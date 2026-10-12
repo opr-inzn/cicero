@@ -178,6 +178,52 @@ struct ListEditButton: View {
     }
 }
 
+/// A pop-up menu that always shows its background. In grouped forms on macOS 26, a SwiftUI Picker
+/// (and a plain NSPopUpButton) is only its text and a chevron until the pointer is over it.
+struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
+    let options: [(title: String, value: Value)]
+    @Binding var selection: Value
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.bezelStyle = .flexiblePush
+        button.target = context.coordinator
+        button.action = #selector(PopUpTarget.choose(_:))
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        let titles = options.map(\.title)
+        if button.itemTitles != titles {
+            button.removeAllItems()
+            button.addItems(withTitles: titles)
+        }
+        button.selectItem(at: options.firstIndex { $0.value == selection } ?? -1)
+        context.coordinator.onChoose = { index in selection = options[index].value }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+
+    func makeCoordinator() -> PopUpTarget { PopUpTarget() }
+}
+
+final class PopUpTarget: NSObject {
+    var onChoose: (Int) -> Void = { _ in }
+
+    @objc func choose(_ sender: NSPopUpButton) {
+        onChoose(sender.indexOfSelectedItem)
+    }
+}
+
+extension View {
+    /// For a section footer in a grouped form: moves it closer to its card than the default gap.
+    func formFooter() -> some View {
+        padding(.top, -4)
+    }
+}
+
 /// Lays children out left to right, wrapping onto new lines.
 struct FlowLayout: Layout {
     var spacing: CGFloat

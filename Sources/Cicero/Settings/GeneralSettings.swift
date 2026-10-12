@@ -1,6 +1,5 @@
 import CiceroCore
 import SwiftUI
-import AppKit
 
 struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
@@ -17,38 +16,18 @@ struct GeneralSettings: View {
                 .pickerStyle(.segmented)
             }
             Section {
-                Picker("Activate fonts by", selection: $model.data.installMethod) {
-                    ForEach(InstallMethod.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                LabeledContent("E labeled") {
-                    Picker("E", selection: $model.data.installMethod) {
-                        ForEach(InstallMethod.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .labelsHidden().pickerStyle(.menu).fixedSize()
-                }
-                HStack {
-                    Text("F hstack")
-                    Spacer()
-                    Picker("F", selection: $model.data.installMethod) {
-                        ForEach(InstallMethod.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .labelsHidden().pickerStyle(.menu).fixedSize()
-                }
-                LabeledContent("G appkit") {
-                    TestPopUp(titles: InstallMethod.allCases.map(\.title), index: Binding(
-                        get: { InstallMethod.allCases.firstIndex(of: model.data.installMethod) ?? 0 },
-                        set: { model.data.installMethod = InstallMethod.allCases[$0] }))
-                    .fixedSize()
+                LabeledContent("Activate fonts by") {
+                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title, $0) }, selection: $model.data.installMethod)
                 }
             } header: {
                 Text("Activation")
             } footer: {
-                Text(activationExplanation)
+                Text(activationExplanation).formFooter()
             }
             Section {
                 Toggle("Show system fonts in other lists", isOn: $model.data.showSystemFonts)
             } footer: {
-                Text("Fonts that come with macOS are always in System Fonts. With this on, they’re in All Fonts, foundries, classifications and every other list too.")
+                Text("Fonts that come with macOS are always in System Fonts. With this on, they’re in All Fonts, foundries, classifications and every other list too.").formFooter()
             }
             Section {
                 LabeledContent("Cicero’s font list") {
@@ -60,7 +39,7 @@ struct GeneralSettings: View {
             } header: {
                 Text("Font Caches")
             } footer: {
-                Text("Rebuild reads every font file again. Clearing the caches helps when fonts don’t show up in apps or look wrong.")
+                Text("Rebuild reads every font file again. Clearing the caches helps when fonts don’t show up in apps or look wrong.").formFooter()
             }
         }
         .formStyle(.grouped)
@@ -85,24 +64,5 @@ private extension InstallMethod {
         case .copy: "Copy into ~/Library/Fonts"
         case .inPlace: "Use the files where they are"
         }
-    }
-}
-
-private struct TestPopUp: NSViewRepresentable {
-    let titles: [String]
-    @Binding var index: Int
-    func makeNSView(context: Context) -> NSPopUpButton {
-        let b = NSPopUpButton(frame: .zero, pullsDown: false)
-        b.addItems(withTitles: titles)
-        b.target = context.coordinator
-        b.action = #selector(Coordinator.changed(_:))
-        return b
-    }
-    func updateNSView(_ b: NSPopUpButton, context: Context) { b.selectItem(at: index); context.coordinator.parent = self }
-    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
-    final class Coordinator: NSObject {
-        var parent: TestPopUp
-        init(parent: TestPopUp) { self.parent = parent }
-        @objc func changed(_ b: NSPopUpButton) { parent.index = b.indexOfSelectedItem }
     }
 }
