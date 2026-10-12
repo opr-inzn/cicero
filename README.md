@@ -1,6 +1,6 @@
-# Point
+# Cicero
 
-**[Download the latest version](https://github.com/opr-inzn/point/releases/latest/download/Point.dmg)** · [All versions and release notes](https://github.com/opr-inzn/point/releases) · Requires macOS 26 on Apple silicon.
+**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · Requires macOS 26 on Apple silicon.
 
 A font manager for macOS 26. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
@@ -10,21 +10,21 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Preview Options.** Sample text, size, weight and letter spacing, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.
 - **Customizable sidebar.** Click **Edit** next to Fonts and every item and group gets a checkbox; uncheck what you don't want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*.
-- **Sets, smart sets and tags.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Point reads from the fonts themselves.
+- **Sets, smart sets and tags.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Cicero reads from the fonts themselves.
 - **Character sets.** See which fonts have every character of Latin S–XL, Adobe Latin 1–5, Google Fonts' Latin, Cyrillic and Greek sets, a Unicode block (Latin-1 Supplement, Latin Extended-A and -B, Greek, Cyrillic and more), or a set you define yourself.
 - **Character Toolbox** (⌥⌘T). Paste any text to find the fonts that have every character, or pick one of 780 languages to see which fonts support it.
 - **Compare** (⌥⌘C). Fonts stacked on a shared baseline or drawn over each other.
 - **Problems.** Finds fonts installed twice, missing and damaged files, fonts on external disks, and duplicates, with a fix for each. Fonts whose named styles share a PostScript name with another font are listed too, as a minor note.
 - **Watched folders.** Fonts in your folders are listed without being installed. Adobe's font folders are added for you: the shared ones every Adobe app loads, and each InDesign and InCopy version's own Fonts folder. A folder that one app loads on its own is marked for that app instead of showing as not activated; turning one of its fonts on makes it available in every app, using the file where it is.
-- **System Fonts.** The fonts that ship with macOS have their own item, and View → Show System Fonts (⇧⌘.) keeps them out of your other lists.
-- **Temporary activation.** Turn a font on just until Point quits, or until you log out, from the Fonts menu (⌥⌘↩), a font's right-click menu, or a single style. Nothing is copied, and Point turns the font off again on its way out.
-- **Font cache tools.** Clear the macOS font caches for your account or for all users, plus the caches Adobe apps and Microsoft Office keep (they go to the Trash and are rebuilt on next launch), and rebuild Point's font list, from the Fonts menu or Settings → General.
+- **System Fonts.** The fonts that ship with macOS have their own item, and you can keep them out of your other lists in Settings → General or by right-clicking System Fonts in the sidebar.
+- **Temporary activation.** Turn a font on just until Cicero quits, or until you log out, from the Fonts menu (⌥⌘↩), a font's right-click menu, or a single style. Nothing is copied, and Cicero turns the font off again on its way out.
+- **Font cache tools.** Clear the macOS font caches for your account or for all users, plus the caches Adobe apps and Microsoft Office keep (they go to the Trash and are rebuilt on next launch), and rebuild Cicero's font list, from the Fonts menu or Settings → General.
 - **Move to Trash** removes a font's files, including copies in other folders; fonts that come with macOS or an app are never touched.
 - **Reveal in Finder** from a font's right-click menu, a style, ⇧⌘R, or the info panel.
 
 ## Privacy
 
-Point doesn't collect any data and never connects to the internet. Everything it knows about your fonts stays in local files on your Mac.
+Cicero doesn't collect any data and never connects to the internet. Everything it knows about your fonts stays in local files on your Mac.
 
 ## Credits
 

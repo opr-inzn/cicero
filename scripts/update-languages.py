@@ -10,7 +10,7 @@ Hyperglot release is out, then commit the three files:
 
 Hyperglot needs Python 3.11 or newer (`brew install python@3.13`). The script makes its own venv
 in .build/update-languages-venv, installs hyperglot there and re-runs itself inside it. This is the
-only place Point ever touches the network; the app itself reads the bundled JSON and nothing else.
+only place Cicero ever touches the network; the app itself reads the bundled JSON and nothing else.
 
 What gets exported, using Hyperglot's own API so the resolution matches its checker exactly:
 - every language Hyperglot would consider by default (validity "draft" or better), with the
@@ -22,7 +22,7 @@ What gets exported, using Hyperglot's own API so the resolution matches its chec
     auxiliary ∪ marks ∪ auxiliaryMarks   -> what "fully supported" adds (check=base,auxiliary)
 Orthographies with no base characters are left out since nothing can be checked against them.
 Shaping checks (mark attachment, Arabic joining, Indic conjuncts) need HarfBuzz and are not part of
-this data; Point only checks character coverage.
+this data; Cicero only checks character coverage.
 """
 
 import argparse
@@ -165,7 +165,7 @@ def export():
             f"({HYPERGLOT_URL}), a database of the characters each language's orthography needs.\n"
             f"Hyperglot is licensed under the Apache License 2.0; see Languages-LICENSE.txt.\n"
             f"\n"
-            f"Point uses it to work out which languages a font supports, checking character coverage\n"
+            f"Cicero uses it to work out which languages a font supports, checking character coverage\n"
             f"only (no shaping checks). Generated on {today} by scripts/update-languages.py; do not\n"
             f"edit by hand.\n"
         )
