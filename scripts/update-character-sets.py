@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Regenerates Resources/CharacterSets.json, the built-in character sets Point checks fonts against.
 
-Run by hand when a source changes: ./scripts/update-character-sets.py
-It downloads the sources at the commits pinned below (Point itself never goes online), resolves
-sets that build on each other into complete lists, and drops whitespace and invisible characters,
-which aren't what people mean by character set support.
+Run by hand when a source changes: ./scripts/update-character-sets.py (Python 3.13 or later, whose
+Unicode data matches the block list it downloads). It downloads the sources at the commits and
+versions pinned below (Point itself never goes online), resolves sets that build on each other into
+complete lists, and drops whitespace and invisible characters, which aren't what people mean by
+character set support.
 
 Sources:
 - Latin S–XL by Christoph Koeberlin, MIT: https://github.com/koeberlin/Latin-Character-Sets
 - Adobe Latin 1–5 by Adobe, MIT: https://github.com/adobe-type-tools/adobe-latin-charsets
 - Google Fonts glyph sets, Apache 2.0: https://github.com/googlefonts/glyphsets
+- Unicode blocks (the assigned, visible characters of each block), Unicode License v3:
+  https://www.unicode.org/Public/<version>/ucd/Blocks.txt
 """
 
 import json
@@ -22,6 +25,19 @@ from pathlib import Path
 KOEBERLIN = "https://raw.githubusercontent.com/koeberlin/Latin-Character-Sets/78ba1aa04919f2409b7a35ea1526ac1f1cb59c92"
 ADOBE = "https://raw.githubusercontent.com/adobe-type-tools/adobe-latin-charsets/3b8b7fc2d0cbc6cb56c55d68634ea6ac4a7ac8ac"
 GOOGLE = "https://raw.githubusercontent.com/googlefonts/glyphsets/432104e3ecb119c44b3cc29d7209d7b54bf41017"
+UNICODE = f"https://www.unicode.org/Public/{unicodedata.unidata_version}/ucd/Blocks.txt"
+
+# Blocks type designers check coverage of. Ideograph blocks, private use and the like aren't useful
+# as "has every character" filters.
+BLOCKS = [
+    "Basic Latin", "Latin-1 Supplement", "Latin Extended-A", "Latin Extended-B", "Latin Extended Additional",
+    "Latin Extended-C", "Latin Extended-D", "Latin Extended-E", "IPA Extensions", "Spacing Modifier Letters",
+    "Combining Diacritical Marks", "Greek and Coptic", "Greek Extended", "Cyrillic", "Cyrillic Supplement",
+    "Cyrillic Extended-A", "Cyrillic Extended-B", "Armenian", "Hebrew", "Arabic", "Devanagari", "Thai", "Georgian",
+    "General Punctuation", "Superscripts and Subscripts", "Currency Symbols", "Letterlike Symbols", "Number Forms",
+    "Arrows", "Mathematical Operators", "Miscellaneous Technical", "Enclosed Alphanumerics", "Box Drawing",
+    "Block Elements", "Geometric Shapes", "Miscellaneous Symbols", "Dingbats", "Alphabetic Presentation Forms",
+]
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -43,6 +59,26 @@ def adobe(name):
 def google(name):
     text = fetch(f"{GOOGLE}/Lib/glyphsets/results/nam/{name}.nam")
     return {int(match, 16) for match in re.findall(r"^0x([0-9A-Fa-f]+)", text, re.M)}
+
+
+def unicode_blocks():
+    ranges = {}
+    for line in fetch(UNICODE).splitlines():
+        line = line.split("#")[0].strip()
+        if not line:
+            continue
+        span, name = (part.strip() for part in line.split(";"))
+        low, high = (int(bound, 16) for bound in span.split(".."))
+        ranges[name] = range(low, high + 1)
+    missing = [name for name in BLOCKS if name not in ranges]
+    assert not missing, f"Unknown blocks: {missing}"
+    def assigned(block):
+        return {value for value in ranges[block] if unicodedata.category(chr(value)) not in ("Cn", "Co", "Cs")}
+    return [(slug(name), name, f"Every character in the {name} block (U+{ranges[name].start:04X}–U+{ranges[name].stop - 1:04X}).", assigned(name)) for name in BLOCKS]
+
+
+def slug(name):
+    return "unicode-" + re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
 def visible(scalars):
@@ -107,6 +143,14 @@ def main():
             ],
         },
     ]
+
+    groups.append({
+        "id": "unicode",
+        "name": "Unicode Blocks",
+        "credit": f"Unicode {unicodedata.unidata_version} block list by the Unicode Consortium",
+        "url": "https://www.unicode.org/charts/",
+        "sets": unicode_blocks(),
+    })
 
     lines = ["{", f'  "generated": "{date.today().isoformat()}",', '  "groups": [']
     for g, group in enumerate(groups):

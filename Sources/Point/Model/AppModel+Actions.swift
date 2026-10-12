@@ -313,7 +313,6 @@ extension AppModel {
             data.customCharacterSets[index] = set
         } else {
             data.customCharacterSets.append(set)
-            data.sidebar.shownCharacterSets.insert(set.setID)
             data.sidebar.hidden.remove(SidebarSection.characterSets.key)
         }
     }
@@ -321,7 +320,7 @@ extension AppModel {
     func deleteCharacterSet(_ id: UUID) {
         let setID = "custom.\(id.uuidString)"
         data.customCharacterSets.removeAll { $0.id == id }
-        data.sidebar.shownCharacterSets.remove(setID)
+        data.sidebar.hidden.remove("charset.\(setID)")
         if selection == .characterSet(setID) { selection = .all }
     }
 
@@ -390,21 +389,30 @@ extension AppModel {
         return "Fonts"
     }
 
-    func isVisible(_ key: String) -> Bool {
-        if key.hasPrefix("charset.") { return data.sidebar.shownCharacterSets.contains(String(key.dropFirst("charset.".count))) }
-        return !data.sidebar.hidden.contains(key)
-    }
+    func isVisible(_ key: String) -> Bool { !data.sidebar.hidden.contains(key) }
 
     func setVisible(_ key: String, _ visible: Bool) {
-        if key.hasPrefix("charset.") {
-            let id = String(key.dropFirst("charset.".count))
-            if visible { data.sidebar.shownCharacterSets.insert(id) } else { data.sidebar.shownCharacterSets.remove(id) }
-        } else if visible {
-            data.sidebar.hidden.remove(key)
-        } else {
-            data.sidebar.hidden.insert(key)
-        }
+        if visible { data.sidebar.hidden.remove(key) } else { data.sidebar.hidden.insert(key) }
         if !visible, let selection, !isShown(selection) { self.selection = .all }
+    }
+
+    /// Character sets for the sidebar, in their groups (Latin S–XL, Adobe Latin, Unicode Blocks,
+    /// Google Fonts, then the user's own).
+    var characterSetGroups: [(id: String, title: String, rows: [SidebarRow])] {
+        func row(_ set: CharacterSetDefinition) -> SidebarRow {
+            SidebarRow(key: "charset.\(set.id)", title: set.name, icon: set.isCustom ? "character.cursor.ibeam" : "textformat.abc", item: .characterSet(set.id))
+        }
+        var groups = characterSetCatalog.groups.map { (id: $0.id, title: $0.name, rows: $0.sets.map(row)) }
+        if !data.customCharacterSets.isEmpty {
+            groups.append((id: CharacterSetDefinition.customGroupID, title: "Your Character Sets", rows: customCharacterSets.map(row)))
+        }
+        return groups
+    }
+
+    func isGroupExpanded(_ id: String) -> Bool { !data.sidebar.collapsed.contains("charsetgroup.\(id)") }
+
+    func setGroupExpanded(_ id: String, _ expanded: Bool) {
+        if expanded { data.sidebar.collapsed.remove("charsetgroup.\(id)") } else { data.sidebar.collapsed.insert("charsetgroup.\(id)") }
     }
 
     func showAllSidebarItems() {

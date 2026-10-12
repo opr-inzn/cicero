@@ -99,6 +99,7 @@ private struct InfoRows: View {
             }
             LanguagesRow(face: face.face)
             CharacterSetsRow(face: face.face)
+            UnicodeBlocksRow(face: face.face)
             VStack(alignment: .leading, spacing: 4) {
                 label("Location")
                 Text(face.face.path).font(.callout).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)

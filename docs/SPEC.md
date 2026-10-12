@@ -30,7 +30,7 @@ ellipsis character (…) for items that ask for more input.
   - **Tags** (+). Menu: Rename Tag…, Delete Tag.
   - **Foundries**. Menu: Rename Foundry…
   - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
-  - **Character Sets** (+ new custom set). Only sets switched on in Settings → Character Sets (default Latin S, M, L, XL) plus custom ones. Menu for custom: Edit Character Set…, Delete Character Set.
+  - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Unicode Blocks, Google Fonts, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - Every row menu also has Hide from Sidebar and Edit Sidebar.
 - Dropping family names (drag from the browser) onto a set, tag or foundry adds them.
 - Creating a set, tag or character set un-hides its section.
@@ -61,7 +61,7 @@ ellipsis character (…) for items that ask for more input.
 - Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate; locked families get a disabled Deactivate with the reason as tooltip.
 - **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center, a big editable text (default "Sphinx of black quartz, judge my vow."), remembered.
 - **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Point quits"); right-click → style menu.
-- **Glyphs**: filter field (character, Unicode name or U+ code), sections with counts (Latin, Numbers, Symbols & punctuation, other scripts…), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
+- **Glyphs**: filter field (character, Unicode name or U+ code), one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
 ## Info panel (trailing column, 300 pt wide, starts below the toolbar, toggled by ⓘ / ⌘I)
 
@@ -110,8 +110,8 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 - Sets: ordered lists of family names. Tags: names in sidebar order; family → tags.
 - Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
-- Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
-- Settings → Character Sets: groups with checkboxes (show in sidebar), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
+- Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
+- Settings → Character Sets: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
 
 ## Coverage and languages
 
