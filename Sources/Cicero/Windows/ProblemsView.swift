@@ -72,7 +72,12 @@ private struct MinorProblemGroup: View {
     @State private var isExpanded = false
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
+        // DisclosureGroup animates opening but not closing; open instantly too.
+        DisclosureGroup(isExpanded: Binding(get: { isExpanded }, set: { newValue in
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { isExpanded = newValue }
+        })) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(kind.explanation).foregroundStyle(.secondary)
                 ForEach(problems) { ProblemCard(problem: $0) }
@@ -189,7 +194,7 @@ private struct FolderRow: View {
                     }
                     Text(facts).font(.caption).foregroundStyle(.secondary)
                     Button {
-                        withAnimation(.snappy(duration: 0.2)) { isExpanded.toggle() }
+                        isExpanded.toggle()
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.right")
