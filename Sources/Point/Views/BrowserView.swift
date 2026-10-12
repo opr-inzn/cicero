@@ -124,7 +124,7 @@ struct BrowserView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
+        ToolbarItem {
             Picker("View", selection: $mode) {
                 Label("List", systemImage: "list.bullet").tag(BrowserMode.list)
                 Label("Grid", systemImage: "square.grid.2x2").tag(BrowserMode.grid)
@@ -134,10 +134,11 @@ struct BrowserView: View {
             .labelStyle(.iconOnly)
             .help("Show as a list, a grid or specimens")
         }
+        ToolbarSpacer(.fixed)
         ToolbarItem { SlideshowToolbarButton() }
         ToolbarItem { PreviewOptionsButton() }
+        ToolbarSpacer(.fixed)
         ToolbarItem { InfoToolbarButton() }
-            .sharedBackgroundVisibility(.hidden)
     }
 }
 
@@ -217,8 +218,8 @@ struct StatusTag: View {
     }
 }
 
-/// Shows or hides the inspector (Info and, inside a font, Features). Drawn as its own glass
-/// capsule so it doesn't merge into the neighbouring toolbar group.
+/// Shows or hides the inspector (Info and, inside a font, Features). Toolbars give it a group of
+/// its own with a fixed spacer.
 struct InfoToolbarButton: View {
     @Environment(LibraryStore.self) private var library
 
@@ -226,13 +227,8 @@ struct InfoToolbarButton: View {
         Button {
             library.isInspectorPresented.toggle()
         } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 15))
-                .frame(width: 26, height: 26)
+            Label("Info", systemImage: "info.circle")
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(.large)
         .help("Info")
     }
 }

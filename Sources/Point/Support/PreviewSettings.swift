@@ -71,23 +71,26 @@ private struct PreviewOptionsForm: View {
                         Button(sample) { preview.sampleText = sample }
                     }
                 }
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+                .fixedSize()
             }
             Section {
                 LabeledContent("Size") {
                     HStack {
-                        Slider(value: $preview.size, in: 8...160)
+                        ValueSlider(value: $preview.size, in: 8...160, round: { $0.rounded() })
                         Text("\(Int(preview.size.rounded())) pt").monospacedDigit().frame(width: 48, alignment: .trailing)
                     }
                 }
                 LabeledContent("Weight") {
                     HStack {
-                        Slider(value: $preview.weight, in: 100...900, step: 50)
+                        ValueSlider(value: $preview.weight, in: 100...900, round: { $0.rounded() })
                         Text("\(Int(preview.weight))").monospacedDigit().frame(width: 48, alignment: .trailing)
                     }
                 }
                 LabeledContent("Spacing") {
                     HStack {
-                        Slider(value: $preview.tracking, in: -10...40, step: 0.5)
+                        ValueSlider(value: $preview.tracking, in: -10...40, round: { ($0 * 2).rounded() / 2 })
                         Text(String(format: "%.1f%%", preview.tracking)).monospacedDigit().frame(width: 48, alignment: .trailing)
                     }
                 }
@@ -96,5 +99,53 @@ private struct PreviewOptionsForm: View {
         .formStyle(.grouped)
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A slider drawn by Point. The system slider's glass knob vanishes in some toolbar popovers on
+/// macOS 26, leaving a gap in the track; this one always shows a solid knob.
+struct ValueSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var round: (Double) -> Double = { $0 }
+    @Environment(\.isEnabled) private var isEnabled
+
+    init(value: Binding<Double>, in range: ClosedRange<Double>, round: @escaping (Double) -> Double = { $0 }) {
+        _value = value
+        self.range = range
+        self.round = round
+    }
+
+    private let knob: CGFloat = 18
+
+    var body: some View {
+        GeometryReader { geometry in
+            let travel = max(geometry.size.width - knob, 1)
+            let fraction = (min(max(value, range.lowerBound), range.upperBound) - range.lowerBound) / (range.upperBound - range.lowerBound)
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary).frame(height: 4)
+                Capsule().fill(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: knob / 2 + travel * fraction, height: 4)
+                Circle()
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
+                    .frame(width: knob, height: knob)
+                    .offset(x: travel * fraction)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(.rect)
+            .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
+                let position = min(max((drag.location.x - knob / 2) / travel, 0), 1)
+                value = round(range.lowerBound + position * (range.upperBound - range.lowerBound))
+            })
+        }
+        .frame(height: knob + 4)
+        .accessibilityElement()
+        .accessibilityValue(Text(value, format: .number.precision(.fractionLength(0...1))))
+        .accessibilityAdjustableAction { direction in
+            let step = (range.upperBound - range.lowerBound) / 50
+            let next = direction == .increment ? value + step : value - step
+            value = round(min(max(next, range.lowerBound), range.upperBound))
+        }
     }
 }
