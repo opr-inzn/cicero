@@ -250,7 +250,7 @@ public enum ProblemDetector {
             return Problem(
                 id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
                 title: joined(families),
-                summary: "\(families.count == 2 ? "Both" : "All") use the PostScript \(names.count == 1 ? "name" : "names") \(joined(shown)).",
+                summary: "\(names.count == 1 ? "Named style" : "Named styles") \(joined(shown)) \(names.count == 1 ? "uses the same PostScript name" : "use the same PostScript names") in \(families.count == 2 ? "both" : "all of them").",
                 files: paths.map { context.file($0) }, fixes: [],
                 fileFixes: Dictionary(uniqueKeysWithValues: paths.map { path in
                     (path, [ProblemFix.reveal(path)] + ((group.files[path] ?? nil).map { [.deactivate($0)] } ?? []))
