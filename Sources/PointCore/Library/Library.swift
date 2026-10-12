@@ -195,7 +195,7 @@ public final class LibraryScanner: Sendable {
     // MARK: Finding
 
     struct FoundFile: Sendable {
-        var stamp: FileStamp
+        var stamp: FaceStamp
         var isActive: Bool
         var folderIDs: [UUID] = []
         var appName: String?
@@ -244,7 +244,7 @@ public final class LibraryScanner: Sendable {
 
     /// Every font file under a folder, except inside packages and hidden ones (AppleDouble "._" files look like fonts).
     /// Paths start with the folder's own path, as the user chose it, even when it goes through a symlink.
-    private static func enumerate(_ folder: URL, _ body: (String, FileStamp) -> Void) {
+    private static func enumerate(_ folder: URL, _ body: (String, FaceStamp) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
         guard let enumerator = FileManager.default.enumerator(
             at: folder, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles, .skipsPackageDescendants]
@@ -258,7 +258,7 @@ public final class LibraryScanner: Sendable {
             else { continue }
             var path = url.path(percentEncoded: false)
             if resolved != chosen, path.hasPrefix(resolved) { path = chosen + path.dropFirst(resolved.count) }
-            body(path, FileStamp(modified: modified, size: Int64(size)))
+            body(path, FaceStamp(modified: modified, size: Int64(size)))
         }
     }
 
@@ -269,11 +269,11 @@ public final class LibraryScanner: Sendable {
         return String(cString: resolved)
     }
 
-    private static func stamp(ofPath path: String) -> FileStamp? {
+    private static func stamp(ofPath path: String) -> FaceStamp? {
         var info = stat()
         guard stat(path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
         let modified = Date(timeIntervalSince1970: Double(info.st_mtimespec.tv_sec) + Double(info.st_mtimespec.tv_nsec) / 1e9)
-        return FileStamp(modified: modified, size: Int64(info.st_size))
+        return FaceStamp(modified: modified, size: Int64(info.st_size))
     }
 
     // MARK: Reading
@@ -352,7 +352,7 @@ public final class LibraryScanner: Sendable {
         var state: FaceState
         var dateAdded: Date?
         var folderIDs: [UUID]
-        var stamp: FileStamp
+        var stamp: FaceStamp
     }
 
     private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput) -> Library {
@@ -378,7 +378,7 @@ public final class LibraryScanner: Sendable {
 
         // One face per PostScript name within a family: the active file wins, the others are its other
         // copies. Different families keep their own faces even when names clash (the Problems view says so).
-        var byFamily: [String: [(LibraryFace, Set<UUID>, FileStamp)]] = [:]
+        var byFamily: [String: [(LibraryFace, Set<UUID>, FaceStamp)]] = [:]
         for (_, copies) in candidates {
             let sorted = copies.sorted { Self.precedes($0, $1) }
             let winner = sorted[0]
@@ -393,7 +393,7 @@ public final class LibraryScanner: Sendable {
 
         var families: [Family] = []
         families.reserveCapacity(byFamily.count)
-        var stamps: [FaceID: FileStamp] = [:]
+        var stamps: [FaceID: FaceStamp] = [:]
         let names = sortedNames(Array(byFamily.keys))
         for name in names {
             let members = byFamily[name]!

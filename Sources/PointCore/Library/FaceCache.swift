@@ -1,7 +1,7 @@
 import Foundation
 
 /// A file's size and modification time (whole milliseconds), which decide whether its cached faces are current.
-struct FileStamp: Hashable, Sendable {
+struct FaceStamp: Hashable, Sendable {
     var modified: Int64
     var size: Int64
 
@@ -18,7 +18,7 @@ struct FileStamp: Hashable, Sendable {
 
 /// What was read from one font file.
 struct CachedFile: Hashable, Sendable {
-    var stamp: FileStamp
+    var stamp: FaceStamp
     var dateAdded: Date?
     /// Empty when CoreText couldn't read the file.
     var faces: [FontFace]
@@ -72,7 +72,7 @@ enum FaceCache {
                 files.reserveCapacity(count)
                 for _ in 0..<count {
                     let path = try reader.string()
-                    let stamp = FileStamp(modified: try reader.i64(), size: try reader.i64())
+                    let stamp = FaceStamp(modified: try reader.i64(), size: try reader.i64())
                     let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
                     let faceCount = Int(try reader.u32())
                     var faces: [FontFace] = []
