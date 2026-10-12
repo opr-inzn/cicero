@@ -186,7 +186,7 @@ struct ActivationSheet: View {
                    detail: "Copies the files into ~/Library/Fonts, so they keep working if the originals move or their drive is unplugged.")
             option(.register, icon: "link.circle.fill", title: "Use Files Where They Are",
                    detail: "Nothing is copied. The fonts turn off if the original files move or go away.")
-            Toggle("Remember this choice (you can change it in Settings)", isOn: $remember)
+            Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
                 .toggleStyle(.checkbox)
             HStack {
                 // Session-only activation: used where they are, gone at quit or logout.

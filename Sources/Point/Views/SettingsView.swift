@@ -6,7 +6,6 @@ struct SettingsView: View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Folders", systemImage: "folder") { FoldersSettings() }
-            Tab("Activation", systemImage: "power") { ActivationSettings() }
             Tab("Sidebar", systemImage: "sidebar.left") { SidebarSettings() }
             Tab("Character Sets", systemImage: "character.textbox") { CharacterSetSettings() }
         }
@@ -179,6 +178,15 @@ private struct GeneralSettings: View {
                 .pickerStyle(.segmented)
                 .onChange(of: appearance) { appearance.apply() }
             }
+            Section("Activation") {
+                Picker("Activate fonts by", selection: $library.data.installMethod) {
+                    ForEach(InstallMethod.allCases, id: \.self) { Text($0.settingsLabel).tag($0) }
+                }
+                .onChange(of: library.data.installMethod) { library.save() }
+                Text("A copy in ~/Library/Fonts keeps working if the original files move or their drive is unplugged. Using the files where they are saves space, but the fonts turn off when those files go away. Fonts from a folder an app loads itself, like Adobe’s, are always used where they are.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Show system fonts in other lists", isOn: $library.data.showSystemFonts)
                     .onChange(of: library.data.showSystemFonts) { library.save() }
@@ -204,24 +212,3 @@ private struct GeneralSettings: View {
     }
 }
 
-// MARK: - Activation
-
-private struct ActivationSettings: View {
-    @Environment(LibraryStore.self) private var library
-
-    var body: some View {
-        @Bindable var library = library
-        Form {
-            Section {
-                Picker("Activate by", selection: $library.data.installMethod) {
-                    ForEach(InstallMethod.allCases, id: \.self) { Text($0.settingsLabel).tag($0) }
-                }
-                .onChange(of: library.data.installMethod) { library.save() }
-                Text("A copy in ~/Library/Fonts keeps working if the original files move or their drive is unplugged. Using the files where they are saves space, but the fonts turn off when those files go away.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
