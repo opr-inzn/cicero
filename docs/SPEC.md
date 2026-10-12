@@ -11,7 +11,7 @@ ellipsis character (…) for items that ask for more input.
 ## Windows
 
 1. **Main window** — sidebar | browser (or a font page pushed over it) | optional Info panel.
-2. **Settings** — tabs General, Folders, Sidebar, Character Sets.
+2. **Settings** — tabs General, Folders, Sidebar, Coverage (the character sets; a short name keeps the tabs evenly spaced).
 3. **Character Toolbox** (⌥⌘T) — tabs Text and Languages.
 4. **Compare** (⌥⌘C).
 
@@ -111,7 +111,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Sets: ordered lists of family names. Tags: names in sidebar order; family → tags.
 - Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
 - Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
-- Settings → Character Sets: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
+- Settings → Coverage: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
 
 ## Coverage and languages
 
