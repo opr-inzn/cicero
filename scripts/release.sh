@@ -2,18 +2,24 @@
 # Builds an Apple silicon, Developer ID–signed, notarized and stapled build/Point-<version>.dmg.
 #   ./scripts/release.sh          release the version in Resources/Info.plist
 #   ./scripts/release.sh 1.1      set the version (and bump the build number) first
-# One-time setup is described in README.md under "Releasing".
+#
+# One-time setup on the Mac that releases:
+#   1. A "Developer ID Application" certificate in the login keychain (Xcode → Settings → Accounts →
+#      Manage Certificates, or developer.apple.com). Allow codesign to use its key ("Always Allow").
+#   2. Notarization credentials stored for notarytool, using an app-specific password from
+#      account.apple.com:
+#        xcrun notarytool store-credentials point-notary --apple-id <id> --team-id <team>
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PROFILE="${NOTARY_PROFILE:-point-notary}"
 IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)}"
 if [[ -z "$IDENTITY" ]]; then
-    echo "No \"Developer ID Application\" certificate in the keychain. See README.md → Releasing." >&2
+    echo "No \"Developer ID Application\" certificate in the keychain. See the setup notes at the top of this script." >&2
     exit 1
 fi
 if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
-    echo "No notarytool credentials named \"$PROFILE\". See README.md → Releasing." >&2
+    echo "No notarytool credentials named \"$PROFILE\". See the setup notes at the top of this script." >&2
     exit 1
 fi
 
