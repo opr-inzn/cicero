@@ -16,7 +16,7 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Compare and Slideshow.** Compare (⌥⌘C) shows fonts stacked on a shared baseline or drawn over each other; Slideshow (⌥⌘S) presents them one at a time, full screen.
 - **Problems.** Finds fonts active from more than one file, missing and damaged files, fonts on external disks, and duplicates, with a fix for each.
 - **Watched folders.** Fonts in your folders are listed without being installed. A folder that one app loads on its own, like Adobe's Fonts folder, is marked for that app (detected automatically) instead of showing as not activated; turning one of its fonts on makes it available in every app, using the file where it is.
-- **System Fonts.** The fonts that ship with macOS have their own item, and can be kept out of your other lists.
+- **System Fonts.** The fonts that ship with macOS have their own item, and View → Show System Fonts (⇧⌘.) keeps them out of your other lists.
 - **Temporary activation.** Turn a font on just until Point quits, or until you log out, from the Fonts menu (⌥⌘↩), a font's right-click menu, or a single style. Nothing is copied, and Point turns the font off again on its way out.
 - **Font cache tools.** Clear the macOS font caches for your account or for all users, plus the caches Adobe apps and Microsoft Office keep (they go to the Trash and are rebuilt on next launch), and rebuild Point's font list, from the Fonts menu or Settings → General.
 - **Move to Trash** removes a font's files, including copies in other folders; fonts that come with macOS or an app are never touched.

@@ -74,6 +74,11 @@ struct PointCommands: Commands {
             Button(library.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
                 withAnimation(.snappy) { library.isEditingSidebar.toggle() }
             }
+            Toggle("Show System Fonts", isOn: Binding(
+                get: { library.data.showSystemFonts },
+                set: { library.data.showSystemFonts = $0; library.save() }
+            ))
+            .keyboardShortcut(".", modifiers: [.command, .shift])
             Divider()
         }
         CommandMenu("Fonts") {

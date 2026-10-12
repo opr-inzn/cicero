@@ -190,7 +190,7 @@ private struct GeneralSettings: View {
             Section {
                 Toggle("Show system fonts in other lists", isOn: $library.data.showSystemFonts)
                     .onChange(of: library.data.showSystemFonts) { library.save() }
-                Text("Fonts that ship with macOS (in /System/Library/Fonts) can’t be turned off. Turn this off to list them only under System Fonts in the sidebar.")
+                Text("Fonts that ship with macOS (in /System/Library/Fonts) can’t be turned off. Turn this off to list them only under System Fonts in the sidebar; View → Show System Fonts (⇧⌘.) does the same.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
