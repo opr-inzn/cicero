@@ -1,8 +1,9 @@
 import CiceroCore
 import SwiftUI
 
-/// Every character a style has, grouped, with a filter by character, Unicode name or U+ code.
-struct GlyphsTab: View {
+/// Every character a style has, grouped, with a filter by character, Unicode name or U+ code. Several
+/// views in a row, so each block's header pins in the page's lazy stack.
+struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
@@ -15,57 +16,58 @@ struct GlyphsTab: View {
     var body: some View {
         let face = family.face(nearestWeight: preview.weight).face
         let shown = filtered(sections ?? [])
-        VStack(spacing: 0) {
-            HStack {
-                TextField("Filter", text: $query, prompt: Text("Character, name or U+ code"))
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 280)
-                Spacer()
-                if let sections {
-                    let total = sections.reduce(0) { $0 + $1.scalars.count }
-                    Text(total == 1 ? "1 character" : "\(total.formatted()) characters")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
+        HStack(spacing: 12) {
+            Text("Glyphs").font(.title2.weight(.semibold))
+            if let sections {
+                let total = sections.reduce(0) { $0 + $1.scalars.count }
+                Text(total == 1 ? "1 character" : "\(total.formatted()) characters")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
-            if sections == nil {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if shown.isEmpty {
-                ContentUnavailableView(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
-                                       description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18, pinnedViews: .sectionHeaders) {
-                        ForEach(shown) { section in
-                            Section {
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: cell, maximum: cell), spacing: 4)], alignment: .leading, spacing: 4) {
-                                    ForEach(section.scalars, id: \.self) { scalar in
-                                        glyph(scalar, face: face)
-                                    }
-                                }
-                            } header: {
-                                HStack(spacing: 6) {
-                                    Text(section.title).font(.headline)
-                                    Text("— \(section.scalars.count.formatted())").font(.callout).foregroundStyle(.secondary)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                                .background(Color.canvas)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
-                }
-            }
+            Spacer()
+            TextField("Filter", text: $query, prompt: Text("Character, name or U+ code"))
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 280)
         }
+        .padding(.horizontal, 24)
+        // Well clear of the styles above, and close to the blocks it heads.
+        .padding(.top, 56)
+        .padding(.bottom, 4)
+        // Here rather than on the whole body, which would start it once per view.
         .task(id: face.id) {
             sections = nil
             let ranges = await model.coverage.coverage(computing: face).scalars
             sections = await Task.detached(priority: .userInitiated) { GlyphSection.sections(for: ranges) }.value
+        }
+        if sections == nil {
+            ProgressView().frame(maxWidth: .infinity).padding(40)
+        } else if shown.isEmpty {
+            ContentUnavailableView(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
+                                   description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
+                .padding(.vertical, 40)
+        } else {
+            ForEach(shown) { section in
+                Section {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: cell, maximum: cell), spacing: 4)], alignment: .leading, spacing: 4) {
+                        ForEach(section.scalars, id: \.self) { scalar in
+                            glyph(scalar, face: face)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 18)
+                } header: {
+                    HStack(spacing: 6) {
+                        Text(section.title).font(.headline)
+                        Text("— \(section.scalars.count.formatted())").font(.callout).foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 4)
+                    .background(Color.canvas)
+                }
+            }
+            Color.clear.frame(height: 6)
         }
     }
 
