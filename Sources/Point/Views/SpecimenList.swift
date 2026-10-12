@@ -22,30 +22,7 @@ struct SpecimenList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .onKeyPress(.return) {
-                guard library.selectedFamilyIDs.count == 1 else { return .ignored }
-                library.detailFamilyID = library.selectedFamilyIDs.first
-                return .handled
-            }
-            .onKeyPress(.escape) {
-                library.selectedFamilyIDs = []
-                return .handled
-            }
-            .onKeyPress(characters: .alphanumerics, phases: .down) { press in
-                if press.modifiers.contains(.command) {
-                    guard press.characters == "a" else { return .ignored }
-                    library.selectedFamilyIDs = Set(families.map(\.id))
-                    return .handled
-                }
-                guard press.modifiers.isEmpty || press.modifiers == .shift,
-                      let target = families.first(where: { $0.name.lowercased().hasPrefix(press.characters.lowercased()) }) else {
-                    return .ignored
-                }
-                library.selectedFamilyIDs = [target.id]
-                anchorID = target.id
-                withAnimation { proxy.scrollTo(target.id, anchor: .top) }
-                return .handled
-            }
+            .modifier(FamilyListKeys(families: families, anchorID: $anchorID, proxy: proxy))
         }
     }
 
@@ -58,33 +35,12 @@ struct SpecimenList: View {
             .simultaneousGesture(TapGesture().onEnded { click(family, in: families) })
             .contextMenu { FontActionsMenu(families: library.targets(for: family)) }
             .draggable(family.name)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-            .accessibilityAction { library.detailFamilyID = family.id }
-            .accessibilityAction(named: "Select") { click(family, in: families) }
-            .accessibilityAction(named: family.hasActiveFaces ? "Deactivate" : "Activate") {
-                family.hasActiveFaces ? library.requestDeactivate([family]) : library.requestActivate([family])
-            }
+            .familyAccessibility(family, isSelected: selected) { click(family, in: families) }
     }
 
     private func click(_ family: FontFamily, in families: [FontFamily]) {
         focused = true
-        let modifiers = NSEvent.modifierFlags
-        if modifiers.contains(.command) {
-            if library.selectedFamilyIDs.contains(family.id) {
-                library.selectedFamilyIDs.remove(family.id)
-            } else {
-                library.selectedFamilyIDs.insert(family.id)
-            }
-            anchorID = family.id
-        } else if modifiers.contains(.shift), let anchorID,
-                  let a = families.firstIndex(where: { $0.id == anchorID }),
-                  let b = families.firstIndex(where: { $0.id == family.id }) {
-            library.selectedFamilyIDs = Set(families[min(a, b)...max(a, b)].map(\.id))
-        } else {
-            library.selectedFamilyIDs = [family.id]
-            anchorID = family.id
-        }
+        library.click(family, in: families, anchor: &anchorID)
     }
 }
 
