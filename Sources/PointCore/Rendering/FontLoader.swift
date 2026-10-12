@@ -24,7 +24,7 @@ public final class FontLoader: Sendable {
 
     private struct State: Sendable {
         /// The faces of every file read so far (empty for files CoreText can't read).
-        var descriptors: [String: [CTFontDescriptor]] = [:]
+        var descriptors: [String: FileDescriptors] = [:]
         /// Files a prefetch is about to read.
         var pending: Set<String> = []
         /// Bumped by `invalidate`, so fonts made from an old version of a file are never served again.
@@ -70,13 +70,18 @@ public final class FontLoader: Sendable {
         guard !paths.isEmpty else { return }
         prefetchQueue.async { [self] in
             for path in paths where state.withLock({ $0.pending.contains(path) }) {
-                let descriptors = FontFiles.descriptors(at: path)
+                let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
                 state.withLock { state in
                     // Still pending means nothing read or invalidated the file in the meantime.
                     if state.pending.remove(path) != nil { state.descriptors[path] = descriptors }
                 }
             }
         }
+    }
+
+    /// Whether the file's faces have been read (prefetched or on demand).
+    func hasDescriptors(for path: String) -> Bool {
+        state.withLock { $0.descriptors[path] != nil }
     }
 
     /// Drops what's cached for files that changed or went away.
@@ -94,17 +99,26 @@ public final class FontLoader: Sendable {
     /// the same name when the file can't be read.
     private func descriptor(for face: FontFace) -> CTFontDescriptor {
         let path = face.path
-        let descriptors: [CTFontDescriptor]
+        let descriptors: FileDescriptors
         if let cached = state.withLock({ $0.descriptors[path] }) {
             descriptors = cached
         } else {
-            descriptors = FontFiles.descriptors(at: path)
+            descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
                 state.descriptors[path] = descriptors
                 state.pending.remove(path)
             }
         }
-        return FontFiles.descriptor(for: face, in: descriptors) ?? FontFiles.installedDescriptor(named: face.postScriptName)
+        return FontFiles.descriptor(for: face, in: descriptors.list) ?? FontFiles.installedDescriptor(named: face.postScriptName)
+    }
+}
+
+/// The faces of one file. CTFontDescriptor is immutable and thread-safe, just not marked Sendable.
+private struct FileDescriptors: @unchecked Sendable {
+    let list: [CTFontDescriptor]
+
+    init(_ list: [CTFontDescriptor]) {
+        self.list = list
     }
 }
 

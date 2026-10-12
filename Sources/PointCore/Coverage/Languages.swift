@@ -180,7 +180,7 @@ struct LanguageRequirements: Sendable {
     /// Per language, in catalog order.
     let orthographies: [[Orthography]]
 
-    init(rows: [LanguageFile.Row]) {
+    fileprivate init(rows: [LanguageFile.Row]) {
         func scalars(_ strings: String?...) -> Set<UInt32> {
             var set: Set<UInt32> = []
             for string in strings {
