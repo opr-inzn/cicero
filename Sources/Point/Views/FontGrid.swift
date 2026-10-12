@@ -59,7 +59,7 @@ struct FontTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                StatusTag(status: family.status)
+                StatusTag(family: family)
                 Spacer()
                 ActivationSwitch(family: family)
                     .accessibilityHidden(true)

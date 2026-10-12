@@ -20,6 +20,9 @@ struct FontActionsMenu: View {
             let appOnly = families.allSatisfy { if case .appOnly = $0.status { true } else { false } }
             let title = partial ? "Activate Remaining Styles" : appOnly ? "Activate in All Apps" : "Activate"
             Button(title + (appOnly ? "" : ellipsis)) { library.requestActivate(families) }
+            TemporaryActivationMenu { library.requestActivateTemporarily(families, scope: $0) }
+        } else if families.contains(where: \.hasTemporaryFaces) {
+            Button("Activate Permanently" + ellipsis) { library.requestActivate(families) }
         }
         if families.contains(where: \.hasDeactivatableFaces) {
             Button("Deactivate") { library.requestDeactivate(families) }
@@ -80,6 +83,7 @@ struct FontActionsMenu: View {
         switch families[0].status {
         case .appOnly(let app): return "Available in \(app) apps only"
         case .system: return "Installed with macOS"
+        case .active where families[0].isTemporarilyActive: return families[0].faces.first(where: \.isTemporary)?.status.label
         default: return nil
         }
     }
@@ -93,8 +97,14 @@ struct FaceActionsMenu: View {
 
     var body: some View {
         Text(face.status.label)
+        let ellipsis = library.data.installMethod == .ask ? "…" : ""
         if face.canActivate {
-            Button("Activate Style" + (library.data.installMethod == .ask ? "…" : "")) {
+            Button("Activate Style" + ellipsis) {
+                library.requestActivate(faces: [face], title: "\(family.name) \(face.face.styleName)")
+            }
+            TemporaryActivationMenu { library.requestActivateTemporarily(faces: [face], scope: $0) }
+        } else if face.isTemporary {
+            Button("Activate Style Permanently" + ellipsis) {
                 library.requestActivate(faces: [face], title: "\(family.name) \(face.face.styleName)")
             }
         }

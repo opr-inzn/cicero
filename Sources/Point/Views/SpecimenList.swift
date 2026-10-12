@@ -59,7 +59,7 @@ struct SpecimenRow: View {
                 Text(family.name)
                     .font(.headline)
                     .lineLimit(1)
-                StatusTag(status: family.status)
+                StatusTag(family: family)
                 Text(details)
                     .font(.caption)
                     .foregroundStyle(.secondary)

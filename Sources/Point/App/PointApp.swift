@@ -77,7 +77,13 @@ struct PointCommands: Commands {
             let selection = library.selectedFamilies
             Button("Activate") { library.requestActivate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!selection.contains(where: \.hasActivatableFaces))
+                .disabled(!selection.contains { $0.hasActivatableFaces || $0.hasTemporaryFaces })
+            Menu("Activate Temporarily") {
+                Button("Until Point Quits") { library.requestActivateTemporarily(selection, scope: .untilQuit) }
+                    .keyboardShortcut(.return, modifiers: [.command, .option])
+                Button("Until You Log Out") { library.requestActivateTemporarily(selection, scope: .untilLogout) }
+            }
+            .disabled(!selection.contains(where: \.hasActivatableFaces))
             Button("Deactivate") { library.requestDeactivate(selection) }
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasDeactivatableFaces))
@@ -184,6 +190,13 @@ struct ActivationSheet: View {
             Toggle("Remember this choice (you can change it in Settings)", isOn: $remember)
                 .toggleStyle(.checkbox)
             HStack {
+                // Session-only activation: used where they are, gone at quit or logout.
+                TemporaryActivationMenu { scope in
+                    let faces = request.faces
+                    dismiss()
+                    Task { await library.activateTemporarily(faces, scope: scope) }
+                }
+                .fixedSize()
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)

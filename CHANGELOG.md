@@ -13,6 +13,7 @@ First release.
 - Sets, tags, foundries, and automatic classifications read from each font.
 - Watch folders of fonts without installing them; folders that only one app loads, like Adobe's Fonts folder, are marked for that app.
 - System Fonts item, with an option to keep macOS fonts out of your other lists.
-- Clear the macOS font caches and rebuild Point's font list when fonts misbehave.
+- Clear the macOS font caches, and the ones Adobe apps and Microsoft Office keep, and rebuild Point's font list when fonts misbehave.
 - Activate fonts by copying them to your Fonts folder or using them where they are. Deactivating never deletes your only copy.
+- Activate fonts temporarily, until Point quits or until you log out, with nothing copied.
 - Reveal any font or style in Finder.
