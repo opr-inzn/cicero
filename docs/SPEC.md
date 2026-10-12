@@ -87,7 +87,7 @@ ellipsis character (…) for items that ask for more input.
 - **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
 - **Glyphs**: filter field (character, Unicode name or U+ code), one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
-## Info panel (trailing column, 300 pt wide, starts below the toolbar, toggled by ⓘ / ⌘I)
+## Info panel (a pane floating at the trailing edge like the sidebar and in its colour, 300 pt wide, starts below the toolbar, stays put when a font page opens, toggled by ⓘ / ⌘I)
 
 - Family name; segmented Info | Features (no style picker: it describes the style being previewed).
 - Info: Status, Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Weight, Variable weight, Glyphs, Format, Copyright, Languages ("213 languages, including English, German, …" + Show All popover grouped by script with search; full support marked), Character Sets (largest set per series the face has, e.g. "Latin S, Adobe Latin 3, GF Latin Core", plus "Latin M needs 12 more characters"), Location + Reveal in Finder, Other copies.

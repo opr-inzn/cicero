@@ -19,8 +19,10 @@ struct FontGrid: View {
                             .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
                     }
                 }
+                .scrollTargetLayout()
                 .padding(16)
             }
+            .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
             .focused($focused)

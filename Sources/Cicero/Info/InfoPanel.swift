@@ -2,24 +2,63 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Adds the Info panel at the trailing edge of a page, below the toolbar. A plain column rather than
-/// SwiftUI's inspector, which runs the full window height under the toolbar's search field.
+/// Adds the Info panel at the trailing edge of the window: a pane floating below the toolbar like the
+/// sidebar. Not SwiftUI's inspector, which runs the full window height under the search field.
 struct InfoPanelColumn: ViewModifier {
     @Environment(AppModel.self) private var model
+    private static let width: CGFloat = 300
+    private static let gap: CGFloat = 8
 
     func body(content: Content) -> some View {
-        HStack(spacing: 0) {
-            content.frame(maxWidth: .infinity, maxHeight: .infinity)
-            if model.isInfoPresented {
-                Divider()
-                InfoPanel()
-                    .frame(width: 300)
-                    .frame(maxHeight: .infinity)
-                    .background(.background.secondary)
-                    .transition(.move(edge: .trailing))
+        let isPresented = model.isInfoPresented
+        ZStack(alignment: .trailing) {
+            // Makes room in one step, so a grid reflows once rather than on every frame of the slide. An inset
+            // rather than padding, so the page still runs under the toolbar from edge to edge and the search
+            // field keeps the look it has over the page instead of turning flat above the panel.
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaPadding(.trailing, isPresented ? Self.width + Self.gap * 2 : 0)
+            ZStack {
+                if isPresented {
+                    let shape = RoundedRectangle(cornerRadius: 20)
+                    InfoPanel()
+                        .frame(width: Self.width)
+                        .frame(maxHeight: .infinity)
+                        .background {
+                            // Opaque, as it slides out over the page; the tint matches the sidebar.
+                            shape.fill(Color.canvas)
+                            shape.fill(.quaternary.opacity(0.5))
+                        }
+                        .clipShape(shape)
+                        .padding([.horizontal, .bottom], Self.gap)
+                        .transition(.move(edge: .trailing))
+                }
             }
+            .animation(.snappy, value: isPresented)
         }
-        .animation(.snappy, value: model.isInfoPresented)
+        // The toolbar and the gap around the panel show the page's colour from edge to edge.
+        .background(Color.canvas)
+    }
+}
+
+/// Keeps the family at the top of a grid or list there when its width changes, as when the Info panel
+/// opens or closes; otherwise the same scroll offset lands on other families once rows hold fewer or more.
+/// Needs `.scrollTargetLayout()`.
+struct KeepsTopOnResize: ViewModifier {
+    // Applied by the scroll view as it lays out, so after the rows have reflowed (a proxy can jump too early).
+    @State private var position = ScrollPosition(idType: String.self)
+    @State private var topID: String?
+    @State private var isAtTop = true
+
+    func body(content: Content) -> some View {
+        content
+            .scrollPosition($position, anchor: .top)
+            .onScrollTargetVisibilityChange(idType: String.self) { if let first = $0.first { topID = first } }
+            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top < 1 } action: { isAtTop = $1 }
+            // Reported before the visible families update, so `topID` is still the one from before.
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, _ in
+                if !isAtTop, let topID { position.scrollTo(id: topID, anchor: .top) }
+            }
     }
 }
 
@@ -52,7 +91,7 @@ private struct FamilyInfo: View {
                 .font(.headline)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding([.horizontal, .top], 12)
+                .padding([.horizontal, .top], 16)
             Picker("Tab", selection: $model.infoTab) {
                 ForEach(InfoTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
