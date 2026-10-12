@@ -42,18 +42,6 @@ struct FamilyMenu: View {
                 model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
             }
         }
-        Menu("Tags") {
-            ForEach(model.data.tags, id: \.self) { tag in
-                Toggle(tag, isOn: Binding(
-                    get: { families.allSatisfy { model.tags(of: $0).contains(tag) } },
-                    set: { model.setTag(tag, $0, for: families) }
-                ))
-            }
-            if !model.data.tags.isEmpty { Divider() }
-            Button("New Tag…") {
-                model.prompt("New Tag", confirm: "Add") { model.addTag(named: $0, to: families) }
-            }
-        }
 
         Divider()
 

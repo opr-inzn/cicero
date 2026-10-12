@@ -27,13 +27,12 @@ ellipsis character (…) for items that ask for more input.
     Cicero's own Deactivated folder appears here when it has fonts.
   - **Sets** (+ menu: New Set…, New Smart Set…). Sets (square.stack) and smart sets (gearshape).
     Menus: Rename Set…, Delete Set; Edit Smart Set…, Delete Smart Set.
-  - **Tags** (+). Menu: Rename Tag…, Delete Tag.
   - **Foundries**. Menu: Rename Foundry…
   - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
   - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Unicode Blocks, Google Fonts, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - Every row menu also has Hide from Sidebar and Edit Sidebar.
-- Dropping family names (drag from the browser) onto a set, tag or foundry adds them.
-- Creating a set, tag or character set un-hides its section.
+- Dropping family names (drag from the browser) onto a set or foundry adds them.
+- Creating a set or character set un-hides its section.
 - Settings → Sidebar lists the same items as Finder-style checkboxes, with Show All.
 
 ## Browser
@@ -48,7 +47,7 @@ ellipsis character (…) for items that ask for more input.
   text when set), name, "N styles · Foundry". Tiles scale with the preview size.
 - **Specimens**: rows — name, status tag, "Foundry · N styles", switch; the sample at preview size; up to 14 style names set in themselves (+N more).
 - Selection: click, ⌘-click, ⇧-click, ⌘A, Esc clears, typing a letter jumps, Return or double-click opens the font page; rows are draggable as family names. Right-click → family menu.
-- Empty states per selection (no folders → Add Folder…; nothing activated; empty set; no tagged fonts; smart set with no matches → Edit Smart Set…; character set still being checked; search with no results).
+- Empty states per selection (no folders → Add Folder…; nothing activated; empty set; smart set with no matches → Edit Smart Set…; character set still being checked; search with no results).
 - A small glass capsule bottom-right while scanning ("Finding fonts…", "Identifying fonts… 200 of 4000").
 - Selecting Problems shows the Problems view instead of a list.
 - Status tags (small capsules): System; Partly active (orange); app name e.g. "Adobe" (red) for app-only; "Temporary" (blue) for temporarily active.
@@ -79,7 +78,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N.
 - **View**: Edit Sidebar / Done Editing Sidebar.
 - **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Cicero Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
-- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Tags ▸ (toggles, New Tag…); Reveal in Finder; Copy Family Name(s); Compare; Open; Show Info; Move to Trash…
+- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Reveal in Finder; Copy Family Name(s); Compare; Open; Show Info; Move to Trash…
 - **Style menu**: status label, Activate Style…, Activate Temporarily ▸, Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
 
 ## Library and fonts
@@ -103,13 +102,13 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Temporary: CoreText session registration in place; until Cicero quits (unregistered on quit; leftovers from a crash unregistered at launch) or until you log out (forgotten when the login session changes: audit session ID + boot time).
 - Deactivate: installed copies go to the Trash when another copy exists (origin or other copy outside ~/Library/Fonts); otherwise the file moves to Cicero's Deactivated folder — ask first if Cicero didn't install it ("Deactivate fonts?" alert). In-place/temporary → unregister (persistent, falling back to session). macOS, all-users, app and Adobe Fonts faces can't be turned off ("These fonts are managed by macOS or another app.").
 - Activating permanently a temporarily active font ends the session registration first.
-- Move to Trash (family or style): unregister, trash every file including other copies; never touches /System, /Library/Application Support/Apple, /usr, /private, app bundles, Adobe CoreSync; collections that also contain other families are named in the alert; removes the family from sets/tags/foundry overrides. Alert "Move “X” to the Trash?" with destructive Move to Trash.
+- Move to Trash (family or style): unregister, trash every file including other copies; never touches /System, /Library/Application Support/Apple, /usr, /private, app bundles, Adobe CoreSync; collections that also contain other families are named in the alert; removes the family from sets, its saved tags and foundry overrides. Alert "Move “X” to the Trash?" with destructive Move to Trash.
 - Short toasts at the bottom ("Activated.", "Deactivated.", "Moved to the Trash.", failures).
 
-## Sets, tags, smart sets, character sets
+## Sets, smart sets, character sets
 
-- Sets: ordered lists of family names. Tags: names in sidebar order; family → tags.
-- Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
+- Sets: ordered lists of family names. Tags (names; family → tags) are only kept in the saved data for now: no sidebar section, menu or new smart-set rules, but rules saved with one still work.
+- Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Set (is in / isn’t in), Folder (is in / isn’t in), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
 - Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
 - Settings → Coverage: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
 
@@ -146,9 +145,9 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Show system fonts in other lists" (+ explanation); Font Caches (Rebuild, Clear…).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Show system fonts in other lists" (+ explanation); Font Caches (Rebuild, a red Clear).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
-- Sidebar: Finder-style checkboxes.
+- Sidebar: Finder-style checkboxes. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Character Sets: as above.
 
 ## Data and privacy

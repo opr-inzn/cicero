@@ -7,7 +7,7 @@ public struct UserData: Codable, Equatable, Sendable {
     public var folders: [WatchedFolder] = []
     public var sets: [FontSet] = []
     public var smartSets: [SmartSet] = []
-    /// Tag names in sidebar order.
+    /// Tag names in sidebar order. Tags have no UI for now; they're kept so none are lost.
     public var tags: [String] = []
     /// Family name → its tags.
     public var familyTags: [String: [String]] = [:]

@@ -74,7 +74,8 @@ private struct RuleRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Picker("Field", selection: field) {
-                ForEach(SmartRule.Field.allCases, id: \.self) { Text($0.title).tag($0) }
+                // Tags have no UI for now: offered only to a rule saved with one.
+                ForEach(SmartRule.Field.allCases.filter { $0 != .tag || rule.field == .tag }, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()
             Picker("Comparison", selection: $rule.comparison) {
