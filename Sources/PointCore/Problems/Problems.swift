@@ -219,7 +219,8 @@ public enum ProblemDetector {
 
     // MARK: Shared names
 
-    /// Different families whose active faces use the same PostScript names, grouped by the families involved.
+    /// Different families whose active faces use the same PostScript names (typically bare names like
+    /// "Bold" given to variable fonts' named instances), grouped by the families involved.
     private static func sharedNames(_ context: inout Context) -> [Problem] {
         struct Clash {
             var weight = Int.max
@@ -247,10 +248,12 @@ public enum ProblemDetector {
             let names = group.names.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0 < $1.0 }.map(\.0)
             let shown = names.count > 7 ? Array(names.prefix(6)) + ["\(names.count - 6) more"] : names
             let paths = group.files.keys.sorted()
+            let summary = names.count == 1
+                ? "Named style \(names[0]) uses the same PostScript name in \(families.count == 2 ? "both" : "all of them")."
+                : "Named styles \(joined(shown)) use the same PostScript names in \(families.count == 2 ? "both" : "all of them")."
             return Problem(
                 id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
-                title: joined(families),
-                summary: "\(names.count == 1 ? "Named style" : "Named styles") \(joined(shown)) \(names.count == 1 ? "uses the same PostScript name" : "use the same PostScript names") in \(families.count == 2 ? "both" : "all of them").",
+                title: joined(families), summary: summary,
                 files: paths.map { context.file($0) }, fixes: [],
                 fileFixes: Dictionary(uniqueKeysWithValues: paths.map { path in
                     (path, [ProblemFix.reveal(path)] + ((group.files[path] ?? nil).map { [.deactivate($0)] } ?? []))
