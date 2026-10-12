@@ -11,7 +11,7 @@ struct CharacterSetsSettings: View {
         VStack(spacing: 0) {
             Form {
                 Section {} footer: {
-                    Text("Checked sets appear in the sidebar, where you can see which fonts have every one of their characters. All of them are shown at first.")
+                    Text("Checked sets appear in the sidebar, where you can see which fonts have every one of their characters. All of them are shown at first.").formFooter()
                 }
                 ForEach(model.characterSetCatalog.groups) { group in
                     Section {
@@ -19,11 +19,14 @@ struct CharacterSetsSettings: View {
                     } header: {
                         Text(group.name)
                     } footer: {
-                        if let url = URL(string: group.url) {
-                            Link(group.credit, destination: url)
-                        } else {
-                            Text(group.credit)
+                        Group {
+                            if let url = URL(string: group.url) {
+                                Link(group.credit, destination: url)
+                            } else {
+                                Text(group.credit)
+                            }
                         }
+                        .formFooter()
                     }
                 }
             }

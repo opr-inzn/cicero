@@ -1,3 +1,4 @@
+import AppKit
 import CiceroCore
 import SwiftUI
 
@@ -50,6 +51,11 @@ struct CiceroCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Cicero") {
+                NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
+            }
+        }
         CommandGroup(after: .newItem) {
             Button("Add Folder…") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
@@ -107,5 +113,21 @@ struct CiceroCommands: Commands {
             Button("Rebuild Font List") { model.rebuildFontList() }
             Button("Clear Font Caches…") { model.isClearingCaches = true }
         }
+    }
+
+    /// "Built by Maximilian Inzinger" under the version in the About panel, the name linking to the website.
+    private static var credits: NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let base: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraph,
+        ]
+        let credits = NSMutableAttributedString(string: "Built by ", attributes: base)
+        var link = base
+        link[.link] = URL(string: "https://maximilianinzinger.com")!
+        credits.append(NSAttributedString(string: "Maximilian Inzinger", attributes: link))
+        return credits
     }
 }
