@@ -345,6 +345,8 @@ public final class LibraryScanner: Sendable {
     private struct FaceKey: Hashable {
         var family: String
         var postScriptName: String
+        /// Some fonts' italics are named exactly like their uprights, so the name alone doesn't make two files copies.
+        var isItalic: Bool
     }
 
     private struct Candidate {
@@ -370,13 +372,13 @@ public final class LibraryScanner: Sendable {
             }
             let state = Self.faceState(of: path, file: file, locations: locations, records: input.records)
             for face in cached.faces where !face.familyName.hasPrefix(".") && !face.familyName.isEmpty {
-                candidates[FaceKey(family: face.familyName, postScriptName: face.postScriptName), default: []].append(
+                candidates[FaceKey(family: face.familyName, postScriptName: face.postScriptName, isItalic: face.isItalic), default: []].append(
                     Candidate(face: face, state: state, dateAdded: cached.dateAdded, folderIDs: file.folderIDs, stamp: cached.stamp)
                 )
             }
         }
 
-        // One face per PostScript name within a family: the active file wins, the others are its other
+        // One face per PostScript name (and slant) within a family: the active file wins, the others are its other
         // copies. Different families keep their own faces even when names clash (the Problems view says so).
         var byFamily: [String: [(LibraryFace, Set<UUID>, FaceStamp)]] = [:]
         for (_, copies) in candidates {
