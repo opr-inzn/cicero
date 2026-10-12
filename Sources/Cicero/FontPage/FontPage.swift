@@ -54,7 +54,6 @@ struct FontPage: View {
             ToolbarSpacer(.fixed)
             ToolbarItem { InfoButton() }
         }
-        .modifier(InfoPanelColumn())
         .onExitCommand { model.openFamilyID = nil }
     }
 
