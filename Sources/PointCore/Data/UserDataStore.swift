@@ -117,7 +117,9 @@ enum LegacyImport {
         data.foundryRenames = object["foundryRenames"] as? [String: String] ?? [:]
         data.sidebar.hidden = Set(strings(object["hiddenSidebarItems"]).filter { !$0.hasPrefix("charset.") })
         // Version 1 had no character set groups; the big ones start collapsed, as for a new user.
-        data.sidebar.collapsed = Set(strings(object["collapsedSections"])).union(["charsetgroup.unicode", "charsetgroup.google"])
+        if let collapsed = object["collapsedSections"] as? [String] {
+            data.sidebar.collapsed = Set(collapsed).union(["charsetgroup.unicode", "charsetgroup.google"])
+        }
         switch object["installMethod"] as? String {
         case "copy": data.installMethod = .copy
         case "register": data.installMethod = .inPlace

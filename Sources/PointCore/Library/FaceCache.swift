@@ -39,7 +39,8 @@ enum FaceCache {
             writer.write(path)
             writer.write(file.stamp.modified)
             writer.write(file.stamp.size)
-            writer.write(file.dateAdded?.timeIntervalSince1970)
+            // Reference-date intervals round-trip exactly, so cached dates hash like fresh ones.
+            writer.write(file.dateAdded?.timeIntervalSinceReferenceDate)
             writer.write(UInt32(file.faces.count))
             for face in file.faces {
                 writer.write(UInt32(face.id.index))
@@ -72,7 +73,7 @@ enum FaceCache {
                 for _ in 0..<count {
                     let path = try reader.string()
                     let stamp = FileStamp(modified: try reader.i64(), size: try reader.i64())
-                    let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSince1970: $0) }
+                    let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
                     let faceCount = Int(try reader.u32())
                     var faces: [FontFace] = []
                     faces.reserveCapacity(faceCount)
