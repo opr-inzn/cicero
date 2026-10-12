@@ -169,6 +169,8 @@ struct SidebarView: View {
     @ViewBuilder
     private func menu(for row: SidebarRow) -> some View {
         switch row.item {
+        case .folder(WatchedFolder.adobeAppsID):
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }
         case .folder(let id):
             if let folder = model.folder(id) {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }

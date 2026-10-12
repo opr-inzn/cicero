@@ -9,6 +9,7 @@ struct FoldersSettings: View {
     @State private var appName = ""
 
     var body: some View {
+        @Bindable var model = model
         VStack(alignment: .leading, spacing: 10) {
             Text("Fonts in these folders are in your library without being installed. For a folder an app loads by itself, its fonts count as active in that app.")
                 .font(.callout)
@@ -22,7 +23,17 @@ struct FoldersSettings: View {
                 }
             }
             .listStyle(.bordered)
-            .alternatingRowBackgrounds()
+            // No stripes behind the empty-state note.
+            .alternatingRowBackgrounds(model.data.folders.isEmpty ? .disabled : .enabled)
+            .overlay {
+                if model.data.folders.isEmpty {
+                    Text("Add a folder of fonts to browse them without installing them.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+            }
             HStack(spacing: 2) {
                 ListEditButton("Add Folder", systemImage: "plus") { model.presentAddFolderPanel() }
                     .help("Add a folder of fonts")
@@ -32,6 +43,20 @@ struct FoldersSettings: View {
                 }
                 .disabled(selection == nil)
                 .help("Remove the folder from the library; its files stay where they are")
+            }
+            Divider()
+                .padding(.vertical, 6)
+            HStack(alignment: .firstTextBaseline, spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Show fonts installed for Adobe apps")
+                    Text("Adobe apps load fonts from Adobe’s Fonts folder and from their own, like InDesign’s, without installing them. Cicero lists them all under Adobe Apps in the sidebar.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Toggle("Show fonts installed for Adobe apps", isOn: $model.data.showAdobeFonts)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
             }
         }
         .padding(20)
