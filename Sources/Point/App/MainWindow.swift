@@ -21,6 +21,7 @@ struct MainWindow: View {
             }
         }
         .sheet(item: $model.activationPrompt) { ActivationSheet(prompt: $0) }
+        .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }
         .alert(
