@@ -96,6 +96,12 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
+    /// The user's folders, then Adobe Apps when its fonts are shown.
+    private var folderOptions: [(id: String, title: String)] {
+        model.data.folders.map { ($0.id.uuidString, $0.displayName) }
+            + (model.data.showAdobeFonts ? [(WatchedFolder.adobeAppsID.uuidString, "Adobe Apps")] : [])
+    }
+
     /// Changing the field resets the comparison and value to ones that make sense for it.
     private var field: Binding<SmartRule.Field> {
         Binding(get: { rule.field }, set: { new in
@@ -111,7 +117,7 @@ private struct RuleRow: View {
         case .classification: Classification.serif.rawValue
         case .tag: model.data.tags.first ?? ""
         case .set: model.data.sets.first?.id.uuidString ?? ""
-        case .folder: model.data.folders.first?.id.uuidString ?? ""
+        case .folder: folderOptions.first?.id ?? ""
         case .status: SmartRuleValue.statuses[0]
         case .kind: SmartRuleValue.kinds[0]
         case .format: FontFormat.openTypePostScript.rawValue
@@ -140,7 +146,7 @@ private struct RuleRow: View {
         case .set:
             options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No sets yet")
         case .folder:
-            options(model.data.folders.map { ($0.id.uuidString, $0.displayName) }, empty: "No folders yet")
+            options(folderOptions, empty: "No folders yet")
         case .status:
             options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:

@@ -19,9 +19,9 @@ public struct UserData: Codable, Equatable, Sendable {
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
     public var showSystemFonts = true
+    /// List the fonts in the folders Adobe apps load by themselves, as one Adobe Apps item.
+    public var showAdobeFonts = true
     public var records = ActivationRecords()
-    /// App font folders Cicero found by itself and the user removed; they aren't added again.
-    public var dismissedFolders: Set<String> = []
 
     public init() {}
 
@@ -44,8 +44,13 @@ public struct UserData: Codable, Equatable, Sendable {
         sidebar = try value(.sidebar, d.sidebar)
         installMethod = try value(.installMethod, d.installMethod)
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
+        showAdobeFonts = try value(.showAdobeFonts, d.showAdobeFonts)
         records = try value(.records, d.records)
-        dismissedFolders = try value(.dismissedFolders, d.dismissedFolders)
+    }
+
+    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
+    public func scannedFolders() -> [WatchedFolder] {
+        folders + (showAdobeFonts ? WatchedFolder.appFontFolders() : [])
     }
 }
 
@@ -57,6 +62,9 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
     public static let deactivatedID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
+    /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
+    /// them as one item.
+    public static let adobeAppsID = UUID(uuidString: "00000000-0000-0000-0000-00000000AD0B")!
 
     public init(id: UUID = UUID(), path: String, appName: String? = nil) {
         self.id = id
@@ -66,36 +74,30 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// "Adobe Apps" / "Adobe Apps (Your Account)" / "InDesign 2026" for the folders apps load fonts
-    /// from, "Deactivated" for Cicero's own, "<Parent> Fonts" for other folders called Fonts, else the name.
+    /// "Deactivated" and "Adobe Apps" for Cicero's own items, "<Parent> Fonts" for other folders
+    /// called Fonts, else the name.
     public var displayName: String {
         if id == Self.deactivatedID { return "Deactivated" }
-        let lower = path.lowercased()
-        if lower.hasSuffix(Self.adobeFolderSuffix) {
-            return path.hasPrefix(NSHomeDirectory()) ? "Adobe Apps (Your Account)" : "Adobe Apps"
-        }
+        if id == Self.adobeAppsID { return "Adobe Apps" }
         let last = url.lastPathComponent
         guard last.caseInsensitiveCompare("Fonts") == .orderedSame else { return last }
-        let parent = url.deletingLastPathComponent().lastPathComponent
-        if parent.hasPrefix("Adobe ") && Self.detectAppName(forPath: path) != nil { return String(parent.dropFirst("Adobe ".count)) }
-        return parent + " Fonts"
+        return url.deletingLastPathComponent().lastPathComponent + " Fonts"
     }
 
     private static let adobeFolderSuffix = "/application support/adobe/fonts"
 
     /// Which app loads a folder's fonts by itself, so they count as active there rather than inactive:
-    /// Adobe's shared font folders (all Adobe apps) and the Fonts folder inside InDesign or InCopy.
+    /// Adobe's shared font folders (all Adobe apps) and the Fonts folder next to an Adobe app
+    /// ("Adobe InDesign 2026/Fonts" → "InDesign").
     public static func detectAppName(forPath path: String) -> String? {
         let lower = path.lowercased()
         if lower.hasSuffix(adobeFolderSuffix) || lower.contains(adobeFolderSuffix + "/") { return "Adobe" }
-        for app in ["InDesign", "InCopy"] where lower.range(of: "/applications/adobe \(app.lowercased())[^/]*/fonts(/|$)", options: .regularExpression) != nil {
-            return app
-        }
-        return nil
+        guard let match = path.firstMatch(of: #/^/Applications/Adobe ([^/]+?)(?: \d{4})?/Fonts(?:/|$)/#.ignoresCase()) else { return nil }
+        return String(match.1)
     }
 
     /// The folders on this Mac that Adobe apps load fonts from by themselves: Adobe's shared folder for
-    /// all users and for this account, and each InDesign or InCopy version's Fonts folder.
+    /// all users and for this account, and the Fonts folder next to any Adobe app (InDesign has one).
     public static func appFontFolders(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [WatchedFolder] {
         let fm = FileManager.default
         var paths = [
@@ -103,13 +105,15 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
             home.appendingPathComponent("Library/Application Support/Adobe/Fonts").path,
         ]
         let apps = (try? fm.contentsOfDirectory(atPath: "/Applications")) ?? []
-        for app in apps.sorted() where app.hasPrefix("Adobe InDesign") || app.hasPrefix("Adobe InCopy") {
+        for app in apps.sorted() where app.hasPrefix("Adobe ") {
             paths.append("/Applications/\(app)/Fonts")
         }
         return paths.compactMap { path in
             var isDirectory: ObjCBool = false
-            guard fm.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else { return nil }
-            return WatchedFolder(path: path, appName: detectAppName(forPath: path))
+            guard fm.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue,
+                  let app = detectAppName(forPath: path)
+            else { return nil }
+            return WatchedFolder(id: adobeAppsID, path: path, appName: app)
         }
     }
 }
