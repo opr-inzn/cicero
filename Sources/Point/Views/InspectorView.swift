@@ -9,19 +9,17 @@ enum InspectorTab: String, CaseIterable {
 /// Window-level inspector: describes the open family, or the selected one in the browser.
 struct InspectorPanel: View {
     @Environment(LibraryStore.self) private var library
-    @AppStorage(Prefs.weight) private var browserWeight = 400.0
-    @AppStorage(Prefs.detailWeight) private var detailWeight = 400.0
+    @Environment(PreviewSettings.self) private var preview
 
     var body: some View {
         @Bindable var library = library
         if let family = library.inspectorFamily {
-            let inDetail = library.detailFamily != nil
             InspectorView(
                 family: family,
                 tab: $library.inspectorTab,
                 features: $library.detailFeatures,
-                previewFace: family.face(nearestWeight: Int(inDetail ? detailWeight : browserWeight)),
-                allowsFeatures: inDetail
+                previewFace: family.face(nearestWeight: Int(preview.weight)),
+                allowsFeatures: library.detailFamily != nil
             )
             .id(family.id)
         } else {
@@ -90,6 +88,8 @@ struct InspectorView: View {
 private struct InfoPane: View {
     @Environment(LibraryStore.self) private var library
     let face: LibraryFace
+    /// Worked out off the main thread: CoreText checks the character set against every language.
+    @State private var languages: String?
 
     var body: some View {
         let metadata = FontMetadata(face: face.face)
@@ -97,6 +97,9 @@ private struct InfoPane: View {
             row("Status", face.status.label)
             ForEach(Array(metadata.rows.enumerated()), id: \.offset) { _, pair in
                 row(pair.0, pair.1)
+            }
+            if let languages {
+                row("Languages", languages)
             }
             VStack(alignment: .leading, spacing: 4) {
                 label("Location")
@@ -122,6 +125,10 @@ private struct InfoPane: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: face.id) {
+            let target = face.face
+            languages = await Task.detached(priority: .userInitiated) { FontMetadata.languagesSummary(of: target) }.value
+        }
     }
 
     private func label(_ text: String) -> some View {
