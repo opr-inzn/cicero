@@ -28,12 +28,16 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Every change goes through fontd and waits for it (copies are registered too, files are unregistered
   before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
-- **Signposts** (`Signposts.swift`): os_signpost intervals, for timing activation in Instruments.
+- **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem local.cicero.Cicero) for activation
+  (copy, register, confirm), scans (find, parse, build, save cache), applying a library, and coverage,
+  for timing them in Instruments.
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
-  preview) and prefetches them after scans; feature groups, font info and glyph sections.
+  preview) and prefetches them after scans, four files at a time, what the browser shows first. It keeps
+  the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
+  Feature groups, font info and glyph sections.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office.
 
