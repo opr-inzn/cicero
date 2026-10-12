@@ -100,7 +100,7 @@ struct SpecimenRow: View {
     }
 
     private var details: String {
-        [foundry, family.classification.rawValue, family.stylesLabel].compactMap { $0 }.joined(separator: " · ")
+        [foundry, family.stylesLabel].compactMap { $0 }.joined(separator: " · ")
     }
 }
 
