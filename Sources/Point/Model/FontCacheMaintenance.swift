@@ -95,11 +95,11 @@ extension LibraryStore {
                 clearedMacOS = true
             } catch FontCacheMaintenance.Failure.cancelled {
             } catch {
-                showToast("Couldn't clear the macOS font caches: \(error.localizedDescription)")
+                showToast("Couldn’t clear the macOS font caches: \(error.localizedDescription)")
             }
         }
         if failures > 0 {
-            showToast("Couldn't move \(failures == 1 ? "1 cache item" : "\(failures) cache items") to the Trash.")
+            showToast("Couldn’t move \(failures == 1 ? "1 cache item" : "\(failures) cache items") to the Trash.")
         } else if !trashed.isEmpty && !clearedMacOS {
             showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash.")
         }

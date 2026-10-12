@@ -20,7 +20,7 @@ struct FontCacheSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Clear Font Caches")
                 .font(.headline)
-            Text("Use this when fonts look wrong, show an old version, or won't turn on or off. Apps rebuild their caches the next time they open.")
+            Text("Use this when fonts look wrong, show an old version, or won’t turn on or off. Apps rebuild their caches the next time they open.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 8) {

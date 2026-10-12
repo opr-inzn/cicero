@@ -136,7 +136,7 @@ private struct FamilyActivationButtons: View {
 
     private var lockedReason: String {
         switch family.faces.first?.status {
-        case .active(.system): "Installed with macOS, so it can't be turned off"
+        case .active(.system): "Installed with macOS, so it can’t be turned off"
         case .active(.allUsers): "Installed for all users; an administrator has to remove it"
         case .active(.application): "Belongs to an app, which manages it itself"
         case .active(.adobeCloud): "Managed by Adobe Creative Cloud"

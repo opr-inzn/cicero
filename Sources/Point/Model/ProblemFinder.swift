@@ -32,7 +32,7 @@ enum ProblemKind: String, CaseIterable, Sendable {
         case .missing:
             "Point remembers these fonts, but their files are gone. The drive may be unplugged, or the files were moved or deleted."
         case .unreadable:
-            "Point couldn't read these files. They may be damaged, or not font files at all."
+            "Point couldn’t read these files. They may be damaged, or not font files at all."
         case .external:
             "These fonts are used where they are, from a disk that can be unplugged. They turn off when it is. Installing a copy keeps them working."
         case .duplicate:
@@ -211,7 +211,7 @@ enum ProblemFinder {
         case .registered: "Used where it is"
         case .temporary(let scope): scope.statusLabel
         case .other: "Activated by another app"
-        case nil: path.hasPrefix(input.deactivatedFolder + "/") ? "In Point's Deactivated folder" : "Not active"
+        case nil: path.hasPrefix(input.deactivatedFolder + "/") ? "In Point’s Deactivated folder" : "Not active"
         }
     }
 
@@ -264,7 +264,7 @@ enum ProblemFinder {
             return FontProblem(
                 id: "unreadable:\(path)", kind: .unreadable,
                 title: URL(fileURLWithPath: path).lastPathComponent,
-                summary: "macOS can't read this file as a font.",
+                summary: "macOS can’t read this file as a font.",
                 files: [ProblemFile(path: path, modified: modified, note: "Unreadable")],
                 detail: .unreadable(path: path)
             )
@@ -366,7 +366,7 @@ extension LibraryStore {
             }
         }
         if failed > 0 {
-            showToast("Couldn't move \(failed == 1 ? "1 file" : "\(failed) files") to the Trash.")
+            showToast("Couldn’t move \(failed == 1 ? "1 file" : "\(failed) files") to the Trash.")
         } else {
             showToast(moved == 1 ? "Moved to the Trash." : "Moved \(moved) files to the Trash.")
         }

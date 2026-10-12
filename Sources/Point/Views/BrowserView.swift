@@ -104,7 +104,7 @@ struct BrowserView: View {
                     ContentUnavailableView {
                         Label("No Matching Fonts", systemImage: "gearshape")
                     } description: {
-                        Text("No fonts in your library match this smart set's rules.")
+                        Text("No fonts in your library match this smart set’s rules.")
                     } actions: {
                         if let smartSet = library.smartSet(id) {
                             Button("Edit Smart Set…") { library.editingSmartSet = smartSet }

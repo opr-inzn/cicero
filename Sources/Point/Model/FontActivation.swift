@@ -47,7 +47,7 @@ extension LibraryStore {
         if failures.isEmpty {
             showToast(succeeded == 1 ? "Activated." : "Activated \(succeeded) files.")
         } else {
-            showToast("Couldn't activate \(failures.count) of \(paths.count) files.")
+            showToast("Couldn’t activate \(failures.count) of \(paths.count) files.")
         }
         save()
         scheduleRescan(after: 0.8)
@@ -110,7 +110,7 @@ extension LibraryStore {
             failures += await unregister(toUnregister)
         }
         failures += await endTemporaryActivation(of: temporary)
-        showToast(failures == 0 ? "Deactivated." : "Couldn't deactivate \(failures) files.")
+        showToast(failures == 0 ? "Deactivated." : "Couldn’t deactivate \(failures) files.")
         save()
         scheduleRescan(after: 0.8)
     }
