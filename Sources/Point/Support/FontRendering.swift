@@ -108,6 +108,34 @@ struct FontMetadata {
         default: url.pathExtension.uppercased()
         }
     }
+
+    // MARK: Languages
+
+    /// Languages the font covers, named for the current locale. The user's own languages come
+    /// first, the rest alphabetically.
+    static func supportedLanguages(of face: FontFace) -> [String] {
+        let font = FontCache.shared.font(face, size: 12)
+        let codes = (CTFontCopySupportedLanguages(font) as? [String]) ?? []
+        let locale = Locale.current
+        let preferred = Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier }
+        var seen = Set<String>()
+        let ranked: [(rank: Int, name: String)] = codes.compactMap { code in
+            guard let name = locale.localizedString(forIdentifier: code), seen.insert(name).inserted else { return nil }
+            let base = Locale(identifier: code).language.languageCode?.identifier ?? code
+            return (preferred.firstIndex(of: base) ?? preferred.count, name)
+        }
+        return ranked
+            .sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .map(\.name)
+    }
+
+    /// A count and a few names, e.g. "48 languages, including English, German, French, Spanish and Italian".
+    static func languagesSummary(of face: FontFace, sampleCount: Int = 5) -> String? {
+        let names = supportedLanguages(of: face)
+        guard !names.isEmpty else { return nil }
+        let sample = ListFormatter.localizedString(byJoining: Array(names.prefix(sampleCount)))
+        return names.count <= sampleCount ? sample : "\(names.count) languages, including \(sample)"
+    }
 }
 
 // MARK: - OpenType features
