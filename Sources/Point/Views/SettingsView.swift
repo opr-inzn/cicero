@@ -167,10 +167,18 @@ private struct SidebarSettings: View {
 private struct GeneralSettings: View {
     @Environment(LibraryStore.self) private var library
     @State private var isConfirmingCacheClear = false
+    @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = .system
 
     var body: some View {
         @Bindable var library = library
         Form {
+            Section {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(AppAppearance.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appearance) { appearance.apply() }
+            }
             Section {
                 Toggle("Show system fonts in other lists", isOn: $library.data.showSystemFonts)
                     .onChange(of: library.data.showSystemFonts) { library.save() }

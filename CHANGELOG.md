@@ -10,6 +10,7 @@ First release.
 - Font pages with a large editable text, a waterfall, a table of styles you can switch on individually, and a searchable glyph map.
 - An info panel with font details, supported languages and character sets, and a Features tab for OpenType features.
 - Preview Options for sample text, size, weight and letter spacing.
+- Choose a light or dark appearance, or follow macOS, in Settings → General.
 - Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item.
 - Sets, smart sets with rules, tags, foundries, and automatic classifications read from each font.
 - Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, and your own; filter by them in the sidebar and sort the list by them.

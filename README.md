@@ -8,6 +8,7 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Font pages.** A large text you can type into, a waterfall from 9 to 96 pt, a table of styles you can switch on one by one, and a searchable glyph map.
 - **Info and Features.** The info panel shows a font's details, the languages it supports and its character sets; the Features tab turns OpenType features on for that family wherever it's previewed.
 - **Preview Options.** Sample text, size, weight and letter spacing, shared by every view.
+- **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.
 - **Customizable sidebar.** Click **Edit** next to Fonts and every item and group gets a checkbox; uncheck what you don't want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*.
 - **Sets, smart sets and tags.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Point reads from the fonts themselves.
 - **Character sets.** See which fonts have every character of Latin S–XL, Adobe Latin 1–5, or Google Fonts' Latin, Cyrillic and Greek sets, or of a set you define yourself.
