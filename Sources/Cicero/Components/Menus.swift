@@ -56,12 +56,6 @@ struct FamilyMenu: View {
                 openWindow(id: WindowID.compare)
             }
         }
-        if families.count == 1 {
-            Divider()
-            Button("Open") { model.openFamilyID = families[0].id }
-            Button("Show Info") { model.showInfo(for: families[0]) }
-        }
-
         Divider()
 
         Button("Move to Trash…") { model.requestTrash(families) }

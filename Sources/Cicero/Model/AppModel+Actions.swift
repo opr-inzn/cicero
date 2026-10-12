@@ -139,12 +139,6 @@ extension AppModel {
         }
     }
 
-    func showInfo(for family: Family) {
-        if openFamilyID == nil { selectedIDs = [family.id] }
-        infoTab = .info
-        isInfoPresented = true
-    }
-
     // MARK: Folders
 
     func presentAddFolderPanel() {
