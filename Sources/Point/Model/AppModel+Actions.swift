@@ -164,12 +164,16 @@ extension AppModel {
         guard !new.isEmpty else { return }
         for path in new {
             data.folders.append(WatchedFolder(path: path, appName: WatchedFolder.detectAppName(forPath: path)))
+            data.dismissedFolders.remove(path)
         }
         data.sidebar.hidden.remove(SidebarSection.folders.key)
         rescan()
     }
 
     func removeFolder(_ id: UUID) {
+        if let folder = data.folders.first(where: { $0.id == id }), WatchedFolder.detectAppName(forPath: folder.path) != nil {
+            data.dismissedFolders.insert(folder.path)
+        }
         data.folders.removeAll { $0.id == id }
         data.sidebar.hidden.remove("folder.\(id)")
         if selection == .folder(id) { selection = .all }

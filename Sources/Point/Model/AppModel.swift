@@ -135,7 +135,16 @@ final class AppModel {
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
         }
+        addAppFontFolders()
         rescan()
+    }
+
+    /// Adds the folders Adobe apps load fonts from by themselves (found on this Mac), unless they're
+    /// already watched or the user removed them before.
+    private func addAppFontFolders() {
+        let watched = Set(data.folders.map(\.path))
+        let new = WatchedFolder.appFontFolders().filter { !watched.contains($0.path) && !data.dismissedFolders.contains($0.path) }
+        if !new.isEmpty { data.folders += new }
     }
 
     private func prepareToQuit() {
