@@ -22,7 +22,7 @@ struct GlyphGrid: View {
 
     var body: some View {
         let face = family.face(nearestWeight: Int(preview.weight))
-        let features = library.detailFeatures
+        let features = library.features(for: family)
         VStack(spacing: 0) {
             filterBar
             ScrollView {

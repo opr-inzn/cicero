@@ -79,7 +79,7 @@ struct FontTable: View {
                 FontPreviewText(
                     text: preview.text(for: row.family),
                     face: row.family.face(nearestWeight: Int(preview.weight)).face,
-                    size: 17, weight: preview.weight, kerning: preview.kerning(atSize: 17)
+                    size: 17, weight: preview.weight, features: library.features(for: row.family), kerning: preview.kerning(atSize: 17)
                 )
             }
             .width(min: 160, ideal: 380)

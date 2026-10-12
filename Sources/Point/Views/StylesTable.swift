@@ -10,7 +10,7 @@ struct StylesTable: View {
 
     var body: some View {
         let text = preview.text(for: family)
-        let features = library.detailFeatures
+        let features = library.features(for: family)
         let rows = sortOrder.isEmpty ? family.faces : family.faces.sorted(using: sortOrder)
         Table(rows, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Preview") { style in

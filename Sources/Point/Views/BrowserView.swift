@@ -11,11 +11,14 @@ struct BrowserView: View {
     @AppStorage("browser.mode") private var mode: BrowserMode = .list
 
     var body: some View {
-        if library.sidebarSelection == .problems {
-            ProblemsView()
-        } else {
-            browser
+        Group {
+            if library.sidebarSelection == .problems {
+                ProblemsView()
+            } else {
+                browser
+            }
         }
+        .modifier(LibraryInspector())
     }
 
     private var browser: some View {

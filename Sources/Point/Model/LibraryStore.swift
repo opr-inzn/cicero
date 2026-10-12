@@ -92,16 +92,22 @@ final class LibraryStore {
         }
     }
     var selectedFamilyIDs: Set<String> = []
-    var detailFamilyID: String? {
-        didSet { if oldValue != detailFamilyID { detailFeatures = [] } }
-    }
+    var detailFamilyID: String?
     var searchText = ""
     var isEditingSidebar = false
     var isInspectorPresented = false
     var isConfirmingCacheClear = false
     var inspectorTab: InspectorTab = .info
-    /// OpenType features applied to the detail view's previews.
-    var detailFeatures: [FeatureSetting] = []
+    /// OpenType features chosen in the inspector, per family; they apply wherever the family is previewed.
+    var familyFeatures: [String: [FeatureSetting]] = [:]
+
+    func features(for family: FontFamily) -> [FeatureSetting] {
+        familyFeatures[family.id] ?? []
+    }
+
+    func featuresBinding(for family: FontFamily) -> Binding<[FeatureSetting]> {
+        Binding(get: { self.familyFeatures[family.id] ?? [] }, set: { self.familyFeatures[family.id] = $0.isEmpty ? nil : $0 })
+    }
 
     var pendingActivation: ActivationRequest?
     var pendingDeactivation: DeactivationRequest?
