@@ -50,16 +50,17 @@ struct FontPage: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
+        ToolbarItem {
             Picker("View", selection: $tab) {
                 ForEach(FontPageTab.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
         }
+        ToolbarSpacer(.fixed)
         ToolbarItem { PreviewOptionsButton() }
+        ToolbarSpacer(.fixed)
         ToolbarItem { InfoToolbarButton() }
-            .sharedBackgroundVisibility(.hidden)
     }
 }
 
