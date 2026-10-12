@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum BrowserMode: String {
-    case list, specimens
+    case list, grid, specimens
 }
 
 /// The font browser: a sortable table, or full-width specimens, of the families in the sidebar selection.
@@ -24,6 +24,7 @@ struct BrowserView: View {
         return Group {
             switch mode {
             case .list: FontTable(families: families)
+            case .grid: FontGrid(families: families)
             case .specimens: SpecimenList(families: families)
             }
         }
@@ -126,11 +127,12 @@ struct BrowserView: View {
         ToolbarItem(placement: .principal) {
             Picker("View", selection: $mode) {
                 Label("List", systemImage: "list.bullet").tag(BrowserMode.list)
+                Label("Grid", systemImage: "square.grid.2x2").tag(BrowserMode.grid)
                 Label("Specimens", systemImage: "text.justify.leading").tag(BrowserMode.specimens)
             }
             .pickerStyle(.segmented)
             .labelStyle(.iconOnly)
-            .help("Show as a list or as specimens")
+            .help("Show as a list, a grid or specimens")
         }
         ToolbarItem { SlideshowToolbarButton() }
         ToolbarItem { PreviewOptionsButton() }
