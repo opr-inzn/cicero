@@ -60,7 +60,7 @@ public final class CoverageIndex: Sendable {
     }
 
     public init(caches: URL, languages: LanguageCatalog) {
-        file = caches.appendingPathComponent("coverage-v1.plist", isDirectory: false)
+        file = caches.appendingPathComponent("coverage-v2.plist", isDirectory: false)
         self.languages = languages
     }
 
