@@ -13,6 +13,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Point"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# Language data from Hyperglot (see scripts/update-languages.py) and its license.
+cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"
 
 # Compile the Icon Composer icon into Assets.car plus an AppIcon.icns fallback.
 # actool runs through a helper process, so it needs absolute paths.

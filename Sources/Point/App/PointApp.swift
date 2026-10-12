@@ -17,6 +17,15 @@ struct PointApp: App {
         .defaultSize(width: 1440, height: 900)
         .commands { PointCommands(library: library) }
 
+        Window("Character Toolbox", id: "toolbox") {
+            ToolboxWindow()
+                .environment(library)
+                .environment(preview)
+                .frame(minWidth: 760, minHeight: 480)
+                .onAppear { library.start() }
+        }
+        .defaultSize(width: 1000, height: 660)
+
         Settings {
             SettingsView()
                 .environment(library)
@@ -25,6 +34,7 @@ struct PointApp: App {
 }
 
 struct PointCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
     let library: LibraryStore
 
     var body: some Commands {
@@ -42,6 +52,10 @@ struct PointCommands: Commands {
             }
             Divider()
         }
+        CommandGroup(before: .singleWindowList) {
+            Button("Character Toolbox") { openWindow(id: "toolbox") }
+                .keyboardShortcut("t", modifiers: [.command, .option])
+        }
         CommandMenu("Fonts") {
             let selection = library.selectedFamilies
             Button("Activate") { library.requestActivate(selection) }
@@ -56,6 +70,9 @@ struct PointCommands: Commands {
             Button("Reveal in Finder") { library.revealSelection() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
+            Divider()
+            Button("Character Toolbox") { openWindow(id: "toolbox") }
+                .keyboardShortcut("t", modifiers: [.command, .option])
             Divider()
             Button("Rescan Library") { library.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
