@@ -1,3 +1,4 @@
+import CoreText
 import Foundation
 
 public enum ProblemKind: String, CaseIterable, Sendable {
@@ -5,6 +6,9 @@ public enum ProblemKind: String, CaseIterable, Sendable {
 
     /// Worth knowing, rarely worth acting on: not counted in the sidebar badge and shown collapsed.
     public var isMinor: Bool { self == .sharedNames }
+
+    /// Whether the files are copies of one font, shown by folder. Shared names lists different fonts, one file each.
+    public var groupsFilesByFolder: Bool { self != .sharedNames }
 
     public var title: String {
         switch self {
@@ -23,7 +27,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .installedTwice:
             "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
         case .sharedNames:
-            "Each of these fonts has its own main PostScript name, but some of its named styles use a bare name like “Bold” that another font uses too. A document that refers to one of those styles by name may open with the other font. Usually there’s nothing to do; if it happens, turn one of the fonts off or get updated versions."
+            "Each of these fonts has its own main PostScript name (name ID 6), but variable fonts also give each named style a PostScript name of its own, and some use just “Bold” or “Light”. When two fonts use the same one, macOS gives it to only one of them, and a document set in the other may open in the wrong font. Usually there’s nothing to do; if it happens, turn off the font you don’t need or get an updated version."
         case .missing:
             "Cicero remembers these files, but they’re gone. Fonts used where they were stop working when their files move or their disk is unplugged."
         case .unreadable:
@@ -43,12 +47,21 @@ public struct ProblemFile: Hashable, Sendable {
     public var modified: Date?
     /// Where it is or how it's active, e.g. "In your Fonts folder", "Used where it is".
     public var detail: String
+    /// Shown instead of the file name, e.g. the font's family.
+    public var title: String?
+    /// What about the file matters here, e.g. the styles involved.
+    public var note: String?
+    /// The PostScript names macOS gives this file when an app asks for them, of the names the problem is about.
+    public var preferredFor: [String]
 
-    public init(path: String, version: String?, modified: Date?, detail: String) {
+    public init(path: String, version: String?, modified: Date?, detail: String, title: String? = nil, note: String? = nil, preferredFor: [String] = []) {
         self.path = path
         self.version = version
         self.modified = modified
         self.detail = detail
+        self.title = title
+        self.note = note
+        self.preferredFor = preferredFor
     }
 }
 
@@ -132,8 +145,10 @@ public struct ProblemFolder: Hashable, Sendable {
 
 public enum ProblemDetector {
     /// Finds problems in the library. Reads font versions from disk for the files involved, so call it off the main thread.
-    public static func detect(in library: Library, data: UserData, locations: Locations) -> [Problem] {
-        var context = Context(library: library, data: data, locations: locations)
+    /// `fileForName` is the file macOS uses for a PostScript name, if any.
+    public static func detect(in library: Library, data: UserData, locations: Locations,
+                              fileForName: @escaping (String) -> String? = activeFile(named:)) -> [Problem] {
+        var context = Context(library: library, data: data, locations: locations, fileForName: fileForName)
         var problems = installedTwice(&context) + sharedNames(&context) + duplicates(&context) + missing(&context) + unreadable(&context) + external(&context)
         let order = Dictionary(uniqueKeysWithValues: ProblemKind.allCases.enumerated().map { ($1, $0) })
         problems.sort { a, b in
@@ -147,17 +162,26 @@ public enum ProblemDetector {
         return problems
     }
 
+    /// The file macOS uses when an app asks for a font by PostScript name, or nil when no active font has the name.
+    public static func activeFile(named postScriptName: String) -> String? {
+        let font = CTFontCreateWithName(postScriptName as CFString, 12, nil)
+        guard CTFontCopyPostScriptName(font) as String == postScriptName else { return nil }
+        return (CTFontCopyAttribute(font, kCTFontURLAttribute) as? URL)?.path
+    }
+
     private struct Context {
         let library: Library
         let data: UserData
         let locations: Locations
         let folders: [WatchedFolder]
+        let fileForName: (String) -> String?
         private var versions: [String: String?] = [:]
 
-        init(library: Library, data: UserData, locations: Locations) {
+        init(library: Library, data: UserData, locations: Locations, fileForName: @escaping (String) -> String?) {
             self.library = library
             self.data = data
             self.locations = locations
+            self.fileForName = fileForName
             folders = data.scannedFolders()
         }
 
@@ -266,49 +290,108 @@ public enum ProblemDetector {
 
     // MARK: Shared names
 
-    /// Different families whose active faces use the same PostScript names (typically bare names like
-    /// "Bold" given to variable fonts' named instances), grouped by the families involved.
+    /// Different families whose active faces use the same PostScript names (typically bare names like "Bold" that
+    /// variable fonts give their named instances). Families linked by any shared name are one problem: which of them
+    /// to keep on is one decision.
     private static func sharedNames(_ context: inout Context) -> [Problem] {
-        struct Clash {
-            var weight = Int.max
-            var files: [String: FaceID?] = [:]
-            var families: [String] = []
+        struct Face {
+            var path: String
+            var copies: [String]
+            var family: String
+            var style: String
+            /// Upright before italic, then by weight (from the style name: a variable font's named styles share one OS/2
+            /// weight): the order styles are listed in.
+            var rank: Int
+            var id: FaceID?
         }
-        var clashes: [String: Clash] = [:]
+        struct File {
+            var families: [String] = []
+            var styles: [(name: String, rank: Int)] = []
+            var won: [String] = []
+            var id: FaceID?
+        }
+        var clashes: [String: [Face]] = [:]
         for family in context.library.families {
             for face in family.faces where face.state.isActive {
-                var clash = clashes[face.face.postScriptName] ?? Clash()
-                clash.weight = min(clash.weight, face.face.weight)
-                clash.files[face.face.path] = face.canDeactivate ? Self.first(face.id, clash.files[face.face.path] ?? nil) : clash.files[face.face.path] ?? nil
-                if !clash.families.contains(family.id) { clash.families.append(family.id) }
-                clashes[face.face.postScriptName] = clash
+                clashes[face.face.postScriptName, default: []].append(Face(
+                    path: face.face.path, copies: face.otherCopies, family: family.id, style: face.face.styleName,
+                    rank: (face.face.isItalic ? 10_000 : 0) + (StyleName(face.face.styleName).weight ?? face.face.weight),
+                    id: face.canDeactivate ? face.id : nil
+                ))
             }
         }
-        var groups: [[String]: (names: [(String, Int)], files: [String: FaceID?])] = [:]
-        for (name, clash) in clashes where clash.families.count >= 2 && !clash.files.keys.allSatisfy(ActivationEngine.isProtected) {
-            var group = groups[clash.families] ?? ([], [:])
-            group.names.append((name, clash.weight))
-            group.files.merge(clash.files) { known, new in Self.first(known, new) }
-            groups[clash.families] = group
+        clashes = clashes.filter { _, faces in
+            Set(faces.map(\.family)).count >= 2 && !faces.allSatisfy { ActivationEngine.isProtected($0.path) }
         }
-        return groups.map { families, group in
-            let names = group.names.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0 < $1.0 }.map(\.0)
-            let shown = names.count > 7 ? Array(names.prefix(6)) + ["\(names.count - 6) more"] : names
-            let paths = group.files.keys.sorted()
-            let fileFixes = Dictionary(uniqueKeysWithValues: paths.map { path in
-                (path, [ProblemFix.reveal([path])] + ((group.files[path] ?? nil).map { [.deactivate([$0])] } ?? []))
-            })
-            let summary = names.count == 1
-                ? "Named style \(names[0]) uses the same PostScript name in \(families.count == 2 ? "both" : "all of them")."
-                : "Named styles \(joined(shown)) use the same PostScript names in \(families.count == 2 ? "both" : "all of them")."
+
+        // Families that share a name, and the families those share a name with, and so on.
+        var components: [Set<String>] = []
+        for faces in clashes.values {
+            var linked = Set(faces.map(\.family))
+            components.removeAll { component in
+                guard !component.isDisjoint(with: linked) else { return false }
+                linked.formUnion(component)
+                return true
+            }
+            components.append(linked)
+        }
+
+        return components.map { component in
+            let names = clashes.keys.filter { component.contains(clashes[$0]![0].family) }
+                .map { (name: $0, rank: clashes[$0]!.map(\.rank).min()!) }
+                .sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }
+                .map(\.name)
+            var files: [String: File] = [:]
+            for name in names {
+                let faces = clashes[name]!
+                for face in faces {
+                    var file = files[face.path] ?? File()
+                    if !file.families.contains(face.family) { file.families.append(face.family) }
+                    if !file.styles.contains(where: { $0.name == face.style }) { file.styles.append((face.style, face.rank)) }
+                    file.id = Self.first(file.id, face.id)
+                    files[face.path] = file
+                }
+                // An app asking for the name gets this file (or another active copy of the same face).
+                if let path = context.fileForName(name), let face = faces.first(where: { $0.path == path || $0.copies.contains(path) }) {
+                    files[face.path]?.won.append(name)
+                }
+            }
+            let problemFiles = files.map { path, file in
+                let styles = file.styles.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }.map(\.name)
+                return ProblemFile(path: path, version: nil, modified: nil, detail: context.detail(of: path),
+                                   title: joined(sorted(file.families)), note: joined(abridged(styles)), preferredFor: file.won)
+            }.sorted { a, b in
+                let order = a.title!.localizedStandardCompare(b.title!)
+                return order == .orderedSame ? a.path < b.path : order == .orderedAscending
+            }
+
+            let families = sorted(Array(component))
+            var summary = names.count == 1
+                ? "One style in each has the same PostScript name, \(names[0])."
+                : "Some of their styles have the same PostScript names: \(joined(abridged(names)))."
+            let winners = problemFiles.filter { !$0.preferredFor.isEmpty }
+            if winners.map(\.preferredFor.count).reduce(0, +) == names.count {
+                summary += " macOS gives \(names.count == 1 ? "that name" : "those names") to \(joined(winners.map { $0.title! }))."
+            }
             return Problem(
                 id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
-                title: joined(families), summary: summary,
-                files: paths.map { context.file($0) }, fixes: [], fileFixes: fileFixes,
-                // A folder can hold more than one of the fonts: deactivating all its files could turn off every one.
-                folderFixes: folderFixes(paths, fileFixes) { _ in false }
+                title: joined(families.count > 4 ? Array(families.prefix(3)) + ["\(families.count - 3) more"] : families),
+                summary: summary, files: problemFiles, fixes: [],
+                fileFixes: Dictionary(uniqueKeysWithValues: problemFiles.map { file in
+                    (file.path, [ProblemFix.reveal([file.path])] + (files[file.path]!.id.map { [.deactivate([$0])] } ?? []))
+                })
             )
         }
+    }
+
+    /// The first six of more than seven items, then "N more".
+    private static func abridged(_ items: [String]) -> [String] {
+        items.count > 7 ? Array(items.prefix(6)) + ["\(items.count - 6) more"] : items
+    }
+
+    /// In Finder's order.
+    private static func sorted(_ names: [String]) -> [String] {
+        names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     /// Reveal for each folder holding more than one of the paths, and the files' own Move to Trash or Deactivate
