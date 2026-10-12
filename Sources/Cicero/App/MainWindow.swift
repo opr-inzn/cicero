@@ -73,7 +73,7 @@ struct MainWindow: View {
     static func trashMessage(_ plan: TrashPlan) -> String {
         var parts = [plan.paths.count == 1
             ? "1 font file will be removed from your Mac and turned off in every app."
-            : "\(plan.paths.count) font files, including copies in other folders, will be removed from your Mac and turned off in every app."]
+            : "\(plan.paths.count) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be removed from your Mac and turned off in every app."]
         if !plan.otherFamilies.isEmpty {
             let names = ListFormatter.localizedString(byJoining: Array(plan.otherFamilies.prefix(3)))
             parts.append("Some files also contain \(names)\(plan.otherFamilies.count > 3 ? " and others" : ""), which will be removed too.")

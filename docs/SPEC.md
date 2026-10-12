@@ -132,6 +132,7 @@ Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a 
 
 Sidebar item with badge; groups with a short explanation and fixes:
 - Installed Twice: the same font (same family) active from more than one file. Per copy: version, modified date, where; Reveal; Remove Copy… / Deactivate when Cicero can.
+- In every group, a problem's files that share a folder share one row: the folder, the files' version(s), modified dates and where, and "› 18 files" to show them (each with its own fixes). The row's Reveal selects them all; in Installed Twice it also has Remove Copies… / Deactivate when every file has it and every style keeps a copy outside the folder, and a green "Newest" tag marks the folder (or file) with the highest version when all the others are older.
 - Shared Style Names (minor — not counted in the badge, collapsed at the bottom): fonts whose main PostScript names (name ID 6) differ, but whose named styles (variable fonts' fvar instances) use bare PostScript names like "Bold" that another active font uses too; the summary lists them ("Named styles Light, Medium, Bold and Black use the same PostScript names in both."); per file Reveal and Deactivate (when Cicero can).
 - Duplicates: same font more than once in your folders (inactive); Move Extra Copies to Trash… (keep the installed copy's origin, else newest).
 - Missing files: in-place registrations whose file is gone (Forget + unregister), installed copies gone (Forget), set members no longer in the library (Remove from Set).
