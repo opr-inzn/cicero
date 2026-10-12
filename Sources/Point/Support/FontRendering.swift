@@ -220,57 +220,10 @@ enum CharacterSections {
     }
 }
 
-// MARK: - Colors
-
-enum PreviewColorMode: String, CaseIterable {
-    case light, dark, custom
-}
-
-struct PreviewColors {
-    var foreground: Color
-    var background: Color
-
-    /// The window chrome follows the canvas so toolbar text stays readable.
-    var colorScheme: ColorScheme {
-        guard let color = NSColor(background).usingColorSpace(.sRGB) else { return .light }
-        let luminance = 0.2126 * color.redComponent + 0.7152 * color.greenComponent + 0.0722 * color.blueComponent
-        return luminance < 0.5 ? .dark : .light
-    }
-
-    init(mode: PreviewColorMode, foregroundHex: String, backgroundHex: String) {
-        switch mode {
-        case .light:
-            foreground = .black
-            background = .white
-        case .dark:
-            foreground = .white
-            background = .black
-        case .custom:
-            foreground = Color(hex: foregroundHex) ?? .white
-            background = Color(hex: backgroundHex) ?? .orange
-        }
-    }
-}
 
 extension Color {
-    init?(hex: String) {
-        var string = hex.trimmingCharacters(in: .whitespaces)
-        if string.hasPrefix("#") { string.removeFirst() }
-        guard string.count == 6, let value = UInt32(string, radix: 16) else { return nil }
-        self.init(
-            red: Double((value >> 16) & 0xFF) / 255,
-            green: Double((value >> 8) & 0xFF) / 255,
-            blue: Double(value & 0xFF) / 255
-        )
-    }
-
-    var hexString: String {
-        guard let color = NSColor(self).usingColorSpace(.sRGB) else { return "#000000" }
-        let r = Int((color.redComponent * 255).rounded())
-        let g = Int((color.greenComponent * 255).rounded())
-        let b = Int((color.blueComponent * 255).rounded())
-        return String(format: "#%02X%02X%02X", r, g, b)
-    }
+    /// Background behind font previews; follows the system light/dark appearance.
+    static let canvas = Color(nsColor: .textBackgroundColor)
 }
 
 enum Prefs {
@@ -278,9 +231,6 @@ enum Prefs {
     static let weight = "browser.weight"
     static let sampleText = "browser.sampleText"
     static let viewMode = "browser.viewMode"
-    static let colorMode = "display.colorMode"
-    static let customForeground = "display.customForeground"
-    static let customBackground = "display.customBackground"
     static let detailPointSize = "detail.pointSize"
     static let detailWeight = "detail.weight"
     static let detailTracking = "detail.tracking"

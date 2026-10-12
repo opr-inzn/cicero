@@ -9,9 +9,6 @@ struct FamilyDetailView: View {
     @AppStorage(Prefs.detailWeight) private var weight = 400.0
     @AppStorage(Prefs.detailTracking) private var tracking = 0.0
     @AppStorage(Prefs.detailText) private var previewText = "The quick brown fox jumps over the lazy dog."
-    @AppStorage(Prefs.colorMode) private var colorMode: PreviewColorMode = .light
-    @AppStorage(Prefs.customForeground) private var customForeground = "#FFFFFF"
-    @AppStorage(Prefs.customBackground) private var customBackground = "#F04000"
 
     @State private var sections: [CharacterSection] = []
     @State private var selectedCharacter: UInt32?
@@ -28,7 +25,6 @@ struct FamilyDetailView: View {
     ]
 
     var body: some View {
-        let colors = PreviewColors(mode: colorMode, foregroundHex: customForeground, backgroundHex: customBackground)
         let face = family.face(nearestWeight: Int(weight))
         let features = library.detailFeatures
         ScrollView {
@@ -37,7 +33,7 @@ struct FamilyDetailView: View {
                     .textFieldStyle(.plain)
                     .font(Font(FontCache.shared.font(face.face, size: pointSize, weight: weight, features: features)))
                     .tracking(pointSize * tracking / 100)
-                    .foregroundStyle(colors.foreground)
+                    .foregroundStyle(Color.primary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 48)
                     .padding(.vertical, 60)
@@ -45,18 +41,18 @@ struct FamilyDetailView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(family.faces.enumerated()), id: \.element.id) { index, style in
-                        styleRow(style, index: index, colors: colors)
+                        styleRow(style, index: index)
                     }
                 }
                 .padding(.horizontal, 24)
 
                 ForEach(sections) { section in
-                    characterSection(section, face: face.face, colors: colors)
+                    characterSection(section, face: face.face)
                 }
             }
             .padding(.bottom, 40)
         }
-        .background(colors.background)
+        .background(Color.canvas)
         .navigationTitle(family.name)
         .toolbar { toolbar }
         .onExitCommand { library.detailFamilyID = nil }
@@ -68,7 +64,7 @@ struct FamilyDetailView: View {
 
     // MARK: Styles
 
-    private func styleRow(_ style: LibraryFace, index: Int, colors: PreviewColors) -> some View {
+    private func styleRow(_ style: LibraryFace, index: Int) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(style.face.styleName)
@@ -80,45 +76,45 @@ struct FamilyDetailView: View {
                         .opacity(0.7)
                 }
             }
-            .foregroundStyle(colors.foreground.opacity(0.55))
+            .foregroundStyle(Color.primary.opacity(0.55))
             .frame(width: 120, alignment: .leading)
             FontPreviewText(
                 text: Self.pangrams[index % Self.pangrams.count],
-                face: style.face, size: 28, weight: Double(style.face.weightClass), features: library.detailFeatures, color: colors.foreground
+                face: style.face, size: 28, weight: Double(style.face.weightClass), features: library.detailFeatures
             )
             Spacer(minLength: 0)
         }
         .padding(.vertical, 16)
-        .overlay(alignment: .bottom) { Rectangle().fill(colors.foreground.opacity(0.08)).frame(height: 1) }
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
         .contentShape(.rect)
         .contextMenu { FaceActionsMenu(family: family, face: style) }
     }
 
     // MARK: Characters
 
-    private func characterSection(_ section: CharacterSection, face: FontFace, colors: PreviewColors) -> some View {
+    private func characterSection(_ section: CharacterSection, face: FontFace) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(section.title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(colors.foreground.opacity(0.5))
+                .foregroundStyle(Color.primary.opacity(0.5))
                 .padding(.horizontal, 24)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 0)], spacing: 0) {
                 ForEach(section.scalars, id: \.self) { value in
-                    characterCell(value, face: face, colors: colors)
+                    characterCell(value, face: face)
                 }
             }
         }
         .padding(.top, 36)
     }
 
-    private func characterCell(_ value: UInt32, face: FontFace, colors: PreviewColors) -> some View {
+    private func characterCell(_ value: UInt32, face: FontFace) -> some View {
         let character = String(Unicode.Scalar(value).map(Character.init) ?? " ")
         return Text(character)
             .font(Font(FontCache.shared.font(face, size: 30, weight: weight, features: library.detailFeatures)))
-            .foregroundStyle(colors.foreground)
+            .foregroundStyle(Color.primary)
             .frame(maxWidth: .infinity, minHeight: 64)
             .background(selectedCharacter == value ? Color.accentColor.opacity(0.18) : .clear)
-            .overlay { Rectangle().strokeBorder(colors.foreground.opacity(0.07), lineWidth: 0.5) }
+            .overlay { Rectangle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5) }
             .contentShape(.rect)
             .onTapGesture { selectedCharacter = value }
             .popover(isPresented: Binding(
@@ -165,9 +161,6 @@ struct FamilyDetailView: View {
             }
             .padding(.horizontal, 6)
             .help("Letter spacing")
-        }
-        ToolbarItem {
-            ColorChips(mode: $colorMode, foregroundHex: $customForeground, backgroundHex: $customBackground)
         }
         ToolbarItem { InfoToolbarButton() }
             .sharedBackgroundVisibility(.hidden)
