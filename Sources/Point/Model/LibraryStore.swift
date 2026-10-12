@@ -248,6 +248,7 @@ final class LibraryStore {
         unreadableFiles = files.filter { $0.faces.isEmpty }.map(\.path)
         activePaths = Set(files.lazy.filter(\.isActive).map(\.path))
         refreshProblems()
+        CharacterCoverage.shared.index(result)
     }
 
     func activeKind(of path: String, userFonts: String) -> ActiveKind {
