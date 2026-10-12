@@ -81,7 +81,7 @@ struct FamilyMenu: View {
 
     private var note: String? {
         switch families.first?.state {
-        case .appOnly(let app): "Available in \(app) apps only"
+        case .appOnly(let app): "Available in \(FaceState.appDescription(app)) only"
         case .system: "Installed with macOS"
         default: nil
         }

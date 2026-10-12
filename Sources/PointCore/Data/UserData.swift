@@ -20,8 +20,33 @@ public struct UserData: Codable, Equatable, Sendable {
     public var installMethod: InstallMethod = .ask
     public var showSystemFonts = true
     public var records = ActivationRecords()
+    /// App font folders Point found by itself and the user removed; they aren't added again.
+    public var dismissedFolders: Set<String> = []
 
     public init() {}
+
+    /// Missing keys take their defaults, so files from older versions keep loading.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = UserData()
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) throws -> T {
+            try c.decodeIfPresent(T.self, forKey: key) ?? fallback
+        }
+        version = try value(.version, d.version)
+        folders = try value(.folders, d.folders)
+        sets = try value(.sets, d.sets)
+        smartSets = try value(.smartSets, d.smartSets)
+        tags = try value(.tags, d.tags)
+        familyTags = try value(.familyTags, d.familyTags)
+        foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
+        foundryRenames = try value(.foundryRenames, d.foundryRenames)
+        customCharacterSets = try value(.customCharacterSets, d.customCharacterSets)
+        sidebar = try value(.sidebar, d.sidebar)
+        installMethod = try value(.installMethod, d.installMethod)
+        showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
+        records = try value(.records, d.records)
+        dismissedFolders = try value(.dismissedFolders, d.dismissedFolders)
+    }
 }
 
 public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
@@ -41,19 +66,51 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// "Adobe Fonts" for …/Adobe/Fonts, else the folder's name.
+    /// "Adobe Apps" / "Adobe Apps (Your Account)" / "InDesign 2026" for the folders apps load fonts
+    /// from, "Deactivated" for Point's own, "<Parent> Fonts" for other folders called Fonts, else the name.
     public var displayName: String {
         if id == Self.deactivatedID { return "Deactivated" }
+        let lower = path.lowercased()
+        if lower.hasSuffix(Self.adobeFolderSuffix) {
+            return path.hasPrefix(NSHomeDirectory()) ? "Adobe Apps (Your Account)" : "Adobe Apps"
+        }
         let last = url.lastPathComponent
         guard last.caseInsensitiveCompare("Fonts") == .orderedSame else { return last }
-        return url.deletingLastPathComponent().lastPathComponent + " Fonts"
+        let parent = url.deletingLastPathComponent().lastPathComponent
+        if parent.hasPrefix("Adobe ") && Self.detectAppName(forPath: path) != nil { return String(parent.dropFirst("Adobe ".count)) }
+        return parent + " Fonts"
     }
 
-    /// Adobe apps load fonts in Application Support/Adobe/Fonts by themselves; nothing else sees them.
+    private static let adobeFolderSuffix = "/application support/adobe/fonts"
+
+    /// Which app loads a folder's fonts by itself, so they count as active there rather than inactive:
+    /// Adobe's shared font folders (all Adobe apps) and the Fonts folder inside InDesign or InCopy.
     public static func detectAppName(forPath path: String) -> String? {
         let lower = path.lowercased()
-        let adobe = "/application support/adobe/fonts"
-        return lower.hasSuffix(adobe) || lower.contains(adobe + "/") ? "Adobe" : nil
+        if lower.hasSuffix(adobeFolderSuffix) || lower.contains(adobeFolderSuffix + "/") { return "Adobe" }
+        for app in ["InDesign", "InCopy"] where lower.range(of: "/applications/adobe \(app.lowercased())[^/]*/fonts(/|$)", options: .regularExpression) != nil {
+            return app
+        }
+        return nil
+    }
+
+    /// The folders on this Mac that Adobe apps load fonts from by themselves: Adobe's shared folder for
+    /// all users and for this account, and each InDesign or InCopy version's Fonts folder.
+    public static func appFontFolders(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [WatchedFolder] {
+        let fm = FileManager.default
+        var paths = [
+            "/Library/Application Support/Adobe/Fonts",
+            home.appendingPathComponent("Library/Application Support/Adobe/Fonts").path,
+        ]
+        let apps = (try? fm.contentsOfDirectory(atPath: "/Applications")) ?? []
+        for app in apps.sorted() where app.hasPrefix("Adobe InDesign") || app.hasPrefix("Adobe InCopy") {
+            paths.append("/Applications/\(app)/Fonts")
+        }
+        return paths.compactMap { path in
+            var isDirectory: ObjCBool = false
+            guard fm.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else { return nil }
+            return WatchedFolder(path: path, appName: detectAppName(forPath: path))
+        }
     }
 }
 
