@@ -124,12 +124,14 @@ public enum ProblemDetector {
         let library: Library
         let data: UserData
         let locations: Locations
+        let folders: [WatchedFolder]
         private var versions: [String: String?] = [:]
 
         init(library: Library, data: UserData, locations: Locations) {
             self.library = library
             self.data = data
             self.locations = locations
+            folders = data.scannedFolders()
         }
 
         mutating func file(_ path: String) -> ProblemFile {
@@ -162,14 +164,14 @@ public enum ProblemDetector {
                 }
             }
             if path.hasPrefix(locations.deactivated.path + "/") { return "In Cicero’s Deactivated folder" }
-            if let folder = data.folders.first(where: { path.hasPrefix($0.path + "/") }) {
+            if let folder = folders.first(where: { path.hasPrefix($0.path + "/") }) {
                 return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
             }
             return "Not activated"
         }
 
         func isInWatchedFolder(_ path: String) -> Bool {
-            path.hasPrefix(locations.deactivated.path + "/") || data.folders.contains { path.hasPrefix($0.path + "/") }
+            path.hasPrefix(locations.deactivated.path + "/") || folders.contains { path.hasPrefix($0.path + "/") }
         }
 
         /// "Version 2.001" → 2.001, for picking the newest copy.

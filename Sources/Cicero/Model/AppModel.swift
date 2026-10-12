@@ -43,6 +43,7 @@ final class AppModel {
                 refreshGroups()
             }
             if data.customCharacterSets != oldValue.customCharacterSets { characterSetLookup.reset() }
+            if data.showAdobeFonts != oldValue.showAdobeFonts { rescan() }
         }
     }
     /// Bumped on every change to `data`; cached lists depend on it.
@@ -135,16 +136,13 @@ final class AppModel {
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
         }
-        addAppFontFolders()
+        dropAdobeFolders()
         rescan()
     }
 
-    /// Adds the folders Adobe apps load fonts from by themselves (found on this Mac), unless they're
-    /// already watched or the user removed them before.
-    private func addAppFontFolders() {
-        let watched = Set(data.folders.map(\.path))
-        let new = WatchedFolder.appFontFolders().filter { !watched.contains($0.path) && !data.dismissedFolders.contains($0.path) }
-        if !new.isEmpty { data.folders += new }
+    /// Adobe's font folders used to be added to the user's folders; the Adobe Apps switch covers them now.
+    private func dropAdobeFolders() {
+        data.folders.removeAll { WatchedFolder.detectAppName(forPath: $0.path) != nil }
     }
 
     private func prepareToQuit() {
@@ -158,7 +156,7 @@ final class AppModel {
         scanTask?.cancel()
         lastScan = Date()
         scanProgress = .finding
-        let input = ScanInput(folders: data.folders, records: data.records)
+        let input = ScanInput(folders: data.scannedFolders(), records: data.records)
         let scanner = scanner
         let report: @Sendable (ScanProgress) -> Void = { [weak self] progress in
             guard let self else { return }
