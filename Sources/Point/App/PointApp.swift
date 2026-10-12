@@ -36,6 +36,15 @@ struct PointApp: App {
         .restorationBehavior(.disabled)
         .commandsRemoved()
 
+        Window("Character Toolbox", id: "toolbox") {
+            ToolboxWindow()
+                .environment(library)
+                .environment(preview)
+                .frame(minWidth: 760, minHeight: 480)
+                .onAppear { library.start() }
+        }
+        .defaultSize(width: 1000, height: 660)
+
         Settings {
             SettingsView()
                 .environment(library)
@@ -44,6 +53,7 @@ struct PointApp: App {
 }
 
 struct PointCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
     let library: LibraryStore
 
     var body: some Commands {
@@ -77,6 +87,8 @@ struct PointCommands: Commands {
                 .disabled(selection.isEmpty)
             Divider()
             PresentationCommands(library: library)
+            Button("Character Toolbox") { openWindow(id: "toolbox") }
+                .keyboardShortcut("t", modifiers: [.command, .option])
             Divider()
             Button("Rescan Library") { library.rescan() }
                 .keyboardShortcut("r", modifiers: .command)

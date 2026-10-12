@@ -88,8 +88,6 @@ struct InspectorView: View {
 private struct InfoPane: View {
     @Environment(LibraryStore.self) private var library
     let face: LibraryFace
-    /// Worked out off the main thread: CoreText checks the character set against every language.
-    @State private var languages: String?
 
     var body: some View {
         let metadata = FontMetadata(face: face.face)
@@ -98,9 +96,7 @@ private struct InfoPane: View {
             ForEach(Array(metadata.rows.enumerated()), id: \.offset) { _, pair in
                 row(pair.0, pair.1)
             }
-            if let languages {
-                row("Languages", languages)
-            }
+            LanguagesRow(face: face.face)
             VStack(alignment: .leading, spacing: 4) {
                 label("Location")
                 Text(face.face.path)
@@ -125,10 +121,6 @@ private struct InfoPane: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: face.id) {
-            let target = face.face
-            languages = await Task.detached(priority: .userInitiated) { FontMetadata.languagesSummary(of: target) }.value
-        }
     }
 
     private func label(_ text: String) -> some View {
