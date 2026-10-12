@@ -19,7 +19,7 @@ ellipsis character (…) for items that ask for more input.
 
 - Header "Fonts" with an **Edit**/**Done** button. Edit mode shows a checkbox on every row and every
   section header; unchecked items are dimmed, and disappear when you click Done.
-- Fixed rows: All Fonts (books.vertical), Activated (circle.inset.filled), Not Activated (circle),
+- Fixed rows: All Fonts (books.vertical), Activated (checkmark.circle), Not Activated (circle.dashed),
   System Fonts (apple.logo), Problems (exclamationmark.triangle, count badge).
 - Sections, each collapsible and hideable:
   - **Folders** (+ adds folders). Point adds the folders Adobe apps load fonts from by themselves when they exist — /Library/Application Support/Adobe/Fonts ("Adobe Apps"), ~/Library/Application Support/Adobe/Fonts ("Adobe Apps (Your Account)"), and each /Applications/Adobe InDesign|InCopy <version>/Fonts ("InDesign 2026", fonts active in InDesign only) — at first launch and whenever a new one appears; a removed one isn't added again. Row menu: Reveal in Finder; "Fonts in This Folder" picker —
