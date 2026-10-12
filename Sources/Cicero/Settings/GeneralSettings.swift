@@ -27,9 +27,9 @@ struct GeneralSettings: View {
                 Text(activationExplanation).formFooter()
             }
             Section {
-                Toggle("Show system fonts in other lists", isOn: $model.data.showSystemFonts)
+                Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
             } footer: {
-                Text("Fonts that come with macOS are always in System Fonts. With this on, they’re in All Fonts, foundries, classifications and every other list too.").formFooter()
+                Text("Fonts that come with macOS. With this off, they’re hidden everywhere, System Fonts in the sidebar too.").formFooter()
             }
             Section {
                 LabeledContent("Cicero’s font list") {

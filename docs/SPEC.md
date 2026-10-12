@@ -20,7 +20,7 @@ ellipsis character (…) for items that ask for more input.
 - Header "Fonts" with an **Edit**/**Done** button. Edit mode shows a checkbox on every row and every
   section header; unchecked items are dimmed, and disappear when you click Done.
 - Fixed rows: All Fonts (books.vertical), Activated (checkmark.circle), Not Activated (circle.dashed),
-  System Fonts (apple.logo), Problems (exclamationmark.triangle, count badge).
+  System Fonts (apple.logo, only while system fonts are shown), Problems (exclamationmark.triangle, count badge).
 - Sections, each collapsible and hideable:
   - **Folders** (+ adds folders). The folders Adobe apps load fonts from by themselves — /Library/Application Support/Adobe/Fonts, ~/Library/Application Support/Adobe/Fonts (all Adobe apps) and the Fonts folder next to any Adobe app, like /Applications/Adobe InDesign 2026/Fonts (that app only) — are one "Adobe Apps" item, shown while it has fonts (row menu: Reveal in Finder). They aren't in the user's folders: Settings → Folders → "Show fonts installed for Adobe apps" (on by default) switches them; adding one of them with + turns the switch on. Row menu for the user's folders: Reveal in Finder; "Fonts in This Folder" picker —
     "Not activated until you activate them" / "Active in Adobe apps" / a custom app name; Remove Folder from Library.
@@ -31,13 +31,22 @@ ellipsis character (…) for items that ask for more input.
   - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
   - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Unicode Blocks, Google Fonts, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - Every row menu also has Hide from Sidebar and Edit Sidebar.
+- Order: rows drag to a new place within their own section (character sets within their group, and the
+  groups within Character Sets), never into another one. Section titles drag onto each other: the dragged
+  section takes the other's place, which is highlighted. While a section is dragged its rows fold away
+  under its title, so it moves as one (a list drags a header as a picture of it, with no custom preview),
+  and come back when it's dropped. Items that are gone for now (System Fonts while
+  system fonts are off, an empty Deactivated folder) keep their place; new items go last.
+- Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
+  together; the browser then shows the fonts in any of them. Selecting in another section starts over there.
 - Dropping family names (drag from the browser) onto a set or foundry adds them.
 - Creating a set or character set un-hides its section.
-- Settings → Sidebar lists the same items as Finder-style checkboxes, with Show All.
+- Settings → Sidebar lists the same items, in the sidebar's order, as Finder-style checkboxes, with
+  Reset Order and Show All.
 
 ## Browser
 
-- Title = selected item's name; subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
+- Title = selected item's name (several: "Serif and Script"); subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right with equal gaps (ToolbarSpacer(.fixed) between groups): view switcher
   [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field.
 - **List** (SwiftUI Table, sortable, column customisation saved): Status (switch) · Name (+ status tag) ·
@@ -91,7 +100,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Classification from OS/2 family class (1,2,3,7 serif; 4,5 slab; 8 sans; 9 ornamental; 10 script; 12 symbol), monospace first, then name hints (mono/code, slab, sans/grotesk/gothic, serif/garamond/antiqua, script/brush/hand).
 - Foundry: manufacturer name trimmed of Inc./LLC/GmbH/…, URLs and copyright lines dropped, casing unified; user can rename a foundry or set a family's foundry (drop onto foundry).
 - Rescan: on launch, after activation changes, on CoreText's registered-fonts-changed notification (debounced), and when the app becomes active after ≥10 s. An unchanged scan must cost almost nothing (fingerprint; no UI churn).
-- Show system fonts in other lists (Settings → General, or Show in Other Lists in the System Fonts item's context menu) off hides system families everywhere except the System Fonts item.
+- Show system fonts (Settings → General) off hides system families everywhere, and the System Fonts item with them.
 
 ## Activation
 
@@ -145,9 +154,9 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Show system fonts in other lists" (+ explanation); Font Caches (Rebuild, a red Clear).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
-- Sidebar: Finder-style checkboxes. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
+- Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Character Sets: as above.
 
 ## Data and privacy
