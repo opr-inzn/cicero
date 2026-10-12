@@ -141,27 +141,34 @@ public struct ActivationEngine: Sendable {
     }
 
     /// Copies into ~/Library/Fonts or registers in place (`method` is `.copy` or `.inPlace`). Faces
-    /// from app-only folders are always registered in place. Temporarily active faces are made permanent.
+    /// from app-only folders are always registered in place, after going back into the folder if Cicero
+    /// moved them out. Temporarily active faces are made permanent.
     public func activate(_ faces: [LibraryFace], method: InstallMethod, records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
         var succeeded = 0
         var toCopy: [String] = []
         var toRegister: [String] = []
-        for face in Self.uniqueByPath(faces) where face.canActivate {
-            if case .appOnly = face.state {
-                toRegister.append(face.face.path)
-            } else if method == .inPlace {
-                toRegister.append(face.face.path)
-            } else {
-                toCopy.append(face.face.path)
-            }
-        }
+        let targets = Self.uniqueByPath(faces).filter(\.canActivate)
         // A session registration of the same file would shadow the permanent one.
-        let temporary = (toCopy + toRegister).filter { records.temporary[$0] != nil }
+        let temporary = targets.map(\.face.path).filter { records.temporary[$0] != nil }
         if !temporary.isEmpty {
             let stuck = await registrar.unregister(temporary.map(Self.url), scope: .session)
             for path in temporary where !stuck.contains(path) { records.temporary[path] = nil }
+        }
+        for face in targets {
+            let path = face.face.path
+            if records.appFolderOrigins[path] != nil {
+                do {
+                    toRegister.append(try moveBackToAppFolder(path, records: &records))
+                } catch {
+                    failed.append(path)
+                }
+            } else if face.app != nil || method == .inPlace {
+                toRegister.append(path)
+            } else {
+                toCopy.append(path)
+            }
         }
         for path in toCopy {
             do {
@@ -229,6 +236,8 @@ public struct ActivationEngine: Sendable {
         }
     }
 
+    /// Faces an app loads from its own folder also leave that folder for Cicero's Deactivated folder,
+    /// so they're off in the app too.
     public func deactivate(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
@@ -236,8 +245,18 @@ public struct ActivationEngine: Sendable {
         var succeeded = 0
         var persistent: [String] = []
         var session: [String] = []
+        var leaving: [String] = []
         for face in Self.uniqueByPath(faces) {
             let path = face.face.path
+            if face.app != nil, records.appFolderOrigins[path] == nil {
+                leaving.append(path)
+                switch face.state.source {
+                case .inPlace, .otherApp: persistent.append(path)
+                case .temporary: session.append(path)
+                default: break
+                }
+                continue
+            }
             switch face.state.source {
             case nil:
                 continue
@@ -267,7 +286,7 @@ public struct ActivationEngine: Sendable {
                     failed.append(path)
                 } else {
                     records.inPlace.remove(path)
-                    succeeded += 1
+                    if !leaving.contains(path) { succeeded += 1 }
                 }
             }
         }
@@ -278,14 +297,67 @@ public struct ActivationEngine: Sendable {
                     failed.append(path)
                 } else {
                     records.temporary[path] = nil
-                    succeeded += 1
+                    if !leaving.contains(path) { succeeded += 1 }
                 }
+            }
+        }
+        for path in leaving where !failed.contains(path) {
+            do {
+                try moveOutOfAppFolder(path, records: &records)
+                succeeded += 1
+            } catch {
+                failed.append(path)
             }
         }
         let message = failed.isEmpty && succeeded == 0 && !locked.isEmpty
             ? "These fonts are managed by macOS or another app."
             : Self.message("Deactivated", "deactivate", succeeded: succeeded, failed: failed.count + locked.count)
         return ActivationResult(records: records, succeeded: succeeded, failed: failed + locked, message: message)
+    }
+
+    /// Faces an app loads from its own folder go back to being on in that app only: files Cicero moved
+    /// out of the folder go back, files it registered there are unregistered.
+    public func useInAppOnly(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
+        var records = records
+        var failed: [String] = []
+        var persistent: [String] = []
+        var session: [String] = []
+        var returning: [String] = []
+        for face in Self.uniqueByPath(faces) where face.app != nil {
+            let path = face.face.path
+            if records.appFolderOrigins[path] != nil { returning.append(path) }
+            switch face.state.source {
+            case .inPlace, .otherApp: persistent.append(path)
+            case .temporary: session.append(path)
+            default: break
+            }
+        }
+        if !persistent.isEmpty {
+            var stuck = await registrar.unregister(persistent.map(Self.url), scope: .persistent)
+            if !stuck.isEmpty {
+                stuck = await registrar.unregister(stuck.sorted().map(Self.url), scope: .session)
+            }
+            for path in persistent where !stuck.contains(path) { records.inPlace.remove(path) }
+            failed += persistent.filter(stuck.contains)
+        }
+        if !session.isEmpty {
+            let stuck = await registrar.unregister(session.map(Self.url), scope: .session)
+            for path in session where !stuck.contains(path) { records.temporary[path] = nil }
+            failed += session.filter(stuck.contains)
+        }
+        for path in returning where !failed.contains(path) {
+            do {
+                _ = try moveBackToAppFolder(path, records: &records)
+            } catch {
+                failed.append(path)
+            }
+        }
+        let succeeded = Set(persistent + session + returning).subtracting(failed).count
+        let app = faces.lazy.compactMap(\.app).first.map(FaceState.appDescription) ?? "the app"
+        let message = failed.isEmpty
+            ? "On in \(app) only."
+            : Self.message("Done", "move", succeeded: succeeded, failed: failed.count)
+        return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
     /// nil when every file is protected (the app then says so).
@@ -329,6 +401,7 @@ public struct ActivationEngine: Sendable {
                 records.installedCopies[path] = nil
                 records.inPlace.remove(path)
                 records.temporary[path] = nil
+                records.appFolderOrigins[path] = nil
                 succeeded += 1
             } catch {
                 failed.append(path)
@@ -447,6 +520,29 @@ public struct ActivationEngine: Sendable {
             try fm.copyItem(at: source, to: destination)
         }
         records.installedCopies[destination.path] = path
+    }
+
+    /// Moves a file out of an app's folder into Cicero's Deactivated folder, so the app stops loading it,
+    /// and remembers where it was.
+    private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true)
+        let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: locations.deactivated)
+        try fm.moveItem(at: Self.url(path), to: destination)
+        records.appFolderOrigins[destination.path] = path
+    }
+
+    /// Puts a file back where it was in an app's folder (beside a newer file of the same name, if there
+    /// is one) and returns its path there. Fails when the folder is gone.
+    private func moveBackToAppFolder(_ path: String, records: inout ActivationRecords) throws -> String {
+        guard let origin = records.appFolderOrigins[path] else { return path }
+        let original = Self.url(origin)
+        let destination = FileManager.default.fileExists(atPath: origin)
+            ? Self.uniqueURL(for: original.lastPathComponent, in: original.deletingLastPathComponent())
+            : original
+        try FileManager.default.moveItem(at: Self.url(path), to: destination)
+        records.appFolderOrigins[path] = nil
+        return destination.path
     }
 
     /// Trashes an installed copy when its original is still there, else keeps the file in Cicero's Deactivated folder.

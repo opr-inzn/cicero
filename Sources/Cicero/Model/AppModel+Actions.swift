@@ -13,7 +13,7 @@ extension AppModel {
     func activate(_ faces: [LibraryFace], title: String) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on.") }
-        let needsChoice = targets.contains { if case .appOnly = $0.state { false } else { true } }
+        let needsChoice = targets.contains { $0.app == nil }
         if data.installMethod == .ask && needsChoice {
             activationPrompt = ActivationPrompt(title: title, faces: targets)
         } else {
@@ -65,8 +65,29 @@ extension AppModel {
         }
     }
 
+    /// On ↔ off; fonts an app loads from its own folder go from on in that app to on everywhere, then
+    /// off everywhere, then back.
     func toggle(_ family: Family) {
-        family.hasActive ? deactivate([family]) : activate([family])
+        switch family.position {
+        case .on: deactivate([family])
+        case .app: activate([family])
+        case .off: family.app == nil ? activate([family]) : useInAppOnly(family.faces)
+        }
+    }
+
+    func toggle(_ face: LibraryFace, in family: Family) {
+        switch face.position {
+        case .on: deactivate([face])
+        case .app: activate([face], title: "\(family.name) \(face.face.styleName)")
+        case .off: face.app == nil ? activate([face], title: "\(family.name) \(face.face.styleName)") : useInAppOnly([face])
+        }
+    }
+
+    func useInAppOnly(_ faces: [LibraryFace]) {
+        enqueue { model in
+            let result = await model.engine.useInAppOnly(faces, records: model.data.records)
+            model.finish(result)
+        }
     }
 
     func finish(_ result: ActivationResult) {

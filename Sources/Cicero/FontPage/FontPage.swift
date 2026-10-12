@@ -86,7 +86,7 @@ private struct Header: View {
             Spacer(minLength: 16)
             HStack(spacing: 8) {
                 if family.hasActivatable {
-                    Button("Activate" + (model.data.installMethod == .ask ? "…" : "")) { model.activate([family]) }
+                    Button("Activate" + (model.data.installMethod == .ask && family.app == nil ? "…" : "")) { model.activate([family]) }
                         .buttonStyle(.borderedProminent)
                 }
                 if family.hasDeactivatable {
@@ -202,8 +202,8 @@ private struct StylesTab: View {
             .width(min: 50, ideal: 60)
             TableColumn("Status") { style in
                 HStack(spacing: 8) {
-                    MiniSwitch(isOn: style.state.isActive, isEnabled: style.canActivate || style.canDeactivate) {
-                        style.state.isActive ? model.deactivate([style]) : model.activate([style], title: "\(family.name) \(style.face.styleName)")
+                    MiniSwitch(position: style.position, isEnabled: style.canActivate || style.canDeactivate) {
+                        model.toggle(style, in: family)
                     }
                     Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
                 }
