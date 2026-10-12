@@ -230,34 +230,8 @@ struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct StyleCategory: Codable, Hashable, Identifiable, Sendable {
-    var id: String
-    var name: String
-    var isBuiltIn: Bool
-
-    static let defaults: [StyleCategory] = [
-        .init(id: "serif", name: "Serif", isBuiltIn: true),
-        .init(id: "sans", name: "Sans-Serif", isBuiltIn: true),
-        .init(id: "display", name: "Display", isBuiltIn: true),
-        .init(id: "mono", name: "Mono", isBuiltIn: true),
-        .init(id: "script", name: "Script", isBuiltIn: true),
-        .init(id: "decorative", name: "Decorative", isBuiltIn: true),
-    ]
-
-    var icon: String {
-        switch id {
-        case "serif": "textformat"
-        case "sans": "textformat.alt"
-        case "display": "textformat.size.larger"
-        case "mono": "chevron.left.forwardslash.chevron.right"
-        case "script": "scribble.variable"
-        case "decorative": "paintbrush.pointed"
-        default: "tag"
-        }
-    }
-}
-
-struct FontCollection: Codable, Hashable, Identifiable, Sendable {
+/// A hand-picked group of families.
+struct FontSet: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
     var name: String
     var familyNames: [String] = []
@@ -277,16 +251,17 @@ enum InstallMethod: String, Codable, CaseIterable, Sendable {
 
 struct UserLibraryData: Codable, Sendable {
     var watchedFolders: [WatchedFolder] = []
-    var styles: [StyleCategory] = StyleCategory.defaults
-    /// Family name → style id. An empty string means "explicitly unclassified".
-    var styleAssignments: [String: String] = [:]
-    var collections: [FontCollection] = []
+    var sets: [FontSet] = []
+    /// Tag names in sidebar order.
+    var tags: [String] = []
+    /// Family name → its tags.
+    var familyTags: [String: [String]] = [:]
     /// Family name → foundry name, overriding the font's manufacturer metadata.
     var foundryOverrides: [String: String] = [:]
     /// Foundry name from metadata → display name.
     var foundryRenames: [String: String] = [:]
     var hiddenSidebarItems: Set<String> = []
-    var collapsedSections: Set<String> = ["foundries"]
+    var collapsedSections: Set<String> = ["foundries", "classifications"]
     var installMethod: InstallMethod = .ask
     /// Installed copy in ~/Library/Fonts → the file it was copied from.
     var installedCopies: [String: String] = [:]
@@ -295,13 +270,23 @@ struct UserLibraryData: Codable, Sendable {
 
     init() {}
 
+    /// Keys from earlier versions, which had Collections and hand-assigned Styles instead of Sets and Tags.
+    private enum LegacyKeys: String, CodingKey {
+        case collections, styles, styleAssignments
+    }
+
+    private struct LegacyStyle: Decodable {
+        var id: String
+        var name: String
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
         let d = UserLibraryData()
         watchedFolders = try c.decodeIfPresent([WatchedFolder].self, forKey: .watchedFolders) ?? d.watchedFolders
-        styles = try c.decodeIfPresent([StyleCategory].self, forKey: .styles) ?? d.styles
-        styleAssignments = try c.decodeIfPresent([String: String].self, forKey: .styleAssignments) ?? d.styleAssignments
-        collections = try c.decodeIfPresent([FontCollection].self, forKey: .collections) ?? d.collections
+        sets = try c.decodeIfPresent([FontSet].self, forKey: .sets)
+            ?? legacy.decodeIfPresent([FontSet].self, forKey: .collections) ?? d.sets
         foundryOverrides = try c.decodeIfPresent([String: String].self, forKey: .foundryOverrides) ?? d.foundryOverrides
         foundryRenames = try c.decodeIfPresent([String: String].self, forKey: .foundryRenames) ?? d.foundryRenames
         hiddenSidebarItems = try c.decodeIfPresent(Set<String>.self, forKey: .hiddenSidebarItems) ?? d.hiddenSidebarItems
@@ -310,6 +295,29 @@ struct UserLibraryData: Codable, Sendable {
         installedCopies = try c.decodeIfPresent([String: String].self, forKey: .installedCopies) ?? d.installedCopies
         registeredPaths = try c.decodeIfPresent(Set<String>.self, forKey: .registeredPaths) ?? d.registeredPaths
         showSystemFonts = try c.decodeIfPresent(Bool.self, forKey: .showSystemFonts) ?? d.showSystemFonts
+
+        if let tags = try c.decodeIfPresent([String].self, forKey: .tags) {
+            self.tags = tags
+            familyTags = try c.decodeIfPresent([String: [String]].self, forKey: .familyTags) ?? [:]
+        } else if let assignments = try legacy.decodeIfPresent([String: String].self, forKey: .styleAssignments) {
+            // Each old style becomes a tag of the same name.
+            let styles = try legacy.decodeIfPresent([LegacyStyle].self, forKey: .styles) ?? []
+            let names = Dictionary(styles.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+            for (family, styleID) in assignments where !styleID.isEmpty {
+                familyTags[family] = [names[styleID] ?? styleID]
+            }
+            let used = Set(familyTags.values.joined())
+            tags = styles.map(\.name).filter(used.contains) + used.subtracting(styles.map(\.name)).sorted()
+            let tagForStyle = names
+            hiddenSidebarItems = Set(hiddenSidebarItems.map { key in
+                if key == "section.styles" { return "section.tags" }
+                if key == "section.collections" { return "section.sets" }
+                if key.hasPrefix("collection.") { return "set." + key.dropFirst("collection.".count) }
+                if key.hasPrefix("style.") { return "tag." + (tagForStyle[String(key.dropFirst("style.".count))] ?? "") }
+                return key
+            })
+            collapsedSections = Set(collapsedSections.map { $0 == "styles" ? "tags" : $0 == "collections" ? "sets" : $0 })
+        }
     }
 }
 

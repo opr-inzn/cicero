@@ -1,65 +1,22 @@
 import AppKit
 import SwiftUI
 
-enum BrowserViewMode: String {
-    case grid, list
+enum BrowserMode: String {
+    case list, specimens
 }
 
+/// The font browser: a sortable table, or full-width specimens, of the families in the sidebar selection.
 struct BrowserView: View {
     @Environment(LibraryStore.self) private var library
-    @AppStorage(Prefs.pointSize) private var pointSize = 36.0
-    @AppStorage(Prefs.weight) private var weight = 400.0
-    @AppStorage(Prefs.sampleText) private var sampleText = "Aa 123"
-    @AppStorage(Prefs.viewMode) private var viewMode: BrowserViewMode = .grid
-    @State private var anchorID: String?
-    @FocusState private var focused: Bool
+    @AppStorage("browser.mode") private var mode: BrowserMode = .list
 
     var body: some View {
         @Bindable var library = library
         let families = library.visibleFamilies
-        ScrollViewReader { proxy in
-            ScrollView {
-                if viewMode == .grid {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 0)], spacing: 0) {
-                        ForEach(families) { family in
-                            cell(family, families: families)
-                        }
-                    }
-                } else {
-                    LazyVStack(spacing: 0) {
-                        ForEach(families) { family in
-                            cell(family, families: families)
-                        }
-                    }
-                }
-            }
-            .background(Color.canvas)
-            .focusable()
-            .focused($focused)
-            .focusEffectDisabled()
-            .onKeyPress(.return) {
-                guard library.selectedFamilyIDs.count == 1, let id = library.selectedFamilyIDs.first else { return .ignored }
-                library.detailFamilyID = id
-                return .handled
-            }
-            .onKeyPress(.escape) {
-                library.selectedFamilyIDs = []
-                return .handled
-            }
-            .onKeyPress(characters: .alphanumerics, phases: .down) { press in
-                if press.modifiers.contains(.command) {
-                    guard press.characters == "a" else { return .ignored }
-                    library.selectedFamilyIDs = Set(families.map(\.id))
-                    return .handled
-                }
-                guard press.modifiers.isEmpty || press.modifiers == .shift,
-                      let target = families.first(where: { $0.name.lowercased().hasPrefix(press.characters.lowercased()) }) else {
-                    return .ignored
-                }
-                library.selectedFamilyIDs = [target.id]
-                anchorID = target.id
-                withAnimation { proxy.scrollTo(target.id, anchor: .top) }
-                return .handled
+        Group {
+            switch mode {
+            case .list: FontTable(families: families)
+            case .specimens: SpecimenList(families: families)
             }
         }
         .overlay { emptyState(isEmpty: families.isEmpty) }
@@ -76,53 +33,16 @@ struct BrowserView: View {
                 .padding(16)
             }
         }
-        .navigationTitle(Text(verbatim: families.count == 1 ? "1 Font" : "\(families.count) Fonts"))
+        .navigationTitle(library.selectionTitle)
+        .navigationSubtitle(subtitle(for: families))
         .toolbar { toolbar }
         .searchable(text: $library.searchText, placement: .toolbar, prompt: "Search")
     }
 
-    // MARK: Cells
-
-    @ViewBuilder
-    private func cell(_ family: FontFamily, families: [FontFamily]) -> some View {
-        let selected = library.selectedFamilyIDs.contains(family.id)
-        Group {
-            if viewMode == .grid {
-                FontCard(family: family, sample: sampleText, pointSize: pointSize, weight: weight, isSelected: selected)
-            } else {
-                FontListRow(family: family, sample: sampleText, pointSize: pointSize, weight: weight, isSelected: selected)
-            }
-        }
-        .id(family.id)
-        .contentShape(.rect)
-        .onTapGesture(count: 2) { library.detailFamilyID = family.id }
-        .simultaneousGesture(TapGesture().onEnded { click(family, in: families) })
-        .contextMenu { FontActionsMenu(families: library.targets(for: family)) }
-        .draggable(family.name)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction { library.detailFamilyID = family.id }
-        .accessibilityAction(named: "Select") { click(family, in: families) }
-    }
-
-    private func click(_ family: FontFamily, in families: [FontFamily]) {
-        focused = true
-        let modifiers = NSEvent.modifierFlags
-        if modifiers.contains(.command) {
-            if library.selectedFamilyIDs.contains(family.id) {
-                library.selectedFamilyIDs.remove(family.id)
-            } else {
-                library.selectedFamilyIDs.insert(family.id)
-            }
-            anchorID = family.id
-        } else if modifiers.contains(.shift), let anchorID,
-                  let a = families.firstIndex(where: { $0.id == anchorID }),
-                  let b = families.firstIndex(where: { $0.id == family.id }) {
-            library.selectedFamilyIDs = Set(families[min(a, b)...max(a, b)].map(\.id))
-        } else {
-            library.selectedFamilyIDs = [family.id]
-            anchorID = family.id
-        }
+    private func subtitle(for families: [FontFamily]) -> String {
+        let activated = families.filter(\.hasActiveFaces).count
+        let count = families.count == 1 ? "1 family" : "\(families.count.formatted()) families"
+        return "\(count) · \(activated.formatted()) activated"
     }
 
     // MARK: Empty states
@@ -144,17 +64,17 @@ struct BrowserView: View {
                         Button("Add Folder…") { library.presentAddFolderPanel() }
                     }
                 case .inactive:
-                    ContentUnavailableView("Nothing Inactive", systemImage: "checkmark.circle",
+                    ContentUnavailableView("Everything Is Activated", systemImage: "circle.inset.filled",
                                            description: Text("Every font in your library is turned on."))
                 case .active:
-                    ContentUnavailableView("Nothing Active", systemImage: "circle.dashed",
+                    ContentUnavailableView("Nothing Activated", systemImage: "circle",
                                            description: Text("Turn a font on and it shows up here."))
-                case .collection:
-                    ContentUnavailableView("Empty Collection", systemImage: "rectangle.stack",
-                                           description: Text("Drag fonts onto the collection in the sidebar, or right-click a font and choose Collections."))
-                case .style:
-                    ContentUnavailableView("No Fonts in This Style", systemImage: "textformat",
-                                           description: Text("Right-click a font and choose Style to put it here."))
+                case .set:
+                    ContentUnavailableView("Empty Set", systemImage: "square.stack",
+                                           description: Text("Drag fonts onto the set in the sidebar, or right-click a font and choose Add to Set."))
+                case .tag:
+                    ContentUnavailableView("No Fonts with This Tag", systemImage: "tag",
+                                           description: Text("Right-click a font and choose Tags to add it here."))
                 default:
                     ContentUnavailableView("No Fonts", systemImage: "textformat")
                 }
@@ -166,31 +86,22 @@ struct BrowserView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem {
-            Button {
-                viewMode = viewMode == .grid ? .list : .grid
-            } label: {
-                Image(systemName: viewMode == .grid ? "rectangle.grid.1x3" : "square.grid.2x2")
+        ToolbarItem(placement: .principal) {
+            Picker("View", selection: $mode) {
+                Label("List", systemImage: "list.bullet").tag(BrowserMode.list)
+                Label("Specimens", systemImage: "text.justify.leading").tag(BrowserMode.specimens)
             }
-            .help(viewMode == .grid ? "Show as List" : "Show as Grid")
+            .pickerStyle(.segmented)
+            .labelStyle(.iconOnly)
+            .help("Show as a list or as specimens")
         }
-        ToolbarItem {
-            SliderMenuControl(value: $pointSize, range: 8...200, presets: [12, 18, 24, 36, 48, 64, 96, 144], unit: " pt")
-                .help("Preview size")
-        }
-        ToolbarItem {
-            SliderMenuControl(value: $weight, range: 100...900, presets: [100, 200, 300, 400, 500, 600, 700, 800, 900], unit: "")
-                .help("Preview weight")
-        }
-        ToolbarItem {
-            SampleTextControl(text: $sampleText)
-        }
+        ToolbarItem { PreviewOptionsButton() }
         ToolbarItem { InfoToolbarButton() }
             .sharedBackgroundVisibility(.hidden)
     }
 }
 
-// MARK: - Cards
+// MARK: - Shared pieces
 
 struct FontPreviewText: View {
     let text: String
@@ -198,81 +109,31 @@ struct FontPreviewText: View {
     let size: Double
     let weight: Double
     var features: [FeatureSetting] = []
+    var kerning: Double = 0
 
     var body: some View {
         Text(text.isEmpty ? " " : text)
             .font(Font(FontCache.shared.font(face, size: size, weight: weight, features: features)))
+            .kerning(kerning)
             .lineLimit(1)
     }
 }
 
-struct FontCard: View {
-    let family: FontFamily
-    let sample: String
-    let pointSize: Double
-    let weight: Double
-    let isSelected: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            FontPreviewText(text: sample, face: family.face(nearestWeight: Int(weight)).face, size: pointSize, weight: weight)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, minHeight: max(130, pointSize * 2.6))
-            FamilyCaption(family: family)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
-        }
-        .background(Color.canvas)
-        .overlay(alignment: .trailing) { Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1) }
-        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
-        .overlay {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.accentColor, lineWidth: 2.5)
-                    .padding(3)
-            }
-        }
-    }
-}
-
-struct FontListRow: View {
-    let family: FontFamily
-    let sample: String
-    let pointSize: Double
-    let weight: Double
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(spacing: 16) {
-            FamilyCaption(family: family)
-                .frame(width: 220, alignment: .leading)
-            FontPreviewText(text: sample, face: family.face(nearestWeight: Int(weight)).face, size: pointSize, weight: weight)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .frame(minHeight: max(56, pointSize * 1.7))
-        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.canvas)
-        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
-    }
-}
-
-/// Family name, status tag and style count under a preview.
-struct FamilyCaption: View {
+/// On/off switch for a whole family. Off deactivates every style Point can control.
+struct ActivationSwitch: View {
+    @Environment(LibraryStore.self) private var library
     let family: FontFamily
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(family.name)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                StatusTag(status: family.status)
-            }
-            Text(family.stylesLabel)
-                .font(.system(size: 10))
-                .opacity(0.6)
-        }
-        .foregroundStyle(.secondary)
+        Toggle("Activated", isOn: Binding(
+            get: { family.hasActiveFaces },
+            set: { $0 ? library.requestActivate([family]) : library.requestDeactivate([family]) }
+        ))
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .labelsHidden()
+        .disabled(!family.hasActivatableFaces && !family.hasDeactivatableFaces)
+        .help(family.status == .system ? "Installed with macOS" : family.hasActiveFaces ? "Deactivate" : "Activate")
     }
 }
 
@@ -308,8 +169,6 @@ struct StatusTag: View {
     }
 }
 
-// MARK: - Toolbar controls
-
 /// Shows or hides the inspector (Info and, inside a font, Features). Drawn as its own glass
 /// capsule so it doesn't merge into the neighbouring toolbar group.
 struct InfoToolbarButton: View {
@@ -329,56 +188,3 @@ struct InfoToolbarButton: View {
         .help("Info")
     }
 }
-
-struct SliderMenuControl: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let presets: [Double]
-    let unit: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Slider(value: $value, in: range)
-                .controlSize(.mini)
-                .frame(width: 84)
-            Menu("\(Int(value.rounded()))\(unit)") {
-                ForEach(presets, id: \.self) { preset in
-                    Button("\(Int(preset))\(unit)") { value = preset }
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-        }
-        .padding(.horizontal, 6)
-    }
-}
-
-struct SampleTextControl: View {
-    @Binding var text: String
-    @State private var showing = false
-
-    var body: some View {
-        Button {
-            showing.toggle()
-        } label: {
-            Image(systemName: "character.cursor.ibeam")
-        }
-        .help("Sample text")
-        .popover(isPresented: $showing, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Sample Text").font(.headline)
-                TextField("Sample text", text: $text)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 260)
-                HStack {
-                    ForEach(["Aa 123", "Hamburgefonstiv", "The quick brown fox"], id: \.self) { preset in
-                        Button(preset) { text = preset }
-                            .controlSize(.small)
-                    }
-                }
-            }
-            .padding(14)
-        }
-    }
-}
-

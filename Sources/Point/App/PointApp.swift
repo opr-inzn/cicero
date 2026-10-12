@@ -8,6 +8,7 @@ struct PointApp: App {
     var body: some Scene {
         Window("Point", id: "main") {
             RootView()
+                .modifier(FontCacheDialogs(isConfirming: $library.isConfirmingCacheClear))
                 .environment(library)
                 .environment(preview)
                 .frame(minWidth: 960, minHeight: 600)
@@ -30,23 +31,36 @@ struct PointCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("Add Folder…") { library.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("New Collection…") {
-                library.prompt("New Collection", confirm: "Create") { library.addCollection(named: $0, with: library.selectedFamilies) }
+            Button("New Set…") {
+                library.prompt("New Set", confirm: "Create") { library.addSet(named: $0, with: library.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            Divider()
-            Button("Reveal in Finder") { library.revealSelection() }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-            Button("Show Info") { library.toggleInfo() }
-                .keyboardShortcut("i", modifiers: .command)
         }
         CommandGroup(after: .sidebar) {
             Button(library.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
                 withAnimation(.snappy) { library.isEditingSidebar.toggle() }
             }
+            Divider()
+        }
+        CommandMenu("Fonts") {
+            let selection = library.selectedFamilies
+            Button("Activate") { library.requestActivate(selection) }
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!selection.contains(where: \.hasActivatableFaces))
+            Button("Deactivate") { library.requestDeactivate(selection) }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!selection.contains(where: \.hasDeactivatableFaces))
+            Divider()
+            Button("Show Info") { library.toggleInfo() }
+                .keyboardShortcut("i", modifiers: .command)
+            Button("Reveal in Finder") { library.revealSelection() }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(selection.isEmpty)
+            Divider()
             Button("Rescan Library") { library.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
-            Divider()
+            Button("Rebuild Font List") { library.rebuildFontList() }
+            Button("Clear Font Caches…") { library.isConfirmingCacheClear = true }
         }
     }
 }

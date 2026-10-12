@@ -203,6 +203,10 @@ struct FaceCache: Codable {
         }
     }
 
+    static func clear() {
+        try? FileManager.default.removeItem(at: url)
+    }
+
     static func stamp(of path: String) -> Stamp? {
         var info = stat()
         guard stat(path, &info) == 0 else { return nil }

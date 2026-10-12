@@ -5,17 +5,28 @@ import SwiftUI
 enum SidebarSelection: Hashable {
     case all, active, inactive, system
     case folder(UUID)
-    case style(String)
-    case collection(UUID)
+    case set(UUID)
+    case tag(String)
     case foundry(String)
+    case classification(FontClassification)
 }
 
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case folders, styles, collections, foundries
+    case folders, sets, tags, foundries, classifications
 
     var id: String { rawValue }
     var key: String { "section.\(rawValue)" }
     var title: String { rawValue.capitalized }
+
+    var icon: String {
+        switch self {
+        case .folders: "folder"
+        case .sets: "square.stack"
+        case .tags: "tag"
+        case .foundries: "building.2"
+        case .classifications: "textformat"
+        }
+    }
 }
 
 struct SidebarRow: Identifiable, Hashable {
@@ -51,7 +62,6 @@ final class LibraryStore {
     private(set) var families: [FontFamily] = []
     private var familyIndex: [String: Int] = [:]
     private var searchBlobs: [String: String] = [:]
-    private var autoStyles: [String: String] = [:]
     private(set) var isScanning = false
     private(set) var scanStatus = ""
     private(set) var hasScanned = false
@@ -72,6 +82,7 @@ final class LibraryStore {
     var searchText = ""
     var isEditingSidebar = false
     var isInspectorPresented = false
+    var isConfirmingCacheClear = false
     var inspectorTab: InspectorTab = .info
     /// OpenType features applied to the detail view's previews.
     var detailFeatures: [FeatureSetting] = []
@@ -97,6 +108,7 @@ final class LibraryStore {
     func start() {
         guard !started else { return }
         started = true
+        save()  // writes data migrated from older versions in the current format
         let center = NotificationCenter.default
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -216,10 +228,8 @@ final class LibraryStore {
 
         families = result
         familyIndex = Dictionary(uniqueKeysWithValues: result.enumerated().map { ($1.name, $0) })
-        autoStyles = [:]
         searchBlobs = [:]
         for family in result {
-            if let style = Self.autoStyle(for: family) { autoStyles[family.name] = style }
             let names = family.faces.map(\.face.postScriptName).joined(separator: " ")
             searchBlobs[family.name] = "\(family.name) \(family.manufacturer ?? "") \(names)".lowercased()
         }
@@ -276,8 +286,8 @@ final class LibraryStore {
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         let selection = sidebarSelection ?? .all
         var members: Set<String>?
-        if case .collection(let id) = selection {
-            members = Set(data.collections.first { $0.id == id }?.familyNames ?? [])
+        if case .set(let id) = selection {
+            members = Set(data.sets.first { $0.id == id }?.familyNames ?? [])
         }
         return families.filter { family in
             if let members {
@@ -297,15 +307,11 @@ final class LibraryStore {
         case .inactive: family.faces.contains { $0.status == .inactive }
         case .system: family.status == .system
         case .folder(let id): family.folderIDs.contains(id)
-        case .style(let id): styleID(of: family) == id
-        case .collection: true
+        case .set: true
+        case .tag(let tag): tags(of: family).contains(tag)
         case .foundry(let name): foundryName(of: family) == name
+        case .classification(let classification): family.classification == classification
         }
-    }
-
-    func styleID(of family: FontFamily) -> String? {
-        if let assigned = data.styleAssignments[family.name] { return assigned.isEmpty ? nil : assigned }
-        return autoStyles[family.name]
     }
 
     func foundryName(of family: FontFamily) -> String? {
@@ -320,6 +326,20 @@ final class LibraryStore {
             if let name = foundryName(of: family) { names.insert(name) }
         }
         return names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    /// The name of the current sidebar selection, used as the window title.
+    var selectionTitle: String {
+        let selection = sidebarSelection ?? .all
+        if let row = libraryRows.first(where: { $0.selection == selection }) { return row.title }
+        for section in SidebarSection.allCases {
+            if let row = rows(for: section).first(where: { $0.selection == selection }) { return row.title }
+        }
+        return "Fonts"
+    }
+
+    func families(withIDs ids: Set<String>) -> [FontFamily] {
+        families.filter { ids.contains($0.id) }
     }
 
     /// Context-menu targets: the whole selection when the clicked family is part of it.
@@ -370,9 +390,9 @@ final class LibraryStore {
 
     var libraryRows: [SidebarRow] {
         [
-            SidebarRow(key: "library.all", title: "All", icon: "square.grid.2x2", selection: .all),
-            SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", selection: .active),
-            SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", selection: .inactive),
+            SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", selection: .all),
+            SidebarRow(key: "library.active", title: "Activated", icon: "circle.inset.filled", selection: .active),
+            SidebarRow(key: "library.inactive", title: "Not Activated", icon: "circle", selection: .inactive),
             SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", selection: .system),
         ]
     }
@@ -387,12 +407,17 @@ final class LibraryStore {
             return folders.map {
                 SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: $0.appOnlyName == nil ? "folder" : "folder.badge.gearshape", selection: .folder($0.id))
             }
-        case .styles:
-            return data.styles.map { SidebarRow(key: "style.\($0.id)", title: $0.name, icon: $0.icon, selection: .style($0.id)) }
-        case .collections:
-            return data.collections.map { SidebarRow(key: "collection.\($0.id)", title: $0.name, icon: "rectangle.stack", selection: .collection($0.id)) }
+        case .sets:
+            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: "square.stack", selection: .set($0.id)) }
+        case .tags:
+            return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: "tag", selection: .tag($0)) }
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", selection: .foundry($0)) }
+        case .classifications:
+            let present = Set(families.lazy.filter { self.data.showSystemFonts || $0.status != .system }.map(\.classification))
+            return FontClassification.allCases.filter(present.contains).map {
+                SidebarRow(key: "classification.\($0.rawValue)", title: $0.rawValue, icon: $0.icon, selection: .classification($0))
+            }
         }
     }
 
@@ -450,69 +475,92 @@ final class LibraryStore {
         return data.watchedFolders.first { $0.id == id }
     }
 
-    // MARK: Organization
+    // MARK: Sets
 
-    func setStyle(_ styleID: String?, for families: [FontFamily]) {
-        for family in families { data.styleAssignments[family.name] = styleID ?? "" }
-        save()
-    }
-
-    func addStyle(named name: String) {
+    func addSet(named name: String, with families: [FontFamily] = []) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        data.styles.append(StyleCategory(id: UUID().uuidString, name: trimmed, isBuiltIn: false))
+        data.sets.append(FontSet(name: trimmed, familyNames: families.map(\.name)))
         save()
     }
 
-    func renameStyle(_ id: String, to name: String) {
+    func renameSet(_ id: UUID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let index = data.styles.firstIndex(where: { $0.id == id }) else { return }
-        data.styles[index].name = trimmed
+        guard !trimmed.isEmpty, let index = data.sets.firstIndex(where: { $0.id == id }) else { return }
+        data.sets[index].name = trimmed
         save()
     }
 
-    func deleteStyle(_ id: String) {
-        data.styles.removeAll { $0.id == id && !$0.isBuiltIn }
-        data.styleAssignments = data.styleAssignments.filter { $0.value != id }
-        if sidebarSelection == .style(id) { sidebarSelection = .all }
+    func deleteSet(_ id: UUID) {
+        data.sets.removeAll { $0.id == id }
+        data.hiddenSidebarItems.remove("set.\(id)")
+        if sidebarSelection == .set(id) { sidebarSelection = .all }
         save()
     }
 
-    func addCollection(named name: String, with families: [FontFamily] = []) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        data.collections.append(FontCollection(name: trimmed, familyNames: families.map(\.name)))
-        save()
+    func isMember(_ family: FontFamily, of setID: UUID) -> Bool {
+        data.sets.first { $0.id == setID }?.familyNames.contains(family.name) ?? false
     }
 
-    func renameCollection(_ id: UUID, to name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let index = data.collections.firstIndex(where: { $0.id == id }) else { return }
-        data.collections[index].name = trimmed
-        save()
-    }
-
-    func deleteCollection(_ id: UUID) {
-        data.collections.removeAll { $0.id == id }
-        data.hiddenSidebarItems.remove("collection.\(id)")
-        if sidebarSelection == .collection(id) { sidebarSelection = .all }
-        save()
-    }
-
-    func isMember(_ family: FontFamily, of collectionID: UUID) -> Bool {
-        data.collections.first { $0.id == collectionID }?.familyNames.contains(family.name) ?? false
-    }
-
-    func setMembership(_ member: Bool, for families: [FontFamily], in collectionID: UUID) {
-        guard let index = data.collections.firstIndex(where: { $0.id == collectionID }) else { return }
-        var names = data.collections[index].familyNames
+    func setMembership(_ member: Bool, for families: [FontFamily], in setID: UUID) {
+        guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
+        var names = data.sets[index].familyNames
         for family in families {
             names.removeAll { $0 == family.name }
             if member { names.append(family.name) }
         }
-        data.collections[index].familyNames = names
+        data.sets[index].familyNames = names
         save()
     }
+
+    // MARK: Tags
+
+    func tags(of family: FontFamily) -> [String] {
+        data.familyTags[family.name] ?? []
+    }
+
+    func setTag(_ tag: String, _ on: Bool, for families: [FontFamily]) {
+        for family in families {
+            var tags = data.familyTags[family.name] ?? []
+            tags.removeAll { $0 == tag }
+            if on { tags.append(tag) }
+            data.familyTags[family.name] = tags.isEmpty ? nil : tags
+        }
+        save()
+    }
+
+    func addTag(named name: String, to families: [FontFamily] = []) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if !data.tags.contains(trimmed) { data.tags.append(trimmed) }
+        if families.isEmpty { save() } else { setTag(trimmed, true, for: families) }
+    }
+
+    func renameTag(_ old: String, to new: String) {
+        let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != old, !data.tags.contains(trimmed),
+              let index = data.tags.firstIndex(of: old) else { return }
+        data.tags[index] = trimmed
+        for (family, tags) in data.familyTags where tags.contains(old) {
+            data.familyTags[family] = tags.map { $0 == old ? trimmed : $0 }
+        }
+        if data.hiddenSidebarItems.remove("tag.\(old)") != nil { data.hiddenSidebarItems.insert("tag.\(trimmed)") }
+        if sidebarSelection == .tag(old) { sidebarSelection = .tag(trimmed) }
+        save()
+    }
+
+    func deleteTag(_ tag: String) {
+        data.tags.removeAll { $0 == tag }
+        for (family, tags) in data.familyTags where tags.contains(tag) {
+            let remaining = tags.filter { $0 != tag }
+            data.familyTags[family] = remaining.isEmpty ? nil : remaining
+        }
+        data.hiddenSidebarItems.remove("tag.\(tag)")
+        if sidebarSelection == .tag(tag) { sidebarSelection = .all }
+        save()
+    }
+
+    // MARK: Foundries
 
     func setFoundry(_ name: String?, for families: [FontFamily]) {
         for family in families {
@@ -538,8 +586,8 @@ final class LibraryStore {
         let dropped = names.compactMap(family(named:))
         guard !dropped.isEmpty else { return false }
         switch selection {
-        case .collection(let id): setMembership(true, for: dropped, in: id)
-        case .style(let id): setStyle(id, for: dropped)
+        case .set(let id): setMembership(true, for: dropped, in: id)
+        case .tag(let tag): setTag(tag, true, for: dropped)
         case .foundry(let name): setFoundry(name, for: dropped)
         default: return false
         }
@@ -592,20 +640,4 @@ final class LibraryStore {
         return name.isEmpty ? nil : name
     }
 
-    static func autoStyle(for family: FontFamily) -> String? {
-        let name = family.name.lowercased()
-        if name.contains("mono") || family.faces.contains(where: { $0.face.isMonospace }) { return "mono" }
-        switch family.faces.first?.face.fontClass ?? 0 {
-        case 1, 2, 3, 4, 5, 7: return "serif"
-        case 8: return "sans"
-        case 10: return "script"
-        case 9, 12: return "decorative"
-        default: break
-        }
-        if name.contains("sans") || name.contains("grotesk") || name.contains("grotesque") || name.contains("gothic") { return "sans" }
-        if name.contains("serif") || name.contains("garamond") || name.contains("antiqua") { return "serif" }
-        if name.contains("script") || name.contains("brush") { return "script" }
-        if name.contains("display") { return "display" }
-        return nil
-    }
 }
