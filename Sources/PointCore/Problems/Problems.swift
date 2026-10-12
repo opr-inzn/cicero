@@ -1,11 +1,12 @@
 import Foundation
 
 public enum ProblemKind: String, CaseIterable, Sendable {
-    case conflicts, missing, unreadable, external, duplicates
+    case installedTwice, sharedNames, missing, unreadable, external, duplicates
 
     public var title: String {
         switch self {
-        case .conflicts: "Conflicts"
+        case .installedTwice: "Installed Twice"
+        case .sharedNames: "Different Fonts Share a Name"
         case .missing: "Missing Files"
         case .unreadable: "Damaged or Unreadable Files"
         case .external: "Fonts on External Disks"
@@ -16,8 +17,10 @@ public enum ProblemKind: String, CaseIterable, Sendable {
     /// One or two plain sentences shown above the group.
     public var explanation: String {
         switch self {
-        case .conflicts:
-            "Fonts with the same PostScript name are active from more than one file. macOS uses only one of them, so apps may get an old version or a different font. Keep one and turn off the rest."
+        case .installedTwice:
+            "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
+        case .sharedNames:
+            "These are different fonts, but some of their styles use the same PostScript name, the name documents and PDFs use to find a font. Asked for one of those names, macOS may give either font. Updated versions from the foundry usually fix this; until then, turn one off while you use the other."
         case .missing:
             "Point remembers these files, but they’re gone. Fonts used where they were stop working when their files move or their disk is unplugged."
         case .unreadable:
