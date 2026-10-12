@@ -131,7 +131,8 @@ Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a 
 ## Problems
 
 Sidebar item with badge; groups with a short explanation and fixes:
-- Conflicts: the same PostScript name active from more than one file ("Fonts with the same PostScript name are active from more than one file. macOS uses only one of them, so apps may get an old version or a different font. Keep one and turn off the rest."). Per copy: version, modified date, where; Reveal; Remove Copy… / Deactivate when Point can.
+- Installed Twice: the same font (same family) active from more than one file. Per copy: version, modified date, where; Reveal; Remove Copy… / Deactivate when Point can.
+- Different Fonts Share a Name: different families whose active styles use the same PostScript names (badly built variable fonts whose named styles are just "Bold", "Light"…); the summary lists the clashing names ("Both use the PostScript names Light, Medium, Bold and Black."); per file Reveal and Deactivate (when Point can). Explanation: documents and PDFs find fonts by that name, so macOS may give either font; updated versions usually fix it.
 - Duplicates: same font more than once in your folders (inactive); Move Extra Copies to Trash… (keep the installed copy's origin, else newest).
 - Missing files: in-place registrations whose file is gone (Forget + unregister), installed copies gone (Forget), set members no longer in the library (Remove from Set).
 - Damaged or unreadable files (not WOFF/WOFF2): Reveal, Move to Trash…
