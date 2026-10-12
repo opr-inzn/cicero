@@ -101,13 +101,20 @@ private struct ProblemCard: View {
                     Spacer(minLength: 0)
                     FixButtons(fixes: problem.fixes, kind: problem.kind)
                 }
-                ForEach(problem.folders, id: \.path) { folder in
-                    Divider()
-                    let isNewest = folder.path == problem.newestFolder
-                    if folder.files.count == 1 {
-                        FileRow(file: folder.files[0], fixes: problem.fileFixes[folder.files[0].path] ?? [], kind: problem.kind, isNewest: isNewest)
-                    } else {
-                        FolderRow(folder: folder, fixes: problem.folderFixes[folder.path] ?? [], fileFixes: problem.fileFixes, kind: problem.kind, isNewest: isNewest)
+                if problem.kind.groupsFilesByFolder {
+                    ForEach(problem.folders, id: \.path) { folder in
+                        Divider()
+                        let isNewest = folder.path == problem.newestFolder
+                        if folder.files.count == 1 {
+                            FileRow(file: folder.files[0], fixes: problem.fileFixes[folder.files[0].path] ?? [], kind: problem.kind, isNewest: isNewest)
+                        } else {
+                            FolderRow(folder: folder, fixes: problem.folderFixes[folder.path] ?? [], fileFixes: problem.fileFixes, kind: problem.kind, isNewest: isNewest)
+                        }
+                    }
+                } else {
+                    ForEach(problem.files, id: \.path) { file in
+                        Divider()
+                        FileRow(file: file, fixes: problem.fileFixes[file.path] ?? [], kind: problem.kind)
                     }
                 }
             }
@@ -130,10 +137,12 @@ private struct FileRow: View {
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1)
                     if isNewest { NewestTag() }
+                    if !file.preferredFor.isEmpty { PreferredTag(names: file.preferredFor) }
                 }
-                Text(((file.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
+                // Under a title, the whole path says which file it is.
+                Text(((file.title == nil ? (file.path as NSString).deletingLastPathComponent : file.path) as NSString).abbreviatingWithTildeInPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -146,7 +155,7 @@ private struct FileRow: View {
     }
 
     static func facts(of file: ProblemFile) -> String {
-        var parts: [String] = []
+        var parts = file.note.map { [$0] } ?? []
         if let version = file.version { parts.append("Version \(FontFace.displayVersion(version))") }
         if let modified = file.modified { parts.append("Modified \(modified.formatted(date: .abbreviated, time: .omitted))") }
         if !file.detail.isEmpty { parts.append(file.detail) }
@@ -253,6 +262,14 @@ private struct FolderRow: View {
 private struct NewestTag: View {
     var body: some View {
         Tag(text: "Newest", tint: .green).help("The highest version. Usually the copy to keep.")
+    }
+}
+
+private struct PreferredTag: View {
+    let names: [String]
+
+    var body: some View {
+        Tag(text: "Preferred", tint: .blue).help("Apps that ask for \(ListFormatter.localizedString(byJoining: names)) get this font.")
     }
 }
 
