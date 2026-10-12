@@ -28,6 +28,30 @@ public struct WeightAxis: Hashable, Codable, Sendable {
     }
 }
 
+/// One of a variable font's design axes, and where the face, one of the font's named instances, sits on it.
+public struct VariationAxis: Hashable, Codable, Sendable {
+    /// Four characters: a registered axis in lowercase (wght, wdth, ital, slnt, opsz), the designer's own in capitals (GRAD).
+    public var tag: String
+    /// The name the font gives the axis; the tag when it gives none.
+    public var name: String
+    /// The instance's position on the axis ("Bold" at 700 on wght).
+    public var value: Double
+
+    public init(tag: String, name: String, value: Double) {
+        self.tag = tag
+        self.name = name
+        self.value = value
+    }
+
+    /// The registered axes, in the order of MDN's variable fonts guide.
+    static let registered = ["wght", "wdth", "ital", "slnt", "opsz"]
+
+    /// The name in Title Case, for the designer's own axes ("Grade").
+    var title: String {
+        name.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+}
+
 /// What a font file says about one of its faces. Read once and cached by file stamp.
 public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public let id: FaceID
@@ -44,11 +68,15 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var manufacturer: String?
     public var version: String?
     public var weightAxis: WeightAxis?
+    /// OS/2 width class, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded).
+    public var width: Int
+    /// A variable font's axes, without the ones it hides, with this instance's position on each; empty for a static font.
+    public var axes: [VariationAxis]
 
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int,
-        manufacturer: String?, version: String?, weightAxis: WeightAxis?
+        manufacturer: String?, version: String?, weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = []
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -62,6 +90,8 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.manufacturer = manufacturer
         self.version = version
         self.weightAxis = weightAxis
+        self.width = width
+        self.axes = axes
     }
 
     public var path: String { id.path }
@@ -256,6 +286,8 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let isVariable: Bool
     public let isMonospaced: Bool
     public let hasItalics: Bool
+    /// What the faces span, for tile captions: "9 Weights · 3 Widths · Italics", "8 Weights · Italics · 3 Optical Sizes".
+    public let rangeLabel: String
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
     public let position: SwitchPosition
@@ -279,9 +311,10 @@ public struct Family: Identifiable, Hashable, Sendable {
         self.folderIDs = folderIDs
         self.manufacturer = manufacturer
         dateAdded = faces.compactMap(\.dateAdded).min()
-        isVariable = faces.contains { $0.face.weightAxis != nil }
+        isVariable = faces.contains { !$0.face.axes.isEmpty }
         isMonospaced = faces.contains { $0.face.isMonospaced }
         hasItalics = faces.contains { $0.face.isItalic }
+        rangeLabel = Self.rangeLabel(of: faces.map(\.face))
         let apps = Set(faces.map(\.app))
         app = apps.count == 1 ? apps.first! : nil
         position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
@@ -313,6 +346,77 @@ public struct Family: Identifiable, Hashable, Sendable {
         }
         return best ?? faces[0]
     }
+
+    /// Counts the styles along the registered axes (weight, width, italic, optical size), then names the
+    /// designer's own axes the styles step along. A variable font's styles are its named instances, placed by
+    /// their axis values; a static font's by its style names and classes. Families with more styles than
+    /// that tells apart (hidden axes, small caps cut as fonts of their own) also get the style count.
+    static func rangeLabel(of faces: [FontFace]) -> String {
+        let styleNames = faces.map { StyleName($0.styleName) }
+        func value(_ face: FontFace, _ tag: String) -> Double? { face.axes.first { $0.tag == tag }?.value }
+        // The weight the name spells out. Names come first because a variable font may nudge an instance off
+        // the round value (Skia's Black Condensed is lighter than its Black) and many static files leave every
+        // class at 400. A style whose name gives none ("Italic", "Condensed") has the weight of a named style at
+        // the same place on the axis or with the same class; else, when the name gives a width or slope, the
+        // regular weight; else that place or class ("110", "W3").
+        let rawWeights = faces.map { value($0, "wght") ?? Double($0.weight) }
+        var namedByRaw: [Double: [Double]] = [:]
+        for (name, raw) in zip(styleNames, rawWeights) {
+            if let weight = name.weight { namedByRaw[raw, default: []].append(Double(weight)) }
+        }
+        let weights: [Double] = zip(styleNames, rawWeights).map { name, raw in
+            if let weight = name.weight { return Double(weight) }
+            if let named = namedByRaw[raw]?.min(by: { abs($0 - raw) < abs($1 - raw) }) { return named }
+            return name.isRegular ? 400 : raw
+        }
+        // A variable font's instances are placed by their width values, and those whose names give the same width,
+        // as written ("Compressed", not "XXX Compressed"), are one width. A static name without a width word means
+        // the normal width; a width class other than normal was set on purpose, while normal is often just left.
+        let widthGroups = Self.groups(zip(faces, styleNames).map { face, name in
+            if let raw = value(face, "wdth") { return (raw, name.widthWords.isEmpty ? nil : name.widthWords) }
+            return (Double(face.width == 5 ? name.width ?? 5 : face.width), nil)
+        })
+        let sloped = faces.map { face in face.isItalic || (value(face, "ital") ?? 0) >= 0.5 || (value(face, "slnt") ?? 0) != 0 }
+        var custom: [VariationAxis] = []
+        for axis in faces.flatMap(\.axes) where !VariationAxis.registered.contains(axis.tag) && !custom.contains(where: { $0.tag == axis.tag }) {
+            custom.append(axis)
+        }
+
+        var parts: [String] = []
+        let weightCount = Set(weights).count, widthCount = Set(widthGroups).count
+        parts.append(weightCount == 1 ? "1 Weight" : "\(weightCount) Weights")
+        if widthCount > 1 { parts.append("\(widthCount) Widths") }
+        let italics = sloped.count { $0 }
+        if italics == faces.count { parts.append("Italic") } else if italics > 0 { parts.append("Italics") }
+        let opticalSizes = Set(faces.compactMap { value($0, "opsz") }).count
+        if opticalSizes > 1 { parts.append("\(opticalSizes) Optical Sizes") }
+        let stepped = custom.filter { axis in Set(faces.compactMap { value($0, axis.tag) }).count > 1 }
+        parts += stepped.map(\.title)
+        let told = Set(faces.indices.map { index -> [Double] in
+            let place: [Double] = [weights[index], Double(widthGroups[index]), sloped[index] ? 1 : 0, value(faces[index], "opsz") ?? 0]
+            return place + stepped.map { value(faces[index], $0.tag) ?? 0 }
+        })
+        if told.count < faces.count { parts.append("\(faces.count) Styles") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Each style's group, where styles at the same place or with the same word (when they have one) are one group.
+    private static func groups<Word: Hashable>(_ keys: [(place: Double, word: Word?)]) -> [Int] {
+        var parent = Array(keys.indices)
+        func root(_ index: Int) -> Int {
+            var index = index
+            while parent[index] != index { index = parent[index] }
+            return index
+        }
+        var byPlace: [Double: Int] = [:]
+        var byWord: [Word: Int] = [:]
+        for (index, key) in keys.enumerated() {
+            if let other = byPlace[key.place] { parent[root(index)] = root(other) } else { byPlace[key.place] = index }
+            guard let word = key.word else { continue }
+            if let other = byWord[word] { parent[root(index)] = root(other) } else { byWord[word] = index }
+        }
+        return keys.indices.map(root)
+    }
 }
 
 /// The weight and width a style name spells out ("SemiBold Condensed", "U Lt", "Cn Bd"), on the OS/2 scales.
@@ -322,12 +426,38 @@ public struct Family: Identifiable, Hashable, Sendable {
 struct StyleName {
     var weight: Int?
     var width: Int?
+    /// The width words as written, with a run of X's kept on ("XXX Compressed" → xxxcompressed).
+    var widthWords: [String] = []
+    private var hasSlope = false
+    private var hasOther = false
+    /// Nothing but width and slope words ("Extended", "X Compressed Italic"): the regular weight. A word Cicero
+    /// doesn't know may be a weight ("Buch Kursiv").
+    var isRegular: Bool { weight == nil && !hasOther && (width != nil || hasSlope) }
 
     init(_ name: String) {
-        let words = Self.words(name)
-        weight = words.lazy.compactMap { Self.weights[$0] }.first
-        width = words.lazy.compactMap { Self.widths[$0] }.first
+        var run = ""
+        for word in Self.words(name) {
+            if word.allSatisfy({ $0 == "x" }) {
+                run += word
+                continue
+            }
+            let written = run + word
+            run = ""
+            if let value = Self.weights[written] ?? Self.weights[word] {
+                if weight == nil { weight = value }
+            } else if let value = Self.widths[written] ?? Self.widths[word] {
+                if width == nil { width = value }
+                widthWords.append(written)
+            } else if Self.slopes.contains(word) {
+                hasSlope = true
+            } else {
+                hasOther = true
+            }
+        }
+        if !run.isEmpty { hasOther = true }
     }
+
+    private static let slopes: Set<String> = ["italic", "it", "ital", "oblique", "obl", "slanted", "slant", "inclined", "kursiv", "backslant"]
 
     /// "SemiBold Cond-Italic" → semibold, cond, italic: split at anything but a letter and at a
     /// lowercase-to-uppercase step, with a prefix (extra, ultra, semi, demi, x, u) joined to the
@@ -357,7 +487,7 @@ struct StyleName {
     private static let prefixes: Set<String> = ["extra", "ultra", "semi", "demi", "x", "xx", "u"]
 
     private static let weights: [String: Int] = [
-        "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "thin": 100, "th": 100,
+        "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "lazer": 85, "lz": 85, "thin": 100, "th": 100,
         "ultralight": 190, "ult": 190, "extralight": 200, "xlight": 200, "xlt": 200,
         "light": 300, "lt": 300, "semilight": 340, "book": 350, "bk": 350,
         "regular": 400, "rg": 400, "reg": 400, "roman": 400, "normal": 400, "plain": 400,

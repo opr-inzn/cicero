@@ -15,7 +15,7 @@ struct FontGrid: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: width, maximum: width * 1.6), spacing: 12)], spacing: 12) {
                     ForEach(families) { family in
-                        Tile(family: family, foundry: model.foundryName(of: family), isSelected: model.selectedIDs.contains(family.id), model: model)
+                        Tile(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
                     }
                 }
@@ -33,7 +33,6 @@ struct FontGrid: View {
 private struct Tile: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    let foundry: String?
     let isSelected: Bool
     let model: AppModel
     @State private var isHovered = false
@@ -61,10 +60,11 @@ private struct Tile: View {
                 Text(family.name)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
-                Text([family.stylesLabel, foundry].compactMap { $0 }.joined(separator: " · "))
+                Text(family.rangeLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .help(family.rangeLabel)
             }
         }
         .padding(14)
