@@ -142,12 +142,11 @@ public struct CustomCharacterSet: Codable, Hashable, Identifiable, Sendable {
 
 public struct SidebarPreferences: Codable, Equatable, Sendable {
     /// Keys of hidden rows and sections: "library.all", "section.sets", "set.<uuid>", "smartset.<uuid>",
-    /// "tag.<name>", "foundry.<name>", "classification.<name>", "folder.<uuid>". Character sets use `shownCharacterSets`.
+    /// "tag.<name>", "foundry.<name>", "classification.<name>", "folder.<uuid>", "charset.<id>".
     public var hidden: Set<String> = []
-    /// Section keys ("folders", "sets", "tags", "foundries", "classifications", "characterSets") that are collapsed.
-    public var collapsed: Set<String> = ["foundries", "classifications"]
-    /// Character set ids listed in the sidebar; opt-in because there are many.
-    public var shownCharacterSets: Set<String> = ["latin-s", "latin-m", "latin-l", "latin-xl"]
+    /// Collapsed sections ("folders", "sets", "tags", "foundries", "classifications", "characterSets")
+    /// and character set groups ("charsetgroup.<group id>").
+    public var collapsed: Set<String> = ["foundries", "classifications", "charsetgroup.unicode", "charsetgroup.google"]
 
     public init() {}
 }
