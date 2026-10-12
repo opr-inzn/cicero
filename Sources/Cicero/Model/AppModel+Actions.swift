@@ -499,16 +499,18 @@ extension AppModel {
 
     func apply(_ fix: ProblemFix) {
         switch fix {
-        case .reveal(let path):
-            reveal(path: path)
-        case .deactivate(let id):
-            if let face = library.families.lazy.flatMap(\.faces).first(where: { $0.id == id }) { performDeactivation([face]) }
+        case .reveal(let paths):
+            NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
+        case .deactivate(let ids):
+            let ids = Set(ids)
+            let faces = library.families.flatMap(\.faces).filter { ids.contains($0.id) }
+            if !faces.isEmpty { performDeactivation(faces) }
         case .trash(let paths):
             let allowed = paths.filter { !ActivationEngine.isProtected($0) }
             guard !allowed.isEmpty else { return }
             trashPlan = TrashPlan(
                 title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) files",
-                paths: allowed, otherFamilies: [], protectedCount: paths.count - allowed.count, removedFamilies: []
+                paths: allowed, otherFamilies: [], protectedCount: paths.count - allowed.count, removedFamilies: [], includesCopies: false
             )
         case .forgetInPlace(let path):
             enqueue { model in

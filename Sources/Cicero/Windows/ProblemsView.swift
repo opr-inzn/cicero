@@ -101,9 +101,14 @@ private struct ProblemCard: View {
                     Spacer(minLength: 0)
                     FixButtons(fixes: problem.fixes, kind: problem.kind)
                 }
-                ForEach(problem.files, id: \.path) { file in
+                ForEach(problem.folders, id: \.path) { folder in
                     Divider()
-                    FileRow(file: file, fixes: problem.fileFixes[file.path] ?? [], kind: problem.kind)
+                    let isNewest = folder.path == problem.newestFolder
+                    if folder.files.count == 1 {
+                        FileRow(file: folder.files[0], fixes: problem.fileFixes[folder.files[0].path] ?? [], kind: problem.kind, isNewest: isNewest)
+                    } else {
+                        FolderRow(folder: folder, fixes: problem.folderFixes[folder.path] ?? [], fileFixes: problem.fileFixes, kind: problem.kind, isNewest: isNewest)
+                    }
                 }
             }
             .padding(6)
@@ -115,32 +120,139 @@ private struct FileRow: View {
     let file: ProblemFile
     let fixes: [ProblemFix]
     let kind: ProblemKind
+    var isNewest = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "doc")
                 .foregroundStyle(.secondary)
+                .frame(width: 16)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
-                Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                    if isNewest { NewestTag() }
+                }
                 Text(((file.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(facts).font(.caption).foregroundStyle(.secondary)
+                Text(Self.facts(of: file)).font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
             FixButtons(fixes: fixes, kind: kind).controlSize(.small)
         }
     }
 
-    private var facts: String {
+    static func facts(of file: ProblemFile) -> String {
         var parts: [String] = []
         if let version = file.version { parts.append("Version \(FontFace.displayVersion(version))") }
         if let modified = file.modified { parts.append("Modified \(modified.formatted(date: .abbreviated, time: .omitted))") }
         if !file.detail.isEmpty { parts.append(file.detail) }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Several files in one folder, usually one copy of a whole family: one row for all of them, with the files
+/// themselves under a disclosure.
+private struct FolderRow: View {
+    let folder: ProblemFolder
+    let fixes: [ProblemFix]
+    let fileFixes: [String: [ProblemFix]]
+    let kind: ProblemKind
+    let isNewest: Bool
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text((folder.path as NSString).abbreviatingWithTildeInPath)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if isNewest { NewestTag() }
+                    }
+                    Text(facts).font(.caption).foregroundStyle(.secondary)
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) { isExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold))
+                                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            Text("\(folder.files.count) files")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
+                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count) Files")
+                }
+                Spacer(minLength: 0)
+                FixButtons(fixes: fixes, kind: kind).controlSize(.small)
+            }
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(folder.files, id: \.path) { file in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                                if filesDiffer {
+                                    Text(FileRow.facts(of: file)).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            FixButtons(fixes: fileFixes[file.path] ?? [], kind: kind).controlSize(.small)
+                        }
+                    }
+                }
+                .padding(.leading, 28)
+            }
+        }
+    }
+
+    /// What the files have in common, or the range when they don't.
+    private var facts: String {
+        var parts: [String] = []
+        let versions = unique(folder.files.compactMap { $0.version.map(FontFace.displayVersion) })
+        switch versions.count {
+        case 0: break
+        case 1: parts.append("Version \(versions[0])")
+        case 2: parts.append("Versions \(versions[0]) and \(versions[1])")
+        default: parts.append("\(versions.count) versions")
+        }
+        let dates = folder.files.compactMap(\.modified)
+        if let first = dates.min(), let last = dates.max() {
+            parts.append(Calendar.current.isDate(first, inSameDayAs: last)
+                ? "Modified \(first.formatted(date: .abbreviated, time: .omitted))"
+                : "Modified \((first..<last).formatted(date: .abbreviated, time: .omitted))")
+        }
+        parts += unique(folder.files.map(\.detail).filter { !$0.isEmpty })
+        return parts.joined(separator: " · ")
+    }
+
+    /// Whether each file needs its own version, date and place.
+    private var filesDiffer: Bool {
+        Set(folder.files.map(FileRow.facts)).count > 1
+    }
+
+    private func unique(_ items: [String]) -> [String] {
+        var seen = Set<String>()
+        return items.filter { seen.insert($0).inserted }
+    }
+}
+
+private struct NewestTag: View {
+    var body: some View {
+        Tag(text: "Newest", tint: .green).help("The highest version. Usually the copy to keep.")
     }
 }
 
@@ -159,7 +271,7 @@ private struct FixButtons: View {
 
     /// Only in Installed Twice is a trashed file a spare copy of the same font.
     private func title(_ fix: ProblemFix) -> String {
-        if kind == .installedTwice, case .trash(let paths) = fix, paths.count == 1 { return "Remove Copy…" }
+        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy…" : "Remove Copies…" }
         return fix.title
     }
 

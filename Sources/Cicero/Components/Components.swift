@@ -75,19 +75,28 @@ struct ActivationSwitch: View {
     }
 }
 
+/// A small tinted capsule with a word or two.
+struct Tag: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .semibold))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(tint.opacity(0.14), in: .capsule)
+            .foregroundStyle(tint.opacity(0.9))
+    }
+}
+
 /// A small capsule for families that aren't simply on or off.
 struct StatusTag: View {
     let family: Family
 
     var body: some View {
         if let (text, tint) = content {
-            Text(text)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1.5)
-                .background(tint.opacity(0.14), in: .capsule)
-                .foregroundStyle(tint.opacity(0.9))
-                .help(help)
+            Tag(text: text, tint: tint).help(help)
         }
     }
 
