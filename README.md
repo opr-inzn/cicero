@@ -14,18 +14,3 @@ Also: a grid/list browser with size, weight and color controls; a detail view wi
 ## Privacy
 
 Point doesn't collect any data and never connects to the internet. Everything it knows about your fonts stays in local files on your Mac.
-
-## Releasing
-
-1. Add a `## 1.1` section to [CHANGELOG.md](CHANGELOG.md) describing the changes.
-2. `./scripts/release.sh 1.1` sets the version, builds the app (Apple silicon only), signs it with your Developer ID, and notarizes and staples both the app and the DMG.
-3. Commit and push, then `./scripts/publish.sh` creates the `v1.1` GitHub release with the changelog section as notes and the DMG attached as `Point.dmg`, so the README's download link always points at the newest version.
-
-One-time setup:
-
-1. **Developer ID certificate**: Xcode → Settings → Accounts → your team → Manage Certificates… → + → *Developer ID Application*.
-2. **Notarization credentials**: create an app-specific password at [account.apple.com](https://account.apple.com) (Sign-In and Security → App-Specific Passwords), then run the following and paste the password when asked. It is stored in your keychain.
-
-   ```sh
-   xcrun notarytool store-credentials point-notary --apple-id <your Apple ID> --team-id <your team ID>
-   ```
