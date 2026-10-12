@@ -64,7 +64,9 @@ struct TextPrompt: Identifiable {
 
 @Observable @MainActor
 final class LibraryStore {
-    private(set) var families: [FontFamily] = []
+    private(set) var families: [FontFamily] = [] {
+        didSet { refreshGroupLists() }
+    }
     private var familyIndex: [String: Int] = [:]
     private var searchBlobs: [String: String] = [:]
     private(set) var isScanning = false
@@ -79,7 +81,17 @@ final class LibraryStore {
     /// Families shown by the Compare and Slideshow windows.
     var presentation = PresentationState()
 
-    var data: UserLibraryData
+    var data: UserLibraryData {
+        didSet {
+            if oldValue.showSystemFonts != data.showSystemFonts || oldValue.foundryOverrides != data.foundryOverrides
+                || oldValue.foundryRenames != data.foundryRenames {
+                refreshGroupLists()
+            }
+        }
+    }
+    /// The sidebar's foundries and classifications, kept current instead of worked out on every render.
+    private(set) var foundryNames: [String] = []
+    private(set) var presentClassifications: [FontClassification] = []
     @ObservationIgnored let characterSetIndex = CharacterSetIndex()
     var editingSmartSet: SmartSet?
     var editingCharacterSet: CustomCharacterSet?
@@ -93,7 +105,13 @@ final class LibraryStore {
     }
     var selectedFamilyIDs: Set<String> = []
     var detailFamilyID: String?
-    var searchText = ""
+    var searchText = "" {
+        didSet { scheduleSearch() }
+    }
+    /// The search the lists filter by: follows `searchText` after a short pause, so typing doesn't
+    /// rebuild the list on every keystroke.
+    private(set) var appliedSearch = ""
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
     var isEditingSidebar = false
     var isInspectorPresented = false
     var isConfirmingCacheClear = false
@@ -282,6 +300,19 @@ final class LibraryStore {
     }
 
 
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        guard !searchText.isEmpty else {
+            appliedSearch = ""
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, let self, self.appliedSearch != self.searchText else { return }
+            self.appliedSearch = self.searchText
+        }
+    }
+
     // MARK: Inspector
 
     /// The family the inspector describes: the open family, or a single selection in the browser.
@@ -315,13 +346,13 @@ final class LibraryStore {
     var detailFamily: FontFamily? { detailFamilyID.flatMap(family(named:)) }
 
     var visibleFamilies: [FontFamily] {
-        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        let query = appliedSearch.trimmingCharacters(in: .whitespaces).lowercased()
         let selection = sidebarSelection ?? .all
         var members: Set<String>?
         if case .set(let id) = selection {
             members = Set(data.sets.first { $0.id == id }?.familyNames ?? [])
         }
-        let smartSet: SmartSet? = if case .smartSet(let id) = selection { self.smartSet(id) } else { nil }
+        let smartSet: ((FontFamily) -> Bool)? = if case .smartSet(let id) = selection { self.smartSet(id).map(matcher(for:)) } else { nil }
         let characterSet: CharacterSetDefinition? = if case .characterSet(let id) = selection { self.characterSet(id) } else { nil }
         return families.filter { family in
             if let members {
@@ -329,7 +360,7 @@ final class LibraryStore {
             } else {
                 if !data.showSystemFonts && family.status == .system && selection != .system { return false }
                 if let smartSet {
-                    guard matches(family, smartSet) else { return false }
+                    guard smartSet(family) else { return false }
                 } else if let characterSet {
                     guard supports(family, characterSet: characterSet) == true else { return false }
                 } else {
@@ -363,12 +394,17 @@ final class LibraryStore {
         return data.foundryRenames[raw] ?? raw
     }
 
-    var foundryNames: [String] {
+    private func refreshGroupLists() {
         var names = Set<String>()
+        var classifications = Set<FontClassification>()
         for family in families where data.showSystemFonts || family.status != .system {
             if let name = foundryName(of: family) { names.insert(name) }
+            classifications.insert(family.classification)
         }
-        return names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let sortedNames = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        if sortedNames != foundryNames { foundryNames = sortedNames }
+        let present = FontClassification.allCases.filter(classifications.contains)
+        if present != presentClassifications { presentClassifications = present }
     }
 
     /// The name of the current sidebar selection, used as the window title.
@@ -468,8 +504,7 @@ final class LibraryStore {
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", selection: .foundry($0)) }
         case .classifications:
-            let present = Set(families.lazy.filter { self.data.showSystemFonts || $0.status != .system }.map(\.classification))
-            return FontClassification.allCases.filter(present.contains).map {
+            return presentClassifications.map {
                 SidebarRow(key: "classification.\($0.rawValue)", title: $0.rawValue, icon: $0.icon, selection: .classification($0))
             }
         case .characterSets:

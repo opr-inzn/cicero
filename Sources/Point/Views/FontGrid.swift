@@ -62,7 +62,7 @@ struct FontTile: View {
             HStack {
                 StatusTag(family: family)
                 Spacer()
-                ActivationSwitch(family: family)
+                ActivationSwitch(family: family, library: library)
                     .accessibilityHidden(true)
             }
             FontPreviewText(

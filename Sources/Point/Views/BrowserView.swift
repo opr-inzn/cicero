@@ -32,19 +32,7 @@ struct BrowserView: View {
             }
         }
         .overlay { emptyState(isEmpty: families.isEmpty) }
-        .overlay(alignment: .bottomTrailing) {
-            if library.isScanning {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(library.scanStatus.isEmpty ? "Scanning fonts…" : library.scanStatus)
-                        .font(.callout)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glassEffect(.regular, in: .capsule)
-                .padding(16)
-            }
-        }
+        .overlay(alignment: .bottomTrailing) { ScanStatus() }
         .navigationTitle(library.selectionTitle)
         .navigationSubtitle(subtitle(for: families))
         .toolbar { toolbar }
@@ -75,7 +63,7 @@ struct BrowserView: View {
     @ViewBuilder
     private func emptyState(isEmpty: Bool) -> some View {
         if isEmpty && library.hasScanned {
-            let query = library.searchText.trimmingCharacters(in: .whitespaces)
+            let query = library.appliedSearch.trimmingCharacters(in: .whitespaces)
             if !query.isEmpty {
                 ContentUnavailableView.search(text: query)
             } else {
@@ -163,21 +151,27 @@ struct FontPreviewText: View {
     }
 }
 
-/// On/off switch for a whole family. Off deactivates every style Point can control.
+/// On/off switch for a whole family. Off deactivates every style Point can control. The library
+/// is passed in rather than read from the environment: AppKit can build table cells outside
+/// SwiftUI's update, where the environment isn't available yet.
 struct ActivationSwitch: View {
-    @Environment(LibraryStore.self) private var library
     let family: FontFamily
+    let library: LibraryStore
 
     var body: some View {
-        Toggle("Activated", isOn: Binding(
-            get: { family.hasActiveFaces },
-            set: { $0 ? library.requestActivate([family]) : library.requestDeactivate([family]) }
-        ))
-        .toggleStyle(.switch)
-        .controlSize(.mini)
-        .labelsHidden()
-        .disabled(!family.hasActivatableFaces && !family.hasDeactivatableFaces)
-        .help(helpText)
+        let isOn = family.hasActiveFaces
+        let isEnabled = family.hasActivatableFaces || family.hasDeactivatableFaces
+        MiniSwitch(isOn: isOn, isEnabled: isEnabled) { toggle(isOn) }
+            .help(helpText)
+            .accessibilityElement()
+            .accessibilityLabel("Activated")
+            .accessibilityValue(isOn ? "On" : "Off")
+            .accessibilityAddTraits(.isToggle)
+            .accessibilityAction { if isEnabled { toggle(isOn) } }
+    }
+
+    private func toggle(_ isOn: Bool) {
+        isOn ? library.requestDeactivate([family]) : library.requestActivate([family])
     }
 
     private var helpText: String {
@@ -247,5 +241,48 @@ struct InfoToolbarButton: View {
             Label("Info", systemImage: "info.circle")
         }
         .help("Info")
+    }
+}
+
+/// A small switch drawn in SwiftUI. Lists show one per family, and a native switch per row made
+/// building the font list about a third slower.
+struct MiniSwitch: View {
+    let isOn: Bool
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Capsule()
+            .fill(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
+            .frame(width: 26, height: 15)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle()
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 0.5, y: 0.5)
+                    .padding(1.5)
+            }
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(.rect)
+            .onTapGesture { if isEnabled { action() } }
+            .animation(.snappy(duration: 0.15), value: isOn)
+    }
+}
+
+/// The scanning capsule. Its own view, so progress messages don't re-render the whole browser.
+private struct ScanStatus: View {
+    @Environment(LibraryStore.self) private var library
+
+    var body: some View {
+        if library.isScanning {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(library.scanStatus.isEmpty ? "Scanning fonts…" : library.scanStatus)
+                    .font(.callout)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .glassEffect(.regular, in: .capsule)
+            .padding(16)
+        }
     }
 }
