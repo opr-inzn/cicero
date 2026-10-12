@@ -283,6 +283,71 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
 }
 
+/// The weight and width a style name spells out ("SemiBold Condensed", "U Lt", "Cn Bd"), on the OS/2 scales.
+/// Many files give every style the same classes, Bold and Light at 400 or Extended at normal width,
+/// so the name tells styles apart more reliably. Only abbreviations share a value: a family that uses
+/// two words ("Extrabold" and "Ultrabold") means two weights.
+struct StyleName {
+    var weight: Int?
+    var width: Int?
+
+    init(_ name: String) {
+        let words = Self.words(name)
+        weight = words.lazy.compactMap { Self.weights[$0] }.first
+        width = words.lazy.compactMap { Self.widths[$0] }.first
+    }
+
+    /// "SemiBold Cond-Italic" → semibold, cond, italic: split at anything but a letter and at a
+    /// lowercase-to-uppercase step, with a prefix (extra, ultra, semi, demi, x, u) joined to the
+    /// word after when that makes a known word.
+    static func words(_ name: String) -> [String] {
+        var words: [String] = []
+        var word = ""
+        for character in name {
+            if !character.isLetter || character.isUppercase && word.last?.isLowercase == true {
+                if !word.isEmpty { words.append(word.lowercased()) }
+                word = ""
+            }
+            if character.isLetter { word.append(character) }
+        }
+        if !word.isEmpty { words.append(word.lowercased()) }
+        var joined: [String] = []
+        for word in words {
+            if let last = joined.last, prefixes.contains(last), weights[last + word] != nil || widths[last + word] != nil {
+                joined[joined.count - 1] = last + word
+            } else {
+                joined.append(word)
+            }
+        }
+        return joined
+    }
+
+    private static let prefixes: Set<String> = ["extra", "ultra", "semi", "demi", "x", "xx", "u"]
+
+    private static let weights: [String: Int] = [
+        "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "thin": 100, "th": 100,
+        "ultralight": 190, "ult": 190, "extralight": 200, "xlight": 200, "xlt": 200,
+        "light": 300, "lt": 300, "semilight": 340, "book": 350, "bk": 350,
+        "regular": 400, "rg": 400, "reg": 400, "roman": 400, "normal": 400, "plain": 400,
+        "medium": 500, "md": 500, "med": 500,
+        "semibold": 600, "sbd": 600, "demibold": 610, "demi": 610,
+        "bold": 700, "bd": 700,
+        "extrabold": 800, "xbold": 800, "xbd": 800, "ultrabold": 810, "ubd": 810, "heavy": 850, "hv": 850,
+        "black": 900, "bl": 900, "blk": 900, "extrablack": 950, "xblack": 950, "ultrablack": 960, "ultra": 960, "super": 1000,
+    ]
+
+    private static let widths: [String: Int] = [
+        "ultracondensed": 1, "ultracompressed": 1, "xxcondensed": 1, "xxcompressed": 1, "xcm": 1,
+        "extracondensed": 2, "extracompressed": 2, "xcondensed": 2, "xcompressed": 2, "compressed": 2, "comp": 2, "cm": 2,
+        "condensed": 3, "cond": 3, "cn": 3, "narrow": 3,
+        "semicondensed": 4, "semicompressed": 4, "semicond": 4,
+        "semiextended": 6, "semiexpanded": 6, "semiwide": 6,
+        "extended": 7, "ext": 7, "expanded": 7, "exp": 7, "wide": 7,
+        "extraextended": 8, "extraexpanded": 8, "extrawide": 8, "xextended": 8, "xexpanded": 8, "xwide": 8, "xext": 8,
+        "ultraextended": 9, "ultraexpanded": 9, "ultrawide": 9, "xxextended": 9, "xxexpanded": 9, "xxwide": 9, "xexp": 9,
+    ]
+}
+
 extension Classification {
     /// The OS/2 family class of the regular upright face, then hints in the name.
     static func of(name: String, faces: [LibraryFace]) -> Classification {
