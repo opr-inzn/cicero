@@ -21,13 +21,19 @@ struct BrowserView: View {
         @Bindable var model = model
         let families = model.visibleFamilies
         return Group {
-            switch mode {
-            case .list: FontList(families: families)
-            case .grid: FontGrid(families: families)
-            case .specimens: SpecimenList(families: families)
+            if families.isEmpty && model.hasScanned {
+                // Just the message on the plain background; an empty table would still draw its rows.
+                EmptyBrowser()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.canvas)
+            } else {
+                switch mode {
+                case .list: FontList(families: families)
+                case .grid: FontGrid(families: families)
+                case .specimens: SpecimenList(families: families)
+                }
             }
         }
-        .overlay { EmptyBrowser(isEmpty: families.isEmpty) }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
@@ -97,16 +103,13 @@ private struct ScanCapsule: View {
 
 private struct EmptyBrowser: View {
     @Environment(AppModel.self) private var model
-    let isEmpty: Bool
 
     var body: some View {
-        if isEmpty && model.hasScanned {
-            let query = model.appliedSearch.trimmingCharacters(in: .whitespaces)
-            if !query.isEmpty {
-                ContentUnavailableView.search(text: query)
-            } else {
-                content
-            }
+        let query = model.appliedSearch.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            ContentUnavailableView.search(text: query)
+        } else {
+            content
         }
     }
 
@@ -122,10 +125,15 @@ private struct EmptyBrowser: View {
                 Button("Add Folder…") { model.presentAddFolderPanel() }
             }
         case .inactive:
-            ContentUnavailableView("Everything Is Activated", systemImage: "circle.inset.filled",
-                                   description: Text("Every font in your library is turned on."))
+            ContentUnavailableView {
+                Label("Everything Is Activated", systemImage: "checkmark.circle")
+            } description: {
+                Text("Every font in your library is turned on. Add a folder of fonts to keep more here without installing them.")
+            } actions: {
+                Button("Add Folder…") { model.presentAddFolderPanel() }
+            }
         case .active:
-            ContentUnavailableView("Nothing Activated", systemImage: "circle",
+            ContentUnavailableView("Nothing Activated", systemImage: "circle.dashed",
                                    description: Text("Turn a font on and it shows up here."))
         case .set:
             ContentUnavailableView("Empty Set", systemImage: "square.stack",
