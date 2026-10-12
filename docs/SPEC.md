@@ -65,7 +65,7 @@ ellipsis character (…) for items that ask for more input.
 
 ## Info panel (trailing column, 300 pt wide, starts below the toolbar, toggled by ⓘ / ⌘I)
 
-- Family name; segmented Info | Features; Style picker when more than one style.
+- Family name; segmented Info | Features (no style picker: it describes the style being previewed).
 - Info: Status, Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Weight, Variable weight, Glyphs, Format, Copyright, Languages ("213 languages, including English, German, …" + Show All popover grouped by script with search; full support marked), Character Sets (largest set per series the face has, e.g. "Latin S, Adobe Latin 3, GF Latin Core", plus "Latin M needs 12 more characters"), Location + Reveal in Finder, Other copies.
 - Features: the face's OpenType features (toggles / menus); chosen features apply to that family everywhere it's previewed (list, grid, specimens, font page).
 - With nothing (or several fonts) selected: "No Selection" / "3 Fonts Selected".
