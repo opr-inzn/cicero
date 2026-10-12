@@ -4,12 +4,15 @@
 
 A font manager for macOS 26. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
-- **Customizable sidebar.** Click **Edit** next to Library and every sidebar item and group gets a checkbox; uncheck what you don't want and click **Done**. The same list lives in **Settings → Sidebar**, Finder-style. Right-click any row → *Hide from Sidebar* also works.
-- **App-only folders.** A watched folder can be marked *Active in Adobe apps* (auto-detected for `…/Application Support/Adobe/Fonts`). Its fonts get an "Adobe" tag and stay out of Inactive; browse them through the folder's sidebar row. Set this per folder in **Settings → Fonts** or from the folder's right-click menu; other app names work too.
-- **Reveal in Finder.** Right-click a font (or a selection), a style row in the detail view, or use ⇧⌘R. The inspector shows the file path with a Reveal button as well.
-- **Folders group** in the sidebar, one row per watched folder, and a **System Fonts** item for the fonts that ship with macOS (which can also be kept out of All/Active).
-
-Also: a grid/list browser with size, weight and color controls; a detail view with an editable preview, every style and a character grid; an Info/OpenType Features inspector; styles, collections (drag fonts onto them) and foundries; activation by copying to `~/Library/Fonts` or using the files where they are.
+- **Two ways to browse.** A sortable list with an on/off switch for each family, a preview in the font itself, and classification, foundry and format columns you can show or hide. Or full-width specimens with every style set in itself.
+- **Font pages.** A waterfall from 9 to 96 pt, a table of styles you can switch on one by one, and a searchable glyph map.
+- **Preview Options.** Sample text (the font's own name by default), size, weight and letter spacing, shared by every view. OpenType features live in the info panel.
+- **Customizable sidebar.** Click **Edit** next to Fonts and every item and group gets a checkbox; uncheck what you don't want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*.
+- **Sets, tags and classifications.** Group fonts by hand in sets, label them with tags, and browse by foundry or by classification, which Point reads from the fonts themselves.
+- **Watched folders.** Fonts in your folders are listed without being installed. A folder that one app loads on its own, like Adobe's Fonts folder, is marked for that app (detected automatically) instead of showing as not activated.
+- **System Fonts.** The fonts that ship with macOS have their own item, and can be kept out of your other lists.
+- **Font cache tools.** Clear the macOS font caches for your account or for all users, and rebuild Point's font list, from the Fonts menu or Settings → General.
+- **Reveal in Finder** from a font's right-click menu, a style, ⇧⌘R, or the info panel.
 
 ## Privacy
 

@@ -62,6 +62,9 @@ struct SpecimenList: View {
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { library.detailFamilyID = family.id }
             .accessibilityAction(named: "Select") { click(family, in: families) }
+            .accessibilityAction(named: family.hasActiveFaces ? "Deactivate" : "Activate") {
+                family.hasActiveFaces ? library.requestDeactivate([family]) : library.requestActivate([family])
+            }
     }
 
     private func click(_ family: FontFamily, in families: [FontFamily]) {
@@ -106,7 +109,9 @@ struct SpecimenRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
+                // The row exposes Activate/Deactivate as accessibility actions instead.
                 ActivationSwitch(family: family)
+                    .accessibilityHidden(true)
             }
             FontPreviewText(
                 text: preview.text(for: family),

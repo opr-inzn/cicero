@@ -248,19 +248,7 @@ enum CharacterSections {
     }
 }
 
-
 extension Color {
     /// Background behind font previews; follows the system light/dark appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-}
-
-enum Prefs {
-    static let pointSize = "browser.pointSize"
-    static let weight = "browser.weight"
-    static let sampleText = "browser.sampleText"
-    static let viewMode = "browser.viewMode"
-    static let detailPointSize = "detail.pointSize"
-    static let detailWeight = "detail.weight"
-    static let detailTracking = "detail.tracking"
-    static let detailText = "detail.text"
 }
