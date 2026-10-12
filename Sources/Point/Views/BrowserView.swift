@@ -11,9 +11,17 @@ struct BrowserView: View {
     @AppStorage("browser.mode") private var mode: BrowserMode = .list
 
     var body: some View {
+        if library.sidebarSelection == .problems {
+            ProblemsView()
+        } else {
+            browser
+        }
+    }
+
+    private var browser: some View {
         @Bindable var library = library
         let families = library.visibleFamilies
-        Group {
+        return Group {
             switch mode {
             case .list: FontTable(families: families)
             case .specimens: SpecimenList(families: families)
@@ -95,6 +103,7 @@ struct BrowserView: View {
             .labelStyle(.iconOnly)
             .help("Show as a list or as specimens")
         }
+        ToolbarItem { SlideshowToolbarButton() }
         ToolbarItem { PreviewOptionsButton() }
         ToolbarItem { InfoToolbarButton() }
             .sharedBackgroundVisibility(.hidden)

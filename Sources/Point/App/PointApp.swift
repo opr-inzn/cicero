@@ -17,6 +17,25 @@ struct PointApp: App {
         .defaultSize(width: 1440, height: 900)
         .commands { PointCommands(library: library) }
 
+        Window("Compare", id: PresentationWindow.compare) {
+            CompareView()
+                .environment(library)
+                .environment(preview)
+        }
+        .defaultSize(width: 960, height: 640)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
+
+        Window("Slideshow", id: PresentationWindow.slideshow) {
+            SlideshowView()
+                .environment(library)
+                .environment(preview)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1200, height: 800)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
+
         Settings {
             SettingsView()
                 .environment(library)
@@ -56,6 +75,8 @@ struct PointCommands: Commands {
             Button("Reveal in Finder") { library.revealSelection() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
+            Divider()
+            PresentationCommands(library: library)
             Divider()
             Button("Rescan Library") { library.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
