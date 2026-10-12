@@ -6,14 +6,19 @@ Each version's notes here become its release notes on the [releases page](https:
 
 First release.
 
-- Browse your library as a sortable list with on/off switches, or as full-width specimens.
-- Font pages with a waterfall, a table of styles you can switch on individually, and a searchable glyph map.
-- Preview Options for sample text, size, weight and letter spacing; OpenType features and font info in the info panel.
+- Browse your library as a sortable list with on/off switches, a grid, or full-width specimens.
+- Font pages with a large editable text, a waterfall, a table of styles you can switch on individually, and a searchable glyph map.
+- An info panel with font details, supported languages and character sets, and a Features tab for OpenType features.
+- Preview Options for sample text, size, weight and letter spacing.
 - Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item.
-- Sets, tags, foundries, and automatic classifications read from each font.
+- Sets, smart sets with rules, tags, foundries, and automatic classifications read from each font.
+- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, and your own; filter by them in the sidebar and sort the list by them.
+- Character Toolbox: find fonts that have every character of a text or support one of 780 languages.
+- Compare fonts on a shared baseline or overlaid, and present them in a full-screen slideshow.
+- A Problems view for conflicting, missing, damaged and duplicate fonts.
 - Watch folders of fonts without installing them; folders that only one app loads, like Adobe's Fonts folder, are marked for that app.
 - System Fonts item, with an option to keep macOS fonts out of your other lists.
 - Clear the macOS font caches, and the ones Adobe apps and Microsoft Office keep, and rebuild Point's font list when fonts misbehave.
 - Activate fonts by copying them to your Fonts folder or using them where they are. Deactivating never deletes your only copy.
 - Activate fonts temporarily, until Point quits or until you log out, with nothing copied.
-- Reveal any font or style in Finder.
+- Move fonts to the Trash, and reveal any font or style in Finder.
