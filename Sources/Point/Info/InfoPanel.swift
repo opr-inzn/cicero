@@ -29,7 +29,7 @@ private struct InfoPanel: View {
 
     var body: some View {
         if let family = model.inspectedFamily {
-            FamilyInfo(family: family, previewFace: family.face(nearestWeight: preview.weight))
+            FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
                 .id(family.id)
         } else {
             let count = model.selectedIDs.count
@@ -39,15 +39,11 @@ private struct InfoPanel: View {
     }
 }
 
+/// Describes the style being previewed (the regular one at the default weight).
 private struct FamilyInfo: View {
     @Environment(AppModel.self) private var model
     let family: Family
-    let previewFace: LibraryFace
-    @State private var faceID: FaceID?
-
-    private var face: LibraryFace {
-        family.faces.first { $0.id == faceID } ?? previewFace
-    }
+    let face: LibraryFace
 
     var body: some View {
         @Bindable var model = model
@@ -63,13 +59,6 @@ private struct FamilyInfo: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding(12)
-            if family.faces.count > 1 {
-                Picker("Style", selection: Binding(get: { face.id }, set: { faceID = $0 })) {
-                    ForEach(family.faces) { Text($0.face.styleName).tag($0.id) }
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-            }
             Divider()
             ScrollView {
                 switch model.infoTab {
@@ -78,7 +67,6 @@ private struct FamilyInfo: View {
                 }
             }
         }
-        .onChange(of: previewFace.id) { faceID = nil }
     }
 }
 
