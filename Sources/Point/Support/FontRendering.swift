@@ -99,14 +99,7 @@ struct FontMetadata {
     }
 
     static func format(of url: URL) -> String {
-        switch url.pathExtension.lowercased() {
-        case "otf": "OpenType, PostScript outlines"
-        case "ttf": "OpenType, TrueType outlines"
-        case "ttc", "otc": "Font Collection"
-        case "dfont": "Datafork TrueType"
-        case "woff", "woff2": "Web Font"
-        default: url.pathExtension.uppercased()
-        }
+        format(ofExtension: url.pathExtension)
     }
 }
 

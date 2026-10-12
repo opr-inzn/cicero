@@ -5,7 +5,7 @@
 A font manager for macOS 26. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
 - **Three ways to browse.** A sortable list with an on/off switch for each family, a preview in the font itself, and columns you can show or hide (classification, foundry, Latin S–XL and Adobe Latin coverage, date added, format). A grid of tiles. Or full-width specimens with every style set in itself.
-- **Font pages.** A large text you can type into, a waterfall from 9 to 96 pt, a table of styles you can switch on one by one, and a searchable glyph map.
+- **Font pages.** A large text you can type into, a table of styles you can switch on one by one, and a searchable glyph map.
 - **Info and Features.** The info panel shows a font's details, the languages it supports and its character sets; the Features tab turns OpenType features on for that family wherever it's previewed.
 - **Preview Options.** Sample text, size, weight and letter spacing, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.

@@ -407,8 +407,8 @@ extension FontMetadata {
     /// The format named by a file extension; reads no file.
     static func format(ofExtension ext: String) -> String {
         switch ext.lowercased() {
-        case "otf": "OpenType, PostScript outlines"
-        case "ttf": "OpenType, TrueType outlines"
+        case "otf": "OpenType PostScript"
+        case "ttf": "OpenType TrueType"
         case "ttc", "otc": "Font Collection"
         case "dfont": "Datafork TrueType"
         case "woff", "woff2": "Web Font"
