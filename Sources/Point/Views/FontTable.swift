@@ -10,16 +10,27 @@ struct FontRow: Identifiable {
     let format: String
     /// Sorts activated families first, then partly activated, then the rest.
     let activationRank: Int
+    /// The largest Latin S–XL and Adobe Latin sets the family has, ranked by size; -1 for none.
+    let latinSize: String
+    let latinSizeRank: Int
+    let adobeLatin: String
+    let adobeLatinRank: Int
+    let dateAdded: Date
 
     var id: String { family.id }
 
-    init(family: FontFamily, foundry: String?) {
+    init(family: FontFamily, foundry: String?, latinSize: CharacterSetDefinition?, adobeLatin: CharacterSetDefinition?) {
         self.family = family
         name = family.name
         self.foundry = foundry ?? ""
         styleCount = family.faces.count
         classification = family.classification.rawValue
         format = family.format
+        self.latinSize = latinSize?.name ?? ""
+        latinSizeRank = latinSize?.level ?? -1
+        self.adobeLatin = adobeLatin?.name ?? ""
+        adobeLatinRank = adobeLatin?.level ?? -1
+        dateAdded = family.dateAdded ?? .distantPast
         switch family.status {
         case .active, .system: activationRank = 0
         case .partial: activationRank = 1
@@ -39,7 +50,14 @@ struct FontTable: View {
 
     var body: some View {
         @Bindable var library = library
-        let rows = families.map { FontRow(family: $0, foundry: library.foundryName(of: $0)) }.sorted(using: sortOrder)
+        let rows = families.map {
+            FontRow(
+                family: $0, foundry: library.foundryName(of: $0),
+                latinSize: library.largestCharacterSet(of: $0, inGroup: "koeberlin"),
+                adobeLatin: library.largestCharacterSet(of: $0, inGroup: "adobe")
+            )
+        }
+        .sorted(using: sortOrder)
         Table(rows, selection: $library.selectedFamilyIDs, sortOrder: $sortOrder, columnCustomization: $columns) {
             TableColumn("On", value: \.activationRank) { row in
                 ActivationSwitch(family: row.family)
@@ -85,6 +103,28 @@ struct FontTable: View {
             .width(min: 80, ideal: 150)
             .customizationID("foundry")
 
+            TableColumn("Latin S–XL", value: \.latinSizeRank) { row in
+                Text(row.latinSize).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .width(min: 60, ideal: 80)
+            .customizationID("latinSize")
+
+            TableColumn("Adobe Latin", value: \.adobeLatinRank) { row in
+                Text(row.adobeLatin.replacingOccurrences(of: "Adobe Latin", with: "AL")).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .width(min: 60, ideal: 80)
+            .customizationID("adobeLatin")
+
+            TableColumn("Date Added", value: \.dateAdded) { row in
+                if row.dateAdded != .distantPast {
+                    Text(row.dateAdded, format: .dateTime.day().month(.abbreviated).year())
+                        .foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            .width(min: 80, ideal: 100)
+            .customizationID("added")
+            .defaultVisibility(.hidden)
+
             TableColumn("Format", value: \.format) { row in
                 Text(row.format).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -102,5 +142,13 @@ struct FontTable: View {
             library.detailFamilyID = library.selectedFamilyIDs.first
             return .handled
         }
+        // A new list reloads the table instead of diffing it: inserting a thousand rows makes the
+        // table measure every one of them, which takes minutes with live font previews.
+        .id(TableIdentity(selection: library.sidebarSelection, search: library.searchText))
     }
+}
+
+private struct TableIdentity: Hashable {
+    var selection: SidebarSelection?
+    var search: String
 }

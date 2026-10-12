@@ -73,29 +73,45 @@ struct SidebarView: View {
             Text(section.title)
                 .opacity(editing && !library.isVisible(section.key) ? 0.45 : 1)
             Spacer()
-            if !editing, let action = addAction(for: section) {
-                Button(action: action.perform) {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help(action.help)
-            }
+            if !editing { addButton(for: section) }
         }
         .padding(.trailing, 10)
     }
 
-    private func addAction(for section: SidebarSection) -> (help: String, perform: () -> Void)? {
+    @ViewBuilder
+    private func addButton(for section: SidebarSection) -> some View {
         switch section {
         case .folders:
-            return ("Add a folder of fonts", { library.presentAddFolderPanel() })
+            plusButton("Add a folder of fonts") { library.presentAddFolderPanel() }
         case .sets:
-            return ("New set", { library.prompt("New Set", confirm: "Create") { library.addSet(named: $0) } })
+            Menu {
+                Button("New Set…") { library.prompt("New Set", confirm: "Create") { library.addSet(named: $0) } }
+                Button("New Smart Set…") { library.editingSmartSet = SmartSet(name: "") }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .fixedSize()
+            .help("New set or smart set")
         case .tags:
-            return ("New tag", { library.prompt("New Tag", confirm: "Create") { library.addTag(named: $0) } })
+            plusButton("New tag") { library.prompt("New Tag", confirm: "Create") { library.addTag(named: $0) } }
+        case .characterSets:
+            plusButton("New character set") { library.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
         case .foundries, .classifications:
-            return nil
+            EmptyView()
         }
+    }
+
+    private func plusButton(_ help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "plus")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(help)
     }
 
     private func expansion(_ section: SidebarSection) -> Binding<Bool> {
@@ -164,6 +180,16 @@ struct SidebarView: View {
                     library.prompt("Rename Set", text: set.name, confirm: "Rename") { library.renameSet(id, to: $0) }
                 }
                 Button("Delete Set") { library.deleteSet(id) }
+            }
+        case .smartSet(let id):
+            if let smartSet = library.smartSet(id) {
+                Button("Edit Smart Set…") { library.editingSmartSet = smartSet }
+                Button("Delete Smart Set") { library.deleteSmartSet(id) }
+            }
+        case .characterSet(let id):
+            if let custom = library.data.customCharacterSets.first(where: { $0.definitionID == id }) {
+                Button("Edit Character Set…") { library.editingCharacterSet = custom }
+                Button("Delete Character Set") { library.deleteCharacterSet(custom.id) }
             }
         case .system:
             Toggle("Also Show in Other Lists", isOn: Binding(

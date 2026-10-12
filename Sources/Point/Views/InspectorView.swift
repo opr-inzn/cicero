@@ -97,6 +97,7 @@ private struct InfoPane: View {
                 row(pair.0, pair.1)
             }
             LanguagesRow(face: face.face)
+            CharacterSetsRow(face: face.face)
             VStack(alignment: .leading, spacing: 4) {
                 label("Location")
                 Text(face.face.path)

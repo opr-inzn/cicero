@@ -8,6 +8,7 @@ struct SettingsView: View {
             Tab("Folders", systemImage: "folder") { FoldersSettings() }
             Tab("Activation", systemImage: "power") { ActivationSettings() }
             Tab("Sidebar", systemImage: "sidebar.left") { SidebarSettings() }
+            Tab("Character Sets", systemImage: "character.textbox") { CharacterSetSettings() }
         }
         .frame(width: 560, height: 580)
     }

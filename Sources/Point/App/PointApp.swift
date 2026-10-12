@@ -64,6 +64,8 @@ struct PointCommands: Commands {
                 library.prompt("New Set", confirm: "Create") { library.addSet(named: $0, with: library.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("New Smart Set…") { library.editingSmartSet = SmartSet(name: "") }
+                .keyboardShortcut("n", modifiers: [.command, .option])
         }
         CommandGroup(after: .sidebar) {
             Button(library.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
@@ -121,6 +123,7 @@ struct RootView: View {
                     .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
             }
         }
+        .modifier(SetEditorSheets())
         .sheet(item: $library.pendingActivation) { request in
             ActivationSheet(request: request)
         }

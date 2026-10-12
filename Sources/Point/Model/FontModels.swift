@@ -86,6 +86,8 @@ struct LibraryFace: Identifiable, Hashable, Sendable {
     var status: FaceStatus
     /// Other files on disk containing the same PostScript name (e.g. the original of an installed copy).
     var otherPaths: [String] = []
+    /// When the earliest of those files arrived in its folder.
+    var added: Date?
 
     var id: String { face.id }
     var canActivate: Bool { !status.isActive }
@@ -124,6 +126,8 @@ struct FontFamily: Identifiable, Hashable, Sendable {
     var status: FamilyStatus
     var folderIDs: Set<UUID>
     var manufacturer: String?
+    /// When the family's first file arrived in its folder.
+    var dateAdded: Date?
 
     var id: String { name }
 
@@ -252,6 +256,10 @@ enum InstallMethod: String, Codable, CaseIterable, Sendable {
 struct UserLibraryData: Codable, Sendable {
     var watchedFolders: [WatchedFolder] = []
     var sets: [FontSet] = []
+    var smartSets: [SmartSet] = []
+    var customCharacterSets: [CustomCharacterSet] = []
+    /// Character sets listed in the sidebar. Unlike other rows they're opt-in, since there are many.
+    var shownCharacterSets: Set<String> = CharacterSetCatalog.defaultShownIDs
     /// Tag names in sidebar order.
     var tags: [String] = []
     /// Family name → its tags.
@@ -287,6 +295,9 @@ struct UserLibraryData: Codable, Sendable {
         watchedFolders = try c.decodeIfPresent([WatchedFolder].self, forKey: .watchedFolders) ?? d.watchedFolders
         sets = try c.decodeIfPresent([FontSet].self, forKey: .sets)
             ?? legacy.decodeIfPresent([FontSet].self, forKey: .collections) ?? d.sets
+        smartSets = try c.decodeIfPresent([SmartSet].self, forKey: .smartSets) ?? d.smartSets
+        customCharacterSets = try c.decodeIfPresent([CustomCharacterSet].self, forKey: .customCharacterSets) ?? d.customCharacterSets
+        shownCharacterSets = try c.decodeIfPresent(Set<String>.self, forKey: .shownCharacterSets) ?? d.shownCharacterSets
         foundryOverrides = try c.decodeIfPresent([String: String].self, forKey: .foundryOverrides) ?? d.foundryOverrides
         foundryRenames = try c.decodeIfPresent([String: String].self, forKey: .foundryRenames) ?? d.foundryRenames
         hiddenSidebarItems = try c.decodeIfPresent(Set<String>.self, forKey: .hiddenSidebarItems) ?? d.hiddenSidebarItems

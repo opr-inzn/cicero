@@ -28,7 +28,7 @@ enum ProblemKind: String, CaseIterable, Sendable {
     var explanation: String {
         switch self {
         case .conflict:
-            "The same font is active from more than one file. macOS picks one of them, so apps may get an old version. Keep one copy and turn off the rest."
+            "Fonts with the same PostScript name are active from more than one file. macOS uses only one of them, so apps may get an old version or a different font. Keep one and turn off the rest."
         case .missing:
             "Point remembers these fonts, but their files are gone. The drive may be unplugged, or the files were moved or deleted."
         case .unreadable:
