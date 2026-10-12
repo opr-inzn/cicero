@@ -83,7 +83,7 @@ struct ActivationSwitch: View {
 
     var body: some View {
         let isEnabled = family.hasActivatable || family.hasDeactivatable
-        MiniSwitch(position: family.position, isEnabled: isEnabled) { model.toggle(family) }
+        MiniSwitch(position: model.position(of: family), isEnabled: isEnabled) { model.toggle(family) }
             .help(help)
             .accessibilityElement()
             .accessibilityLabel("Activated")
@@ -95,7 +95,7 @@ struct ActivationSwitch: View {
     private var help: String {
         if family.state == .system { return "Installed with macOS" }
         guard let app = family.app.map(FaceState.appDescription) else { return family.hasActive ? "Deactivate" : "Activate" }
-        return switch family.position {
+        return switch model.position(of: family) {
         case .app: "On in \(app) only. Click to turn on in every app."
         case .on: "On in every app. Click to turn off, \(app) included."
         case .off: "Off. Click to turn on in \(app) only."
@@ -103,7 +103,7 @@ struct ActivationSwitch: View {
     }
 
     private var accessibilityValue: String {
-        switch family.position {
+        switch model.position(of: family) {
         case .on: "On"
         case .app: "On in \(family.app.map(FaceState.appDescription) ?? "one app") only"
         case .off: "Off"

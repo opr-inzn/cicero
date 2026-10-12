@@ -17,13 +17,18 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, the Fonts
   folders, watched folders, the Deactivated folder), reads new or changed files with a stamp-keyed
   cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint` lets the
-  app skip rescans that changed nothing.
+  app skip rescans that changed nothing. `FolderWatcher` (FSEvents) says when font files come or go
+  in the scanned folders.
 - **Data** (`Data/`): `UserData` is everything the user set up (folders, sets, smart sets, tags,
   foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
   state and the engine stays testable; `FontRegistrar` hides CoreText so tests never touch the system.
+  Every change goes through fontd and waits for it (copies are registered too, files are unregistered
+  before they move), and a file only counts once fontd reports it active: when an operation returns,
+  every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
+- **Signposts** (`Signposts.swift`): os_signpost intervals, for timing activation in Instruments.
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
@@ -36,7 +41,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 
 - `AppModel` (`Model/`) holds the current `Library`, the `UserData` and what the windows show. It
   starts scans, applies results, and runs activation-type operations one at a time so their record
-  changes never overwrite each other. Lists it hands to views (`visibleFamilies`, sidebar rows,
+  changes never overwrite each other. Switches move when clicked (`expect`) and the scan an operation
+  starts when it finishes confirms them; font-change notifications during and just after an operation
+  are left to that scan. Lists it hands to views (`visibleFamilies`, sidebar rows,
   character set lookups) are cached and keyed on the inputs they depend on.
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
