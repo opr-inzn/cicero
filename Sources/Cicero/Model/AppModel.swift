@@ -124,6 +124,7 @@ final class AppModel {
         MainActor.assumeIsolated { self?.fontsChanged() }
     }
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
+    @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
 
     init() {
@@ -249,31 +250,20 @@ final class AppModel {
     }
 
     private func apply(_ new: Library, scan id: Int) {
+        let signpost = Signposts.library.beginInterval("Apply")
+        defer { Signposts.library.endInterval("Apply", signpost) }
         endScan(id)
         hasScanned = true
         guard new.fingerprint != library.fingerprint else { return }
-        let old = library
         library = new
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
-        FontLoader.shared.invalidate(paths: Self.changedPaths(from: old, to: new))
-        FontLoader.shared.prefetch(new.families.map(\.regular.face))
+        FontLoader.shared.invalidate(paths: new.changedPaths)
+        // What the browser shows first, then everything else.
+        FontLoader.shared.prefetch((visibleFamilies + new.families).map(\.regular.face))
         updateCoverage()
         updateProblems()
-    }
-
-    private static func changedPaths(from old: Library, to new: Library) -> Set<String> {
-        func faces(_ library: Library) -> [String: [FontFace]] {
-            var result: [String: [FontFace]] = [:]
-            for family in library.families {
-                for face in family.faces { result[face.face.path, default: []].append(face.face) }
-            }
-            return result
-        }
-        let before = faces(old)
-        let after = faces(new)
-        return Set(before.keys).union(after.keys).filter { before[$0] != after[$0] }
     }
 
     private func updateCoverage() {

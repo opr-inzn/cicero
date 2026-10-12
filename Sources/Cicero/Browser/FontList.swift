@@ -43,18 +43,17 @@ nonisolated struct FontRow: Identifiable, Sendable {
     }
 }
 
-/// The families as a sortable table with an on/off switch and a preview per row.
+/// The visible families as a sortable table with an on/off switch and a preview per row.
 struct FontList: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
-    let families: [Family]
     @State private var sortOrder = [KeyPathComparator(\FontRow.name, comparator: .localizedStandard)]
     @SceneStorage("FontListColumns") private var columns: TableColumnCustomization<FontRow>
 
     var body: some View {
         @Bindable var bindable = model
         let model = self.model
-        let rows = families.map { FontRow($0, model: model) }.sorted(using: sortOrder)
+        let rows = model.fontRows(sortedBy: sortOrder)
         Table(rows, selection: $bindable.selectedIDs, sortOrder: $sortOrder, columnCustomization: $columns) {
             TableColumn("Status", value: \.activation) { row in
                 ActivationSwitch(family: row.family, model: model)

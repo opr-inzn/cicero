@@ -47,6 +47,8 @@ public final class CoverageIndex: Sendable {
     private let file: URL
     private let languages: LanguageCatalog
     private let state = Mutex(State())
+    /// Writes the cache one save at a time, after `update` has returned.
+    private let saveQueue = DispatchQueue(label: "Cicero.CoverageIndex.save", qos: .utility)
 
     private struct Entry: Sendable {
         var stamp: CoverageStamp
@@ -65,8 +67,11 @@ public final class CoverageIndex: Sendable {
     }
 
     /// Computes what's missing at low priority; cheap when nothing changed. `progress` reports
-    /// (done, total) only when there's work. Cancellable.
+    /// (done, total) only when there's work. Cancellable. The cache is written afterwards, without
+    /// holding up the lists waiting for the results.
     public func update(_ families: [Family], progress: @escaping @Sendable (Int, Int) -> Void) async {
+        let signpost = Signposts.library.beginInterval("Coverage")
+        defer { Signposts.library.endInterval("Coverage", signpost) }
         loadIfNeeded()
         let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
         let work = state.withLock { state in
@@ -94,7 +99,8 @@ public final class CoverageIndex: Sendable {
                 }
             }
         }
-        saveIfNeeded(keeping: Set(families.flatMap { $0.faces.map(\.id) }))
+        let known = Set(families.flatMap { $0.faces.map(\.id) })
+        saveQueue.async { self.saveIfNeeded(keeping: known) }
     }
 
     /// nil until computed.
@@ -118,11 +124,19 @@ public final class CoverageIndex: Sendable {
     }
 
     public func clearCache() {
-        state.withLock {
-            $0.entries = [:]
-            $0.dirty = false
+        // After any save in progress, so it can't write the file back.
+        saveQueue.sync {
+            state.withLock {
+                $0.entries = [:]
+                $0.dirty = false
+            }
+            try? FileManager.default.removeItem(at: file)
         }
-        try? FileManager.default.removeItem(at: file)
+    }
+
+    /// Waits for the cache to be written.
+    func waitForSave() {
+        saveQueue.sync {}
     }
 
     // MARK: - Computing
@@ -135,7 +149,7 @@ public final class CoverageIndex: Sendable {
     /// The scalars the face's file says it covers; an installed font of the same name when the
     /// file can't be read, and nothing when neither exists.
     static func scalars(of face: FontFace) -> ScalarRanges {
-        let descriptor = FontFiles.descriptor(for: face, in: FontFiles.descriptors(at: face.path))
+        let descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         guard CTFontCopyPostScriptName(font) as String == face.postScriptName else { return .empty }
@@ -173,6 +187,8 @@ public final class CoverageIndex: Sendable {
             return kept
         }
         guard let entries else { return }
+        let signpost = Signposts.library.beginInterval("Save coverage")
+        defer { Signposts.library.endInterval("Save coverage", signpost) }
         let cache = CacheFile(language: languages.dataVersion, entries: entries.map { id, entry in
             CacheEntry(
                 path: id.path, index: id.index, modified: entry.stamp.modified, size: entry.stamp.size,
