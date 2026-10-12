@@ -12,7 +12,10 @@ struct PointApp: App {
                 .environment(library)
                 .environment(preview)
                 .frame(minWidth: 960, minHeight: 600)
-                .onAppear { library.start() }
+                .onAppear {
+                    AppAppearance.applySaved()
+                    library.start()
+                }
         }
         .defaultSize(width: 1440, height: 900)
         .commands { PointCommands(library: library) }
