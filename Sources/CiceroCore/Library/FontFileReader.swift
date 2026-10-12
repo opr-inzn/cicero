@@ -31,24 +31,37 @@ enum FontFileReader {
         let symbolic = CTFontGetSymbolicTraits(font)
         let lowercasedStyle = styleName.lowercased()
         var axis: WeightAxis?
-        if let axes = CTFontCopyVariationAxes(font) as? [[String: Any]] {
-            for entry in axes where (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value == weightAxisTag {
-                guard let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
-                      let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double,
-                      let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double
-                else { continue }
+        var axes: [VariationAxis] = []
+        // A named instance's own coordinates; axes it leaves out are at their defaults. (The font's variation
+        // would also hold the optical size CoreText picks for its point size.)
+        let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
+            .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
+        for entry in CTFontCopyVariationAxes(font) as? [[String: Any]] ?? [] {
+            guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
+                  let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double
+            else { continue }
+            if identifier == weightAxisTag,
+               let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
+               let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double {
                 axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
             }
+            if entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true { continue }
+            let tag = String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .isoLatin1) ?? ""
+            let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
+            axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
         }
+        let os2 = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), CTFontTableOptions(rawValue: 0)) as Data?
         return FontFace(
             id: id, postScriptName: postScriptName, familyName: familyName, styleName: styleName, fullName: fullName,
-            weight: weightClass(of: font),
+            weight: weightClass(of: font, os2: os2),
             isItalic: symbolic.contains(.italicTrait) || lowercasedStyle.contains("italic") || lowercasedStyle.contains("oblique"),
             isMonospaced: symbolic.contains(.monoSpaceTrait),
             familyClass: Int((symbolic.rawValue >> 28) & 0xF),
             manufacturer: name(kCTFontManufacturerNameKey, of: font),
             version: name(kCTFontVersionNameKey, of: font),
-            weightAxis: axis
+            weightAxis: axis,
+            width: widthClass(os2),
+            axes: axes
         )
     }
 
@@ -61,8 +74,8 @@ enum FontFileReader {
     }
 
     /// OS/2 usWeightClass when it's in range, else the nearest class to CoreText's weight trait.
-    private static func weightClass(of font: CTFont) -> Int {
-        if let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), CTFontTableOptions(rawValue: 0)) as Data?, table.count >= 6 {
+    private static func weightClass(of font: CTFont, os2 table: Data?) -> Int {
+        if let table, table.count >= 6 {
             let weight = Int(table[table.startIndex + 4]) << 8 | Int(table[table.startIndex + 5])
             if (1...1000).contains(weight) { return weight }
         }
@@ -71,5 +84,12 @@ enum FontFileReader {
         // AppKit's weight scale: ultraLight -0.8 … regular 0 … black 0.62.
         let scale: [(Double, Int)] = [(-0.8, 100), (-0.6, 200), (-0.4, 300), (0, 400), (0.23, 500), (0.3, 600), (0.4, 700), (0.56, 800), (0.62, 900)]
         return scale.min { abs($0.0 - trait) < abs($1.0 - trait) }!.1
+    }
+
+    /// OS/2 usWidthClass when it's in range, else normal.
+    private static func widthClass(_ table: Data?) -> Int {
+        guard let table, table.count >= 8 else { return 5 }
+        let width = Int(table[table.startIndex + 6]) << 8 | Int(table[table.startIndex + 7])
+        return (1...9).contains(width) ? width : 5
     }
 }
