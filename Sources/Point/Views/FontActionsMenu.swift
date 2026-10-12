@@ -53,6 +53,10 @@ struct FontActionsMenu: View {
 
         Divider()
 
+        PresentationMenuItems(families: families)
+
+        Divider()
+
         Button("Reveal in Finder") { library.reveal(families) }
         Button(families.count == 1 ? "Copy Family Name" : "Copy Family Names") {
             NSPasteboard.general.clearContents()
