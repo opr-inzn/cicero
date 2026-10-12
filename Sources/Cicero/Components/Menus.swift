@@ -16,16 +16,24 @@ struct FamilyMenu: View {
         }
 
         let ellipsis = model.data.installMethod == .ask ? "…" : ""
+        // Every family is one an app loads from its own folder: on and off mean in every app, Adobe's included.
+        let app = families.allSatisfy { $0.app != nil } ? families.first?.app.map { $0 == "Adobe" ? "Adobe Apps" : $0 } : nil
         if families.contains(where: \.hasActivatable) {
-            let appOnly = families.allSatisfy { if case .appOnly = $0.state { true } else { false } }
             let temporary = families.allSatisfy { $0.temporaryScope != nil }
             let partial = families.contains { $0.hasActive && $0.temporaryScope == nil }
-            let title = temporary ? "Activate Permanently" : appOnly ? "Activate in All Apps" : partial ? "Activate Remaining Styles" : "Activate"
-            Button(title + (appOnly ? "" : ellipsis)) { model.activate(families) }
+            let title = temporary ? "Activate Permanently" : app != nil ? "Activate in All Apps" : partial ? "Activate Remaining Styles" : "Activate"
+            Button(title + (app != nil ? "" : ellipsis)) { model.activate(families) }
         }
-        TemporaryMenu { model.activateTemporarily(families, scope: $0) }
+        if let app, families.contains(where: { $0.position != .app }) {
+            Button("Use in \(app) Only") { model.useInAppOnly(families.flatMap(\.faces)) }
+        }
+        if families.contains(where: \.hasActivatable) {
+            TemporaryMenu { model.activateTemporarily(families, scope: $0) }
+        }
         if families.contains(where: \.hasDeactivatable) {
-            Button("Deactivate") { model.deactivate(families) }
+            // On in the app only, nothing is on in other apps: turning it off there is all deactivating does.
+            let title = app.map { families.contains(where: \.hasActive) ? "Deactivate in All Apps" : "Deactivate in \($0)" } ?? "Deactivate"
+            Button(title) { model.deactivate(families) }
         }
 
         Divider()
@@ -83,7 +91,9 @@ struct StyleMenu: View {
                 model.activate([face], title: "\(family.name) \(face.face.styleName)")
             }
         }
-        TemporaryMenu { model.activateTemporarily([face], scope: $0) }
+        if face.canActivate {
+            TemporaryMenu { model.activateTemporarily([face], scope: $0) }
+        }
         if face.canDeactivate {
             Button("Deactivate Style") { model.deactivate([face]) }
         }
