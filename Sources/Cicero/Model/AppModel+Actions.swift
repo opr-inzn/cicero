@@ -163,17 +163,18 @@ extension AppModel {
         let new = urls.map(\.standardizedFileURL.path).filter { !existing.contains($0) }
         guard !new.isEmpty else { return }
         for path in new {
-            data.folders.append(WatchedFolder(path: path, appName: WatchedFolder.detectAppName(forPath: path)))
-            data.dismissedFolders.remove(path)
+            // Adobe's folders come with the Adobe Apps switch rather than one by one.
+            if WatchedFolder.detectAppName(forPath: path) != nil {
+                data.showAdobeFonts = true
+            } else {
+                data.folders.append(WatchedFolder(path: path))
+            }
         }
         data.sidebar.hidden.remove(SidebarSection.folders.key)
         rescan()
     }
 
     func removeFolder(_ id: UUID) {
-        if let folder = data.folders.first(where: { $0.id == id }), WatchedFolder.detectAppName(forPath: folder.path) != nil {
-            data.dismissedFolders.insert(folder.path)
-        }
         data.folders.removeAll { $0.id == id }
         data.sidebar.hidden.remove("folder.\(id)")
         if selection == .folder(id) { selection = .all }
@@ -359,6 +360,10 @@ extension AppModel {
         switch section {
         case .folders:
             var folders = data.folders
+            // Every folder Adobe apps load by themselves is one item.
+            if library.families.contains(where: { $0.folderIDs.contains(WatchedFolder.adobeAppsID) }) {
+                folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
+            }
             if library.families.contains(where: { $0.folderIDs.contains(WatchedFolder.deactivatedID) }) {
                 folders.append(WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path))
             }
