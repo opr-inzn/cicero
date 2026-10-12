@@ -113,10 +113,10 @@ public final class CharacterSetCatalog: Sendable {
             var name: String
             var credit: String
             var url: String
-            var sets: [Set]
+            var sets: [Entry]
         }
 
-        struct Set: Decodable {
+        struct Entry: Decodable {
             var id: String
             var name: String
             var summary: String
