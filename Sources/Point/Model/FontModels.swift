@@ -92,6 +92,32 @@ struct LibraryFace: Identifiable, Hashable, Sendable {
     var canDeactivate: Bool { status.activeKind?.isUserControllable ?? false }
 }
 
+/// A standard typeface classification, read from the font's own metadata (OS/2 family class) with
+/// a few name-based fallbacks. Users organise further with tags.
+enum FontClassification: String, CaseIterable, Sendable {
+    case serif = "Serif"
+    case slabSerif = "Slab Serif"
+    case sansSerif = "Sans Serif"
+    case monospaced = "Monospaced"
+    case script = "Script"
+    case ornamental = "Ornamental"
+    case symbol = "Symbol"
+    case unclassified = "Unclassified"
+
+    var icon: String {
+        switch self {
+        case .serif: "textformat"
+        case .slabSerif: "rectangle.split.3x1"
+        case .sansSerif: "textformat.alt"
+        case .monospaced: "chevron.left.forwardslash.chevron.right"
+        case .script: "scribble.variable"
+        case .ornamental: "sparkles"
+        case .symbol: "star.square.on.square"
+        case .unclassified: "questionmark.square.dashed"
+        }
+    }
+}
+
 struct FontFamily: Identifiable, Hashable, Sendable {
     var name: String
     var faces: [LibraryFace]
@@ -102,6 +128,36 @@ struct FontFamily: Identifiable, Hashable, Sendable {
     var id: String { name }
 
     var stylesLabel: String { faces.count == 1 ? "1 style" : "\(faces.count) styles" }
+    var activeFaceCount: Int { faces.filter { $0.status.isActive }.count }
+    var isVariable: Bool { faces.contains { $0.face.weightAxis != nil } }
+    var isMonospaced: Bool { faces.contains { $0.face.isMonospace } }
+
+    var classification: FontClassification {
+        if isMonospaced { return .monospaced }
+        let upright = faces.first { !$0.face.isItalic } ?? faces[0]
+        switch upright.face.fontClass {
+        case 1, 2, 3, 7: return .serif
+        case 4, 5: return .slabSerif
+        case 8: return .sansSerif
+        case 9: return .ornamental
+        case 10: return .script
+        case 12: return .symbol
+        default: break
+        }
+        let name = self.name.lowercased()
+        if name.contains("mono") || name.contains("code") { return .monospaced }
+        if name.contains("slab") { return .slabSerif }
+        if name.contains("sans") || name.contains("grotesk") || name.contains("grotesque") || name.contains("gothic") { return .sansSerif }
+        if name.contains("serif") || name.contains("garamond") || name.contains("antiqua") { return .serif }
+        if name.contains("script") || name.contains("brush") || name.contains("hand") { return .script }
+        return .unclassified
+    }
+
+    /// File format, or "Mixed" when styles come in different formats.
+    var format: String {
+        let formats = Set(faces.map { FontMetadata.format(of: $0.face.url) })
+        return formats.count == 1 ? formats.first! : "Mixed"
+    }
     var hasActiveFaces: Bool { faces.contains { $0.status.isActive } }
     var hasActivatableFaces: Bool { faces.contains(where: \.canActivate) }
     var hasDeactivatableFaces: Bool { faces.contains(where: \.canDeactivate) }

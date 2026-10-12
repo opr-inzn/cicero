@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct PointApp: App {
     @State private var library = LibraryStore()
+    @State private var preview = PreviewSettings()
 
     var body: some Scene {
         Window("Point", id: "main") {
             RootView()
                 .environment(library)
+                .environment(preview)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear { library.start() }
         }
