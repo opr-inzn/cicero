@@ -1,6 +1,6 @@
 # Changelog
 
-Each version's notes here become its release notes on the [releases page](https://github.com/opr-inzn/point/releases).
+Each version's notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
 ## 1.0
 
@@ -19,7 +19,7 @@ First release.
 - A Problems view for fonts installed twice, missing, damaged and duplicate fonts, and styles that share a PostScript name with another font.
 - Watch folders of fonts without installing them. Adobe's font folders, including each InDesign and InCopy version's, are added automatically and marked for those apps.
 - System Fonts item, with an option to keep macOS fonts out of your other lists.
-- Clear the macOS font caches, and the ones Adobe apps and Microsoft Office keep, and rebuild Point's font list when fonts misbehave.
+- Clear the macOS font caches, and the ones Adobe apps and Microsoft Office keep, and rebuild Cicero's font list when fonts misbehave.
 - Activate fonts by copying them to your Fonts folder or using them where they are. Deactivating never deletes your only copy.
-- Activate fonts temporarily, until Point quits or until you log out, with nothing copied.
+- Activate fonts temporarily, until Cicero quits or until you log out, with nothing copied.
 - Move fonts to the Trash, and reveal any font or style in Finder.

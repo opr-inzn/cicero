@@ -40,11 +40,49 @@
   ],
   "groups": [
     {
+      "name": "Accent",
+      "layers": [
+        {
+          "name": "Accent",
+          "image-name": "Accent.svg",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.84314,0.23137,0.13725,1"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.94118,0.33725,0.21961,1"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
       "name": "Letter",
       "layers": [
         {
-          "name": "P",
-          "image-name": "P.svg",
+          "name": "Letter",
+          "image-name": "Letter.svg",
           "glass": true,
           "fill-specializations": [
             {
