@@ -8,16 +8,16 @@ First release.
 
 - Browse your library as a sortable list with on/off switches, a grid, or full-width specimens.
 - Font pages with a large editable text, a table of styles you can switch on individually, and a searchable glyph map.
-- An info panel with font details, supported languages and character sets, and a Features tab for OpenType features.
+- An info panel with font details, supported languages, character sets and Unicode blocks, and a Features tab for OpenType features.
 - Preview Options for sample text, size, weight and letter spacing.
 - Choose a light or dark appearance, or follow macOS, in Settings → General.
 - Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item.
 - Sets, smart sets with rules, tags, foundries, and automatic classifications read from each font.
-- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, and your own; filter by them in the sidebar and sort the list by them.
+- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar and sort the list by them.
 - Character Toolbox: find fonts that have every character of a text or support one of 780 languages.
-- Compare fonts on a shared baseline or overlaid, and present them in a full-screen slideshow.
-- A Problems view for conflicting, missing, damaged and duplicate fonts.
-- Watch folders of fonts without installing them; folders that only one app loads, like Adobe's Fonts folder, are marked for that app.
+- Compare fonts on a shared baseline or overlaid.
+- A Problems view for fonts installed twice, missing, damaged and duplicate fonts, and styles that share a PostScript name with another font.
+- Watch folders of fonts without installing them. Adobe's font folders, including each InDesign and InCopy version's, are added automatically and marked for those apps.
 - System Fonts item, with an option to keep macOS fonts out of your other lists.
 - Clear the macOS font caches, and the ones Adobe apps and Microsoft Office keep, and rebuild Point's font list when fonts misbehave.
 - Activate fonts by copying them to your Fonts folder or using them where they are. Deactivating never deletes your only copy.

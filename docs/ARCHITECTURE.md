@@ -1,0 +1,53 @@
+# Architecture
+
+Point is a SwiftPM package with two targets and a test target.
+
+```
+Sources/PointCore   fonts, the library, activation, coverage, user data — no UI
+Sources/Point       the app (SwiftUI); everything runs on the main actor by default
+Tests/PointCoreTests
+```
+
+## PointCore
+
+Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendable`.
+
+- **Model** (`Model/Font.swift`): `FontFace` (what a file says about one face), `LibraryFace` (a face's
+  state in the library), `Family` (faces plus everything lists and filters need, computed once).
+- **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, the Fonts
+  folders, watched folders, the Deactivated folder), reads new or changed files with a stamp-keyed
+  cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint` lets the
+  app skip rescans that changed nothing.
+- **Data** (`Data/`): `UserData` is everything the user set up (folders, sets, smart sets, tags,
+  foundry names, character sets, sidebar choices, install method, activation records).
+  `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
+- **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
+  session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
+  state and the engine stays testable; `FontRegistrar` hides CoreText so tests never touch the system.
+- **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
+  `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
+  `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
+- **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
+  preview) and prefetches them after scans; feature groups, font info and glyph sections.
+- **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
+  font caches of macOS, Adobe apps and Microsoft Office.
+
+## The app
+
+- `AppModel` (`Model/`) holds the current `Library`, the `UserData` and what the windows show. It
+  starts scans, applies results, and runs activation-type operations one at a time so their record
+  changes never overwrite each other. Lists it hands to views (`visibleFamilies`, sidebar rows,
+  character set lookups) are cached and keyed on the inputs they depend on.
+- `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
+- Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
+  `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
+  are in `Components/`.
+
+## Rules of thumb
+
+- Views read precomputed values; anything that walks the whole library or reads files happens in
+  PointCore, off the main thread, and only when its inputs change.
+- Views shown inside `Table` cells get the model passed in, not from the environment: AppKit can
+  build cells outside SwiftUI's update.
+- Point never connects to the internet. Files it removes go to the Trash; it never deletes a
+  user's only copy of a font.
