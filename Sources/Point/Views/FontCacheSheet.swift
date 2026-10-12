@@ -72,21 +72,22 @@ struct FontCacheSheet: View {
     }
 
     private func canClear(_ app: AppFontCaches.App) -> Bool {
-        running[app]?.isEmpty != false && found[app]?.isEmpty == false
+        guard running[app]?.isEmpty != false else { return false }
+        return app.isGuardedByMacOS || found[app]?.isEmpty == false
     }
 
     private func detail(for app: AppFontCaches.App) -> String {
         if let names = running[app], !names.isEmpty {
             return "Quit \(names.formatted(.list(type: .and))) first"
         }
+        if app.isGuardedByMacOS { return "macOS asks for permission" }
         return found[app]?.summary ?? "Looking…"
     }
 
     private func refresh() async {
         refreshRunning()
-        let results = await Task.detached(priority: .userInitiated) {
-            AppFontCaches.App.allCases.map(AppFontCaches.find)
-        }.value
+        let apps = AppFontCaches.App.allCases.filter { !$0.isGuardedByMacOS }
+        let results = await Task.detached(priority: .userInitiated) { apps.map(AppFontCaches.find) }.value
         for result in results { found[result.app] = result }
     }
 
@@ -99,12 +100,19 @@ struct FontCacheSheet: View {
 
     private func clear() {
         isClearing = true
-        let selection = FontCacheSelection(
-            scopes: (macOSUser ? [.currentUser] : []) + (macOSAllUsers ? [.allUsers] : []),
-            apps: apps.compactMap { found[$0] }
-        )
+        let scopes: [FontCacheMaintenance.Scope] = (macOSUser ? [.currentUser] : []) + (macOSAllUsers ? [.allUsers] : [])
+        let chosen = AppFontCaches.App.allCases.filter(apps.contains)
+        let known = found
         Task {
-            let clearedMacOS = await library.clearFontCaches(selection)
+            var caches: [AppFontCaches.Found] = []
+            for app in chosen {
+                if let result = known[app] {
+                    caches.append(result)
+                } else {
+                    caches.append(await Task.detached(priority: .userInitiated) { AppFontCaches.find(app) }.value)
+                }
+            }
+            let clearedMacOS = await library.clearFontCaches(FontCacheSelection(scopes: scopes, apps: caches))
             isClearing = false
             dismiss()
             onCleared(clearedMacOS)

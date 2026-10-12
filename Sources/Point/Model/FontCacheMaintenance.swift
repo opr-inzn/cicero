@@ -84,7 +84,7 @@ extension LibraryStore {
     func clearFontCaches(_ selection: FontCacheSelection) async -> Bool {
         var trashed: [String] = []
         var failures = 0
-        for found in selection.apps {
+        for found in selection.apps where !found.isEmpty {
             failures += await Task.detached { AppFontCaches.trash(found) }.value
             trashed.append(found.app.title)
         }

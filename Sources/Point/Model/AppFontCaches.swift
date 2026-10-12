@@ -15,6 +15,10 @@ enum AppFontCaches {
             }
         }
 
+        /// Office keeps its caches inside its app containers. Looking there makes macOS ask whether
+        /// Point may access other apps' data, so Point only looks once someone chooses to clear them.
+        var isGuardedByMacOS: Bool { self == .office }
+
         /// The apps that read these caches; they have to be quit before clearing.
         var bundleIDs: Set<String> {
             switch self {
