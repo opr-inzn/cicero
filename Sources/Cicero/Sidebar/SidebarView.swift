@@ -54,7 +54,17 @@ struct SidebarView: View {
                 )) {
                     ForEach(rows) { row($0, section: .characterSets) }
                 } label: {
-                    Text(group.title).foregroundStyle(.secondary)
+                    // Only the chevron toggles a group in a selectable list; make the title do it too.
+                    Button {
+                        guard !model.isEditingSidebar else { return }
+                        withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
+                    } label: {
+                        Text(group.title)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
