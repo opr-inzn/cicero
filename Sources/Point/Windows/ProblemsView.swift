@@ -18,7 +18,11 @@ struct ProblemsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {
                         ForEach(groups, id: \.kind) { group in
-                            ProblemGroup(kind: group.kind, problems: group.problems)
+                            if group.kind.isMinor {
+                                MinorProblemGroup(kind: group.kind, problems: group.problems)
+                            } else {
+                                ProblemGroup(kind: group.kind, problems: group.problems)
+                            }
                         }
                     }
                     .frame(maxWidth: 760, alignment: .leading)
@@ -40,7 +44,7 @@ struct ProblemsView: View {
     }
 
     private var subtitle: String {
-        switch model.problems.count {
+        switch model.problems.count(where: { !$0.kind.isMinor }) {
         case 0: ""
         case 1: "1 problem"
         case let count: "\(count) problems"
@@ -57,6 +61,28 @@ private struct ProblemGroup: View {
             Text(kind.title).font(.title2.bold())
             Text(kind.explanation).foregroundStyle(.secondary)
             ForEach(problems) { ProblemCard(problem: $0) }
+        }
+    }
+}
+
+/// Minor problems, collapsed until opened.
+private struct MinorProblemGroup: View {
+    let kind: ProblemKind
+    let problems: [Problem]
+    @State private var isExpanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(kind.explanation).foregroundStyle(.secondary)
+                ForEach(problems) { ProblemCard(problem: $0) }
+            }
+            .padding(.top, 8)
+        } label: {
+            HStack(spacing: 6) {
+                Text(kind.title).font(.title3.weight(.semibold))
+                Text("\(problems.count)").foregroundStyle(.secondary).monospacedDigit()
+            }
         }
     }
 }

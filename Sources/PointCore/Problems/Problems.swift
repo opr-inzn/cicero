@@ -1,12 +1,15 @@
 import Foundation
 
 public enum ProblemKind: String, CaseIterable, Sendable {
-    case installedTwice, sharedNames, missing, unreadable, external, duplicates
+    case installedTwice, missing, unreadable, external, duplicates, sharedNames
+
+    /// Worth knowing, rarely worth acting on: not counted in the sidebar badge and shown collapsed.
+    public var isMinor: Bool { self == .sharedNames }
 
     public var title: String {
         switch self {
         case .installedTwice: "Installed Twice"
-        case .sharedNames: "Different Fonts Share a Name"
+        case .sharedNames: "Shared Style Names"
         case .missing: "Missing Files"
         case .unreadable: "Damaged or Unreadable Files"
         case .external: "Fonts on External Disks"
@@ -20,7 +23,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .installedTwice:
             "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
         case .sharedNames:
-            "These are different fonts, but some of their styles use the same PostScript name, the name documents and PDFs use to find a font. Asked for one of those names, macOS may give either font. Updated versions from the foundry usually fix this; until then, turn one off while you use the other."
+            "Each of these fonts has its own main PostScript name, but some of its named styles use a bare name like “Bold” that another font uses too. A document that refers to one of those styles by name may open with the other font. Usually there’s nothing to do; if it happens, turn one of the fonts off or get updated versions."
         case .missing:
             "Point remembers these files, but they’re gone. Fonts used where they were stop working when their files move or their disk is unplugged."
         case .unreadable:
