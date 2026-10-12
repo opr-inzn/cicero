@@ -75,12 +75,13 @@ struct RootView: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 340)
         } detail: {
-            Group {
-                if let family = library.detailFamily {
-                    FamilyDetailView(family: family)
-                } else {
-                    BrowserView()
-                }
+            // The browser is the root; setting `detailFamilyID` pushes the font page and going back clears it.
+            NavigationStack(path: Binding(
+                get: { library.detailFamilyID.map { [$0] } ?? [] },
+                set: { library.detailFamilyID = $0.last }
+            )) {
+                BrowserView()
+                    .navigationDestination(for: String.self) { FontPage(familyID: $0) }
             }
             .inspector(isPresented: $library.isInspectorPresented) {
                 InspectorPanel()
