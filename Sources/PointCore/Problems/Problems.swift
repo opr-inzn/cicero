@@ -104,7 +104,7 @@ public enum ProblemDetector {
     /// Finds problems in the library. Reads font versions from disk for the files involved, so call it off the main thread.
     public static func detect(in library: Library, data: UserData, locations: Locations) -> [Problem] {
         var context = Context(library: library, data: data, locations: locations)
-        var problems = conflicts(&context) + duplicates(&context) + missing(&context) + unreadable(&context) + external(&context)
+        var problems = installedTwice(&context) + sharedNames(&context) + duplicates(&context) + missing(&context) + unreadable(&context) + external(&context)
         let order = Dictionary(uniqueKeysWithValues: ProblemKind.allCases.enumerated().map { ($1, $0) })
         problems.sort { a, b in
             if a.kind != b.kind { return order[a.kind]! < order[b.kind]! }
@@ -159,7 +159,9 @@ public enum ProblemDetector {
                 }
             }
             if path.hasPrefix(locations.deactivated.path + "/") { return "In Point’s Deactivated folder" }
-            if let folder = data.folders.first(where: { path.hasPrefix($0.path + "/") }) { return "In \(folder.displayName)" }
+            if let folder = data.folders.first(where: { path.hasPrefix($0.path + "/") }) {
+                return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
+            }
             return "Not activated"
         }
 
@@ -175,10 +177,10 @@ public enum ProblemDetector {
         }
     }
 
-    // MARK: Conflicts
+    // MARK: Installed twice
 
-    /// The same PostScript name active from more than one file, grouped by family.
-    private static func conflicts(_ context: inout Context) -> [Problem] {
+    /// The same font active from more than one file, grouped by family.
+    private static func installedTwice(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         for family in context.library.families {
             var paths: [String] = []
@@ -204,12 +206,65 @@ public enum ProblemDetector {
                 fileFixes[path] = fixes
             }
             problems.append(Problem(
-                id: "conflict.\(family.id)", kind: .conflicts, title: family.name,
+                id: "installedTwice.\(family.id)", kind: .installedTwice, title: family.name,
                 summary: styles == 1 ? "Active from \(paths.count) files." : "\(styles) styles active from \(paths.count) files.",
                 files: paths.map { context.file($0) }, fixes: [], fileFixes: fileFixes
             ))
         }
         return problems
+    }
+
+    // MARK: Shared names
+
+    /// Different families whose active faces use the same PostScript names, grouped by the families involved.
+    private static func sharedNames(_ context: inout Context) -> [Problem] {
+        struct Clash {
+            var weight = Int.max
+            var files: [String: FaceID?] = [:]
+            var families: [String] = []
+        }
+        var clashes: [String: Clash] = [:]
+        for family in context.library.families {
+            for face in family.faces where face.state.isActive {
+                var clash = clashes[face.face.postScriptName] ?? Clash()
+                clash.weight = min(clash.weight, face.face.weight)
+                clash.files[face.face.path] = face.canDeactivate ? Self.first(face.id, clash.files[face.face.path] ?? nil) : clash.files[face.face.path] ?? nil
+                if !clash.families.contains(family.id) { clash.families.append(family.id) }
+                clashes[face.face.postScriptName] = clash
+            }
+        }
+        var groups: [[String]: (names: [(String, Int)], files: [String: FaceID?])] = [:]
+        for (name, clash) in clashes where clash.families.count >= 2 {
+            var group = groups[clash.families] ?? ([], [:])
+            group.names.append((name, clash.weight))
+            group.files.merge(clash.files) { known, new in Self.first(known, new) }
+            groups[clash.families] = group
+        }
+        return groups.map { families, group in
+            let names = group.names.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0 < $1.0 }.map(\.0)
+            let shown = names.count > 7 ? Array(names.prefix(6)) + ["\(names.count - 6) more"] : names
+            let paths = group.files.keys.sorted()
+            return Problem(
+                id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
+                title: joined(families),
+                summary: "\(families.count == 2 ? "Both" : "All") use the PostScript \(names.count == 1 ? "name" : "names") \(joined(shown)).",
+                files: paths.map { context.file($0) }, fixes: [],
+                fileFixes: Dictionary(uniqueKeysWithValues: paths.map { path in
+                    (path, [ProblemFix.reveal(path)] + ((group.files[path] ?? nil).map { [.deactivate($0)] } ?? []))
+                })
+            )
+        }
+    }
+
+    private static func first(_ a: FaceID?, _ b: FaceID?) -> FaceID? {
+        guard let a, let b else { return a ?? b }
+        return min(a, b)
+    }
+
+    /// "A and B", "A, B and C".
+    private static func joined(_ items: [String]) -> String {
+        guard items.count > 1 else { return items.joined() }
+        return items.dropLast().joined(separator: ", ") + " and " + items.last!
     }
 
     // MARK: Duplicates
