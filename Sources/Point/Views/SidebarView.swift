@@ -50,7 +50,7 @@ struct SidebarView: View {
 
     private func libraryHeader(editing: Bool) -> some View {
         HStack {
-            Text("Library")
+            Text("Fonts")
             Spacer()
             Button(editing ? "Done" : "Edit") {
                 withAnimation(.snappy) { library.isEditingSidebar.toggle() }
@@ -89,11 +89,11 @@ struct SidebarView: View {
         switch section {
         case .folders:
             return ("Add a folder of fonts", { library.presentAddFolderPanel() })
-        case .styles:
-            return ("New style", { library.prompt("New Style", confirm: "Create") { library.addStyle(named: $0) } })
-        case .collections:
-            return ("New collection", { library.prompt("New Collection", confirm: "Create") { library.addCollection(named: $0) } })
-        case .foundries:
+        case .sets:
+            return ("New set", { library.prompt("New Set", confirm: "Create") { library.addSet(named: $0) } })
+        case .tags:
+            return ("New tag", { library.prompt("New Tag", confirm: "Create") { library.addTag(named: $0) } })
+        case .foundries, .classifications:
             return nil
         }
     }
@@ -143,7 +143,7 @@ struct SidebarView: View {
                         get: { folder.appOnlyName ?? "" },
                         set: { library.setAppOnlyName($0, forFolder: id) }
                     )) {
-                        Text("Inactive until activated").tag("")
+                        Text("Not activated until you activate them").tag("")
                         Text("Active in Adobe apps").tag("Adobe")
                         if let custom = folder.appOnlyName, custom != "Adobe" {
                             Text("Active in \(custom) apps").tag(custom)
@@ -152,24 +152,20 @@ struct SidebarView: View {
                     Button("Remove Folder from Library") { library.removeFolder(id) }
                 }
             }
-        case .style(let id):
-            if let style = library.data.styles.first(where: { $0.id == id }) {
-                Button("Rename Style…") {
-                    library.prompt("Rename Style", text: style.name, confirm: "Rename") { library.renameStyle(id, to: $0) }
-                }
-                if !style.isBuiltIn {
-                    Button("Delete Style") { library.deleteStyle(id) }
-                }
+        case .tag(let tag):
+            Button("Rename Tag…") {
+                library.prompt("Rename Tag", text: tag, confirm: "Rename") { library.renameTag(tag, to: $0) }
             }
-        case .collection(let id):
-            if let collection = library.data.collections.first(where: { $0.id == id }) {
-                Button("Rename Collection…") {
-                    library.prompt("Rename Collection", text: collection.name, confirm: "Rename") { library.renameCollection(id, to: $0) }
+            Button("Delete Tag") { library.deleteTag(tag) }
+        case .set(let id):
+            if let set = library.data.sets.first(where: { $0.id == id }) {
+                Button("Rename Set…") {
+                    library.prompt("Rename Set", text: set.name, confirm: "Rename") { library.renameSet(id, to: $0) }
                 }
-                Button("Delete Collection") { library.deleteCollection(id) }
+                Button("Delete Set") { library.deleteSet(id) }
             }
         case .system:
-            Toggle("Also Show in All, Active and Other Lists", isOn: Binding(
+            Toggle("Also Show in Other Lists", isOn: Binding(
                 get: { library.data.showSystemFonts },
                 set: { library.data.showSystemFonts = $0; library.save() }
             ))

@@ -4,17 +4,18 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            Tab("Fonts", systemImage: "textformat") { FontsSettings() }
-            Tab("Sidebar", systemImage: "sidebar.left") { SidebarSettings() }
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
+            Tab("Folders", systemImage: "folder") { FoldersSettings() }
+            Tab("Activation", systemImage: "power") { ActivationSettings() }
+            Tab("Sidebar", systemImage: "sidebar.left") { SidebarSettings() }
         }
         .frame(width: 560, height: 580)
     }
 }
 
-// MARK: - Fonts
+// MARK: - Folders
 
-private struct FontsSettings: View {
+private struct FoldersSettings: View {
     @Environment(LibraryStore.self) private var library
     @State private var selection: UUID?
     @State private var customAppFolder: UUID?
@@ -35,7 +36,7 @@ private struct FontsSettings: View {
                 }
             }
             .listStyle(.bordered(alternatesRowBackgrounds: false))
-            .frame(minHeight: 200)
+            .frame(minHeight: 280)
 
             HStack(spacing: 0) {
                 Button { library.presentAddFolderPanel() } label: { Image(systemName: "plus").frame(width: 22, height: 18) }
@@ -47,19 +48,6 @@ private struct FontsSettings: View {
                 .disabled(selection == nil)
             }
             .buttonStyle(.borderless)
-
-            Divider().padding(.vertical, 8)
-
-            Text("Activation").font(.headline)
-            Picker("Activate by:", selection: $library.data.installMethod) {
-                ForEach(InstallMethod.allCases, id: \.self) { Text($0.settingsLabel).tag($0) }
-            }
-            .fixedSize()
-            .onChange(of: library.data.installMethod) { library.save() }
-            Text("A copy in ~/Library/Fonts keeps working if the original files move or their drive is unplugged. Using the files where they are saves space, but the fonts turn off when those files go away.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
         .alert("Which app loads these fonts?", isPresented: Binding(get: { customAppFolder != nil }, set: { if !$0 { customAppFolder = nil } })) {
@@ -134,7 +122,7 @@ private struct SidebarSettings: View {
                 }
                 Section("Groups") {
                     ForEach(SidebarSection.allCases) { section in
-                        checkbox(section.key, section.title, icon(for: section))
+                        checkbox(section.key, section.title, section.icon)
                     }
                 }
                 ForEach(SidebarSection.allCases) { section in
@@ -171,37 +159,58 @@ private struct SidebarSettings: View {
         }
         .toggleStyle(.checkbox)
     }
-
-    private func icon(for section: SidebarSection) -> String {
-        switch section {
-        case .folders: "folder"
-        case .styles: "textformat"
-        case .collections: "rectangle.stack"
-        case .foundries: "building.2"
-        }
-    }
 }
 
 // MARK: - General
 
 private struct GeneralSettings: View {
     @Environment(LibraryStore.self) private var library
+    @State private var isConfirmingCacheClear = false
 
     var body: some View {
         @Bindable var library = library
         Form {
             Section {
-                Toggle("Show system fonts in All, Active and other lists", isOn: $library.data.showSystemFonts)
+                Toggle("Show system fonts in other lists", isOn: $library.data.showSystemFonts)
                     .onChange(of: library.data.showSystemFonts) { library.save() }
-                Text("Fonts that ship with macOS (in /System/Library/Fonts) can't be turned off. Turn this off to keep them out of your lists; they stay under System Fonts in the sidebar, which you can hide too.")
+                Text("Fonts that ship with macOS (in /System/Library/Fonts) can't be turned off. Turn this off to list them only under System Fonts in the sidebar.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            Section {
-                LabeledContent("Library") {
-                    Button("Rescan Now") { library.rescan() }
+            Section("Font Caches") {
+                LabeledContent("Point's font list") {
+                    Button("Rebuild") { library.rebuildFontList() }
                         .disabled(library.isScanning)
                 }
+                LabeledContent("macOS font caches") {
+                    Button("Clear…") { isConfirmingCacheClear = true }
+                }
+                Text("If fonts look wrong, show an old version, or won't turn on or off, clearing the caches usually fixes it.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .modifier(FontCacheDialogs(isConfirming: $isConfirmingCacheClear))
+    }
+}
+
+// MARK: - Activation
+
+private struct ActivationSettings: View {
+    @Environment(LibraryStore.self) private var library
+
+    var body: some View {
+        @Bindable var library = library
+        Form {
+            Section {
+                Picker("Activate by", selection: $library.data.installMethod) {
+                    ForEach(InstallMethod.allCases, id: \.self) { Text($0.settingsLabel).tag($0) }
+                }
+                .onChange(of: library.data.installMethod) { library.save() }
+                Text("A copy in ~/Library/Fonts keeps working if the original files move or their drive is unplugged. Using the files where they are saves space, but the fonts turn off when those files go away.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

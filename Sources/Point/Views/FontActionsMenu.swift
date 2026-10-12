@@ -17,7 +17,7 @@ struct FontActionsMenu: View {
         let ellipsis = library.data.installMethod == .ask ? "…" : ""
         if families.contains(where: \.hasActivatableFaces) {
             let partial = families.contains(where: \.hasActiveFaces)
-            Button((partial ? "Activate Inactive Styles" : "Activate") + ellipsis) { library.requestActivate(families) }
+            Button((partial ? "Activate Remaining Styles" : "Activate") + ellipsis) { library.requestActivate(families) }
         }
         if families.contains(where: \.hasDeactivatableFaces) {
             Button("Deactivate") { library.requestDeactivate(families) }
@@ -25,52 +25,29 @@ struct FontActionsMenu: View {
 
         Divider()
 
-        Menu("Style") {
-            ForEach(library.data.styles) { style in
-                Toggle(style.name, isOn: Binding(
-                    get: { families.allSatisfy { library.styleID(of: $0) == style.id } },
-                    set: { library.setStyle($0 ? style.id : nil, for: families) }
+        Menu("Add to Set") {
+            ForEach(library.data.sets) { set in
+                Toggle(set.name, isOn: Binding(
+                    get: { families.allSatisfy { library.isMember($0, of: set.id) } },
+                    set: { library.setMembership($0, for: families, in: set.id) }
                 ))
             }
-            Divider()
-            Button("None") { library.setStyle(nil, for: families) }
-            Button("New Style…") {
-                library.prompt("New Style", confirm: "Create") { name in
-                    library.addStyle(named: name)
-                    if let style = library.data.styles.last { library.setStyle(style.id, for: families) }
-                }
+            if !library.data.sets.isEmpty { Divider() }
+            Button("New Set from Selection…") {
+                library.prompt("New Set", confirm: "Create") { library.addSet(named: $0, with: families) }
             }
         }
 
-        Menu("Collections") {
-            ForEach(library.data.collections) { collection in
-                Toggle(collection.name, isOn: Binding(
-                    get: { families.allSatisfy { library.isMember($0, of: collection.id) } },
-                    set: { library.setMembership($0, for: families, in: collection.id) }
+        Menu("Tags") {
+            ForEach(library.data.tags, id: \.self) { tag in
+                Toggle(tag, isOn: Binding(
+                    get: { families.allSatisfy { library.tags(of: $0).contains(tag) } },
+                    set: { library.setTag(tag, $0, for: families) }
                 ))
             }
-            if !library.data.collections.isEmpty { Divider() }
-            Button("New Collection…") {
-                library.prompt("New Collection", confirm: "Create") { library.addCollection(named: $0, with: families) }
-            }
-        }
-
-        Menu("Foundry") {
-            let current = Set(families.compactMap { library.foundryName(of: $0) })
-            ForEach(library.foundryNames, id: \.self) { foundry in
-                Toggle(foundry, isOn: Binding(
-                    get: { current == [foundry] },
-                    set: { if $0 { library.setFoundry(foundry, for: families) } }
-                ))
-            }
-            Divider()
-            Button("Other Foundry…") {
-                library.prompt("Set Foundry", text: current.count == 1 ? current.first! : "", confirm: "Set") {
-                    library.setFoundry($0, for: families)
-                }
-            }
-            if families.contains(where: { library.data.foundryOverrides[$0.name] != nil }) {
-                Button("Use Font's Own Foundry") { library.setFoundry(nil, for: families) }
+            if !library.data.tags.isEmpty { Divider() }
+            Button("New Tag…") {
+                library.prompt("New Tag", confirm: "Add") { library.addTag(named: $0, to: families) }
             }
         }
 
