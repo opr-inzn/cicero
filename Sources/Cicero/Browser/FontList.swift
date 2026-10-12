@@ -141,11 +141,11 @@ struct FontList: View {
         }
         // A new list replaces the table instead of being diffed into it: inserting many rows makes
         // the table measure every one of them.
-        .id(ListIdentity(selection: model.selection, search: model.appliedSearch))
+        .id(ListIdentity(selection: model.selectedItems, search: model.appliedSearch))
     }
 }
 
 private struct ListIdentity: Hashable {
-    var selection: SidebarItem?
+    var selection: Set<SidebarItem>
     var search: String
 }

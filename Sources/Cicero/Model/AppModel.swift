@@ -42,6 +42,7 @@ final class AppModel {
                 || data.showSystemFonts != oldValue.showSystemFonts {
                 refreshGroups()
             }
+            if !data.showSystemFonts { deselect { $0 == .system } }
             if data.customCharacterSets != oldValue.customCharacterSets { characterSetLookup.reset() }
             if data.showAdobeFonts != oldValue.showAdobeFonts { rescan() }
         }
@@ -51,13 +52,19 @@ final class AppModel {
 
     // MARK: Navigation
 
+    /// The sidebar item the browser's title and empty states follow. Setting it selects just that item.
     var selection: SidebarItem? = .all {
         didSet {
+            let items: Set<SidebarItem> = selection.map { [$0] } ?? []
+            if selectedItems != items { selectedItems = items }
             guard oldValue != selection else { return }
             selectedIDs = []
             openFamilyID = nil
         }
     }
+    /// Every selected sidebar item, `selection` among them; the browser shows the fonts in any of them.
+    /// Change it with `selectSidebarItems`, which keeps several to one list of the sidebar.
+    var selectedItems: Set<SidebarItem> = [.all]
     var selectedIDs: Set<String> = []
     /// The family whose page is pushed over the browser.
     var openFamilyID: String?

@@ -208,8 +208,68 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
     /// Collapsed sections ("folders", "sets", "tags", "foundries", "classifications", "characterSets")
     /// and character set groups ("charsetgroup.<group id>").
     public var collapsed: Set<String> = ["foundries", "classifications", "charsetgroup.unicode", "charsetgroup.google"]
+    /// Keys in the order the user dragged them into, per list: "sections" (section keys), "library",
+    /// a section's rows ("folders", "sets", "foundries", "classifications"), "characterSets" (group keys
+    /// "charsetgroup.<group id>") and a group's rows ("charsetgroup.<group id>").
+    public var order: [String: [String]] = [:]
 
     public init() {}
+
+    /// Missing keys take their defaults, so files from before a key existed keep loading.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = SidebarPreferences()
+        hidden = try c.decodeIfPresent(Set<String>.self, forKey: .hidden) ?? d.hidden
+        collapsed = try c.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? d.collapsed
+        order = try c.decodeIfPresent([String: [String]].self, forKey: .order) ?? d.order
+    }
+
+    /// `items` in the user's order for `list`: the ones placed there, as placed, then the others as given.
+    public func ordered<T>(_ items: [T], in list: String, key: (T) -> String) -> [T] {
+        guard let saved = order[list], !saved.isEmpty else { return items }
+        let rank = Dictionary(saved.enumerated().map { ($1, $0) }, uniquingKeysWith: min)
+        let placed = items.compactMap { item in rank[key(item)].map { (item, $0) } }
+        return placed.sorted { $0.1 < $1.1 }.map(\.0) + items.filter { rank[key($0)] == nil }
+    }
+
+    /// Moves the items at `source` in `shown` to `destination`, as a list's onMove gives them. `shown`
+    /// is what the list shows, `all` every item in it in its current order: hidden ones keep their places.
+    public mutating func move(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
+        let moving = source.map { shown[$0] }
+        var reordered = shown.indices.filter { !source.contains($0) }.map { shown[$0] }
+        reordered.insert(contentsOf: moving, at: destination - source.count { $0 < destination })
+        let isShown = Set(shown)
+        var next = reordered.makeIterator()
+        setOrder(all.map { isShown.contains($0) ? next.next() ?? $0 : $0 }, of: list)
+    }
+
+    /// Saves `keys` as the order of `list`. Keys saved before that it leaves out, for items that are
+    /// gone for now (System Fonts while system fonts are off), stay after the key they followed.
+    public mutating func setOrder(_ keys: [String], of list: String) {
+        var result = keys
+        let present = Set(keys)
+        var previous: String?
+        for key in order[list] ?? [] {
+            if !present.contains(key) {
+                let index = previous.flatMap { result.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
+                result.insert(key, at: index)
+            }
+            previous = key
+        }
+        order[list] = result
+    }
+
+    /// For an item that's gone for good.
+    public mutating func forget(_ key: String) {
+        hidden.remove(key)
+        for list in order.keys { order[list]?.removeAll { $0 == key } }
+    }
+
+    /// A renamed item stays hidden, and in its place.
+    public mutating func rename(_ old: String, to new: String) {
+        if hidden.remove(old) != nil { hidden.insert(new) }
+        for list in order.keys { order[list] = order[list]?.map { $0 == old ? new : $0 } }
+    }
 }
 
 public enum InstallMethod: String, Codable, CaseIterable, Sendable {

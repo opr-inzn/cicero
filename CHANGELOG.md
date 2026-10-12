@@ -11,7 +11,7 @@ First release.
 - An info panel with font details, supported languages, character sets and Unicode blocks, and a Features tab for OpenType features.
 - Preview Options for sample text, size, weight and letter spacing.
 - Choose a light or dark appearance, or follow macOS, in Settings → General.
-- Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item.
+- Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item, and drag items and whole sections into the order you like. Select several items in a section to see their fonts together.
 - Sets, smart sets with rules, foundries, and automatic classifications read from each font.
 - Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar and sort the list by them.
 - Character Toolbox: find fonts that have every character of a text or support one of 780 languages.

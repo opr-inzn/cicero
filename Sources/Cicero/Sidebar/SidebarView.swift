@@ -1,29 +1,34 @@
 import AppKit
 import CiceroCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
-/// choices are in Settings → Sidebar.
+/// choices are in Settings → Sidebar. Rows drag to a new place within their section (or character set
+/// group), several at once when they're selected together, and section titles drag onto each other.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
+    /// The section whose title is being dragged: its rows fold away under it until the drag ends.
+    @State private var draggedSection: SidebarSection?
+    /// The section whose title a dragged section is over.
+    @State private var sectionDropTarget: SidebarSection?
 
     var body: some View {
-        @Bindable var model = model
         let editing = model.isEditingSidebar
-        List(selection: $model.selection) {
+        List(selection: Binding(get: { model.selectedItems }, set: { model.selectSidebarItems($0) })) {
             Section {
-                ForEach(shown(model.libraryRows)) { row($0, section: nil) }
+                movableRows(model.libraryRows, in: "library", section: nil)
             } header: {
                 header
             }
-            ForEach(SidebarSection.allCases) { section in
+            ForEach(model.sections) { section in
                 if editing || model.isVisible(section.key) {
                     let rows = model.rows(for: section)
                     Section(isExpanded: expansion(section)) {
                         if section == .characterSets {
                             characterSetGroups
                         } else {
-                            ForEach(shown(rows)) { row($0, section: section) }
+                            movableRows(rows, in: section.rawValue, section: section)
                         }
                         if editing && rows.isEmpty {
                             Text("Nothing here yet")
@@ -43,30 +48,42 @@ struct SidebarView: View {
         }
     }
 
-    /// Character sets in collapsible groups; a group whose sets are all hidden disappears.
+    /// Rows that drag to a new place among themselves.
+    private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
+        let shownRows = shown(rows)
+        return ForEach(shownRows) { row($0, section: section) }
+            .onMove { model.moveSidebarItems($0, to: $1, shown: shownRows.map(\.key), all: rows.map(\.key), in: list) }
+    }
+
+    /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Groups move
+    /// among themselves, and sets within their group.
     private var characterSetGroups: some View {
-        ForEach(model.characterSetGroups, id: \.id) { group in
-            let rows = shown(group.rows)
-            if !rows.isEmpty {
-                DisclosureGroup(isExpanded: Binding(
-                    get: { model.isEditingSidebar || model.isGroupExpanded(group.id) },
-                    set: { if !model.isEditingSidebar { model.setGroupExpanded(group.id, $0) } }
-                )) {
-                    ForEach(rows) { row($0, section: .characterSets) }
+        let groups = model.characterSetGroups
+        let shownGroups = groups.filter { !shown($0.rows).isEmpty }
+        func key(_ id: String) -> String { "charsetgroup.\(id)" }
+        return ForEach(shownGroups, id: \.id) { group in
+            DisclosureGroup(isExpanded: Binding(
+                get: { model.isEditingSidebar || model.isGroupExpanded(group.id) },
+                set: { if !model.isEditingSidebar { model.setGroupExpanded(group.id, $0) } }
+            )) {
+                movableRows(group.rows, in: key(group.id), section: .characterSets)
+            } label: {
+                // Only the chevron toggles a group in a selectable list; make the title do it too.
+                Button {
+                    guard !model.isEditingSidebar else { return }
+                    withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
                 } label: {
-                    // Only the chevron toggles a group in a selectable list; make the title do it too.
-                    Button {
-                        guard !model.isEditingSidebar else { return }
-                        withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
-                    } label: {
-                        Text(group.title)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
+                    Text(group.title)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
             }
+        }
+        .onMove {
+            model.moveSidebarItems($0, to: $1, shown: shownGroups.map { key($0.id) }, all: groups.map { key($0.id) },
+                                   in: SidebarSection.characterSets.rawValue)
         }
     }
 
@@ -76,9 +93,20 @@ struct SidebarView: View {
 
     private func expansion(_ section: SidebarSection) -> Binding<Bool> {
         Binding(
-            get: { model.isEditingSidebar || model.isExpanded(section) },
-            set: { if !model.isEditingSidebar { model.setExpanded(section, $0) } }
+            get: { draggedSection != section && (model.isEditingSidebar || model.isExpanded(section)) },
+            set: { if !model.isEditingSidebar && draggedSection == nil { model.setExpanded(section, $0) } }
         )
+    }
+
+    /// The payload of a section title's drag, made as the drag starts: the section's rows fold away
+    /// under its title, so it moves as one, and come back when the mouse button goes up wherever it's dropped.
+    private func beginDrag(of section: SidebarSection) -> SectionDrag {
+        withAnimation(.snappy) { draggedSection = section }
+        Task {
+            while NSEvent.pressedMouseButtons & 1 != 0 { try? await Task.sleep(for: .milliseconds(100)) }
+            withAnimation(.snappy) { draggedSection = nil }
+        }
+        return SectionDrag(section: section.rawValue)
     }
 
     // MARK: Headers
@@ -109,6 +137,20 @@ struct SidebarView: View {
             if !model.isEditingSidebar { addButton(section) }
         }
         .padding(.trailing, 10)
+        .background {
+            if sectionDropTarget == section {
+                RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.leading, -6)
+            }
+        }
+        // A list drags a header as a picture of it and ignores drag previews, so the rows fold away instead.
+        .draggable(beginDrag(of: section))
+        .dropDestination(for: SectionDrag.self) { drags, _ in
+            guard let dragged = drags.first.flatMap({ SidebarSection(rawValue: $0.section) }), dragged != section else { return false }
+            withAnimation(.snappy) { model.moveSection(dragged, onto: section) }
+            return true
+        } isTargeted: { targeted in
+            if targeted { sectionDropTarget = section } else if sectionDropTarget == section { sectionDropTarget = nil }
+        }
     }
 
     @ViewBuilder
@@ -204,8 +246,6 @@ struct SidebarView: View {
                 Button("Edit Character Set…") { model.editingCharacterSet = custom }
                 Button("Delete Character Set") { model.deleteCharacterSet(custom.id) }
             }
-        case .system:
-            Toggle("Show in Other Lists", isOn: Binding(get: { model.data.showSystemFonts }, set: { model.data.showSystemFonts = $0 }))
         default:
             EmptyView()
         }
@@ -215,4 +255,18 @@ struct SidebarView: View {
         }
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
     }
+}
+
+/// A section title being dragged onto another.
+private nonisolated struct SectionDrag: Codable, Transferable {
+    var section: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .ciceroSidebarSection)
+    }
+}
+
+private extension UTType {
+    /// Declared in Info.plist.
+    nonisolated static let ciceroSidebarSection = UTType(exportedAs: "local.cicero.sidebar-section")
 }
