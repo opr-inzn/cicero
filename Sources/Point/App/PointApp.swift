@@ -87,6 +87,8 @@ struct PointCommands: Commands {
             Button("Reveal in Finder") { library.revealSelection() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
+            Button("Move to Trash…") { library.requestTrash(selection) }
+                .disabled(selection.isEmpty)
             Divider()
             PresentationCommands(library: library)
             Button("Character Toolbox") { openWindow(id: "toolbox") }
@@ -124,6 +126,7 @@ struct RootView: View {
             }
         }
         .modifier(SetEditorSheets())
+        .modifier(FontTrashAlert())
         .sheet(item: $library.pendingActivation) { request in
             ActivationSheet(request: request)
         }
