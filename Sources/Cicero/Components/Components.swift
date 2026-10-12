@@ -231,6 +231,12 @@ extension View {
     func formFooter() -> some View {
         padding(.top, -4)
     }
+
+    /// For a grouped-form row with a button, pop-up or segmented picker: macOS 26 sets those 2 pt
+    /// above the middle of the row (6 pt above, 10 below), and the label with them.
+    func formRowCentered() -> some View {
+        offset(y: 2)
+    }
 }
 
 /// Lays children out left to right, wrapping onto new lines.

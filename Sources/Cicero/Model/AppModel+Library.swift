@@ -6,14 +6,13 @@ enum SidebarItem: Hashable {
     case folder(UUID)
     case set(UUID)
     case smartSet(UUID)
-    case tag(String)
     case foundry(String)
     case classification(Classification)
     case characterSet(String)
 }
 
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case folders, sets, tags, foundries, classifications, characterSets
+    case folders, sets, foundries, classifications, characterSets
 
     var id: String { rawValue }
     var key: String { "section.\(rawValue)" }
@@ -22,7 +21,6 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "Folders"
         case .sets: "Sets"
-        case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
         case .characterSets: "Character Sets"
@@ -33,7 +31,6 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "folder"
         case .sets: "square.stack"
-        case .tags: "tag"
         case .foundries: "building.2"
         case .classifications: "textformat"
         case .characterSets: "character.textbox"
@@ -108,8 +105,6 @@ extension AppModel {
         return data.foundryRenames[raw] ?? raw
     }
 
-    func tags(of family: Family) -> [String] { data.familyTags[family.id] ?? [] }
-
     func features(for family: Family) -> [FeatureSetting] { familyFeatures[family.id] ?? [] }
 
     // MARK: The list
@@ -152,7 +147,6 @@ extension AppModel {
         case .smartSet(let id):
             guard let smartSet = data.smartSets.first(where: { $0.id == id }) else { return { _ in false } }
             return matcher(for: smartSet)
-        case .tag(let tag): return { self.tags(of: $0).contains(tag) }
         case .foundry(let name): return { self.foundryName(of: $0) == name }
         case .classification(let classification): return { $0.classification == classification }
         case .characterSet(let id):
@@ -194,7 +188,8 @@ extension AppModel {
         case .classification:
             return compare { $0.classification.rawValue == value }
         case .tag:
-            return compare { self.tags(of: $0).contains(value) }
+            // Tags have no UI for now; rules saved before keep working.
+            return compare { self.data.familyTags[$0.id]?.contains(value) == true }
         case .set:
             let members = Set(data.sets.first { $0.id.uuidString == value }?.families ?? [])
             return compare { members.contains($0.id) }

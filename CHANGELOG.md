@@ -12,7 +12,7 @@ First release.
 - Preview Options for sample text, size, weight and letter spacing.
 - Choose a light or dark appearance, or follow macOS, in Settings → General.
 - Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item.
-- Sets, smart sets with rules, tags, foundries, and automatic classifications read from each font.
+- Sets, smart sets with rules, foundries, and automatic classifications read from each font.
 - Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar and sort the list by them.
 - Character Toolbox: find fonts that have every character of a text or support one of 780 languages.
 - Compare fonts on a shared baseline or overlaid.
