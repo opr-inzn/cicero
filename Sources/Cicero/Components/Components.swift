@@ -26,17 +26,27 @@ struct FontText: View {
 }
 
 /// A small switch drawn in SwiftUI. Lists show one per family, and a native switch per row made
-/// building a list much slower.
+/// building a list much slower. The middle position (on in one app only) puts the knob halfway.
 struct MiniSwitch: View {
-    let isOn: Bool
+    let position: SwitchPosition
     let isEnabled: Bool
     let action: () -> Void
 
+    init(position: SwitchPosition, isEnabled: Bool, action: @escaping () -> Void) {
+        self.position = position
+        self.isEnabled = isEnabled
+        self.action = action
+    }
+
+    init(isOn: Bool, isEnabled: Bool, action: @escaping () -> Void) {
+        self.init(position: isOn ? .on : .off, isEnabled: isEnabled, action: action)
+    }
+
     var body: some View {
         Capsule()
-            .fill(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
+            .fill(fill)
             .frame(width: 26, height: 15)
-            .overlay(alignment: isOn ? .trailing : .leading) {
+            .overlay(alignment: alignment) {
                 Circle()
                     .fill(.white)
                     .shadow(color: .black.opacity(0.25), radius: 0.5, y: 0.5)
@@ -45,7 +55,23 @@ struct MiniSwitch: View {
             .opacity(isEnabled ? 1 : 0.45)
             .contentShape(.rect)
             .onTapGesture { if isEnabled { action() } }
-            .animation(.snappy(duration: 0.15), value: isOn)
+            .animation(.snappy(duration: 0.15), value: position)
+    }
+
+    private var fill: AnyShapeStyle {
+        switch position {
+        case .off: AnyShapeStyle(.quaternary)
+        case .app: AnyShapeStyle(.tint.opacity(0.45))
+        case .on: AnyShapeStyle(.tint)
+        }
+    }
+
+    private var alignment: Alignment {
+        switch position {
+        case .off: .leading
+        case .app: .center
+        case .on: .trailing
+        }
     }
 }
 
@@ -57,20 +83,30 @@ struct ActivationSwitch: View {
 
     var body: some View {
         let isEnabled = family.hasActivatable || family.hasDeactivatable
-        MiniSwitch(isOn: family.hasActive, isEnabled: isEnabled) { model.toggle(family) }
+        MiniSwitch(position: family.position, isEnabled: isEnabled) { model.toggle(family) }
             .help(help)
             .accessibilityElement()
             .accessibilityLabel("Activated")
-            .accessibilityValue(family.hasActive ? "On" : "Off")
+            .accessibilityValue(accessibilityValue)
             .accessibilityAddTraits(.isToggle)
             .accessibilityAction { if isEnabled { model.toggle(family) } }
     }
 
     private var help: String {
-        switch family.state {
-        case .system: "Installed with macOS"
-        case .appOnly(let app): "On in \(FaceState.appDescription(app)) only. Turn on to use it in every app."
-        default: family.hasActive ? "Deactivate" : "Activate"
+        if family.state == .system { return "Installed with macOS" }
+        guard let app = family.app.map(FaceState.appDescription) else { return family.hasActive ? "Deactivate" : "Activate" }
+        return switch family.position {
+        case .app: "On in \(app) only. Click to turn on in every app."
+        case .on: "On in every app. Click to turn off, \(app) included."
+        case .off: "Off. Click to turn on in \(app) only."
+        }
+    }
+
+    private var accessibilityValue: String {
+        switch family.position {
+        case .on: "On"
+        case .app: "On in \(family.app.map(FaceState.appDescription) ?? "one app") only"
+        case .off: "Off"
         }
     }
 }

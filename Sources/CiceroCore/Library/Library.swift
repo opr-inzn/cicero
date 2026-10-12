@@ -183,6 +183,12 @@ public final class LibraryScanner: Sendable {
             }
         }
         for path in records.inPlace { add { $0.combine(path) } }
+        for (path, origin) in records.appFolderOrigins {
+            add { hasher in
+                hasher.combine(path)
+                hasher.combine(origin)
+            }
+        }
         for (path, record) in records.temporary {
             add { hasher in
                 hasher.combine(path)
@@ -223,6 +229,12 @@ public final class LibraryScanner: Sendable {
                 found[path]!.folderIDs.append(folder.id)
                 if found[path]!.appName == nil { found[path]!.appName = folder.appName }
             }
+        }
+        // Files Cicero moved out of an app's folder to turn them off still belong with that folder.
+        for (path, origin) in input.records.appFolderOrigins where found[path] != nil {
+            guard let folder = input.folders.first(where: { $0.appName != nil && origin.hasPrefix($0.path + "/") }) else { continue }
+            found[path]!.folderIDs.append(folder.id)
+            found[path]!.appName = folder.appName
         }
         return found
     }
@@ -355,6 +367,7 @@ public final class LibraryScanner: Sendable {
         var dateAdded: Date?
         var folderIDs: [UUID]
         var stamp: FaceStamp
+        var app: String?
     }
 
     private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput) -> Library {
@@ -373,7 +386,7 @@ public final class LibraryScanner: Sendable {
             let state = Self.faceState(of: path, file: file, locations: locations, records: input.records)
             for face in cached.faces where !face.familyName.hasPrefix(".") && !face.familyName.isEmpty {
                 candidates[FaceKey(family: face.familyName, postScriptName: face.postScriptName, isItalic: face.isItalic), default: []].append(
-                    Candidate(face: face, state: state, dateAdded: cached.dateAdded, folderIDs: file.folderIDs, stamp: cached.stamp)
+                    Candidate(face: face, state: state, dateAdded: cached.dateAdded, folderIDs: file.folderIDs, stamp: cached.stamp, app: file.appName)
                 )
             }
         }
@@ -388,7 +401,7 @@ public final class LibraryScanner: Sendable {
             for copy in sorted.dropFirst() where copy.face.path != winner.face.path && !others.contains(copy.face.path) {
                 others.append(copy.face.path)
             }
-            let face = LibraryFace(face: winner.face, state: winner.state, otherCopies: others, dateAdded: sorted.compactMap(\.dateAdded).min())
+            let face = LibraryFace(face: winner.face, state: winner.state, otherCopies: others, dateAdded: sorted.compactMap(\.dateAdded).min(), app: winner.app)
             let folderIDs = Set(sorted.flatMap(\.folderIDs))
             byFamily[winner.face.familyName, default: []].append((face, folderIDs, winner.stamp))
         }
@@ -425,6 +438,7 @@ public final class LibraryScanner: Sendable {
                 hasher.combine(face.id)
                 hasher.combine(face.state)
                 hasher.combine(face.otherCopies)
+                hasher.combine(face.app)
                 hasher.combine(face.dateAdded)
                 hasher.combine(stamps[face.id])
             }
@@ -458,7 +472,7 @@ public final class LibraryScanner: Sendable {
 
     static func faceState(of path: String, file: FoundFile, locations: Locations, records: ActivationRecords) -> FaceState {
         if file.isActive { return .active(activeSource(of: path, locations: locations, records: records)) }
-        if let app = file.appName { return .appOnly(app) }
+        if let app = file.appName, records.appFolderOrigins[path] == nil { return .appOnly(app) }
         return .inactive
     }
 
