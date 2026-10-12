@@ -351,7 +351,7 @@ extension AppModel {
             SidebarRow(key: "library.active", title: "Activated", icon: "checkmark.circle", item: .active),
             SidebarRow(key: "library.inactive", title: "Not Activated", icon: "circle.dashed", item: .inactive),
             SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system),
-            SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count),
+            SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
         ]
     }
 
