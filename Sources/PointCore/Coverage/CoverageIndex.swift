@@ -49,7 +49,7 @@ public final class CoverageIndex: Sendable {
     private let state = Mutex(State())
 
     private struct Entry: Sendable {
-        var stamp: FileStamp
+        var stamp: CoverageStamp
         var coverage: FaceCoverage
     }
 
@@ -68,7 +68,7 @@ public final class CoverageIndex: Sendable {
     /// (done, total) only when there's work. Cancellable.
     public func update(_ families: [Family], progress: @escaping @Sendable (Int, Int) -> Void) async {
         loadIfNeeded()
-        let stamped = families.map { ($0.regular.face, FileStamp.of(path: $0.regular.face.path)) }
+        let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
         }
@@ -76,7 +76,7 @@ public final class CoverageIndex: Sendable {
             let total = work.count
             progress(0, total)
             var done = 0
-            await withTaskGroup(of: (FaceID, FileStamp, FaceCoverage).self) { group in
+            await withTaskGroup(of: (FaceID, CoverageStamp, FaceCoverage).self) { group in
                 var pending = work.makeIterator()
                 func addNext() {
                     guard !Task.isCancelled, let (face, stamp) = pending.next() else { return }
@@ -105,7 +105,7 @@ public final class CoverageIndex: Sendable {
     /// Computes now if needed (for the Info panel and glyph grid of any face).
     public func coverage(computing face: FontFace) async -> FaceCoverage {
         loadIfNeeded()
-        let stamp = FileStamp.of(path: face.path)
+        let stamp = CoverageStamp.of(path: face.path)
         if let entry = state.withLock({ $0.entries[face.id] }), entry.stamp == stamp {
             return entry.coverage
         }
@@ -158,7 +158,7 @@ public final class CoverageIndex: Sendable {
                     scalars: ScalarRanges(bounds: entry.bounds.array(of: UInt32.self)), order: order,
                     bits: LanguageBits(base: entry.base.array(of: UInt64.self), full: entry.full.array(of: UInt64.self))
                 )
-                state.entries[FaceID(path: entry.path, index: entry.index)] = Entry(stamp: FileStamp(modified: entry.modified, size: entry.size), coverage: coverage)
+                state.entries[FaceID(path: entry.path, index: entry.index)] = Entry(stamp: CoverageStamp(modified: entry.modified, size: entry.size), coverage: coverage)
             }
         }
     }
@@ -205,17 +205,17 @@ public final class CoverageIndex: Sendable {
 }
 
 /// A file's modification time and size, which is what tells a cached result is still good.
-struct FileStamp: Hashable, Sendable {
+struct CoverageStamp: Hashable, Sendable {
     var modified: Double
     var size: Int64
 
     /// Stands for a file that isn't there, so its (empty) result isn't recomputed on every update.
-    static let missing = FileStamp(modified: 0, size: -1)
+    static let missing = CoverageStamp(modified: 0, size: -1)
 
-    static func of(path: String) -> FileStamp {
+    static func of(path: String) -> CoverageStamp {
         var info = stat()
         guard stat(path, &info) == 0 else { return .missing }
-        return FileStamp(modified: Double(info.st_mtimespec.tv_sec) + Double(info.st_mtimespec.tv_nsec) / 1e9, size: Int64(info.st_size))
+        return CoverageStamp(modified: Double(info.st_mtimespec.tv_sec) + Double(info.st_mtimespec.tv_nsec) / 1e9, size: Int64(info.st_size))
     }
 }
 
