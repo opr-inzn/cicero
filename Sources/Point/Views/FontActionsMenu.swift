@@ -17,7 +17,9 @@ struct FontActionsMenu: View {
         let ellipsis = library.data.installMethod == .ask ? "…" : ""
         if families.contains(where: \.hasActivatableFaces) {
             let partial = families.contains(where: \.hasActiveFaces)
-            Button((partial ? "Activate Remaining Styles" : "Activate") + ellipsis) { library.requestActivate(families) }
+            let appOnly = families.allSatisfy { if case .appOnly = $0.status { true } else { false } }
+            let title = partial ? "Activate Remaining Styles" : appOnly ? "Activate in All Apps" : "Activate"
+            Button(title + (appOnly ? "" : ellipsis)) { library.requestActivate(families) }
         }
         if families.contains(where: \.hasDeactivatableFaces) {
             Button("Deactivate") { library.requestDeactivate(families) }
@@ -67,6 +69,10 @@ struct FontActionsMenu: View {
             Button("Open") { library.detailFamilyID = families[0].id }
             Button("Show Info") { library.showInfo(for: families[0]) }
         }
+
+        Divider()
+
+        Button("Move to Trash…") { library.requestTrash(families) }
     }
 
     private var statusNote: String? {
@@ -100,6 +106,10 @@ struct FaceActionsMenu: View {
         Button("Copy PostScript Name") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(face.face.postScriptName, forType: .string)
+        }
+        Divider()
+        Button("Move Style to Trash…") {
+            library.requestTrash(faces: [face], title: "“\(family.name) \(face.face.styleName)”")
         }
     }
 }

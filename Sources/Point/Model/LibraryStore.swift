@@ -105,6 +105,7 @@ final class LibraryStore {
 
     var pendingActivation: ActivationRequest?
     var pendingDeactivation: DeactivationRequest?
+    var pendingTrash: TrashRequest?
     var textPrompt: TextPrompt?
     var toast: String?
 

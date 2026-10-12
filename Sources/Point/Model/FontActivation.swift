@@ -12,10 +12,18 @@ extension LibraryStore {
     }
 
     func requestActivate(faces: [LibraryFace], title: String) {
-        let targets = faces.filter(\.canActivate)
+        var targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else {
             showToast("Already on.")
             return
+        }
+        // Fonts an app already loads from its own folder (like Adobe's) are used where they are:
+        // that folder stays put, and a copy would only show the app the same font twice.
+        let appOnly = targets.filter { if case .appOnly = $0.status { true } else { false } }
+        if !appOnly.isEmpty {
+            Task { await activate(appOnly, method: .register) }
+            targets.removeAll { if case .appOnly = $0.status { true } else { false } }
+            guard !targets.isEmpty else { return }
         }
         switch data.installMethod {
         case .ask: pendingActivation = ActivationRequest(title: title, faces: targets)

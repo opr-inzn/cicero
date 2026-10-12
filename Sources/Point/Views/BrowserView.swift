@@ -171,7 +171,15 @@ struct ActivationSwitch: View {
         .controlSize(.mini)
         .labelsHidden()
         .disabled(!family.hasActivatableFaces && !family.hasDeactivatableFaces)
-        .help(family.status == .system ? "Installed with macOS" : family.hasActiveFaces ? "Deactivate" : "Activate")
+        .help(helpText)
+    }
+
+    private var helpText: String {
+        switch family.status {
+        case .system: "Installed with macOS"
+        case .appOnly(let app): "On in \(app) apps only. Turn on to use it in every app."
+        default: family.hasActiveFaces ? "Deactivate" : "Activate"
+        }
     }
 }
 
