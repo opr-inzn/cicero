@@ -66,6 +66,12 @@ enum FontCacheMaintenance {
     }
 }
 
+/// What the Clear Font Caches sheet asked for.
+struct FontCacheSelection {
+    var scopes: [FontCacheMaintenance.Scope] = []
+    var apps: [AppFontCaches.Found] = []
+}
+
 extension LibraryStore {
     /// Re-reads every font file instead of using Point's cached metadata.
     func rebuildFontList() {
@@ -73,35 +79,46 @@ extension LibraryStore {
         rescan()
     }
 
-    /// Returns true when the caches were cleared.
-    func clearFontCaches(_ scope: FontCacheMaintenance.Scope) async -> Bool {
-        do {
-            try await FontCacheMaintenance.clear(scope)
-            rebuildFontList()
-            return true
-        } catch FontCacheMaintenance.Failure.cancelled {
-            return false
-        } catch {
-            showToast("Couldn't clear font caches: \(error.localizedDescription)")
-            return false
+    /// Clears the chosen caches: app caches go to the Trash, macOS ones through atsutil. Returns true
+    /// when any of the macOS caches were cleared, which is when a restart helps.
+    func clearFontCaches(_ selection: FontCacheSelection) async -> Bool {
+        var trashed: [String] = []
+        var failures = 0
+        for found in selection.apps {
+            failures += await Task.detached { AppFontCaches.trash(found) }.value
+            trashed.append(found.app.title)
         }
+        var clearedMacOS = false
+        for scope in selection.scopes {
+            do {
+                try await FontCacheMaintenance.clear(scope)
+                clearedMacOS = true
+            } catch FontCacheMaintenance.Failure.cancelled {
+            } catch {
+                showToast("Couldn't clear the macOS font caches: \(error.localizedDescription)")
+            }
+        }
+        if failures > 0 {
+            showToast("Couldn't move \(failures == 1 ? "1 cache item" : "\(failures) cache items") to the Trash.")
+        } else if !trashed.isEmpty && !clearedMacOS {
+            showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash.")
+        }
+        if clearedMacOS || !trashed.isEmpty { rebuildFontList() }
+        return clearedMacOS
     }
 }
 
-/// The confirmation and follow-up restart prompt for clearing font caches, attachable to any window.
+/// The Clear Font Caches sheet and its follow-up restart prompt, attachable to any window.
 struct FontCacheDialogs: ViewModifier {
-    @Environment(LibraryStore.self) private var library
     @Binding var isConfirming: Bool
     @State private var showsRestartPrompt = false
 
     func body(content: Content) -> some View {
         content
-            .confirmationDialog("Clear font caches?", isPresented: $isConfirming) {
-                Button("Clear for My Account") { clear(.currentUser) }
-                Button("Clear for All Users…") { clear(.allUsers) }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Use this when fonts look wrong, show an old version, or won't turn on or off. Clearing for all users needs an administrator password.")
+            .sheet(isPresented: $isConfirming) {
+                FontCacheSheet { clearedMacOS in
+                    if clearedMacOS { showsRestartPrompt = true }
+                }
             }
             .alert("Font caches cleared", isPresented: $showsRestartPrompt) {
                 Button("Restart Now…") { FontCacheMaintenance.restartMac() }
@@ -109,11 +126,5 @@ struct FontCacheDialogs: ViewModifier {
             } message: {
                 Text("Restart your Mac so every app picks up the rebuilt caches.")
             }
-    }
-
-    private func clear(_ scope: FontCacheMaintenance.Scope) {
-        Task {
-            if await library.clearFontCaches(scope) { showsRestartPrompt = true }
-        }
     }
 }

@@ -209,6 +209,7 @@ enum ProblemFinder {
         case .adobeCloud: "Adobe Fonts"
         case .user: "In your Fonts folder"
         case .registered: "Used where it is"
+        case .temporary(let scope): scope.statusLabel
         case .other: "Activated by another app"
         case nil: path.hasPrefix(input.deactivatedFolder + "/") ? "In Point's Deactivated folder" : "Not active"
         }
@@ -292,7 +293,7 @@ enum ProblemFinder {
         var seen = Set<String>()
         for family in input.families {
             for face in family.faces {
-                guard let kind = face.status.activeKind, kind == .registered || kind == .other,
+                guard let kind = face.status.activeKind, kind == .registered || kind == .other || kind.isTemporary,
                       seen.insert(face.face.path).inserted,
                       let volume = volume(of: face.face.path), volume.external else { continue }
                 let styles = family.faces.filter { $0.face.path == face.face.path }

@@ -191,6 +191,17 @@ struct ActivationSwitch: View {
 
 struct StatusTag: View {
     let status: FamilyStatus
+    /// Set when every active style is on for this session only, e.g. "Active until Point quits".
+    var temporaryLabel: String?
+
+    init(status: FamilyStatus) {
+        self.status = status
+    }
+
+    init(family: FontFamily) {
+        status = family.status
+        if family.isTemporarilyActive { temporaryLabel = family.faces.first(where: \.isTemporary)?.status.label }
+    }
 
     var body: some View {
         if let text {
@@ -200,6 +211,7 @@ struct StatusTag: View {
                 .padding(.vertical, 1.5)
                 .background(tint.opacity(0.12), in: .capsule)
                 .foregroundStyle(tint.opacity(0.85))
+                .help(temporaryLabel ?? "")
         }
     }
 
@@ -208,7 +220,8 @@ struct StatusTag: View {
         case .system: "System"
         case .partial: "Partly active"
         case .appOnly(let app): app
-        case .active, .inactive: nil
+        case .active: temporaryLabel == nil ? nil : "Temporary"
+        case .inactive: nil
         }
     }
 
@@ -216,6 +229,7 @@ struct StatusTag: View {
         switch status {
         case .appOnly: .red
         case .partial: .orange
+        case .active: .blue
         default: .secondary
         }
     }

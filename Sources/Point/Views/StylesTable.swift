@@ -70,8 +70,14 @@ struct StylesTable: View {
             FaceActionsMenu(family: family, face: faces[0])
         } else if faces.count > 1 {
             Text("\(faces.count) Styles")
+            let ellipsis = library.data.installMethod == .ask ? "…" : ""
             if faces.contains(where: \.canActivate) {
-                Button("Activate" + (library.data.installMethod == .ask ? "…" : "")) {
+                Button("Activate" + ellipsis) {
+                    library.requestActivate(faces: faces, title: "\(faces.count) styles of \(family.name)")
+                }
+                TemporaryActivationMenu { library.requestActivateTemporarily(faces: faces, scope: $0) }
+            } else if faces.contains(where: \.isTemporary) {
+                Button("Activate Permanently" + ellipsis) {
                     library.requestActivate(faces: faces, title: "\(faces.count) styles of \(family.name)")
                 }
             }
