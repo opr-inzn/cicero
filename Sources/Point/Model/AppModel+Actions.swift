@@ -431,7 +431,7 @@ extension AppModel {
         textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, action: action)
     }
 
-    // MARK: Compare and slideshow
+    // MARK: Compare
 
     func compare(_ families: [Family]) {
         compareIDs = families.map(\.id)
@@ -445,18 +445,6 @@ extension AppModel {
 
     func removeFromCompare(_ id: String) {
         compareIDs.removeAll { $0 == id }
-    }
-
-    /// The selection, or the whole list starting at the one selected family.
-    func prepareSlideshow(_ families: [Family]) {
-        if families.count > 1 {
-            slideshowIDs = families.map(\.id)
-            slideshowStart = 0
-        } else {
-            let list = visibleFamilies
-            slideshowIDs = list.map(\.id)
-            slideshowStart = families.first.flatMap { family in list.firstIndex { $0.id == family.id } } ?? 0
-        }
     }
 
     // MARK: Font caches

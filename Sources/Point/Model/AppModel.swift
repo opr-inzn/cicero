@@ -82,11 +82,9 @@ final class AppModel {
     var isClearingCaches = false
     private(set) var toast: String?
 
-    // MARK: Compare and slideshow
+    // MARK: Compare
 
     var compareIDs: [String] = []
-    var slideshowIDs: [String] = []
-    var slideshowStart = 0
 
     // MARK: Private
 

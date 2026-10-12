@@ -13,7 +13,7 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Sets, smart sets and tags.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Point reads from the fonts themselves.
 - **Character sets.** See which fonts have every character of Latin S–XL, Adobe Latin 1–5, or Google Fonts' Latin, Cyrillic and Greek sets, or of a set you define yourself.
 - **Character Toolbox** (⌥⌘T). Paste any text to find the fonts that have every character, or pick one of 780 languages to see which fonts support it.
-- **Compare and Slideshow.** Compare (⌥⌘C) shows fonts stacked on a shared baseline or drawn over each other; Slideshow (⌥⌘S) presents them one at a time, full screen.
+- **Compare** (⌥⌘C). Fonts stacked on a shared baseline or drawn over each other.
 - **Problems.** Finds fonts active from more than one file, missing and damaged files, fonts on external disks, and duplicates, with a fix for each.
 - **Watched folders.** Fonts in your folders are listed without being installed. A folder that one app loads on its own, like Adobe's Fonts folder, is marked for that app (detected automatically) instead of showing as not activated; turning one of its fonts on makes it available in every app, using the file where it is.
 - **System Fonts.** The fonts that ship with macOS have their own item, and View → Show System Fonts (⇧⌘.) keeps them out of your other lists.

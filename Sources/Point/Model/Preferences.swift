@@ -105,5 +105,4 @@ enum WindowID {
     static let main = "main"
     static let toolbox = "toolbox"
     static let compare = "compare"
-    static let slideshow = "slideshow"
 }

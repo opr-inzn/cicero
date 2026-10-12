@@ -40,7 +40,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   character set lookups) are cached and keyed on the inputs they depend on.
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
-  `Windows/` (Character Toolbox, Compare, Slideshow, Problems, sheets), `Settings/`. Shared pieces
+  `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
   are in `Components/`.
 
 ## Rules of thumb

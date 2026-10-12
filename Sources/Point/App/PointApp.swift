@@ -37,16 +37,6 @@ struct PointApp: App {
         .restorationBehavior(.disabled)
         .commandsRemoved()
 
-        Window("Slideshow", id: WindowID.slideshow) {
-            SlideshowWindow()
-                .environment(model)
-                .environment(preview)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1200, height: 800)
-        .restorationBehavior(.disabled)
-        .commandsRemoved()
-
         Settings {
             SettingsWindow()
                 .environment(model)
@@ -108,12 +98,6 @@ struct PointCommands: Commands {
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
             .disabled(selection.count < 2)
-            Button("Slideshow") {
-                model.prepareSlideshow(selection)
-                openWindow(id: WindowID.slideshow)
-            }
-            .keyboardShortcut("s", modifiers: [.command, .option])
-            .disabled(model.library.families.isEmpty)
             Button("Character Toolbox") { openWindow(id: WindowID.toolbox) }
                 .keyboardShortcut("t", modifiers: [.command, .option])
             Divider()
