@@ -68,10 +68,6 @@ struct FamilyMenu: View {
                 openWindow(id: WindowID.compare)
             }
         }
-        Button("Slideshow") {
-            model.prepareSlideshow(families)
-            openWindow(id: WindowID.slideshow)
-        }
         if families.count == 1 {
             Divider()
             Button("Open") { model.openFamilyID = families[0].id }

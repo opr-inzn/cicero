@@ -64,26 +64,9 @@ struct BrowserView: View {
             .help("Show as a list, a grid or specimens")
         }
         ToolbarSpacer(.fixed)
-        ToolbarItem { SlideshowButton() }
         ToolbarItem { PreviewOptionsButton() }
         ToolbarSpacer(.fixed)
         ToolbarItem { InfoButton() }
-    }
-}
-
-private struct SlideshowButton: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button {
-            model.prepareSlideshow(model.selectedFamilies)
-            openWindow(id: WindowID.slideshow)
-        } label: {
-            Label("Slideshow", systemImage: "play.rectangle")
-        }
-        .help("Show these fonts one at a time, full screen")
-        .disabled(model.library.families.isEmpty)
     }
 }
 

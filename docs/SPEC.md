@@ -14,7 +14,6 @@ ellipsis character (…) for items that ask for more input.
 2. **Settings** — tabs General, Folders, Sidebar, Character Sets.
 3. **Character Toolbox** (⌥⌘T) — tabs Text and Languages.
 4. **Compare** (⌥⌘C).
-5. **Slideshow** (⌥⌘S) — full screen.
 
 ## Sidebar
 
@@ -41,7 +40,7 @@ ellipsis character (…) for items that ask for more input.
 
 - Title = selected item's name; subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right with equal gaps (ToolbarSpacer(.fixed) between groups): view switcher
-  [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Slideshow play.rectangle, Preview Options textformat.size] · [Info info.circle] · native search field.
+  [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field.
 - **List** (SwiftUI Table, sortable, column customisation saved): On (switch) · Name (+ status tag) ·
   Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL (largest of
   Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) · Format (hidden).
@@ -79,8 +78,8 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N.
 - **View**: Edit Sidebar / Done Editing Sidebar, Show System Fonts ⇧⌘. (checkmark).
-- **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Point Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Slideshow ⌥⌘S, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
-- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Tags ▸ (toggles, New Tag…); Reveal in Finder; Copy Family Name(s); Compare / Slideshow; Open; Show Info; Move to Trash…
+- **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Point Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
+- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Tags ▸ (toggles, New Tag…); Reveal in Finder; Copy Family Name(s); Compare; Open; Show Info; Move to Trash…
 - **Style menu**: status label, Activate Style…, Activate Temporarily ▸, Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
 
 ## Library and fonts
@@ -128,9 +127,6 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a shared baseline, name + style + remove button under each) and Overlay (all samples drawn over each other in tints, x-height/cap-height ticks, legend chips with remove). Uses the preview sample (or "Hamburgefonstiv"), size, weight, spacing; Preview Options in its toolbar; drop families from the main window; choosing Compare again replaces the set. Content starts top-left.
 
-## Slideshow
-
-Full-screen window: name, foundry, style count, status; the sample (or family name) as large as fits; a strip of styles; ←/→/Space navigate, P play/pause (2/3/5/10/20 s), A activate/deactivate, Esc closes; glass control capsule that fades after 2.5 s idle. Shows the selection, or the whole current list when 0–1 selected.
 
 ## Problems
 
