@@ -1,6 +1,6 @@
-# Point — product spec for the clean rewrite
+# Cicero — product spec for the clean rewrite
 
-Point is a macOS 26 font manager (SwiftUI, Liquid Glass, Apple silicon only, never uses the network).
+Cicero is a macOS 26 font manager (SwiftUI, Liquid Glass, Apple silicon only, never uses the network).
 This is a ground-up rewrite: new code and architecture, same product. The user shaped every
 behaviour below; keep them. Never mention or reference any other font manager app anywhere.
 
@@ -22,9 +22,9 @@ ellipsis character (…) for items that ask for more input.
 - Fixed rows: All Fonts (books.vertical), Activated (checkmark.circle), Not Activated (circle.dashed),
   System Fonts (apple.logo), Problems (exclamationmark.triangle, count badge).
 - Sections, each collapsible and hideable:
-  - **Folders** (+ adds folders). Point adds the folders Adobe apps load fonts from by themselves when they exist — /Library/Application Support/Adobe/Fonts ("Adobe Apps"), ~/Library/Application Support/Adobe/Fonts ("Adobe Apps (Your Account)"), and each /Applications/Adobe InDesign|InCopy <version>/Fonts ("InDesign 2026", fonts active in InDesign only) — at first launch and whenever a new one appears; a removed one isn't added again. Row menu: Reveal in Finder; "Fonts in This Folder" picker —
+  - **Folders** (+ adds folders). Cicero adds the folders Adobe apps load fonts from by themselves when they exist — /Library/Application Support/Adobe/Fonts ("Adobe Apps"), ~/Library/Application Support/Adobe/Fonts ("Adobe Apps (Your Account)"), and each /Applications/Adobe InDesign|InCopy <version>/Fonts ("InDesign 2026", fonts active in InDesign only) — at first launch and whenever a new one appears; a removed one isn't added again. Row menu: Reveal in Finder; "Fonts in This Folder" picker —
     "Not activated until you activate them" / "Active in Adobe apps" / a custom app name; Remove Folder from Library.
-    Point's own Deactivated folder appears here when it has fonts.
+    Cicero's own Deactivated folder appears here when it has fonts.
   - **Sets** (+ menu: New Set…, New Smart Set…). Sets (square.stack) and smart sets (gearshape).
     Menus: Rename Set…, Delete Set; Edit Smart Set…, Delete Smart Set.
   - **Tags** (+). Menu: Rename Tag…, Delete Tag.
@@ -60,7 +60,7 @@ ellipsis character (…) for items that ask for more input.
 - Toolbar: tabs [Text | Styles (only when the family has more than one style) | Glyphs] · Preview Options · Info.
 - Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate; locked families get a disabled Deactivate with the reason as tooltip.
 - **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center, a big editable text (default "Sphinx of black quartz, judge my vow."), remembered.
-- **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Point quits"); right-click → style menu.
+- **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
 - **Glyphs**: filter field (character, Unicode name or U+ code), one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
 ## Info panel (trailing column, 300 pt wide, starts below the toolbar, toggled by ⓘ / ⌘I)
@@ -77,22 +77,22 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 ## Menus
 
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N.
-- **View**: Edit Sidebar / Done Editing Sidebar, Show System Fonts ⇧⌘. (checkmark).
-- **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Point Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
+- **View**: Edit Sidebar / Done Editing Sidebar.
+- **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Cicero Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
 - **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Tags ▸ (toggles, New Tag…); Reveal in Finder; Copy Family Name(s); Compare; Open; Show Info; Move to Trash…
 - **Style menu**: status label, Activate Style…, Activate Temporarily ▸, Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
 
 ## Library and fonts
 
-- Sources: everything CoreText reports active (`CTFontManagerCopyAvailableFontURLs`), ~/Library/Fonts and /Library/Fonts (always active), watched folders, Point's Deactivated folder (~/Library/Application Support/Point/Deactivated).
+- Sources: everything CoreText reports active (`CTFontManagerCopyAvailableFontURLs`), ~/Library/Fonts and /Library/Fonts (always active), watched folders, Cicero's Deactivated folder (~/Library/Application Support/Cicero/Deactivated).
 - Files: otf ttf ttc otc dfont woff woff2; each face read with CoreText (PostScript name, family, style, full name, OS/2 weight class (fallback from traits), italic, monospace, OS/2 family class, manufacturer, version, wght axis). Unreadable files are kept for Problems. Parsed faces are cached by path + modification date + size; Date Added (Finder's, fallback creation date) is cached with them.
 - Families group faces by family name (hidden "."-prefixed families skipped). The same PostScript name in several files is one face: the active file wins, the others are "other copies"; Date Added is the earliest.
-- Face state: active (from macOS / installed for all users / inside an app / Adobe Fonts (CoreSync) / your Fonts folder / used in place by Point / temporarily until quit or logout / another app), inactive, or "active in <App> apps" for watched folders marked app-only (Adobe's /Library/Application Support/Adobe/Fonts is detected automatically).
+- Face state: active (from macOS / installed for all users / inside an app / Adobe Fonts (CoreSync) / your Fonts folder / used in place by Cicero / temporarily until quit or logout / another app), inactive, or "active in <App> apps" for watched folders marked app-only (Adobe's /Library/Application Support/Adobe/Fonts is detected automatically).
 - Family state: all active (system if all from macOS) / partly / inactive / app-only / system.
 - Classification from OS/2 family class (1,2,3,7 serif; 4,5 slab; 8 sans; 9 ornamental; 10 script; 12 symbol), monospace first, then name hints (mono/code, slab, sans/grotesk/gothic, serif/garamond/antiqua, script/brush/hand).
 - Foundry: manufacturer name trimmed of Inc./LLC/GmbH/…, URLs and copyright lines dropped, casing unified; user can rename a foundry or set a family's foundry (drop onto foundry).
 - Rescan: on launch, after activation changes, on CoreText's registered-fonts-changed notification (debounced), and when the app becomes active after ≥10 s. An unchanged scan must cost almost nothing (fingerprint; no UI churn).
-- Show System Fonts off hides system families everywhere except the System Fonts item.
+- Show system fonts in other lists (Settings → General, or Show in Other Lists in the System Fonts item's context menu) off hides system families everywhere except the System Fonts item.
 
 ## Activation
 
@@ -100,8 +100,8 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Copy: into ~/Library/Fonts (unique name if needed; identical size counts as already there), remembered as installed copy → origin.
 - In place: CoreText persistent registration, remembered.
 - Fonts from app-only folders (Adobe) are always used in place — never copied.
-- Temporary: CoreText session registration in place; until Point quits (unregistered on quit; leftovers from a crash unregistered at launch) or until you log out (forgotten when the login session changes: audit session ID + boot time).
-- Deactivate: installed copies go to the Trash when another copy exists (origin or other copy outside ~/Library/Fonts); otherwise the file moves to Point's Deactivated folder — ask first if Point didn't install it ("Deactivate fonts?" alert). In-place/temporary → unregister (persistent, falling back to session). macOS, all-users, app and Adobe Fonts faces can't be turned off ("These fonts are managed by macOS or another app.").
+- Temporary: CoreText session registration in place; until Cicero quits (unregistered on quit; leftovers from a crash unregistered at launch) or until you log out (forgotten when the login session changes: audit session ID + boot time).
+- Deactivate: installed copies go to the Trash when another copy exists (origin or other copy outside ~/Library/Fonts); otherwise the file moves to Cicero's Deactivated folder — ask first if Cicero didn't install it ("Deactivate fonts?" alert). In-place/temporary → unregister (persistent, falling back to session). macOS, all-users, app and Adobe Fonts faces can't be turned off ("These fonts are managed by macOS or another app.").
 - Activating permanently a temporarily active font ends the session registration first.
 - Move to Trash (family or style): unregister, trash every file including other copies; never touches /System, /Library/Application Support/Apple, /usr, /private, app bundles, Adobe CoreSync; collections that also contain other families are named in the alert; removes the family from sets/tags/foundry overrides. Alert "Move “X” to the Trash?" with destructive Move to Trash.
 - Short toasts at the bottom ("Activated.", "Deactivated.", "Moved to the Trash.", failures).
@@ -131,8 +131,8 @@ Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a 
 ## Problems
 
 Sidebar item with badge; groups with a short explanation and fixes:
-- Installed Twice: the same font (same family) active from more than one file. Per copy: version, modified date, where; Reveal; Remove Copy… / Deactivate when Point can.
-- Shared Style Names (minor — not counted in the badge, collapsed at the bottom): fonts whose main PostScript names (name ID 6) differ, but whose named styles (variable fonts' fvar instances) use bare PostScript names like "Bold" that another active font uses too; the summary lists them ("Named styles Light, Medium, Bold and Black use the same PostScript names in both."); per file Reveal and Deactivate (when Point can).
+- Installed Twice: the same font (same family) active from more than one file. Per copy: version, modified date, where; Reveal; Remove Copy… / Deactivate when Cicero can.
+- Shared Style Names (minor — not counted in the badge, collapsed at the bottom): fonts whose main PostScript names (name ID 6) differ, but whose named styles (variable fonts' fvar instances) use bare PostScript names like "Bold" that another active font uses too; the summary lists them ("Named styles Light, Medium, Bold and Black use the same PostScript names in both."); per file Reveal and Deactivate (when Cicero can).
 - Duplicates: same font more than once in your folders (inactive); Move Extra Copies to Trash… (keep the installed copy's origin, else newest).
 - Missing files: in-place registrations whose file is gone (Forget + unregister), installed copies gone (Forget), set members no longer in the library (Remove from Set).
 - Damaged or unreadable files (not WOFF/WOFF2): Reveal, Move to Trash…
@@ -141,7 +141,7 @@ Sidebar item with badge; groups with a short explanation and fixes:
 
 ## Font caches
 
-Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macOS (my account) [`atsutil databases -removeUser` + restart fontd], macOS (all users) [admin prompt via osascript; "Needs an administrator password"], Adobe apps [AdobeFnt*.lst and CT Font Cache locations; disabled with "Quit InDesign first" while an Adobe app runs; shows size], Microsoft Office [its containers are protected by macOS: never look inside until the user ticks it and clicks Clear; row says "macOS asks for permission"]. App caches go to the Trash. Afterwards rebuild Point's font list; offer "Restart Now…" only when macOS caches were cleared. Settings → General also has "Point’s font list: Rebuild".
+Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macOS (my account) [`atsutil databases -removeUser` + restart fontd], macOS (all users) [admin prompt via osascript; "Needs an administrator password"], Adobe apps [AdobeFnt*.lst and CT Font Cache locations; disabled with "Quit InDesign first" while an Adobe app runs; shows size], Microsoft Office [its containers are protected by macOS: never look inside until the user ticks it and clicks Clear; row says "macOS asks for permission"]. App caches go to the Trash. Afterwards rebuild Cicero's font list; offer "Restart Now…" only when macOS caches were cleared. Settings → General also has "Cicero’s font list: Rebuild".
 
 ## Settings
 
@@ -152,5 +152,5 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Data and privacy
 
-- Everything local: ~/Library/Application Support/Point (user data, Deactivated folder), ~/Library/Caches/Point (face and coverage caches). No network, no analytics.
+- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). No network, no analytics.
 - The rewrite reads the existing user data file (library.json, format described in the architecture doc) once and keeps working from its own file; the old file is never modified.

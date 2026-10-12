@@ -1,14 +1,14 @@
 # Architecture
 
-Point is a SwiftPM package with two targets and a test target.
+Cicero is a SwiftPM package with two targets and a test target.
 
 ```
-Sources/PointCore   fonts, the library, activation, coverage, user data — no UI
-Sources/Point       the app (SwiftUI); everything runs on the main actor by default
-Tests/PointCoreTests
+Sources/CiceroCore   fonts, the library, activation, coverage, user data — no UI
+Sources/Cicero       the app (SwiftUI); everything runs on the main actor by default
+Tests/CiceroCoreTests
 ```
 
-## PointCore
+## CiceroCore
 
 Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendable`.
 
@@ -46,8 +46,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 ## Rules of thumb
 
 - Views read precomputed values; anything that walks the whole library or reads files happens in
-  PointCore, off the main thread, and only when its inputs change.
+  CiceroCore, off the main thread, and only when its inputs change.
 - Views shown inside `Table` cells get the model passed in, not from the environment: AppKit can
   build cells outside SwiftUI's update.
-- Point never connects to the internet. Files it removes go to the Trash; it never deletes a
+- Cicero never connects to the internet. Files it removes go to the Trash; it never deletes a
   user's only copy of a font.
