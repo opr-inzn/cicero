@@ -20,7 +20,11 @@ struct SidebarView: View {
                 if editing || model.isVisible(section.key) {
                     let rows = model.rows(for: section)
                     Section(isExpanded: expansion(section)) {
-                        ForEach(shown(rows)) { row($0, section: section) }
+                        if section == .characterSets {
+                            characterSetGroups
+                        } else {
+                            ForEach(shown(rows)) { row($0, section: section) }
+                        }
                         if editing && rows.isEmpty {
                             Text("Nothing here yet")
                                 .foregroundStyle(.tertiary)
@@ -36,6 +40,23 @@ struct SidebarView: View {
         .animation(.snappy, value: editing)
         .contextMenu {
             Button(editing ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
+        }
+    }
+
+    /// Character sets in collapsible groups; a group whose sets are all hidden disappears.
+    private var characterSetGroups: some View {
+        ForEach(model.characterSetGroups, id: \.id) { group in
+            let rows = shown(group.rows)
+            if !rows.isEmpty {
+                DisclosureGroup(isExpanded: Binding(
+                    get: { model.isEditingSidebar || model.isGroupExpanded(group.id) },
+                    set: { if !model.isEditingSidebar { model.setGroupExpanded(group.id, $0) } }
+                )) {
+                    ForEach(rows) { row($0, section: .characterSets) }
+                } label: {
+                    Text(group.title).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

@@ -127,7 +127,7 @@ struct CharacterSetsRow: View {
         var best: [String: CharacterSetDefinition] = [:]
         var order: [String] = []
         let seriesIDs = Set(model.characterSetCatalog.groups.filter(\.isSeries).map(\.id))
-        for set in model.characterSets where ranges.missingCount(sorted: set.scalars) == 0 {
+        for set in model.characterSets where set.groupID != Self.unicodeGroupID && ranges.missingCount(sorted: set.scalars) == 0 {
             let series = set.isCustom ? set.id : seriesIDs.contains(set.groupID) ? set.groupID : String(set.id.split(separator: "-").dropLast().joined(separator: "-"))
             if best[series] == nil { order.append(series) }
             best[series] = set
@@ -135,11 +135,69 @@ struct CharacterSetsRow: View {
         return order.compactMap { best[$0] }
     }
 
+    static let unicodeGroupID = "unicode"
+
     private func nextLatin(after has: [CharacterSetDefinition], ranges: ScalarRanges) -> String? {
         guard let series = model.characterSetCatalog.groups.first(where: { $0.id == CharacterSetCatalog.latinSeriesID })?.sets else { return nil }
         let level = has.first { $0.groupID == CharacterSetCatalog.latinSeriesID }?.level ?? -1
         guard let next = series.first(where: { $0.level == level + 1 }) else { return nil }
         let missing = ranges.missingCount(sorted: next.scalars)
         return missing == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.formatted()) more characters"
+    }
+}
+
+/// Which Unicode blocks the face covers completely, with every block's coverage in a popover.
+struct UnicodeBlocksRow: View {
+    @Environment(AppModel.self) private var model
+    let face: FontFace
+    @State private var coverage: [(block: CharacterSetDefinition, has: Int)]?
+    @State private var showsAll = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Unicode Blocks").font(.caption).foregroundStyle(.secondary)
+            if let coverage {
+                let complete = coverage.filter { $0.has == $0.block.scalars.count }.map(\.block.name)
+                let partial = coverage.count { $0.has > 0 && $0.has < $0.block.scalars.count }
+                Text(complete.isEmpty ? "None complete" : "Complete: " + ListFormatter.localizedString(byJoining: complete))
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if partial > 0 {
+                    Text(partial == 1 ? "1 more block partly covered" : "\(partial) more blocks partly covered")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Show All") { showsAll = true }
+                    .controlSize(.small)
+                    .padding(.top, 2)
+                    .popover(isPresented: $showsAll, arrowEdge: .leading) { list(coverage) }
+            } else {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .task(id: face.id) {
+            coverage = nil
+            let ranges = await model.coverage.coverage(computing: face).scalars
+            let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
+            coverage = blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
+        }
+    }
+
+    private func list(_ coverage: [(block: CharacterSetDefinition, has: Int)]) -> some View {
+        List(coverage, id: \.block.id) { entry in
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(entry.block.name)
+                    Spacer()
+                    Text("\(entry.has) of \(entry.block.scalars.count)").monospacedDigit().foregroundStyle(.secondary)
+                }
+                ProgressView(value: Double(entry.has), total: Double(max(entry.block.scalars.count, 1)))
+                    .progressViewStyle(.linear)
+                    .controlSize(.mini)
+            }
+        }
+        .listStyle(.plain)
+        .frame(width: 320, height: 420)
     }
 }
