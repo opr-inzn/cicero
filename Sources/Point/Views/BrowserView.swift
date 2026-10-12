@@ -50,7 +50,20 @@ struct BrowserView: View {
     private func subtitle(for families: [FontFamily]) -> String {
         let activated = families.filter(\.hasActiveFaces).count
         let count = families.count == 1 ? "1 family" : "\(families.count.formatted()) families"
+        let coverage = CharacterCoverage.shared
+        if coverage.isIndexing && dependsOnCoverage {
+            return "\(count) · checking characters, \(coverage.indexedCount.formatted()) of \(coverage.totalCount.formatted())"
+        }
         return "\(count) · \(activated.formatted()) activated"
+    }
+
+    /// Whether the list can still grow while character coverage is being worked out.
+    private var dependsOnCoverage: Bool {
+        switch library.sidebarSelection {
+        case .characterSet: true
+        case .smartSet(let id): library.smartSet(id)?.rules.contains { $0.field == .language || $0.field == .characterSet } ?? false
+        default: false
+        }
     }
 
     // MARK: Empty states
@@ -83,6 +96,22 @@ struct BrowserView: View {
                 case .tag:
                     ContentUnavailableView("No Fonts with This Tag", systemImage: "tag",
                                            description: Text("Right-click a font and choose Tags to add it here."))
+                case .smartSet(let id):
+                    ContentUnavailableView {
+                        Label("No Matching Fonts", systemImage: "gearshape")
+                    } description: {
+                        Text("No fonts in your library match this smart set's rules.")
+                    } actions: {
+                        if let smartSet = library.smartSet(id) {
+                            Button("Edit Smart Set…") { library.editingSmartSet = smartSet }
+                        }
+                    }
+                case .characterSet(let id) where CharacterCoverage.shared.isIndexing:
+                    ContentUnavailableView("Checking Characters…", systemImage: "character.textbox",
+                                           description: Text("Fonts that have every character of \(library.characterSet(id)?.name ?? "this set") will show up here."))
+                case .characterSet(let id):
+                    ContentUnavailableView("No Fonts with Every Character", systemImage: "character.textbox",
+                                           description: Text("None of these fonts have all the characters in \(library.characterSet(id)?.name ?? "this set")."))
                 default:
                     ContentUnavailableView("No Fonts", systemImage: "textformat")
                 }

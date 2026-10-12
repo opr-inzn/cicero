@@ -136,6 +136,7 @@ private struct StackedCompare: View {
             }
             .padding(24)
         }
+        .defaultScrollAnchor(.topLeading, for: .alignment)
     }
 }
 

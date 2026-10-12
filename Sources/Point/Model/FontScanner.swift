@@ -6,6 +6,7 @@ struct ScannedFile: Sendable {
     var faces: [FontFace]
     var isActive: Bool
     var folderID: UUID?
+    var added: Date?
 }
 
 /// Finds every font file Point should know about: everything macOS has active, plus the watched folders.
@@ -74,8 +75,14 @@ enum FontScanner {
         }
 
         return paths.enumerated().map { i, path in
-            ScannedFile(path: path, faces: faces[i], isActive: entries[path]!.active, folderID: entries[path]!.folder)
+            ScannedFile(path: path, faces: faces[i], isActive: entries[path]!.active, folderID: entries[path]!.folder, added: dateAdded(path))
         }
+    }
+
+    /// When the file arrived in its folder, as Finder's Date Added shows it.
+    private static func dateAdded(_ path: String) -> Date? {
+        let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.addedToDirectoryDateKey, .creationDateKey])
+        return values?.addedToDirectoryDate ?? values?.creationDate
     }
 
     static func fontFiles(in directory: String) -> [String] {

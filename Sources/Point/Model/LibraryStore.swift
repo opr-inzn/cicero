@@ -6,17 +6,19 @@ enum SidebarSelection: Hashable {
     case all, active, inactive, system, problems
     case folder(UUID)
     case set(UUID)
+    case smartSet(UUID)
     case tag(String)
     case foundry(String)
     case classification(FontClassification)
+    case characterSet(String)
 }
 
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case folders, sets, tags, foundries, classifications
+    case folders, sets, tags, foundries, classifications, characterSets
 
     var id: String { rawValue }
     var key: String { "section.\(rawValue)" }
-    var title: String { rawValue.capitalized }
+    var title: String { self == .characterSets ? "Character Sets" : rawValue.capitalized }
 
     var icon: String {
         switch self {
@@ -25,6 +27,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .tags: "tag"
         case .foundries: "building.2"
         case .classifications: "textformat"
+        case .characterSets: "character.textbox"
         }
     }
 }
@@ -77,6 +80,9 @@ final class LibraryStore {
     var presentation = PresentationState()
 
     var data: UserLibraryData
+    @ObservationIgnored let characterSetIndex = CharacterSetIndex()
+    var editingSmartSet: SmartSet?
+    var editingCharacterSet: CustomCharacterSet?
 
     var sidebarSelection: SidebarSelection? = .all {
         didSet {
@@ -197,16 +203,18 @@ final class LibraryStore {
                 if let folder = file.folderID { builder.folders.insert(folder) }
                 // The same font can exist twice, e.g. an original in a watched folder and its installed copy.
                 if var existing = builder.faces[face.postScriptName] {
+                    let added = [existing.added, file.added].compactMap { $0 }.min()
                     if !existing.status.isActive && status.isActive {
                         builder.faces[face.postScriptName] = LibraryFace(
-                            face: face, status: status, otherPaths: existing.otherPaths + [existing.face.path]
+                            face: face, status: status, otherPaths: existing.otherPaths + [existing.face.path], added: added
                         )
                     } else {
                         existing.otherPaths.append(face.path)
+                        existing.added = added
                         builder.faces[face.postScriptName] = existing
                     }
                 } else {
-                    builder.faces[face.postScriptName] = LibraryFace(face: face, status: status)
+                    builder.faces[face.postScriptName] = LibraryFace(face: face, status: status, added: file.added)
                 }
                 builders[face.familyName] = builder
             }
@@ -231,7 +239,8 @@ final class LibraryStore {
                 faces: faces,
                 status: FontFamily.status(of: faces),
                 folderIDs: builder.folders,
-                manufacturer: manufacturer
+                manufacturer: manufacturer,
+                dateAdded: faces.compactMap(\.added).min()
             ))
         }
         result.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -303,12 +312,20 @@ final class LibraryStore {
         if case .set(let id) = selection {
             members = Set(data.sets.first { $0.id == id }?.familyNames ?? [])
         }
+        let smartSet: SmartSet? = if case .smartSet(let id) = selection { self.smartSet(id) } else { nil }
+        let characterSet: CharacterSetDefinition? = if case .characterSet(let id) = selection { self.characterSet(id) } else { nil }
         return families.filter { family in
             if let members {
                 guard members.contains(family.name) else { return false }
             } else {
                 if !data.showSystemFonts && family.status == .system && selection != .system { return false }
-                guard matches(family, selection) else { return false }
+                if let smartSet {
+                    guard matches(family, smartSet) else { return false }
+                } else if let characterSet {
+                    guard supports(family, characterSet: characterSet) == true else { return false }
+                } else {
+                    guard matches(family, selection) else { return false }
+                }
             }
             return query.isEmpty || (searchBlobs[family.name]?.contains(query) ?? false)
         }
@@ -323,6 +340,8 @@ final class LibraryStore {
         case .problems: false
         case .folder(let id): family.folderIDs.contains(id)
         case .set: true
+        case .smartSet(let id): smartSet(id).map { matches(family, $0) } ?? false
+        case .characterSet(let id): characterSet(id).flatMap { supports(family, characterSet: $0) } ?? false
         case .tag(let tag): tags(of: family).contains(tag)
         case .foundry(let name): foundryName(of: family) == name
         case .classification(let classification): family.classification == classification
@@ -370,10 +389,19 @@ final class LibraryStore {
 
     // MARK: Sidebar
 
-    func isVisible(_ key: String) -> Bool { !data.hiddenSidebarItems.contains(key) }
+    func isVisible(_ key: String) -> Bool {
+        if let id = Self.characterSetID(fromKey: key) { return data.shownCharacterSets.contains(id) }
+        return !data.hiddenSidebarItems.contains(key)
+    }
 
     func setVisible(_ key: String, _ visible: Bool) {
-        if visible { data.hiddenSidebarItems.remove(key) } else { data.hiddenSidebarItems.insert(key) }
+        if let id = Self.characterSetID(fromKey: key) {
+            if visible { data.shownCharacterSets.insert(id) } else { data.shownCharacterSets.remove(id) }
+        } else if visible {
+            data.hiddenSidebarItems.remove(key)
+        } else {
+            data.hiddenSidebarItems.insert(key)
+        }
         save()
         if !visible, let selection = sidebarSelection, !isSelectionVisible(selection) {
             sidebarSelection = firstVisibleSelection
@@ -425,6 +453,7 @@ final class LibraryStore {
             }
         case .sets:
             return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: "square.stack", selection: .set($0.id)) }
+                + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", selection: .smartSet($0.id)) }
         case .tags:
             return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: "tag", selection: .tag($0)) }
         case .foundries:
@@ -434,7 +463,15 @@ final class LibraryStore {
             return FontClassification.allCases.filter(present.contains).map {
                 SidebarRow(key: "classification.\($0.rawValue)", title: $0.rawValue, icon: $0.icon, selection: .classification($0))
             }
+        case .characterSets:
+            return characterSets.map {
+                SidebarRow(key: "charset.\($0.id)", title: $0.name, icon: $0.isCustom ? "character.cursor.ibeam" : "textformat.abc", selection: .characterSet($0.id))
+            }
         }
+    }
+
+    static func characterSetID(fromKey key: String) -> String? {
+        key.hasPrefix("charset.") ? String(key.dropFirst("charset.".count)) : nil
     }
 
     func isExpanded(_ section: SidebarSection) -> Bool { !data.collapsedSections.contains(section.rawValue) }
@@ -497,6 +534,7 @@ final class LibraryStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         data.sets.append(FontSet(name: trimmed, familyNames: families.map(\.name)))
+        data.hiddenSidebarItems.remove(SidebarSection.sets.key)
         save()
     }
 
@@ -549,6 +587,7 @@ final class LibraryStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if !data.tags.contains(trimmed) { data.tags.append(trimmed) }
+        data.hiddenSidebarItems.remove(SidebarSection.tags.key)
         if families.isEmpty { save() } else { setTag(trimmed, true, for: families) }
     }
 
