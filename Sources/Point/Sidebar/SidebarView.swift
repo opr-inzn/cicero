@@ -171,7 +171,7 @@ struct SidebarView: View {
                         Text("Not activated until you activate them").tag("")
                         Text("Active in Adobe apps").tag("Adobe")
                         if let custom = folder.appName, custom != "Adobe" {
-                            Text("Active in \(custom) apps").tag(custom)
+                            Text("Active in \(FaceState.appDescription(custom))").tag(custom)
                         }
                     }
                     Button("Remove Folder from Library") { model.removeFolder(id) }

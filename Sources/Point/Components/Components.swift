@@ -69,7 +69,7 @@ struct ActivationSwitch: View {
     private var help: String {
         switch family.state {
         case .system: "Installed with macOS"
-        case .appOnly(let app): "On in \(app) apps only. Turn on to use it in every app."
+        case .appOnly(let app): "On in \(FaceState.appDescription(app)) only. Turn on to use it in every app."
         default: family.hasActive ? "Deactivate" : "Activate"
         }
     }
