@@ -100,6 +100,222 @@ public struct Problem: Identifiable, Hashable, Sendable {
 public enum ProblemDetector {
     /// Finds problems in the library. Reads font versions from disk for the files involved, so call it off the main thread.
     public static func detect(in library: Library, data: UserData, locations: Locations) -> [Problem] {
-        fatalError("Implemented in PointCore")
+        var context = Context(library: library, data: data, locations: locations)
+        var problems = conflicts(&context) + duplicates(&context) + missing(&context) + unreadable(&context) + external(&context)
+        let order = Dictionary(uniqueKeysWithValues: ProblemKind.allCases.enumerated().map { ($1, $0) })
+        problems.sort { a, b in
+            if a.kind != b.kind { return order[a.kind]! < order[b.kind]! }
+            switch a.title.localizedStandardCompare(b.title) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return a.id < b.id
+            }
+        }
+        return problems
+    }
+
+    private struct Context {
+        let library: Library
+        let data: UserData
+        let locations: Locations
+        private var versions: [String: String?] = [:]
+
+        init(library: Library, data: UserData, locations: Locations) {
+            self.library = library
+            self.data = data
+            self.locations = locations
+        }
+
+        mutating func file(_ path: String) -> ProblemFile {
+            ProblemFile(path: path, version: version(of: path), modified: Self.modified(path), detail: detail(of: path))
+        }
+
+        mutating func version(of path: String) -> String? {
+            if let known = versions[path] { return known }
+            let version = FontFileReader.faces(atPath: path).first?.version
+            versions[path] = version
+            return version
+        }
+
+        static func modified(_ path: String) -> Date? {
+            try? URL(fileURLWithPath: path).resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }
+
+        func detail(of path: String) -> String {
+            if library.activePaths.contains(path) {
+                switch LibraryScanner.activeSource(of: path, locations: locations, records: data.records) {
+                case .macOS: return "Comes with macOS"
+                case .allUsers: return "Installed for all users"
+                case .app: return "Comes with an app"
+                case .adobeFonts: return "Adobe Fonts"
+                case .fontsFolder: return "In your Fonts folder"
+                case .inPlace: return "Used where it is"
+                case .temporary(.untilQuit): return "Active until Point quits"
+                case .temporary(.untilLogout): return "Active until you log out"
+                case .otherApp: return "Activated by another app"
+                }
+            }
+            if path.hasPrefix(locations.deactivated.path + "/") { return "In Point’s Deactivated folder" }
+            if let folder = data.folders.first(where: { path.hasPrefix($0.path + "/") }) { return "In \(folder.displayName)" }
+            return "Not activated"
+        }
+
+        func isInWatchedFolder(_ path: String) -> Bool {
+            path.hasPrefix(locations.deactivated.path + "/") || data.folders.contains { path.hasPrefix($0.path + "/") }
+        }
+
+        /// "Version 2.001" → 2.001, for picking the newest copy.
+        func versionNumber(of path: String) -> Double {
+            guard let version = versions[path] ?? nil else { return 0 }
+            let digits = version.drop { !$0.isNumber }.prefix { $0.isNumber || $0 == "." }
+            return Double(digits.trimmingCharacters(in: CharacterSet(charactersIn: "."))) ?? 0
+        }
+    }
+
+    // MARK: Conflicts
+
+    /// The same PostScript name active from more than one file, grouped by family.
+    private static func conflicts(_ context: inout Context) -> [Problem] {
+        var problems: [Problem] = []
+        for family in context.library.families {
+            var paths: [String] = []
+            var styles = 0
+            var deactivatable: [String: FaceID] = [:]
+            for face in family.faces {
+                let active = ([face.face.path] + face.otherCopies).filter { context.library.activePaths.contains($0) }
+                guard active.count >= 2 else { continue }
+                styles += 1
+                for path in active where !paths.contains(path) { paths.append(path) }
+                if face.canDeactivate, deactivatable[face.face.path] == nil { deactivatable[face.face.path] = face.id }
+            }
+            guard !paths.isEmpty else { continue }
+            paths.sort()
+            var fileFixes: [String: [ProblemFix]] = [:]
+            for path in paths {
+                var fixes: [ProblemFix] = [.reveal(path)]
+                if let id = deactivatable[path] {
+                    fixes.append(.deactivate(id))
+                } else if !ActivationEngine.isProtected(path) {
+                    fixes.append(.trash([path]))
+                }
+                fileFixes[path] = fixes
+            }
+            problems.append(Problem(
+                id: "conflict.\(family.id)", kind: .conflicts, title: family.name,
+                summary: styles == 1 ? "Active from \(paths.count) files." : "\(styles) styles active from \(paths.count) files.",
+                files: paths.map { context.file($0) }, fixes: [], fileFixes: fileFixes
+            ))
+        }
+        return problems
+    }
+
+    // MARK: Duplicates
+
+    /// The same font more than once among the inactive files in the user's folders.
+    private static func duplicates(_ context: inout Context) -> [Problem] {
+        var problems: [Problem] = []
+        let origins = Set(context.data.records.installedCopies.values)
+        for family in context.library.families {
+            var paths: [String] = []
+            var keep = Set<String>()
+            var styles = 0
+            for face in family.faces {
+                let copies = ([face.face.path] + face.otherCopies).filter { !context.library.activePaths.contains($0) && context.isInWatchedFolder($0) }
+                guard copies.count >= 2 else { continue }
+                styles += 1
+                for path in copies where !paths.contains(path) { paths.append(path) }
+                for path in copies { _ = context.version(of: path) }
+                let kept = copies.first { origins.contains($0) } ?? copies.max { a, b in
+                    let (va, vb) = (context.versionNumber(of: a), context.versionNumber(of: b))
+                    if va != vb { return va < vb }
+                    return (Context.modified(a) ?? .distantPast) < (Context.modified(b) ?? .distantPast)
+                }!
+                keep.insert(kept)
+            }
+            guard !paths.isEmpty else { continue }
+            paths.sort()
+            let extras = paths.filter { !keep.contains($0) && !ActivationEngine.isProtected($0) }
+            problems.append(Problem(
+                id: "duplicate.\(family.id)", kind: .duplicates, title: family.name,
+                summary: styles == 1 ? "In \(paths.count) files." : "\(styles) styles in \(paths.count) files.",
+                files: paths.map { context.file($0) },
+                fixes: extras.isEmpty ? [] : [.trash(extras)],
+                fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal($0)]) })
+            ))
+        }
+        return problems
+    }
+
+    // MARK: Missing
+
+    private static func missing(_ context: inout Context) -> [Problem] {
+        let fm = FileManager.default
+        var problems: [Problem] = []
+        for path in context.data.records.inPlace.sorted() where !fm.fileExists(atPath: path) {
+            problems.append(Problem(
+                id: "missing.inplace.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
+                summary: "Used where it was.",
+                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Used where it was")],
+                fixes: [.forgetInPlace(path)], fileFixes: [:]
+            ))
+        }
+        for (path, origin) in context.data.records.installedCopies.sorted(by: { $0.key < $1.key }) where !fm.fileExists(atPath: path) {
+            problems.append(Problem(
+                id: "missing.copy.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
+                summary: "Installed from “\((origin as NSString).lastPathComponent)”.",
+                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Was in your Fonts folder")],
+                fixes: [.forgetInstalledCopy(path)], fileFixes: [:]
+            ))
+        }
+        for set in context.data.sets {
+            for family in set.families where context.library.family(family) == nil {
+                problems.append(Problem(
+                    id: "missing.set.\(set.id.uuidString).\(family)", kind: .missing, title: family,
+                    summary: "In the set “\(set.name)”, but not in the library.",
+                    files: [], fixes: [.removeFromSet(set.id, family: family)], fileFixes: [:]
+                ))
+            }
+        }
+        return problems
+    }
+
+    // MARK: Unreadable
+
+    private static func unreadable(_ context: inout Context) -> [Problem] {
+        context.library.unreadableFiles.filter { !["woff", "woff2"].contains(($0 as NSString).pathExtension.lowercased()) }.map { path in
+            var fixes: [ProblemFix] = [.reveal(path)]
+            if !ActivationEngine.isProtected(path) { fixes.append(.trash([path])) }
+            return Problem(
+                id: "unreadable.\(path)", kind: .unreadable, title: (path as NSString).lastPathComponent,
+                summary: context.detail(of: path) + ".",
+                files: [ProblemFile(path: path, version: nil, modified: Context.modified(path), detail: context.detail(of: path))],
+                fixes: fixes, fileFixes: [:]
+            )
+        }
+    }
+
+    // MARK: External
+
+    /// Fonts used in place from disks that can go away.
+    private static func external(_ context: inout Context) -> [Problem] {
+        var problems: [Problem] = []
+        for path in context.data.records.inPlace.sorted() {
+            guard let volume = externalVolumeName(of: path) else { continue }
+            let family = context.library.families.first { $0.faces.contains { $0.face.path == path } }
+            problems.append(Problem(
+                id: "external.\(path)", kind: .external, title: family?.name ?? (path as NSString).lastPathComponent,
+                summary: "Used where it is, on “\(volume)”.",
+                files: [context.file(path)], fixes: [.installCopy(path), .reveal(path)], fileFixes: [:]
+            ))
+        }
+        return problems
+    }
+
+    /// The volume's name when it's removable, external or on the network; nil for the Mac's own disk (or a missing file).
+    private static func externalVolumeName(of path: String) -> String? {
+        let keys: Set<URLResourceKey> = [.volumeIsRemovableKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsEjectableKey, .volumeLocalizedNameKey]
+        guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys) else { return nil }
+        let external = values.volumeIsRemovable == true || values.volumeIsEjectable == true || values.volumeIsInternal == false || values.volumeIsLocal == false
+        return external ? values.volumeLocalizedName ?? "an external disk" : nil
     }
 }
