@@ -1,11 +1,13 @@
-import PointCore
 import SwiftUI
 
-// Placeholder until the real view lands.
 struct SettingsWindow: View {
-    
-
     var body: some View {
-        Text("SettingsWindow")
+        TabView {
+            Tab("General", systemImage: "gearshape") { GeneralSettings() }
+            Tab("Folders", systemImage: "folder") { FoldersSettings() }
+            Tab("Sidebar", systemImage: "sidebar.leading") { SidebarSettings() }
+            Tab("Character Sets", systemImage: "character.textbox") { CharacterSetsSettings() }
+        }
+        .frame(width: 560, height: 580)
     }
 }
