@@ -66,6 +66,14 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
 
     public var path: String { id.path }
     public var url: URL { URL(fileURLWithPath: id.path, isDirectory: false) }
+
+    /// "Version 1.001;FEAKit 1.0" → "1.001": the version string without its label or build notes.
+    public static func displayVersion(_ version: String) -> String {
+        var value = version.trimmingCharacters(in: .whitespaces)
+        if value.lowercased().hasPrefix("version ") { value = String(value.dropFirst("version ".count)) }
+        if let end = value.firstIndex(of: ";") { value = String(value[..<end]) }
+        return value.trimmingCharacters(in: .whitespaces)
+    }
 }
 
 // MARK: - State

@@ -77,6 +77,8 @@ struct FontList: View {
                     text: preview.text(for: row.family), face: row.family.face(nearestWeight: preview.weight).face,
                     size: 17, weight: preview.weight, features: model.features(for: row.family), kerning: preview.kerning(at: 17)
                 )
+                // Every row the same height, however tall the font's glyphs.
+                .frame(height: 22)
             }
             .width(min: 160, ideal: 380)
             .customizationID("preview")

@@ -16,10 +16,7 @@ public struct FontInfo: Sendable {
         func name(_ key: CFString) -> String? {
             (CTFontCopyName(font, key) as String?)?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        var version = name(kCTFontVersionNameKey) ?? face.version
-        if let value = version, value.lowercased().hasPrefix("version ") {
-            version = value.dropFirst("version ".count).trimmingCharacters(in: .whitespaces)
-        }
+        let version = (name(kCTFontVersionNameKey) ?? face.version).map(FontFace.displayVersion)
         let rows: [(String, String?)] = [
             ("Family", name(kCTFontFamilyNameKey) ?? face.familyName),
             ("Style", name(kCTFontSubFamilyNameKey) ?? face.styleName),

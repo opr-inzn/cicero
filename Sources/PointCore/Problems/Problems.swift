@@ -196,7 +196,8 @@ public enum ProblemDetector {
                 for path in active where !paths.contains(path) { paths.append(path) }
                 if face.canDeactivate, deactivatable[face.face.path] == nil { deactivatable[face.face.path] = face.id }
             }
-            guard !paths.isEmpty else { continue }
+            // Copies that all come with macOS are macOS's business: there's nothing to do about them.
+            guard !paths.isEmpty, !paths.allSatisfy(ActivationEngine.isProtected) else { continue }
             paths.sort()
             var fileFixes: [String: [ProblemFix]] = [:]
             for path in paths {
@@ -238,7 +239,7 @@ public enum ProblemDetector {
             }
         }
         var groups: [[String]: (names: [(String, Int)], files: [String: FaceID?])] = [:]
-        for (name, clash) in clashes where clash.families.count >= 2 {
+        for (name, clash) in clashes where clash.families.count >= 2 && !clash.files.keys.allSatisfy(ActivationEngine.isProtected) {
             var group = groups[clash.families] ?? ([], [:])
             group.names.append((name, clash.weight))
             group.files.merge(clash.files) { known, new in Self.first(known, new) }

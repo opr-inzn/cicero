@@ -69,7 +69,8 @@ struct CharacterSetsSettings: View {
                 }
             }
             .listStyle(.bordered)
-            .alternatingRowBackgrounds()
+            // No stripes behind the empty-state note.
+            .alternatingRowBackgrounds(model.data.customCharacterSets.isEmpty ? .disabled : .enabled)
             .frame(height: 110)
             .overlay {
                 if model.data.customCharacterSets.isEmpty {

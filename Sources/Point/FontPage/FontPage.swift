@@ -210,6 +210,8 @@ private struct StylesTab: View {
             }
             .width(min: 140, ideal: 210)
         }
+        // A family has a handful of styles: stripes would mostly fill the empty space below them.
+        .alternatingRowBackgrounds(.disabled)
         .contextMenu(forSelectionType: FaceID.self) { ids in
             if let id = ids.first, let style = family.faces.first(where: { $0.id == id }) {
                 StyleMenu(family: family, face: style, model: model)

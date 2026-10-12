@@ -78,13 +78,17 @@ private struct TextTab: View {
             if query.text.isEmpty {
                 ContentUnavailableView("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
                                        description: Text("Type or paste text, and Point lists the fonts that have every character in it."))
+                    .frame(maxHeight: .infinity)
             } else if matches.isEmpty && !isSearching {
                 ContentUnavailableView("No Fonts Have Every Character", systemImage: "character.textbox",
                                        description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
+                    .frame(maxHeight: .infinity)
             } else {
                 table
             }
         }
+        // Keeps the controls at the top while the empty states fill the space below.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: query) { await search(query) }
     }
 
@@ -131,6 +135,7 @@ private struct TextTab: View {
                     text: sample, face: match.family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
                     features: model.features(for: match.family), kerning: preview.kerning(at: 17)
                 )
+                .frame(height: 22)
             }
             .width(min: 200, ideal: 460)
 
