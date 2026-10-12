@@ -201,15 +201,14 @@ private struct StylesTab: View {
             }
             .width(min: 50, ideal: 60)
             TableColumn("Status") { style in
-                Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .width(min: 100, ideal: 170)
-            TableColumn("On") { style in
-                MiniSwitch(isOn: style.state.isActive, isEnabled: style.canActivate || style.canDeactivate) {
-                    style.state.isActive ? model.deactivate([style]) : model.activate([style], title: "\(family.name) \(style.face.styleName)")
+                HStack(spacing: 8) {
+                    MiniSwitch(isOn: style.state.isActive, isEnabled: style.canActivate || style.canDeactivate) {
+                        style.state.isActive ? model.deactivate([style]) : model.activate([style], title: "\(family.name) \(style.face.styleName)")
+                    }
+                    Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-            .width(34)
+            .width(min: 140, ideal: 210)
         }
         .contextMenu(forSelectionType: FaceID.self) { ids in
             if let id = ids.first, let style = family.faces.first(where: { $0.id == id }) {

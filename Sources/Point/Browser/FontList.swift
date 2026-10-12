@@ -56,11 +56,11 @@ struct FontList: View {
         let model = self.model
         let rows = families.map { FontRow($0, model: model) }.sorted(using: sortOrder)
         Table(rows, selection: $bindable.selectedIDs, sortOrder: $sortOrder, columnCustomization: $columns) {
-            TableColumn("On", value: \.activation) { row in
+            TableColumn("Status", value: \.activation) { row in
                 ActivationSwitch(family: row.family, model: model)
             }
-            .width(34)
-            .customizationID("on")
+            .width(min: 52, ideal: 56, max: 64)
+            .customizationID("status")
 
             TableColumn("Name", value: \.name, comparator: .localizedStandard) { row in
                 HStack(spacing: 6) {
