@@ -7,14 +7,11 @@ struct BrowserView: View {
     @AppStorage("browser.mode") private var mode: BrowserMode = .grid
 
     var body: some View {
-        Group {
-            if model.selection == .problems {
-                ProblemsView()
-            } else {
-                browser
-            }
+        if model.selection == .problems {
+            ProblemsView()
+        } else {
+            browser
         }
-        .modifier(InfoPanelColumn())
     }
 
     private var browser: some View {

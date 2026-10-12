@@ -17,8 +17,10 @@ struct SpecimenList: View {
                             .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
                     }
                 }
+                .scrollTargetLayout()
                 .padding(.vertical, 10)
             }
+            .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
             .focused($focused)
