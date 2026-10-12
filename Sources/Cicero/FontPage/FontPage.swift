@@ -1,22 +1,9 @@
 import CiceroCore
 import SwiftUI
 
-enum FontPageTab: String, CaseIterable {
-    case text, styles, glyphs
-
-    var title: String {
-        switch self {
-        case .text: "Text"
-        case .styles: "Styles"
-        case .glyphs: "Glyphs"
-        }
-    }
-}
-
-/// One family's page, pushed over the browser.
+/// One family's page, pushed over the browser: a type tester, every style, then the glyphs, one under the other.
 struct FontPage: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("fontPage.tab") private var tab: FontPageTab = .text
     let familyID: String
 
     var body: some View {
@@ -30,40 +17,27 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        VStack(spacing: 0) {
-            Header(family: family)
-            Divider()
-            switch shownTab(family) {
-            case .text: TextTab(family: family)
-            case .styles: StylesTab(family: family)
-            case .glyphs: GlyphsTab(family: family)
+        ScrollView {
+            // Lazy for the glyphs, which can run to thousands of cells; their block headers stay pinned.
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                Header(family: family)
+                Divider()
+                TypeTester(family: family)
+                // With one style the tester already shows it.
+                if family.faces.count > 1 {
+                    StyleRows(family: family)
+                }
+                GlyphsSection(family: family)
             }
         }
         .background(Color.canvas)
         .navigationTitle(family.name)
         .toolbar {
-            ToolbarItem {
-                Picker("View", selection: Binding(get: { shownTab(family) }, set: { tab = $0 })) {
-                    ForEach(tabs(family), id: \.self) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-            ToolbarSpacer(.fixed)
             ToolbarItem { PreviewOptionsButton() }
             ToolbarSpacer(.fixed)
             ToolbarItem { InfoButton() }
         }
         .onExitCommand { model.openFamilyID = nil }
-    }
-
-    /// Styles only has something to show when there's more than one.
-    private func tabs(_ family: Family) -> [FontPageTab] {
-        family.faces.count > 1 ? FontPageTab.allCases : [.text, .glyphs]
-    }
-
-    private func shownTab(_ family: Family) -> FontPageTab {
-        tabs(family).contains(tab) ? tab : .text
     }
 }
 
@@ -123,7 +97,7 @@ private struct Header: View {
 }
 
 /// A large, editable sample in one style.
-private struct TextTab: View {
+private struct TypeTester: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
@@ -163,58 +137,90 @@ private struct TextTab: View {
                 .fixedSize()
                 .help("Align left or center")
             }
-            .padding(.horizontal, 24)
             .padding(.top, 12)
-            TextEditor(text: $text)
-                .font(Font(FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family))))
-                .kerning(preview.kerning(at: size))
-                .multilineTextAlignment(centered ? .center : .leading)
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, 24)
+            let font = Font(FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family)))
+            let kerning = preview.kerning(at: size)
+            let alignment: TextAlignment = centered ? .center : .leading
+            // An invisible copy of the text sets the editor's height, so it grows with the page instead of
+            // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
+            Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
+                .font(font)
+                .kerning(kerning)
+                .multilineTextAlignment(alignment)
+                .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
+                .padding(.horizontal, 5)
+                .hidden()
+                .overlay {
+                    TextEditor(text: $text)
+                        .font(font)
+                        .kerning(kerning)
+                        .multilineTextAlignment(alignment)
+                        .scrollContentBackground(.hidden)
+                        .scrollDisabled(true)
+                }
+                .frame(minHeight: 280)
                 .padding(.vertical, 20)
         }
+        .padding(.horizontal, 24)
     }
 }
 
-/// Every style with its own switch.
-private struct StylesTab: View {
+/// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
+/// rather than with the page.
+private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    @State private var selection: Set<FaceID> = []
 
     var body: some View {
         let model = self.model
         let features = model.features(for: family)
-        Table(family.faces, selection: $selection) {
-            TableColumn("Preview") { style in
-                FontText(text: preview.text(for: family), face: style.face, size: 20, weight: Double(style.face.weight), features: features)
+        VStack(spacing: 0) {
+            row {
+                Text("Preview")
+            } style: {
+                Text("Style")
+            } weight: {
+                Text("Weight")
+            } status: {
+                Text("Status")
             }
-            .width(min: 200, ideal: 420)
-            TableColumn("Style") { style in
-                Text(style.face.styleName)
-            }
-            .width(min: 90, ideal: 140)
-            TableColumn("Weight") { style in
-                Text("\(style.face.weight)").monospacedDigit().foregroundStyle(.secondary)
-            }
-            .width(min: 50, ideal: 60)
-            TableColumn("Status") { style in
-                HStack(spacing: 8) {
-                    MiniSwitch(position: style.position, isEnabled: style.canActivate || style.canDeactivate) {
-                        model.toggle(style, in: family)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 6)
+            ForEach(family.faces) { style in
+                Divider()
+                row {
+                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: Double(style.face.weight), features: features)
+                } style: {
+                    Text(style.face.styleName)
+                } weight: {
+                    Text("\(style.face.weight)").monospacedDigit().foregroundStyle(.secondary)
+                } status: {
+                    HStack(spacing: 8) {
+                        MiniSwitch(position: style.position, isEnabled: style.canActivate || style.canDeactivate) {
+                            model.toggle(style, in: family)
+                        }
+                        Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
                 }
+                .padding(.vertical, 8)
+                .contentShape(.rect)
+                .contextMenu { StyleMenu(family: family, face: style, model: model) }
             }
-            .width(min: 140, ideal: 210)
+            Divider()
         }
-        // A family has a handful of styles: stripes would mostly fill the empty space below them.
-        .alternatingRowBackgrounds(.disabled)
-        .contextMenu(forSelectionType: FaceID.self) { ids in
-            if let id = ids.first, let style = family.faces.first(where: { $0.id == id }) {
-                StyleMenu(family: family, face: style, model: model)
-            }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+    }
+
+    private func row(@ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
+                     @ViewBuilder weight: () -> some View, @ViewBuilder status: () -> some View) -> some View {
+        HStack(spacing: 12) {
+            preview().frame(maxWidth: .infinity, alignment: .leading)
+            style().lineLimit(1).frame(width: 140, alignment: .leading)
+            weight().frame(width: 56, alignment: .leading)
+            status().frame(width: 210, alignment: .leading)
         }
     }
 }
