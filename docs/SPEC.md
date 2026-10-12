@@ -14,7 +14,6 @@ ellipsis character (…) for items that ask for more input.
 2. **Settings** — tabs General, Folders, Sidebar, Character Sets.
 3. **Character Toolbox** (⌥⌘T) — tabs Text and Languages.
 4. **Compare** (⌥⌘C).
-5. **Slideshow** (⌥⌘S) — full screen.
 
 ## Sidebar
 
@@ -31,7 +30,7 @@ ellipsis character (…) for items that ask for more input.
   - **Tags** (+). Menu: Rename Tag…, Delete Tag.
   - **Foundries**. Menu: Rename Foundry…
   - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
-  - **Character Sets** (+ new custom set). Only sets switched on in Settings → Character Sets (default Latin S, M, L, XL) plus custom ones. Menu for custom: Edit Character Set…, Delete Character Set.
+  - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Unicode Blocks, Google Fonts, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - Every row menu also has Hide from Sidebar and Edit Sidebar.
 - Dropping family names (drag from the browser) onto a set, tag or foundry adds them.
 - Creating a set, tag or character set un-hides its section.
@@ -41,8 +40,8 @@ ellipsis character (…) for items that ask for more input.
 
 - Title = selected item's name; subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right with equal gaps (ToolbarSpacer(.fixed) between groups): view switcher
-  [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Slideshow play.rectangle, Preview Options textformat.size] · [Info info.circle] · native search field.
-- **List** (SwiftUI Table, sortable, column customisation saved): On (switch) · Name (+ status tag) ·
+  [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field.
+- **List** (SwiftUI Table, sortable, column customisation saved): Status (switch) · Name (+ status tag) ·
   Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL (largest of
   Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) · Format (hidden).
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
@@ -61,8 +60,8 @@ ellipsis character (…) for items that ask for more input.
 - Toolbar: tabs [Text | Styles (only when the family has more than one style) | Glyphs] · Preview Options · Info.
 - Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate; locked families get a disabled Deactivate with the reason as tooltip.
 - **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center, a big editable text (default "Sphinx of black quartz, judge my vow."), remembered.
-- **Styles**: table of styles — preview, style name, weight, status, per-style switch; right-click → style menu.
-- **Glyphs**: filter field (character, Unicode name or U+ code), sections with counts (Latin, Numbers, Symbols & punctuation, other scripts…), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
+- **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Point quits"); right-click → style menu.
+- **Glyphs**: filter field (character, Unicode name or U+ code), one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
 ## Info panel (trailing column, 300 pt wide, starts below the toolbar, toggled by ⓘ / ⌘I)
 
@@ -79,8 +78,8 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N.
 - **View**: Edit Sidebar / Done Editing Sidebar, Show System Fonts ⇧⌘. (checkmark).
-- **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Point Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Slideshow ⌥⌘S, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
-- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Tags ▸ (toggles, New Tag…); Reveal in Finder; Copy Family Name(s); Compare / Slideshow; Open; Show Info; Move to Trash…
+- **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Point Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
+- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Tags ▸ (toggles, New Tag…); Reveal in Finder; Copy Family Name(s); Compare; Open; Show Info; Move to Trash…
 - **Style menu**: status label, Activate Style…, Activate Temporarily ▸, Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
 
 ## Library and fonts
@@ -111,8 +110,8 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 - Sets: ordered lists of family names. Tags: names in sidebar order; family → tags.
 - Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
-- Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
-- Settings → Character Sets: groups with checkboxes (show in sidebar), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
+- Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
+- Settings → Character Sets: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
 
 ## Coverage and languages
 
@@ -128,9 +127,6 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a shared baseline, name + style + remove button under each) and Overlay (all samples drawn over each other in tints, x-height/cap-height ticks, legend chips with remove). Uses the preview sample (or "Hamburgefonstiv"), size, weight, spacing; Preview Options in its toolbar; drop families from the main window; choosing Compare again replaces the set. Content starts top-left.
 
-## Slideshow
-
-Full-screen window: name, foundry, style count, status; the sample (or family name) as large as fits; a strip of styles; ←/→/Space navigate, P play/pause (2/3/5/10/20 s), A activate/deactivate, Esc closes; glass control capsule that fades after 2.5 s idle. Shows the selection, or the whole current list when 0–1 selected.
 
 ## Problems
 

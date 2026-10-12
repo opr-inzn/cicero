@@ -15,7 +15,7 @@ First release.
 - Sets, smart sets with rules, tags, foundries, and automatic classifications read from each font.
 - Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, and your own; filter by them in the sidebar and sort the list by them.
 - Character Toolbox: find fonts that have every character of a text or support one of 780 languages.
-- Compare fonts on a shared baseline or overlaid, and present them in a full-screen slideshow.
+- Compare fonts on a shared baseline or overlaid.
 - A Problems view for conflicting, missing, damaged and duplicate fonts.
 - Watch folders of fonts without installing them; folders that only one app loads, like Adobe's Fonts folder, are marked for that app.
 - System Fonts item, with an option to keep macOS fonts out of your other lists.

@@ -99,6 +99,16 @@ public struct ActivationEngine: Sendable {
         fatalError("Implemented in PointCore")
     }
 
+    /// Stops using a file registered in place (e.g. one whose file is gone) and forgets it.
+    public func forgetInPlace(_ path: String, records: ActivationRecords) async -> ActivationRecords {
+        fatalError("Implemented in PointCore")
+    }
+
+    /// Copies a font used in place into ~/Library/Fonts, then stops using the original in place.
+    public func installCopy(of face: LibraryFace, records: ActivationRecords) async -> ActivationResult {
+        fatalError("Implemented in PointCore")
+    }
+
     /// At launch: forgets temporary activations from an earlier login session and unregisters
     /// "until Point quits" ones left behind by a crash.
     public func reconcileTemporary(_ records: ActivationRecords) async -> ActivationRecords {

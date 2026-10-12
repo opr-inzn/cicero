@@ -1,0 +1,110 @@
+import PointCore
+import SwiftUI
+
+@main
+struct PointApp: App {
+    @State private var model = AppModel()
+    @State private var preview = PreviewSettings()
+
+    var body: some Scene {
+        Window("Point", id: WindowID.main) {
+            MainWindow()
+                .environment(model)
+                .environment(preview)
+                .frame(minWidth: 960, minHeight: 600)
+                .onAppear {
+                    Appearance.applySaved()
+                    model.start()
+                }
+        }
+        .defaultSize(width: 1440, height: 900)
+        .commands { PointCommands(model: model) }
+
+        Window("Character Toolbox", id: WindowID.toolbox) {
+            ToolboxWindow()
+                .environment(model)
+                .environment(preview)
+                .frame(minWidth: 760, minHeight: 480)
+        }
+        .defaultSize(width: 1000, height: 660)
+
+        Window("Compare", id: WindowID.compare) {
+            CompareWindow()
+                .environment(model)
+                .environment(preview)
+        }
+        .defaultSize(width: 960, height: 640)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
+
+        Settings {
+            SettingsWindow()
+                .environment(model)
+                .environment(preview)
+        }
+    }
+}
+
+struct PointCommands: Commands {
+    let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .newItem) {
+            Button("Add Folder…") { model.presentAddFolderPanel() }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("New Set…") {
+                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("New Smart Set…") { model.editingSmartSet = SmartSet(name: "") }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+        }
+        CommandGroup(after: .sidebar) {
+            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
+                withAnimation(.snappy) { model.isEditingSidebar.toggle() }
+            }
+            Toggle("Show System Fonts", isOn: Binding(get: { model.data.showSystemFonts }, set: { model.data.showSystemFonts = $0 }))
+                .keyboardShortcut(".", modifiers: [.command, .shift])
+            Divider()
+        }
+        CommandMenu("Fonts") {
+            let selection = model.selectedFamilies
+            Button("Activate") { model.activate(selection) }
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!selection.contains(where: \.hasActivatable))
+            Menu("Activate Temporarily") {
+                ForEach(TemporaryScope.allCases, id: \.self) { scope in
+                    Button(scope.menuTitle) { model.activateTemporarily(selection, scope: scope) }
+                        .keyboardShortcut(scope == .untilQuit ? KeyboardShortcut(.return, modifiers: [.command, .option]) : nil)
+                }
+            }
+            .disabled(selection.isEmpty)
+            Button("Deactivate") { model.deactivate(selection) }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!selection.contains(where: \.hasDeactivatable))
+            Divider()
+            Button("Show Info") { model.toggleInfo() }
+                .keyboardShortcut("i", modifiers: .command)
+            Button("Reveal in Finder") { model.reveal(selection) }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(selection.isEmpty)
+            Button("Move to Trash…") { model.requestTrash(selection) }
+                .disabled(selection.isEmpty)
+            Divider()
+            Button("Compare") {
+                model.compare(selection)
+                openWindow(id: WindowID.compare)
+            }
+            .keyboardShortcut("c", modifiers: [.command, .option])
+            .disabled(selection.count < 2)
+            Button("Character Toolbox") { openWindow(id: WindowID.toolbox) }
+                .keyboardShortcut("t", modifiers: [.command, .option])
+            Divider()
+            Button("Rescan Library") { model.rescan() }
+                .keyboardShortcut("r", modifiers: .command)
+            Button("Rebuild Font List") { model.rebuildFontList() }
+            Button("Clear Font Caches…") { model.isClearingCaches = true }
+        }
+    }
+}
