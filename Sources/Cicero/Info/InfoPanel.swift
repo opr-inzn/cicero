@@ -99,11 +99,9 @@ private struct FamilyInfo: View {
             .labelsHidden()
             .padding(12)
             Divider()
-            ScrollView {
-                switch model.infoTab {
-                case .info: InfoRows(face: face)
-                case .features: FeatureControls(family: family, face: face.face)
-                }
+            switch model.infoTab {
+            case .info: ScrollView { InfoRows(face: face) }
+            case .features: FeatureControls(family: family, face: face.face)
             }
         }
     }
@@ -176,34 +174,29 @@ private struct FeatureControls: View {
     @State private var groups: [FontFeatureGroup]?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if let groups {
-                if groups.isEmpty {
-                    ContentUnavailableView("No Features", systemImage: "textformat.abc",
-                                           description: Text("This font has no optional OpenType features to switch on or off."))
-                }
-                ForEach(groups) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(group.name).font(.caption).foregroundStyle(.secondary)
-                        if group.isExclusive {
-                            Picker(group.name, selection: exclusive(group)) {
-                                ForEach(group.options) { Text($0.name).tag($0.selector) }
-                            }
-                            .labelsHidden()
-                            .fixedSize()
-                        } else {
+        Group {
+            if let groups, groups.isEmpty {
+                ContentUnavailableView("No Features", systemImage: "textformat.abc",
+                                       description: Text("This font has no optional OpenType features to switch on or off."))
+            } else if let groups {
+                // A box of switches per feature, like the system Typography panel.
+                Form {
+                    ForEach(groups) { group in
+                        Section(group.name) {
                             ForEach(group.options) { option in
-                                Toggle(option.name, isOn: toggle(group, option)).toggleStyle(.checkbox)
+                                Toggle(option.name, isOn: group.isExclusive ? choice(group, option) : toggle(group, option))
+                                    .toggleStyle(.switch)
                             }
                         }
                     }
                 }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
             } else {
                 ProgressView().controlSize(.small)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: face.id) {
             let face = face
             groups = await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
@@ -223,6 +216,18 @@ private struct FeatureControls: View {
                 var list = settings.filter { $0.type != group.type }
                 if selector != group.options.first(where: \.isDefault)?.selector { list.append(FeatureSetting(type: group.type, selector: selector)) }
                 set(list)
+            }
+        )
+    }
+
+    /// Exclusive features: switching an option on picks it; switching the picked one off goes back to the default.
+    private func choice(_ group: FontFeatureGroup, _ option: FontFeatureGroup.Option) -> Binding<Bool> {
+        let picked = exclusive(group)
+        let fallback = group.options.first(where: \.isDefault)?.selector ?? group.options[0].selector
+        return Binding(
+            get: { picked.wrappedValue == option.selector },
+            set: { on in
+                if on { picked.wrappedValue = option.selector } else if picked.wrappedValue == option.selector { picked.wrappedValue = fallback }
             }
         )
     }
