@@ -6,7 +6,7 @@ struct SettingsWindow: View {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Folders", systemImage: "folder") { FoldersSettings() }
             Tab("Sidebar", systemImage: "sidebar.leading") { SidebarSettings() }
-            Tab("Character Sets", systemImage: "character.textbox") { CharacterSetsSettings() }
+            Tab("Coverage", systemImage: "character.textbox") { CharacterSetsSettings() }
         }
         .frame(width: 560, height: 580)
     }

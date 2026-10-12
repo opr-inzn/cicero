@@ -54,9 +54,9 @@ public struct ProblemFile: Hashable, Sendable {
 
 /// Something the user can do about a problem. The app carries these out.
 public enum ProblemFix: Hashable, Sendable {
-    case reveal(String)
-    /// Deactivate this active copy (installed copies go to the Trash or the Deactivated folder).
-    case deactivate(FaceID)
+    case reveal([String])
+    /// Deactivate these active copies (installed copies go to the Trash or the Deactivated folder).
+    case deactivate([FaceID])
     /// Move these files to the Trash (never protected paths, never the only copy).
     case trash([String])
     /// Forget a missing in-place registration and unregister it.
@@ -91,8 +91,13 @@ public struct Problem: Identifiable, Hashable, Sendable {
     public var fixes: [ProblemFix]
     /// Fixes for single files, by path.
     public var fileFixes: [String: [ProblemFix]]
+    /// Fixes for all the files in a folder that holds more than one of them, by the folder's path.
+    public var folderFixes: [String: [ProblemFix]]
+    /// The folder with the newest version, when every other folder's files are older: usually the copy to keep.
+    public var newestFolder: String?
 
-    public init(id: String, kind: ProblemKind, title: String, summary: String, files: [ProblemFile], fixes: [ProblemFix], fileFixes: [String: [ProblemFix]]) {
+    public init(id: String, kind: ProblemKind, title: String, summary: String, files: [ProblemFile], fixes: [ProblemFix],
+                fileFixes: [String: [ProblemFix]], folderFixes: [String: [ProblemFix]] = [:], newestFolder: String? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -100,7 +105,29 @@ public struct Problem: Identifiable, Hashable, Sendable {
         self.files = files
         self.fixes = fixes
         self.fileFixes = fileFixes
+        self.folderFixes = folderFixes
+        self.newestFolder = newestFolder
     }
+
+    /// The files by the folder they're in, in order.
+    public var folders: [ProblemFolder] {
+        var folders: [ProblemFolder] = []
+        for file in files {
+            let path = (file.path as NSString).deletingLastPathComponent
+            if let index = folders.firstIndex(where: { $0.path == path }) {
+                folders[index].files.append(file)
+            } else {
+                folders.append(ProblemFolder(path: path, files: [file]))
+            }
+        }
+        return folders
+    }
+}
+
+/// The files of a problem that are in one folder.
+public struct ProblemFolder: Hashable, Sendable {
+    public var path: String
+    public var files: [ProblemFile]
 }
 
 public enum ProblemDetector {
@@ -174,11 +201,22 @@ public enum ProblemDetector {
             path.hasPrefix(locations.deactivated.path + "/") || folders.contains { path.hasPrefix($0.path + "/") }
         }
 
-        /// "Version 2.001" → 2.001, for picking the newest copy.
-        func versionNumber(of path: String) -> Double {
-            guard let version = versions[path] ?? nil else { return 0 }
-            let digits = version.drop { !$0.isNumber }.prefix { $0.isNumber || $0 == "." }
-            return Double(digits.trimmingCharacters(in: CharacterSet(charactersIn: "."))) ?? 0
+        /// "Version 2.001" → [2.001], "Version 5.01.2" → [5.01, 2], for picking the newest copy: compare with
+        /// `lexicographicallyPrecedes`. Empty when there's no version.
+        func versionNumber(of path: String) -> [Double] {
+            guard let version = versions[path] ?? nil else { return [] }
+            let parts = version.drop { !$0.isNumber }.prefix { $0.isNumber || $0 == "." }.split(separator: ".")
+            guard let major = parts.first else { return [] }
+            return [Double(parts.count > 1 ? "\(major).\(parts[1])" : String(major)) ?? 0] + parts.dropFirst(2).compactMap { Double($0) }
+        }
+
+        /// The folder whose files include the newest version, when every other folder's are all older.
+        func newestFolder(of paths: [String]) -> String? {
+            let ranked = Dictionary(grouping: paths) { ($0 as NSString).deletingLastPathComponent }
+                .mapValues { $0.map(versionNumber).max { $0.lexicographicallyPrecedes($1) } ?? [] }
+                .sorted { $1.value.lexicographicallyPrecedes($0.value) }
+            guard ranked.count > 1, ranked[1].value.lexicographicallyPrecedes(ranked[0].value) else { return nil }
+            return ranked[0].key
         }
     }
 
@@ -189,12 +227,12 @@ public enum ProblemDetector {
         var problems: [Problem] = []
         for family in context.library.families {
             var paths: [String] = []
-            var styles = 0
+            var copies: [[String]] = []
             var deactivatable: [String: FaceID] = [:]
             for face in family.faces {
                 let active = ([face.face.path] + face.otherCopies).filter { context.library.activePaths.contains($0) }
                 guard active.count >= 2 else { continue }
-                styles += 1
+                copies.append(active)
                 for path in active where !paths.contains(path) { paths.append(path) }
                 if face.canDeactivate, deactivatable[face.face.path] == nil { deactivatable[face.face.path] = face.id }
             }
@@ -203,18 +241,24 @@ public enum ProblemDetector {
             paths.sort()
             var fileFixes: [String: [ProblemFix]] = [:]
             for path in paths {
-                var fixes: [ProblemFix] = [.reveal(path)]
+                var fixes: [ProblemFix] = [.reveal([path])]
                 if let id = deactivatable[path] {
-                    fixes.append(.deactivate(id))
+                    fixes.append(.deactivate([id]))
                 } else if !ActivationEngine.isProtected(path) {
                     fixes.append(.trash([path]))
                 }
                 fileFixes[path] = fixes
             }
+            let files = paths.map { context.file($0) }
             problems.append(Problem(
                 id: "installedTwice.\(family.id)", kind: .installedTwice, title: family.name,
-                summary: styles == 1 ? "Active from \(paths.count) files." : "\(styles) styles active from \(paths.count) files.",
-                files: paths.map { context.file($0) }, fixes: [], fileFixes: fileFixes
+                summary: copies.count == 1 ? "Active from \(paths.count) files." : "\(copies.count) styles active from \(paths.count) files.",
+                files: files, fixes: [], fileFixes: fileFixes,
+                // Removing a folder's files at once must leave every style another copy.
+                folderFixes: folderFixes(paths, fileFixes) { folder in
+                    copies.allSatisfy { $0.contains { !folder.contains($0) } }
+                },
+                newestFolder: context.newestFolder(of: paths)
             ))
         }
         return problems
@@ -251,18 +295,47 @@ public enum ProblemDetector {
             let names = group.names.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0 < $1.0 }.map(\.0)
             let shown = names.count > 7 ? Array(names.prefix(6)) + ["\(names.count - 6) more"] : names
             let paths = group.files.keys.sorted()
+            let fileFixes = Dictionary(uniqueKeysWithValues: paths.map { path in
+                (path, [ProblemFix.reveal([path])] + ((group.files[path] ?? nil).map { [.deactivate([$0])] } ?? []))
+            })
             let summary = names.count == 1
                 ? "Named style \(names[0]) uses the same PostScript name in \(families.count == 2 ? "both" : "all of them")."
                 : "Named styles \(joined(shown)) use the same PostScript names in \(families.count == 2 ? "both" : "all of them")."
             return Problem(
                 id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
                 title: joined(families), summary: summary,
-                files: paths.map { context.file($0) }, fixes: [],
-                fileFixes: Dictionary(uniqueKeysWithValues: paths.map { path in
-                    (path, [ProblemFix.reveal(path)] + ((group.files[path] ?? nil).map { [.deactivate($0)] } ?? []))
-                })
+                files: paths.map { context.file($0) }, fixes: [], fileFixes: fileFixes,
+                // A folder can hold more than one of the fonts: deactivating all its files could turn off every one.
+                folderFixes: folderFixes(paths, fileFixes) { _ in false }
             )
         }
+    }
+
+    /// Reveal for each folder holding more than one of the paths, and the files' own Move to Trash or Deactivate
+    /// for all of them at once when every file has it and `canCombine` allows it for the folder's files.
+    private static func folderFixes(_ paths: [String], _ fileFixes: [String: [ProblemFix]], canCombine: (Set<String>) -> Bool) -> [String: [ProblemFix]] {
+        var result: [String: [ProblemFix]] = [:]
+        for (folder, files) in Dictionary(grouping: paths, by: { ($0 as NSString).deletingLastPathComponent }) where files.count > 1 {
+            var fixes: [ProblemFix] = [.reveal(files)]
+            var trash: [String] = []
+            var deactivate: [FaceID] = []
+            for fix in files.flatMap({ fileFixes[$0] ?? [] }) {
+                switch fix {
+                case .trash(let paths): trash += paths
+                case .deactivate(let ids): deactivate += ids
+                default: break
+                }
+            }
+            if canCombine(Set(files)) {
+                if trash.count == files.count {
+                    fixes.append(.trash(trash))
+                } else if deactivate.count == files.count {
+                    fixes.append(.deactivate(deactivate))
+                }
+            }
+            result[folder] = fixes
+        }
+        return result
     }
 
     private static func first(_ a: FaceID?, _ b: FaceID?) -> FaceID? {
@@ -294,7 +367,7 @@ public enum ProblemDetector {
                 for path in copies { _ = context.version(of: path) }
                 let kept = copies.first { origins.contains($0) } ?? copies.max { a, b in
                     let (va, vb) = (context.versionNumber(of: a), context.versionNumber(of: b))
-                    if va != vb { return va < vb }
+                    if va != vb { return va.lexicographicallyPrecedes(vb) }
                     return (Context.modified(a) ?? .distantPast) < (Context.modified(b) ?? .distantPast)
                 }!
                 keep.insert(kept)
@@ -307,7 +380,8 @@ public enum ProblemDetector {
                 summary: styles == 1 ? "In \(paths.count) files." : "\(styles) styles in \(paths.count) files.",
                 files: paths.map { context.file($0) },
                 fixes: extras.isEmpty ? [] : [.trash(extras)],
-                fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal($0)]) })
+                fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal([$0])]) }),
+                folderFixes: folderFixes(paths, [:]) { _ in false }
             ))
         }
         return problems
@@ -350,7 +424,7 @@ public enum ProblemDetector {
 
     private static func unreadable(_ context: inout Context) -> [Problem] {
         context.library.unreadableFiles.filter { !["woff", "woff2"].contains(($0 as NSString).pathExtension.lowercased()) }.map { path in
-            var fixes: [ProblemFix] = [.reveal(path)]
+            var fixes: [ProblemFix] = [.reveal([path])]
             if !ActivationEngine.isProtected(path) { fixes.append(.trash([path])) }
             return Problem(
                 id: "unreadable.\(path)", kind: .unreadable, title: (path as NSString).lastPathComponent,
@@ -372,7 +446,7 @@ public enum ProblemDetector {
             problems.append(Problem(
                 id: "external.\(path)", kind: .external, title: family?.name ?? (path as NSString).lastPathComponent,
                 summary: "Used where it is, on “\(volume)”.",
-                files: [context.file(path)], fixes: [.installCopy(path), .reveal(path)], fileFixes: [:]
+                files: [context.file(path)], fixes: [.installCopy(path), .reveal([path])], fileFixes: [:]
             ))
         }
         return problems
