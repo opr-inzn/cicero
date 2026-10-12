@@ -3,7 +3,7 @@ import CoreText
 import SwiftUI
 
 enum SidebarSelection: Hashable {
-    case all, active, inactive, system
+    case all, active, inactive, system, problems
     case folder(UUID)
     case set(UUID)
     case tag(String)
@@ -34,6 +34,8 @@ struct SidebarRow: Identifiable, Hashable {
     var title: String
     var icon: String
     var selection: SidebarSelection
+    /// A count shown at the trailing edge; zero shows nothing.
+    var badge = 0
 
     var id: String { key }
 }
@@ -65,6 +67,14 @@ final class LibraryStore {
     private(set) var isScanning = false
     private(set) var scanStatus = ""
     private(set) var hasScanned = false
+    /// Font files from the last scan that CoreText couldn't read.
+    private(set) var unreadableFiles: [String] = []
+    /// Every file path macOS currently has active.
+    private(set) var activePaths: Set<String> = []
+    /// Trouble found in the library (see ProblemFinder); refreshed after each scan.
+    var problems: [FontProblem] = []
+    /// Families shown by the Compare and Slideshow windows.
+    var presentation = PresentationState()
 
     var data: UserLibraryData
 
@@ -235,9 +245,12 @@ final class LibraryStore {
         }
         selectedFamilyIDs = selectedFamilyIDs.filter { familyIndex[$0] != nil }
         if let detail = detailFamilyID, familyIndex[detail] == nil { detailFamilyID = nil }
+        unreadableFiles = files.filter { $0.faces.isEmpty }.map(\.path)
+        activePaths = Set(files.lazy.filter(\.isActive).map(\.path))
+        refreshProblems()
     }
 
-    private func activeKind(of path: String, userFonts: String) -> ActiveKind {
+    func activeKind(of path: String, userFonts: String) -> ActiveKind {
         if path.hasPrefix("/System/") || path.hasPrefix("/Library/Application Support/Apple/") {
             return .system
         }
@@ -306,6 +319,7 @@ final class LibraryStore {
         case .active: family.hasActiveFaces
         case .inactive: family.faces.contains { $0.status == .inactive }
         case .system: family.status == .system
+        case .problems: false
         case .folder(let id): family.folderIDs.contains(id)
         case .set: true
         case .tag(let tag): tags(of: family).contains(tag)
@@ -394,6 +408,7 @@ final class LibraryStore {
             SidebarRow(key: "library.active", title: "Activated", icon: "circle.inset.filled", selection: .active),
             SidebarRow(key: "library.inactive", title: "Not Activated", icon: "circle", selection: .inactive),
             SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", selection: .system),
+            SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", selection: .problems, badge: problems.count),
         ]
     }
 
