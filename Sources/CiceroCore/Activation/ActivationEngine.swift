@@ -114,13 +114,16 @@ public struct TrashPlan: Sendable, Identifiable {
     public var protectedCount: Int
     /// Families removed entirely, to drop from sets, tags and foundry overrides.
     public var removedFamilies: [String]
+    /// The paths are every copy of some fonts, wherever they are; false for files picked one by one.
+    public var includesCopies: Bool
 
-    public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String]) {
+    public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String], includesCopies: Bool = true) {
         self.title = title
         self.paths = paths
         self.otherFamilies = otherFamilies
         self.protectedCount = protectedCount
         self.removedFamilies = removedFamilies
+        self.includesCopies = includesCopies
     }
 }
 
