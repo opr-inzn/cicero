@@ -22,7 +22,7 @@ ellipsis character (…) for items that ask for more input.
 - Fixed rows: All Fonts (books.vertical), Activated (circle.inset.filled), Not Activated (circle),
   System Fonts (apple.logo), Problems (exclamationmark.triangle, count badge).
 - Sections, each collapsible and hideable:
-  - **Folders** (+ adds folders). Row menu: Reveal in Finder; "Fonts in This Folder" picker —
+  - **Folders** (+ adds folders). Point adds the folders Adobe apps load fonts from by themselves when they exist — /Library/Application Support/Adobe/Fonts ("Adobe Apps"), ~/Library/Application Support/Adobe/Fonts ("Adobe Apps (Your Account)"), and each /Applications/Adobe InDesign|InCopy <version>/Fonts ("InDesign 2026", fonts active in InDesign only) — at first launch and whenever a new one appears; a removed one isn't added again. Row menu: Reveal in Finder; "Fonts in This Folder" picker —
     "Not activated until you activate them" / "Active in Adobe apps" / a custom app name; Remove Folder from Library.
     Point's own Deactivated folder appears here when it has fonts.
   - **Sets** (+ menu: New Set…, New Smart Set…). Sets (square.stack) and smart sets (gearshape).

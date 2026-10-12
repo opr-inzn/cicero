@@ -122,6 +122,11 @@ public enum FaceState: Hashable, Sendable {
         return nil
     }
 
+    /// "Adobe apps" for Adobe's shared folders, else the app's name ("InDesign").
+    public static func appDescription(_ app: String) -> String {
+        app == "Adobe" ? "Adobe apps" : app
+    }
+
     public var label: String {
         switch self {
         case .active(.macOS): "Installed with macOS"
@@ -132,7 +137,7 @@ public enum FaceState: Hashable, Sendable {
         case .active(.temporary(.untilLogout)): "Active until you log out"
         case .active: "Active"
         case .inactive: "Not activated"
-        case .appOnly(let app): "Active in \(app) apps"
+        case .appOnly(let app): "Active in \(FaceState.appDescription(app))"
         }
     }
 }
