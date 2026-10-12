@@ -123,6 +123,7 @@ struct SidebarView: View {
             Label(row.title, systemImage: row.icon)
                 .lineLimit(1)
         }
+        .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
         .opacity(editing && hidden ? 0.45 : 1)
         .tag(row.selection)
         .contextMenu { rowMenu(row) }
