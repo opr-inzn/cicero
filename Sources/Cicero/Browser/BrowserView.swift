@@ -46,7 +46,14 @@ struct BrowserView: View {
         if let progress = model.coverageProgress, dependsOnCoverage {
             return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
         }
-        return "\(count) · \(families.count(where: \.hasActive).formatted()) activated"
+        var parts = [count, "\(families.count(where: \.hasActive).formatted()) activated"]
+        // On in one app only (like Adobe's fonts folder): neither activated nor not, so counted apart.
+        let apps = families.compactMap { if case .appOnly(let app) = $0.state { app } else { nil } }
+        if !apps.isEmpty {
+            let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
+            parts.append("\(apps.count.formatted()) in \(place)")
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// Whether the list can still grow while coverage is being worked out.
@@ -138,9 +145,6 @@ private struct EmptyBrowser: View {
         case .set:
             ContentUnavailableView("Empty Set", systemImage: "square.stack",
                                    description: Text("Drag fonts onto the set in the sidebar, or right-click a font and choose Add to Set."))
-        case .tag:
-            ContentUnavailableView("No Fonts with This Tag", systemImage: "tag",
-                                   description: Text("Right-click a font and choose Tags to add it here."))
         case .smartSet(let id):
             ContentUnavailableView {
                 Label("No Matching Fonts", systemImage: "gearshape")

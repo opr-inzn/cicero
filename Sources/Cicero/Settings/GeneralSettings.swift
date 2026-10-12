@@ -14,11 +14,13 @@ struct GeneralSettings: View {
                     ForEach(Appearance.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .formRowCentered()
             }
             Section {
                 LabeledContent("Activate fonts by") {
                     PopUpPicker(options: InstallMethod.allCases.map { ($0.title, $0) }, selection: $model.data.installMethod)
                 }
+                .formRowCentered()
             } header: {
                 Text("Activation")
             } footer: {
@@ -33,9 +35,12 @@ struct GeneralSettings: View {
                 LabeledContent("Cicero’s font list") {
                     Button("Rebuild") { model.rebuildFontList() }
                 }
+                .formRowCentered()
                 LabeledContent("macOS, Adobe and Office caches") {
-                    Button("Clear…") { isClearingCaches = true }
+                    Button("Clear") { isClearingCaches = true }
+                        .foregroundStyle(.red)
                 }
+                .formRowCentered()
             } header: {
                 Text("Font Caches")
             } footer: {

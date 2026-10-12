@@ -247,51 +247,6 @@ extension AppModel {
         if selection == .smartSet(id) { selection = .all }
     }
 
-    // MARK: Tags
-
-    func setTag(_ tag: String, _ on: Bool, for families: [Family]) {
-        for family in families {
-            var tags = data.familyTags[family.id] ?? []
-            tags.removeAll { $0 == tag }
-            if on { tags.append(tag) }
-            data.familyTags[family.id] = tags.isEmpty ? nil : tags
-        }
-    }
-
-    func addTag(named name: String, to families: [Family] = []) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if !data.tags.contains(trimmed) { data.tags.append(trimmed) }
-        data.sidebar.hidden.remove(SidebarSection.tags.key)
-        if !families.isEmpty { setTag(trimmed, true, for: families) }
-    }
-
-    func renameTag(_ old: String, to new: String) {
-        let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != old, !data.tags.contains(trimmed), let index = data.tags.firstIndex(of: old) else { return }
-        data.tags[index] = trimmed
-        for (family, tags) in data.familyTags where tags.contains(old) {
-            data.familyTags[family] = tags.map { $0 == old ? trimmed : $0 }
-        }
-        if data.sidebar.hidden.remove("tag.\(old)") != nil { data.sidebar.hidden.insert("tag.\(trimmed)") }
-        for index in data.smartSets.indices {
-            for rule in data.smartSets[index].rules.indices where data.smartSets[index].rules[rule].field == .tag && data.smartSets[index].rules[rule].value == old {
-                data.smartSets[index].rules[rule].value = trimmed
-            }
-        }
-        if selection == .tag(old) { selection = .tag(trimmed) }
-    }
-
-    func deleteTag(_ tag: String) {
-        data.tags.removeAll { $0 == tag }
-        for (family, tags) in data.familyTags where tags.contains(tag) {
-            let remaining = tags.filter { $0 != tag }
-            data.familyTags[family] = remaining.isEmpty ? nil : remaining
-        }
-        data.sidebar.hidden.remove("tag.\(tag)")
-        if selection == .tag(tag) { selection = .all }
-    }
-
     // MARK: Foundries
 
     func setFoundry(_ name: String?, for families: [Family]) {
@@ -337,7 +292,6 @@ extension AppModel {
         guard !families.isEmpty else { return false }
         switch item {
         case .set(let id): setMembership(true, for: families, in: id)
-        case .tag(let tag): setTag(tag, true, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         default: return false
         }
@@ -373,8 +327,6 @@ extension AppModel {
         case .sets:
             return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: "square.stack", item: .set($0.id)) }
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
-        case .tags:
-            return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: "tag", item: .tag($0)) }
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", item: .foundry($0)) }
         case .classifications:
