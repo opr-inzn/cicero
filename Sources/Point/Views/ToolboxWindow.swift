@@ -409,7 +409,7 @@ private struct FamilyRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(family.name).lineLimit(1)
-                    StatusTag(status: family.status)
+                    StatusTag(family: family)
                 }
                 if let note {
                     Text(note)

@@ -68,7 +68,7 @@ struct FontTable: View {
             TableColumn("Name", value: \.name, comparator: .localizedStandard) { row in
                 HStack(spacing: 6) {
                     Text(row.name).lineLimit(1)
-                    StatusTag(status: row.family.status)
+                    StatusTag(family: row.family)
                 }
                 .draggable(row.name)
             }

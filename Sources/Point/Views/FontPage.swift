@@ -116,6 +116,9 @@ private struct FamilyActivationButtons: View {
                 Button("Activate" + (library.data.installMethod == .ask ? "…" : "")) { library.requestActivate([family]) }
                     .buttonStyle(.borderedProminent)
                     .help(family.hasActiveFaces ? "Turn on the styles that are still off" : "Turn on every style, for all apps")
+            } else if family.hasTemporaryFaces {
+                Button("Activate Permanently" + (library.data.installMethod == .ask ? "…" : "")) { library.requestActivate([family]) }
+                    .help("Keep these styles on after Point quits or you log out")
             }
             if family.hasDeactivatableFaces {
                 Button("Deactivate") { library.requestDeactivate([family]) }

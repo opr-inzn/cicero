@@ -27,20 +27,26 @@ struct FontFace: Codable, Hashable, Sendable, Identifiable {
 }
 
 /// Where an active face is activated from. Decides whether Point may deactivate it.
-enum ActiveKind: Sendable {
+enum ActiveKind: Hashable, Sendable {
     case system        // ships with macOS: /System/Library/Fonts and Apple's downloadable fonts
     case allUsers      // /Library/Fonts, installed for every user (needs an admin to change)
     case application   // shipped inside an app bundle
     case adobeCloud    // Adobe Fonts synced by Creative Cloud
     case user          // ~/Library/Fonts
     case registered    // registered in place by Point
+    case temporary(TemporaryScope)  // registered in place by Point for this session only
     case other         // registered by another app
 
     var isUserControllable: Bool {
         switch self {
-        case .user, .registered, .other: true
+        case .user, .registered, .temporary, .other: true
         case .system, .allUsers, .application, .adobeCloud: false
         }
+    }
+
+    var isTemporary: Bool {
+        if case .temporary = self { return true }
+        return false
     }
 }
 
@@ -66,6 +72,7 @@ enum FaceStatus: Hashable, Sendable {
         case .active(.allUsers): "Installed for all users"
         case .active(.application): "App font"
         case .active(.adobeCloud): "Adobe Fonts"
+        case .active(.temporary(let scope)): scope.statusLabel
         case .active: "Active"
         case .inactive: "Inactive"
         case .appOnly(let app): "Active in \(app) apps"
@@ -92,6 +99,7 @@ struct LibraryFace: Identifiable, Hashable, Sendable {
     var id: String { face.id }
     var canActivate: Bool { !status.isActive }
     var canDeactivate: Bool { status.activeKind?.isUserControllable ?? false }
+    var isTemporary: Bool { status.activeKind?.isTemporary ?? false }
 }
 
 /// A standard typeface classification, read from the font's own metadata (OS/2 family class) with
@@ -165,6 +173,9 @@ struct FontFamily: Identifiable, Hashable, Sendable {
     var hasActiveFaces: Bool { faces.contains { $0.status.isActive } }
     var hasActivatableFaces: Bool { faces.contains(where: \.canActivate) }
     var hasDeactivatableFaces: Bool { faces.contains(where: \.canDeactivate) }
+    var hasTemporaryFaces: Bool { faces.contains(where: \.isTemporary) }
+    /// Every active style is on for this session only.
+    var isTemporarilyActive: Bool { hasActiveFaces && faces.allSatisfy { !$0.status.isActive || $0.isTemporary } }
 
     /// Every file belonging to the family, active copy first.
     var revealURLs: [URL] {
@@ -274,6 +285,8 @@ struct UserLibraryData: Codable, Sendable {
     /// Installed copy in ~/Library/Fonts → the file it was copied from.
     var installedCopies: [String: String] = [:]
     var registeredPaths: Set<String> = []
+    /// File path → its session-only registration (see TemporaryActivation).
+    var temporaryActivations: [String: TemporaryActivation] = [:]
     var showSystemFonts = true
 
     init() {}
@@ -305,6 +318,7 @@ struct UserLibraryData: Codable, Sendable {
         installMethod = try c.decodeIfPresent(InstallMethod.self, forKey: .installMethod) ?? d.installMethod
         installedCopies = try c.decodeIfPresent([String: String].self, forKey: .installedCopies) ?? d.installedCopies
         registeredPaths = try c.decodeIfPresent(Set<String>.self, forKey: .registeredPaths) ?? d.registeredPaths
+        temporaryActivations = try c.decodeIfPresent([String: TemporaryActivation].self, forKey: .temporaryActivations) ?? d.temporaryActivations
         showSystemFonts = try c.decodeIfPresent(Bool.self, forKey: .showSystemFonts) ?? d.showSystemFonts
 
         if let tags = try c.decodeIfPresent([String].self, forKey: .tags) {

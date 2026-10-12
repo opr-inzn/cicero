@@ -183,7 +183,7 @@ private struct GeneralSettings: View {
                     Button("Rebuild") { library.rebuildFontList() }
                         .disabled(library.isScanning)
                 }
-                LabeledContent("macOS font caches") {
+                LabeledContent("macOS, Adobe and Office caches") {
                     Button("Clear…") { isConfirmingCacheClear = true }
                 }
                 Text("If fonts look wrong, show an old version, or won't turn on or off, clearing the caches usually fixes it.")
