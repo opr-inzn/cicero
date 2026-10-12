@@ -4,17 +4,28 @@
 
 A font manager for macOS 26. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
-- **Two ways to browse.** A sortable list with an on/off switch for each family, a preview in the font itself, and classification, foundry and format columns you can show or hide. Or full-width specimens with every style set in itself.
-- **Font pages.** A waterfall from 9 to 96 pt, a table of styles you can switch on one by one, and a searchable glyph map.
-- **Preview Options.** Sample text (the font's own name by default), size, weight and letter spacing, shared by every view. OpenType features live in the info panel.
+- **Three ways to browse.** A sortable list with an on/off switch for each family, a preview in the font itself, and columns you can show or hide (classification, foundry, Latin S–XL and Adobe Latin coverage, date added, format). A grid of tiles. Or full-width specimens with every style set in itself.
+- **Font pages.** A large text you can type into, a waterfall from 9 to 96 pt, a table of styles you can switch on one by one, and a searchable glyph map.
+- **Info and Features.** The info panel shows a font's details, the languages it supports and its character sets; the Features tab turns OpenType features on for that family wherever it's previewed.
+- **Preview Options.** Sample text, size, weight and letter spacing, shared by every view.
 - **Customizable sidebar.** Click **Edit** next to Fonts and every item and group gets a checkbox; uncheck what you don't want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*.
-- **Sets, tags and classifications.** Group fonts by hand in sets, label them with tags, and browse by foundry or by classification, which Point reads from the fonts themselves.
-- **Watched folders.** Fonts in your folders are listed without being installed. A folder that one app loads on its own, like Adobe's Fonts folder, is marked for that app (detected automatically) instead of showing as not activated.
+- **Sets, smart sets and tags.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Point reads from the fonts themselves.
+- **Character sets.** See which fonts have every character of Latin S–XL, Adobe Latin 1–5, or Google Fonts' Latin, Cyrillic and Greek sets, or of a set you define yourself.
+- **Character Toolbox** (⌥⌘T). Paste any text to find the fonts that have every character, or pick one of 780 languages to see which fonts support it.
+- **Compare and Slideshow.** Compare (⌥⌘C) shows fonts stacked on a shared baseline or drawn over each other; Slideshow (⌥⌘S) presents them one at a time, full screen.
+- **Problems.** Finds fonts active from more than one file, missing and damaged files, fonts on external disks, and duplicates, with a fix for each.
+- **Watched folders.** Fonts in your folders are listed without being installed. A folder that one app loads on its own, like Adobe's Fonts folder, is marked for that app (detected automatically) instead of showing as not activated; turning one of its fonts on makes it available in every app, using the file where it is.
 - **System Fonts.** The fonts that ship with macOS have their own item, and can be kept out of your other lists.
 - **Temporary activation.** Turn a font on just until Point quits, or until you log out, from the Fonts menu (⌥⌘↩), a font's right-click menu, or a single style. Nothing is copied, and Point turns the font off again on its way out.
 - **Font cache tools.** Clear the macOS font caches for your account or for all users, plus the caches Adobe apps and Microsoft Office keep (they go to the Trash and are rebuilt on next launch), and rebuild Point's font list, from the Fonts menu or Settings → General.
+- **Move to Trash** removes a font's files, including copies in other folders; fonts that come with macOS or an app are never touched.
 - **Reveal in Finder** from a font's right-click menu, a style, ⇧⌘R, or the info panel.
 
 ## Privacy
 
 Point doesn't collect any data and never connects to the internet. Everything it knows about your fonts stays in local files on your Mac.
+
+## Credits
+
+- Language data: [Hyperglot](https://github.com/rosettatype/hyperglot) by Rosetta, Apache License 2.0.
+- Character sets: [Latin S–XL](https://github.com/koeberlin/Latin-Character-Sets) by Christoph Koeberlin (MIT), [Adobe Latin](https://github.com/adobe-type-tools/adobe-latin-charsets) by Adobe (MIT), and the [Google Fonts glyph sets](https://github.com/googlefonts/glyphsets) (Apache License 2.0).
