@@ -66,20 +66,20 @@ struct SmartRule: Codable, Hashable, Identifiable, Sendable {
     func label(for comparison: Comparison) -> String {
         switch (field, comparison) {
         case (.tag, .is): "has"
-        case (.tag, .isNot): "doesn't have"
+        case (.tag, .isNot): "doesn’t have"
         case (.set, .is), (.folder, .is): "is in"
-        case (.set, .isNot), (.folder, .isNot): "isn't in"
+        case (.set, .isNot), (.folder, .isNot): "isn’t in"
         case (.language, .is), (.characterSet, .is): "is supported"
-        case (.language, .isNot), (.characterSet, .isNot): "isn't supported"
+        case (.language, .isNot), (.characterSet, .isNot): "isn’t supported"
         case (_, .contains): "contains"
-        case (_, .doesNotContain): "doesn't contain"
+        case (_, .doesNotContain): "doesn’t contain"
         case (_, .beginsWith): "begins with"
         case (_, .is): "is"
         case (_, .isNot): "is not"
         case (_, .greaterThan): "is more than"
         case (_, .lessThan): "is less than"
         case (_, .inLast): "is in the last"
-        case (_, .notInLast): "isn't in the last"
+        case (_, .notInLast): "isn’t in the last"
         }
     }
 }

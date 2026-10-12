@@ -81,7 +81,7 @@ extension LibraryStore {
         if failed.isEmpty {
             showToast(succeeded == 1 ? "Activated \(scope.toastSuffix)." : "Activated \(succeeded) files \(scope.toastSuffix).")
         } else {
-            showToast("Couldn't activate \(failed.count) of \(paths.count) files.")
+            showToast("Couldn’t activate \(failed.count) of \(paths.count) files.")
         }
         save()
         scheduleRescan(after: 0.8)

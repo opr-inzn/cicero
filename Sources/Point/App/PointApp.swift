@@ -143,7 +143,7 @@ struct RootView: View {
             Button("Deactivate") { Task { await library.deactivate(request.faces) } }
             Button("Cancel", role: .cancel) {}
         } message: { request in
-            Text("\(request.unmanagedCount == 1 ? "1 file wasn't" : "\(request.unmanagedCount) files weren't") installed by Point, so there may be no other copy. Point will move \(request.unmanagedCount == 1 ? "it" : "them") to its Deactivated folder, which stays in your library.")
+            Text("\(request.unmanagedCount == 1 ? "1 file wasn’t" : "\(request.unmanagedCount) files weren’t") installed by Point, so there may be no other copy. Point will move \(request.unmanagedCount == 1 ? "it" : "them") to its Deactivated folder, which stays in your library.")
         }
         .alert(
             library.textPrompt?.title ?? "",

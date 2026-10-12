@@ -26,7 +26,7 @@ private struct FoldersSettings: View {
         @Bindable var library = library
         VStack(alignment: .leading, spacing: 10) {
             Text("Folders").font(.headline)
-            Text("Fonts in these folders show up in your library but stay off until you activate them. If an app loads a folder by itself, like Adobe's Fonts folder, mark it so its fonts count as on in that app.")
+            Text("Fonts in these folders show up in your library but stay off until you activate them. If an app loads a folder by itself, like Adobe’s Fonts folder, mark it so its fonts count as on in that app.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -182,19 +182,19 @@ private struct GeneralSettings: View {
             Section {
                 Toggle("Show system fonts in other lists", isOn: $library.data.showSystemFonts)
                     .onChange(of: library.data.showSystemFonts) { library.save() }
-                Text("Fonts that ship with macOS (in /System/Library/Fonts) can't be turned off. Turn this off to list them only under System Fonts in the sidebar.")
+                Text("Fonts that ship with macOS (in /System/Library/Fonts) can’t be turned off. Turn this off to list them only under System Fonts in the sidebar.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
             Section("Font Caches") {
-                LabeledContent("Point's font list") {
+                LabeledContent("Point’s font list") {
                     Button("Rebuild") { library.rebuildFontList() }
                         .disabled(library.isScanning)
                 }
                 LabeledContent("macOS, Adobe and Office caches") {
                     Button("Clear…") { isConfirmingCacheClear = true }
                 }
-                Text("If fonts look wrong, show an old version, or won't turn on or off, clearing the caches usually fixes it.")
+                Text("If fonts look wrong, show an old version, or won’t turn on or off, clearing the caches usually fixes it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

@@ -498,7 +498,7 @@ final class LibraryStore {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        panel.message = "Select folders that contain fonts. They're listed in your library without being installed."
+        panel.message = "Select folders that contain fonts. They’re listed in your library without being installed."
         guard panel.runModal() == .OK else { return }
         addFolders(panel.urls)
     }

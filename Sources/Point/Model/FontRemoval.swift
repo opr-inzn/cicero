@@ -31,7 +31,7 @@ extension LibraryStore {
             }
         }
         guard !paths.isEmpty else {
-            showToast("Fonts that come with macOS or an app can't be moved to the Trash.")
+            showToast("Fonts that come with macOS or an app can’t be moved to the Trash.")
             return
         }
         let requested = Set(familyNames)
@@ -67,7 +67,7 @@ extension LibraryStore {
             for name in request.familyNames { forget(familyNamed: name) }
             showToast(request.paths.count == 1 ? "Moved to the Trash." : "Moved \(request.paths.count) files to the Trash.")
         } else {
-            showToast("Couldn't move \(failures) of \(request.paths.count) files to the Trash.")
+            showToast("Couldn’t move \(failures) of \(request.paths.count) files to the Trash.")
         }
         save()
         scheduleRescan(after: 0.8)

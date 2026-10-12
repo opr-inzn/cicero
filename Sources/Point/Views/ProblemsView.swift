@@ -157,7 +157,7 @@ struct ProblemsView: View {
                 Button("Remove Copy…") {
                     trashRequest = TrashRequest(
                         title: "Remove this copy?",
-                        message: "Point moves \(file.displayPath) to the Trash, or to its Deactivated folder if it's your only copy outside the Fonts folder. The other copy stays active.",
+                        message: "Point moves \(file.displayPath) to the Trash, or to its Deactivated folder if it’s your only copy outside the Fonts folder. The other copy stays active.",
                         face: face
                     )
                 }

@@ -76,7 +76,7 @@ struct GlyphGrid: View {
             ProgressView()
         } else if !isLoading && sections.isEmpty {
             ContentUnavailableView("No Characters", systemImage: "character",
-                                   description: Text("Point couldn't read a character set from this font."))
+                                   description: Text("Point couldn’t read a character set from this font."))
         } else if shown.isEmpty && !query.isEmpty {
             ContentUnavailableView.search(text: query)
         }
