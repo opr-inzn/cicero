@@ -6,7 +6,31 @@ enum InspectorTab: String, CaseIterable {
     case features = "Features"
 }
 
-/// Window-level inspector: describes the open family, or the selected one in the browser.
+/// The Info/Features panel at the trailing edge of a page. Each page in the navigation stack adds
+/// it itself. It's a plain column rather than SwiftUI's inspector: on macOS 26 the inspector runs
+/// the full window height, so the toolbar's search field sat on top of it, and attached outside the
+/// stack it never appeared over pushed font pages.
+struct LibraryInspector: ViewModifier {
+    @Environment(LibraryStore.self) private var library
+
+    func body(content: Content) -> some View {
+        HStack(spacing: 0) {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if library.isInspectorPresented {
+                Divider()
+                InspectorPanel()
+                    .frame(width: 300)
+                    .frame(maxHeight: .infinity)
+                    .background(.background.secondary)
+                    .transition(.move(edge: .trailing))
+            }
+        }
+        .animation(.snappy, value: library.isInspectorPresented)
+    }
+}
+
+/// Describes the open family, or the selected one in the browser.
 struct InspectorPanel: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PreviewSettings.self) private var preview
@@ -17,9 +41,8 @@ struct InspectorPanel: View {
             InspectorView(
                 family: family,
                 tab: $library.inspectorTab,
-                features: $library.detailFeatures,
-                previewFace: family.face(nearestWeight: Int(preview.weight)),
-                allowsFeatures: library.detailFamily != nil
+                features: library.featuresBinding(for: family),
+                previewFace: family.face(nearestWeight: Int(preview.weight))
             )
             .id(family.id)
         } else {
@@ -38,8 +61,6 @@ struct InspectorView: View {
     @Binding var tab: InspectorTab
     @Binding var features: [FeatureSetting]
     let previewFace: LibraryFace
-    /// Features only apply to the detail view's previews, so the browser shows Info alone.
-    let allowsFeatures: Bool
     @State private var faceID: String?
 
     private var face: LibraryFace {
@@ -47,22 +68,18 @@ struct InspectorView: View {
     }
 
     var body: some View {
-        let shownTab = allowsFeatures ? tab : .info
         VStack(spacing: 0) {
-            if allowsFeatures {
-                Picker("", selection: $tab) {
-                    ForEach(InspectorTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .padding(12)
-            } else {
-                Text(family.name)
-                    .font(.headline)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+            Text(family.name)
+                .font(.headline)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding([.horizontal, .top], 12)
+            Picker("", selection: $tab) {
+                ForEach(InspectorTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(12)
 
             if family.faces.count > 1 {
                 Picker("Style", selection: Binding(get: { face.id }, set: { faceID = $0 })) {
@@ -75,7 +92,7 @@ struct InspectorView: View {
             Divider()
 
             ScrollView {
-                switch shownTab {
+                switch tab {
                 case .info: InfoPane(face: face)
                 case .features: FeaturesPane(face: face.face, features: $features)
                 }

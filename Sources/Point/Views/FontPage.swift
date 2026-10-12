@@ -1,10 +1,11 @@
 import SwiftUI
 
 enum FontPageTab: String, CaseIterable {
-    case waterfall, styles, glyphs
+    case text, waterfall, styles, glyphs
 
     var title: String {
         switch self {
+        case .text: "Text"
         case .waterfall: "Waterfall"
         case .styles: "Styles"
         case .glyphs: "Glyphs"
@@ -15,7 +16,7 @@ enum FontPageTab: String, CaseIterable {
 /// One family's page, pushed over the browser: a header band, then whichever tab was last used.
 struct FontPage: View {
     @Environment(LibraryStore.self) private var library
-    @AppStorage("fontPage.tab") private var tab: FontPageTab = .waterfall
+    @AppStorage("fontPage.view") private var tab: FontPageTab = .text
     let familyID: String
 
     var body: some View {
@@ -35,6 +36,7 @@ struct FontPage: View {
             FontPageHeader(family: family)
             Divider()
             switch tab {
+            case .text: TypeTester(family: family)
             case .waterfall: WaterfallView(family: family)
             case .styles: StylesTable(family: family)
             case .glyphs: GlyphGrid(family: family)
@@ -43,6 +45,7 @@ struct FontPage: View {
         .background(Color.canvas)
         .navigationTitle(family.name)
         .toolbar { toolbar }
+        .modifier(LibraryInspector())
         .onExitCommand { library.detailFamilyID = nil }
     }
 

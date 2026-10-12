@@ -120,10 +120,6 @@ struct RootView: View {
                 BrowserView()
                     .navigationDestination(for: String.self) { FontPage(familyID: $0) }
             }
-            .inspector(isPresented: $library.isInspectorPresented) {
-                InspectorPanel()
-                    .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
-            }
         }
         .modifier(SetEditorSheets())
         .modifier(FontTrashAlert())

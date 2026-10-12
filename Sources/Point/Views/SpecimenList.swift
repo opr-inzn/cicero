@@ -45,6 +45,7 @@ struct SpecimenList: View {
 }
 
 struct SpecimenRow: View {
+    @Environment(LibraryStore.self) private var library
     @Environment(PreviewSettings.self) private var preview
     let family: FontFamily
     let foundry: String?
@@ -72,7 +73,8 @@ struct SpecimenRow: View {
             FontPreviewText(
                 text: preview.text(for: family),
                 face: family.face(nearestWeight: Int(preview.weight)).face,
-                size: preview.size, weight: preview.weight, kerning: preview.kerning(atSize: preview.size)
+                size: preview.size, weight: preview.weight, features: library.features(for: family),
+                kerning: preview.kerning(atSize: preview.size)
             )
             if family.faces.count > 1 {
                 FlowLayout(spacing: 14, lineSpacing: 4) {

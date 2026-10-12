@@ -47,6 +47,7 @@ struct FontGrid: View {
 }
 
 struct FontTile: View {
+    @Environment(LibraryStore.self) private var library
     @Environment(PreviewSettings.self) private var preview
     let family: FontFamily
     let foundry: String?
@@ -67,7 +68,8 @@ struct FontTile: View {
             FontPreviewText(
                 text: preview.sampleText.isEmpty ? Self.defaultSample : preview.sampleText,
                 face: family.face(nearestWeight: Int(preview.weight)).face,
-                size: preview.size, weight: preview.weight, kerning: preview.kerning(atSize: preview.size)
+                size: preview.size, weight: preview.weight, features: library.features(for: family),
+                kerning: preview.kerning(atSize: preview.size)
             )
             .minimumScaleFactor(0.4)
             .padding(.horizontal, 8)
