@@ -10,7 +10,7 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Preview Options.** Sample text, size, weight and letter spacing, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.
 - **Customizable sidebar.** Click **Edit** next to Fonts and every item and group gets a checkbox; uncheck what you don't want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*.
-- **Sets, smart sets and tags.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Cicero reads from the fonts themselves.
+- **Sets and smart sets.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, folder, status, kind, format, number of styles, language, character set, or date added. Browse by foundry or by classification, which Cicero reads from the fonts themselves.
 - **Character sets.** See which fonts have every character of Latin S–XL, Adobe Latin 1–5, Google Fonts' Latin, Cyrillic and Greek sets, a Unicode block (Latin-1 Supplement, Latin Extended-A and -B, Greek, Cyrillic and more), or a set you define yourself.
 - **Character Toolbox** (⌥⌘T). Paste any text to find the fonts that have every character, or pick one of 780 languages to see which fonts support it.
 - **Compare** (⌥⌘C). Fonts stacked on a shared baseline or drawn over each other.

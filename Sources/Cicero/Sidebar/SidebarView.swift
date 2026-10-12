@@ -129,8 +129,6 @@ struct SidebarView: View {
             .foregroundStyle(.secondary)
             .fixedSize()
             .help("New set or smart set")
-        case .tags:
-            plus("New tag") { model.prompt("New Tag", confirm: "Create") { model.addTag(named: $0) } }
         case .characterSets:
             plus("New character set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
         case .foundries, .classifications:
@@ -199,9 +197,6 @@ struct SidebarView: View {
                 Button("Edit Smart Set…") { model.editingSmartSet = smartSet }
                 Button("Delete Smart Set") { model.deleteSmartSet(id) }
             }
-        case .tag(let tag):
-            Button("Rename Tag…") { model.prompt("Rename Tag", text: tag, confirm: "Rename") { model.renameTag(tag, to: $0) } }
-            Button("Delete Tag") { model.deleteTag(tag) }
         case .foundry(let name):
             Button("Rename Foundry…") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
         case .characterSet(let id):

@@ -13,14 +13,27 @@ struct SidebarSettings: View {
                 }
                 ForEach(SidebarSection.allCases) { section in
                     Section {
-                        if section == .characterSets {
+                        switch section {
+                        case .characterSets:
                             ForEach(model.characterSetGroups, id: \.id) { group in
                                 DisclosureGroup(group.title) {
-                                    ForEach(group.rows) { checkbox($0) }
+                                    // A grouped form centres what's inside a disclosure group.
+                                    ForEach(group.rows) {
+                                        checkbox($0, in: section).frame(maxWidth: .infinity, alignment: .leading)
+                                    }
                                 }
                             }
-                        } else {
-                            ForEach(model.rows(for: section)) { checkbox($0) }
+                        // A library can have hundreds: just the section's checkbox here.
+                        case .foundries:
+                            note("Hide single foundries with Edit in the sidebar.")
+                        default:
+                            // A section without rows still gets a card, or its header runs into the next one.
+                            let rows = model.rows(for: section)
+                            if rows.isEmpty {
+                                note("No \(section.title.lowercased()) yet.")
+                            } else {
+                                ForEach(rows) { checkbox($0, in: section) }
+                            }
                         }
                     } header: {
                         Toggle(section.title, isOn: visibility(section.key))
@@ -41,7 +54,12 @@ struct SidebarSettings: View {
         }
     }
 
-    private func checkbox(_ row: SidebarRow) -> some View {
+    private func note(_ text: String) -> some View {
+        Text(text).foregroundStyle(.secondary)
+    }
+
+    /// Off while its section is: the row can't show then either way.
+    private func checkbox(_ row: SidebarRow, in section: SidebarSection? = nil) -> some View {
         Toggle(isOn: visibility(row.key)) {
             HStack(spacing: 6) {
                 // A fixed width keeps the titles lined up however wide each symbol is.
@@ -52,6 +70,7 @@ struct SidebarSettings: View {
             }
         }
         .toggleStyle(.checkbox)
+        .disabled(section.map { !model.isVisible($0.key) } ?? false)
     }
 
     private func visibility(_ key: String) -> Binding<Bool> {
