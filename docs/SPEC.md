@@ -53,7 +53,18 @@ ellipsis character (…) for items that ask for more input.
   Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL (largest of
   Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) · Format (hidden).
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
-  text when set), name, "N styles · Foundry". Tiles scale with the preview size.
+  text when set), name, and what the family's styles span, in Title Case, along the registered axes
+  (MDN order: weight, width, italic, then optical size) and then the designer's own: "9 Weights · 3
+  Widths · Italics", "8 Weights · Italics · 3 Optical Sizes · Grade". No axis ranges: a variable font's
+  styles are its named instances, placed by their axis values; a static font's by its names and
+  classes. Weights count the words in style names (Bold, Bd, U Lt…) first — many static files leave
+  every class at 400 and variable fonts nudge instances off round values — then the axis value or
+  OS/2 class. Widths: a variable instance's wdth value, with instances whose names write the same
+  width words (Condensed, not XXX Condensed) counted once; a static font's OS/2 width class unless
+  it's normal, then the name. Slanted or italic styles make "Italics" ("Italic" when all are). Optical
+  sizes and custom axes (by the name the font gives them, else their tag) show when the styles step
+  along them. A family with more styles than these tell apart (hidden axes, small caps cut as fonts of
+  their own) adds "N Styles". The full caption is the tooltip. Tiles scale with the preview size.
 - **Specimens**: rows — name, status tag, "Foundry · N styles", switch; the sample at preview size; up to 14 style names set in themselves (+N more).
 - Selection: click, ⌘-click, ⇧-click, ⌘A, Esc clears, typing a letter jumps, Return or double-click opens the font page; rows are draggable as family names. Right-click → family menu.
 - Empty states per selection (no folders → Add Folder…; nothing activated; empty set; smart set with no matches → Edit Smart Set…; character set still being checked; search with no results).
@@ -98,7 +109,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 ## Library and fonts
 
 - Sources: everything CoreText reports active (`CTFontManagerCopyAvailableFontURLs`), ~/Library/Fonts and /Library/Fonts (always active), watched folders, Cicero's Deactivated folder (~/Library/Application Support/Cicero/Deactivated).
-- Files: otf ttf ttc otc dfont woff woff2; each face read with CoreText (PostScript name, family, style, full name, OS/2 weight class (fallback from traits), italic, monospace, OS/2 family class, manufacturer, version, wght axis). Unreadable files are kept for Problems. Parsed faces are cached by path + modification date + size; Date Added (Finder's, fallback creation date) is cached with them.
+- Files: otf ttf ttc otc dfont woff woff2; each face read with CoreText (PostScript name, family, style, full name, OS/2 weight class (fallback from traits), OS/2 width class, italic, monospace, OS/2 family class, manufacturer, version, wght axis range, visible variation axes (tag, name — the tag when the font gives none — and the named instance's value on each)). Unreadable files are kept for Problems. Parsed faces are cached by path + modification date + size; Date Added (Finder's, fallback creation date) is cached with them.
 - Families group faces by family name (hidden "."-prefixed families skipped). The same PostScript name in several files is one face: the active file wins, the others are "other copies"; Date Added is the earliest.
 - Face state: active (from macOS / installed for all users / inside an app / Adobe Fonts (CoreSync) / your Fonts folder / used in place by Cicero / temporarily until quit or logout / another app), inactive, or "active in <App> apps" for watched folders marked app-only and the Adobe Apps folders.
 - Family state: all active (system if all from macOS) / partly / inactive / app-only / system.

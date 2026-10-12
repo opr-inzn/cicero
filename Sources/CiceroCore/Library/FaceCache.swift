@@ -28,7 +28,7 @@ struct CachedFile: Hashable, Sendable {
 /// fast; a hand-written layout decodes in a few milliseconds where Codable takes tens.
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
-    private static let version: UInt32 = 1
+    private static let version: UInt32 = 4
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -56,6 +56,13 @@ enum FaceCache {
                 writer.write(face.weightAxis?.minimum)
                 writer.write(face.weightAxis?.maximum)
                 writer.write(face.weightAxis?.defaultValue)
+                writer.write(UInt8(face.width))
+                writer.write(UInt32(face.axes.count))
+                for axis in face.axes {
+                    writer.write(axis.tag)
+                    writer.write(axis.name)
+                    writer.write(axis.value)
+                }
             }
         }
         return writer.data
@@ -91,6 +98,12 @@ enum FaceCache {
                         let minimum = try reader.optionalDouble()
                         let maximum = try reader.optionalDouble()
                         let defaultValue = try reader.optionalDouble()
+                        let width = Int(try reader.u8())
+                        let axisCount = Int(try reader.u32())
+                        var axes: [VariationAxis] = []
+                        for _ in 0..<axisCount {
+                            axes.append(VariationAxis(tag: try reader.string(), name: try reader.string(), value: try reader.double()))
+                        }
                         var axis: WeightAxis?
                         if let minimum, let maximum, let defaultValue {
                             axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
@@ -99,7 +112,7 @@ enum FaceCache {
                             id: FaceID(path: path, index: index), postScriptName: postScriptName, familyName: familyName,
                             styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
                             isMonospaced: flags & 2 != 0, familyClass: familyClass, manufacturer: manufacturer,
-                            version: version, weightAxis: axis
+                            version: version, weightAxis: axis, width: width, axes: axes
                         ))
                     }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
@@ -127,10 +140,14 @@ private struct ByteWriter {
         withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
     }
 
+    mutating func write(_ value: Double) {
+        withUnsafeBytes(of: value.bitPattern.littleEndian) { data.append(contentsOf: $0) }
+    }
+
     mutating func write(_ value: Double?) {
         guard let value else { return write(UInt8(0)) }
         write(UInt8(1))
-        withUnsafeBytes(of: value.bitPattern.littleEndian) { data.append(contentsOf: $0) }
+        write(value)
     }
 
     mutating func write(_ string: String) {
@@ -176,9 +193,12 @@ private struct ByteReader {
         Int64(littleEndian: buffer.loadUnaligned(fromByteOffset: try take(8), as: Int64.self))
     }
 
+    mutating func double() throws -> Double {
+        Double(bitPattern: UInt64(littleEndian: buffer.loadUnaligned(fromByteOffset: try take(8), as: UInt64.self)))
+    }
+
     mutating func optionalDouble() throws -> Double? {
-        guard try u8() == 1 else { return nil }
-        return Double(bitPattern: UInt64(littleEndian: buffer.loadUnaligned(fromByteOffset: try take(8), as: UInt64.self)))
+        try u8() == 1 ? try double() : nil
     }
 
     mutating func string() throws -> String {
