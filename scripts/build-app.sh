@@ -1,17 +1,17 @@
 #!/bin/bash
-# Builds build/Point.app. Pass --install to also copy it to /Applications.
+# Builds build/Cicero.app. Pass --install to also copy it to /Applications.
 #   SIGN_IDENTITY  codesigning identity (default: ad-hoc "-"); a real identity also enables the hardened runtime
 # Apple silicon only.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 swift build -c release --arch arm64
-BIN="$(swift build -c release --arch arm64 --show-bin-path)/Point"
+BIN="$(swift build -c release --arch arm64 --show-bin-path)/Cicero"
 
-APP=build/Point.app
+APP=build/Cicero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/Point"
+cp "$BIN" "$APP/Contents/MacOS/Cicero"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Language data from Hyperglot (see scripts/update-languages.py) and its license.
 cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"
@@ -33,9 +33,9 @@ else
 fi
 
 if [[ "${1:-}" == "--install" ]]; then
-    rm -rf /Applications/Point.app
-    cp -R "$APP" /Applications/Point.app
-    echo "Installed /Applications/Point.app"
+    rm -rf /Applications/Cicero.app
+    cp -R "$APP" /Applications/Cicero.app
+    echo "Installed /Applications/Cicero.app"
 else
     echo "Built $APP"
 fi

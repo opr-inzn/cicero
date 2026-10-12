@@ -1,14 +1,14 @@
 #!/bin/bash
-# Publishes build/Point-<version>.dmg (made by release.sh) as a GitHub release, using that
-# version's section of CHANGELOG.md as the notes. The asset is always named Point.dmg so
-# https://github.com/opr-inzn/point/releases/latest/download/Point.dmg stays the latest version.
+# Publishes build/Cicero-<version>.dmg (made by release.sh) as a GitHub release, using that
+# version's section of CHANGELOG.md as the notes. The asset is always named Cicero.dmg so
+# https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg stays the latest version.
 #   ./scripts/publish.sh                  publish the version in Resources/Info.plist
 #   ./scripts/publish.sh --allow-unsigned publish even if the DMG isn't notarized
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)
-DMG="build/Point-$VERSION.dmg"
+DMG="build/Cicero-$VERSION.dmg"
 [[ -f "$DMG" ]] || { echo "Missing $DMG — run ./scripts/release.sh first." >&2; exit 1; }
 
 if [[ "${1:-}" != "--allow-unsigned" ]] && ! xcrun stapler validate "$DMG" >/dev/null 2>&1; then
@@ -25,7 +25,7 @@ if [[ -n "$(git status --porcelain)" ]] || [[ "$(git rev-parse HEAD)" != "$(git 
 fi
 
 ASSET_DIR=$(mktemp -d)
-cp "$DMG" "$ASSET_DIR/Point.dmg"
-gh release create "v$VERSION" "$ASSET_DIR/Point.dmg" \
-    --title "Point $VERSION" --notes "$NOTES" --target "$(git rev-parse HEAD)" --latest
+cp "$DMG" "$ASSET_DIR/Cicero.dmg"
+gh release create "v$VERSION" "$ASSET_DIR/Cicero.dmg" \
+    --title "Cicero $VERSION" --notes "$NOTES" --target "$(git rev-parse HEAD)" --latest
 rm -rf "$ASSET_DIR"

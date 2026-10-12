@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Regenerates Sources/PointCore/Rendering/UnicodeBlocks.swift, the Unicode block table the glyph grid
+"""Regenerates Sources/CiceroCore/Rendering/UnicodeBlocks.swift, the Unicode block table the glyph grid
 groups characters by.
 
-Run by hand when a new Unicode version is out (Point itself never goes online):
+Run by hand when a new Unicode version is out (Cicero itself never goes online):
 
     scripts/update-unicode-blocks.py                  # downloads Blocks.txt for VERSION below
     scripts/update-unicode-blocks.py path/to/Blocks.txt
@@ -15,7 +15,7 @@ from pathlib import Path
 
 VERSION = "15.1.0"
 URL = f"https://www.unicode.org/Public/{VERSION}/ucd/Blocks.txt"
-OUT = Path(__file__).resolve().parent.parent / "Sources" / "PointCore" / "Rendering" / "UnicodeBlocks.swift"
+OUT = Path(__file__).resolve().parent.parent / "Sources" / "CiceroCore" / "Rendering" / "UnicodeBlocks.swift"
 
 
 def main():

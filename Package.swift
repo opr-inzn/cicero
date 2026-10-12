@@ -2,18 +2,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "Point",
+    name: "Cicero",
     platforms: [.macOS(.v26)],
     targets: [
-        // Fonts, the library, activation, coverage and user data. No UI; tested by PointCoreTests.
-        .target(name: "PointCore", path: "Sources/PointCore"),
+        // Fonts, the library, activation, coverage and user data. No UI; tested by CiceroCoreTests.
+        .target(name: "CiceroCore", path: "Sources/CiceroCore"),
         // The app. Everything in it runs on the main actor unless it says otherwise.
         .executableTarget(
-            name: "Point",
-            dependencies: ["PointCore"],
-            path: "Sources/Point",
+            name: "Cicero",
+            dependencies: ["CiceroCore"],
+            path: "Sources/Cicero",
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
-        .testTarget(name: "PointCoreTests", dependencies: ["PointCore"], path: "Tests/PointCoreTests"),
+        .testTarget(name: "CiceroCoreTests", dependencies: ["CiceroCore"], path: "Tests/CiceroCoreTests"),
     ]
 )
