@@ -81,11 +81,13 @@ ellipsis character (…) for items that ask for more input.
 
 ## Font page (pushed over the browser; Esc or Back returns)
 
-- Toolbar: tabs [Text | Styles (only when the family has more than one style) | Glyphs] · Preview Options · Info.
+One scrolling page, top to bottom: header, text, styles, glyphs (no tabs).
+
+- Toolbar: Preview Options · Info.
 - Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate; locked families get a disabled Deactivate with the reason as tooltip.
-- **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center, a big editable text (default "Sphinx of black quartz, judge my vow."), remembered.
-- **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
-- **Glyphs**: filter field (character, Unicode name or U+ code), one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
+- **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center, a big editable text (default "Sphinx of black quartz, judge my vow.") that grows with what's typed, remembered.
+- **Styles** (only when the family has more than one style): laid out like a table — Preview, Style, Weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
+- **Glyphs**: heading with "404 characters" total and a filter field (character, Unicode name or U+ code), then one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), block headers pinned while scrolling, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
 ## Info panel (a pane floating at the trailing edge like the sidebar and in its colour, 300 pt wide, starts below the toolbar, stays put when a font page opens, toggled by ⓘ / ⌘I)
 
