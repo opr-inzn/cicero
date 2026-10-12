@@ -105,9 +105,20 @@ extension LibraryStore {
     }
 
     func matches(_ family: FontFamily, _ smartSet: SmartSet) -> Bool {
+        matcher(for: smartSet)(family)
+    }
+
+    /// A test for many families at once: set rules look up their set's members once instead of per family.
+    func matcher(for smartSet: SmartSet) -> (FontFamily) -> Bool {
         let rules = smartSet.rules
-        guard !rules.isEmpty else { return false }
-        return smartSet.matchAll ? rules.allSatisfy { matches(family, $0) } : rules.contains { matches(family, $0) }
+        guard !rules.isEmpty else { return { _ in false } }
+        let checks: [(FontFamily) -> Bool] = rules.map { rule in
+            guard rule.field == .set else { return { self.matches($0, rule) } }
+            let members = Set(data.sets.first { $0.id.uuidString == rule.value }?.familyNames ?? [])
+            let isNot = rule.comparison == .isNot
+            return { members.contains($0.name) != isNot }
+        }
+        return smartSet.matchAll ? { family in checks.allSatisfy { $0(family) } } : { family in checks.contains { $0(family) } }
     }
 
     func matches(_ family: FontFamily, _ rule: SmartRule) -> Bool {

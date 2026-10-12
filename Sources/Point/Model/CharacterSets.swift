@@ -122,21 +122,33 @@ extension ScalarRanges {
     }
 }
 
-/// Remembers which families have which character sets, for the current coverage data.
+/// Remembers which families have which character sets, for the current coverage data. The font
+/// list asks for every family on every render, so lookups have to be cheap.
 @MainActor
 final class CharacterSetIndex {
+    private struct Key: Hashable {
+        var set: String
+        var size: Int
+        var path: String
+        var index: Int
+    }
+
+    private struct SeriesKey: Hashable {
+        var group: String
+        var family: String
+    }
+
     private var generation = -1
-    private var missing: [String: Int] = [:]
+    private var missing: [Key: Int] = [:]
+    /// Level of the largest set of a series each family has; -1 for none.
+    private var largest: [SeriesKey: Int] = [:]
 
     /// Characters of the set the family lacks; nil while the family's coverage is still being worked out.
     func missingCount(_ family: FontFamily, _ set: CharacterSetDefinition) -> Int? {
         let coverage = CharacterCoverage.shared
-        if coverage.generation != generation {
-            generation = coverage.generation
-            missing.removeAll(keepingCapacity: true)
-        }
-        let face = CharacterCoverage.representative(of: family)
-        let key = "\(set.id)|\(set.scalars.count)|\(face.id)"
+        syncGeneration()
+        let face = family.regularFace
+        let key = Key(set: set.id, size: set.scalars.count, path: face.path, index: face.index)
         if let known = missing[key] { return known }
         guard let ranges = coverage.coverage(of: face)?.scalars else { return nil }
         let count = ranges.missingCount(sorted: set.scalars)
@@ -144,8 +156,34 @@ final class CharacterSetIndex {
         return count
     }
 
+    /// The largest set of a series the family has completely.
+    func largest(_ family: FontFamily, in series: [CharacterSetDefinition], group: String) -> CharacterSetDefinition? {
+        syncGeneration()
+        let key = SeriesKey(group: group, family: family.id)
+        if let level = largest[key] { return level >= 0 && level < series.count ? series[level] : nil }
+        var level = -1
+        for (index, set) in series.enumerated().reversed() {
+            guard let count = missingCount(family, set) else { return nil }
+            if count == 0 {
+                level = index
+                break
+            }
+        }
+        largest[key] = level
+        return level >= 0 ? series[level] : nil
+    }
+
     func invalidate() {
         missing.removeAll()
+        largest.removeAll()
+    }
+
+    private func syncGeneration() {
+        let current = CharacterCoverage.shared.generation
+        guard current != generation else { return }
+        generation = current
+        missing.removeAll(keepingCapacity: true)
+        largest.removeAll(keepingCapacity: true)
     }
 }
 
@@ -173,8 +211,8 @@ extension LibraryStore {
 
     /// The largest set of a series the family has, or nil when it has none of them.
     func largestCharacterSet(of family: FontFamily, inGroup groupID: String) -> CharacterSetDefinition? {
-        let series = CharacterSetCatalog.groups.first { $0.id == groupID }?.sets ?? []
-        return series.reversed().first { supports(family, characterSet: $0) == true }
+        guard let series = CharacterSetCatalog.groups.first(where: { $0.id == groupID })?.sets else { return nil }
+        return characterSetIndex.largest(family, in: series, group: groupID)
     }
 
     // MARK: Custom sets

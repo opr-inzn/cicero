@@ -60,7 +60,7 @@ struct FontTable: View {
         .sorted(using: sortOrder)
         Table(rows, selection: $library.selectedFamilyIDs, sortOrder: $sortOrder, columnCustomization: $columns) {
             TableColumn("On", value: \.activationRank) { row in
-                ActivationSwitch(family: row.family)
+                ActivationSwitch(family: row.family, library: library)
             }
             .width(34)
             .customizationID("on")
@@ -144,11 +144,13 @@ struct FontTable: View {
         }
         // A new list reloads the table instead of diffing it: inserting a thousand rows makes the
         // table measure every one of them, which takes minutes with live font previews.
-        .id(TableIdentity(selection: library.sidebarSelection, search: library.searchText))
+        .id(TableIdentity(selection: library.sidebarSelection, search: library.appliedSearch, ready: library.hasScanned))
     }
 }
 
 private struct TableIdentity: Hashable {
     var selection: SidebarSelection?
     var search: String
+    /// The first scan fills the table at once instead of inserting every row into an empty one.
+    var ready: Bool
 }

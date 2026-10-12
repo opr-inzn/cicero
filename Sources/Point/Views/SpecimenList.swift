@@ -67,7 +67,7 @@ struct SpecimenRow: View {
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 // The row exposes Activate/Deactivate as accessibility actions instead.
-                ActivationSwitch(family: family)
+                ActivationSwitch(family: family, library: library)
                     .accessibilityHidden(true)
             }
             FontPreviewText(

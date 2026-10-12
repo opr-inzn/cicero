@@ -70,8 +70,9 @@ struct SmartSetEditor: View {
     }
 
     private var matchCount: String {
+        let matches = library.matcher(for: draft)
         let count = library.families.count { family in
-            (library.data.showSystemFonts || family.status != .system) && library.matches(family, draft)
+            (library.data.showSystemFonts || family.status != .system) && matches(family)
         }
         return count == 1 ? "1 family matches" : "\(count.formatted()) families match"
     }

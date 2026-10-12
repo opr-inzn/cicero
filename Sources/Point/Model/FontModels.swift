@@ -23,7 +23,7 @@ struct FontFace: Codable, Hashable, Sendable, Identifiable {
     var weightAxis: VariationAxis?
 
     var id: String { "\(path)#\(index)" }
-    var url: URL { URL(fileURLWithPath: path) }
+    var url: URL { URL(fileURLWithPath: path, isDirectory: false) }
 }
 
 /// Where an active face is activated from. Decides whether Point may deactivate it.
@@ -129,22 +129,43 @@ enum FontClassification: String, CaseIterable, Sendable {
 }
 
 struct FontFamily: Identifiable, Hashable, Sendable {
-    var name: String
-    var faces: [LibraryFace]
-    var status: FamilyStatus
-    var folderIDs: Set<UUID>
-    var manufacturer: String?
+    let name: String
+    let faces: [LibraryFace]
+    let status: FamilyStatus
+    let folderIDs: Set<UUID>
+    let manufacturer: String?
     /// When the family's first file arrived in its folder.
-    var dateAdded: Date?
+    let dateAdded: Date?
+    // Worked out once: lists, sorting and smart sets read these for every family on every render.
+    let classification: FontClassification
+    /// File format, or "Mixed" when styles come in different formats.
+    let format: String
+    let isVariable: Bool
+    let isMonospaced: Bool
+    /// The regular upright style, which stands for the family in coverage checks.
+    let regularFace: FontFace
+
+    init(name: String, faces: [LibraryFace], status: FamilyStatus, folderIDs: Set<UUID>, manufacturer: String?, dateAdded: Date? = nil) {
+        self.name = name
+        self.faces = faces
+        self.status = status
+        self.folderIDs = folderIDs
+        self.manufacturer = manufacturer
+        self.dateAdded = dateAdded
+        isVariable = faces.contains { $0.face.weightAxis != nil }
+        isMonospaced = faces.contains { $0.face.isMonospace }
+        let formats = Set(faces.map { FontMetadata.format(ofExtension: ($0.face.path as NSString).pathExtension) })
+        format = formats.count == 1 ? formats.first! : "Mixed"
+        classification = Self.classify(name: name, faces: faces, isMonospaced: isMonospaced)
+        regularFace = Self.nearest(400, in: faces).face
+    }
 
     var id: String { name }
 
     var stylesLabel: String { faces.count == 1 ? "1 style" : "\(faces.count) styles" }
     var activeFaceCount: Int { faces.filter { $0.status.isActive }.count }
-    var isVariable: Bool { faces.contains { $0.face.weightAxis != nil } }
-    var isMonospaced: Bool { faces.contains { $0.face.isMonospace } }
 
-    var classification: FontClassification {
+    private static func classify(name: String, faces: [LibraryFace], isMonospaced: Bool) -> FontClassification {
         if isMonospaced { return .monospaced }
         let upright = faces.first { !$0.face.isItalic } ?? faces[0]
         switch upright.face.fontClass {
@@ -156,7 +177,7 @@ struct FontFamily: Identifiable, Hashable, Sendable {
         case 12: return .symbol
         default: break
         }
-        let name = self.name.lowercased()
+        let name = name.lowercased()
         if name.contains("mono") || name.contains("code") { return .monospaced }
         if name.contains("slab") { return .slabSerif }
         if name.contains("sans") || name.contains("grotesk") || name.contains("grotesque") || name.contains("gothic") { return .sansSerif }
@@ -165,11 +186,6 @@ struct FontFamily: Identifiable, Hashable, Sendable {
         return .unclassified
     }
 
-    /// File format, or "Mixed" when styles come in different formats.
-    var format: String {
-        let formats = Set(faces.map { FontMetadata.format(of: $0.face.url) })
-        return formats.count == 1 ? formats.first! : "Mixed"
-    }
     var hasActiveFaces: Bool { faces.contains { $0.status.isActive } }
     var hasActivatableFaces: Bool { faces.contains(where: \.canActivate) }
     var hasDeactivatableFaces: Bool { faces.contains(where: \.canDeactivate) }
@@ -191,12 +207,21 @@ struct FontFamily: Identifiable, Hashable, Sendable {
 
     /// The face to preview at a given weight: a variable face if there is one, else the closest static weight.
     func face(nearestWeight weight: Int) -> LibraryFace {
-        let upright = faces.filter { !$0.face.isItalic }
-        let pool = upright.isEmpty ? faces : upright
-        if let variable = pool.first(where: { $0.face.weightAxis != nil }) {
-            return variable
+        if weight == 400, let regular = faces.first(where: { $0.face.path == regularFace.path && $0.face.index == regularFace.index }) {
+            return regular
         }
-        return pool.min { abs($0.face.weightClass - weight) < abs($1.face.weightClass - weight) } ?? faces[0]
+        return Self.nearest(weight, in: faces)
+    }
+
+    private static func nearest(_ weight: Int, in faces: [LibraryFace]) -> LibraryFace {
+        var best: LibraryFace?
+        var hasUpright = false
+        for face in faces where !face.face.isItalic { hasUpright = true; break }
+        for face in faces where !hasUpright || !face.face.isItalic {
+            if face.face.weightAxis != nil { return face }
+            if best == nil || abs(face.face.weightClass - weight) < abs(best!.face.weightClass - weight) { best = face }
+        }
+        return best ?? faces[0]
     }
 
     static func status(of faces: [LibraryFace]) -> FamilyStatus {
@@ -374,6 +399,20 @@ enum Persistence {
             try encoder.encode(library).write(to: libraryFile, options: .atomic)
         } catch {
             NSLog("Point: failed to save library: \(error)")
+        }
+    }
+}
+
+extension FontMetadata {
+    /// The format named by a file extension; reads no file.
+    static func format(ofExtension ext: String) -> String {
+        switch ext.lowercased() {
+        case "otf": "OpenType, PostScript outlines"
+        case "ttf": "OpenType, TrueType outlines"
+        case "ttc", "otc": "Font Collection"
+        case "dfont": "Datafork TrueType"
+        case "woff", "woff2": "Web Font"
+        default: ext.uppercased()
         }
     }
 }
