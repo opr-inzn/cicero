@@ -137,7 +137,7 @@ private struct FileRow: View {
 
     private var facts: String {
         var parts: [String] = []
-        if let version = file.version { parts.append("Version \(version)") }
+        if let version = file.version { parts.append("Version \(FontFace.displayVersion(version))") }
         if let modified = file.modified { parts.append("Modified \(modified.formatted(date: .abbreviated, time: .omitted))") }
         if !file.detail.isEmpty { parts.append(file.detail) }
         return parts.joined(separator: " · ")

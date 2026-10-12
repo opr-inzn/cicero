@@ -43,7 +43,13 @@ struct SidebarSettings: View {
 
     private func checkbox(_ row: SidebarRow) -> some View {
         Toggle(isOn: visibility(row.key)) {
-            Label(row.title, systemImage: row.icon)
+            HStack(spacing: 6) {
+                // A fixed width keeps the titles lined up however wide each symbol is.
+                Image(systemName: row.icon)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20)
+                Text(row.title)
+            }
         }
         .toggleStyle(.checkbox)
     }

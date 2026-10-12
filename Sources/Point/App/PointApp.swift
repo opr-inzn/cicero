@@ -84,6 +84,9 @@ struct PointCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()
+            Button("Open") { model.openFamilyID = selection.first?.id }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+                .disabled(selection.count != 1 || model.openFamilyID != nil)
             Button("Show Info") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
             Button("Reveal in Finder") { model.reveal(selection) }
