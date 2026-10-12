@@ -61,7 +61,12 @@ ellipsis character (…) for items that ask for more input.
 - Selecting Problems shows the Problems view instead of a list.
 - Status tags (small capsules): System; Partly active (orange); app name e.g. "Adobe" (red) for app-only; "Temporary" (blue) for temporarily active.
 - Switches: a small switch drawn in SwiftUI (not a native NSSwitch per row — too slow), with tooltip
-  ("Installed with macOS" / "On in Adobe apps only. Turn on to use it in every app." / Activate / Deactivate) and VoiceOver toggle semantics.
+  ("Installed with macOS" / Activate / Deactivate) and VoiceOver toggle semantics. Families whose
+  every face is in (or was moved out of) one app's own folder, like Adobe's, have three positions: on in
+  that app only (knob halfway, track lightly tinted), on everywhere, off everywhere. Clicking goes
+  app only → everywhere → off → app only; tooltips "On in Adobe apps only. Click to turn on in every
+  app." / "On in every app. Click to turn off, Adobe apps included." / "Off. Click to turn on in Adobe
+  apps only." The styles table's switches do the same per style.
 
 ## Font page (pushed over the browser; Esc or Back returns)
 
@@ -87,8 +92,8 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N.
 - **View**: Edit Sidebar / Done Editing Sidebar.
 - **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Cicero Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
-- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-only fonts) (+ "…" when the install method is Ask); Activate Temporarily ▸; Activate Permanently… (temporary fonts); Deactivate; Add to Set ▸ (checkmark toggles, New Set from Selection…); Reveal in Finder; Copy Family Name(s); Compare; Move to Trash…
-- **Style menu**: status label, Activate Style…, Activate Temporarily ▸, Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
+- **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-folder fonts) (+ "…" when the install method is Ask); Use in Adobe Apps Only (app-folder fonts not already there); Activate Temporarily ▸ (hidden when everything is already on for good); Activate Permanently… (temporary fonts); Deactivate / Deactivate in All Apps (app-folder fonts on everywhere) / Deactivate in Adobe Apps (app-folder fonts on in Adobe apps only); Add to Set ▸ (checkmark toggles, New Set from Selection…); Reveal in Finder; Copy Family Name(s); Compare; Move to Trash…
+- **Style menu**: status label, Activate Style…, Activate Temporarily ▸ (hidden when the style is already on for good), Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
 
 ## Library and fonts
 
@@ -107,8 +112,12 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Install method (Settings → General → Activation): Ask each time / Copy into ~/Library/Fonts / Use the files where they are. "Ask" shows a sheet: Install a Copy, Use Files Where They Are, an Activate Temporarily pull-down, "Remember this choice (you can change it in Settings → General)".
 - Copy: into ~/Library/Fonts (unique name if needed; identical size counts as already there), remembered as installed copy → origin.
 - In place: CoreText persistent registration, remembered.
-- Fonts from app-only folders (Adobe) are always used in place — never copied.
-- Temporary: CoreText session registration in place; until Cicero quits (unregistered on quit; leftovers from a crash unregistered at launch) or until you log out (forgotten when the login session changes: audit session ID + boot time).
+- Fonts from app-only folders (Adobe) are always used in place — never copied. Turning one off
+  everywhere moves its file into Cicero's Deactivated folder (the app would load it otherwise) and
+  records where it was (`appFolderOrigins`); it stays listed with that folder. Activating it, or Use in
+  Adobe Apps Only, moves it back first (beside a newer file of the same name; fails if the folder is
+  gone). Folders the user can't write to (InDesign's, owned by root) can't be turned off this way.
+- Temporary: CoreText session registration in place (app-folder fonts too: on in every app for that long, then back to where they were); until Cicero quits (unregistered on quit; leftovers from a crash unregistered at launch) or until you log out (forgotten when the login session changes: audit session ID + boot time).
 - Deactivate: installed copies go to the Trash when another copy exists (origin or other copy outside ~/Library/Fonts); otherwise the file moves to Cicero's Deactivated folder — ask first if Cicero didn't install it ("Deactivate fonts?" alert). In-place/temporary → unregister (persistent, falling back to session). macOS, all-users, app and Adobe Fonts faces can't be turned off ("These fonts are managed by macOS or another app.").
 - Activating permanently a temporarily active font ends the session registration first.
 - Move to Trash (family or style): unregister, trash every file including other copies; never touches /System, /Library/Application Support/Apple, /usr, /private, app bundles, Adobe CoreSync; collections that also contain other families are named in the alert; removes the family from sets, its saved tags and foundry overrides. Alert "Move “X” to the Trash?" with destructive Move to Trash.

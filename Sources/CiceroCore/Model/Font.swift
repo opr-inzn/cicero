@@ -158,17 +158,43 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
     /// Other files containing the same PostScript name (e.g. the original of an installed copy).
     public let otherCopies: [String]
     public let dateAdded: Date?
+    /// The app that loads the file from its own folder ("Adobe", "InDesign"), also while Cicero keeps
+    /// it out of that folder to turn it off there.
+    public let app: String?
 
-    public init(face: FontFace, state: FaceState, otherCopies: [String] = [], dateAdded: Date? = nil) {
+    public init(face: FontFace, state: FaceState, otherCopies: [String] = [], dateAdded: Date? = nil, app: String? = nil) {
         self.face = face
         self.state = state
         self.otherCopies = otherCopies
         self.dateAdded = dateAdded
+        self.app = app
     }
 
     public var id: FaceID { face.id }
     public var canActivate: Bool { !state.isActive || state.temporaryScope != nil }
-    public var canDeactivate: Bool { state.source?.canDeactivate ?? false }
+    /// A face an app loads from its folder can be turned off there too, by moving it out.
+    public var canDeactivate: Bool {
+        if case .appOnly = state { return true }
+        return state.source?.canDeactivate ?? false
+    }
+
+    /// Off, on, or (for a face an app loads from its folder) on in that app only.
+    public var position: SwitchPosition {
+        if state.isActive { return .on }
+        return app != nil && state != .inactive ? .app : .off
+    }
+}
+
+/// Where an on/off switch sits. Fonts an app loads from its own folder have a third position, on in
+/// that app only, and their switch goes from there to on everywhere, then off everywhere, then back.
+public enum SwitchPosition: Sendable {
+    case off, app, on
+
+    /// One position for several faces: all on, all off, else the middle (some on in the app, or a mix).
+    init(_ positions: some Sequence<SwitchPosition>) {
+        let all = Set(positions)
+        self = all == [.on] ? .on : all.isEmpty || all == [.off] ? .off : .app
+    }
 }
 
 public enum FamilyState: Hashable, Sendable {
@@ -230,6 +256,9 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let isVariable: Bool
     public let isMonospaced: Bool
     public let hasItalics: Bool
+    /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
+    public let app: String?
+    public let position: SwitchPosition
     /// The regular upright face, which stands for the family in previews and coverage.
     public let regular: LibraryFace
     public let activeCount: Int
@@ -253,6 +282,9 @@ public struct Family: Identifiable, Hashable, Sendable {
         isVariable = faces.contains { $0.face.weightAxis != nil }
         isMonospaced = faces.contains { $0.face.isMonospaced }
         hasItalics = faces.contains { $0.face.isItalic }
+        let apps = Set(faces.map(\.app))
+        app = apps.count == 1 ? apps.first! : nil
+        position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
         let formats = Set(faces.map { FontFormat.of(path: $0.face.path) })
         format = formats.count == 1 ? formats.first! : .mixed
         classification = Classification.of(name: name, faces: faces)

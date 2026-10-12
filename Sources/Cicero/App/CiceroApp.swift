@@ -83,7 +83,7 @@ struct CiceroCommands: Commands {
                         .keyboardShortcut(scope == .untilQuit ? KeyboardShortcut(.return, modifiers: [.command, .option]) : nil)
                 }
             }
-            .disabled(selection.isEmpty)
+            .disabled(!selection.contains(where: \.hasActivatable))
             Button("Deactivate") { model.deactivate(selection) }
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasDeactivatable))

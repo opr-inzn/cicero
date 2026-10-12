@@ -288,8 +288,20 @@ public struct ActivationRecords: Codable, Equatable, Sendable {
     public var inPlace: Set<String> = []
     /// Files registered for this session.
     public var temporary: [String: TemporaryRecord] = [:]
+    /// File in Cicero's Deactivated folder → where it was in an app's own folder (Adobe's), which it
+    /// left so the app stops loading it.
+    public var appFolderOrigins: [String: String] = [:]
 
     public init() {}
+
+    /// Missing keys take their defaults, so files from older versions keep loading.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        installedCopies = try c.decodeIfPresent([String: String].self, forKey: .installedCopies) ?? [:]
+        inPlace = try c.decodeIfPresent(Set<String>.self, forKey: .inPlace) ?? []
+        temporary = try c.decodeIfPresent([String: TemporaryRecord].self, forKey: .temporary) ?? [:]
+        appFolderOrigins = try c.decodeIfPresent([String: String].self, forKey: .appFolderOrigins) ?? [:]
+    }
 }
 
 public struct TemporaryRecord: Codable, Equatable, Sendable {
