@@ -131,6 +131,7 @@ final class LibraryStore {
     func start() {
         guard !started else { return }
         started = true
+        startTemporaryActivations()
         save()  // writes data migrated from older versions in the current format
         let center = NotificationCenter.default
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -274,6 +275,7 @@ final class LibraryStore {
         if path.hasPrefix("/Library/Fonts/") { return .allUsers }
         if path.hasPrefix(userFonts) { return .user }
         if path.contains("/Adobe/CoreSync/") { return .adobeCloud }
+        if let temporary = data.temporaryActivations[path] { return .temporary(temporary.scope) }
         if data.registeredPaths.contains(path) { return .registered }
         if path.contains(".app/") { return .application }
         return .other

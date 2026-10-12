@@ -45,6 +45,7 @@ extension LibraryStore {
 
     func trash(_ request: TrashRequest) async {
         let fm = FileManager.default
+        await endTemporaryActivation(of: request.paths)
         let registered = request.paths.filter(data.registeredPaths.contains)
         if !registered.isEmpty {
             let urls = registered.map { URL(fileURLWithPath: $0) }

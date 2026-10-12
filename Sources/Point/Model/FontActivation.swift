@@ -12,7 +12,8 @@ extension LibraryStore {
     }
 
     func requestActivate(faces: [LibraryFace], title: String) {
-        var targets = faces.filter(\.canActivate)
+        // Fonts on for this session only can be made permanent.
+        var targets = faces.filter { $0.canActivate || $0.isTemporary }
         guard !targets.isEmpty else {
             showToast("Already on.")
             return
@@ -33,6 +34,7 @@ extension LibraryStore {
 
     func activate(_ faces: [LibraryFace], method: InstallMethod) async {
         let paths = uniquePaths(of: faces)
+        await endTemporaryActivation(of: paths)
         var failures: [String] = []
         switch method {
         case .copy, .ask:
@@ -78,6 +80,7 @@ extension LibraryStore {
         let fm = FileManager.default
         var failures = 0
         var toUnregister: [String] = []
+        var temporary: [String] = []
         for path in uniquePaths(of: faces) {
             let face = faces.first { $0.face.path == path }!
             switch face.status.activeKind {
@@ -97,6 +100,8 @@ extension LibraryStore {
                 }
             case .registered, .other:
                 toUnregister.append(path)
+            case .temporary:
+                temporary.append(path)
             default:
                 failures += 1
             }
@@ -104,6 +109,7 @@ extension LibraryStore {
         if !toUnregister.isEmpty {
             failures += await unregister(toUnregister)
         }
+        failures += await endTemporaryActivation(of: temporary)
         showToast(failures == 0 ? "Deactivated." : "Couldn't deactivate \(failures) files.")
         save()
         scheduleRescan(after: 0.8)
@@ -191,10 +197,10 @@ extension LibraryStore {
 
 enum CoreTextRegistration {
     /// Returns the paths that failed.
-    static func register(_ urls: [URL]) async -> Set<String> {
+    static func register(_ urls: [URL], scope: CTFontManagerScope = .persistent) async -> Set<String> {
         await withCheckedContinuation { continuation in
             var failed = Set<String>()
-            CTFontManagerRegisterFontURLs(urls as CFArray, .persistent, true) { errors, done in
+            CTFontManagerRegisterFontURLs(urls as CFArray, scope, true) { errors, done in
                 failed.formUnion(failedPaths(errors))
                 if done { continuation.resume(returning: failed) }
                 return true
