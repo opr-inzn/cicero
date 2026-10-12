@@ -176,8 +176,8 @@ extension AppModel {
 
     func removeFolder(_ id: UUID) {
         data.folders.removeAll { $0.id == id }
-        data.sidebar.hidden.remove("folder.\(id)")
-        if selection == .folder(id) { selection = .all }
+        data.sidebar.forget("folder.\(id)")
+        deselect { $0 == .folder(id) }
         rescan()
     }
 
@@ -210,11 +210,11 @@ extension AppModel {
 
     func deleteSet(_ id: UUID) {
         data.sets.removeAll { $0.id == id }
-        data.sidebar.hidden.remove("set.\(id)")
+        data.sidebar.forget("set.\(id)")
         for index in data.smartSets.indices {
             data.smartSets[index].rules.removeAll { $0.field == .set && $0.value == id.uuidString }
         }
-        if selection == .set(id) { selection = .all }
+        deselect { $0 == .set(id) }
     }
 
     func isMember(_ family: Family, of setID: UUID) -> Bool {
@@ -243,8 +243,8 @@ extension AppModel {
 
     func deleteSmartSet(_ id: UUID) {
         data.smartSets.removeAll { $0.id == id }
-        data.sidebar.hidden.remove("smartset.\(id)")
-        if selection == .smartSet(id) { selection = .all }
+        data.sidebar.forget("smartset.\(id)")
+        deselect { $0 == .smartSet(id) }
     }
 
     // MARK: Foundries
@@ -262,8 +262,10 @@ extension AppModel {
             if let raw = family.manufacturer { data.foundryRenames[raw] = trimmed }
         }
         for (family, foundry) in data.foundryOverrides where foundry == old { data.foundryOverrides[family] = trimmed }
-        if data.sidebar.hidden.remove("foundry.\(old)") != nil { data.sidebar.hidden.insert("foundry.\(trimmed)") }
-        if selection == .foundry(old) { selection = .foundry(trimmed) }
+        data.sidebar.rename("foundry.\(old)", to: "foundry.\(trimmed)")
+        if selectedItems.contains(.foundry(old)) {
+            selectSidebarItems(Set(selectedItems.map { $0 == .foundry(old) ? .foundry(trimmed) : $0 }))
+        }
     }
 
     // MARK: Character sets
@@ -280,8 +282,8 @@ extension AppModel {
     func deleteCharacterSet(_ id: UUID) {
         let setID = "custom.\(id.uuidString)"
         data.customCharacterSets.removeAll { $0.id == id }
-        data.sidebar.hidden.remove("charset.\(setID)")
-        if selection == .characterSet(setID) { selection = .all }
+        data.sidebar.forget("charset.\(setID)")
+        deselect { $0 == .characterSet(setID) }
     }
 
     // MARK: Drag and drop
@@ -300,17 +302,30 @@ extension AppModel {
 
     // MARK: Sidebar
 
+    /// The sections below the library rows, in the user's order.
+    var sections: [SidebarSection] {
+        data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
+    }
+
     var libraryRows: [SidebarRow] {
-        [
+        let rows = [
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
             SidebarRow(key: "library.active", title: "Activated", icon: "checkmark.circle", item: .active),
             SidebarRow(key: "library.inactive", title: "Not Activated", icon: "circle.dashed", item: .inactive),
-            SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system),
+            // With system fonts off in Settings, they're nowhere, this item included.
+            data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
-        ]
+        ].compactMap { $0 }
+        return data.sidebar.ordered(rows, in: "library", key: \.key)
     }
 
+    /// A section's rows in the user's order. Character sets are in groups, ordered in `characterSetGroups`.
     func rows(for section: SidebarSection) -> [SidebarRow] {
+        let rows = unorderedRows(for: section)
+        return section == .characterSets ? rows : data.sidebar.ordered(rows, in: section.rawValue, key: \.key)
+    }
+
+    private func unorderedRows(for section: SidebarSection) -> [SidebarRow] {
         switch section {
         case .folders:
             var folders = data.folders
@@ -340,9 +355,14 @@ extension AppModel {
         }
     }
 
-    /// The window title for the sidebar selection.
+    /// The window title for the sidebar selection: with several items, their names.
     var selectionTitle: String {
         let item = selection ?? .all
+        if selectedItems.count > 1 {
+            return rows(inList: sidebarList(of: item))
+                .filter { selectedItems.contains($0.item) && $0.item != .problems }
+                .map(\.title).formatted(.list(type: .and))
+        }
         if let row = libraryRows.first(where: { $0.item == item }) { return row.title }
         for section in SidebarSection.allCases {
             if let row = rows(for: section).first(where: { $0.item == item }) { return row.title }
@@ -354,7 +374,54 @@ extension AppModel {
 
     func setVisible(_ key: String, _ visible: Bool) {
         if visible { data.sidebar.hidden.remove(key) } else { data.sidebar.hidden.insert(key) }
-        if !visible, let selection, !isShown(selection) { self.selection = .all }
+        if !visible { deselect { !isShown($0) } }
+    }
+
+    /// What the sidebar list selects. Several items only within one list (a section, or a group of
+    /// character sets), so they can move together: Command-clicking in another list starts over there.
+    func selectSidebarItems(_ items: Set<SidebarItem>) {
+        guard !items.isEmpty else { selection = nil; return }
+        let added = items.subtracting(selectedItems)
+        let anchor = added.count == 1 ? added.first! : selection.flatMap { items.contains($0) ? $0 : nil } ?? items.first!
+        let list = sidebarList(of: anchor)
+        let items = items.filter { sidebarList(of: $0) == list }
+        // The one selected before when it's still there, else the first. Problems has no fonts to show,
+        // so it's never the one among several.
+        let candidates = items.count > 1 ? items.subtracting([.problems]) : items
+        let primary = selection.flatMap { candidates.contains($0) ? $0 : nil }
+            ?? rows(inList: list).first { candidates.contains($0.item) }?.item ?? candidates.first
+        if selection != primary { selection = primary }
+        if selectedItems != items {
+            selectedItems = items
+            selectedIDs = []
+            openFamilyID = nil
+        }
+    }
+
+    /// Takes items that are gone, or hidden, out of the sidebar selection; All Fonts when none are left.
+    func deselect(where remove: (SidebarItem) -> Bool) {
+        let kept = selectedItems.filter { !remove($0) }
+        guard kept != selectedItems else { return }
+        if kept.isEmpty { selection = .all } else { selectSidebarItems(kept) }
+    }
+
+    /// The list of the sidebar an item is in, named as in `SidebarPreferences.order`.
+    func sidebarList(of item: SidebarItem) -> String {
+        switch item {
+        case .all, .active, .inactive, .system, .problems: "library"
+        case .folder: SidebarSection.folders.rawValue
+        case .set, .smartSet: SidebarSection.sets.rawValue
+        case .foundry: SidebarSection.foundries.rawValue
+        case .classification: SidebarSection.classifications.rawValue
+        case .characterSet:
+            "charsetgroup.\(characterSetGroups.first { $0.rows.contains { $0.item == item } }?.id ?? "")"
+        }
+    }
+
+    private func rows(inList list: String) -> [SidebarRow] {
+        if list == "library" { return libraryRows }
+        if let section = SidebarSection(rawValue: list) { return rows(for: section) }
+        return characterSetGroups.first { "charsetgroup.\($0.id)" == list }?.rows ?? []
     }
 
     /// Character sets for the sidebar, in their groups (Latin S–XL, Adobe Latin, Unicode Blocks,
@@ -367,7 +434,8 @@ extension AppModel {
         if !data.customCharacterSets.isEmpty {
             groups.append((id: CharacterSetDefinition.customGroupID, title: "Your Character Sets", rows: customCharacterSets.map(row)))
         }
-        return groups
+        let ordered = groups.map { (id: $0.id, title: $0.title, rows: data.sidebar.ordered($0.rows, in: "charsetgroup.\($0.id)", key: \.key)) }
+        return data.sidebar.ordered(ordered, in: SidebarSection.characterSets.rawValue) { "charsetgroup.\($0.id)" }
     }
 
     func isGroupExpanded(_ id: String) -> Bool { !data.sidebar.collapsed.contains("charsetgroup.\(id)") }
@@ -378,6 +446,25 @@ extension AppModel {
 
     func showAllSidebarItems() {
         data.sidebar.hidden.removeAll()
+    }
+
+    /// Moves items within one list of the sidebar (see `SidebarPreferences.order`), never into another.
+    /// `shown` is what the list shows, `all` the keys of every item it has.
+    func moveSidebarItems(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
+        data.sidebar.move(source, to: destination, shown: shown, all: all, in: list)
+    }
+
+    /// Puts a section where `target` is; `target` moves aside, towards where the section was.
+    func moveSection(_ section: SidebarSection, onto target: SidebarSection) {
+        let keys = sections.map(\.key)
+        guard let from = keys.firstIndex(of: section.key), let to = keys.firstIndex(of: target.key), from != to else { return }
+        data.sidebar.move([from], to: from < to ? to + 1 : to, shown: keys, all: keys, in: "sections")
+    }
+
+    var hasSidebarOrder: Bool { !data.sidebar.order.isEmpty }
+
+    func resetSidebarOrder() {
+        data.sidebar.order = [:]
     }
 
     private func isShown(_ item: SidebarItem) -> Bool {
