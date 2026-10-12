@@ -52,7 +52,7 @@ struct SidebarRow: Identifiable, Hashable {
 /// What a cached `visibleFamilies` was computed from.
 struct VisibleKey: Equatable {
     var fingerprint: Int
-    var selection: SidebarItem?
+    var selection: Set<SidebarItem>
     var search: String
     var dataRevision: Int
     var coverageRevision: Int
@@ -113,7 +113,7 @@ extension AppModel {
     /// when the library, selection, search, user data or coverage change.
     var visibleFamilies: [Family] {
         let key = VisibleKey(
-            fingerprint: library.fingerprint, selection: selection, search: appliedSearch,
+            fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
             dataRevision: dataRevision, coverageRevision: coverageRevision
         )
         if let cached = visibleCache, cached.key == key { return cached.families }
@@ -124,11 +124,10 @@ extension AppModel {
 
     private func computeVisibleFamilies() -> [Family] {
         let query = appliedSearch.trimmingCharacters(in: .whitespaces).lowercased()
-        let selection = selection ?? .all
-        let test = filter(for: selection)
+        let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
         return library.families.filter { family in
-            if !data.showSystemFonts && family.state == .system && selection != .system { return false }
-            return test(family) && library.matches(family, search: query)
+            if !data.showSystemFonts && family.state == .system { return false }
+            return tests.contains { $0(family) } && library.matches(family, search: query)
         }
     }
 

@@ -1,7 +1,7 @@
 import CiceroCore
 import SwiftUI
 
-/// Finder-style checkboxes for every sidebar row and section.
+/// Finder-style checkboxes for every sidebar row and section, in the sidebar's order.
 struct SidebarSettings: View {
     @Environment(AppModel.self) private var model
 
@@ -11,7 +11,7 @@ struct SidebarSettings: View {
                 Section("Library") {
                     ForEach(model.libraryRows) { checkbox($0) }
                 }
-                ForEach(SidebarSection.allCases) { section in
+                ForEach(model.sections) { section in
                     Section {
                         switch section {
                         case .characterSets:
@@ -44,10 +44,12 @@ struct SidebarSettings: View {
             .formStyle(.grouped)
             Divider()
             HStack {
-                Text("Unchecked items stay out of the sidebar. Edit in the sidebar itself does the same.")
+                Text("Unchecked items stay out of the sidebar; Edit there does the same. Drag items and section titles in the sidebar to reorder them.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("Reset Order") { model.resetSidebarOrder() }
+                    .disabled(!model.hasSidebarOrder)
                 Button("Show All") { model.showAllSidebarItems() }
             }
             .padding()
