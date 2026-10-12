@@ -41,7 +41,7 @@ ellipsis character (…) for items that ask for more input.
 - Title = selected item's name; subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right with equal gaps (ToolbarSpacer(.fixed) between groups): view switcher
   [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field.
-- **List** (SwiftUI Table, sortable, column customisation saved): On (switch) · Name (+ status tag) ·
+- **List** (SwiftUI Table, sortable, column customisation saved): Status (switch) · Name (+ status tag) ·
   Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL (largest of
   Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) · Format (hidden).
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
@@ -60,7 +60,7 @@ ellipsis character (…) for items that ask for more input.
 - Toolbar: tabs [Text | Styles (only when the family has more than one style) | Glyphs] · Preview Options · Info.
 - Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate; locked families get a disabled Deactivate with the reason as tooltip.
 - **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center, a big editable text (default "Sphinx of black quartz, judge my vow."), remembered.
-- **Styles**: table of styles — preview, style name, weight, status, per-style switch; right-click → style menu.
+- **Styles**: table of styles — preview, style name, weight, Status (the style's switch and its state, e.g. "Active until Point quits"); right-click → style menu.
 - **Glyphs**: filter field (character, Unicode name or U+ code), sections with counts (Latin, Numbers, Symbols & punctuation, other scripts…), "404 characters" total, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
 ## Info panel (trailing column, 300 pt wide, starts below the toolbar, toggled by ⓘ / ⌘I)
