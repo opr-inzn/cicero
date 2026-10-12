@@ -94,7 +94,7 @@ enum SmartRuleOption {
         ("variable", "Variable"), ("monospaced", "Monospaced"), ("italics", "Has Italics"),
     ]
     static let formats = [
-        "OpenType, PostScript outlines", "OpenType, TrueType outlines", "Font Collection",
+        "OpenType PostScript", "OpenType TrueType", "Font Collection",
         "Datafork TrueType", "Web Font", "Mixed",
     ]
 }

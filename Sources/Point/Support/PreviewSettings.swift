@@ -3,7 +3,6 @@ import SwiftUI
 /// Preview options shared by the browser and the font page. An empty sample shows each family's own name.
 @Observable @MainActor
 final class PreviewSettings {
-    static let waterfallSizes: [Double] = [9, 10, 11, 12, 14, 18, 24, 30, 36, 48, 60, 72, 96]
     static let samplePresets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@", "ÀÉÎÕÜ ñçß øæœ"]
 
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }

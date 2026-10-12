@@ -1,12 +1,11 @@
 import SwiftUI
 
 enum FontPageTab: String, CaseIterable {
-    case text, waterfall, styles, glyphs
+    case text, styles, glyphs
 
     var title: String {
         switch self {
         case .text: "Text"
-        case .waterfall: "Waterfall"
         case .styles: "Styles"
         case .glyphs: "Glyphs"
         }
@@ -35,27 +34,35 @@ struct FontPage: View {
         VStack(spacing: 0) {
             FontPageHeader(family: family)
             Divider()
-            switch tab {
+            switch shownTab(for: family) {
             case .text: TypeTester(family: family)
-            case .waterfall: WaterfallView(family: family)
             case .styles: StylesTable(family: family)
             case .glyphs: GlyphGrid(family: family)
             }
         }
         .background(Color.canvas)
         .navigationTitle(family.name)
-        .toolbar { toolbar }
+        .toolbar { toolbar(for: family) }
         .modifier(LibraryInspector())
         .onExitCommand { library.detailFamilyID = nil }
     }
 
     // MARK: Toolbar
 
+    /// Styles only has something to show when there's more than one.
+    private func tabs(for family: FontFamily) -> [FontPageTab] {
+        family.faces.count > 1 ? FontPageTab.allCases : [.text, .glyphs]
+    }
+
+    private func shownTab(for family: FontFamily) -> FontPageTab {
+        tabs(for: family).contains(tab) ? tab : .text
+    }
+
     @ToolbarContentBuilder
-    private var toolbar: some ToolbarContent {
+    private func toolbar(for family: FontFamily) -> some ToolbarContent {
         ToolbarItem {
-            Picker("View", selection: $tab) {
-                ForEach(FontPageTab.allCases, id: \.self) { Text($0.title).tag($0) }
+            Picker("View", selection: Binding(get: { shownTab(for: family) }, set: { tab = $0 })) {
+                ForEach(tabs(for: family), id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -98,7 +105,6 @@ private struct FontPageHeader: View {
     private var summary: String {
         var parts: [String] = []
         if let foundry = library.foundryName(of: family) { parts.append(foundry) }
-        parts.append(family.classification.rawValue)
         parts.append(family.format)
         if family.isVariable { parts.append("Variable") }
         parts.append("\(family.stylesLabel) · \(family.activeFaceCount) activated")

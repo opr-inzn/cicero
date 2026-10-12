@@ -119,7 +119,7 @@ struct BrowserView: View {
             Picker("View", selection: $mode) {
                 Label("List", systemImage: "list.bullet").tag(BrowserMode.list)
                 Label("Grid", systemImage: "square.grid.2x2").tag(BrowserMode.grid)
-                Label("Specimens", systemImage: "text.justify.leading").tag(BrowserMode.specimens)
+                Label("Specimens", systemImage: "rectangle.grid.1x2").tag(BrowserMode.specimens)
             }
             .pickerStyle(.segmented)
             .labelStyle(.iconOnly)

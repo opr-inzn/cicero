@@ -7,7 +7,7 @@ Each version's notes here become its release notes on the [releases page](https:
 First release.
 
 - Browse your library as a sortable list with on/off switches, a grid, or full-width specimens.
-- Font pages with a large editable text, a waterfall, a table of styles you can switch on individually, and a searchable glyph map.
+- Font pages with a large editable text, a table of styles you can switch on individually, and a searchable glyph map.
 - An info panel with font details, supported languages and character sets, and a Features tab for OpenType features.
 - Preview Options for sample text, size, weight and letter spacing.
 - Choose a light or dark appearance, or follow macOS, in Settings → General.
