@@ -235,6 +235,7 @@ final class LibraryStore {
         }
         selectedFamilyIDs = selectedFamilyIDs.filter { familyIndex[$0] != nil }
         if let detail = detailFamilyID, familyIndex[detail] == nil { detailFamilyID = nil }
+        CharacterCoverage.shared.index(result)
     }
 
     private func activeKind(of path: String, userFonts: String) -> ActiveKind {
