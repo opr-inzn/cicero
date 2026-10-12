@@ -11,33 +11,29 @@ struct BrowserView: View {
     @AppStorage(Prefs.weight) private var weight = 400.0
     @AppStorage(Prefs.sampleText) private var sampleText = "Aa 123"
     @AppStorage(Prefs.viewMode) private var viewMode: BrowserViewMode = .grid
-    @AppStorage(Prefs.colorMode) private var colorMode: PreviewColorMode = .light
-    @AppStorage(Prefs.customForeground) private var customForeground = "#FFFFFF"
-    @AppStorage(Prefs.customBackground) private var customBackground = "#F04000"
     @State private var anchorID: String?
     @FocusState private var focused: Bool
 
     var body: some View {
         @Bindable var library = library
         let families = library.visibleFamilies
-        let colors = PreviewColors(mode: colorMode, foregroundHex: customForeground, backgroundHex: customBackground)
         ScrollViewReader { proxy in
             ScrollView {
                 if viewMode == .grid {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 0)], spacing: 0) {
                         ForEach(families) { family in
-                            cell(family, families: families, colors: colors)
+                            cell(family, families: families)
                         }
                     }
                 } else {
                     LazyVStack(spacing: 0) {
                         ForEach(families) { family in
-                            cell(family, families: families, colors: colors)
+                            cell(family, families: families)
                         }
                     }
                 }
             }
-            .background(colors.background)
+            .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
@@ -88,13 +84,13 @@ struct BrowserView: View {
     // MARK: Cells
 
     @ViewBuilder
-    private func cell(_ family: FontFamily, families: [FontFamily], colors: PreviewColors) -> some View {
+    private func cell(_ family: FontFamily, families: [FontFamily]) -> some View {
         let selected = library.selectedFamilyIDs.contains(family.id)
         Group {
             if viewMode == .grid {
-                FontCard(family: family, sample: sampleText, pointSize: pointSize, weight: weight, colors: colors, isSelected: selected)
+                FontCard(family: family, sample: sampleText, pointSize: pointSize, weight: weight, isSelected: selected)
             } else {
-                FontListRow(family: family, sample: sampleText, pointSize: pointSize, weight: weight, colors: colors, isSelected: selected)
+                FontListRow(family: family, sample: sampleText, pointSize: pointSize, weight: weight, isSelected: selected)
             }
         }
         .id(family.id)
@@ -189,9 +185,6 @@ struct BrowserView: View {
         ToolbarItem {
             SampleTextControl(text: $sampleText)
         }
-        ToolbarItem {
-            ColorChips(mode: $colorMode, foregroundHex: $customForeground, backgroundHex: $customBackground)
-        }
         ToolbarItem { InfoToolbarButton() }
             .sharedBackgroundVisibility(.hidden)
     }
@@ -205,12 +198,10 @@ struct FontPreviewText: View {
     let size: Double
     let weight: Double
     var features: [FeatureSetting] = []
-    let color: Color
 
     var body: some View {
         Text(text.isEmpty ? " " : text)
             .font(Font(FontCache.shared.font(face, size: size, weight: weight, features: features)))
-            .foregroundStyle(color)
             .lineLimit(1)
     }
 }
@@ -220,21 +211,20 @@ struct FontCard: View {
     let sample: String
     let pointSize: Double
     let weight: Double
-    let colors: PreviewColors
     let isSelected: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FontPreviewText(text: sample, face: family.face(nearestWeight: Int(weight)).face, size: pointSize, weight: weight, color: colors.foreground)
+            FontPreviewText(text: sample, face: family.face(nearestWeight: Int(weight)).face, size: pointSize, weight: weight)
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, minHeight: max(130, pointSize * 2.6))
-            FamilyCaption(family: family, color: colors.foreground)
+            FamilyCaption(family: family)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 10)
         }
-        .background(colors.background)
-        .overlay(alignment: .trailing) { Rectangle().fill(colors.foreground.opacity(0.08)).frame(width: 1) }
-        .overlay(alignment: .bottom) { Rectangle().fill(colors.foreground.opacity(0.08)).frame(height: 1) }
+        .background(Color.canvas)
+        .overlay(alignment: .trailing) { Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1) }
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
         .overlay {
             if isSelected {
                 RoundedRectangle(cornerRadius: 6)
@@ -250,27 +240,25 @@ struct FontListRow: View {
     let sample: String
     let pointSize: Double
     let weight: Double
-    let colors: PreviewColors
     let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 16) {
-            FamilyCaption(family: family, color: colors.foreground)
+            FamilyCaption(family: family)
                 .frame(width: 220, alignment: .leading)
-            FontPreviewText(text: sample, face: family.face(nearestWeight: Int(weight)).face, size: pointSize, weight: weight, color: colors.foreground)
+            FontPreviewText(text: sample, face: family.face(nearestWeight: Int(weight)).face, size: pointSize, weight: weight)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
         .frame(minHeight: max(56, pointSize * 1.7))
-        .background(isSelected ? Color.accentColor.opacity(0.15) : colors.background)
-        .overlay(alignment: .bottom) { Rectangle().fill(colors.foreground.opacity(0.08)).frame(height: 1) }
+        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.canvas)
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
     }
 }
 
 /// Family name, status tag and style count under a preview.
 struct FamilyCaption: View {
     let family: FontFamily
-    let color: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -284,7 +272,7 @@ struct FamilyCaption: View {
                 .font(.system(size: 10))
                 .opacity(0.6)
         }
-        .foregroundStyle(color.opacity(0.7))
+        .foregroundStyle(.secondary)
     }
 }
 
@@ -394,50 +382,3 @@ struct SampleTextControl: View {
     }
 }
 
-struct ColorChips: View {
-    @Binding var mode: PreviewColorMode
-    @Binding var foregroundHex: String
-    @Binding var backgroundHex: String
-    @State private var editingCustom = false
-
-    var body: some View {
-        HStack(spacing: 4) {
-            chip(.light, fill: AnyShapeStyle(Color.white))
-            chip(.dark, fill: AnyShapeStyle(Color.black))
-            chip(.custom, fill: AnyShapeStyle(LinearGradient(colors: [.red, .orange, .green, .blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)))
-                .popover(isPresented: $editingCustom, arrowEdge: .bottom) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ColorPicker("Text", selection: hexBinding($foregroundHex), supportsOpacity: false)
-                        ColorPicker("Background", selection: hexBinding($backgroundHex), supportsOpacity: false)
-                    }
-                    .padding(14)
-                    .frame(width: 200)
-                }
-        }
-        .padding(.horizontal, 4)
-    }
-
-    private func chip(_ chipMode: PreviewColorMode, fill: AnyShapeStyle) -> some View {
-        Button {
-            if chipMode == .custom && mode == .custom { editingCustom.toggle() }
-            mode = chipMode
-        } label: {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(fill)
-                .frame(width: 26, height: 18)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.primary.opacity(0.15), lineWidth: 1))
-                .padding(2)
-                .overlay {
-                    if mode == chipMode {
-                        RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-        .help(chipMode == .custom ? "Custom colors (click again to edit)" : chipMode == .light ? "Light" : "Dark")
-    }
-
-    private func hexBinding(_ hex: Binding<String>) -> Binding<Color> {
-        Binding(get: { Color(hex: hex.wrappedValue) ?? .white }, set: { hex.wrappedValue = $0.hexString })
-    }
-}

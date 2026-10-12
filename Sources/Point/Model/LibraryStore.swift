@@ -75,8 +75,6 @@ final class LibraryStore {
     var inspectorTab: InspectorTab = .info
     /// OpenType features applied to the detail view's previews.
     var detailFeatures: [FeatureSetting] = []
-    /// The system appearance, which the sidebar keeps even when the canvas forces the window light or dark.
-    private(set) var systemColorScheme: ColorScheme = LibraryStore.currentSystemColorScheme()
 
     var pendingActivation: ActivationRequest?
     var pendingDeactivation: DeactivationRequest?
@@ -99,11 +97,6 @@ final class LibraryStore {
     func start() {
         guard !started else { return }
         started = true
-        DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.systemColorScheme = LibraryStore.currentSystemColorScheme() }
-        }
         let center = NotificationCenter.default
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -246,9 +239,6 @@ final class LibraryStore {
         return .other
     }
 
-    private static func currentSystemColorScheme() -> ColorScheme {
-        UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark" ? .dark : .light
-    }
 
     // MARK: Inspector
 

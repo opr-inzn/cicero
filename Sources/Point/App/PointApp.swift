@@ -51,9 +51,6 @@ struct PointCommands: Commands {
 
 struct RootView: View {
     @Environment(LibraryStore.self) private var library
-    @AppStorage(Prefs.colorMode) private var colorMode: PreviewColorMode = .light
-    @AppStorage(Prefs.customForeground) private var customForeground = "#FFFFFF"
-    @AppStorage(Prefs.customBackground) private var customBackground = "#F04000"
     @State private var promptText = ""
 
     var body: some View {
@@ -61,8 +58,6 @@ struct RootView: View {
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 340)
-                .environment(\.colorScheme, library.systemColorScheme)
-                .background(SidebarAppearance(colorScheme: library.systemColorScheme))
         } detail: {
             Group {
                 if let family = library.detailFamily {
@@ -76,8 +71,6 @@ struct RootView: View {
                     .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
             }
         }
-        // The title bar and toolbar sit over the canvas, so the window takes the canvas's light/dark scheme.
-        .preferredColorScheme(PreviewColors(mode: colorMode, foregroundHex: customForeground, backgroundHex: customBackground).colorScheme)
         .sheet(item: $library.pendingActivation) { request in
             ActivationSheet(request: request)
         }
