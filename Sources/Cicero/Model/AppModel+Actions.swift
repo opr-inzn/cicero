@@ -559,29 +559,30 @@ extension AppModel {
 
     // MARK: Problems
 
-    func apply(_ fix: ProblemFix) {
+    /// `family` is the family the problem is about, if any: removing files names the others in them.
+    func apply(_ fix: ProblemFix, family: String? = nil) {
         switch fix {
         case .reveal(let paths):
             NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
         case .deactivate(let ids):
+            // Asks first like any deactivation, for files Cicero didn't install.
             let ids = Set(ids)
             let faces = library.families.flatMap(\.faces).filter { ids.contains($0.id) }
-            if !faces.isEmpty { performDeactivation(faces) }
+            if !faces.isEmpty { deactivate(faces) }
         case .trash(let paths):
-            let allowed = paths.filter { !ActivationEngine.isProtected($0) }
-            guard !allowed.isEmpty else { return }
-            trashPlan = TrashPlan(
-                title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) files",
-                paths: allowed, otherFamilies: [], protectedCount: paths.count - allowed.count, removedFamilies: [], includesCopies: false
-            )
+            guard let plan = engine.spareCopiesTrashPlan(paths, family: family, in: library) else { return }
+            trashPlan = plan
         case .forgetInPlace(let path):
             enqueue { model in
                 model.data.records = await model.engine.forgetInPlace(path, records: model.data.records)
                 model.rescan()
             }
         case .forgetInstalledCopy(let path):
-            data.records.installedCopies[path] = nil
-            updateProblems()
+            // Queued, so an operation already running can't write its older records back over it.
+            enqueue { model in
+                model.data.records.installedCopies[path] = nil
+                model.updateProblems()
+            }
         case .removeFromSet(let id, let family):
             if let index = data.sets.firstIndex(where: { $0.id == id }) { data.sets[index].families.removeAll { $0 == family } }
             updateProblems()
