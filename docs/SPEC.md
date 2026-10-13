@@ -38,6 +38,8 @@ ellipsis character (…) for items that ask for more input.
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
   together; the browser then shows the fonts in any of them. Selecting in another section starts over there.
+- Moving through the sidebar quickly (holding an arrow key, clicking from row to row) moves the selection at
+  every step; the browser shows the last one once the selection rests for a moment.
 - Dropping family names (drag from the browser) onto a set or foundry adds them.
 - Creating a set or character set un-hides its section.
 - Settings → Sidebar lists the same items, in the sidebar's order, as Finder-style checkboxes, with

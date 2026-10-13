@@ -48,6 +48,13 @@ public struct UserData: Codable, Equatable, Sendable {
         records = try value(.records, d.records)
     }
 
+    /// Whether anything but the sidebar's choices (order, hidden and collapsed items) differs.
+    public func differs(besidesSidebar other: UserData) -> Bool {
+        var other = other
+        other.sidebar = sidebar
+        return self != other
+    }
+
     /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
     public func scannedFolders() -> [WatchedFolder] {
         folders + (showAdobeFonts ? WatchedFolder.appFontFolders() : [])

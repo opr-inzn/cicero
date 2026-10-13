@@ -52,13 +52,19 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   changes never overwrite each other. Switches move when clicked (`expect`) and the scan an operation
   starts when it finishes confirms them; font-change notifications during an operation are left to
   that scan (or one right after the operation, when it starts none). Lists it hands to views (`visibleFamilies`, sidebar rows,
-  character set lookups) are cached and keyed on the inputs they depend on.
+  character set lookups, custom character sets) are cached and keyed on the inputs they depend on. The
+  sidebar's choices (open sections, order, hidden items) are user data that no list depends on, so changing
+  them leaves `dataRevision`, and the browser's list, as they are.
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Open) can take them.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
   `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
   are in `Components/`.
+- The sidebar is a SwiftUI `List`, so every row it shows is a hosting view of its own, about a millisecond
+  each to make: `SidebarView` keeps its sections in a view apart from the list, so a change of selection
+  doesn't remake them, only sets and foundries are drop targets (that alone makes a row a third slower to
+  appear), and while the selection changes quickly the browser takes it only once it rests.
 
 ## Rules of thumb
 
