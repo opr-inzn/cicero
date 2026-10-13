@@ -4,10 +4,12 @@ import SwiftUI
 /// Sidebar, the browser with font pages pushed over it, prompts and toasts.
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
+    @Environment(BackupPrompts.self) private var backup
     @State private var promptText = ""
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var backup = backup
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 340)
@@ -26,6 +28,8 @@ struct MainWindow: View {
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }
+        .backupSheet(isPresented: $backup.isBackingUp)
+        .restoreSheet(contents: $backup.restoring)
         .alert(
             "Deactivate fonts?",
             isPresented: Binding(get: { model.deactivationPrompt != nil }, set: { if !$0 { model.deactivationPrompt = nil } }),
