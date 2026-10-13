@@ -122,13 +122,14 @@ struct CharacterSetsRow: View {
         }
     }
 
-    /// One set per series (Google's grouped by script); custom sets each count on their own.
+    /// The largest set of each series (Google's grouped by script); sets in none, like GF Latin African and
+    /// custom sets, each count on their own.
     private func supported(by ranges: ScalarRanges) -> [CharacterSetDefinition] {
         var best: [String: CharacterSetDefinition] = [:]
         var order: [String] = []
-        let seriesIDs = Set(model.characterSetCatalog.groups.filter(\.isSeries).map(\.id))
+        let seriesOf = Dictionary(model.characterSetCatalog.series.flatMap { series in series.sets.map { ($0.id, series.id) } }) { first, _ in first }
         for set in model.characterSets where set.groupID != Self.unicodeGroupID && ranges.missingCount(sorted: set.scalars) == 0 {
-            let series = set.isCustom ? set.id : seriesIDs.contains(set.groupID) ? set.groupID : String(set.id.split(separator: "-").dropLast().joined(separator: "-"))
+            let series = seriesOf[set.id] ?? set.id
             if best[series] == nil { order.append(series) }
             best[series] = set
         }

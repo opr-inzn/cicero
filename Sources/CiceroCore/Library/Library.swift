@@ -267,7 +267,7 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Files in the Fonts folders are active unless macOS says otherwise, as for one Font Book turned off or
+    /// Files in the Fonts folders are active unless macOS says otherwise, as for one turned off in macOS or
     /// one macOS hasn't noticed yet. Its list leaves out files whose fonts have hidden names, so files missing
     /// from it are asked about one by one (there are only a few); without a list at all, they count as active.
     private func confirmFontsFolders(_ found: inout [String: FoundFile], listed: Bool) {

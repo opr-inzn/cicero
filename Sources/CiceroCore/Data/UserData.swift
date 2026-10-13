@@ -48,6 +48,13 @@ public struct UserData: Codable, Equatable, Sendable {
         records = try value(.records, d.records)
     }
 
+    /// Whether anything but the sidebar's choices (order, hidden and collapsed items) differs.
+    public func differs(besidesSidebar other: UserData) -> Bool {
+        var other = other
+        other.sidebar = sidebar
+        return self != other
+    }
+
     /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
     public func scannedFolders() -> [WatchedFolder] {
         folders + (showAdobeFonts ? WatchedFolder.appFontFolders() : [])
@@ -188,6 +195,16 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
         self.value = value
     }
 
+    /// Rules for a classification there used to be pick the one it's part of now.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        field = try c.decode(Field.self, forKey: .field)
+        comparison = try c.decode(Comparison.self, forKey: .comparison)
+        let value = try c.decode(String.self, forKey: .value)
+        self.value = field == .classification ? Classification(saved: value)?.rawValue ?? value : value
+    }
+
     public enum Field: String, Codable, CaseIterable, Sendable {
         case name, foundry, classification, tag, set, folder, status, kind, format, styles, language, characterSet, added
 
@@ -236,7 +253,8 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
     /// Collapsed sections ("folders", "sets", "tags", "foundries", "classifications", "characterSets")
     /// and character set groups ("charsetgroup.<group id>").
     public var collapsed: Set<String> = ["foundries", "classifications", "charsetgroup.unicode", "charsetgroup.google"]
-    /// Keys in the order the user dragged them into, per list: "sections" (section keys), "library",
+    /// Keys in the order the user dragged them into, per list: "sections" (section keys, from when sections
+    /// could be dragged; still followed), "library",
     /// a section's rows ("folders", "sets", "foundries", "classifications"), "characterSets" (group keys
     /// "charsetgroup.<group id>") and a group's rows ("charsetgroup.<group id>").
     public var order: [String: [String]] = [:]
@@ -334,7 +352,8 @@ public struct ActivationRecords: Codable, Equatable, Sendable {
 
 public struct TemporaryRecord: Codable, Equatable, Sendable {
     public var scope: TemporaryScope
-    /// Identifies the login session it was made in (see `ActivationEngine.currentSession`).
+    /// Identifies the login session it was made in (see `ActivationEngine.currentSession`), so an
+    /// application set's record from before a logout is forgotten.
     public var session: String
     /// For `.whileAppsRun`: the bundle IDs of the open apps whose application sets have the file.
     public var apps: [String]?

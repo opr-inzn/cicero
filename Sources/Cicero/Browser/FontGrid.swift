@@ -8,6 +8,7 @@ struct FontGrid: View {
     let families: [Family]
     @State private var anchor: String?
     @FocusState private var focused: Bool
+    @State private var gridWidth: CGFloat = 0
 
     var body: some View {
         let width = max(240, preview.size * 8)
@@ -20,6 +21,7 @@ struct FontGrid: View {
                     }
                 }
                 .scrollTargetLayout()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
                 .padding(16)
             }
             .modifier(KeepsTopOnResize())
@@ -27,8 +29,13 @@ struct FontGrid: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy))
+            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy, layout: .grid(columns: columns(tile: width))))
         }
+    }
+
+    /// Tiles in a row, for ↑/↓: as many as fit at their narrowest, as the adaptive grid lays them out.
+    private func columns(tile width: CGFloat) -> Int {
+        max(1, Int((gridWidth + 12) / (width + 12)))
     }
 }
 

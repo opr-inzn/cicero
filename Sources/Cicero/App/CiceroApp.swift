@@ -7,6 +7,7 @@ struct CiceroApp: App {
     @State private var model = AppModel()
     @State private var preview = PreviewSettings()
     @State private var backup = BackupPrompts()
+    @State private var updates = Updates()
 
     var body: some Scene {
         Window("Cicero", id: WindowID.main) {
@@ -17,12 +18,14 @@ struct CiceroApp: App {
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     Appearance.applySaved()
+                    TextEditingKeys.install()
                     model.start()
                     model.appSets.start(model)
+                    ApplicationsFolder.checkAtLaunch(model: model)
                 }
         }
         .defaultSize(width: 1440, height: 900)
-        .commands { CiceroCommands(model: model, backup: backup) }
+        .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -45,6 +48,7 @@ struct CiceroApp: App {
             SettingsWindow()
                 .environment(model)
                 .environment(preview)
+                .environment(updates)
         }
     }
 }
@@ -52,6 +56,7 @@ struct CiceroApp: App {
 struct CiceroCommands: Commands {
     let model: AppModel
     let backup: BackupPrompts
+    let updates: Updates
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -59,6 +64,8 @@ struct CiceroCommands: Commands {
             Button("About Cicero") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
+            Button("Check for Updates…") { updates.checkForUpdates() }
+                .disabled(!updates.canCheckForUpdates)
         }
         CommandGroup(after: .newItem) {
             Button("Add Folder…") { model.presentAddFolderPanel() }
@@ -88,13 +95,9 @@ struct CiceroCommands: Commands {
             Button("Activate") { model.activate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
-            Menu("Activate Temporarily") {
-                ForEach(TemporaryScope.choices, id: \.self) { scope in
-                    Button(scope.menuTitle) { model.activateTemporarily(selection, scope: scope) }
-                        .keyboardShortcut(scope == .untilQuit ? KeyboardShortcut(.return, modifiers: [.command, .option]) : nil)
-                }
-            }
-            .disabled(!selection.contains(where: \.hasActivatable))
+            Button("Activate Temporarily") { model.activateTemporarily(selection) }
+                .keyboardShortcut(.return, modifiers: [.command, .option])
+                .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
             Button("Deactivate") { model.deactivate(selection) }
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasDeactivatable))
@@ -104,6 +107,9 @@ struct CiceroCommands: Commands {
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
             Button("Show Info") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
+            Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look") { model.quickLook.toggle() }
+                .keyboardShortcut("y", modifiers: .command)
+                .disabled(!model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
             Button("Reveal in Finder") { model.reveal(selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
@@ -124,21 +130,28 @@ struct CiceroCommands: Commands {
             Button("Rebuild Font List") { model.rebuildFontList() }
             Button("Clear Font Caches…") { model.isClearingCaches = true }
         }
+        // The user guide and the project's pages on GitHub, opened in the default browser.
+        CommandGroup(replacing: .help) {
+            Button("Cicero Help") {
+                NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/README.md")!)
+            }
+            .keyboardShortcut("?", modifiers: .command)
+            Button("Release Notes") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/releases")!) }
+            Divider()
+            Button("Report an Issue") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/issues/new")!) }
+        }
     }
 
-    /// "Built by Maximilian Inzinger" under the version in the About panel, the name linking to the website.
+    /// A link to the website under the version in the About panel. The panel puts the copyright
+    /// (NSHumanReadableCopyright, "© 2026 Maximilian Inzinger") below it, so the name isn't repeated here.
     private static var credits: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        let base: [NSAttributedString.Key: Any] = [
+        return NSAttributedString(string: "maximilianinzinger.com", attributes: [
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
             .foregroundColor: NSColor.secondaryLabelColor,
             .paragraphStyle: paragraph,
-        ]
-        let credits = NSMutableAttributedString(string: "Built by ", attributes: base)
-        var link = base
-        link[.link] = URL(string: "https://maximilianinzinger.com")!
-        credits.append(NSAttributedString(string: "Maximilian Inzinger", attributes: link))
-        return credits
+            .link: URL(string: "https://maximilianinzinger.com")!,
+        ])
     }
 }

@@ -24,11 +24,13 @@ struct ActivationSheet: View {
             }
             Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
             HStack {
-                TemporaryMenu { scope in
-                    model.activateTemporarily(prompt.faces, scope: scope)
-                    dismiss()
+                if prompt.faces.contains(where: \.canActivateTemporarily) {
+                    Button("Activate Temporarily") {
+                        model.activateTemporarily(prompt.faces)
+                        dismiss()
+                    }
+                    .help(prompt.faces.count == 1 ? "Turns the font on until Cicero quits." : "Turns the fonts on until Cicero quits.")
                 }
-                .fixedSize()
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
             }
