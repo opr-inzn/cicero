@@ -66,4 +66,6 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   tables make every row whenever an accessibility client walks the window, which with a thousand
   families blocks the main thread for minutes. A lazy stack exposes only the rows on screen.
 - Cicero never connects to the internet. Files it removes go to the Trash; it never deletes a
-  user's only copy of a font.
+  user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
+  engine, exporter and backup, `using:` for app caches), so tests remove temporary files instead and
+  never touch the user's Trash.
