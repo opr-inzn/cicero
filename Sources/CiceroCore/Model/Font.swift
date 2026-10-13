@@ -94,6 +94,12 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.axes = axes
     }
 
+    /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
+    /// axis, not the file's one weight class.
+    public var styleWeight: Double {
+        axes.first { $0.tag == "wght" }?.value ?? Double(weight)
+    }
+
     public var path: String { id.path }
     public var url: URL { URL(fileURLWithPath: id.path, isDirectory: false) }
 

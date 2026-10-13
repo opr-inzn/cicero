@@ -114,7 +114,7 @@ private struct TypeTester: View {
     var body: some View {
         let chosen = family.faces.first { $0.id == styleID }
         let face = chosen ?? family.face(nearestWeight: preview.weight)
-        let weight = chosen.map { Double($0.face.weight) } ?? preview.weight
+        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 if family.faces.count > 1 {
@@ -195,11 +195,11 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: Double(style.face.weight), features: features)
+                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight, features: features)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
-                    Text("\(style.face.weight)").monospacedDigit().foregroundStyle(.secondary)
+                    Text("\(Int(style.face.styleWeight.rounded()))").monospacedDigit().foregroundStyle(.secondary)
                 } status: {
                     HStack(spacing: 8) {
                         MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {

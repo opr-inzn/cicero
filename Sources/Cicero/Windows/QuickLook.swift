@@ -276,7 +276,7 @@ private struct FamilyQuickLook: View {
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 10)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: Self.weight(of: style.face), features: features)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight, features: features)
                             .padding(.horizontal, Self.inset)
                             .padding(.vertical, 5)
                     }
@@ -302,11 +302,6 @@ private struct FamilyQuickLook: View {
         } else {
             QuickLookText(text: preview.sampleText, face: face, size: 56, features: features, kerning: preview.kerning(at: 56), lineLimit: nil)
         }
-    }
-
-    /// A variable font's named instance at its own place on the weight axis, not the regular weight.
-    private static func weight(of face: FontFace) -> Double {
-        face.axes.first { $0.tag == "wght" }?.value ?? Double(face.weight)
     }
 
     private var footer: some View {
