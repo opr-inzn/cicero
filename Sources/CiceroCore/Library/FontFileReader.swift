@@ -64,6 +64,8 @@ enum FontFileReader {
             familyClass: Int((symbolic.rawValue >> 28) & 0xF),
             manufacturer: name(kCTFontManufacturerNameKey, of: font),
             version: name(kCTFontVersionNameKey, of: font),
+            designer: name(kCTFontDesignerNameKey, of: font),
+            vendorID: vendorID(os2),
             weightAxis: axis,
             width: widthClass(os2),
             axes: axes
@@ -89,6 +91,15 @@ enum FontFileReader {
         // AppKit's weight scale: ultraLight -0.8 … regular 0 … black 0.62.
         let scale: [(Double, Int)] = [(-0.8, 100), (-0.6, 200), (-0.4, 300), (0, 400), (0.23, 500), (0.3, 600), (0.4, 700), (0.56, 800), (0.62, 900)]
         return scale.min { abs($0.0 - trait) < abs($1.0 - trait) }!.1
+    }
+
+    /// OS/2 achVendID without its padding; nil when it's blank or isn't printable ASCII.
+    static func vendorID(_ table: Data?) -> String? {
+        guard let table, table.count >= 62 else { return nil }
+        let bytes = table[(table.startIndex + 58)..<(table.startIndex + 62)]
+        guard bytes.allSatisfy({ $0 == 0 || (0x20...0x7E).contains($0) }) else { return nil }
+        let id = String(decoding: bytes.filter { $0 != 0 }, as: UTF8.self).trimmingCharacters(in: .whitespaces)
+        return id.isEmpty ? nil : id
     }
 
     /// OS/2 usWidthClass when it's in range, else normal.

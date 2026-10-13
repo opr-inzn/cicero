@@ -2,22 +2,18 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Adds the Info panel at the trailing edge of the window: a pane floating below the toolbar like the
-/// sidebar. Not SwiftUI's inspector, which runs the full window height under the search field.
-struct InfoPanelColumn: ViewModifier {
+/// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar. Not
+/// SwiftUI's inspector, which runs the full window height under the search field. Over the split view rather
+/// than in its detail column, whose stack swaps the whole column for a pushed font page; each page makes room
+/// for it with `InfoPanelInset`.
+struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
-    private static let width: CGFloat = 300
-    private static let gap: CGFloat = 8
+    static let width: CGFloat = 300
+    static let gap: CGFloat = 8
 
     func body(content: Content) -> some View {
         let isPresented = model.isInfoPresented
-        ZStack(alignment: .trailing) {
-            // Makes room in one step, so a grid reflows once rather than on every frame of the slide. An inset
-            // rather than padding, so the page still runs under the toolbar from edge to edge and the search
-            // field keeps the look it has over the page instead of turning flat above the panel.
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .safeAreaPadding(.trailing, isPresented ? Self.width + Self.gap * 2 : 0)
+        content.overlay(alignment: .trailing) {
             ZStack {
                 if isPresented {
                     let shape = RoundedRectangle(cornerRadius: 20)
@@ -36,8 +32,22 @@ struct InfoPanelColumn: ViewModifier {
             }
             .animation(.snappy, value: isPresented)
         }
-        // The toolbar and the gap around the panel show the page's colour from edge to edge.
-        .background(Color.canvas)
+    }
+}
+
+/// Makes room on a page of the detail column for the Info panel while it's open.
+struct InfoPanelInset: ViewModifier {
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        // Makes room in one step, so a grid reflows once rather than on every frame of the slide. An inset
+        // rather than padding, so the page still runs under the toolbar from edge to edge and the search
+        // field keeps the look it has over the page instead of turning flat above the panel.
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaPadding(.trailing, model.isInfoPresented ? InfoPanelOverlay.width + InfoPanelOverlay.gap * 2 : 0)
+            // The toolbar and the gap around the panel show the page's colour from edge to edge.
+            .background(Color.canvas)
     }
 }
 
@@ -100,7 +110,7 @@ private struct FamilyInfo: View {
             .padding(12)
             Divider()
             switch model.infoTab {
-            case .info: ScrollView { InfoRows(face: face) }
+            case .info: ScrollView { InfoRows(family: family, face: face) }
             case .features: FeatureControls(family: family, face: face.face)
             }
         }
@@ -109,12 +119,14 @@ private struct FamilyInfo: View {
 
 private struct InfoRows: View {
     @Environment(AppModel.self) private var model
+    let family: Family
     let face: LibraryFace
     @State private var info: CiceroCore.FontInfo?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             row("Status", face.state.label)
+            TagsRow(family: family)
             if let info {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
                     self.row(row.label, row.value)
@@ -161,6 +173,39 @@ private struct InfoRows: View {
         VStack(alignment: .leading, spacing: 2) {
             label(title)
             Text(value).font(.callout).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The family's tags, with a menu to give it others or take them off.
+private struct TagsRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+
+    var body: some View {
+        let tags = model.data.tags(of: family.id)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Tags").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Menu(tags.isEmpty ? "Add Tag" : "Edit Tags") { TagMenuItems(families: [family], model: model) }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .fixedSize()
+            }
+            if tags.isEmpty {
+                Text("None").font(.callout).foregroundStyle(.secondary)
+            } else {
+                FlowLayout(spacing: 10, lineSpacing: 4) {
+                    ForEach(tags, id: \.self) { tag in
+                        HStack(spacing: 4) {
+                            TagDots(colors: model.data.tagColors[tag].map { [$0] } ?? [])
+                            Text(tag).font(.callout)
+                        }
+                    }
+                }
+            }
         }
     }
 }

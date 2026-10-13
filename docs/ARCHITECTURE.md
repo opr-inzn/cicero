@@ -15,13 +15,14 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 
 - **Model** (`Model/Font.swift`): `FontFace` (what a file says about one face), `LibraryFace` (a face's
   state in the library), `Family` (faces plus everything lists and filters need, computed once).
-- **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, the Fonts
-  folders, watched folders, the Deactivated folder), reads new or changed files with a stamp-keyed
-  cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint` lets the
-  app skip rescans that changed nothing. `FolderWatcher` (FSEvents) says when font files come or go
-  in the scanned folders.
-- **Data** (`Data/`): `UserData` is everything the user set up (folders, sets, smart sets, tags,
-  foundry names, character sets, sidebar choices, install method, activation records).
+- **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
+  which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
+  with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
+  lets the app skip rescans that changed nothing. `FolderWatcher` (FSEvents) says when font files come or go
+  in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
+  only for that file.
+- **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
+  tags and their colours, foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
@@ -38,7 +39,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
   preview) and prefetches them after scans, four files at a time, what the browser shows first. It keeps
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
-  Feature groups, font info and glyph sections.
+  Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
+  (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
+  their components back to characters through the cmap.
+- **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
+  Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library; `FontFileSearch`
+  asks Spotlight for font files by PostScript name.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
   taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
@@ -65,7 +71,14 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   character set lookups, custom character sets) are cached and keyed on the inputs they depend on. The
   sidebar's choices (open sections, order, hidden items) are user data that no list depends on, so changing
   them leaves `dataRevision`, and the browser's list, as they are.
-- `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
+- `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
+  light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
+  `TextEditor` follows too, so the font page's text and the hidden copy that sizes it agree.
+- Files come in through `AppModel.open` (`Model/AppModel+Files.swift`): from the Finder (Info.plist declares the
+  font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
+  several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from
+  Add Fonts…. It gathers URLs for a moment, adds folders and unlisted files to the user data, and shows
+  their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends).
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Open) can take them.
 - `QuickLook` (`Windows/QuickLook.swift`, owned by `AppModel` like `AppSetWatcher`) runs the Quick Look
@@ -82,6 +95,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   instead of registering a login item from elsewhere (`LoginItem.set`). It finds disk images with
   DiskArbitration, moves through `AppLocation`, and relaunches the copy from a shell script that waits
   for Cicero to quit and detaches the image.
+- The main window's detail column is a NavigationStack, and a stack in a split view's detail column swaps the
+  whole column for a page pushed onto it, dropping whatever is wrapped around the stack. So the Info panel is an
+  overlay on the split view (`InfoPanelOverlay`), and each page (the browser, a font page) makes room for it and
+  takes dropped files itself (`DetailPage`).
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
   `Windows/` (Character Toolbox, Compare, Problems, Quick Look, sheets), `Settings/`. Shared pieces
   are in `Components/`.

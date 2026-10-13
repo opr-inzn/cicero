@@ -29,18 +29,17 @@ extension AppModel {
         }
     }
 
-    /// Sidebar rows whose fonts can be exported: sets, folders, foundries, classifications and character sets.
+    /// Sidebar rows whose fonts can be exported: sets, tags, folders, foundries, classifications and character sets.
     func canExport(_ item: SidebarItem) -> Bool {
         switch item {
-        case .set, .smartSet, .folder, .foundry, .classification, .characterSet: true
+        case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
         case .all, .active, .inactive, .system, .problems: false
         }
     }
 
     /// Exports the families a sidebar row shows, named after the row.
     func exportFonts(in item: SidebarItem, named name: String) {
-        let test = filter(for: item)
-        exportFonts(library.families.filter { (data.showSystemFonts || $0.state != .system) && test($0) }, named: name)
+        exportFonts(families(in: item), named: name)
     }
 
     /// Asks where to put the files (and whether as a folder or a ZIP archive), copies them off the

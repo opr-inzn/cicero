@@ -32,7 +32,7 @@ final class AppModel {
     private(set) var coverageProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
     private(set) var presentClassifications: [Classification] = []
-    /// Cicero's own folder items that have fonts now (Adobe Apps, Deactivated): the sidebar lists them.
+    /// Cicero's own folder items that have fonts now (Adobe Apps, Added Fonts, Deactivated): the sidebar lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Where operations in progress will put switches, shown from the click until the scan after the
     /// operation confirms it (see `expect`).
@@ -54,11 +54,17 @@ final class AppModel {
             }
             if !data.showSystemFonts { deselect { $0 == .system } }
             if data.customCharacterSets != oldValue.customCharacterSets { characterSetLookup.reset() }
+            if data.tags != oldValue.tags || data.familyTags != oldValue.familyTags || data.tagColors != oldValue.tagColors {
+                refreshTagDots()
+            }
             if data.showAdobeFonts != oldValue.showAdobeFonts { rescan() }
         }
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
     private(set) var dataRevision = 0
+    /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
+    /// don't draw again for every change to it.
+    private(set) var tagDots: [String: [TagColor]] = [:]
 
     // MARK: Navigation
 
@@ -100,15 +106,25 @@ final class AppModel {
     var editingAppsForSet: UUID?
     var editingCharacterSet: CustomCharacterSet?
     var isClearingCaches = false
+    /// The document whose fonts the Fonts in Document sheet shows.
+    var documentFonts: DocumentFontsReport?
+    @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
 
     // MARK: Compare
 
     var compareIDs: [String] = []
 
+    // MARK: Opening files
+
+    /// Files and folders opened or dropped, gathered for a moment so several arriving one by one are added together.
+    @ObservationIgnored var openQueue: (urls: [URL], set: UUID?, showsPage: Bool, task: Task<Void, Never>?) = ([], nil, false, nil)
+    /// Files the browser shows once the scan that lists them is done.
+    @ObservationIgnored var awaitingScan: OpenedFiles?
+
     // MARK: Private
 
-    @ObservationIgnored private var started = false
+    @ObservationIgnored private(set) var started = false
     @ObservationIgnored private var scanTask: Task<Void, Never>?
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var coverageTask: Task<Void, Never>?
@@ -146,6 +162,7 @@ final class AppModel {
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
         data = store.load()
+        refreshTagDots()
     }
 
     // MARK: Lifecycle
@@ -176,6 +193,7 @@ final class AppModel {
         }
         dropAdobeFolders()
         rescan()
+        openWaitingFiles()
     }
 
     /// Adobe's font folders used to be added to the user's folders; the Adobe Apps switch covers them now.
@@ -197,8 +215,8 @@ final class AppModel {
         lastScan = Date()
         scanCount += 1
         let id = scanCount
-        let input = ScanInput(folders: data.scannedFolders(), records: data.records)
-        folderWatcher.watch(input.folders.map(\.path))
+        let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
+        folderWatcher.watch(input.folders.map(\.path), files: input.files)
         // Most scans take a fraction of a second; the capsule only shows for one that takes longer.
         latestProgress = .finding
         revealProgress?.cancel()
@@ -235,6 +253,7 @@ final class AppModel {
         }
         dropExpectations(confirmedBy: id)
         mergeExpectations()
+        showOpenedFiles(after: id)
     }
 
     /// CoreText's fonts-changed notification, or font files coming or going in a watched folder.
@@ -421,6 +440,15 @@ final class AppModel {
 
     // MARK: Groups
 
+    private func refreshTagDots() {
+        var dots: [String: [TagColor]] = [:]
+        for family in data.familyTags.keys {
+            let colors = data.tags(of: family).compactMap { data.tagColors[$0] }
+            if !colors.isEmpty { dots[family] = colors }
+        }
+        if dots != tagDots { tagDots = dots }
+    }
+
     private func refreshGroups() {
         var names = Set<String>()
         var classifications = Set<Classification>()
@@ -429,6 +457,7 @@ final class AppModel {
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
             if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
+            if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.showSystemFonts || family.state != .system else { continue }
             if let name = foundryName(family) { names.insert(name) }
             classifications.insert(family.classification)

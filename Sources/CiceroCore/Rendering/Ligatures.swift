@@ -1,0 +1,310 @@
+import CoreText
+import Foundation
+
+/// A ligature a font makes: the characters it stands for and the glyph it draws instead.
+public struct Ligature: Hashable, Sendable, Identifiable {
+    public let glyph: CGGlyph
+    /// The characters it replaces, in order ("f", "f", "i").
+    public let characters: [UInt32]
+
+    public init(glyph: CGGlyph, characters: [UInt32]) {
+        self.glyph = glyph
+        self.characters = characters
+    }
+
+    public var id: [UInt32] { characters }
+
+    /// The characters as text, "ffi".
+    public var text: String {
+        String(String.UnicodeScalarView(characters.compactMap(Unicode.Scalar.init)))
+    }
+}
+
+/// The ligatures of one OpenType feature, as the font page lists them.
+public struct LigatureGroup: Identifiable, Sendable {
+    /// The feature's tag, "liga".
+    public let tag: String
+    public let ligatures: [Ligature]
+    public var id: String { tag }
+
+    public init(tag: String, ligatures: [Ligature]) {
+        self.tag = tag
+        self.ligatures = ligatures
+    }
+
+    /// The features that make ligatures, in the order the font page shows them, with their names.
+    public static let features: [(tag: String, name: String)] = [
+        ("liga", "Standard Ligatures"), ("dlig", "Discretionary Ligatures"), ("hlig", "Historical Ligatures"),
+        ("clig", "Contextual Ligatures"), ("rlig", "Required Ligatures"),
+    ]
+
+    public var name: String { Self.features.first { $0.tag == tag }?.name ?? tag }
+
+    /// Keeps icon fonts, whose ligatures turn thousands of words into symbols, to a sensible number.
+    public static let limit = 3000
+
+    /// The face's ligatures by feature, those whose every component is a character (or another ligature of
+    /// characters); ligatures of alternates and contextual forms that no character maps to are left out. Reads
+    /// the font's GSUB table; call off the main thread.
+    public static func read(_ face: FontFace) -> [LigatureGroup] {
+        let font = FontLoader.shared.font(face, size: 12)
+        guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
+        let found = GSUBLigatures.read(table, features: Set(features.map(\.tag)))
+        guard !found.isEmpty else { return [] }
+        return resolve(found, characters: characterGlyphs(of: font, needed: Set(found.values.flatMap { $0.flatMap(\.components) })))
+    }
+
+    /// Turns glyph ligatures into character ligatures, in feature order. A component that's itself a ligature
+    /// ("f_f" in "f_f_i") stands for its characters.
+    static func resolve(_ found: [String: [GSUBLigatures.Entry]], characters: [CGGlyph: UInt32]) -> [LigatureGroup] {
+        var made: [CGGlyph: [UInt32]] = [:]
+        var pending = features.flatMap { feature in (found[feature.tag] ?? []).map { (feature.tag, $0) } }
+        var resolved: [(String, GSUBLigatures.Entry, [UInt32])] = []
+        // Each pass resolves the ligatures whose components are known by now, so ligatures of ligatures follow.
+        while true {
+            var next: [(String, GSUBLigatures.Entry)] = []
+            for (tag, entry) in pending {
+                var text: [UInt32] = []
+                for component in entry.components {
+                    if let scalar = characters[component] {
+                        text.append(scalar)
+                    } else if let ligature = made[component] {
+                        text += ligature
+                    } else {
+                        text = []
+                        break
+                    }
+                }
+                if text.isEmpty {
+                    next.append((tag, entry))
+                } else {
+                    resolved.append((tag, entry, text))
+                    if made[entry.glyph] == nil { made[entry.glyph] = text }
+                }
+            }
+            guard !next.isEmpty, next.count < pending.count else { break }
+            pending = next
+        }
+        return features.compactMap { feature in
+            var seen = Set<[UInt32]>()
+            var ligatures: [Ligature] = []
+            for (tag, entry, text) in resolved where tag == feature.tag && ligatures.count < limit && seen.insert(text).inserted {
+                ligatures.append(Ligature(glyph: entry.glyph, characters: text))
+            }
+            return ligatures.isEmpty ? nil : LigatureGroup(tag: feature.tag, ligatures: ligatures)
+        }
+    }
+
+    /// The character each needed glyph is drawn for: the lowest one when several share a glyph.
+    private static func characterGlyphs(of font: CTFont, needed: Set<CGGlyph>) -> [CGGlyph: UInt32] {
+        var result: [CGGlyph: UInt32] = [:]
+        var units: [UniChar] = [0, 0]
+        var glyphs: [CGGlyph] = [0, 0]
+        for range in ScalarRanges(characterSet: CTFontCopyCharacterSet(font)).ranges {
+            for scalar in range {
+                let count: Int
+                if scalar < 0x10000 {
+                    units[0] = UniChar(scalar)
+                    count = 1
+                } else {
+                    let value = scalar - 0x10000
+                    units[0] = UniChar(0xD800 + (value >> 10))
+                    units[1] = UniChar(0xDC00 + (value & 0x3FF))
+                    count = 2
+                }
+                guard CTFontGetGlyphsForCharacters(font, units, &glyphs, count) else { continue }
+                let glyph = glyphs[0]
+                if needed.contains(glyph), result[glyph] == nil {
+                    result[glyph] = scalar
+                    if result.count == needed.count { return result }
+                }
+            }
+        }
+        return result
+    }
+}
+
+/// Reads ligature substitutions (lookup type 4) from a GSUB table, by feature. Lookups an extension (type 7)
+/// wraps are read through it, and contextual lookups (types 5 and 6) are followed to the lookups they apply.
+/// Every offset and count is checked against the table, so a damaged one gives fewer ligatures, never a crash.
+enum GSUBLigatures {
+    struct Entry: Hashable {
+        var glyph: CGGlyph
+        var components: [CGGlyph]
+    }
+
+    static func read(_ table: Data, features tags: Set<String>) -> [String: [Entry]] {
+        let reader = Reader(bytes: [UInt8](table))
+        // Header: version (4 bytes), then the offsets of the script, feature and lookup lists.
+        guard let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [:] }
+        let lookups = Lookups(reader: reader, list: lookupList)
+        var result: [String: [Entry]] = [:]
+        var done: [String: Set<Int>] = [:]
+        for record in 0..<(reader.u16(featureList) ?? 0) {
+            let at = featureList + 2 + record * 6
+            guard let tag = reader.tag(at), tags.contains(tag), let offset = reader.u16(at + 4) else { continue }
+            let feature = featureList + offset
+            for index in 0..<(reader.u16(feature + 2) ?? 0) {
+                guard let lookup = reader.u16(feature + 4 + index * 2), done[tag, default: []].insert(lookup).inserted else { continue }
+                var visited = Set<Int>()
+                result[tag, default: []] += lookups.ligatures(in: lookup, visited: &visited)
+            }
+        }
+        return result.filter { !$0.value.isEmpty }
+    }
+
+    private struct Lookups {
+        let reader: Reader
+        let list: Int
+
+        /// A lookup's ligatures, and those of the lookups it applies in context.
+        func ligatures(in index: Int, visited: inout Set<Int>) -> [Entry] {
+            guard visited.insert(index).inserted, visited.count < 64,
+                  index < reader.u16(list) ?? 0, let offset = reader.u16(list + 2 + index * 2)
+            else { return [] }
+            let lookup = list + offset
+            guard let type = reader.u16(lookup), let count = reader.u16(lookup + 4) else { return [] }
+            var entries: [Entry] = []
+            for subtable in 0..<count {
+                guard let offset = reader.u16(lookup + 6 + subtable * 2) else { continue }
+                entries += self.subtable(lookup + offset, type: type, visited: &visited)
+            }
+            return entries
+        }
+
+        private func subtable(_ start: Int, type: Int, visited: inout Set<Int>) -> [Entry] {
+            switch type {
+            case 4:
+                return ligatureSubstitution(start)
+            case 5, 6:
+                return applied(in: start, chained: type == 6).flatMap { ligatures(in: $0, visited: &visited) }
+            case 7:
+                guard reader.u16(start) == 1, let type = reader.u16(start + 2), type != 7, let offset = reader.u32(start + 4) else { return [] }
+                return subtable(start + offset, type: type, visited: &visited)
+            default:
+                return []
+            }
+        }
+
+        /// LigatureSubstFormat1: per first glyph in the coverage, a set of ligatures of the glyphs after it.
+        private func ligatureSubstitution(_ start: Int) -> [Entry] {
+            guard reader.u16(start) == 1, let coverage = reader.u16(start + 2), let setCount = reader.u16(start + 4) else { return [] }
+            let firsts = reader.coverage(start + coverage)
+            var entries: [Entry] = []
+            for (index, first) in firsts.enumerated() where index < setCount {
+                guard let setOffset = reader.u16(start + 6 + index * 2) else { continue }
+                let set = start + setOffset
+                for ligature in 0..<(reader.u16(set) ?? 0) {
+                    guard let offset = reader.u16(set + 2 + ligature * 2), let glyph = reader.u16(set + offset),
+                          let count = reader.u16(set + offset + 2), count >= 2
+                    else { continue }
+                    let rest = (0..<count - 1).compactMap { reader.u16(set + offset + 4 + $0 * 2) }
+                    guard rest.count == count - 1 else { continue }
+                    entries.append(Entry(glyph: CGGlyph(glyph), components: [first] + rest.map(CGGlyph.init)))
+                }
+            }
+            return entries
+        }
+
+        /// The lookups a contextual subtable applies: the lookup list index of every SubstLookupRecord in it.
+        private func applied(in start: Int, chained: Bool) -> [Int] {
+            guard let format = reader.u16(start) else { return [] }
+            switch format {
+            case 1, 2:
+                // Rule sets, each a list of rules, each ending in its records.
+                let first = start + (chained && format == 2 ? 10 : format == 2 ? 6 : 4)
+                guard let setCount = reader.u16(first) else { return [] }
+                var indices: [Int] = []
+                for set in 0..<setCount {
+                    guard let setOffset = reader.u16(first + 2 + set * 2), setOffset != 0 else { continue }
+                    let ruleSet = start + setOffset
+                    for rule in 0..<(reader.u16(ruleSet) ?? 0) {
+                        guard let offset = reader.u16(ruleSet + 2 + rule * 2) else { continue }
+                        indices += chained ? chainedRuleRecords(ruleSet + offset) : ruleRecords(ruleSet + offset)
+                    }
+                }
+                return indices
+            case 3:
+                if chained {
+                    guard let backtrack = reader.u16(start + 2) else { return [] }
+                    var at = start + 4 + backtrack * 2
+                    guard let input = reader.u16(at) else { return [] }
+                    at += 2 + input * 2
+                    guard let lookahead = reader.u16(at) else { return [] }
+                    at += 2 + lookahead * 2
+                    return records(at)
+                }
+                guard let glyphs = reader.u16(start + 2), let count = reader.u16(start + 4) else { return [] }
+                return records(start + 6 + glyphs * 2, count: count)
+            default:
+                return []
+            }
+        }
+
+        /// SubRule and SubClassRule: glyph count, record count, the input after the first, then the records.
+        private func ruleRecords(_ rule: Int) -> [Int] {
+            guard let glyphs = reader.u16(rule), glyphs >= 1, let count = reader.u16(rule + 2) else { return [] }
+            return records(rule + 4 + (glyphs - 1) * 2, count: count)
+        }
+
+        /// ChainSubRule and ChainSubClassRule: backtrack, input after the first, lookahead, then the records.
+        private func chainedRuleRecords(_ rule: Int) -> [Int] {
+            guard let backtrack = reader.u16(rule) else { return [] }
+            var at = rule + 2 + backtrack * 2
+            guard let input = reader.u16(at), input >= 1 else { return [] }
+            at += 2 + (input - 1) * 2
+            guard let lookahead = reader.u16(at) else { return [] }
+            return records(at + 2 + lookahead * 2)
+        }
+
+        /// A count followed by that many SubstLookupRecords (sequence index, lookup list index).
+        private func records(_ at: Int) -> [Int] {
+            guard let count = reader.u16(at) else { return [] }
+            return records(at + 2, count: count)
+        }
+
+        private func records(_ at: Int, count: Int) -> [Int] {
+            (0..<count).compactMap { reader.u16(at + $0 * 4 + 2) }
+        }
+    }
+
+    /// Big-endian reads that return nil past the end of the table.
+    struct Reader {
+        let bytes: [UInt8]
+
+        func u16(_ offset: Int) -> Int? {
+            guard offset >= 0, offset + 2 <= bytes.count else { return nil }
+            return Int(bytes[offset]) << 8 | Int(bytes[offset + 1])
+        }
+
+        func u32(_ offset: Int) -> Int? {
+            guard let high = u16(offset), let low = u16(offset + 2) else { return nil }
+            return high << 16 | low
+        }
+
+        func tag(_ offset: Int) -> String? {
+            guard offset >= 0, offset + 4 <= bytes.count else { return nil }
+            return String(decoding: bytes[offset..<offset + 4], as: UTF8.self)
+        }
+
+        /// The glyphs a Coverage table lists, in coverage index order.
+        func coverage(_ start: Int) -> [CGGlyph] {
+            switch u16(start) {
+            case 1:
+                guard let count = u16(start + 2) else { return [] }
+                return (0..<count).compactMap { u16(start + 4 + $0 * 2) }.map(CGGlyph.init)
+            case 2:
+                guard let count = u16(start + 2) else { return [] }
+                var glyphs: [(index: Int, glyph: CGGlyph)] = []
+                for range in 0..<count {
+                    let at = start + 4 + range * 6
+                    guard let first = u16(at), let last = u16(at + 2), let index = u16(at + 4), first <= last else { continue }
+                    for glyph in first...last { glyphs.append((index + glyph - first, CGGlyph(glyph))) }
+                }
+                return glyphs.sorted { $0.index < $1.index }.map(\.glyph)
+            default:
+                return []
+            }
+        }
+    }
+}

@@ -67,6 +67,10 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var familyClass: Int
     public var manufacturer: String?
     public var version: String?
+    /// The designer the name table credits (name ID 9).
+    public var designer: String?
+    /// The foundry's four-character vendor ID from the OS/2 table ("ADBE"), without padding.
+    public var vendorID: String?
     public var weightAxis: WeightAxis?
     /// OS/2 width class, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded).
     public var width: Int
@@ -76,7 +80,8 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int,
-        manufacturer: String?, version: String?, weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = []
+        manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
+        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = []
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -89,6 +94,8 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.familyClass = familyClass
         self.manufacturer = manufacturer
         self.version = version
+        self.designer = designer
+        self.vendorID = vendorID
         self.weightAxis = weightAxis
         self.width = width
         self.axes = axes
@@ -283,6 +290,9 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     case web = "Web Font"
     case mixed = "Mixed"
     case other = "Other"
+
+    /// The file extensions Cicero reads fonts from.
+    public static var fileExtensions: Set<String> { FontFileReader.fontExtensions }
 
     public static func of(path: String) -> FontFormat {
         switch (path as NSString).pathExtension.lowercased() {

@@ -44,6 +44,7 @@ private struct Specimen: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(family.name).font(.headline).lineLimit(1)
+                TagDots(colors: model.tagColors(of: family))
                 StatusTag(family: family)
                 Text([foundry, family.stylesLabel].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
@@ -58,6 +59,7 @@ private struct Specimen: View {
                 size: preview.size, weight: preview.weight,
                 features: model.features(for: family), kerning: preview.kerning(at: preview.size)
             )
+            .frame(maxWidth: .infinity, alignment: preview.alignment.frame)
             if family.faces.count > 1 {
                 FlowLayout(spacing: 14, lineSpacing: 4) {
                     ForEach(family.faces.prefix(Self.styleLimit)) { face in
