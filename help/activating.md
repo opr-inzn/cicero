@@ -75,7 +75,7 @@ Turning a font off never deletes your only copy of it. What happens to the file 
 | The font was | When you turn it off |
 | --- | --- |
 | Used where it is, or on temporarily | macOS stops using it. The file stays where it is. |
-| A copy Cicero installed in your Fonts folder, and the original is still there | The copy goes to the Trash. The original stays where it is. |
+| A copy Cicero installed in your Fonts folder, and the original is still there, unchanged | The copy goes to the Trash. The original stays where it is. |
 | Any other file in your Fonts folder | The file moves to Cicero’s [Deactivated folder](#the-deactivated-folder). If Cicero didn’t install it, Cicero asks first. |
 | In a folder an app loads by itself, like Adobe’s | The file moves to the Deactivated folder, so the app stops loading it too. See [Fonts for Adobe apps](#fonts-for-adobe-apps). |
 
