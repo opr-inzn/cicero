@@ -27,7 +27,7 @@ For **All Fonts**, **Activated**, **Not Activated** or **System Fonts**, select 
 - Each file once, even when it holds several styles or families. Only the file each style is using, not its other copies.
 - No fonts that come with macOS or an app, and no Adobe Fonts. The message afterwards says how many were left out.
 
-If the place you pick already has something with that name and you choose to replace it, Cicero moves the old one to the Trash first. It never writes over files.
+If the place you pick already has something with that name and you choose to replace it, Cicero moves the old one to the Trash once the export is complete; if the export fails or you cancel, the old one stays. It never writes over files, and it won’t replace a folder that holds fonts Cicero uses, like your Fonts folder or a watched folder: choose another name or place.
 
 Before you send fonts to someone, check that their licenses allow it.
 
