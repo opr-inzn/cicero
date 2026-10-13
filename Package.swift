@@ -1,5 +1,9 @@
 // swift-tools-version: 6.2
+import Foundation
 import PackageDescription
+
+// The tests stay out of the public repository, so a clone builds without them.
+let hasTests = FileManager.default.fileExists(atPath: Context.packageDirectory + "/Tests/CiceroCoreTests")
 
 let package = Package(
     name: "Cicero",
@@ -20,6 +24,7 @@ let package = Package(
             // Sparkle.framework is embedded in Contents/Frameworks.
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
+    ] + (hasTests ? [
         .testTarget(name: "CiceroCoreTests", dependencies: ["CiceroCore"], path: "Tests/CiceroCoreTests"),
-    ]
+    ] : [])
 )
