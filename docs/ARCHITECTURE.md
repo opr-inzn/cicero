@@ -62,7 +62,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 
 - Views read precomputed values; anything that walks the whole library or reads files happens in
   CiceroCore, off the main thread, and only when its inputs change.
-- Views shown inside `Table` cells get the model passed in, not from the environment: AppKit can
-  build cells outside SwiftUI's update.
+- Long lists of families are lazy stacks (`FontList`, `FamilyRowList`), never `Table` or `List`: AppKit's
+  tables make every row whenever an accessibility client walks the window, which with a thousand
+  families blocks the main thread for minutes. A lazy stack exposes only the rows on screen.
 - Cicero never connects to the internet. Files it removes go to the Trash; it never deletes a
   user's only copy of a font.

@@ -120,39 +120,36 @@ private struct TextTab: View {
         let model = self.model
         let preview = self.preview
         let sample = query.text
-        return Table(matches, selection: $selection) {
-            TableColumn("Name") { match in
-                HStack(spacing: 6) {
-                    Text(match.family.name).lineLimit(1)
-                    StatusTag(family: match.family)
+        let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Name").frame(width: 220, alignment: .leading)
+                Text("Sample").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Missing").frame(width: 160, alignment: .leading)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            Divider()
+            FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
+                HStack(spacing: 12) {
+                    HStack(spacing: 6) {
+                        Text(family.name).lineLimit(1)
+                        StatusTag(family: family)
+                    }
+                    .frame(width: 220, alignment: .leading)
+                    FontText(
+                        text: sample, face: family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
+                        features: model.features(for: family), kerning: preview.kerning(at: 17)
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 22)
+                    .clipped()
+                    Text(Self.characters(missing[family.id] ?? [])).foregroundStyle(.secondary).lineLimit(1)
+                        .frame(width: 160, alignment: .leading)
                 }
-                .draggable(match.family.name)
             }
-            .width(min: 140, ideal: 220)
-
-            TableColumn("Sample") { match in
-                FontText(
-                    text: sample, face: match.family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
-                    features: model.features(for: match.family), kerning: preview.kerning(at: 17)
-                )
-                .frame(height: 22)
-            }
-            .width(min: 200, ideal: 460)
-
-            TableColumn("Missing") { match in
-                Text(Self.characters(match.missing)).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .width(min: 80, ideal: 160)
-        }
-        .contextMenu(forSelectionType: String.self) { ids in
-            FamilyMenu(families: ids.compactMap(model.family), model: model)
-        } primaryAction: { ids in
-            if ids.count == 1, let id = ids.first { open(id) }
-        }
-        .onKeyPress(.return) {
-            guard selection.count == 1, let id = selection.first else { return .ignored }
-            open(id)
-            return .handled
         }
     }
 
@@ -300,19 +297,21 @@ private struct LanguagesTab: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
-                List(selection: $selection) {
-                    section("Fully Supported", support.full, language)
-                    section("Base Characters Only", support.base, language)
-                }
-                .contextMenu(forSelectionType: String.self) { ids in
-                    FamilyMenu(families: ids.compactMap(model.family), model: model)
-                } primaryAction: { ids in
-                    if ids.count == 1, let id = ids.first { open(id) }
-                }
-                .onKeyPress(.return) {
-                    guard selection.count == 1, let id = selection.first else { return .ignored }
-                    open(id)
-                    return .handled
+                FamilyRowList(sections: [
+                    FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
+                    FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
+                ], selection: $selection, open: open) { family in
+                    HStack(spacing: 12) {
+                        HStack(spacing: 6) {
+                            Text(family.name).lineLimit(1)
+                            StatusTag(family: family)
+                        }
+                        .frame(width: 220, alignment: .leading)
+                        FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 22)
+                            .clipped()
+                    }
                 }
             }
             .task(id: query) { await load(query) }
@@ -328,26 +327,6 @@ private struct LanguagesTab: View {
             parts.append("checking characters, \(progress.done.formatted()) of \(progress.total.formatted())")
         }
         return parts.joined(separator: " · ")
-    }
-
-    private func section(_ title: String, _ families: [Family], _ language: Language) -> some View {
-        Section("\(title) (\(families.count.formatted()))") {
-            if families.isEmpty {
-                Text("None").foregroundStyle(.tertiary).selectionDisabled()
-            }
-            ForEach(families) { family in
-                HStack(spacing: 12) {
-                    HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
-                        StatusTag(family: family)
-                    }
-                    .frame(width: 220, alignment: .leading)
-                    FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .draggable(family.name)
-            }
-        }
     }
 
     private func open(_ id: String) {
