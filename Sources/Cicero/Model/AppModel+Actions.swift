@@ -312,6 +312,14 @@ extension AppModel {
 
     // MARK: Drag and drop
 
+    /// Sidebar rows that family names can be dropped onto: sets and foundries.
+    func takesFamilies(_ item: SidebarItem) -> Bool {
+        switch item {
+        case .set, .foundry: true
+        default: false
+        }
+    }
+
     /// Family names dropped onto a sidebar row.
     func handleDrop(_ names: [String], on item: SidebarItem) -> Bool {
         let families = names.compactMap(family)
@@ -326,7 +334,8 @@ extension AppModel {
 
     // MARK: Sidebar
 
-    /// The sections below the library rows, in the user's order.
+    /// The sections below the library rows. They no longer move, but an order saved when they did is kept
+    /// (Reset Order puts them back).
     var sections: [SidebarSection] {
         data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
     }
@@ -354,10 +363,10 @@ extension AppModel {
         case .folders:
             var folders = data.folders
             // Every folder Adobe apps load by themselves is one item.
-            if library.families.contains(where: { $0.folderIDs.contains(WatchedFolder.adobeAppsID) }) {
+            if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
             }
-            if library.families.contains(where: { $0.folderIDs.contains(WatchedFolder.deactivatedID) }) {
+            if ownFoldersWithFonts.contains(WatchedFolder.deactivatedID) {
                 folders.append(WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path))
             }
             return folders.map {
@@ -404,11 +413,9 @@ extension AppModel {
     /// What the sidebar list selects. Several items only within one list (a section, or a group of
     /// character sets), so they can move together: Command-clicking in another list starts over there.
     func selectSidebarItems(_ items: Set<SidebarItem>) {
-        guard !items.isEmpty else { selection = nil; return }
-        let added = items.subtracting(selectedItems)
-        let anchor = added.count == 1 ? added.first! : selection.flatMap { items.contains($0) ? $0 : nil } ?? items.first!
-        let list = sidebarList(of: anchor)
-        let items = items.filter { sidebarList(of: $0) == list }
+        let items = sidebarSelection(items, from: selectedItems)
+        guard let any = items.first else { selection = nil; return }
+        let list = sidebarList(of: any)
         // The one selected before when it's still there, else the first. Problems has no fonts to show,
         // so it's never the one among several.
         let candidates = items.count > 1 ? items.subtracting([.problems]) : items
@@ -420,6 +427,16 @@ extension AppModel {
             selectedIDs = []
             openFamilyID = nil
         }
+    }
+
+    /// What the list's selection becomes when it goes from `current` to `items`: the items in the list of
+    /// the one just added (else of the one selected before), so that several are only ever in one list.
+    func sidebarSelection(_ items: Set<SidebarItem>, from current: Set<SidebarItem>) -> Set<SidebarItem> {
+        guard !items.isEmpty else { return [] }
+        let added = items.subtracting(current)
+        let anchor = added.count == 1 ? added.first! : selection.flatMap { items.contains($0) ? $0 : nil } ?? items.first!
+        let list = sidebarList(of: anchor)
+        return items.filter { sidebarList(of: $0) == list }
     }
 
     /// Takes items that are gone, or hidden, out of the sidebar selection; All Fonts when none are left.
@@ -437,8 +454,8 @@ extension AppModel {
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .foundry: SidebarSection.foundries.rawValue
         case .classification: SidebarSection.classifications.rawValue
-        case .characterSet:
-            "charsetgroup.\(characterSetGroups.first { $0.rows.contains { $0.item == item } }?.id ?? "")"
+        case .characterSet(let id):
+            "charsetgroup.\(id.hasPrefix("custom.") ? CharacterSetDefinition.customGroupID : characterSetCatalog.definition(id)?.groupID ?? "")"
         }
     }
 
@@ -476,13 +493,6 @@ extension AppModel {
     /// `shown` is what the list shows, `all` the keys of every item it has.
     func moveSidebarItems(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
         data.sidebar.move(source, to: destination, shown: shown, all: all, in: list)
-    }
-
-    /// Puts a section where `target` is; `target` moves aside, towards where the section was.
-    func moveSection(_ section: SidebarSection, onto target: SidebarSection) {
-        let keys = sections.map(\.key)
-        guard let from = keys.firstIndex(of: section.key), let to = keys.firstIndex(of: target.key), from != to else { return }
-        data.sidebar.move([from], to: from < to ? to + 1 : to, shown: keys, all: keys, in: "sections")
     }
 
     var hasSidebarOrder: Bool { !data.sidebar.order.isEmpty }

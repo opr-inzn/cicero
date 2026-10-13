@@ -107,9 +107,18 @@ extension AppModel {
     }
 
     func foundryName(of family: Family) -> String? {
-        if let override = data.foundryOverrides[family.id] { return override }
-        guard let raw = family.manufacturer else { return nil }
-        return data.foundryRenames[raw] ?? raw
+        foundryNamer()(family)
+    }
+
+    /// `foundryName(of:)` for many families: the user's names are read once, not for every family.
+    func foundryNamer() -> (Family) -> String? {
+        let overrides = data.foundryOverrides
+        let renames = data.foundryRenames
+        return { family in
+            if let override = overrides[family.id] { return override }
+            guard let raw = family.manufacturer else { return nil }
+            return renames[raw] ?? raw
+        }
     }
 
     func features(for family: Family) -> [FeatureSetting] { familyFeatures[family.id] ?? [] }
@@ -176,7 +185,9 @@ extension AppModel {
         case .smartSet(let id):
             guard let smartSet = data.smartSets.first(where: { $0.id == id }) else { return { _ in false } }
             return matcher(for: smartSet)
-        case .foundry(let name): return { self.foundryName(of: $0) == name }
+        case .foundry(let name):
+            let foundryName = foundryNamer()
+            return { foundryName($0) == name }
         case .classification(let classification): return { $0.classification == classification }
         case .characterSet(let id):
             guard let set = characterSet(id) else { return { _ in false } }
@@ -284,8 +295,14 @@ extension AppModel {
         characterSetCatalog.builtIn + customCharacterSets
     }
 
+    /// Cached: reading a set's characters from what the user typed takes a while for a long one, and the
+    /// sidebar and the lists ask on every update.
     var customCharacterSets: [CharacterSetDefinition] {
-        data.customCharacterSets.enumerated().map { CharacterSetCatalog.definition(for: $1, level: $0) }
+        let sets = data.customCharacterSets
+        if let cached = customSetsCache, cached.sets == sets { return cached.definitions }
+        let definitions = sets.enumerated().map { CharacterSetCatalog.definition(for: $1, level: $0) }
+        customSetsCache = (sets, definitions)
+        return definitions
     }
 
     func characterSet(_ id: String) -> CharacterSetDefinition? {
