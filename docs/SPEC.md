@@ -53,11 +53,15 @@ ellipsis character (…) for items that ask for more input.
   row's cells whenever an accessibility client — a password manager's autofill, say — walks the window, and
   with a thousand families kept the app busy for minutes each time it came to the front): Status (switch) ·
   Name (+ status tag) · Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL
-  (largest of Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) ·
-  Format (hidden). Click a header to sort by it, again to reverse; right-click the headers to show or hide
-  columns (Status, Name and Preview always show); drag a header's right edge to resize it (shown columns and
-  widths saved). When the room runs short (the Info panel open), the preview gives way first, then the other
-  columns down to their minimums. Selection as in the grid, plus ↑/↓ (⇧ extends).
+  (largest of Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · GF Latin, GF Cyrillic,
+  GF Greek (hidden; largest of each script's Google sets, shown as "Plus"; GF Latin African branches off
+  Core, so it isn't in the series) · any set no series covers: a Unicode block, GF Latin African, a custom
+  set (hidden; ✓ when the family has all of it, "12 missing" when some) · Date Added (hidden) · Format
+  (hidden). Click a header to sort by it, again to reverse; right-click the headers to show or hide
+  columns, those single sets under Character Sets (Status, Name and Preview always show); drag a header's
+  right edge to resize it (shown columns and widths saved). When the room runs short (the Info panel open),
+  the preview gives way first, then the other columns down to their minimums. Selection as in the grid,
+  plus ↑/↓ (⇧ extends).
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
   text when set), name, and what the family's styles span, in Title Case, along the registered axes
   (MDN order: weight, width, italic, then optical size) and then the designer's own: "9 Weights · 3
