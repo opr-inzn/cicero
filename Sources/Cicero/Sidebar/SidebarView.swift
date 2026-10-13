@@ -68,17 +68,16 @@ struct SidebarView: View {
             )) {
                 movableRows(group.rows, in: key(group.id), section: .characterSets)
             } label: {
-                // Only the chevron toggles a group in a selectable list; make the title do it too.
-                Button {
-                    guard !model.isEditingSidebar else { return }
-                    withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
-                } label: {
-                    Text(group.title)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
+                // Only the chevron toggles a group in a selectable list; make the title do it too. A tap
+                // rather than a button, so the title doesn't dim while it's pressed.
+                Text(group.title)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        guard !model.isEditingSidebar else { return }
+                        withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
+                    }
             }
         }
         .onMove {
@@ -137,6 +136,12 @@ struct SidebarView: View {
             if !model.isEditingSidebar { addButton(section) }
         }
         .padding(.trailing, 10)
+        // Only the chevron toggles a section in a sidebar list; make the whole title row do it too.
+        .contentShape(.rect)
+        .onTapGesture {
+            let isExpanded = expansion(section)
+            withAnimation(.snappy) { isExpanded.wrappedValue.toggle() }
+        }
         .background {
             if sectionDropTarget == section {
                 RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.leading, -6)
@@ -144,12 +149,21 @@ struct SidebarView: View {
         }
         // A list drags a header as a picture of it and ignores drag previews, so the rows fold away instead.
         .draggable(beginDrag(of: section))
+        // A move, not the default copy, so the pointer doesn't get a green plus.
+        .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
+                                             operationsOutsideApp: .init(allowCopy: false)))
         .dropDestination(for: SectionDrag.self) { drags, _ in
-            guard let dragged = drags.first.flatMap({ SidebarSection(rawValue: $0.section) }), dragged != section else { return false }
+            guard let dragged = drags.first.flatMap({ SidebarSection(rawValue: $0.section) }), dragged != section else { return }
             withAnimation(.snappy) { model.moveSection(dragged, onto: section) }
-            return true
-        } isTargeted: { targeted in
-            if targeted { sectionDropTarget = section } else if sectionDropTarget == section { sectionDropTarget = nil }
+        }
+        .dropConfiguration { _ in DropConfiguration(operation: draggedSection == section ? .forbidden : .move) }
+        .onDropSessionUpdated { session in
+            switch session.phase {
+            case .entering, .active:
+                if draggedSection != section { sectionDropTarget = section }
+            default:
+                if sectionDropTarget == section { sectionDropTarget = nil }
+            }
         }
     }
 
