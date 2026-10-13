@@ -51,6 +51,12 @@
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>When you choose Find on This Mac, Cicero looks here for the files of the fonts a document uses. Nothing leaves your Mac.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>When you choose Find on This Mac, Cicero looks here for the files of the fonts a document uses. Nothing leaves your Mac.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>When you choose Find on This Mac, Cicero looks here for the files of the fonts a document uses. Nothing leaves your Mac.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Cicero asks macOS to restart your Mac when you choose Restart Now after clearing font caches.</string>
     <key>NSHumanReadableCopyright</key>

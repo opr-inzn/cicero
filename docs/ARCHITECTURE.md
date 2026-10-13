@@ -15,8 +15,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 
 - **Model** (`Model/Font.swift`): `FontFace` (what a file says about one face), `LibraryFace` (a face's
   state in the library), `Family` (faces plus everything lists and filters need, computed once).
-- **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, the Fonts
-  folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
+- **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
+  which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
   with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
   lets the app skip rescans that changed nothing. `FolderWatcher` (FSEvents) says when font files come or go
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
@@ -42,6 +42,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
   (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
   their components back to characters through the cmap.
+- **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
+  Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library; `FontFileSearch`
+  asks Spotlight for font files by PostScript name.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
   taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
@@ -92,6 +95,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   instead of registering a login item from elsewhere (`LoginItem.set`). It finds disk images with
   DiskArbitration, moves through `AppLocation`, and relaunches the copy from a shell script that waits
   for Cicero to quit and detaches the image.
+- The main window's detail column is a NavigationStack, and a stack in a split view's detail column swaps the
+  whole column for a page pushed onto it, dropping whatever is wrapped around the stack. So the Info panel is an
+  overlay on the split view (`InfoPanelOverlay`), and each page (the browser, a font page) makes room for it and
+  takes dropped files itself (`DetailPage`).
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
   `Windows/` (Character Toolbox, Compare, Problems, Quick Look, sheets), `Settings/`. Shared pieces
   are in `Components/`.

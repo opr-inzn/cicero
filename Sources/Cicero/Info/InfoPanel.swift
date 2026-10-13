@@ -2,22 +2,18 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Adds the Info panel at the trailing edge of the window: a pane floating below the toolbar like the
-/// sidebar. Not SwiftUI's inspector, which runs the full window height under the search field.
-struct InfoPanelColumn: ViewModifier {
+/// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar. Not
+/// SwiftUI's inspector, which runs the full window height under the search field. Over the split view rather
+/// than in its detail column, whose stack swaps the whole column for a pushed font page; each page makes room
+/// for it with `InfoPanelInset`.
+struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
-    private static let width: CGFloat = 300
-    private static let gap: CGFloat = 8
+    static let width: CGFloat = 300
+    static let gap: CGFloat = 8
 
     func body(content: Content) -> some View {
         let isPresented = model.isInfoPresented
-        ZStack(alignment: .trailing) {
-            // Makes room in one step, so a grid reflows once rather than on every frame of the slide. An inset
-            // rather than padding, so the page still runs under the toolbar from edge to edge and the search
-            // field keeps the look it has over the page instead of turning flat above the panel.
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .safeAreaPadding(.trailing, isPresented ? Self.width + Self.gap * 2 : 0)
+        content.overlay(alignment: .trailing) {
             ZStack {
                 if isPresented {
                     let shape = RoundedRectangle(cornerRadius: 20)
@@ -36,8 +32,22 @@ struct InfoPanelColumn: ViewModifier {
             }
             .animation(.snappy, value: isPresented)
         }
-        // The toolbar and the gap around the panel show the page's colour from edge to edge.
-        .background(Color.canvas)
+    }
+}
+
+/// Makes room on a page of the detail column for the Info panel while it's open.
+struct InfoPanelInset: ViewModifier {
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        // Makes room in one step, so a grid reflows once rather than on every frame of the slide. An inset
+        // rather than padding, so the page still runs under the toolbar from edge to edge and the search
+        // field keeps the look it has over the page instead of turning flat above the panel.
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaPadding(.trailing, model.isInfoPresented ? InfoPanelOverlay.width + InfoPanelOverlay.gap * 2 : 0)
+            // The toolbar and the gap around the panel show the page's colour from edge to edge.
+            .background(Color.canvas)
     }
 }
 
