@@ -76,29 +76,45 @@ public struct FontExporter: Sendable {
     public init() {}
 
     /// Writes the plan's files to `destination`: a folder (or, for `.zip`, an archive of one) with a
-    /// subfolder per family, or the files themselves when there's one family. The save panel has
-    /// already confirmed replacing an item at `destination`; it goes to the Trash first, never over.
+    /// subfolder per family, or the files themselves when there's one family. It's built in a private
+    /// folder on the same disk and moved there once complete, so a cancelled or failed export leaves
+    /// nothing behind. The save panel has already confirmed replacing an item at `destination`; it goes
+    /// to the Trash then, never under the new one, unless it is or holds one of the exported files or of
+    /// `kept` (see `keptPaths`): then nothing moves and this throws `KeptItemError`.
     @concurrent
-    public func export(_ plan: FontExportPlan, to destination: URL, format: FontExportFormat) async throws -> URL {
+    public func export(_ plan: FontExportPlan, to destination: URL, format: FontExportFormat, keeping kept: [String] = []) async throws -> URL {
         let fm = FileManager.default
-        if fm.fileExists(atPath: destination.path) { try trash(destination) }
+        let replacement = try ItemReplacement(for: destination, keeping: kept + plan.items.flatMap(\.paths))
+        defer { replacement.discard() }
         switch format {
         case .folder:
-            do {
-                try Self.copy(plan, into: destination)
-            } catch {
-                // Only ever a folder this export just made.
-                try? fm.removeItem(at: destination)
-                throw error
-            }
+            try Self.copy(plan, into: replacement.staged)
         case .zip:
             let staging = fm.temporaryDirectory.appendingPathComponent("Cicero Export \(UUID().uuidString)", isDirectory: true)
             defer { try? fm.removeItem(at: staging) }
             let folder = staging.appendingPathComponent(destination.deletingPathExtension().lastPathComponent, isDirectory: true)
             try Self.copy(plan, into: folder)
-            try await Archive.zip(folder, to: destination)
+            try await Archive.zip(folder, to: replacement.staged)
         }
+        try Task.checkCancellation()
+        try replacement.commit(trash: trash)
         return destination
+    }
+
+    /// What an export or backup must never move to the Trash to make room: every font file in the library
+    /// and every file Cicero's records name, the Fonts folders, Cicero's own folder and its Deactivated folder,
+    /// and the scanned folders.
+    public static func keptPaths(in library: Library, data: UserData, locations: Locations) -> [String] {
+        var paths = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.deactivated.path]
+            + data.scannedFolders().map(\.path)
+        for family in library.families {
+            for face in family.faces { paths += [face.face.path] + face.otherCopies }
+        }
+        let records = data.records
+        paths += records.inPlace
+        paths += records.installedCopies.flatMap { [$0.key, $0.value] }
+        paths += records.appFolderOrigins.flatMap { [$0.key, $0.value] }
+        return paths
     }
 
     /// Copies with FileManager, which clones on APFS. `folder` doesn't exist yet.

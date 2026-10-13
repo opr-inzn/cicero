@@ -113,9 +113,10 @@ public enum AppFontCaches {
         return Found(app: app, items: items, size: size)
     }
 
-    /// Moves every found item to the Trash; returns how many couldn't be moved.
-    public static func trash(_ found: Found) -> Int {
-        found.items.count { (try? FileManager.default.trashItem(at: $0, resultingItemURL: nil)) == nil }
+    /// Moves every found item to the Trash; returns how many couldn't be moved. Tests pass their own
+    /// `trash` so they don't fill the user's Trash.
+    public static func trash(_ found: Found, using trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) -> Int {
+        found.items.count { (try? trash($0)) == nil }
     }
 
     private static func glob(_ pattern: String) -> [String] {

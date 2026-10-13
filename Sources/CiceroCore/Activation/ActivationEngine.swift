@@ -153,19 +153,25 @@ public struct TrashPlan: Sendable, Identifiable {
     public var removedFamilies: [String]
     /// The paths are every copy of some fonts, wherever they are; false for files picked one by one.
     public var includesCopies: Bool
+    /// For files Problems offers to remove: this library's fonts must each keep a copy in another file
+    /// (the `otherFamilies` too), checked again right before trashing, since a copy may have gone since.
+    public var spareCopiesOf: Library?
 
-    public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String], includesCopies: Bool = true) {
+    public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String],
+                includesCopies: Bool = true, spareCopiesOf: Library? = nil) {
         self.title = title
         self.paths = paths
         self.otherFamilies = otherFamilies
         self.protectedCount = protectedCount
         self.removedFamilies = removedFamilies
         self.includesCopies = includesCopies
+        self.spareCopiesOf = spareCopiesOf
     }
 }
 
-/// Turns fonts on and off. Never deletes a user's only copy: installed copies go to the Trash only
-/// when another copy exists, other files in ~/Library/Fonts move to Cicero's Deactivated folder.
+/// Turns fonts on and off. Never deletes a user's only copy: a copy Cicero installed goes to the Trash
+/// only when the file it was copied from is still there with the same contents; every other file in
+/// ~/Library/Fonts moves to Cicero's Deactivated folder.
 public struct ActivationEngine: Sendable {
     private let locations: Locations
     let registrar: any FontRegistrar
@@ -286,12 +292,10 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
-    /// Faces in ~/Library/Fonts that Cicero didn't install and that have no other copy: deactivating
-    /// them moves the file into Cicero's Deactivated folder, so the app asks first.
+    /// Faces in ~/Library/Fonts whose file Cicero didn't install: deactivating them moves the file into
+    /// Cicero's Deactivated folder, other copies or not, so the app asks first.
     public func unmanaged(_ faces: [LibraryFace], records: ActivationRecords) -> [LibraryFace] {
-        faces.filter { face in
-            face.state.source == .fontsFolder && records.installedCopies[face.face.path] == nil && restorableOriginal(of: face, records: records) == nil
-        }
+        faces.filter { $0.state.source == .fontsFolder && records.installedCopies[$0.face.path] == nil }
     }
 
     /// Faces an app loads from its own folder also leave that folder for Cicero's Deactivated folder,
@@ -336,7 +340,7 @@ public struct ActivationEngine: Sendable {
             var kept: [String] = []
             for face in installed {
                 do {
-                    try moveOutOfFontsFolder(face, records: records)
+                    try moveOutOfFontsFolder(face.face.path, records: records)
                     records.installedCopies[face.face.path] = nil
                     succeeded += 1
                 } catch {
@@ -455,10 +459,34 @@ public struct ActivationEngine: Sendable {
         return TrashPlan(title: title, paths: paths, otherFamilies: otherFamilies, protectedCount: protectedCount, removedFamilies: removed)
     }
 
+    /// For a fix in Problems: files that are spare copies (or that nothing can read), picked one by one.
+    /// Names the families besides `family` with faces in them, which keep their other copies; `moveToTrash`
+    /// checks the files are still spare right before it trashes them. nil when every file is protected.
+    public func spareCopiesTrashPlan(_ paths: [String], family: String?, in library: Library) -> TrashPlan? {
+        let allowed = paths.filter { !Self.isProtected($0) }
+        guard !allowed.isEmpty else { return nil }
+        let set = Set(allowed)
+        let otherFamilies = library.families
+            .filter { $0.id != family && $0.faces.contains { set.contains($0.face.path) || $0.otherCopies.contains(where: set.contains) } }
+            .map(\.id)
+        return TrashPlan(
+            title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) files",
+            paths: allowed, otherFamilies: otherFamilies, protectedCount: paths.count - allowed.count, removedFamilies: [],
+            includesCopies: false, spareCopiesOf: library
+        )
+    }
+
     /// Files in use are unregistered first, so apps drop them at once.
     @concurrent
     public func moveToTrash(_ plan: TrashPlan, records: ActivationRecords) async -> ActivationResult {
         var records = records
+        if let library = plan.spareCopiesOf {
+            var copies = SpareCopies(library)
+            guard copies.areSpare(Set(plan.paths)) else {
+                let message = plan.paths.count == 1 ? "Kept the file: it holds the only copy of a font." : "Kept the files: some hold the only copy of a font."
+                return ActivationResult(records: records, succeeded: 0, failed: plan.paths, message: message)
+            }
+        }
         var failed: [String] = []
         var succeeded = 0
         let persistent = plan.paths.filter { records.inPlace.contains($0) || isInsideUserFonts($0) }
@@ -663,10 +691,14 @@ public struct ActivationEngine: Sendable {
         return destination.path
     }
 
-    /// Trashes an installed copy when its original is still there, else keeps the file in Cicero's Deactivated folder.
-    private func moveOutOfFontsFolder(_ face: LibraryFace, records: ActivationRecords) throws {
-        let url = Self.url(face.face.path)
-        if restorableOriginal(of: face, records: records) != nil {
+    /// Trashes a copy Cicero installed when the file it was copied from is still there, unchanged. Any
+    /// other file, the user's own or a copy whose origin is gone or changed, keeps its place in the library
+    /// in Cicero's Deactivated folder: another file with the same font names (macOS's, Adobe Fonts', another
+    /// version) is no copy of it. The whole file decides, so a collection or variable font goes to the
+    /// Trash only when every face in it is in the origin.
+    private func moveOutOfFontsFolder(_ path: String, records: ActivationRecords) throws {
+        let url = Self.url(path)
+        if let origin = records.installedCopies[path], Self.isIdenticalCopy(path, of: origin) {
             try trash(url)
         } else {
             let fm = FileManager.default
@@ -675,13 +707,18 @@ public struct ActivationEngine: Sendable {
         }
     }
 
-    /// The recorded origin, or another copy outside ~/Library/Fonts, when it still exists.
-    private func restorableOriginal(of face: LibraryFace, records: ActivationRecords) -> String? {
-        let fm = FileManager.default
-        var candidates: [String] = []
-        if let origin = records.installedCopies[face.face.path] { candidates.append(origin) }
-        candidates += face.otherCopies.filter { !isInsideUserFonts($0) }
-        return candidates.first { fm.fileExists(atPath: $0) }
+    /// Whether two paths are separate files with the same bytes, so one can go without losing any face in
+    /// it. The same file reached twice (a symbolic link, a hard link) is no copy. A file iCloud has taken off
+    /// the Mac is never read, which would download it, so it doesn't count either.
+    public static func isIdenticalCopy(_ path: String, of original: String) -> Bool {
+        var copy = stat(), source = stat()
+        guard stat(path, &copy) == 0, stat(original, &source) == 0,
+              copy.st_mode & S_IFMT == S_IFREG, source.st_mode & S_IFMT == S_IFREG,
+              copy.st_dev != source.st_dev || copy.st_ino != source.st_ino,
+              copy.st_size == source.st_size,
+              (copy.st_flags | source.st_flags) & UInt32(SF_DATALESS) == 0
+        else { return false }
+        return FileManager.default.contentsEqual(atPath: path, andPath: original)
     }
 
     /// "Name.otf", then "Name 2.otf", "Name 3.otf"…

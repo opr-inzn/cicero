@@ -40,7 +40,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
-  font caches of macOS, Adobe apps and Microsoft Office.
+  font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
+  taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
+  asks it again for those files right before trashing them.
 - **AppLocation** (`AppLocation.swift`): whether a bundle is in an Applications folder, where a moved copy
   goes and what happens to the original (`move`), the path a translocated app was opened from
   (Security.framework SPI looked up with dlsym), and the copy that strips quarantine (`install`, whose
@@ -48,7 +50,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.
-  Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
+  Restoring trusts nothing in the archive: only font files, only into font locations, and only
+  records about those. Exports and backups are built in a private folder on the destination's disk
+  and moved into place once complete (`ItemReplacement`), and never replace an item holding fonts
+  Cicero uses. Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
 
 ## The app
 
@@ -94,7 +99,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
   width that doesn't depend on them, so a layout settles in one pass.
 - The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
-  uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font.
+  uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
+  engine, exporter and backup, `using:` for app caches), so tests remove temporary files instead and
+  never touch the user's Trash.
 
 ## Building and releasing
 
