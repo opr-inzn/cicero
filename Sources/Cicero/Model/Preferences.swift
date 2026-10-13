@@ -92,16 +92,6 @@ enum BrowserMode: String, CaseIterable {
     }
 }
 
-extension TemporaryScope {
-    var menuTitle: String {
-        switch self {
-        case .untilQuit: "Until Cicero Quits"
-        case .untilLogout: "Until You Log Out"
-        case .whileAppsRun: "While Its App Is Open"
-        }
-    }
-}
-
 enum WindowID {
     static let main = "main"
     static let toolbox = "toolbox"
