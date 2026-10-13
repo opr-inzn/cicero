@@ -17,6 +17,7 @@ struct CiceroApp: App {
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     Appearance.applySaved()
+                    TextEditingKeys.install()
                     model.start()
                     model.appSets.start(model)
                 }
