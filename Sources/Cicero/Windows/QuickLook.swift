@@ -124,6 +124,16 @@ final class QuickLook {
                     self.panel?.orderFront(nil)
                 }
             },
+            // It goes to the Dock with the window and comes back with it.
+            center.addObserver(forName: NSWindow.willMiniaturizeNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.panel?.orderOut(nil) }
+            },
+            center.addObserver(forName: NSWindow.didDeminiaturizeNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.isOpen else { return }
+                    self.panel?.orderFront(nil)
+                }
+            },
         ]
     }
 
