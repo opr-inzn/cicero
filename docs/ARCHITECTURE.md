@@ -56,8 +56,15 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Open) can take them.
+- `QuickLook` (`Windows/QuickLook.swift`, owned by `AppModel` like `AppSetWatcher`) runs the Quick Look
+  panel: a `QuickLookPanel`, an NSPanel that can't become key, hosting SwiftUI in an NSHostingView with the
+  model and preview settings in its environment. The main window keeps the keyboard, so the browser's keys
+  (`FamilyKeys` in `Browser/Selection.swift`: Space, Esc, ↩ and the arrows; the list keeps its own ↑/↓) go on
+  moving the selection the panel shows. `QuickLookHost`, in the main window, hands it the window (centred over, closed
+  with, out of the way of its sheets) and the selection's changes. The panel is made once, ordered out when
+  closed, and draws nothing then; a font file nothing has read yet is read off the main thread first.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
-  `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
+  `Windows/` (Character Toolbox, Compare, Problems, Quick Look, sheets), `Settings/`. Shared pieces
   are in `Components/`.
 
 ## Rules of thumb

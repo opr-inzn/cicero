@@ -101,6 +101,9 @@ struct CiceroCommands: Commands {
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
             Button("Show Info") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
+            Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look") { model.quickLook.toggle() }
+                .keyboardShortcut("y", modifiers: .command)
+                .disabled(!model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
             Button("Reveal in Finder") { model.reveal(selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)

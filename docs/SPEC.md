@@ -14,6 +14,7 @@ ellipsis character (…) for items that ask for more input.
 2. **Settings** — tabs General, Folders, Sidebar, Coverage (the character sets; a short name keeps the tabs evenly spaced).
 3. **Character Toolbox** (⌥⌘T) — tabs Text and Languages.
 4. **Compare** (⌥⌘C).
+5. **Quick Look** (Space in the browser, ⌘Y) — a floating panel with the selected family.
 
 ## Sidebar
 
@@ -60,8 +61,7 @@ ellipsis character (…) for items that ask for more input.
   (hidden). Click a header to sort by it, again to reverse; right-click the headers to show or hide
   columns, those single sets under Character Sets (Status, Name and Preview always show); drag a header's
   right edge to resize it (shown columns and widths saved). When the room runs short (the Info panel open),
-  the preview gives way first, then the other columns down to their minimums. Selection as in the grid,
-  plus ↑/↓ (⇧ extends).
+  the preview gives way first, then the other columns down to their minimums. Selection as in the other views.
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
   text when set), name, and what the family's styles span, in Title Case, along the registered axes
   (MDN order: weight, width, italic, then optical size) and then the designer's own: "9 Weights · 3
@@ -76,7 +76,7 @@ ellipsis character (…) for items that ask for more input.
   along them. A family with more styles than these tell apart (hidden axes, small caps cut as fonts of
   their own) adds "N Styles". The full caption is the tooltip. Tiles scale with the preview size.
 - **Specimens**: rows — name, status tag, "Foundry · N styles", switch; the sample at preview size; up to 14 style names set in themselves (+N more).
-- Selection: click, ⌘-click, ⇧-click, ⌘A, Esc clears, typing a letter jumps, Return or double-click opens the font page; rows are draggable as family names. Right-click → family menu.
+- Selection: click, ⌘-click, ⇧-click, ⌘A, arrow keys (↑/↓ in the list and specimens; in the grid ←/→ a tile and ↑/↓ a row; ⇧ extends), Esc clears (closing Quick Look first when it's open), typing a letter jumps, Return or double-click opens the font page, Space opens Quick Look; rows are draggable as family names. Right-click → family menu.
 - Empty states per selection (no folders → Add Folder…; nothing activated; empty set; smart set with no matches → Edit Smart Set…; character set still being checked; search with no results).
 - A small glass capsule bottom-right while a scan takes longer than 0.4 s ("Finding fonts…", "Identifying fonts… 200 of 4000"); quicker scans show nothing.
 - Selecting Problems shows the Problems view instead of a list.
@@ -99,6 +99,14 @@ One scrolling page, top to bottom: header, text, styles, glyphs (no tabs).
 - **Styles** (only when the family has more than one style): laid out like a table — Preview, Style, Weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
 - **Glyphs**: heading with "404 characters" total and a filter field (character, Unicode name or U+ code), then one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), block headers pinned while scrolling, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
+## Quick Look (Space in the browser; Fonts → Quick Look ⌘Y)
+
+- A floating panel with the family selected in the list, grid or specimens. Space or ⌘Y opens it and closes it again; Esc closes it before it clears the selection. It opens only with families selected and never over a font page, and closes when nothing is selected any more, when a font page opens (↩ opens the family the panel shows, double-click and ⌘↓ as usual) and when the main window closes. The menu item reads "Close Quick Look" while it's open. Space never jumps to a family by its letter.
+- The panel never takes the keyboard (an NSPanel that can't become key: non-activating, floating, hidden while Cicero isn't the active app). The main window stays key, so ↑/↓ (and ←/→ in the grid) go on moving the browser's selection and the panel follows at once. It opens centred over the main window at the size it was last left at (resizable; 680 × 620 at first), and steps aside while the main window shows a sheet or alert, so the activation prompt its switch can bring up isn't hidden.
+- Content: the family name as the window title (the title bar in the page's colour); a large sample in the regular style — the Preview Options sample text (56 pt, wrapping), or when that's empty "Aa Gg 123" (96 pt, shrinking to fit) over A–Z, a–z and 0–9 (24 pt) — with the family's chosen OpenType features and the preview spacing; below it, when the family has more than one style, every style's name set in itself (a variable font's named instances at their own weight), scrolling with the sample; and a glass bar at the bottom: "Foundry · OpenType PostScript · Variable · 12 styles · Active" (the styles' status when they share one, else "3 of 12 activated") and the family's switch.
+- Several families selected: one at a time, in the browser's order, with ‹ › and "2 of 5" in the bar (on past the last back to the first). ←/→ in the list and specimens go through them and leave the selection as it is; in the grid, where ←/→ move the selection, the panel follows that. A family just added to the selection (a click, ⇧↓) is the one shown; several added at once (⌘A, ⇧-click) keep the one shown.
+- Never holds up the selection: a font file nothing has read yet is read off the main thread while room is kept for its text, and only the styles on screen are made, so big variable families with many named instances step as fast as any.
+
 ## Info panel (a pane floating at the trailing edge like the sidebar and in its colour, 300 pt wide, starts below the toolbar, stays put when a font page opens, toggled by ⓘ / ⌘I)
 
 - Family name; segmented Info | Features (no style picker: it describes the style being previewed).
@@ -114,7 +122,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N | Export Fonts… ⇧⌘E | Back Up Library…, Restore Library….
 - **View**: Edit Sidebar / Done Editing Sidebar.
-- **Fonts**: Activate ⌘↩, Activate Temporarily ⌥⌘↩ (until Cicero quits), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
+- **Fonts**: Activate ⌘↩, Activate Temporarily ⌥⌘↩ (until Cicero quits), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Quick Look ⌘Y (families selected; Close Quick Look while it's open), Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
 - **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-folder fonts) (+ "…" when the install method is Ask); Use in Adobe Apps Only (app-folder fonts not already there); Activate Temporarily (until Cicero quits; hidden when everything is already on, for good or until then); Activate Permanently… (temporary fonts); Deactivate / Deactivate in All Apps (app-folder fonts on everywhere) / Deactivate in Adobe Apps (app-folder fonts on in Adobe apps only); Add to Set ▸ (checkmark toggles, New Set from Selection…); Reveal in Finder; Copy Family Name(s); Export…; Compare; Move to Trash…
 - **Style menu**: status label, Activate Style…, Activate Temporarily (hidden when the style is already on, for good or until Cicero quits), Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash…
 - Text editing keeps its shortcuts: when an editable text has the focus (the search field, the sample field, the font page's text, a sheet's fields), ⌘⌫ and ⌘ or ⇧⌘ with an arrow key go to the text, as in any Mac app (⌘⌫ deletes to the start of the line, ⌘↓ moves to the end), not to Deactivate or Open. Menu shortcuts come before the focused view, so a key-down monitor hands those to the text view first. ⌘A selects the text there (Edit → Select All); in a font list it selects every family. ⌘↩ and ⌥⌘↩ mean nothing to text and stay with the Fonts menu.
