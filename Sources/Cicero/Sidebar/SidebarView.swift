@@ -251,6 +251,10 @@ struct SidebarView: View {
         default:
             EmptyView()
         }
+        if model.canExport(row.item) {
+            Divider()
+            Button("Export Fonts…") { model.exportFonts(in: row.item, named: row.title) }
+        }
         Divider()
         if model.isVisible(row.key) {
             Button("Hide from Sidebar") { model.setVisible(row.key, false) }

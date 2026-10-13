@@ -66,11 +66,16 @@ public final class UserDataStore: Sendable {
     }
 
     private func write(_ data: UserData) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let encoded = try? encoder.encode(data) else { return }
+        guard let encoded = try? Self.encoded(data) else { return }
         try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? encoded.write(to: fileURL, options: .atomic)
+    }
+
+    /// The JSON the store writes; backups hold the same.
+    public static func encoded(_ data: UserData) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(data)
     }
 }
 
