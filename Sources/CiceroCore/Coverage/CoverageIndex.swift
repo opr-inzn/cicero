@@ -99,8 +99,10 @@ public final class CoverageIndex: Sendable {
                 }
             }
         }
-        let known = Set(families.flatMap { $0.faces.map(\.id) })
-        saveQueue.async { self.saveIfNeeded(keeping: known) }
+        // What to keep is decided now, against these families; only the writing waits.
+        if let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
+            saveQueue.async { self.write(entries) }
+        }
     }
 
     /// nil until computed.
@@ -124,14 +126,12 @@ public final class CoverageIndex: Sendable {
     }
 
     public func clearCache() {
-        // After any save in progress, so it can't write the file back.
-        saveQueue.sync {
-            state.withLock {
-                $0.entries = [:]
-                $0.dirty = false
-            }
-            try? FileManager.default.removeItem(at: file)
+        state.withLock {
+            $0.entries = [:]
+            $0.dirty = false
         }
+        // After any write already queued, so none can put the file back.
+        saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
     }
 
     /// Waits for the cache to be written.
@@ -177,16 +177,18 @@ public final class CoverageIndex: Sendable {
         }
     }
 
-    /// Writes the cache when something changed, dropping faces that are no longer in the library.
-    private func saveIfNeeded(keeping known: Set<FaceID>) {
-        let entries: [FaceID: Entry]? = state.withLock { state in
+    /// Drops faces that are no longer in the library, and returns the entries to write when something changed.
+    private func entriesToSave(keeping known: Set<FaceID>) -> [FaceID: Entry]? {
+        state.withLock { state in
             let kept = state.entries.filter { known.contains($0.key) }
             guard state.dirty || kept.count != state.entries.count else { return nil }
             state.entries = kept
             state.dirty = false
             return kept
         }
-        guard let entries else { return }
+    }
+
+    private func write(_ entries: [FaceID: Entry]) {
         let signpost = Signposts.library.beginInterval("Save coverage")
         defer { Signposts.library.endInterval("Save coverage", signpost) }
         let cache = CacheFile(language: languages.dataVersion, entries: entries.map { id, entry in

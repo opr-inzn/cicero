@@ -577,7 +577,7 @@ extension AppModel {
         case .forgetInPlace(let path):
             enqueue { model in
                 model.data.records = await model.engine.forgetInPlace(path, records: model.data.records)
-                model.updateProblems()
+                model.rescan()
             }
         case .forgetInstalledCopy(let path):
             data.records.installedCopies[path] = nil

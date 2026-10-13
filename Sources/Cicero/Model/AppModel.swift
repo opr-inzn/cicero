@@ -116,8 +116,9 @@ final class AppModel {
     /// The last progress a scan reported, shown once the scan has taken long enough to mention.
     @ObservationIgnored private var latestProgress: ScanProgress?
     @ObservationIgnored private var runningOperations = 0
-    /// Font changes until then are taken to be the last operation's own, which rescans by itself.
-    @ObservationIgnored private var ownChangesUntil = Date.distantPast
+    /// The scan that was the latest when a font change came in during an operation; the change is left to a
+    /// scan that starts after it, which the operation usually starts itself.
+    @ObservationIgnored private var changeSeenBeforeScan: Int?
     @ObservationIgnored private var operationCount = 0
     @ObservationIgnored private var expectations: [Expectation] = []
     @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] in
@@ -224,12 +225,17 @@ final class AppModel {
             scanProgress = nil
         }
         dropExpectations(confirmedBy: id)
+        mergeExpectations()
     }
 
     /// CoreText's fonts-changed notification, or font files coming or going in a watched folder.
-    /// Changes an operation makes are left to the scan it starts when it finishes.
+    /// During an operation (whose own changes set these off) they wait for the scan the operation starts
+    /// when it finishes; `enqueue` scans afterwards when it started none.
     private func fontsChanged() {
-        guard runningOperations == 0, Date() > ownChangesUntil else { return }
+        if runningOperations > 0 {
+            if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
+            return
+        }
         scheduleRescan(after: 0.3)
     }
 
@@ -252,10 +258,10 @@ final class AppModel {
     private func apply(_ new: Library, scan id: Int) {
         let signpost = Signposts.library.beginInterval("Apply")
         defer { Signposts.library.endInterval("Apply", signpost) }
-        endScan(id)
         hasScanned = true
-        guard new.fingerprint != library.fingerprint else { return }
+        guard new.fingerprint != library.fingerprint else { return endScan(id) }
         library = new
+        endScan(id)
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
@@ -327,8 +333,10 @@ final class AppModel {
             guard let self else { return }
             await work(self)
             self.runningOperations -= 1
-            // fontd's notifications about what the operation did may arrive just after it.
-            self.ownChangesUntil = Date().addingTimeInterval(1.5)
+            if let seen = self.changeSeenBeforeScan, self.runningOperations == 0 {
+                self.changeSeenBeforeScan = nil
+                if self.scanCount == seen { self.rescan() }
+            }
         }
     }
 
@@ -336,8 +344,8 @@ final class AppModel {
 
     private struct Expectation {
         var operation: Int
-        var families: [String: SwitchPosition]
         var faces: [FaceID: SwitchPosition]
+        var families: Set<String>
         /// The scan the operation started when it finished; nil while it runs.
         var scan: Int?
     }
@@ -346,13 +354,10 @@ final class AppModel {
     /// operation that puts them there. Returns the number `finish` takes to have the next scan confirm it.
     func expect(_ faces: [LibraryFace], at position: SwitchPosition) -> Int {
         operationCount += 1
-        var facePositions = expectedFacePositions
-        for face in faces { facePositions[face.id] = position }
-        var families: [String: SwitchPosition] = [:]
-        for name in Set(faces.map(\.face.familyName)) {
-            if let family = library.family(name) { families[name] = family.position(overriding: facePositions) }
-        }
-        expectations.append(Expectation(operation: operationCount, families: families, faces: Dictionary(faces.map { ($0.id, position) }) { a, _ in a }))
+        expectations.append(Expectation(
+            operation: operationCount, faces: Dictionary(faces.map { ($0.id, position) }) { a, _ in a },
+            families: Set(faces.map(\.face.familyName))
+        ))
         mergeExpectations()
         return operationCount
     }
@@ -365,17 +370,21 @@ final class AppModel {
     }
 
     private func dropExpectations(confirmedBy id: Int) {
-        let before = expectations.count
         expectations.removeAll { ($0.scan ?? .max) <= id }
-        if expectations.count != before { mergeExpectations() }
     }
 
+    /// The faces' expected positions, latest operation last, and their families' positions worked out
+    /// from the current library: an earlier operation that failed doesn't linger in a later one's family.
     private func mergeExpectations() {
-        var families: [String: SwitchPosition] = [:]
         var faces: [FaceID: SwitchPosition] = [:]
+        var names = Set<String>()
         for expectation in expectations {
-            families.merge(expectation.families) { _, new in new }
             faces.merge(expectation.faces) { _, new in new }
+            names.formUnion(expectation.families)
+        }
+        var families: [String: SwitchPosition] = [:]
+        for name in names {
+            if let family = library.family(name) { families[name] = family.position(overriding: faces) }
         }
         if families != expectedFamilyPositions { expectedFamilyPositions = families }
         if faces != expectedFacePositions { expectedFacePositions = faces }
