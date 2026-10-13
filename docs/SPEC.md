@@ -1,6 +1,6 @@
 # Cicero — product spec for the clean rewrite
 
-Cicero is a macOS 26 font manager (SwiftUI, Liquid Glass, Apple silicon only, never uses the network).
+Cicero is a macOS 26 font manager (SwiftUI, Liquid Glass, Apple silicon only; the network only for updates).
 This is a ground-up rewrite: new code and architecture, same product. The user shaped every
 behaviour below; keep them. Never mention or reference any other font manager app anywhere.
 
@@ -120,6 +120,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 ## Menus
 
+- **Cicero**: About Cicero (the standard panel: version, a link to maximilianinzinger.com, "© 2026 Maximilian Inzinger"), Check for Updates… (disabled while a check runs).
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N | Export Fonts… ⇧⌘E | Back Up Library…, Restore Library….
 - **View**: Edit Sidebar / Done Editing Sidebar.
 - **Fonts**: Activate ⌘↩, Activate Temporarily ⌥⌘↩ (until Cicero quits), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Quick Look ⌘Y (families selected; Close Quick Look while it's open), Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
@@ -198,7 +199,7 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear); Backup (Back Up…, Restore…, one sentence on what a backup holds).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear); Backup (Back Up…, Restore…, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
 - Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Character Sets: as above.
@@ -209,7 +210,14 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 - **Back Up Library…** (File; Settings → General → Backup) writes a `.cicerobackup` archive (a ZIP made with ditto), named "Cicero Backup 2026-10-13.cicerobackup" by default. A sheet first says what it holds — sets, smart sets, character sets, folders, foundry names, the sidebar and settings — with a checkbox "Include font files" and their count and size ("3,812 files, 2.4 GB": every file in the library, other copies included, protected ones left out, sized off the main thread), then shows progress (a bar while copying, indeterminate while zipping) with Cancel, and reveals the file. Inside: `manifest.json` (format 1, created date, app version, the home folder, `includesFonts`, and every font with its path — the home folder written as "~" — its place in the archive (`Fonts/<n>/<file>`, so names never clash), size, and how it was active: in ~/Library/Fonts, in place, an installed copy with its origin, or not active), `user-data.json` exactly as the store writes it, and the files.
 - **Restore Library…** (File; Settings → General) opens a `.cicerobackup`, unzips it to a temporary folder and asks "Restore the Backup from 13 October 2026?" with two checkboxes: "Sets, folders and settings" (what's inside: "4 sets, 2 smart sets, 3 folders and 1 character set"; replaces the current setup, which is saved first to ~/Library/Application Support/Cicero/Backups/Before Restore <date>.json — the sheet says so) and "Font files" (only when the backup has them: "Puts each font back where it was, unless a file is already there."). "~" means this account's home folder, so a backup moves between Macs and user names; the paths in the user data move with it. Nothing is ever written over: a file already at a path is left alone. Missing folders are made; a file that can't go back (no permission, or a folder next to an app that isn't installed, like /Applications/Adobe InDesign 2025/Fonts) goes into ~/Fonts Restored from Cicero/ keeping its path under it, and that folder is added to the watched folders. Records describe this Mac: the backup's installed copies count when both files exist, its temporary activations are dropped, its app-folder origins count when the file exists, its in-place registrations are activated again (in place, through the activation engine) once a scan has found the faces, and the current records stay where their files exist. Then a rescan and a toast: "Restored 4 sets and 3,790 fonts; 22 were already there." The file work runs off the main thread with progress and Cancel in the sheet; the records change is one queued operation, like an activation.
 
+## Applications folder
+
+- Open at login points at the copy that's running, and Sparkle replaces that copy, so both need Cicero in /Applications or ~/Applications (or a folder inside them), not on a disk image, in Downloads or at an App Translocation path. At launch, a copy elsewhere asks "Move Cicero to the Applications folder?" ("Application sets, opening at login and updates work only when Cicero is in the Applications folder."): Move to Applications Folder / Do Not Move, with a "Don’t ask again" checkbox. A binary run from .build (`swift run`) never asks.
+- Turning on Open at login (Settings → General, or the apps sheet's Open at Login) outside an Applications folder shows the same alert without the checkbox instead of adding a login item; the moved copy then turns Open at login on.
+- Moving copies Cicero.app into /Applications, or ~/Applications when the user can't write there; a Cicero.app already there goes to the Trash first (a Cicero running from it is asked to quit). The copy loses the quarantine attribute. The original goes to the Trash when it's on a writable volume, found through `SecTranslocateCreateOriginalPathForURL` when the app was translocated; a disk image it ran from is detached once Cicero has quit. A small shell script waits for Cicero to quit and opens the moved copy. A failure says "Couldn’t move Cicero to the Applications folder." with the reason.
+
 ## Data and privacy
 
-- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). No network, no analytics.
+- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). No analytics, nothing uploaded.
+- Updates (Sparkle 2): once a day, while Settings → General → "Check for updates automatically" is on (it is from the start, without asking), Cicero downloads the appcast from the latest GitHub release (`SUFeedURL`); Check for Updates… does it at once. Sparkle's system profile stays off, so the request carries nothing but its user agent, "Cicero/1.0 Sparkle/2.10.0". An update the user accepts is downloaded from GitHub and installed only if its EdDSA signature matches `SUPublicEDKey`. The appcast holds the latest version only, with its CHANGELOG.md section as Markdown release notes.
 - The rewrite reads the existing user data file (library.json, format described in the architecture doc) once and keeps working from its own file; the old file is never modified.

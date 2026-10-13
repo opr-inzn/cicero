@@ -13,7 +13,7 @@
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>local.cicero.Cicero</string>
+    <string>com.maximilianinzinger.Cicero</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -30,11 +30,21 @@
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 Maximilian Inzinger</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUEnableSystemProfiling</key>
+    <false/>
+    <key>SUFeedURL</key>
+    <string>https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>p8/wzpFF92Vv02vbxUcR2H2pe2vbKNt3JyM63vu4HuE=</string>
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
             <key>UTTypeIdentifier</key>
-            <string>local.cicero.sidebar-section</string>
+            <string>com.maximilianinzinger.cicero.sidebar-section</string>
             <key>UTTypeDescription</key>
             <string>Cicero Sidebar Section</string>
             <key>UTTypeConformsTo</key>
@@ -44,7 +54,7 @@
         </dict>
         <dict>
             <key>UTTypeIdentifier</key>
-            <string>local.cicero.backup</string>
+            <string>com.maximilianinzinger.cicero.backup</string>
             <key>UTTypeDescription</key>
             <string>Cicero Library Backup</string>
             <key>UTTypeConformsTo</key>
