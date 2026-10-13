@@ -25,7 +25,7 @@ struct SpecimenList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy))
+            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy, layout: .specimens))
         }
     }
 }

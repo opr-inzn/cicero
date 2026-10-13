@@ -17,6 +17,7 @@ final class AppModel {
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
     @ObservationIgnored let appSets = AppSetWatcher()
+    @ObservationIgnored let quickLook = QuickLook()
 
     // MARK: Library
 
