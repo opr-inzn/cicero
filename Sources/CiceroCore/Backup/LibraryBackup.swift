@@ -221,15 +221,16 @@ public struct LibraryBackup: Sendable {
     /// that disappeared since the inventory is left out. Only a complete archive takes the place of an
     /// item at `destination`, which goes to the Trash then, so a cancelled or failed backup leaves the
     /// item alone and nothing behind. An item that is or holds a font in the backup, a Fonts folder,
-    /// Cicero's folder or a watched folder is never replaced: this throws `KeptItemError` first.
+    /// Cicero's folder, a watched folder or anything in `kept` (see `FontExporter.keptPaths`) is never
+    /// replaced: this throws `KeptItemError` first.
     @concurrent
     public func write(
-        to destination: URL, userData: UserData, fonts: [BackupFont], includeFonts: Bool, appVersion: String,
-        progress: @escaping @Sendable (BackupProgress) -> Void
+        to destination: URL, userData: UserData, fonts: [BackupFont], includeFonts: Bool, keeping kept: [String] = [],
+        appVersion: String, progress: @escaping @Sendable (BackupProgress) -> Void
     ) async throws {
         let fm = FileManager.default
         let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.deactivated.path]
-            + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) }
+            + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) } + kept
         let replacement = try ItemReplacement(for: destination, keeping: kept)
         defer { replacement.discard() }
         let staging = fm.temporaryDirectory.appendingPathComponent("Cicero Backup \(UUID().uuidString)", isDirectory: true)

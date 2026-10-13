@@ -82,7 +82,10 @@ extension AppModel {
 
     /// Writes a backup; the caller shows the progress and may cancel the task.
     func backUp(to destination: URL, fonts: [BackupFont], includeFonts: Bool, progress: @escaping @Sendable (BackupProgress) -> Void) async throws {
-        try await backup.write(to: destination, userData: data, fonts: fonts, includeFonts: includeFonts, appVersion: appVersion, progress: progress)
+        // Replace in the save panel must never trash a font, even when the sheet hasn't counted them yet.
+        let kept = FontExporter.keptPaths(in: library, data: data, locations: locations)
+        try await backup.write(to: destination, userData: data, fonts: fonts, includeFonts: includeFonts, keeping: kept,
+                               appVersion: appVersion, progress: progress)
     }
 
     // MARK: Restore
