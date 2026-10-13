@@ -53,8 +53,12 @@ public struct ProblemFile: Hashable, Sendable {
     public var note: String?
     /// The PostScript names macOS gives this file when an app asks for them, of the names the problem is about.
     public var preferredFor: [String]
+    /// The styles behind `preferredFor` when macOS gives this file only some of its names and the rest to other files,
+    /// e.g. "Light Oblique and Bold Oblique".
+    public var preferredStyles: String?
 
-    public init(path: String, version: String?, modified: Date?, detail: String, title: String? = nil, note: String? = nil, preferredFor: [String] = []) {
+    public init(path: String, version: String?, modified: Date?, detail: String, title: String? = nil, note: String? = nil,
+                preferredFor: [String] = [], preferredStyles: String? = nil) {
         self.path = path
         self.version = version
         self.modified = modified
@@ -62,6 +66,7 @@ public struct ProblemFile: Hashable, Sendable {
         self.title = title
         self.note = note
         self.preferredFor = preferredFor
+        self.preferredStyles = preferredStyles
     }
 }
 
@@ -308,7 +313,9 @@ public enum ProblemDetector {
         struct File {
             var families: [String] = []
             var styles: [(name: String, rank: Int)] = []
+            var names: Set<String> = []
             var won: [String] = []
+            var wonStyles: [(name: String, rank: Int)] = []
             var id: FaceID?
         }
         var clashes: [String: [Face]] = [:]
@@ -349,18 +356,25 @@ public enum ProblemDetector {
                     var file = files[face.path] ?? File()
                     if !file.families.contains(face.family) { file.families.append(face.family) }
                     if !file.styles.contains(where: { $0.name == face.style }) { file.styles.append((face.style, face.rank)) }
+                    file.names.insert(name)
                     file.id = Self.first(file.id, face.id)
                     files[face.path] = file
                 }
                 // An app asking for the name gets this file (or another active copy of the same face).
                 if let path = context.fileForName(name), let face = faces.first(where: { $0.path == path || $0.copies.contains(path) }) {
                     files[face.path]?.won.append(name)
+                    if !files[face.path]!.wonStyles.contains(where: { $0.name == face.style }) { files[face.path]?.wonStyles.append((face.style, face.rank)) }
                 }
             }
+            func ordered(_ styles: [(name: String, rank: Int)]) -> String {
+                joined(abridged(styles.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }.map(\.name)))
+            }
             let problemFiles = files.map { path, file in
-                let styles = file.styles.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }.map(\.name)
+                // Getting only some of its names, a file says which: "Preferred" alone would read as all of them.
+                let isPartly = !file.won.isEmpty && file.won.count < file.names.count
                 return ProblemFile(path: path, version: nil, modified: nil, detail: context.detail(of: path),
-                                   title: joined(sorted(file.families)), note: joined(abridged(styles)), preferredFor: file.won)
+                                   title: joined(sorted(file.families)), note: ordered(file.styles), preferredFor: file.won,
+                                   preferredStyles: isPartly ? ordered(file.wonStyles) : nil)
             }.sorted { a, b in
                 let order = a.title!.localizedStandardCompare(b.title!)
                 return order == .orderedSame ? a.path < b.path : order == .orderedAscending
