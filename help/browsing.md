@@ -37,7 +37,7 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own sample text), the name, and what the family’s styles span, like “9 Weights · 3 Widths · Italics”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, and what the family’s styles span, like “9 Weights · 3 Widths · Italics”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
 
 The grid is the view Cicero starts with.
 
@@ -134,11 +134,11 @@ Some features let you choose one option of several; turning one on turns the oth
 
 The features you choose apply to that family wherever Cicero previews it, in the list, grid, specimens and font page, until Cicero quits. They don’t change the font file.
 
-## Change the sample text and size
+## Change the preview text and size
 
 Click **Preview Options** in the toolbar:
 
-- **Sample:** type your own text, or pick one from **Presets**. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”).
+- **Preview Text:** type your own text, or pick one from **Presets**. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”).
 - **Size:** 8 to 160 pt.
 - **Weight:** 100 to 900. Cicero shows the style nearest to it, and the exact weight in a variable font.
 - **Letter Spacing:** from −10 to 40 % of the em.
@@ -152,7 +152,7 @@ The same options apply to every view, font pages and the Compare window. Cicero 
 1. Select two or more families.
 2. Choose **Fonts → Compare** (⌥⌘C), or right-click them and choose **Compare**.
 
-The Compare window shows them with the sample text, size, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no sample text). It has its own **Preview Options** button. Choose a layout in the toolbar:
+The Compare window shows them with the preview text, size, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
 
 - **Stacked:** one row per font, all on the same baseline, with the name and style under each.
 - **Overlay:** every font drawn over the others in its own color, with small marks for each font’s x-height and cap height.

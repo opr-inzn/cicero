@@ -11,12 +11,16 @@ public struct Locations: Sendable {
     public var userFonts: URL
     /// /Library/Fonts
     public var allUsersFonts: URL
+    /// The folders macOS keeps its own fonts in, /System/Library/Fonts. CoreText's lists of fonts leave some of
+    /// them out (Times, Courier, Iowan Old Style, Seravek, many Noto fonts), though every app can use them.
+    public var systemFonts: [URL]
 
-    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL) {
+    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = []) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
         self.allUsersFonts = allUsersFonts
+        self.systemFonts = systemFonts
     }
 
     public static var standard: Locations {
@@ -26,7 +30,8 @@ public struct Locations: Sendable {
             support: fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Cicero", isDirectory: true),
             caches: fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("Cicero", isDirectory: true),
             userFonts: home.appendingPathComponent("Library/Fonts", isDirectory: true),
-            allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true)
+            allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true),
+            systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)]
         )
     }
 
@@ -108,8 +113,8 @@ public struct ScanInput: Sendable {
 }
 
 
-/// Finds every font file (CoreText's active fonts, ~/Library/Fonts, /Library/Fonts, the watched
-/// folders, the files added one at a time and Cicero's Deactivated folder), reads new or changed files,
+/// Finds every font file (CoreText's active fonts, macOS's font folders, ~/Library/Fonts, /Library/Fonts, the
+/// watched folders, the files added one at a time and Cicero's Deactivated folder), reads new or changed files,
 /// and builds a `Library`.
 /// Parsed faces and Date Added are cached in `Locations.caches` by path, modification date and size;
 /// the decoded cache stays in memory between scans. Cancellation stops it between phases.
@@ -157,6 +162,7 @@ public final class LibraryScanner: Sendable {
         let activeURLs = await active
         addActive(activeURLs, to: &found)
         confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
+        confirmRegistered(&found, records: input.records)
         signposter.endInterval("Find", finding)
         try Task.checkCancellation()
 
@@ -248,6 +254,13 @@ public final class LibraryScanner: Sendable {
                 found[path] = FoundFile(stamp: stamp, isActive: false, inFontsFolder: true)
             }
         }
+        // macOS's own fonts are on, whether or not CoreText's list has them. Its hidden ones (".SFNS") have
+        // names starting with a dot, which the library leaves out.
+        for folder in locations.systemFonts {
+            Self.enumerate(folder) { path, stamp in
+                found[path] = FoundFile(stamp: stamp, isActive: true)
+            }
+        }
         let deactivated = WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path)
         for folder in input.folders + [deactivated] {
             Self.enumerate(folder.url, skippingDataless: true) { path, stamp in
@@ -290,6 +303,15 @@ public final class LibraryScanner: Sendable {
         let unconfirmed = found.filter { $0.value.inFontsFolder && !$0.value.isActive }.keys
         for path in unconfirmed {
             found[path]!.isActive = !listed || registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+        }
+    }
+
+    /// The files Cicero registered itself (in place, or for a while) that CoreText's list leaves out are asked
+    /// about one by one, like those in the Fonts folders: the list hides some fonts though they're on, as copies
+    /// of the macOS fonts it hides (Iowan Old Style, Times).
+    private func confirmRegistered(_ found: inout [String: FoundFile], records: ActivationRecords) {
+        for path in records.inPlace.union(records.temporary.keys) where found[path]?.isActive == false {
+            found[path]!.isActive = registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
         }
     }
 
@@ -537,6 +559,7 @@ public final class LibraryScanner: Sendable {
     /// Where an active file is activated from, judged by its path and Cicero's records.
     static func activeSource(of path: String, locations: Locations, records: ActivationRecords) -> ActiveSource {
         if path.hasPrefix("/System/") || path.hasPrefix("/Library/Application Support/Apple/") { return .macOS }
+        if locations.systemFonts.contains(where: { path.hasPrefix($0.path + "/") }) { return .macOS }
         if path.hasPrefix(locations.allUsersFonts.path + "/") { return .allUsers }
         if path.hasPrefix(locations.userFonts.path + "/") { return .fontsFolder }
         if path.contains("/Adobe/CoreSync/") { return .adobeFonts }

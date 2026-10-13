@@ -14,19 +14,25 @@ struct MainWindow: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 340)
         } detail: {
+            // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping
+            // whatever is around the stack: each page makes room for the Info panel and takes dropped files.
             NavigationStack(path: Binding(
                 get: { model.openFamilyID.map { [$0] } ?? [] },
                 set: { model.openFamilyID = $0.last }
             )) {
                 BrowserView()
-                    .navigationDestination(for: String.self) { FontPage(familyID: $0) }
+                    .modifier(DetailPage())
+                    .navigationDestination(for: String.self) { FontPage(familyID: $0).modifier(DetailPage()) }
             }
-            .modifier(FileDrop())
-            // Outside the stack, so the panel stays put when a font page opens or closes.
-            .modifier(InfoPanelColumn())
         }
+        // Over the split view, so the panel stays put when a font page opens or closes.
+        .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
-        .sheet(item: $model.activationPrompt) { ActivationSheet(prompt: $0) }
+        // While the Fonts in Document sheet is up, it asks how to activate itself: a window shows one sheet.
+        .sheet(item: Binding(get: { model.documentFonts == nil ? model.activationPrompt : nil }, set: { model.activationPrompt = $0 })) {
+            ActivationSheet(prompt: $0)
+        }
+        .sheet(item: $model.documentFonts) { DocumentFontsSheet(report: $0) }
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }
@@ -99,6 +105,15 @@ struct MainWindow: View {
         if plan.protectedCount > 0 { parts.append("Files that come with macOS or an app stay where they are.") }
         parts.append(plan.paths.count == 1 ? "You can put it back from the Trash." : "You can put them back from the Trash.")
         return parts.joined(separator: " ")
+    }
+}
+
+/// A page of the detail column: room for the Info panel, and files dropped on it.
+private struct DetailPage: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .modifier(InfoPanelInset())
+            .modifier(FileDrop())
     }
 }
 

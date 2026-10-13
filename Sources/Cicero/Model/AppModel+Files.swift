@@ -33,10 +33,11 @@ extension AppModel {
         open(panel.urls)
     }
 
-    /// Font files and folders opened from the Finder, dropped on the window or chosen in Add Fonts…. Folders
-    /// are added as folders; font files the library doesn't have yet are listed where they are. Once a scan
-    /// has read them, the browser shows their families, selected, or with `showsPage` one family's page.
-    /// Dropped into a set, they join it. Several arriving one by one, as from the Finder, are added together.
+    /// Font files, folders and documents opened from the Finder, dropped on the window or chosen in Add Fonts….
+    /// Folders are added as folders; font files the library doesn't have yet are listed where they are. Once a
+    /// scan has read them, the browser shows their families, selected, or with `showsPage` one family's page.
+    /// Dropped into a set, they join it. A document (PDF, IDML, InDesign, Illustrator) shows the fonts it uses.
+    /// Several arriving one by one, as from the Finder, are added together.
     func open(_ urls: [URL], into set: UUID? = nil, showsPage: Bool = false) {
         openQueue.urls += urls
         openQueue.set = openQueue.set ?? set
@@ -57,17 +58,24 @@ extension AppModel {
         let fm = FileManager.default
         var folders: [URL] = []
         var files: [String] = []
+        var documents: [URL] = []
         for url in urls where url.isFileURL {
             let url = url.standardizedFileURL
             var isDirectory: ObjCBool = false
             guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+            let pathExtension = url.pathExtension.lowercased()
             if isDirectory.boolValue {
                 if !NSWorkspace.shared.isFilePackage(atPath: url.path) { folders.append(url) }
-            } else if FontFormat.fileExtensions.contains(url.pathExtension.lowercased()), !files.contains(url.path) {
+            } else if FontFormat.fileExtensions.contains(pathExtension), !files.contains(url.path) {
                 files.append(url.path)
+            } else if DocumentFonts.fileExtensions.contains(pathExtension) {
+                documents.append(url)
             }
         }
+        // One document at a time: the sheet shows one.
+        if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
+            guard documents.isEmpty else { return }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read." : "Those aren’t fonts Cicero can read.")
         }
         if !folders.isEmpty {
@@ -78,13 +86,18 @@ extension AppModel {
             if files.isEmpty, added.count == 1 { selection = .folder(added[0].id) }
         }
         guard !files.isEmpty else { return }
-        let new = files.filter { !isListed($0) }
-        if !new.isEmpty {
-            data.fontFiles += new
-            data.sidebar.hidden.remove(SidebarSection.folders.key)
-            data.sidebar.hidden.remove("folder.\(WatchedFolder.addedFilesID)")
-        }
+        addFontFiles(files, rescanning: false)
         awaitingScan = OpenedFiles(scan: rescan(), paths: Set(files), set: set, showsPage: showsPage)
+    }
+
+    /// Lists the font files the library doesn't have yet where they are, under Added Fonts.
+    func addFontFiles(_ paths: [String], rescanning: Bool = true) {
+        let new = paths.filter { !isListed($0) }
+        guard !new.isEmpty else { return }
+        data.fontFiles += new
+        data.sidebar.hidden.remove(SidebarSection.folders.key)
+        data.sidebar.hidden.remove("folder.\(WatchedFolder.addedFilesID)")
+        if rescanning { rescan() }
     }
 
     /// Whether the library lists a file already, or will by itself: one of its faces or their other copies is

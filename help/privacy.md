@@ -28,4 +28,5 @@ Backups and exports are files you make yourself and save where you choose. Cicer
 
 - **Clearing the Microsoft Office font caches:** Office’s folders are protected, so macOS asks before Cicero looks inside them. Cicero only looks after you check **Microsoft Office** and click **Clear**.
 - **Clearing the macOS font caches for all users** needs an administrator password.
+- **Find on This Mac**, for a font a document uses, looks for its file with Spotlight, on your Mac. Spotlight only shows an app files in folders it may open, so the first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders. Cicero only looks for font files there, and only when you click **Find on This Mac**.
 - **Open at login** may need your approval in **System Settings → General → Login Items**.

@@ -338,8 +338,8 @@ private struct PreviewOptions: View {
     var body: some View {
         @Bindable var preview = preview
         Form {
-            Section("Sample") {
-                TextField("Sample", text: $preview.sampleText, prompt: Text("Font name"))
+            Section {
+                TextField("Preview Text", text: $preview.sampleText, prompt: Text("Font name"))
                 Menu("Presets") {
                     Button("Font Name") { preview.sampleText = "" }
                     Divider()

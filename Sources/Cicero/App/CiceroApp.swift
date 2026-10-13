@@ -80,6 +80,7 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
             Button("Add Folder…") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("Find Fonts in Document…") { model.presentFindFontsPanel() }
             Button("New Set…") {
                 model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }

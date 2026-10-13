@@ -10,6 +10,10 @@ Each version’s notes here become its release notes on the [releases page](http
 - Font pages list the ligatures each style makes, grouped by feature (standard, discretionary, historical, contextual and required), each drawn from its glyph with the characters it stands for.
 - Font pages align their text right, too, and Preview Options have Line Spacing, for font pages and Quick Look, and Alignment, for specimens and Quick Look. Spacing is now called Letter Spacing.
 - The Info panel shows each font’s vendor ID, and search finds fonts by their designer and vendor ID as well. The first launch reads every font file again to learn them, so it takes a little longer.
+- Fonts in a document: choose File → Find Fonts in Document…, or drop a PDF, IDML, InDesign or Illustrator file on the window, to see which fonts it uses, which of them are on, off or missing, and turn them on, make a set of them, or find a missing font’s file on your Mac with Spotlight.
+- The fonts that come with macOS that CoreText doesn’t list, like Times, Courier, Iowan Old Style and Seravek, are in your library now, and fonts like them that Cicero turns on show as on.
+- The Info panel stays open on font pages.
+- Preview Options call the sample text Preview Text.
 - Backups hold your tags and added fonts.
 
 ## 1.0

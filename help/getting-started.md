@@ -22,7 +22,7 @@ If you say no and later turn on **Open at login**, Cicero offers again. You can 
 
 Cicero looks for fonts in these places:
 
-- every font macOS has turned on, the ones that come with macOS included
+- every font macOS has turned on, and every font that comes with macOS
 - your Fonts folder, `~/Library/Fonts`
 - the Fonts folder for all users, `/Library/Fonts`
 - the folders Adobe apps load fonts from by themselves (see [Fonts for Adobe apps](activating.md#fonts-for-adobe-apps))

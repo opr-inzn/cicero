@@ -106,6 +106,9 @@ final class AppModel {
     var editingAppsForSet: UUID?
     var editingCharacterSet: CustomCharacterSet?
     var isClearingCaches = false
+    /// The document whose fonts the Fonts in Document sheet shows.
+    var documentFonts: DocumentFontsReport?
+    @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
 
     // MARK: Compare
