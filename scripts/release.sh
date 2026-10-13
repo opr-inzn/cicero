@@ -7,7 +7,7 @@
 #   1. A "Developer ID Application" certificate in the login keychain (Xcode → Settings → Accounts →
 #      Manage Certificates, or developer.apple.com). Allow codesign to use its key ("Always Allow").
 #   2. Notarization credentials stored for notarytool, using an app-specific password from
-#      account.apple.com:
+#      account.apple.com (the team ID is in parentheses at the end of the certificate's name):
 #        xcrun notarytool store-credentials cicero-notary --apple-id <Apple ID> --team-id <team ID>
 #   3. The EdDSA key that signs updates (SUPublicEDKey is its public half) in the login keychain, under
 #      the account "cicero", for publish.sh. To bring it from a backup after `swift package resolve`:
@@ -22,9 +22,10 @@ if [[ -z "$IDENTITY" ]]; then
     exit 1
 fi
 if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
+    TEAM_ID=$(sed -n 's/.*(\([A-Z0-9]\{10\}\))$/\1/p' <<<"$IDENTITY")
     echo "No notarytool credentials named \"$PROFILE\" (or notarytool couldn't reach Apple). To store them, with an" >&2
     echo "app-specific password from account.apple.com, run:" >&2
-    echo "  xcrun notarytool store-credentials $PROFILE --apple-id <Apple ID> --team-id <team ID>" >&2
+    echo "  xcrun notarytool store-credentials $PROFILE --apple-id <Apple ID> --team-id ${TEAM_ID:-<team ID>}" >&2
     exit 1
 fi
 
