@@ -32,10 +32,9 @@ ellipsis character (…) for items that ask for more input.
   - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Unicode Blocks, Google Fonts, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - The menus of sets, smart sets, folders, foundries, classifications and character sets also have Export Fonts… (that row's families, see Export and backup). Every row menu also has Hide from Sidebar and Edit Sidebar.
 - Order: rows drag to a new place within their own section (character sets within their group, and the
-  groups within Character Sets), never into another one. Section titles drag onto each other: the dragged
-  section takes the other's place, which is highlighted. While a section is dragged its rows fold away
-  under its title, so it moves as one (a list drags a header as a picture of it, with no custom preview),
-  and come back when it's dropped. Items that are gone for now (System Fonts while
+  groups within Character Sets), never into another one. Sections don't move: a click on a title opens or
+  closes it, and a drag does nothing (an order saved when sections could be dragged is kept; Reset Order
+  puts them back). Items that are gone for now (System Fonts while
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
   together; the browser then shows the fonts in any of them. Selecting in another section starts over there.

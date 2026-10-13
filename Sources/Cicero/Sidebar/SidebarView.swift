@@ -1,17 +1,12 @@
 import AppKit
 import CiceroCore
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
 /// choices are in Settings → Sidebar. Rows drag to a new place within their section (or character set
-/// group), several at once when they're selected together, and section titles drag onto each other.
+/// group), several at once when they're selected together. Sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
-    /// The section whose title is being dragged: its rows fold away under it until the drag ends.
-    @State private var draggedSection: SidebarSection?
-    /// The section whose title a dragged section is over.
-    @State private var sectionDropTarget: SidebarSection?
 
     var body: some View {
         let editing = model.isEditingSidebar
@@ -92,20 +87,9 @@ struct SidebarView: View {
 
     private func expansion(_ section: SidebarSection) -> Binding<Bool> {
         Binding(
-            get: { draggedSection != section && (model.isEditingSidebar || model.isExpanded(section)) },
-            set: { if !model.isEditingSidebar && draggedSection == nil { model.setExpanded(section, $0) } }
+            get: { model.isEditingSidebar || model.isExpanded(section) },
+            set: { if !model.isEditingSidebar { model.setExpanded(section, $0) } }
         )
-    }
-
-    /// The payload of a section title's drag, made as the drag starts: the section's rows fold away
-    /// under its title, so it moves as one, and come back when the mouse button goes up wherever it's dropped.
-    private func beginDrag(of section: SidebarSection) -> SectionDrag {
-        withAnimation(.snappy) { draggedSection = section }
-        Task {
-            while NSEvent.pressedMouseButtons & 1 != 0 { try? await Task.sleep(for: .milliseconds(100)) }
-            withAnimation(.snappy) { draggedSection = nil }
-        }
-        return SectionDrag(section: section.rawValue)
     }
 
     // MARK: Headers
@@ -141,29 +125,6 @@ struct SidebarView: View {
         .onTapGesture {
             let isExpanded = expansion(section)
             withAnimation(.snappy) { isExpanded.wrappedValue.toggle() }
-        }
-        .background {
-            if sectionDropTarget == section {
-                RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.leading, -6)
-            }
-        }
-        // A list drags a header as a picture of it and ignores drag previews, so the rows fold away instead.
-        .draggable(beginDrag(of: section))
-        // A move, not the default copy, so the pointer doesn't get a green plus.
-        .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
-                                             operationsOutsideApp: .init(allowCopy: false)))
-        .dropDestination(for: SectionDrag.self) { drags, _ in
-            guard let dragged = drags.first.flatMap({ SidebarSection(rawValue: $0.section) }), dragged != section else { return }
-            withAnimation(.snappy) { model.moveSection(dragged, onto: section) }
-        }
-        .dropConfiguration { _ in DropConfiguration(operation: draggedSection == section ? .forbidden : .move) }
-        .onDropSessionUpdated { session in
-            switch session.phase {
-            case .entering, .active:
-                if draggedSection != section { sectionDropTarget = section }
-            default:
-                if sectionDropTarget == section { sectionDropTarget = nil }
-            }
         }
     }
 
@@ -275,18 +236,4 @@ struct SidebarView: View {
         }
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
     }
-}
-
-/// A section title being dragged onto another.
-private nonisolated struct SectionDrag: Codable, Transferable {
-    var section: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .ciceroSidebarSection)
-    }
-}
-
-private extension UTType {
-    /// Declared in Info.plist.
-    nonisolated static let ciceroSidebarSection = UTType(exportedAs: "local.cicero.sidebar-section")
 }

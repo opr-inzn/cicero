@@ -236,7 +236,8 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
     /// Collapsed sections ("folders", "sets", "tags", "foundries", "classifications", "characterSets")
     /// and character set groups ("charsetgroup.<group id>").
     public var collapsed: Set<String> = ["foundries", "classifications", "charsetgroup.unicode", "charsetgroup.google"]
-    /// Keys in the order the user dragged them into, per list: "sections" (section keys), "library",
+    /// Keys in the order the user dragged them into, per list: "sections" (section keys, from when sections
+    /// could be dragged; still followed), "library",
     /// a section's rows ("folders", "sets", "foundries", "classifications"), "characterSets" (group keys
     /// "charsetgroup.<group id>") and a group's rows ("charsetgroup.<group id>").
     public var order: [String: [String]] = [:]
