@@ -14,7 +14,7 @@ First release.
 - Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item, and drag items and whole sections into the order you like. Select several items in a section to see their fonts together.
 - Sets, smart sets with rules, foundries, and automatic classifications read from each font.
 - Application sets: Cicero activates a set's fonts while one of its apps is open, and can open at login so they always work.
-- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar and sort the list by them.
+- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar, and show any of them as a column in the list to sort by.
 - Character Toolbox: find fonts that have every character of a text or support one of 780 languages.
 - Compare fonts on a shared baseline or overlaid.
 - A Problems view for fonts installed twice, missing, damaged and duplicate fonts, and styles that share a PostScript name with another font.
