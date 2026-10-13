@@ -28,7 +28,14 @@ enum FamilySelection {
     /// ↑ and ↓ move the selection a row, Shift extending it from the anchor. Returns the row to scroll to.
     static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout String?, extending: Bool) -> String? {
         guard !ids.isEmpty else { return nil }
-        let current = ids.lastIndex { selection.contains($0) && (extending || $0 != anchor) } ?? ids.firstIndex { selection.contains($0) }
+        let first = ids.firstIndex { selection.contains($0) }
+        let current: Int?
+        if extending, let start = anchor, selection.contains(start), let a = ids.firstIndex(of: start), let first {
+            // The end of the selection away from the anchor moves, so Shift grows and shrinks it either way.
+            current = first < a ? first : ids.lastIndex { selection.contains($0) }
+        } else {
+            current = ids.lastIndex { selection.contains($0) && (extending || $0 != anchor) } ?? first
+        }
         let index = current.map { min(max($0 + step, 0), ids.count - 1) } ?? (step > 0 ? 0 : ids.count - 1)
         if extending, let start = anchor, let a = ids.firstIndex(of: start) {
             selection = Set(ids[min(a, index)...max(a, index)])
