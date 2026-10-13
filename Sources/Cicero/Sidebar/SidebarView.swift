@@ -1,10 +1,12 @@
 import AppKit
 import CiceroCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
 /// choices are in Settings → Sidebar. Rows drag to a new place within their section (or character set
-/// group), several at once when they're selected together. Sections stay in their order.
+/// group), several at once when they're selected together, and the rows they pass slide apart to open a
+/// gap where they'll land. Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     /// What the list shows selected while the browser hasn't taken it yet (see `select`).
@@ -62,6 +64,9 @@ private final class SelectionPace {
 /// The sidebar's sections and rows.
 private struct SidebarContent: View {
     @Environment(AppModel.self) private var model
+    /// The character set group whose title is being dragged, and the one whose title it's over.
+    @State private var draggedGroup: String?
+    @State private var groupDropTarget: String?
 
     var body: some View {
         let editing = model.isEditingSidebar
@@ -99,11 +104,19 @@ private struct SidebarContent: View {
             .onMove { model.moveSidebarItems($0, to: $1, shown: shownRows.map(\.key), all: rows.map(\.key), in: list) }
     }
 
-    /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Groups move
-    /// among themselves, and sets within their group.
+    /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Sets move within
+    /// their group. A click on a group's title opens or closes it, and a title that takes clicks can't
+    /// hand drags to the list, so groups move by dropping one's title onto another's, which is
+    /// highlighted: the dragged group takes its place, and the other moves towards where it was.
     private func characterSetGroups(_ groups: [(id: String, title: String, rows: [SidebarRow])]) -> some View {
         let shownGroups = groups.filter { !shown($0.rows).isEmpty }
         func key(_ id: String) -> String { "charsetgroup.\(id)" }
+        func move(_ dragged: String, onto target: String) {
+            let keys = shownGroups.map { key($0.id) }
+            guard let from = keys.firstIndex(of: key(dragged)), let to = keys.firstIndex(of: key(target)), from != to else { return }
+            model.moveSidebarItems([from], to: from < to ? to + 1 : to, shown: keys, all: groups.map { key($0.id) },
+                                   in: SidebarSection.characterSets.rawValue)
+        }
         return ForEach(shownGroups, id: \.id) { group in
             DisclosureGroup(isExpanded: Binding(
                 get: { model.isEditingSidebar || model.isGroupExpanded(group.id) },
@@ -121,12 +134,42 @@ private struct SidebarContent: View {
                         guard !model.isEditingSidebar else { return }
                         withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
                     }
+                    .background {
+                        if groupDropTarget == group.id {
+                            RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.horizontal, -6)
+                        }
+                    }
+                    .draggable(beginDrag(of: group.id))
+                    // A move, not the default copy, so the pointer doesn't get a green plus.
+                    .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
+                                                         operationsOutsideApp: .init(allowCopy: false)))
+                    .dropDestination(for: GroupDrag.self) { drags, _ in
+                        guard let dragged = drags.first?.group, dragged != group.id else { return }
+                        withAnimation(.snappy) { move(dragged, onto: group.id) }
+                    }
+                    .dropConfiguration { _ in DropConfiguration(operation: draggedGroup == group.id ? .forbidden : .move) }
+                    .onDropSessionUpdated { session in
+                        switch session.phase {
+                        case .entering, .active:
+                            if draggedGroup != group.id { groupDropTarget = group.id }
+                        default:
+                            if groupDropTarget == group.id { groupDropTarget = nil }
+                        }
+                    }
             }
         }
-        .onMove {
-            model.moveSidebarItems($0, to: $1, shown: shownGroups.map { key($0.id) }, all: groups.map { key($0.id) },
-                                   in: SidebarSection.characterSets.rawValue)
+    }
+
+    /// The payload of a group title's drag, made as the drag starts. The group is remembered until the
+    /// mouse button goes up, so its own title doesn't light up as a place to drop it.
+    private func beginDrag(of group: String) -> GroupDrag {
+        draggedGroup = group
+        Task {
+            while NSEvent.pressedMouseButtons & 1 != 0 { try? await Task.sleep(for: .milliseconds(100)) }
+            draggedGroup = nil
+            groupDropTarget = nil
         }
+        return GroupDrag(group: group)
     }
 
     private func shown(_ rows: [SidebarRow]) -> [SidebarRow] {
@@ -155,6 +198,7 @@ private struct SidebarContent: View {
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
         }
         .padding(.trailing, 10)
+        .background(GapDropFeedback())
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -290,5 +334,40 @@ private struct SidebarContent: View {
             Button("Hide from Sidebar") { model.setVisible(row.key, false) }
         }
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
+    }
+}
+
+/// A character set group's title being dragged onto another's.
+private nonisolated struct GroupDrag: Codable, Transferable {
+    var group: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .ciceroSidebarGroup)
+    }
+}
+
+private extension UTType {
+    /// Declared in Info.plist.
+    nonisolated static let ciceroSidebarGroup = UTType(exportedAs: "local.cicero.sidebar-group")
+}
+
+/// Makes the list open a gap where dragged rows will land, the rows around it sliding apart as in Finder's
+/// sidebar, instead of drawing an insertion line. SwiftUI has no setting for it: a List on macOS 26 is an
+/// NSOutlineView, whose `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves
+/// the style alone once it's set. This sits behind a header inside the list, so the outline view is among
+/// its superviews; it takes no clicks and draws nothing.
+private struct GapDropFeedback: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Marker() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class Marker: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            var view = superview
+            while let current = view, !(current is NSOutlineView) { view = current.superview }
+            (view as? NSOutlineView)?.draggingDestinationFeedbackStyle = .gap
+        }
     }
 }

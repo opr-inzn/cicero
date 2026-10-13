@@ -64,7 +64,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - The sidebar is a SwiftUI `List`, so every row it shows is a hosting view of its own, about a millisecond
   each to make: `SidebarView` keeps its sections in a view apart from the list, so a change of selection
   doesn't remake them, only sets and foundries are drop targets (that alone makes a row a third slower to
-  appear), and while the selection changes quickly the browser takes it only once it rests.
+  appear), and while the selection changes quickly the browser takes it only once it rests. SwiftUI's List
+  is an NSOutlineView; a marker view behind the "Fonts" header finds it and sets its drop feedback to
+  `.gap`, the one AppKit setting the sidebar changes. Everything else (selection, moves, menus, headers)
+  stays SwiftUI's.
 
 ## Rules of thumb
 
