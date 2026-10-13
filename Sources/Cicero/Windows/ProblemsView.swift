@@ -144,7 +144,7 @@ private struct FileRow: View {
                 HStack(spacing: 6) {
                     Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1)
                     if isNewest { NewestTag() }
-                    if !file.preferredFor.isEmpty { PreferredTag(names: file.preferredFor) }
+                    if !file.preferredFor.isEmpty && file.preferredStyles == nil { PreferredTag(names: file.preferredFor) }
                 }
                 // Under a title, the whole path says which file it is.
                 Text(((file.title == nil ? (file.path as NSString).deletingLastPathComponent : file.path) as NSString).abbreviatingWithTildeInPath)
@@ -153,6 +153,12 @@ private struct FileRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(Self.facts(of: file)).font(.caption).foregroundStyle(.secondary)
+                if let styles = file.preferredStyles {
+                    Text("Preferred for \(styles)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help(PreferredTag.help(file.preferredFor))
+                }
             }
             Spacer(minLength: 0)
             FixButtons(fixes: fixes, kind: kind).controlSize(.small)
@@ -274,7 +280,11 @@ private struct PreferredTag: View {
     let names: [String]
 
     var body: some View {
-        Tag(text: "Preferred", tint: .blue).help("Apps that ask for \(ListFormatter.localizedString(byJoining: names)) get this font.")
+        Tag(text: "Preferred", tint: .blue).help(Self.help(names))
+    }
+
+    static func help(_ names: [String]) -> String {
+        "Apps that ask for \(ListFormatter.localizedString(byJoining: names)) get this font."
     }
 }
 
