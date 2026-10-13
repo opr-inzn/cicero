@@ -250,8 +250,10 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count))
     }
 
+    /// Registers for the session until Cicero quits. Faces already on for an application set stay on
+    /// until then too.
     @concurrent
-    public func activateTemporarily(_ faces: [LibraryFace], scope: TemporaryScope, records: ActivationRecords) async -> ActivationResult {
+    public func activateTemporarily(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
         var succeeded = 0
@@ -260,7 +262,7 @@ public struct ActivationEngine: Sendable {
         for face in Self.uniqueByPath(faces) {
             let path = face.face.path
             if records.temporary[path] != nil {
-                records.temporary[path] = TemporaryRecord(scope: scope, session: session)
+                records.temporary[path] = TemporaryRecord(scope: .untilQuit, session: session)
                 succeeded += 1
             } else if !face.state.isActive {
                 toRegister.append(path)
@@ -271,14 +273,13 @@ public struct ActivationEngine: Sendable {
             if stuck.contains(path) {
                 failed.append(path)
             } else {
-                records.temporary[path] = TemporaryRecord(scope: scope, session: session)
+                records.temporary[path] = TemporaryRecord(scope: .untilQuit, session: session)
                 succeeded += 1
             }
         }
-        let until = scope == .untilQuit ? "until Cicero quits" : "until you log out"
         let message: String
         if failed.isEmpty {
-            message = succeeded <= 1 ? "Activated \(until)." : "Activated \(succeeded) files \(until)."
+            message = succeeded <= 1 ? "Activated until Cicero quits." : "Activated \(succeeded) files until Cicero quits."
         } else {
             message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
         }
@@ -522,18 +523,17 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: 1, failed: [], message: "Installed a copy.")
     }
 
-    /// At launch: forgets temporary activations from an earlier login session and unregisters
-    /// "until Cicero quits" ones left behind by a crash.
+    /// At launch: unregisters "until Cicero quits" activations left behind by a crash, and forgets
+    /// application sets' ones from an earlier login session, which ended with it.
     @concurrent
     public func reconcileTemporary(_ records: ActivationRecords) async -> ActivationRecords {
         var records = records
         let session = Self.currentSession()
         var leftovers: [String] = []
         for (path, record) in records.temporary {
-            if record.session != session {
-                records.temporary[path] = nil
-            } else if record.scope == .untilQuit {
-                leftovers.append(path)
+            switch record.scope {
+            case .untilQuit: leftovers.append(path)
+            case .whileAppsRun: if record.session != session { records.temporary[path] = nil }
             }
         }
         if !leftovers.isEmpty {
@@ -553,7 +553,8 @@ public struct ActivationEngine: Sendable {
         return records
     }
 
-    /// Identifies the current login session (audit session ID plus boot time).
+    /// Identifies the current login session (audit session ID plus boot time). Application sets'
+    /// registrations outlive Cicero but not a logout, so their records only count within one.
     public static func currentSession() -> String {
         var boot = timeval()
         var size = MemoryLayout<timeval>.size
