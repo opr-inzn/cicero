@@ -32,14 +32,17 @@ ellipsis character (…) for items that ask for more input.
   - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
   - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Google Fonts, Unicode Blocks, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - The menus of sets, smart sets, folders, foundries, classifications and character sets also have Export Fonts… (that row's families, see Export and backup). Every row menu also has Hide from Sidebar and Edit Sidebar.
-- Order: rows drag to a new place within their own section (character sets within their group, and the
-  groups within Character Sets), never into another one. Section titles drag onto each other: the dragged
-  section takes the other's place, which is highlighted. While a section is dragged its rows fold away
-  under its title, so it moves as one (a list drags a header as a picture of it, with no custom preview),
-  and come back when it's dropped. Items that are gone for now (System Fonts while
+- Order: rows drag to a new place within their own section (character sets within their group), never
+  into another one; as in Finder's sidebar, the rows around the place they'd land slide apart to open a gap
+  for them. Character set groups move by dragging a group's title onto another's, which is highlighted: the
+  dragged group takes its place (a click on the title opens or closes the group, so the title can't also
+  drag in the list). Sections don't move: a click on a title opens or closes it, and a drag does nothing (an
+  order saved when sections could be dragged is kept; Reset Order puts them back). Items that are gone for now (System Fonts while
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
-  together; the browser then shows the fonts in any of them. Selecting in another section starts over there.
+  together: they land side by side in the gap, in their order. The browser then shows the fonts in any of them. Selecting in another section starts over there.
+- Moving through the sidebar quickly (holding an arrow key, clicking from row to row) moves the selection at
+  every step; the browser shows the last one once the selection rests for a moment.
 - Dropping family names (drag from the browser) onto a set or foundry adds them.
 - Creating a set or character set un-hides its section.
 - Settings → Sidebar lists the same items, in the sidebar's order, as Finder-style checkboxes, with

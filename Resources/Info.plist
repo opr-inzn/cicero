@@ -44,9 +44,9 @@
     <array>
         <dict>
             <key>UTTypeIdentifier</key>
-            <string>com.maximilianinzinger.cicero.sidebar-section</string>
+            <string>com.maximilianinzinger.cicero.sidebar-group</string>
             <key>UTTypeDescription</key>
-            <string>Cicero Sidebar Section</string>
+            <string>Cicero Character Set Group</string>
             <key>UTTypeConformsTo</key>
             <array>
                 <string>public.data</string>

@@ -48,6 +48,13 @@ public struct UserData: Codable, Equatable, Sendable {
         records = try value(.records, d.records)
     }
 
+    /// Whether anything but the sidebar's choices (order, hidden and collapsed items) differs.
+    public func differs(besidesSidebar other: UserData) -> Bool {
+        var other = other
+        other.sidebar = sidebar
+        return self != other
+    }
+
     /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
     public func scannedFolders() -> [WatchedFolder] {
         folders + (showAdobeFonts ? WatchedFolder.appFontFolders() : [])
@@ -236,7 +243,8 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
     /// Collapsed sections ("folders", "sets", "tags", "foundries", "classifications", "characterSets")
     /// and character set groups ("charsetgroup.<group id>").
     public var collapsed: Set<String> = ["foundries", "classifications", "charsetgroup.unicode", "charsetgroup.google"]
-    /// Keys in the order the user dragged them into, per list: "sections" (section keys), "library",
+    /// Keys in the order the user dragged them into, per list: "sections" (section keys, from when sections
+    /// could be dragged; still followed), "library",
     /// a section's rows ("folders", "sets", "foundries", "classifications"), "characterSets" (group keys
     /// "charsetgroup.<group id>") and a group's rows ("charsetgroup.<group id>").
     public var order: [String: [String]] = [:]

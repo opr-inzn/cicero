@@ -5,46 +5,95 @@ import UniformTypeIdentifiers
 
 /// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
 /// choices are in Settings → Sidebar. Rows drag to a new place within their section (or character set
-/// group), several at once when they're selected together, and section titles drag onto each other.
+/// group), several at once when they're selected together, and the rows they pass slide apart to open a
+/// gap where they'll land. Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
-    /// The section whose title is being dragged: its rows fold away under it until the drag ends.
-    @State private var draggedSection: SidebarSection?
-    /// The section whose title a dragged section is over.
-    @State private var sectionDropTarget: SidebarSection?
+    /// What the list shows selected while the browser hasn't taken it yet (see `select`).
+    @State private var pendingSelection: Set<SidebarItem>?
+    @State private var pace = SelectionPace()
+
+    var body: some View {
+        // The rows are a view of their own: a list's selection updates whatever makes the list, and this
+        // way that's just this, not every section and row.
+        List(selection: Binding(get: { pendingSelection ?? model.selectedItems }, set: select)) {
+            SidebarContent()
+        }
+        .listStyle(.sidebar)
+        .animation(.snappy, value: model.isEditingSidebar)
+        .contextMenu {
+            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
+        }
+        .onChange(of: model.selectedItems) {
+            // Selected some other way (a new set, say) while the browser was catching up: that wins.
+            guard pendingSelection != nil else { return }
+            pace.commit?.cancel()
+            pendingSelection = nil
+        }
+    }
+
+    /// The browser shows a new selection at once, unless the selection changes quickly, as while arrowing
+    /// through a long section: the list then moves on at each step and the browser takes the last one when
+    /// it rests, instead of making every list along the way.
+    private func select(_ items: Set<SidebarItem>) {
+        let now = ContinuousClock.now
+        let resting = pace.last.map { now - $0 > .milliseconds(300) } ?? true
+        pace.last = now
+        pace.commit?.cancel()
+        let items = model.sidebarSelection(items, from: pendingSelection ?? model.selectedItems)
+        guard !resting else {
+            pendingSelection = nil
+            return model.selectSidebarItems(items)
+        }
+        pendingSelection = items
+        pace.commit = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            pendingSelection = nil
+            model.selectSidebarItems(items)
+        }
+    }
+}
+
+/// When the sidebar's selection last changed, and the change waiting for the browser.
+private final class SelectionPace {
+    var last: ContinuousClock.Instant?
+    var commit: Task<Void, Never>?
+}
+
+/// The sidebar's sections and rows.
+private struct SidebarContent: View {
+    @Environment(AppModel.self) private var model
+    /// The character set group whose title is being dragged, and the one whose title it's over.
+    @State private var draggedGroup: String?
+    @State private var groupDropTarget: String?
 
     var body: some View {
         let editing = model.isEditingSidebar
-        List(selection: Binding(get: { model.selectedItems }, set: { model.selectSidebarItems($0) })) {
-            Section {
-                movableRows(model.libraryRows, in: "library", section: nil)
-            } header: {
-                header
-            }
-            ForEach(model.sections) { section in
-                if editing || model.isVisible(section.key) {
-                    let rows = model.rows(for: section)
-                    Section(isExpanded: expansion(section)) {
-                        if section == .characterSets {
-                            characterSetGroups
-                        } else {
-                            movableRows(rows, in: section.rawValue, section: section)
-                        }
-                        if editing && rows.isEmpty {
-                            Text("Nothing here yet")
-                                .foregroundStyle(.tertiary)
-                                .selectionDisabled()
-                        }
-                    } header: {
-                        sectionHeader(section)
+        Section {
+            movableRows(model.libraryRows, in: "library", section: nil)
+        } header: {
+            header
+        }
+        ForEach(model.sections) { section in
+            if editing || model.isVisible(section.key) {
+                let groups = section == .characterSets ? model.characterSetGroups : []
+                let rows = section == .characterSets ? [] : model.rows(for: section)
+                Section(isExpanded: expansion(section)) {
+                    if section == .characterSets {
+                        characterSetGroups(groups)
+                    } else {
+                        movableRows(rows, in: section.rawValue, section: section)
                     }
+                    if editing && rows.isEmpty && groups.isEmpty {
+                        Text("Nothing here yet")
+                            .foregroundStyle(.tertiary)
+                            .selectionDisabled()
+                    }
+                } header: {
+                    sectionHeader(section)
                 }
             }
-        }
-        .listStyle(.sidebar)
-        .animation(.snappy, value: editing)
-        .contextMenu {
-            Button(editing ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
         }
     }
 
@@ -55,12 +104,19 @@ struct SidebarView: View {
             .onMove { model.moveSidebarItems($0, to: $1, shown: shownRows.map(\.key), all: rows.map(\.key), in: list) }
     }
 
-    /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Groups move
-    /// among themselves, and sets within their group.
-    private var characterSetGroups: some View {
-        let groups = model.characterSetGroups
+    /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Sets move within
+    /// their group. A click on a group's title opens or closes it, and a title that takes clicks can't
+    /// hand drags to the list, so groups move by dropping one's title onto another's, which is
+    /// highlighted: the dragged group takes its place, and the other moves towards where it was.
+    private func characterSetGroups(_ groups: [(id: String, title: String, rows: [SidebarRow])]) -> some View {
         let shownGroups = groups.filter { !shown($0.rows).isEmpty }
         func key(_ id: String) -> String { "charsetgroup.\(id)" }
+        func move(_ dragged: String, onto target: String) {
+            let keys = shownGroups.map { key($0.id) }
+            guard let from = keys.firstIndex(of: key(dragged)), let to = keys.firstIndex(of: key(target)), from != to else { return }
+            model.moveSidebarItems([from], to: from < to ? to + 1 : to, shown: keys, all: groups.map { key($0.id) },
+                                   in: SidebarSection.characterSets.rawValue)
+        }
         return ForEach(shownGroups, id: \.id) { group in
             DisclosureGroup(isExpanded: Binding(
                 get: { model.isEditingSidebar || model.isGroupExpanded(group.id) },
@@ -78,12 +134,42 @@ struct SidebarView: View {
                         guard !model.isEditingSidebar else { return }
                         withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
                     }
+                    .background {
+                        if groupDropTarget == group.id {
+                            RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.horizontal, -6)
+                        }
+                    }
+                    .draggable(beginDrag(of: group.id))
+                    // A move, not the default copy, so the pointer doesn't get a green plus.
+                    .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
+                                                         operationsOutsideApp: .init(allowCopy: false)))
+                    .dropDestination(for: GroupDrag.self) { drags, _ in
+                        guard let dragged = drags.first?.group, dragged != group.id else { return }
+                        withAnimation(.snappy) { move(dragged, onto: group.id) }
+                    }
+                    .dropConfiguration { _ in DropConfiguration(operation: draggedGroup == group.id ? .forbidden : .move) }
+                    .onDropSessionUpdated { session in
+                        switch session.phase {
+                        case .entering, .active:
+                            if draggedGroup != group.id { groupDropTarget = group.id }
+                        default:
+                            if groupDropTarget == group.id { groupDropTarget = nil }
+                        }
+                    }
             }
         }
-        .onMove {
-            model.moveSidebarItems($0, to: $1, shown: shownGroups.map { key($0.id) }, all: groups.map { key($0.id) },
-                                   in: SidebarSection.characterSets.rawValue)
+    }
+
+    /// The payload of a group title's drag, made as the drag starts. The group is remembered until the
+    /// mouse button goes up, so its own title doesn't light up as a place to drop it.
+    private func beginDrag(of group: String) -> GroupDrag {
+        draggedGroup = group
+        Task {
+            while NSEvent.pressedMouseButtons & 1 != 0 { try? await Task.sleep(for: .milliseconds(100)) }
+            draggedGroup = nil
+            groupDropTarget = nil
         }
+        return GroupDrag(group: group)
     }
 
     private func shown(_ rows: [SidebarRow]) -> [SidebarRow] {
@@ -92,20 +178,9 @@ struct SidebarView: View {
 
     private func expansion(_ section: SidebarSection) -> Binding<Bool> {
         Binding(
-            get: { draggedSection != section && (model.isEditingSidebar || model.isExpanded(section)) },
-            set: { if !model.isEditingSidebar && draggedSection == nil { model.setExpanded(section, $0) } }
+            get: { model.isEditingSidebar || model.isExpanded(section) },
+            set: { if !model.isEditingSidebar { model.setExpanded(section, $0) } }
         )
-    }
-
-    /// The payload of a section title's drag, made as the drag starts: the section's rows fold away
-    /// under its title, so it moves as one, and come back when the mouse button goes up wherever it's dropped.
-    private func beginDrag(of section: SidebarSection) -> SectionDrag {
-        withAnimation(.snappy) { draggedSection = section }
-        Task {
-            while NSEvent.pressedMouseButtons & 1 != 0 { try? await Task.sleep(for: .milliseconds(100)) }
-            withAnimation(.snappy) { draggedSection = nil }
-        }
-        return SectionDrag(section: section.rawValue)
     }
 
     // MARK: Headers
@@ -123,6 +198,7 @@ struct SidebarView: View {
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
         }
         .padding(.trailing, 10)
+        .background(GapDropFeedback())
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -141,29 +217,6 @@ struct SidebarView: View {
         .onTapGesture {
             let isExpanded = expansion(section)
             withAnimation(.snappy) { isExpanded.wrappedValue.toggle() }
-        }
-        .background {
-            if sectionDropTarget == section {
-                RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.leading, -6)
-            }
-        }
-        // A list drags a header as a picture of it and ignores drag previews, so the rows fold away instead.
-        .draggable(beginDrag(of: section))
-        // A move, not the default copy, so the pointer doesn't get a green plus.
-        .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
-                                             operationsOutsideApp: .init(allowCopy: false)))
-        .dropDestination(for: SectionDrag.self) { drags, _ in
-            guard let dragged = drags.first.flatMap({ SidebarSection(rawValue: $0.section) }), dragged != section else { return }
-            withAnimation(.snappy) { model.moveSection(dragged, onto: section) }
-        }
-        .dropConfiguration { _ in DropConfiguration(operation: draggedSection == section ? .forbidden : .move) }
-        .onDropSessionUpdated { session in
-            switch session.phase {
-            case .entering, .active:
-                if draggedSection != section { sectionDropTarget = section }
-            default:
-                if sectionDropTarget == section { sectionDropTarget = nil }
-            }
         }
     }
 
@@ -208,9 +261,10 @@ struct SidebarView: View {
 
     // MARK: Rows
 
+    @ViewBuilder
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
-        return HStack(spacing: 6) {
+        let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title) }
             Label(row.title, systemImage: row.icon).lineLimit(1)
         }
@@ -218,7 +272,13 @@ struct SidebarView: View {
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .tag(row.item)
         .contextMenu { menu(for: row) }
-        .dropDestination(for: String.self) { names, _ in _ = model.handleDrop(names, on: row.item) }
+        // Only rows that take family names are drop targets: being one makes a row much slower to appear,
+        // which shows when a section opens or a long one scrolls.
+        if model.takesFamilies(row.item) {
+            content.dropDestination(for: String.self) { names, _ in _ = model.handleDrop(names, on: row.item) }
+        } else {
+            content
+        }
     }
 
     @ViewBuilder
@@ -277,16 +337,37 @@ struct SidebarView: View {
     }
 }
 
-/// A section title being dragged onto another.
-private nonisolated struct SectionDrag: Codable, Transferable {
-    var section: String
+/// A character set group's title being dragged onto another's.
+private nonisolated struct GroupDrag: Codable, Transferable {
+    var group: String
 
     static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .ciceroSidebarSection)
+        CodableRepresentation(contentType: .ciceroSidebarGroup)
     }
 }
 
 private extension UTType {
     /// Declared in Info.plist.
-    nonisolated static let ciceroSidebarSection = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-section")
+    nonisolated static let ciceroSidebarGroup = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-group")
+}
+
+/// Makes the list open a gap where dragged rows will land, the rows around it sliding apart as in Finder's
+/// sidebar, instead of drawing an insertion line. SwiftUI has no setting for it: a List on macOS 26 is an
+/// NSOutlineView, whose `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves
+/// the style alone once it's set. This sits behind a header inside the list, so the outline view is among
+/// its superviews; it takes no clicks and draws nothing.
+private struct GapDropFeedback: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Marker() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class Marker: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            var view = superview
+            while let current = view, !(current is NSOutlineView) { view = current.superview }
+            (view as? NSOutlineView)?.draggingDestinationFeedbackStyle = .gap
+        }
+    }
 }

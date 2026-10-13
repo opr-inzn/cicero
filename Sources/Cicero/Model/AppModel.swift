@@ -32,6 +32,8 @@ final class AppModel {
     private(set) var coverageProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
     private(set) var presentClassifications: [Classification] = []
+    /// Cicero's own folder items that have fonts now (Adobe Apps, Deactivated): the sidebar lists them.
+    private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Where operations in progress will put switches, shown from the click until the scan after the
     /// operation confirms it (see `expect`).
     private(set) var expectedFamilyPositions: [String: SwitchPosition] = [:]
@@ -43,7 +45,9 @@ final class AppModel {
         didSet {
             guard data != oldValue else { return }
             store.save(data)
-            dataRevision &+= 1
+            // No list of families depends on the sidebar's choices: opening a section, or moving or hiding a
+            // row, leaves the browser's list as it is instead of making and sorting it again.
+            if data.sidebar == oldValue.sidebar || data.differs(besidesSidebar: oldValue) { dataRevision &+= 1 }
             if data.foundryOverrides != oldValue.foundryOverrides || data.foundryRenames != oldValue.foundryRenames
                 || data.showSystemFonts != oldValue.showSystemFonts {
                 refreshGroups()
@@ -53,7 +57,7 @@ final class AppModel {
             if data.showAdobeFonts != oldValue.showAdobeFonts { rescan() }
         }
     }
-    /// Bumped on every change to `data`; cached lists depend on it.
+    /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
     private(set) var dataRevision = 0
 
     // MARK: Navigation
@@ -131,6 +135,7 @@ final class AppModel {
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
+    @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
 
     init() {
         let locations = Locations.standard
@@ -419,14 +424,20 @@ final class AppModel {
     private func refreshGroups() {
         var names = Set<String>()
         var classifications = Set<Classification>()
-        for family in library.families where data.showSystemFonts || family.state != .system {
-            if let name = foundryName(of: family) { names.insert(name) }
+        var ownFolders = Set<UUID>()
+        let foundryName = foundryNamer()
+        for family in library.families {
+            if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
+            if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
+            guard data.showSystemFonts || family.state != .system else { continue }
+            if let name = foundryName(family) { names.insert(name) }
             classifications.insert(family.classification)
         }
         let sorted = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         if sorted != foundryNames { foundryNames = sorted }
         let present = Classification.allCases.filter(classifications.contains)
         if present != presentClassifications { presentClassifications = present }
+        if ownFolders != ownFoldersWithFonts { ownFoldersWithFonts = ownFolders }
     }
 }
 
