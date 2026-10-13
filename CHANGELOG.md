@@ -24,3 +24,5 @@ First release.
 - Activate fonts by copying them to your Fonts folder or using them where they are. Deactivating never deletes your only copy.
 - Activate fonts temporarily, until Cicero quits or until you log out, with nothing copied.
 - Move fonts to the Trash, and reveal any font or style in Finder.
+- Export the files of the selected families, a set, a folder or any other sidebar item into a folder or a ZIP archive (File → Export Fonts…, ⇧⌘E).
+- Back up everything set up in Cicero, with your font files if you like, as one `.cicerobackup` file, and restore it on this Mac or another (File → Back Up Library… and Restore Library…, or Settings → General).
