@@ -74,8 +74,7 @@ private struct RuleRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Picker("Field", selection: field) {
-                // Tags have no UI for now: offered only to a rule saved with one.
-                ForEach(SmartRule.Field.allCases.filter { $0 != .tag || rule.field == .tag }, id: \.self) { Text($0.title).tag($0) }
+                ForEach(SmartRule.Field.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()
             Picker("Comparison", selection: $rule.comparison) {
@@ -97,10 +96,11 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
-    /// The user's folders, then Adobe Apps when its fonts are shown.
+    /// The user's folders, then Adobe Apps when its fonts are shown, and Added Fonts when there are some.
     private var folderOptions: [(id: String, title: String)] {
         model.data.folders.map { ($0.id.uuidString, $0.displayName) }
             + (model.data.showAdobeFonts ? [(WatchedFolder.adobeAppsID.uuidString, "Adobe Apps")] : [])
+            + (model.data.fontFiles.isEmpty ? [] : [(WatchedFolder.addedFilesID.uuidString, "Added Fonts")])
     }
 
     /// Changing the field resets the comparison and value to ones that make sense for it.

@@ -37,11 +37,11 @@ After that, Cicero checks which characters each font has, in the background. Lis
 
 The main window has three parts:
 
-- **The sidebar** on the left chooses what to show: **All Fonts**, **Activated**, **Not Activated**, **System Fonts** and **Problems**, then your **Folders**, **Sets**, **Foundries**, **Classifications** and **Character Sets**. See [Organizing your library](organizing.md).
+- **The sidebar** on the left chooses what to show: **All Fonts**, **Activated**, **Not Activated**, **System Fonts** and **Problems**, then your **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Character Sets**. See [Organizing your library](organizing.md).
 - **The browser** in the middle shows the families of what you chose, as a list, a grid or specimens. The title is the sidebar item’s name, and the subtitle counts the families and how many are activated, like “1,298 families · 716 activated”. See [Browsing and previewing](browsing.md).
 - **The Info panel** on the right, shown with the **Info** button in the toolbar or **Fonts → Show Info** (⌘I), describes the selected font.
 
-Double-click a family to open its **font page**, with a large text to type into, its styles and its characters.
+Double-click a family to open its **font page**, with a large text to type into, its styles, its ligatures and its characters.
 
 The toolbar has, from left to right, the view switcher (List, Grid, Specimens), **Preview Options**, **Info** and the search field.
 
@@ -55,6 +55,14 @@ Keep fonts you don’t always need in folders of your own, and add those folders
 2. Pick one or more folders and click **Add**.
 
 Their fonts show up in your library without being installed. They’re listed under **Not Activated** until you turn them on. See [Folders](organizing.md#folders).
+
+You can add single font files too, without adding the folder they’re in:
+
+- Choose **File → Add Fonts…** (⌘O) and pick the files.
+- Drag font files from the Finder onto Cicero’s window.
+- In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
+
+They’re listed where they are, under **Added Fonts**, without being installed. See [Added Fonts](organizing.md#added-fonts).
 
 ## Turn a font on
 

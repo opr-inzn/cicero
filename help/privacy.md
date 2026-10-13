@@ -17,7 +17,7 @@ The **Help** menu opens pages on GitHub, like this guide, in your web browser, a
 
 | Where | What |
 | --- | --- |
-| `~/Library/Application Support/Cicero` | Your sets, smart sets, character sets, folders and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
+| `~/Library/Application Support/Cicero` | Your sets, smart sets, tags, character sets, folders, added fonts and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
 | `~/Library/Caches/Cicero` | What Cicero read from your font files, like names and characters, so it doesn’t have to read them again. **Fonts → Rebuild Font List** reads everything again. |
 
 Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way.

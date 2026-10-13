@@ -24,7 +24,7 @@ struct BackupSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Back Up Library").font(.title2.bold())
-                Text("The backup has everything set up in Cicero: sets, smart sets, character sets, folders, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
+                Text("The backup has everything set up in Cicero: sets, smart sets, tags, character sets, folders and added fonts, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
                     .foregroundStyle(.secondary)
             }
             Form {

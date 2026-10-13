@@ -59,7 +59,13 @@ public struct Library: Sendable {
         for (position, family) in families.enumerated() { index[family.id] = position }
         self.index = index
         searchText = families.map { family in
-            ([family.name, family.manufacturer ?? ""] + family.faces.map(\.face.postScriptName)).joined(separator: " ").lowercased()
+            var words = [family.name, family.manufacturer ?? ""]
+            var seen = Set<String>()
+            for face in family.faces.map(\.face) {
+                words.append(face.postScriptName)
+                for word in [face.designer, face.vendorID].compactMap({ $0 }) where seen.insert(word).inserted { words.append(word) }
+            }
+            return words.joined(separator: " ").lowercased()
         }
     }
 
@@ -74,7 +80,8 @@ public struct Library: Sendable {
 
     public func position(of id: String) -> Int? { index[id] }
 
-    /// Whether a family matches a search: name, foundry or a PostScript name contains the (lowercased) query.
+    /// Whether a family matches a search: its name, foundry, or a style's PostScript name, designer or vendor
+    /// ID contains the (lowercased) query.
     public func matches(_ family: Family, search lowercasedQuery: String) -> Bool {
         guard !lowercasedQuery.isEmpty, let position = index[family.id] else { return true }
         return searchText[position].contains(lowercasedQuery)
@@ -89,17 +96,21 @@ public enum ScanProgress: Sendable, Equatable {
 /// What a scan needs to know besides the disk.
 public struct ScanInput: Sendable {
     public var folders: [WatchedFolder]
+    /// Font files added one at a time, listed where they are like a folder's (see `WatchedFolder.addedFilesID`).
+    public var files: [String]
     public var records: ActivationRecords
 
-    public init(folders: [WatchedFolder], records: ActivationRecords) {
+    public init(folders: [WatchedFolder], files: [String] = [], records: ActivationRecords) {
         self.folders = folders
+        self.files = files
         self.records = records
     }
 }
 
 
 /// Finds every font file (CoreText's active fonts, ~/Library/Fonts, /Library/Fonts, the watched
-/// folders and Cicero's Deactivated folder), reads new or changed files, and builds a `Library`.
+/// folders, the files added one at a time and Cicero's Deactivated folder), reads new or changed files,
+/// and builds a `Library`.
 /// Parsed faces and Date Added are cached in `Locations.caches` by path, modification date and size;
 /// the decoded cache stays in memory between scans. Cancellation stops it between phases.
 public final class LibraryScanner: Sendable {
@@ -246,6 +257,11 @@ public final class LibraryScanner: Sendable {
                 found[path]!.folderIDs.append(folder.id)
                 if found[path]!.appName == nil { found[path]!.appName = folder.appName }
             }
+        }
+        for path in input.files where Self.isFontFile(path) {
+            guard let stamp = Self.stamp(ofPath: path), !Self.isDataless(path) else { continue }
+            if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
+            found[path]!.folderIDs.append(WatchedFolder.addedFilesID)
         }
         // Files Cicero moved out of an app's folder to turn them off still belong with that folder.
         for (path, origin) in input.records.appFolderOrigins where found[path] != nil {

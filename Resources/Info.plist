@@ -4,6 +4,27 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Font</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.opentype-font</string>
+                <string>public.truetype-ttf-font</string>
+                <string>public.truetype-collection-font</string>
+                <string>public.opentype-collection-font</string>
+                <string>com.apple.truetype-datafork-suitcase-font</string>
+                <string>org.w3c.woff</string>
+                <string>org.w3c.woff2</string>
+            </array>
+        </dict>
+    </array>
     <key>CFBundleDisplayName</key>
     <string>Cicero</string>
     <key>CFBundleExecutable</key>

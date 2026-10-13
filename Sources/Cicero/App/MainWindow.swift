@@ -21,6 +21,7 @@ struct MainWindow: View {
                 BrowserView()
                     .navigationDestination(for: String.self) { FontPage(familyID: $0) }
             }
+            .modifier(FileDrop())
             // Outside the stack, so the panel stays put when a font page opens or closes.
             .modifier(InfoPanelColumn())
         }
@@ -98,5 +99,41 @@ struct MainWindow: View {
         if plan.protectedCount > 0 { parts.append("Files that come with macOS or an app stay where they are.") }
         parts.append(plan.paths.count == 1 ? "You can put it back from the Trash." : "You can put them back from the Trash.")
         return parts.joined(separator: " ")
+    }
+}
+
+/// Font files and folders dropped from the Finder onto the browser or a font page join the library, and the
+/// set the browser shows when it shows one. The page is outlined while files are over it.
+private struct FileDrop: ViewModifier {
+    @Environment(AppModel.self) private var model
+    @State private var isTargeted = false
+
+    func body(content: Content) -> some View {
+        content
+            .dropDestination(for: URL.self) { urls, _ in
+                isTargeted = false
+                model.open(urls, into: set)
+            }
+            .onDropSessionUpdated { session in
+                switch session.phase {
+                // From outside Cicero: families dragged within the window are names, not files.
+                case .entering, .active: isTargeted = session.localSession == nil
+                default: isTargeted = false
+                }
+            }
+            .overlay {
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.accentColor, lineWidth: 3)
+                        .padding(4)
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+
+    /// The set the browser shows, which dropped fonts join.
+    private var set: UUID? {
+        guard model.openFamilyID == nil, model.selectedItems.count == 1, case .set(let id) = model.selection else { return nil }
+        return id
     }
 }

@@ -16,12 +16,15 @@ struct FontText: View {
     var features: [FeatureSetting] = []
     var kerning: Double = 0
     var lineLimit: Int? = 1
+    /// For text that runs over several lines; nil for the font's own line spacing.
+    var lineHeight: AttributedString.LineHeight?
 
     var body: some View {
         Text(text.isEmpty ? " " : text)
             .font(Font(FontLoader.shared.font(face, size: size, weight: weight, features: features)))
             .kerning(kerning)
             .lineLimit(lineLimit)
+            .lineHeight(lineHeight)
     }
 }
 
@@ -324,7 +327,7 @@ struct PreviewOptionsButton: View {
         } label: {
             Label("Preview Options", systemImage: "textformat.size")
         }
-        .help("Preview text, size, weight and spacing")
+        .help("Preview text, size, weight, spacing and alignment")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions() }
     }
 }
@@ -351,7 +354,19 @@ private struct PreviewOptions: View {
             Section {
                 row("Size", "\(Int(preview.size)) pt") { ValueSlider(value: $preview.size, range: 8...160) }
                 row("Weight", "\(Int(preview.weight))") { ValueSlider(value: $preview.weight, range: 100...900) }
-                row("Spacing", String(format: "%.1f%%", preview.tracking)) { ValueSlider(value: $preview.tracking, range: -10...40, step: 0.5) }
+                row("Letter Spacing", String(format: "%.1f%%", preview.tracking)) { ValueSlider(value: $preview.tracking, range: -10...40, step: 0.5) }
+                row("Line Spacing", "\(Int(preview.lineSpacing))%") { ValueSlider(value: $preview.lineSpacing, range: 80...250, step: 5) }
+                    .help("The distance between lines, in percent of the size, where a sample runs over several lines")
+                LabeledContent("Alignment") {
+                    Picker("Alignment", selection: $preview.alignment) {
+                        ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelStyle(.iconOnly)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                .help("How samples line up in specimens and Quick Look; font pages have their own alignment")
             }
         }
         .formStyle(.grouped)

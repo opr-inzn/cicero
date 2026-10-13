@@ -7,6 +7,7 @@
 | Shortcut | Command |
 | --- | --- |
 | ⌘, | **Cicero → Settings…** |
+| ⌘O | **File → Add Fonts…** |
 | ⇧⌘O | **File → Add Folder…** |
 | ⇧⌘N | **File → New Set…** |
 | ⌥⌘N | **File → New Smart Set…** |

@@ -73,7 +73,7 @@ struct GeneralSettings: View {
             } header: {
                 Text("Backup")
             } footer: {
-                Text("A backup holds your sets, smart sets, character sets, folders, foundry names, sidebar, and the settings for activation, system fonts and Adobe fonts, and can include your font files.").formFooter()
+                Text("A backup holds your sets, smart sets, tags, character sets, folders and added fonts, foundry names, sidebar, and the settings for activation, system fonts and Adobe fonts, and can include your font files.").formFooter()
             }
             Section {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)

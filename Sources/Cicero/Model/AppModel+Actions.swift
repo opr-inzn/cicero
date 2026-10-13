@@ -212,6 +212,11 @@ extension AppModel {
         rescan()
     }
 
+    /// Every added font file there is, for Reveal in Finder on Added Fonts.
+    var addedFileURLs: [URL] {
+        data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
+    }
+
     func folder(_ id: UUID) -> WatchedFolder? {
         if id == WatchedFolder.deactivatedID { return WatchedFolder(id: id, path: locations.deactivated.path) }
         return data.folders.first { $0.id == id }
@@ -251,6 +256,31 @@ extension AppModel {
         var list = data.sets[index].families.filter { !names.contains($0) }
         if member { list += families.map(\.id) }
         data.sets[index].families = list
+    }
+
+    /// The families a sidebar row shows, without the search.
+    func families(in item: SidebarItem) -> [Family] {
+        let test = filter(for: item)
+        return library.families.filter { (data.showSystemFonts || $0.state != .system) && test($0) }
+    }
+
+    /// Activate Set on a set's or smart set's menu: every font in it, asking how when the install method is Ask.
+    func activateFonts(in item: SidebarItem, named name: String) {
+        let families = families(in: item)
+        guard !families.isEmpty else { return showToast("There are no fonts in “\(name)”.") }
+        activate(families.flatMap(\.faces), title: "“\(name)”")
+    }
+
+    func activateFontsTemporarily(in item: SidebarItem) {
+        let families = families(in: item)
+        guard !families.isEmpty else { return showToast("Nothing to activate.") }
+        activateTemporarily(families)
+    }
+
+    func deactivateFonts(in item: SidebarItem) {
+        let families = families(in: item)
+        guard !families.isEmpty else { return showToast("Nothing to deactivate.") }
+        deactivate(families)
     }
 
     // MARK: Smart sets
@@ -312,10 +342,10 @@ extension AppModel {
 
     // MARK: Drag and drop
 
-    /// Sidebar rows that family names can be dropped onto: sets and foundries.
+    /// Sidebar rows that family names can be dropped onto: sets, tags and foundries.
     func takesFamilies(_ item: SidebarItem) -> Bool {
         switch item {
-        case .set, .foundry: true
+        case .set, .tag, .foundry: true
         default: false
         }
     }
@@ -326,6 +356,7 @@ extension AppModel {
         guard !families.isEmpty else { return false }
         switch item {
         case .set(let id): setMembership(true, for: families, in: id)
+        case .tag(let name): setTag(name, true, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         default: return false
         }
@@ -366,15 +397,21 @@ extension AppModel {
             if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
             }
+            if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
+                folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
+            }
             if ownFoldersWithFonts.contains(WatchedFolder.deactivatedID) {
                 folders.append(WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path))
             }
             return folders.map {
-                SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: $0.appName == nil ? "folder" : "folder.badge.gearshape", item: .folder($0.id))
+                let icon = $0.id == WatchedFolder.addedFilesID ? "doc" : $0.appName == nil ? "folder" : "folder.badge.gearshape"
+                return SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:
             return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "square.stack" : "app.badge.checkmark", item: .set($0.id)) }
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
+        case .tags:
+            return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: "tag", item: .tag($0), color: data.tagColors[$0]) }
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", item: .foundry($0)) }
         case .classifications:
@@ -452,6 +489,7 @@ extension AppModel {
         case .all, .active, .inactive, .system, .problems: "library"
         case .folder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
+        case .tag: SidebarSection.tags.rawValue
         case .foundry: SidebarSection.foundries.rawValue
         case .classification: SidebarSection.classifications.rawValue
         case .characterSet(let id):
