@@ -42,6 +42,23 @@
                 <string>public.data</string>
             </array>
         </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>local.cicero.backup</string>
+            <key>UTTypeDescription</key>
+            <string>Cicero Library Backup</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>cicerobackup</string>
+                </array>
+            </dict>
+        </dict>
     </array>
 </dict>
 </plist>

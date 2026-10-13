@@ -58,6 +58,7 @@ struct FamilyMenu: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(families.map(\.name).joined(separator: "\n"), forType: .string)
         }
+        Button("Export…") { model.exportFonts(families, named: nil) }
         if families.count > 1 {
             Button("Compare") {
                 model.compare(families)

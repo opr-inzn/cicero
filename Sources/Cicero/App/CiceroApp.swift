@@ -6,12 +6,14 @@ import SwiftUI
 struct CiceroApp: App {
     @State private var model = AppModel()
     @State private var preview = PreviewSettings()
+    @State private var backup = BackupPrompts()
 
     var body: some Scene {
         Window("Cicero", id: WindowID.main) {
             MainWindow()
                 .environment(model)
                 .environment(preview)
+                .environment(backup)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     Appearance.applySaved()
@@ -19,7 +21,7 @@ struct CiceroApp: App {
                 }
         }
         .defaultSize(width: 1440, height: 900)
-        .commands { CiceroCommands(model: model) }
+        .commands { CiceroCommands(model: model, backup: backup) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -48,6 +50,7 @@ struct CiceroApp: App {
 
 struct CiceroCommands: Commands {
     let model: AppModel
+    let backup: BackupPrompts
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -65,6 +68,12 @@ struct CiceroCommands: Commands {
             .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Smart Set…") { model.editingSmartSet = SmartSet(name: "") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
+            Divider()
+            Button("Export Fonts…") { model.exportSelectionOrList() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+            Divider()
+            Button("Back Up Library…") { backup.isBackingUp = true }
+            Button("Restore Library…") { Task { backup.restoring = await model.chooseBackupToRestore() } }
         }
         CommandGroup(after: .sidebar) {
             Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {

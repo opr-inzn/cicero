@@ -5,6 +5,8 @@ struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @State private var isClearingCaches = false
+    @State private var isBackingUp = false
+    @State private var restoring: BackupContents?
 
     var body: some View {
         @Bindable var model = model
@@ -46,10 +48,25 @@ struct GeneralSettings: View {
             } footer: {
                 Text("Rebuild reads every font file again. Clearing the caches helps when fonts don’t show up in apps or look wrong.").formFooter()
             }
+            Section {
+                LabeledContent("Your library") {
+                    HStack {
+                        Button("Back Up…") { isBackingUp = true }
+                        Button("Restore…") { Task { restoring = await model.chooseBackupToRestore() } }
+                    }
+                }
+                .formRowCentered()
+            } header: {
+                Text("Backup")
+            } footer: {
+                Text("A backup holds your sets, smart sets, character sets, folders, foundry names, sidebar and settings, and can include your font files.").formFooter()
+            }
         }
         .formStyle(.grouped)
         .onChange(of: appearance) { appearance.apply() }
         .fontCacheSheet(isPresented: $isClearingCaches)
+        .backupSheet(isPresented: $isBackingUp)
+        .restoreSheet(contents: $restoring)
     }
 
     private var activationExplanation: String {

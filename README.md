@@ -21,6 +21,8 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Font cache tools.** Clear the macOS font caches for your account or for all users, plus the caches Adobe apps and Microsoft Office keep (they go to the Trash and are rebuilt on next launch), and rebuild Cicero's font list, from the Fonts menu or Settings → General.
 - **Move to Trash** removes a font's files, including copies in other folders; fonts that come with macOS or an app are never touched.
 - **Reveal in Finder** from a font's right-click menu, a style, ⇧⌘R, or the info panel.
+- **Export fonts.** Copy the files of the selected families, or of a set, folder, foundry or any other sidebar item, into a folder or a ZIP archive with a subfolder per family, for sending them to someone or a printer (File → Export Fonts…, ⇧⌘E). Fonts that come with macOS or an app are left out.
+- **Back up and restore.** Save everything set up in Cicero — sets, smart sets, character sets, folders, foundry names, the sidebar and settings — with your font files if you like, as one `.cicerobackup` file, and restore it on this Mac or another. Each font goes back where it was unless a file is already there; nothing is ever written over.
 
 ## Privacy
 
