@@ -7,7 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 First release.
 
 - Browse your library as a sortable list with on/off switches, a grid, or full-width specimens.
-- Quick Look: press Space, or choose Fonts → Quick Look (⌘Y), for a floating preview of the selected family. The arrow keys move through the list, and ‹ › step through several selected families.
+- Quick Look: press Space, or choose Fonts → Quick Look (⌘Y), for a floating preview of the selected family. The arrow keys move the selection in the list, grid and specimens while it’s open, and ‹ › step through several selected families.
 - Font pages with a large editable text, a table of styles you can switch on individually, and a searchable glyph map.
 - An info panel with font details, supported languages, character sets and Unicode blocks, and a Features tab for OpenType features.
 - Preview Options for sample text, size, weight and letter spacing.
