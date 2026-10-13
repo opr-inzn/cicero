@@ -336,6 +336,13 @@ public struct Family: Identifiable, Hashable, Sendable {
         temporaryScope = scopes.count == 1 ? scopes.first! : nil
     }
 
+    /// The switch position with some faces at other positions, worked out like `position`: for the app
+    /// to show where an operation in progress will put the switch.
+    public func position(overriding faces: [FaceID: SwitchPosition]) -> SwitchPosition {
+        let positions = self.faces.map { faces[$0.id] ?? $0.position }
+        return app == nil ? (positions.contains(.on) ? .on : .off) : SwitchPosition(positions)
+    }
+
     /// The face to preview at a weight: a variable face when there is one, else the closest upright weight.
     public func face(nearestWeight weight: Double) -> LibraryFace {
         weight == 400 ? regular : Self.nearest(weight, in: faces)

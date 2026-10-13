@@ -82,20 +82,28 @@ final class AppSetWatcher {
         for path in current where managed[path]?.isEmpty ?? true { managed[path] = Set(names(in: path)) }
         let (wanted, faces) = plan()
         let records = model.data.records
-        let needsChange = current.contains { path in
-            guard let apps = wanted[path] else { return true }
-            return Set(records.temporary[path]?.apps ?? []) != apps
-        } || wanted.contains { path, _ in
-            records.temporary[path] == nil && !(faces[path]?.state.isActive ?? true)
+        let turningOn = Set(wanted.keys.filter { records.temporary[$0] == nil && !(faces[$0]?.state.isActive ?? true) })
+        let turningOff = current.filter { wanted[$0] == nil }
+        let appsChanged = current.contains { path in
+            wanted[path].map { Set(records.temporary[path]?.apps ?? []) != $0 } ?? false
         }
-        guard needsChange else { return }
+        guard !turningOn.isEmpty || !turningOff.isEmpty || appsChanged else { return }
+
+        // The switches move at once, as for the user's own activations, and settle with the scan after.
+        var operations: [Int] = []
+        let on = self.faces(inFiles: turningOn)
+        if !on.isEmpty { operations.append(model.expect(on, at: .on)) }
+        let off = Dictionary(grouping: self.faces(inFiles: turningOff)) { face in
+            // A font from an app's folder goes back to being on in that app.
+            face.app != nil && records.appFolderOrigins[face.face.path] == nil ? SwitchPosition.app : .off
+        }
+        for (position, faces) in off { operations.append(model.expect(faces, at: position)) }
 
         model.enqueue { [weak self] model in
             // Worked out again: an operation that ran in the meantime may have changed what's on.
             guard let self else { return }
             let (wanted, faces) = self.plan()
             let result = await model.engine.syncAppSets(wanted, faces: faces, records: model.data.records)
-            let changed = result.records != model.data.records
             model.data.records = result.records
             self.managed = Dictionary(uniqueKeysWithValues: Self.onForAppSets(result.records).map { path in
                 (path, self.managed[path] ?? Set(self.names(in: path)))
@@ -106,7 +114,9 @@ final class AppSetWatcher {
             } else if result.succeeded > 0 {
                 model.showToast("Activated fonts for \(self.appNames(wanting: wanted)).")
             }
-            if changed { model.scheduleRescan(after: 0.3) }
+            // The engine has waited for macOS, so a scan now sees what the sync did.
+            let scan = model.rescan()
+            for operation in operations { model.settle(operation, after: scan) }
         }
     }
 
@@ -134,6 +144,12 @@ final class AppSetWatcher {
         failed = failed.filter { wanted[$0.key] == $0.value }
         for path in failed.keys { wanted[path] = nil }
         return (wanted, faces)
+    }
+
+    /// The library's faces in these files.
+    private func faces(inFiles paths: Set<String>) -> [LibraryFace] {
+        guard let model, !paths.isEmpty else { return [] }
+        return model.library.families.flatMap(\.faces).filter { paths.contains($0.face.path) }
     }
 
     /// PostScript names of the library's faces in a file.

@@ -1,3 +1,4 @@
+import CoreText
 import Foundation
 
 extension ActivationEngine {
@@ -6,7 +7,9 @@ extension ActivationEngine {
     /// for application sets keep going with the apps that still want them, and the ones no open app wants
     /// are unregistered. Files that are on for any other reason are left alone, so an application set
     /// never turns off a font the user turned on.
-    /// `faces` has each wanted file's face, for its current state.
+    /// `faces` has each wanted file's face, for its current state. Like temporary activation, a file
+    /// counts as on only once macOS reports it active.
+    @concurrent
     public func syncAppSets(_ wanted: [String: Set<String>], faces: [String: LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records
         var release: [String] = []
@@ -31,7 +34,7 @@ extension ActivationEngine {
         var succeeded = 0
         if !register.isEmpty {
             let session = Self.currentSession()
-            let stuck = await registrar.register(register.map { URL(fileURLWithPath: $0) }, scope: .session)
+            let stuck = await registerAndConfirm(register, scope: .session)
             for path in register {
                 if stuck.contains(path) {
                     failed.append(path)

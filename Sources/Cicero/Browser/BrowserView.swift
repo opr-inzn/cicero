@@ -25,7 +25,7 @@ struct BrowserView: View {
                     .background(Color.canvas)
             } else {
                 switch mode {
-                case .list: FontList(families: families)
+                case .list: FontList()
                 case .grid: FontGrid(families: families)
                 case .specimens: SpecimenList(families: families)
                 }

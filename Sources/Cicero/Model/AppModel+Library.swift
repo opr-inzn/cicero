@@ -58,6 +58,12 @@ struct VisibleKey: Equatable {
     var coverageRevision: Int
 }
 
+/// What the cached rows of the font list were made from.
+struct FontRowsKey: Equatable {
+    var visible: VisibleKey
+    var order: [KeyPathComparator<FontRow>]
+}
+
 extension Classification {
     var icon: String {
         switch self {
@@ -112,14 +118,28 @@ extension AppModel {
     /// The families the browser shows for the sidebar selection and search. Cached; recomputed only
     /// when the library, selection, search, user data or coverage change.
     var visibleFamilies: [Family] {
-        let key = VisibleKey(
-            fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
-            dataRevision: dataRevision, coverageRevision: coverageRevision
-        )
+        let key = visibleKey
         if let cached = visibleCache, cached.key == key { return cached.families }
         let families = computeVisibleFamilies()
         visibleCache = (key, families)
         return families
+    }
+
+    private var visibleKey: VisibleKey {
+        VisibleKey(
+            fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
+            dataRevision: dataRevision, coverageRevision: coverageRevision
+        )
+    }
+
+    /// The font list's rows for `visibleFamilies`, sorted. Cached: making and sorting thousands of rows
+    /// takes tens of milliseconds, and the table asks again on every update, a click included.
+    func fontRows(sortedBy order: [KeyPathComparator<FontRow>]) -> [FontRow] {
+        let key = FontRowsKey(visible: visibleKey, order: order)
+        if let cached = fontRowsCache, cached.key == key { return cached.rows }
+        let rows = visibleFamilies.map { FontRow($0, model: self) }.sorted(using: order)
+        fontRowsCache = (key, rows)
+        return rows
     }
 
     private func computeVisibleFamilies() -> [Family] {

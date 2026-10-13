@@ -22,9 +22,10 @@ extension AppModel {
     }
 
     func performActivation(_ faces: [LibraryFace], method: InstallMethod) {
+        let operation = expect(faces, at: .on)
         enqueue { model in
             let result = await model.engine.activate(faces, method: method, records: model.data.records)
-            model.finish(result)
+            model.finish(result, operation: operation)
         }
     }
 
@@ -35,9 +36,10 @@ extension AppModel {
     func activateTemporarily(_ faces: [LibraryFace], scope: TemporaryScope) {
         let targets = faces.filter { !$0.state.isActive || ($0.state.temporaryScope.map { $0 != scope } ?? false) }
         guard !targets.isEmpty else { return showToast("Already on.") }
+        let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, scope: scope, records: model.data.records)
-            model.finish(result)
+            model.finish(result, operation: operation)
         }
     }
 
@@ -59,15 +61,17 @@ extension AppModel {
     }
 
     func performDeactivation(_ faces: [LibraryFace]) {
+        let operation = expect(faces, at: .off)
         enqueue { model in
             let result = await model.engine.deactivate(faces, records: model.data.records)
-            model.finish(result)
+            model.finish(result, operation: operation)
         }
     }
 
     /// On ↔ off; fonts an app loads from its own folder go from on in that app to on everywhere, then
-    /// off everywhere, then back.
+    /// off everywhere, then back. A switch already moving waits for its operation.
     func toggle(_ family: Family) {
+        guard expectedFamilyPositions[family.id] == nil else { return }
         switch family.position {
         case .on: deactivate([family])
         case .app: activate([family])
@@ -76,6 +80,7 @@ extension AppModel {
     }
 
     func toggle(_ face: LibraryFace, in family: Family) {
+        guard expectedFacePositions[face.id] == nil else { return }
         switch face.position {
         case .on: deactivate([face])
         case .app: activate([face], title: "\(family.name) \(face.face.styleName)")
@@ -84,16 +89,19 @@ extension AppModel {
     }
 
     func useInAppOnly(_ faces: [LibraryFace]) {
+        let operation = expect(faces, at: .app)
         enqueue { model in
             let result = await model.engine.useInAppOnly(faces, records: model.data.records)
-            model.finish(result)
+            model.finish(result, operation: operation)
         }
     }
 
-    func finish(_ result: ActivationResult) {
+    /// The engine has waited for macOS, so a scan now sees what the operation did.
+    func finish(_ result: ActivationResult, operation: Int? = nil) {
         data.records = result.records
         showToast(result.message)
-        scheduleRescan(after: 0.3)
+        let scan = rescan()
+        if let operation { settle(operation, after: scan) }
     }
 
     static func title(for families: [Family]) -> String {
@@ -122,7 +130,7 @@ extension AppModel {
                 for name in plan.removedFamilies { model.forget(family: name) }
             }
             model.showToast(result.message)
-            model.scheduleRescan(after: 0.3)
+            model.rescan()
         }
     }
 
@@ -569,7 +577,7 @@ extension AppModel {
         case .forgetInPlace(let path):
             enqueue { model in
                 model.data.records = await model.engine.forgetInPlace(path, records: model.data.records)
-                model.updateProblems()
+                model.rescan()
             }
         case .forgetInstalledCopy(let path):
             data.records.installedCopies[path] = nil

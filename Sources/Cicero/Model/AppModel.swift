@@ -31,6 +31,10 @@ final class AppModel {
     private(set) var coverageProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
     private(set) var presentClassifications: [Classification] = []
+    /// Where operations in progress will put switches, shown from the click until the scan after the
+    /// operation confirms it (see `expect`).
+    private(set) var expectedFamilyPositions: [String: SwitchPosition] = [:]
+    private(set) var expectedFacePositions: [FaceID: SwitchPosition] = [:]
 
     // MARK: User data
 
@@ -109,7 +113,22 @@ final class AppModel {
     /// Activation, deactivation and trashing run one at a time, so their record changes never overwrite each other.
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var lastScan = Date.distantPast
+    /// Numbers scans as they start, so results and expectations can tell which came first.
+    @ObservationIgnored private var scanCount = 0
+    @ObservationIgnored private var revealProgress: Task<Void, Never>?
+    /// The last progress a scan reported, shown once the scan has taken long enough to mention.
+    @ObservationIgnored private var latestProgress: ScanProgress?
+    @ObservationIgnored private var runningOperations = 0
+    /// The scan that was the latest when a font change came in during an operation; the change is left to a
+    /// scan that starts after it, which the operation usually starts itself.
+    @ObservationIgnored private var changeSeenBeforeScan: Int?
+    @ObservationIgnored private var operationCount = 0
+    @ObservationIgnored private var expectations: [Expectation] = []
+    @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] in
+        MainActor.assumeIsolated { self?.fontsChanged() }
+    }
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
+    @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
 
     init() {
@@ -129,19 +148,22 @@ final class AppModel {
         guard !started else { return }
         started = true
         let center = NotificationCenter.default
+        // Font changes and the watched folders are followed as they happen; this catches anything they miss,
+        // like folders on network disks.
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, Date().timeIntervalSince(self.lastScan) > 10 else { return }
+                guard let self, Date().timeIntervalSince(self.lastScan) > 60 else { return }
                 self.rescan()
             }
         }
         center.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.prepareToQuit() }
         }
+        // Posted to this process's own center when any app, Cicero included, changes the registered fonts.
         center.addObserver(
             forName: Notification.Name(kCTFontManagerRegisteredFontsChangedNotification as String), object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.scheduleRescan(after: 0.5) }
+            MainActor.assumeIsolated { self?.fontsChanged() }
         }
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
@@ -162,27 +184,62 @@ final class AppModel {
 
     // MARK: Scanning
 
-    func rescan() {
+    /// Returns the scan's number.
+    @discardableResult
+    func rescan() -> Int {
         scanTask?.cancel()
         lastScan = Date()
-        scanProgress = .finding
+        scanCount += 1
+        let id = scanCount
         let input = ScanInput(folders: data.scannedFolders(), records: data.records)
+        folderWatcher.watch(input.folders.map(\.path))
+        // Most scans take a fraction of a second; the capsule only shows for one that takes longer.
+        latestProgress = .finding
+        revealProgress?.cancel()
+        revealProgress = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled, let self, self.scanCount == id else { return }
+            self.scanProgress = self.latestProgress
+        }
         let scanner = scanner
         let report: @Sendable (ScanProgress) -> Void = { [weak self] progress in
             guard let self else { return }
             Task { @MainActor in
+                guard self.scanCount == id else { return }
+                self.latestProgress = progress
                 if self.scanProgress != nil { self.scanProgress = progress }
             }
         }
         scanTask = Task { [weak self] in
             do {
                 let library = try await scanner.scan(input, progress: report)
-                self?.apply(library)
+                self?.apply(library, scan: id)
             } catch is CancellationError {
             } catch {
-                self?.scanProgress = nil
+                self?.endScan(id)
             }
         }
+        return id
+    }
+
+    private func endScan(_ id: Int) {
+        if scanCount == id {
+            revealProgress?.cancel()
+            scanProgress = nil
+        }
+        dropExpectations(confirmedBy: id)
+        mergeExpectations()
+    }
+
+    /// CoreText's fonts-changed notification, or font files coming or going in a watched folder.
+    /// During an operation (whose own changes set these off) they wait for the scan the operation starts
+    /// when it finishes; `enqueue` scans afterwards when it started none.
+    private func fontsChanged() {
+        if runningOperations > 0 {
+            if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
+            return
+        }
+        scheduleRescan(after: 0.3)
     }
 
     func scheduleRescan(after delay: Double) {
@@ -201,32 +258,21 @@ final class AppModel {
         rescan()
     }
 
-    private func apply(_ new: Library) {
-        scanProgress = nil
+    private func apply(_ new: Library, scan id: Int) {
+        let signpost = Signposts.library.beginInterval("Apply")
+        defer { Signposts.library.endInterval("Apply", signpost) }
         hasScanned = true
-        guard new.fingerprint != library.fingerprint else { return }
-        let old = library
+        guard new.fingerprint != library.fingerprint else { return endScan(id) }
         library = new
+        endScan(id)
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
-        FontLoader.shared.invalidate(paths: Self.changedPaths(from: old, to: new))
-        FontLoader.shared.prefetch(new.families.map(\.regular.face))
+        FontLoader.shared.invalidate(paths: new.changedPaths)
+        // What the browser shows first, then everything else.
+        FontLoader.shared.prefetch((visibleFamilies + new.families).map(\.regular.face))
         updateCoverage()
         updateProblems()
-    }
-
-    private static func changedPaths(from old: Library, to new: Library) -> Set<String> {
-        func faces(_ library: Library) -> [String: [FontFace]] {
-            var result: [String: [FontFace]] = [:]
-            for family in library.families {
-                for face in family.faces { result[face.face.path, default: []].append(face.face) }
-            }
-            return result
-        }
-        let before = faces(old)
-        let after = faces(new)
-        return Set(before.keys).union(after.keys).filter { before[$0] != after[$0] }
     }
 
     private func updateCoverage() {
@@ -284,11 +330,75 @@ final class AppModel {
     /// Runs an activation-type operation after the previous one has finished.
     func enqueue(_ work: @escaping (AppModel) async -> Void) {
         let previous = operation
+        runningOperations += 1
         operation = Task { [weak self] in
             await previous?.value
             guard let self else { return }
             await work(self)
+            self.runningOperations -= 1
+            if let seen = self.changeSeenBeforeScan, self.runningOperations == 0 {
+                self.changeSeenBeforeScan = nil
+                if self.scanCount == seen { self.rescan() }
+            }
         }
+    }
+
+    // MARK: Expected positions
+
+    private struct Expectation {
+        var operation: Int
+        var faces: [FaceID: SwitchPosition]
+        var families: Set<String>
+        /// The scan the operation started when it finished; nil while it runs.
+        var scan: Int?
+    }
+
+    /// Moves the switches of these faces and their families to `position` at once, ahead of the
+    /// operation that puts them there. Returns the number `finish` takes to have the next scan confirm it.
+    func expect(_ faces: [LibraryFace], at position: SwitchPosition) -> Int {
+        operationCount += 1
+        expectations.append(Expectation(
+            operation: operationCount, faces: Dictionary(faces.map { ($0.id, position) }) { a, _ in a },
+            families: Set(faces.map(\.face.familyName))
+        ))
+        mergeExpectations()
+        return operationCount
+    }
+
+    /// The operation is done; the scan `id` shows what it did.
+    func settle(_ operation: Int, after id: Int) {
+        for index in expectations.indices where expectations[index].operation == operation {
+            expectations[index].scan = id
+        }
+    }
+
+    private func dropExpectations(confirmedBy id: Int) {
+        expectations.removeAll { ($0.scan ?? .max) <= id }
+    }
+
+    /// The faces' expected positions, latest operation last, and their families' positions worked out
+    /// from the current library: an earlier operation that failed doesn't linger in a later one's family.
+    private func mergeExpectations() {
+        var faces: [FaceID: SwitchPosition] = [:]
+        var names = Set<String>()
+        for expectation in expectations {
+            faces.merge(expectation.faces) { _, new in new }
+            names.formUnion(expectation.families)
+        }
+        var families: [String: SwitchPosition] = [:]
+        for name in names {
+            if let family = library.family(name) { families[name] = family.position(overriding: faces) }
+        }
+        if families != expectedFamilyPositions { expectedFamilyPositions = families }
+        if faces != expectedFacePositions { expectedFacePositions = faces }
+    }
+
+    func position(of family: Family) -> SwitchPosition {
+        expectedFamilyPositions[family.id] ?? family.position
+    }
+
+    func position(of face: LibraryFace) -> SwitchPosition {
+        expectedFacePositions[face.id] ?? face.position
     }
 
     // MARK: Toasts
