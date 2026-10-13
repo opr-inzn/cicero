@@ -14,7 +14,7 @@ At the top of the sidebar are five items that are always there:
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Problems | Things worth fixing, with a count. See [Problems](problems.md) |
 
-Below them are sections: **Folders**, **Sets**, **Foundries**, **Classifications** and **Character Sets**.
+Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Character Sets**.
 
 ### Open or close a section
 
@@ -49,6 +49,7 @@ Selected items have to be in one section, or in one group of character sets. ⌘
 Drag families from the browser onto:
 
 - **a set**, to add them to it
+- **a tag**, to give them that tag
 - **a foundry**, to say they’re from that foundry
 
 ## Folders
@@ -82,6 +83,26 @@ Cicero’s own folder for fonts it moved out of your Fonts folder or an app’s 
 
 Files that iCloud Drive, or another service like it, keeps only online are skipped until they’re downloaded, because reading them would download them. Download them in the Finder and Cicero lists them.
 
+## Added Fonts
+
+Font files you add one at a time are listed where they are, without being installed, like the fonts in a folder. They show up together as **Added Fonts** under **Folders**, while there are any.
+
+### Add font files
+
+- Choose **File → Add Fonts…** (⌘O) and pick one or more font files.
+- Drag font files from the Finder onto the browser or a font page. Drop them while the browser shows a set, and they join that set too.
+- In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All…**
+
+Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). When you open one family from the Finder, its font page opens. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder.
+
+When a file you added changes, as when you build a new version of a font you’re making, Cicero reads it again.
+
+### Remove them again
+
+Right-click families from added files and choose **Remove from Library**. Cicero stops listing them; the files stay where they are. A font you turned on stays listed until you turn it off.
+
+Right-click **Added Fonts** and choose **Reveal in Finder** to see the files.
+
 ## Sets
 
 A set is a list of families you put together by hand, like the fonts for one project.
@@ -100,6 +121,10 @@ A set is a list of families you put together by hand, like the fonts for one pro
 ### Rename or delete a set
 
 Right-click the set and choose **Rename Set…** or **Delete Set**. Deleting a set keeps its fonts in your library. Smart set rules that use the set are removed.
+
+### Turn a set’s fonts on or off
+
+Right-click the set and choose **Activate Set**, **Activate Temporarily** or **Deactivate Set**. Smart sets have the same items. See [Turn on a whole set](activating.md#turn-on-a-whole-set).
 
 A set can also turn its fonts on while an app is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app).
 
@@ -124,8 +149,9 @@ To change it later, right-click it and choose **Edit Smart Set…**. To remove i
 | Name | contains, doesn’t contain, begins with, is | Text |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
+| Tag | has, doesn’t have | One of your tags |
 | Set | is in, isn’t in | One of your sets |
-| Folder | is in, isn’t in | One of your folders, or Adobe Apps |
+| Folder | is in, isn’t in | One of your folders, Adobe Apps, or Added Fonts |
 | Status | is, is not | Activated, Partly Activated, Not Activated, Active in Apps Only or Installed with macOS |
 | Kind | is, is not | Variable, Monospaced or Has Italics |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
@@ -135,6 +161,23 @@ To change it later, right-click it and choose **Edit Smart Set…**. To remove i
 | Date Added | is in the last, isn’t in the last | A number of days |
 
 A smart set with a language or character set rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
+
+## Tags
+
+Tags are labels you give families, like “Licensed”, “Client approved” or “Try later”, each with a color if you like. A family can have any number of them, and its tags show as colored dots next to its name in the list, grid and specimens.
+
+### Tag fonts
+
+- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked tag to take it off. **New Tag…** makes a tag and gives it to them.
+- Drag families onto a tag in the sidebar.
+- In the [Info panel](browsing.md#see-a-fonts-details), click **Add Tag** or **Edit Tags** next to **Tags**.
+
+### Make, change and delete tags
+
+- Click **+** next to **Tags** in the sidebar to make a tag. A new tag gets the first color no other tag has.
+- Right-click a tag and choose **Rename Tag…**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
+
+Select a tag in the sidebar to see the families that have it. To find families with several tags, or without one, make a [smart set](#smart-sets) with **Tag** rules.
 
 ## Foundries
 

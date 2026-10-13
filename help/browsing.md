@@ -17,7 +17,7 @@ One row per family, under column headers:
 | Column | Shows |
 | --- | --- |
 | Status | The family’s on/off switch |
-| Name | The family name, and a tag when it isn’t simply on or off (see [Tags](#tags)) |
+| Name | The family name, the colors of [your tags](organizing.md#tags), and a status tag when it isn’t simply on or off (see [Status tags](#status-tags)) |
 | Preview | A sample in the font |
 | Styles | How many styles the family has |
 | Classification | Serif, Sans Serif, Script and so on, read from the font |
@@ -45,9 +45,9 @@ The grid is the view Cicero starts with.
 
 One wide row per family: the name, the foundry and number of styles, the sample at the preview size, and up to 14 of its style names, each set in its own style.
 
-### Tags
+### Status tags
 
-Small tags next to a family’s name tell you more about its state:
+Small capsules next to a family’s name tell you more about its state:
 
 | Tag | Means |
 | --- | --- |
@@ -59,7 +59,7 @@ Small tags next to a family’s name tell you more about its state:
 
 ## Search
 
-Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, manufacturer, or a style’s PostScript name contains what you type.
+Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name or manufacturer contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
 
 ## Select fonts
 
@@ -74,7 +74,7 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
 | Extend the selection | Hold ⇧ with an arrow key |
 
-Right-click a family for its menu: activate or deactivate it, add it to a set, reveal its files, copy its name, export it, compare it, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
+Right-click a family for its menu: activate or deactivate it, add it to a set, give it tags, reveal its files, copy its name, export it, compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
 You can drag families onto a set or a foundry in the sidebar, or into the Compare window.
 
@@ -94,9 +94,16 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 From top to bottom, a font page has:
 
 - **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many are activated. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why.
-- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left or center. Cicero remembers your text.
+- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text.
 - **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash.
+- **Ligatures,** when the style has any: see [See a font’s ligatures](#see-a-fonts-ligatures).
 - **Glyphs:** every character in the font, in one section per Unicode block, like Basic Latin or Latin-1 Supplement. To find characters, type into **Filter**: a character, part of its Unicode name, or a code like U+00E9. Click a character to see it large, with its name and code.
+
+## See a font’s ligatures
+
+A font page lists the ligatures the style makes: the single glyphs that stand for several characters, like ﬁ for “fi”. They’re grouped by the OpenType feature that makes them: **Standard Ligatures**, which apps use unless you turn them off, then **Discretionary**, **Historical**, **Contextual** and **Required Ligatures**. Each shows the ligature’s glyph with the characters it stands for under it. Click one to see it large, with its characters, their codes and its feature.
+
+Cicero lists the ligatures of characters you can type. Ligatures of alternates, or of forms only other features make, are left out, and so are fonts that make ligatures the Apple way (AAT) rather than the OpenType way. To try discretionary ligatures in previews, turn them on in the [Features](#try-opentype-features) tab.
 
 ## See a font’s details
 
@@ -105,7 +112,8 @@ Click **Info** in the toolbar, or choose **Fonts → Show Info** (⌘I). The Inf
 The panel describes the style being previewed, the one closest to the weight in Preview Options. Its **Info** tab shows:
 
 - **Status**, and the font’s names: family, style, full name and PostScript name
-- version, designer and manufacturer
+- **Tags**: the family’s tags. **Add Tag** or **Edit Tags** gives it others or takes them off.
+- version, designer, manufacturer, and the vendor ID: the four letters a foundry registers, like ADBE for Adobe
 - weight, and the weight range of a variable font
 - number of glyphs, format and copyright
 - **Languages** the font supports, like “213 languages, including English, German, …”. **Show All** lists them by script, with a search field; a checkmark marks full support. See [Languages](character-sets.md#how-cicero-decides-a-font-supports-a-language).
@@ -133,7 +141,9 @@ Click **Preview Options** in the toolbar:
 - **Sample:** type your own text, or pick one from **Presets**. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”).
 - **Size:** 8 to 160 pt.
 - **Weight:** 100 to 900. Cicero shows the style nearest to it, and the exact weight in a variable font.
-- **Spacing:** letter spacing, from −10 to 40 % of the em.
+- **Letter Spacing:** from −10 to 40 % of the em.
+- **Line Spacing:** the distance from one line to the next, from 80 to 250 % of the size; 120 % at first. It applies wherever a sample runs over several lines: on font pages and in Quick Look.
+- **Alignment:** left, center or right, for the samples in specimens and Quick Look. Font pages have their own alignment, next to the size.
 
 The same options apply to every view, font pages and the Compare window. Cicero remembers them.
 

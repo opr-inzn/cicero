@@ -100,7 +100,7 @@ private struct FamilyInfo: View {
             .padding(12)
             Divider()
             switch model.infoTab {
-            case .info: ScrollView { InfoRows(face: face) }
+            case .info: ScrollView { InfoRows(family: family, face: face) }
             case .features: FeatureControls(family: family, face: face.face)
             }
         }
@@ -109,12 +109,14 @@ private struct FamilyInfo: View {
 
 private struct InfoRows: View {
     @Environment(AppModel.self) private var model
+    let family: Family
     let face: LibraryFace
     @State private var info: CiceroCore.FontInfo?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             row("Status", face.state.label)
+            TagsRow(family: family)
             if let info {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
                     self.row(row.label, row.value)
@@ -161,6 +163,39 @@ private struct InfoRows: View {
         VStack(alignment: .leading, spacing: 2) {
             label(title)
             Text(value).font(.callout).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The family's tags, with a menu to give it others or take them off.
+private struct TagsRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+
+    var body: some View {
+        let tags = model.data.tags(of: family.id)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Tags").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Menu(tags.isEmpty ? "Add Tag" : "Edit Tags") { TagMenuItems(families: [family], model: model) }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .fixedSize()
+            }
+            if tags.isEmpty {
+                Text("None").font(.callout).foregroundStyle(.secondary)
+            } else {
+                FlowLayout(spacing: 10, lineSpacing: 4) {
+                    ForEach(tags, id: \.self) { tag in
+                        HStack(spacing: 4) {
+                            TagDots(colors: model.data.tagColors[tag].map { [$0] } ?? [])
+                            Text(tag).font(.callout)
+                        }
+                    }
+                }
+            }
         }
     }
 }

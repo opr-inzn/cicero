@@ -5,12 +5,17 @@ import Foundation
 public struct UserData: Codable, Equatable, Sendable {
     public var version = 2
     public var folders: [WatchedFolder] = []
+    /// Font files added one at a time (Add Fonts…, dropped on the window, or opened from the Finder), listed
+    /// where they are, like the fonts in a folder.
+    public var fontFiles: [String] = []
     public var sets: [FontSet] = []
     public var smartSets: [SmartSet] = []
-    /// Tag names in sidebar order. Tags have no UI for now; they're kept so none are lost.
+    /// Tag names, in the order they were made.
     public var tags: [String] = []
     /// Family name → its tags.
     public var familyTags: [String: [String]] = [:]
+    /// Tag name → its colour. A tag without one has none.
+    public var tagColors: [String: TagColor] = [:]
     /// Family name → foundry, overriding the files' manufacturer.
     public var foundryOverrides: [String: String] = [:]
     /// Manufacturer as the files name it → the name to show.
@@ -34,10 +39,13 @@ public struct UserData: Codable, Equatable, Sendable {
         }
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
+        fontFiles = try value(.fontFiles, d.fontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)
         tags = try value(.tags, d.tags)
         familyTags = try value(.familyTags, d.familyTags)
+        // A colour a later version adds is no colour here, rather than a file that doesn't load.
+        tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
         foundryRenames = try value(.foundryRenames, d.foundryRenames)
         customCharacterSets = try value(.customCharacterSets, d.customCharacterSets)
@@ -59,6 +67,23 @@ public struct UserData: Codable, Equatable, Sendable {
     public func scannedFolders() -> [WatchedFolder] {
         folders + (showAdobeFonts ? WatchedFolder.appFontFolders() : [])
     }
+
+    /// The tags a family has, in the order they were made.
+    public func tags(of family: String) -> [String] {
+        guard let names = familyTags[family], !names.isEmpty else { return [] }
+        return tags.filter(names.contains)
+    }
+}
+
+/// The colours a tag can have: Finder's.
+public enum TagColor: String, Codable, CaseIterable, Sendable {
+    case red, orange, yellow, green, blue, purple, gray
+
+    /// The first colour no tag has yet, in this order, so new tags tell apart; red again once all are taken.
+    public static func next(after taken: some Sequence<TagColor>) -> TagColor {
+        let used = Set(taken)
+        return allCases.first { !used.contains($0) } ?? .red
+    }
 }
 
 public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
@@ -72,6 +97,8 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
     /// them as one item.
     public static let adobeAppsID = UUID(uuidString: "00000000-0000-0000-0000-00000000AD0B")!
+    /// The font files added one at a time, which the sidebar lists as one item with the folders.
+    public static let addedFilesID = UUID(uuidString: "00000000-0000-0000-0000-0000000ADDED")!
 
     public init(id: UUID = UUID(), path: String, appName: String? = nil) {
         self.id = id
@@ -81,11 +108,12 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// "Deactivated" and "Adobe Apps" for Cicero's own items, "<Parent> Fonts" for other folders
-    /// called Fonts, else the name.
+    /// "Deactivated", "Adobe Apps" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other
+    /// folders called Fonts, else the name.
     public var displayName: String {
         if id == Self.deactivatedID { return "Deactivated" }
         if id == Self.adobeAppsID { return "Adobe Apps" }
+        if id == Self.addedFilesID { return "Added Fonts" }
         let last = url.lastPathComponent
         guard last.caseInsensitiveCompare("Fonts") == .orderedSame else { return last }
         return url.deletingLastPathComponent().lastPathComponent + " Fonts"

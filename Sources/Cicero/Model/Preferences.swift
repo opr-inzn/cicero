@@ -1,8 +1,10 @@
 import AppKit
 import Observation
 import CiceroCore
+import SwiftUI
 
-/// How previews look everywhere: sample text, size, weight and letter spacing. Saved in user defaults.
+/// How previews look everywhere: sample text, size, weight, letter and line spacing, and alignment. Saved in
+/// user defaults.
 @Observable
 final class PreviewSettings {
     static let presets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@", "ÀÉÎÕÜ ñçß øæœ"]
@@ -15,6 +17,11 @@ final class PreviewSettings {
     var weight: Double { didSet { defaults.set(weight, forKey: Keys.weight) } }
     /// Letter spacing in percent of the em.
     var tracking: Double { didSet { defaults.set(tracking, forKey: Keys.tracking) } }
+    /// Line height in percent of the size, wherever a sample runs over several lines; 120 is what layout apps
+    /// call automatic leading.
+    var lineSpacing: Double { didSet { defaults.set(lineSpacing, forKey: Keys.lineSpacing) } }
+    /// How samples line up in specimens and Quick Look. Font pages have their own.
+    var alignment: SampleAlignment { didSet { defaults.set(alignment.rawValue, forKey: Keys.alignment) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
 
@@ -23,6 +30,8 @@ final class PreviewSettings {
         static let size = "preview.size"
         static let weight = "preview.weight"
         static let tracking = "preview.tracking"
+        static let lineSpacing = "preview.lineSpacing"
+        static let alignment = "preview.alignment"
     }
 
     init() {
@@ -30,6 +39,8 @@ final class PreviewSettings {
         size = defaults.object(forKey: Keys.size) as? Double ?? 32
         weight = defaults.object(forKey: Keys.weight) as? Double ?? 400
         tracking = defaults.object(forKey: Keys.tracking) as? Double ?? 0
+        lineSpacing = defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120
+        alignment = defaults.string(forKey: Keys.alignment).flatMap(SampleAlignment.init) ?? .leading
     }
 
     func text(for family: Family) -> String {
@@ -39,6 +50,56 @@ final class PreviewSettings {
     /// Points of extra space between letters at a size.
     func kerning(at size: Double) -> Double {
         size * tracking / 100
+    }
+
+    /// The distance from one line's baseline to the next at a size.
+    func lineHeight(at size: Double) -> AttributedString.LineHeight {
+        .exact(points: size * lineSpacing / 100)
+    }
+}
+
+/// Left, centred or right, for samples.
+enum SampleAlignment: String, CaseIterable {
+    case leading, center, trailing
+
+    var title: String {
+        switch self {
+        case .leading: "Left"
+        case .center: "Center"
+        case .trailing: "Right"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .leading: "text.alignleft"
+        case .center: "text.aligncenter"
+        case .trailing: "text.alignright"
+        }
+    }
+
+    var text: TextAlignment {
+        switch self {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+
+    var frame: Alignment {
+        switch self {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+
+    var horizontal: HorizontalAlignment {
+        switch self {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
     }
 }
 

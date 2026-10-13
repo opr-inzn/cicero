@@ -21,6 +21,10 @@ Any of these work:
 
 To turn on a single style, open the font page and use the style’s switch in **Styles**, or right-click the style and choose **Activate Style**.
 
+### Turn on a whole set
+
+Right-click a set or smart set in the sidebar and choose **Activate Set** or **Activate Smart Set** to turn on every font in it. **Activate Temporarily** there turns them on until Cicero quits, and **Deactivate Set** or **Deactivate Smart Set** turns them off again. Like any activation, they follow your choice in [Copy or use in place](#copy-or-use-in-place), and ask first with **Ask each time**.
+
 ## Copy or use in place
 
 There are two ways to turn on a font that isn’t in a Fonts folder:
@@ -51,6 +55,7 @@ To try a font without installing it, turn it on until Cicero quits:
 
 - Choose **Fonts → Activate Temporarily** (⌥⌘↩).
 - Or right-click a family, or a style on its font page, and choose **Activate Temporarily**.
+- Or right-click a set or smart set in the sidebar and choose **Activate Temporarily**, for every font in it.
 - Or choose **Activate Temporarily** when Cicero asks how to turn fonts on.
 
 When the fonts are already on, for good or until Cicero quits, these items are dimmed or left out.
@@ -68,6 +73,7 @@ Any of these work:
 - Click the family’s switch.
 - Select families and choose **Fonts → Deactivate** (⌘⌫).
 - Right-click a family and choose **Deactivate**, or a style and choose **Deactivate Style**.
+- Right-click a set or smart set in the sidebar and choose **Deactivate Set** or **Deactivate Smart Set**.
 - On a font page, click **Deactivate**.
 
 Turning a font off never deletes your only copy of it. What happens to the file depends on how the font was on:

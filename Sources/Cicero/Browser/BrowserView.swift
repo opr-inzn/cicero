@@ -120,13 +120,14 @@ private struct EmptyBrowser: View {
     @ViewBuilder
     private var content: some View {
         switch model.selection ?? .all {
-        case .inactive where model.data.folders.isEmpty:
+        case .inactive where model.data.folders.isEmpty && model.data.fontFiles.isEmpty:
             ContentUnavailableView {
                 Label("No Watched Folders", systemImage: "folder.badge.plus")
             } description: {
-                Text("Add a folder of fonts to browse them here. Nothing gets installed until you activate it.")
+                Text("Add a folder of fonts, or font files, to browse them here. Nothing gets installed until you activate it.")
             } actions: {
                 Button("Add Folder…") { model.presentAddFolderPanel() }
+                Button("Add Fonts…") { model.presentAddFontsPanel() }
             }
         case .inactive:
             ContentUnavailableView {

@@ -4,6 +4,7 @@ import SwiftUI
 
 @main
 struct CiceroApp: App {
+    @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var model = AppModel()
     @State private var preview = PreviewSettings()
     @State private var backup = BackupPrompts()
@@ -22,9 +23,14 @@ struct CiceroApp: App {
                     model.start()
                     model.appSets.start(model)
                     ApplicationsFolder.checkAtLaunch(model: model)
+                    delegate.model = model
                 }
+                // Fonts opened from the Finder (Open With, or a double-click when Cicero opens fonts): SwiftUI
+                // hands the first of them here and the others to the delegate.
+                .onOpenURL { model.open([$0], showsPage: true) }
         }
         .defaultSize(width: 1440, height: 900)
+        .handlesExternalEvents(matching: ["*"])
         .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
@@ -34,6 +40,7 @@ struct CiceroApp: App {
                 .frame(minWidth: 760, minHeight: 480)
         }
         .defaultSize(width: 1000, height: 660)
+        .handlesExternalEvents(matching: [])
 
         Window("Compare", id: WindowID.compare) {
             CompareWindow()
@@ -43,6 +50,7 @@ struct CiceroApp: App {
         .defaultSize(width: 960, height: 640)
         .restorationBehavior(.disabled)
         .commandsRemoved()
+        .handlesExternalEvents(matching: [])
 
         Settings {
             SettingsWindow()
@@ -68,6 +76,8 @@ struct CiceroCommands: Commands {
                 .disabled(!updates.canCheckForUpdates)
         }
         CommandGroup(after: .newItem) {
+            Button("Add Fonts…") { model.presentAddFontsPanel() }
+                .keyboardShortcut("o", modifiers: .command)
             Button("Add Folder…") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("New Set…") {
@@ -153,5 +163,26 @@ struct CiceroCommands: Commands {
             .paragraphStyle: paragraph,
             .link: URL(string: "https://maximilianinzinger.com")!,
         ])
+    }
+}
+
+/// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
+/// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set when the main window appears; files that come before wait for it.
+    var model: AppModel? {
+        didSet { flush() }
+    }
+    private var waiting: [URL] = []
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        waiting += urls
+        flush()
+    }
+
+    private func flush() {
+        guard let model, !waiting.isEmpty else { return }
+        model.open(waiting, showsPage: true)
+        waiting = []
     }
 }

@@ -28,7 +28,7 @@ struct CachedFile: Hashable, Sendable {
 /// fast; a hand-written layout decodes in a few milliseconds where Codable takes tens.
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
-    private static let version: UInt32 = 4
+    private static let version: UInt32 = 5
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -53,6 +53,8 @@ enum FaceCache {
                 writer.write(UInt8((face.isItalic ? 1 : 0) | (face.isMonospaced ? 2 : 0)))
                 writer.write(face.manufacturer)
                 writer.write(face.version)
+                writer.write(face.designer)
+                writer.write(face.vendorID)
                 writer.write(face.weightAxis?.minimum)
                 writer.write(face.weightAxis?.maximum)
                 writer.write(face.weightAxis?.defaultValue)
@@ -95,6 +97,8 @@ enum FaceCache {
                         let flags = try reader.u8()
                         let manufacturer = try reader.optionalString()
                         let version = try reader.optionalString()
+                        let designer = try reader.optionalString()
+                        let vendorID = try reader.optionalString()
                         let minimum = try reader.optionalDouble()
                         let maximum = try reader.optionalDouble()
                         let defaultValue = try reader.optionalDouble()
@@ -112,7 +116,7 @@ enum FaceCache {
                             id: FaceID(path: path, index: index), postScriptName: postScriptName, familyName: familyName,
                             styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
                             isMonospaced: flags & 2 != 0, familyClass: familyClass, manufacturer: manufacturer,
-                            version: version, weightAxis: axis, width: width, axes: axes
+                            version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes
                         ))
                     }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)

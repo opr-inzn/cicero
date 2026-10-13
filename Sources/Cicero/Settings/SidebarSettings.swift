@@ -65,7 +65,7 @@ struct SidebarSettings: View {
         Toggle(isOn: visibility(row.key)) {
             HStack(spacing: 6) {
                 // A fixed width keeps the titles lined up however wide each symbol is.
-                Image(systemName: row.icon)
+                SidebarIcon(row: row)
                     .foregroundStyle(.secondary)
                     .frame(width: 20)
                 Text(row.title)

@@ -14,6 +14,7 @@ nonisolated struct FontRow: Identifiable, Sendable {
     /// What each shown character set column says; nothing while the family is still being checked.
     let coverage: [FontListColumn: CoverageCell]
     let added: Date
+    let tags: [TagColor]
 
     var id: String { family.id }
 
@@ -54,6 +55,7 @@ nonisolated struct FontRow: Identifiable, Sendable {
         }
         self.coverage = coverage
         added = family.dateAdded ?? .distantPast
+        tags = model.tagColors(of: family)
     }
 
     /// A set's name under its series' column: Latin M, AL 3, and Plus for GF Latin Plus.
@@ -490,6 +492,7 @@ private struct FontListRow: View {
         case .name:
             HStack(spacing: 6) {
                 Text(row.name).lineLimit(1)
+                TagDots(colors: row.tags)
                 StatusTag(family: family)
             }
         case .preview:
