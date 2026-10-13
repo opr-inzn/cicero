@@ -81,6 +81,7 @@ struct BackupSheet: View {
 
     private func backUp() {
         let panel = NSSavePanel()
+        panel.title = "Back Up Library"
         panel.allowedContentTypes = [.ciceroBackup]
         panel.nameFieldStringValue = LibraryBackup.defaultName()
         panel.canCreateDirectories = true

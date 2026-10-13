@@ -44,13 +44,13 @@ extension AppModel {
     }
 
     /// Asks where to put the files (and whether as a folder or a ZIP archive), copies them off the
-    /// main thread and reveals the result. `name` is what the export is called unless it's one family.
+    /// main thread and reveals the result. Called `name`, else after the one family or "N Families".
     func exportFonts(_ families: [Family], named name: String?) {
         let plan = FontExportPlan(families: families)
         guard !plan.isEmpty else {
             return showToast(families.isEmpty ? "No fonts to export." : "Fonts that come with macOS or an app can’t be exported.")
         }
-        let defaultName = families.count == 1 ? families[0].name : name ?? "\(families.count) Families"
+        let defaultName = name ?? (families.count == 1 ? families[0].name : "\(families.count) Families")
         guard let choice = ExportPanel.run(name: defaultName) else { return }
         Task {
             do {
@@ -198,6 +198,7 @@ extension AppModel {
 private enum ExportPanel {
     static func run(name: String) -> (url: URL, format: FontExportFormat)? {
         let panel = NSSavePanel()
+        panel.title = "Export Fonts"
         panel.canCreateDirectories = true
         panel.prompt = "Export"
         panel.nameFieldLabel = "Export As:"
@@ -208,7 +209,8 @@ private enum ExportPanel {
         panel.accessoryView = picker
         apply(choice.format, to: panel)
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        return (url, choice.format)
+        // A name typed with .zip means an archive, whatever the picker says.
+        return (url, url.pathExtension.lowercased() == "zip" ? .zip : choice.format)
     }
 
     /// A ZIP archive gets the .zip extension, a folder none.
