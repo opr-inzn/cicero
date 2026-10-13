@@ -9,7 +9,8 @@ struct GlyphsSection: View {
     let family: Family
     /// Cells per row, from the page's width; nil until it's known.
     let columns: Int?
-    @State private var sections: [GlyphSection]?
+    /// The style's characters, loaded by the page; nil while loading.
+    let sections: [GlyphSection]?
     @State private var query = ""
     @State private var popover: UInt32?
 
@@ -43,12 +44,6 @@ struct GlyphsSection: View {
         // Well clear of the styles above, and close to the blocks it heads.
         .padding(.top, 56)
         .padding(.bottom, 4)
-        // Here rather than on the whole body, which would start it once per view.
-        .task(id: face.id) {
-            sections = nil
-            let ranges = await model.coverage.coverage(computing: face).scalars
-            sections = await Task.detached(priority: .userInitiated) { GlyphSection.sections(for: ranges) }.value
-        }
         if sections == nil {
             ProgressView().frame(maxWidth: .infinity).padding(40)
         } else if shown.isEmpty {
