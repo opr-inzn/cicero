@@ -23,6 +23,8 @@
 | ⌘R | **Fonts → Rescan Library** |
 | ⌘? | **Help → Cicero Help** |
 
+While you type in a text field, like the search field, the sample text or a font page’s text, ⌘⌫ and ⌘ with an arrow key edit the text, as in any Mac app: ⌘⌫ deletes to the start of the line, and ⌘↓ moves to the end. They don’t deactivate or open fonts then. ⌘↩ and ⌥⌘↩ still activate the selected fonts.
+
 ## The browser
 
 | Shortcut | Does |

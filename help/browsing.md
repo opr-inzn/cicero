@@ -24,11 +24,13 @@ One row per family, under column headers:
 | Foundry | Who made it |
 | Latin S–XL | The largest of Latin S, M, L and XL the family has every character of |
 | Adobe Latin | The largest Adobe Latin set it has, like “AL 3” |
+| GF Latin, GF Cyrillic, GF Greek | The largest Google Fonts set of that script it has, like “Plus” (hidden at first) |
+| A single character set | Any other set: a Unicode block, GF Latin African or one of your own. A checkmark when the family has all of it, “12 missing” when it lacks a few, nothing when it has none of it (hidden at first) |
 | Date Added | When the font arrived on your Mac (hidden at first) |
 | Format | OpenType PostScript, OpenType TrueType, Font Collection and so on (hidden at first) |
 
-- **Sort:** click a column header. Click it again to reverse the order.
-- **Show or hide columns:** right-click the headers. Status, Name and Preview always show.
+- **Sort:** click a column header. Click it again to reverse the order. A character set column sorts by the largest set a family has, or by how many of the set’s characters it has.
+- **Show or hide columns:** right-click the headers. Single character sets are under **Character Sets** in that menu: your own first, then GF Latin African and the Unicode blocks. Status, Name and Preview always show.
 - **Resize a column:** drag the right edge of its header.
 
 Cicero remembers the columns you show and their widths. When the window gets narrow, for example with the Info panel open, the preview gives way first.
