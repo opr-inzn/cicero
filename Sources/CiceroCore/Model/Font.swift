@@ -109,12 +109,23 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
 // MARK: - State
 
 public enum TemporaryScope: String, Codable, Sendable, CaseIterable {
-    case untilQuit, untilLogout
+    /// Activated temporarily: on until Cicero quits.
+    case untilQuit
     /// On for an application set while one of its apps is open.
     case whileAppsRun
 
-    /// The ones to pick from when activating temporarily; application sets set the third themselves.
-    public static let choices: [TemporaryScope] = [.untilQuit, .untilLogout]
+    /// A scope as saved. "untilLogout", a choice there used to be, ends when Cicero quits now.
+    public init?(saved value: String) {
+        self.init(rawValue: value == "untilLogout" ? Self.untilQuit.rawValue : value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        guard let scope = Self(saved: value) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown scope “\(value)”"))
+        }
+        self = scope
+    }
 }
 
 /// Where an active face is activated from, which decides whether Cicero may turn it off.
@@ -177,7 +188,6 @@ public enum FaceState: Hashable, Sendable {
         case .active(.app): "Comes with an app"
         case .active(.adobeFonts): "Adobe Fonts"
         case .active(.temporary(.untilQuit)): "Active until Cicero quits"
-        case .active(.temporary(.untilLogout)): "Active until you log out"
         case .active(.temporary(.whileAppsRun)): "Active while its app is open"
         case .active: "Active"
         case .inactive: "Not activated"
@@ -208,6 +218,8 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
 
     public var id: FaceID { face.id }
     public var canActivate: Bool { !state.isActive || state.temporaryScope != nil }
+    /// Off, or on only while an application set's app is open.
+    public var canActivateTemporarily: Bool { !state.isActive || state.temporaryScope == .whileAppsRun }
     /// A face an app loads from its folder can be turned off there too, by moving it out.
     public var canDeactivate: Bool {
         if case .appOnly = state { return true }
@@ -302,6 +314,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let activeCount: Int
     public let hasActive: Bool
     public let hasActivatable: Bool
+    public let hasTemporarilyActivatable: Bool
     public let hasDeactivatable: Bool
     /// Set when every active face is temporarily active with this scope.
     public let temporaryScope: TemporaryScope?
@@ -331,6 +344,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         activeCount = faces.count { $0.state.isActive }
         hasActive = activeCount > 0
         hasActivatable = faces.contains(where: \.canActivate)
+        hasTemporarilyActivatable = faces.contains(where: \.canActivateTemporarily)
         hasDeactivatable = faces.contains(where: \.canDeactivate)
         let scopes = Set(faces.filter(\.state.isActive).map(\.state.temporaryScope))
         temporaryScope = scopes.count == 1 ? scopes.first! : nil

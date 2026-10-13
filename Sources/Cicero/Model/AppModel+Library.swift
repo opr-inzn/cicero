@@ -62,6 +62,7 @@ struct VisibleKey: Equatable {
 struct FontRowsKey: Equatable {
     var visible: VisibleKey
     var order: [KeyPathComparator<FontRow>]
+    var columns: [FontListColumn]
 }
 
 extension Classification {
@@ -132,12 +133,21 @@ extension AppModel {
         )
     }
 
-    /// The font list's rows for `visibleFamilies`, sorted. Cached: making and sorting thousands of rows
-    /// takes tens of milliseconds, and the table asks again on every update, a click included.
-    func fontRows(sortedBy order: [KeyPathComparator<FontRow>]) -> [FontRow] {
-        let key = FontRowsKey(visible: visibleKey, order: order)
+    /// The font list's rows for `visibleFamilies`, sorted, with what the shown character set columns say.
+    /// Cached: making and sorting thousands of rows takes tens of milliseconds, and the table asks again
+    /// on every update, a click included.
+    func fontRows(sortedBy order: [KeyPathComparator<FontRow>], columns: [FontListColumn]) -> [FontRow] {
+        let key = FontRowsKey(visible: visibleKey, order: order, columns: columns)
         if let cached = fontRowsCache, cached.key == key { return cached.rows }
-        let rows = visibleFamilies.map { FontRow($0, model: self) }.sorted(using: order)
+        let custom = customCharacterSets
+        let sources: [(FontListColumn, CoverageSource)] = columns.compactMap { column in
+            switch column {
+            case .series(let id): characterSetSeries(id).map { (column, CoverageSource.series($0)) }
+            case .characterSet(let id): (custom.first { $0.id == id } ?? characterSetCatalog.definition(id)).map { (column, CoverageSource.set($0)) }
+            default: nil
+            }
+        }
+        let rows = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }.sorted(using: order)
         fontRowsCache = (key, rows)
         return rows
     }
@@ -293,10 +303,18 @@ extension AppModel {
         }
     }
 
-    /// The largest set of a series (Latin S–XL, Adobe Latin) the family has.
-    func largestSet(in groupID: String, for family: Family) -> CharacterSetDefinition? {
-        guard let group = characterSetCatalog.groups.first(where: { $0.id == groupID }) else { return nil }
-        return characterSetLookup.largest(group, family: family.id, revision: coverageRevision) { set in
+    /// A set's name, without reading the characters of a custom one.
+    func characterSetName(_ id: String) -> String? {
+        id.hasPrefix("custom.") ? data.customCharacterSets.first { $0.setID == id }?.name : characterSetCatalog.definition(id)?.name
+    }
+
+    func characterSetSeries(_ id: String) -> CharacterSetSeries? {
+        characterSetCatalog.series.first { $0.id == id }
+    }
+
+    /// The largest set of a series (Latin S–XL, Adobe Latin, GF Latin…) the family has.
+    func largestSet(in series: CharacterSetSeries, for family: Family) -> CharacterSetDefinition? {
+        characterSetLookup.largest(series, family: family.id, revision: coverageRevision) { set in
             self.missingCount(set, family)
         }
     }
@@ -311,7 +329,7 @@ final class CharacterSetLookup {
     }
 
     private struct SeriesKey: Hashable {
-        var group: String
+        var series: String
         var family: String
     }
 
@@ -340,12 +358,12 @@ final class CharacterSetLookup {
         return count
     }
 
-    func largest(_ group: CharacterSetGroup, family: String, revision: Int, missing: (CharacterSetDefinition) -> Int?) -> CharacterSetDefinition? {
+    func largest(_ series: CharacterSetSeries, family: String, revision: Int, missing: (CharacterSetDefinition) -> Int?) -> CharacterSetDefinition? {
         sync(revision)
-        let key = SeriesKey(group: group.id, family: family)
-        if let level = largest[key] { return level >= 0 ? group.sets[level] : nil }
+        let key = SeriesKey(series: series.id, family: family)
+        if let level = largest[key] { return level >= 0 ? series.sets[level] : nil }
         var level = -1
-        for (index, set) in group.sets.enumerated().reversed() {
+        for (index, set) in series.sets.enumerated().reversed() {
             guard let count = missing(set) else { return nil }
             if count == 0 {
                 level = index
@@ -353,6 +371,6 @@ final class CharacterSetLookup {
             }
         }
         largest[key] = level
-        return level >= 0 ? group.sets[level] : nil
+        return level >= 0 ? series.sets[level] : nil
     }
 }

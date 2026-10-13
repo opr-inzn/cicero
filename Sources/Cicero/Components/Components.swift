@@ -150,7 +150,6 @@ struct StatusTag: View {
     private var help: String {
         switch family.temporaryScope {
         case .untilQuit: "Active until Cicero quits"
-        case .untilLogout: "Active until you log out"
         case .whileAppsRun: "Active while an app it’s set up for is open"
         case nil: ""
         }

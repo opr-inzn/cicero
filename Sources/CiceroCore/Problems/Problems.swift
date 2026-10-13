@@ -215,7 +215,6 @@ public enum ProblemDetector {
                 case .fontsFolder: return "In your Fonts folder"
                 case .inPlace: return "Used where it is"
                 case .temporary(.untilQuit): return "Active until Cicero quits"
-                case .temporary(.untilLogout): return "Active until you log out"
                 case .temporary(.whileAppsRun): return "Active while its app is open"
                 case .otherApp: return "Activated by another app"
                 }
