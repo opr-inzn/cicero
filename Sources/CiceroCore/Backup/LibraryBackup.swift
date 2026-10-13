@@ -214,15 +214,21 @@ public struct LibraryBackup: Sendable {
     }
 
     /// Writes the archive: the font files first (unless `includeFonts` is off), then the manifest
-    /// and user data, then ditto zips it all. A file that disappeared since the inventory is left
-    /// out. Replaces an item at `destination` only by moving it to the Trash first, right before the
-    /// zip step, so a cancelled backup leaves it alone.
+    /// and user data, then ditto zips it all into a private folder on the destination's disk. A file
+    /// that disappeared since the inventory is left out. Only a complete archive takes the place of an
+    /// item at `destination`, which goes to the Trash then, so a cancelled or failed backup leaves the
+    /// item alone and nothing behind. An item that is or holds a font in the backup, a Fonts folder,
+    /// Cicero's folder or a watched folder is never replaced: this throws `KeptItemError` first.
     @concurrent
     public func write(
         to destination: URL, userData: UserData, fonts: [BackupFont], includeFonts: Bool, appVersion: String,
         progress: @escaping @Sendable (BackupProgress) -> Void
     ) async throws {
         let fm = FileManager.default
+        let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.deactivated.path]
+            + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) }
+        let replacement = try ItemReplacement(for: destination, keeping: kept)
+        defer { replacement.discard() }
         let staging = fm.temporaryDirectory.appendingPathComponent("Cicero Backup \(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: staging) }
         let folder = staging.appendingPathComponent(destination.deletingPathExtension().lastPathComponent, isDirectory: true)
@@ -248,8 +254,9 @@ public struct LibraryBackup: Sendable {
 
         try Task.checkCancellation()
         progress(.compressing)
-        if fm.fileExists(atPath: destination.path) { try trash(destination) }
-        try await Archive.zip(folder, to: destination)
+        try await Archive.zip(folder, to: replacement.staged)
+        try Task.checkCancellation()
+        try replacement.commit(trash: trash)
     }
 
     /// Saves the current setup as `Backups/Before Restore <date>.json` and returns the file.
