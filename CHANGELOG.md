@@ -12,10 +12,10 @@ First release.
 - An info panel with font details, supported languages, character sets and Unicode blocks, and a Features tab for OpenType features.
 - Preview Options for sample text, size, weight and letter spacing.
 - Choose a light or dark appearance, or follow macOS, in Settings → General.
-- Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item, and drag items and whole sections into the order you like. Select several items in a section with ⌘- or ⇧-click to drag them together or see their fonts together. A click anywhere on a section’s title opens or closes it.
+- Customize the sidebar: click **Edit** next to Fonts, or use Settings → Sidebar, to show or hide any item, and drag items into the order you like within their section. Select several items in a section with ⌘- or ⇧-click to drag them together or see their fonts together. A click anywhere on a section’s title opens or closes it.
 - Sets, smart sets with rules, foundries, and automatic classifications read from each font.
 - Application sets: Cicero activates a set’s fonts while one of its apps is open, and can open at login so they always work.
-- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar, and sort the list by the largest Latin S–XL or Adobe Latin set each family has.
+- Character sets: Latin S–XL, Adobe Latin 1–5, Google Fonts sets, Unicode blocks, and your own; filter by them in the sidebar, and show any of them as a column in the list to sort by.
 - Character Toolbox: find fonts that have every character of a text or support one of 780 languages.
 - Compare fonts on a shared baseline or overlaid.
 - A Problems view for fonts installed twice, missing, damaged and duplicate fonts, fonts used from external disks, and styles that share a PostScript name with another font.
