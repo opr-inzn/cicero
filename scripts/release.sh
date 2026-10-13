@@ -8,7 +8,10 @@
 #      Manage Certificates, or developer.apple.com). Allow codesign to use its key ("Always Allow").
 #   2. Notarization credentials stored for notarytool, using an app-specific password from
 #      account.apple.com:
-#        xcrun notarytool store-credentials cicero-notary --apple-id <id> --team-id <team>
+#        xcrun notarytool store-credentials cicero-notary --apple-id <Apple ID> --team-id <team ID>
+#   3. The EdDSA key that signs updates (SUPublicEDKey is its public half) in the login keychain, under
+#      the account "cicero", for publish.sh. To bring it from a backup after `swift package resolve`:
+#        .build/artifacts/sparkle/Sparkle/bin/generate_keys --account cicero -f <file>
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,7 +22,9 @@ if [[ -z "$IDENTITY" ]]; then
     exit 1
 fi
 if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
-    echo "No notarytool credentials named \"$PROFILE\". See the setup notes at the top of this script." >&2
+    echo "No notarytool credentials named \"$PROFILE\" (or notarytool couldn't reach Apple). To store them, with an" >&2
+    echo "app-specific password from account.apple.com, run:" >&2
+    echo "  xcrun notarytool store-credentials $PROFILE --apple-id <Apple ID> --team-id <team ID>" >&2
     exit 1
 fi
 

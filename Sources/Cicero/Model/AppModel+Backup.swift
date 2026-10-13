@@ -13,7 +13,7 @@ final class BackupPrompts {
 
 extension UTType {
     /// Declared in Info.plist.
-    nonisolated static let ciceroBackup = UTType(exportedAs: "local.cicero.backup")
+    nonisolated static let ciceroBackup = UTType(exportedAs: "com.maximilianinzinger.cicero.backup")
 }
 
 extension AppModel {

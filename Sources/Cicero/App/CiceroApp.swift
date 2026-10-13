@@ -7,6 +7,7 @@ struct CiceroApp: App {
     @State private var model = AppModel()
     @State private var preview = PreviewSettings()
     @State private var backup = BackupPrompts()
+    @State private var updates = Updates()
 
     var body: some Scene {
         Window("Cicero", id: WindowID.main) {
@@ -20,10 +21,11 @@ struct CiceroApp: App {
                     TextEditingKeys.install()
                     model.start()
                     model.appSets.start(model)
+                    ApplicationsFolder.checkAtLaunch(model: model)
                 }
         }
         .defaultSize(width: 1440, height: 900)
-        .commands { CiceroCommands(model: model, backup: backup) }
+        .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -46,6 +48,7 @@ struct CiceroApp: App {
             SettingsWindow()
                 .environment(model)
                 .environment(preview)
+                .environment(updates)
         }
     }
 }
@@ -53,6 +56,7 @@ struct CiceroApp: App {
 struct CiceroCommands: Commands {
     let model: AppModel
     let backup: BackupPrompts
+    let updates: Updates
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -60,6 +64,8 @@ struct CiceroCommands: Commands {
             Button("About Cicero") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
+            Button("Check for Updates…") { updates.checkForUpdates() }
+                .disabled(!updates.canCheckForUpdates)
         }
         CommandGroup(after: .newItem) {
             Button("Add Folder…") { model.presentAddFolderPanel() }
@@ -126,19 +132,16 @@ struct CiceroCommands: Commands {
         }
     }
 
-    /// "Built by Maximilian Inzinger" under the version in the About panel, the name linking to the website.
+    /// A link to the website under the version in the About panel. The panel puts the copyright
+    /// (NSHumanReadableCopyright, "© 2026 Maximilian Inzinger") below it, so the name isn't repeated here.
     private static var credits: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        let base: [NSAttributedString.Key: Any] = [
+        return NSAttributedString(string: "maximilianinzinger.com", attributes: [
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
             .foregroundColor: NSColor.secondaryLabelColor,
             .paragraphStyle: paragraph,
-        ]
-        let credits = NSMutableAttributedString(string: "Built by ", attributes: base)
-        var link = base
-        link[.link] = URL(string: "https://maximilianinzinger.com")!
-        credits.append(NSAttributedString(string: "Maximilian Inzinger", attributes: link))
-        return credits
+            .link: URL(string: "https://maximilianinzinger.com")!,
+        ])
     }
 }

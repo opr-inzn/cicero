@@ -4,6 +4,7 @@ import SwiftUI
 
 struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
+    @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
@@ -12,6 +13,7 @@ struct GeneralSettings: View {
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var updates = updates
         Form {
             Section {
                 Picker("Appearance", selection: $appearance) {
@@ -72,6 +74,13 @@ struct GeneralSettings: View {
                 Text("Backup")
             } footer: {
                 Text("A backup holds your sets, smart sets, character sets, folders, foundry names, sidebar and settings, and can include your font files.").formFooter()
+            }
+            Section {
+                Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Once a day, Cicero asks GitHub whether there’s a new version. Nothing about you or your fonts is sent.").formFooter()
             }
         }
         .formStyle(.grouped)
