@@ -1,10 +1,12 @@
 import CiceroCore
+import ServiceManagement
 import SwiftUI
 
 struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @State private var isClearingCaches = false
+    @State private var loginItem = LoginItem.status
 
     var body: some View {
         @Bindable var model = model
@@ -25,6 +27,16 @@ struct GeneralSettings: View {
                 Text("Activation")
             } footer: {
                 Text(activationExplanation).formFooter()
+            }
+            Section {
+                Toggle("Open at login", isOn: Binding(
+                    get: { loginItem == .enabled || loginItem == .requiresApproval },
+                    set: { loginItem = LoginItem.set($0, model: model) }
+                ))
+            } footer: {
+                Text(loginItem == .requiresApproval
+                    ? "Allow Cicero in System Settings → General → Login Items."
+                    : "Application sets activate fonts only while Cicero is open.").formFooter()
             }
             Section {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)

@@ -137,6 +137,7 @@ struct StatusTag: View {
     }
 
     private var content: (String, Color)? {
+        if family.temporaryScope == .whileAppsRun { return ("App Set", .blue) }
         if family.temporaryScope != nil { return ("Temporary", .blue) }
         switch family.state {
         case .system: return ("System", .secondary)
@@ -150,6 +151,7 @@ struct StatusTag: View {
         switch family.temporaryScope {
         case .untilQuit: "Active until Cicero quits"
         case .untilLogout: "Active until you log out"
+        case .whileAppsRun: "Active while an app it’s set up for is open"
         case nil: ""
         }
     }

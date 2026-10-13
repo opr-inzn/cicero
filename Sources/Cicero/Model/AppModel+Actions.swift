@@ -355,7 +355,7 @@ extension AppModel {
                 SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: $0.appName == nil ? "folder" : "folder.badge.gearshape", item: .folder($0.id))
             }
         case .sets:
-            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: "square.stack", item: .set($0.id)) }
+            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "square.stack" : "app.badge.checkmark", item: .set($0.id)) }
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", item: .foundry($0)) }

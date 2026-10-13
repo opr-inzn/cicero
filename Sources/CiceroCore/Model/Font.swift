@@ -110,6 +110,11 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
 
 public enum TemporaryScope: String, Codable, Sendable, CaseIterable {
     case untilQuit, untilLogout
+    /// On for an application set while one of its apps is open.
+    case whileAppsRun
+
+    /// The ones to pick from when activating temporarily; application sets set the third themselves.
+    public static let choices: [TemporaryScope] = [.untilQuit, .untilLogout]
 }
 
 /// Where an active face is activated from, which decides whether Cicero may turn it off.
@@ -173,6 +178,7 @@ public enum FaceState: Hashable, Sendable {
         case .active(.adobeFonts): "Adobe Fonts"
         case .active(.temporary(.untilQuit)): "Active until Cicero quits"
         case .active(.temporary(.untilLogout)): "Active until you log out"
+        case .active(.temporary(.whileAppsRun)): "Active while its app is open"
         case .active: "Active"
         case .inactive: "Not activated"
         case .appOnly(let app): "Active in \(FaceState.appDescription(app))"

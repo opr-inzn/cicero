@@ -162,6 +162,7 @@ struct SidebarView: View {
             Menu {
                 Button("New Set…") { model.prompt("New Set", confirm: "Create") { model.addSet(named: $0) } }
                 Button("New Smart Set…") { model.editingSmartSet = SmartSet(name: "") }
+                Button("New Application Set…") { model.newApplicationSet() }
             } label: {
                 Image(systemName: "plus")
             }
@@ -232,6 +233,7 @@ struct SidebarView: View {
         case .set(let id):
             if let set = model.data.sets.first(where: { $0.id == id }) {
                 Button("Rename Set…") { model.prompt("Rename Set", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
+                Button(set.apps.isEmpty ? "Activate with Apps…" : "Edit Apps…") { model.editingAppsForSet = id }
                 Button("Delete Set") { model.deleteSet(id) }
             }
         case .smartSet(let id):

@@ -16,6 +16,7 @@ struct CiceroApp: App {
                 .onAppear {
                     Appearance.applySaved()
                     model.start()
+                    model.appSets.start(model)
                 }
         }
         .defaultSize(width: 1440, height: 900)
@@ -65,6 +66,7 @@ struct CiceroCommands: Commands {
             .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Smart Set…") { model.editingSmartSet = SmartSet(name: "") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
+            Button("New Application Set…") { model.newApplicationSet(with: model.selectedFamilies) }
         }
         CommandGroup(after: .sidebar) {
             Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
@@ -78,7 +80,7 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
             Menu("Activate Temporarily") {
-                ForEach(TemporaryScope.allCases, id: \.self) { scope in
+                ForEach(TemporaryScope.choices, id: \.self) { scope in
                     Button(scope.menuTitle) { model.activateTemporarily(selection, scope: scope) }
                         .keyboardShortcut(scope == .untilQuit ? KeyboardShortcut(.return, modifiers: [.command, .option]) : nil)
                 }

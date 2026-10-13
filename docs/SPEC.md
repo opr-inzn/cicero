@@ -25,7 +25,7 @@ ellipsis character (…) for items that ask for more input.
   - **Folders** (+ adds folders). The folders Adobe apps load fonts from by themselves — /Library/Application Support/Adobe/Fonts, ~/Library/Application Support/Adobe/Fonts (all Adobe apps) and the Fonts folder next to any Adobe app, like /Applications/Adobe InDesign 2026/Fonts (that app only) — are one "Adobe Apps" item, shown while it has fonts (row menu: Reveal in Finder). They aren't in the user's folders: Settings → Folders → "Show fonts installed for Adobe apps" (on by default) switches them; adding one of them with + turns the switch on. Row menu for the user's folders: Reveal in Finder; "Fonts in This Folder" picker —
     "Not activated until you activate them" / "Active in Adobe apps" / a custom app name; Remove Folder from Library.
     Cicero's own Deactivated folder appears here when it has fonts.
-  - **Sets** (+ menu: New Set…, New Smart Set…). Sets (square.stack) and smart sets (gearshape).
+  - **Sets** (+ menu: New Set…, New Smart Set…, New Application Set…). Sets (square.stack), application sets (app.badge.checkmark) and smart sets (gearshape). A set's menu has Activate with Apps… (Edit Apps… once it has some).
     Menus: Rename Set…, Delete Set; Edit Smart Set…, Delete Smart Set.
   - **Foundries**. Menu: Rename Foundry…
   - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
@@ -70,7 +70,7 @@ ellipsis character (…) for items that ask for more input.
 - Empty states per selection (no folders → Add Folder…; nothing activated; empty set; smart set with no matches → Edit Smart Set…; character set still being checked; search with no results).
 - A small glass capsule bottom-right while scanning ("Finding fonts…", "Identifying fonts… 200 of 4000").
 - Selecting Problems shows the Problems view instead of a list.
-- Status tags (small capsules): System; Partly active (orange); app name e.g. "Adobe" (red) for app-only; "Temporary" (blue) for temporarily active.
+- Status tags (small capsules): System; Partly active (orange); app name e.g. "Adobe" (red) for app-only; "Temporary" (blue) for temporarily active; "App Set" (blue) for on for an application set.
 - Switches: a small switch drawn in SwiftUI (not a native NSSwitch per row — too slow), with tooltip
   ("Installed with macOS" / Activate / Deactivate) and VoiceOver toggle semantics. Families whose
   every face is in (or was moved out of) one app's own folder, like Adobe's, have three positions: on in
@@ -133,12 +133,13 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Temporary: CoreText session registration in place (app-folder fonts too: on in every app for that long, then back to where they were); until Cicero quits (unregistered on quit; leftovers from a crash unregistered at launch) or until you log out (forgotten when the login session changes: audit session ID + boot time).
 - Deactivate: installed copies go to the Trash when another copy exists (origin or other copy outside ~/Library/Fonts); otherwise the file moves to Cicero's Deactivated folder — ask first if Cicero didn't install it ("Deactivate fonts?" alert). In-place/temporary → unregister (persistent, falling back to session). macOS, all-users, app and Adobe Fonts faces can't be turned off ("These fonts are managed by macOS or another app.").
 - Activating permanently a temporarily active font ends the session registration first.
+- Application sets: a set with apps (bundle ID, name, path). While one of its apps is open, its fonts that are off are registered for the session (record scope `whileAppsRun`, with the bundle IDs of the open apps that want each file); when no open app wants a file any more it's unregistered. Fonts on for any other reason are never touched. `AppSetWatcher` follows `NSWorkspace.runningApplications` (it changes as an app starts launching, before it reads its fonts) and syncs when apps, sets, records or the library change; a font the user turns off, or on for good, while its app is open is left alone until the app quits. Registrations outlive Cicero quitting (the app may still be open) and are synced at the next launch; they end at logout anyway. Works only while Cicero is open: Settings → General has Open at login (SMAppService), and the apps sheet offers it too.
 - Move to Trash (family or style): unregister, trash every file including other copies; never touches /System, /Library/Application Support/Apple, /usr, /private, app bundles, Adobe CoreSync; collections that also contain other families are named in the alert; removes the family from sets, its saved tags and foundry overrides. Alert "Move “X” to the Trash?" with destructive Move to Trash.
 - Short toasts at the bottom ("Activated.", "Deactivated.", "Moved to the Trash.", failures).
 
 ## Sets, smart sets, character sets
 
-- Sets: ordered lists of family names. Tags (names; family → tags) are only kept in the saved data for now: no sidebar section, menu or new smart-set rules, but rules saved with one still work.
+- Sets: ordered lists of family names, optionally with apps (application sets, see Activation). The apps sheet ("Activate “Name” with Apps"): the apps with their icons, "Open" next to running ones, − to remove, Add App… (an open panel in /Applications), and a line about opening Cicero at login. Tags (names; family → tags) are only kept in the saved data for now: no sidebar section, menu or new smart-set rules, but rules saved with one still work.
 - Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Set (is in / isn’t in), Folder (is in / isn’t in), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
 - Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
 - Settings → Coverage: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….
@@ -176,7 +177,7 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
 - Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Character Sets: as above.

@@ -116,7 +116,7 @@ struct TemporaryMenu: View {
 
     var body: some View {
         Menu("Activate Temporarily") {
-            ForEach(TemporaryScope.allCases, id: \.self) { scope in
+            ForEach(TemporaryScope.choices, id: \.self) { scope in
                 Button(scope.menuTitle) { action(scope) }
             }
         }
