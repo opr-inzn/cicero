@@ -9,6 +9,9 @@
 #   2. Notarization credentials stored for notarytool, using an app-specific password from
 #      account.apple.com:
 #        xcrun notarytool store-credentials cicero-notary --apple-id <id> --team-id <team>
+#   3. The EdDSA key that signs updates (SUPublicEDKey is its public half) in the login keychain, under
+#      the account "cicero", for publish.sh. To bring it from a backup after `swift package resolve`:
+#        .build/artifacts/sparkle/Sparkle/bin/generate_keys --account cicero -f <file>
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

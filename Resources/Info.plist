@@ -32,6 +32,14 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>© 2026 Maximilian Inzinger</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUEnableSystemProfiling</key>
+    <false/>
+    <key>SUFeedURL</key>
+    <string>https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>p8/wzpFF92Vv02vbxUcR2H2pe2vbKNt3JyM63vu4HuE=</string>
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>

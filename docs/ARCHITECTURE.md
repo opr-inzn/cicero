@@ -1,6 +1,7 @@
 # Architecture
 
-Cicero is a SwiftPM package with two targets and a test target.
+Cicero is a SwiftPM package with two targets and a test target. Its one dependency is Sparkle (a binary
+framework, used by the app target only) for updates.
 
 ```
 Sources/CiceroCore   fonts, the library, activation, coverage, user data — no UI
@@ -54,6 +55,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   that scan (or one right after the operation, when it starts none). Lists it hands to views (`visibleFamilies`, sidebar rows,
   character set lookups) are cached and keyed on the inputs they depend on.
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
+- `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates… and the
+  automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
+  binary has no Info.plist with the feed.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
   `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
   are in `Components/`.
@@ -65,5 +69,19 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - Long lists of families are lazy stacks (`FontList`, `FamilyRowList`), never `Table` or `List`: AppKit's
   tables make every row whenever an accessibility client walks the window, which with a thousand
   families blocks the main thread for minutes. A lazy stack exposes only the rows on screen.
-- Cicero never connects to the internet. Files it removes go to the Trash; it never deletes a
-  user's only copy of a font.
+- The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
+  uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font.
+
+## Building and releasing
+
+- `scripts/build-app.sh` builds `build/Cicero.app` from the release binary: Info.plist, resources, the
+  compiled icon, and Sparkle.framework in Contents/Frameworks (the binary's rpath
+  `@executable_path/../Frameworks` comes from Package.swift). Sparkle's XPC services are removed: they're
+  for sandboxed apps, and Cicero isn't. Code is signed inside out, never with `--deep`: Sparkle's
+  Autoupdate and Updater.app, the framework, then the app. Dev builds are signed ad hoc; with
+  `SIGN_IDENTITY` (a Developer ID) every piece gets the hardened runtime and a secure timestamp.
+- `scripts/release.sh` signs with the Developer ID, notarizes and staples the app (nested Sparkle code
+  included) and then the DMG made by `make-dmg.sh`.
+- `scripts/publish.sh` runs `make-appcast.sh`, which signs the final DMG with the Sparkle EdDSA key (keychain
+  account "cicero"; `SUPublicEDKey` is its public half) and writes `build/appcast.xml`, then uploads the DMG
+  and the appcast to a new GitHub release. `SUFeedURL` points at the latest release's appcast.

@@ -1,6 +1,6 @@
 # Cicero — product spec for the clean rewrite
 
-Cicero is a macOS 26 font manager (SwiftUI, Liquid Glass, Apple silicon only, never uses the network).
+Cicero is a macOS 26 font manager (SwiftUI, Liquid Glass, Apple silicon only; the network only for updates).
 This is a ground-up rewrite: new code and architecture, same product. The user shaped every
 behaviour below; keep them. Never mention or reference any other font manager app anywhere.
 
@@ -108,7 +108,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 ## Menus
 
-- **Cicero**: About Cicero (the standard panel: version, a link to maximilianinzinger.com, "© 2026 Maximilian Inzinger").
+- **Cicero**: About Cicero (the standard panel: version, a link to maximilianinzinger.com, "© 2026 Maximilian Inzinger"), Check for Updates… (disabled while a check runs).
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N | Export Fonts… ⇧⌘E | Back Up Library…, Restore Library….
 - **View**: Edit Sidebar / Done Editing Sidebar.
 - **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Cicero Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
@@ -186,7 +186,7 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear); Backup (Back Up…, Restore…, one sentence on what a backup holds).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear); Backup (Back Up…, Restore…, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
 - Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Character Sets: as above.
@@ -199,5 +199,6 @@ Sheet "Clear Font Caches" (Fonts menu and Settings → General): checkboxes macO
 
 ## Data and privacy
 
-- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). No network, no analytics.
+- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). No analytics, nothing uploaded.
+- Updates (Sparkle 2): once a day, while Settings → General → "Check for updates automatically" is on (it is from the start, without asking), Cicero downloads the appcast from the latest GitHub release (`SUFeedURL`); Check for Updates… does it at once. Sparkle's system profile stays off, so the request carries nothing but its user agent, "Cicero/1.0 Sparkle/2.10.0". An update the user accepts is downloaded from GitHub and installed only if its EdDSA signature matches `SUPublicEDKey`. The appcast holds the latest version only, with its CHANGELOG.md section as Markdown release notes.
 - The rewrite reads the existing user data file (library.json, format described in the architecture doc) once and keeps working from its own file; the old file is never modified.
