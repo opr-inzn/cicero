@@ -198,7 +198,7 @@ private struct StyleRows: View {
                     Text("\(style.face.weight)").monospacedDigit().foregroundStyle(.secondary)
                 } status: {
                     HStack(spacing: 8) {
-                        MiniSwitch(position: style.position, isEnabled: style.canActivate || style.canDeactivate) {
+                        MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {
                             model.toggle(style, in: family)
                         }
                         Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)

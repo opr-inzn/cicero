@@ -7,11 +7,16 @@ enum FontFileReader {
 
     /// Empty when CoreText can't read the file.
     static func faces(atPath path: String) -> [FontFace] {
-        let url = URL(fileURLWithPath: path, isDirectory: false)
-        guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] else { return [] }
-        return descriptors.enumerated().compactMap { index, descriptor in
+        read(atPath: path).faces
+    }
+
+    /// The faces, and the descriptors they were read from; both empty when CoreText can't read the file.
+    static func read(atPath path: String) -> (faces: [FontFace], descriptors: [CTFontDescriptor]) {
+        let descriptors = FontFiles.descriptors(at: path)
+        let faces = descriptors.enumerated().compactMap { index, descriptor in
             face(from: descriptor, id: FaceID(path: path, index: index))
         }
+        return (faces, descriptors)
     }
 
     /// Finder's Date Added, else the creation date.
