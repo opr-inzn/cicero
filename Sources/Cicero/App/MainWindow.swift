@@ -42,8 +42,8 @@ struct MainWindow: View {
             Button("Cancel", role: .cancel) {}
         } message: { prompt in
             Text(prompt.unmanagedCount == 1
-                ? "1 file wasn’t installed by Cicero, so there may be no other copy. Cicero will move it to its Deactivated folder, which stays in your library."
-                : "\(prompt.unmanagedCount) files weren’t installed by Cicero, so there may be no other copy. Cicero will move them to its Deactivated folder, which stays in your library.")
+                ? "1 file wasn’t installed by Cicero, so it may be your only copy. Cicero will move it to its Deactivated folder, which stays in your library."
+                : "\(prompt.unmanagedCount) files weren’t installed by Cicero, so they may be your only copies. Cicero will move them to its Deactivated folder, which stays in your library.")
         }
         .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",
