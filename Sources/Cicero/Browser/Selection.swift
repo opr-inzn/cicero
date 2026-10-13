@@ -3,20 +3,40 @@ import CiceroCore
 import SwiftUI
 
 extension AppModel {
-    /// Command toggles, Shift extends from the anchor, a plain click selects one.
     func click(_ family: Family, in families: [Family], anchor: inout String?) {
+        FamilySelection.click(family.id, in: families.map(\.id), selection: &selectedIDs, anchor: &anchor)
+    }
+}
+
+/// How clicks and arrow keys select in every list of families, the browser's and the Character Toolbox's.
+enum FamilySelection {
+    /// Command toggles, Shift extends from the anchor, a plain click selects one.
+    static func click(_ id: String, in ids: [String], selection: inout Set<String>, anchor: inout String?) {
         let modifiers = NSEvent.modifierFlags
         if modifiers.contains(.command) {
-            if selectedIDs.contains(family.id) { selectedIDs.remove(family.id) } else { selectedIDs.insert(family.id) }
-            anchor = family.id
+            if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+            anchor = id
         } else if modifiers.contains(.shift), let start = anchor,
-                  let a = families.firstIndex(where: { $0.id == start }),
-                  let b = families.firstIndex(where: { $0.id == family.id }) {
-            selectedIDs = Set(families[min(a, b)...max(a, b)].map(\.id))
+                  let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) {
+            selection = Set(ids[min(a, b)...max(a, b)])
         } else {
-            selectedIDs = [family.id]
-            anchor = family.id
+            selection = [id]
+            anchor = id
         }
+    }
+
+    /// ↑ and ↓ move the selection a row, Shift extending it from the anchor. Returns the row to scroll to.
+    static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout String?, extending: Bool) -> String? {
+        guard !ids.isEmpty else { return nil }
+        let current = ids.lastIndex { selection.contains($0) && (extending || $0 != anchor) } ?? ids.firstIndex { selection.contains($0) }
+        let index = current.map { min(max($0 + step, 0), ids.count - 1) } ?? (step > 0 ? 0 : ids.count - 1)
+        if extending, let start = anchor, let a = ids.firstIndex(of: start) {
+            selection = Set(ids[min(a, index)...max(a, index)])
+        } else {
+            selection = [ids[index]]
+            anchor = ids[index]
+        }
+        return ids[index]
     }
 }
 
