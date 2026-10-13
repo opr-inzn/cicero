@@ -50,6 +50,7 @@ struct FamilyMenu: View {
                 model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
             }
         }
+        Menu("Tags") { TagMenuItems(families: families, model: model) }
 
         Divider()
 
@@ -67,6 +68,10 @@ struct FamilyMenu: View {
         }
         Divider()
 
+        // Added one at a time, they can leave the library and stay where they are.
+        if model.canRemoveFromLibrary(families) {
+            Button("Remove from Library") { model.removeFromLibrary(families) }
+        }
         Button("Move to Trash…") { model.requestTrash(families) }
     }
 

@@ -1,13 +1,17 @@
 import CiceroCore
 import SwiftUI
 
-/// One family's page, pushed over the browser: a type tester, every style, then the glyphs, one under the other.
+/// One family's page, pushed over the browser: a type tester, every style, the ligatures, then the glyphs, one
+/// under the other.
 struct FontPage: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let familyID: String
     @State private var glyphColumns: Int?
     @State private var glyphs: [GlyphSection]?
+    @State private var ligatureColumns: Int?
+    /// The style's ligatures; nil while loading.
+    @State private var ligatures: [LigatureGroup]?
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -30,16 +34,22 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
+                if let ligatures, !ligatures.isEmpty {
+                    LigaturesSection(face: family.face(nearestWeight: preview.weight).face, columns: ligatureColumns, groups: ligatures)
+                }
                 GlyphsSection(family: family, columns: glyphColumns, sections: glyphs)
             }
             // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
             // at once; only a change in the count redraws the glyphs.
             .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
+            .onGeometryChange(for: Int.self) { LigaturesSection.columns(fitting: $0.size.width) } action: { ligatureColumns = $0 }
         }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
         .task(id: family.face(nearestWeight: preview.weight).face.id) {
             let face = family.face(nearestWeight: preview.weight).face
             glyphs = nil
+            ligatures = nil
+            ligatures = await Task.detached(priority: .userInitiated) { LigatureGroup.read(face) }.value
             let ranges = await model.coverage.coverage(computing: face).scalars
             glyphs = await Task.detached(priority: .userInitiated) { GlyphSection.sections(for: ranges) }.value
         }
@@ -116,7 +126,7 @@ private struct TypeTester: View {
     let family: Family
     @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
     @AppStorage("typeTester.size") private var size = 72.0
-    @AppStorage("typeTester.centered") private var centered = true
+    @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
     /// nil follows the preview weight.
     @State private var styleID: FaceID?
 
@@ -141,33 +151,35 @@ private struct TypeTester: View {
                     ValueSlider(value: $size, range: 12...240).frame(width: 160)
                     Text("\(Int(size)) pt").monospacedDigit().frame(width: 52, alignment: .trailing)
                 }
-                Picker("Alignment", selection: $centered) {
-                    Image(systemName: "text.alignleft").tag(false)
-                    Image(systemName: "text.aligncenter").tag(true)
+                Picker("Alignment", selection: $alignment) {
+                    ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .labelStyle(.iconOnly)
                 .labelsHidden()
                 .fixedSize()
-                .help("Align left or center")
+                .help("Align left, center or right")
             }
             .padding(.top, 12)
             let font = Font(FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family)))
             let kerning = preview.kerning(at: size)
-            let alignment: TextAlignment = centered ? .center : .leading
+            let lineHeight = preview.lineHeight(at: size)
             // An invisible copy of the text sets the editor's height, so it grows with the page instead of
             // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
             Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
                 .font(font)
                 .kerning(kerning)
-                .multilineTextAlignment(alignment)
-                .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
+                .lineHeight(lineHeight)
+                .multilineTextAlignment(alignment.text)
+                .frame(maxWidth: .infinity, alignment: alignment.frame)
                 .padding(.horizontal, 5)
                 .hidden()
                 .overlay {
                     TextEditor(text: $text)
                         .font(font)
                         .kerning(kerning)
-                        .multilineTextAlignment(alignment)
+                        .lineHeight(lineHeight)
+                        .multilineTextAlignment(alignment.text)
                         .scrollContentBackground(.hidden)
                         .scrollDisabled(true)
                 }
@@ -175,6 +187,13 @@ private struct TypeTester: View {
                 .padding(.vertical, 20)
         }
         .padding(.horizontal, 24)
+    }
+}
+
+private extension TypeTester {
+    /// Centered, unless the left alignment was chosen when there were only those two.
+    static var savedAlignment: SampleAlignment {
+        UserDefaults.standard.object(forKey: "typeTester.centered") as? Bool == false ? .leading : .center
     }
 }
 

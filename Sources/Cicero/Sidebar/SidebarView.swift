@@ -240,6 +240,8 @@ private struct SidebarContent: View {
             .foregroundStyle(.secondary)
             .fixedSize()
             .help("New set or smart set")
+        case .tags:
+            plus("New tag") { model.newTag() }
         case .characterSets:
             plus("New character set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
         case .foundries, .classifications:
@@ -262,12 +264,20 @@ private struct SidebarContent: View {
 
     // MARK: Rows
 
+    /// Activate, Activate Temporarily and Deactivate for every font in a set or smart set.
+    @ViewBuilder
+    private func activation(for row: SidebarRow, kind: String) -> some View {
+        Button("Activate \(kind)" + (model.data.installMethod == .ask ? "…" : "")) { model.activateFonts(in: row.item, named: row.title) }
+        Button("Activate Temporarily") { model.activateFontsTemporarily(in: row.item) }
+        Button("Deactivate \(kind)") { model.deactivateFonts(in: row.item) }
+    }
+
     @ViewBuilder
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title) }
-            Label(row.title, systemImage: row.icon).lineLimit(1)
+            Label { Text(row.title).lineLimit(1) } icon: { SidebarIcon(row: row) }
         }
         .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
@@ -287,6 +297,8 @@ private struct SidebarContent: View {
         switch row.item {
         case .folder(WatchedFolder.adobeAppsID):
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }
+        case .folder(WatchedFolder.addedFilesID):
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(model.addedFileURLs) }
         case .folder(let id):
             if let folder = model.folder(id) {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
@@ -307,15 +319,29 @@ private struct SidebarContent: View {
             }
         case .set(let id):
             if let set = model.data.sets.first(where: { $0.id == id }) {
+                activation(for: row, kind: "Set")
+                Divider()
                 Button("Rename Set…") { model.prompt("Rename Set", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
                 Button(set.apps.isEmpty ? "Activate with Apps…" : "Edit Apps…") { model.editingAppsForSet = id }
                 Button("Delete Set") { model.deleteSet(id) }
             }
         case .smartSet(let id):
             if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
+                activation(for: row, kind: "Smart Set")
+                Divider()
                 Button("Edit Smart Set…") { model.editingSmartSet = smartSet }
                 Button("Delete Smart Set") { model.deleteSmartSet(id) }
             }
+        case .tag(let name):
+            Button("Rename Tag…") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
+            Picker("Color", selection: Binding(get: { model.data.tagColors[name] }, set: { model.setColor($0, forTag: name) })) {
+                Text("None").tag(TagColor?.none)
+                Divider()
+                ForEach(TagColor.allCases, id: \.self) { color in
+                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }.tag(Optional(color))
+                }
+            }
+            Button("Delete Tag") { model.deleteTag(name) }
         case .foundry(let name):
             Button("Rename Foundry…") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
         case .characterSet(let id):
@@ -335,6 +361,22 @@ private struct SidebarContent: View {
             Button("Hide from Sidebar") { model.setVisible(row.key, false) }
         }
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
+    }
+}
+
+/// A row's symbol, or a tag's colour as a dot.
+struct SidebarIcon: View {
+    let row: SidebarRow
+
+    var body: some View {
+        if let color = row.color {
+            Image(systemName: "circle.fill")
+                .foregroundStyle(color.color)
+                .imageScale(.small)
+                .accessibilityLabel(color.title)
+        } else {
+            Image(systemName: row.icon)
+        }
     }
 }
 

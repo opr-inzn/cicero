@@ -21,6 +21,10 @@ Any of these work:
 
 To turn on a single style, open the font page and use the style’s switch in **Styles**, or right-click the style and choose **Activate Style**.
 
+### Turn on a whole set
+
+Right-click a set or smart set in the sidebar and choose **Activate Set** or **Activate Smart Set** to turn on every font in it. **Activate Temporarily** there turns them on until Cicero quits, and **Deactivate Set** or **Deactivate Smart Set** turns them off again. Like any activation, they follow your choice in [Copy or use in place](#copy-or-use-in-place), and ask first with **Ask each time**.
+
 ## Copy or use in place
 
 There are two ways to turn on a font that isn’t in a Fonts folder:
@@ -51,6 +55,7 @@ To try a font without installing it, turn it on until Cicero quits:
 
 - Choose **Fonts → Activate Temporarily** (⌥⌘↩).
 - Or right-click a family, or a style on its font page, and choose **Activate Temporarily**.
+- Or right-click a set or smart set in the sidebar and choose **Activate Temporarily**, for every font in it.
 - Or choose **Activate Temporarily** when Cicero asks how to turn fonts on.
 
 When the fonts are already on, for good or until Cicero quits, these items are dimmed or left out.
@@ -68,6 +73,7 @@ Any of these work:
 - Click the family’s switch.
 - Select families and choose **Fonts → Deactivate** (⌘⌫).
 - Right-click a family and choose **Deactivate**, or a style and choose **Deactivate Style**.
+- Right-click a set or smart set in the sidebar and choose **Deactivate Set** or **Deactivate Smart Set**.
 - On a font page, click **Deactivate**.
 
 Turning a font off never deletes your only copy of it. What happens to the file depends on how the font was on:
@@ -126,6 +132,23 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 ### Your own folder that an app loads
 
 If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose an option under **Fonts in This Folder**, or pick one next to the folder in **Settings → Folders**, where **Active in another app…** lets you type the app’s name.
+
+## Turn on the fonts a document uses
+
+To see which fonts a document needs, and turn on the ones you have:
+
+1. Choose **File → Find Fonts in Document…** and pick the document, or drag it from the Finder onto Cicero’s window.
+2. Cicero lists every font the document uses, missing ones first:
+   - **On** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
+   - **Off** (a dashed circle): it’s in your library but not on. Click **Activate**.
+   - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders; see [Privacy](privacy.md#when-macos-asks-for-permission).
+3. **Activate All** turns on every font of the document that’s in your library. **Make Set** makes a set named after the document with its fonts that are in your library, or adds them to a set of that name.
+
+Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`) and Illustrator files (`.ai`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.
+
+- **PDFs** list the fonts their pages use. An **Embedded** tag marks the ones the PDF carries itself, so it shows as it should even where the font is missing.
+- **IDML files** list every style of each family they use; Cicero shows the styles the document’s text and styles apply, which can now and then include one it doesn’t use.
+- **InDesign and Illustrator files** keep a list of their fonts, which Cicero reads.
 
 ## Turn fonts on with an app
 

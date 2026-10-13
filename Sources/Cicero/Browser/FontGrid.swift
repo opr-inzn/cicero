@@ -66,9 +66,12 @@ private struct Tile: View {
             .frame(height: preview.size * 3.4)
             .clipped()
             VStack(alignment: .leading, spacing: 2) {
-                Text(family.name)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(family.name)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                    TagDots(colors: model.tagColors(of: family))
+                }
                 Text(family.rangeLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
