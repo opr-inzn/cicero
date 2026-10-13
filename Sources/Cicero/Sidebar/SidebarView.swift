@@ -7,39 +7,88 @@ import SwiftUI
 /// group), several at once when they're selected together. Sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
+    /// What the list shows selected while the browser hasn't taken it yet (see `select`).
+    @State private var pendingSelection: Set<SidebarItem>?
+    @State private var pace = SelectionPace()
+
+    var body: some View {
+        // The rows are a view of their own: a list's selection updates whatever makes the list, and this
+        // way that's just this, not every section and row.
+        List(selection: Binding(get: { pendingSelection ?? model.selectedItems }, set: select)) {
+            SidebarContent()
+        }
+        .listStyle(.sidebar)
+        .animation(.snappy, value: model.isEditingSidebar)
+        .contextMenu {
+            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
+        }
+        .onChange(of: model.selectedItems) {
+            // Selected some other way (a new set, say) while the browser was catching up: that wins.
+            guard pendingSelection != nil else { return }
+            pace.commit?.cancel()
+            pendingSelection = nil
+        }
+    }
+
+    /// The browser shows a new selection at once, unless the selection changes quickly, as while arrowing
+    /// through a long section: the list then moves on at each step and the browser takes the last one when
+    /// it rests, instead of making every list along the way.
+    private func select(_ items: Set<SidebarItem>) {
+        let now = ContinuousClock.now
+        let resting = pace.last.map { now - $0 > .milliseconds(300) } ?? true
+        pace.last = now
+        pace.commit?.cancel()
+        let items = model.sidebarSelection(items, from: pendingSelection ?? model.selectedItems)
+        guard !resting else {
+            pendingSelection = nil
+            return model.selectSidebarItems(items)
+        }
+        pendingSelection = items
+        pace.commit = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            pendingSelection = nil
+            model.selectSidebarItems(items)
+        }
+    }
+}
+
+/// When the sidebar's selection last changed, and the change waiting for the browser.
+private final class SelectionPace {
+    var last: ContinuousClock.Instant?
+    var commit: Task<Void, Never>?
+}
+
+/// The sidebar's sections and rows.
+private struct SidebarContent: View {
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         let editing = model.isEditingSidebar
-        List(selection: Binding(get: { model.selectedItems }, set: { model.selectSidebarItems($0) })) {
-            Section {
-                movableRows(model.libraryRows, in: "library", section: nil)
-            } header: {
-                header
-            }
-            ForEach(model.sections) { section in
-                if editing || model.isVisible(section.key) {
-                    let rows = model.rows(for: section)
-                    Section(isExpanded: expansion(section)) {
-                        if section == .characterSets {
-                            characterSetGroups
-                        } else {
-                            movableRows(rows, in: section.rawValue, section: section)
-                        }
-                        if editing && rows.isEmpty {
-                            Text("Nothing here yet")
-                                .foregroundStyle(.tertiary)
-                                .selectionDisabled()
-                        }
-                    } header: {
-                        sectionHeader(section)
+        Section {
+            movableRows(model.libraryRows, in: "library", section: nil)
+        } header: {
+            header
+        }
+        ForEach(model.sections) { section in
+            if editing || model.isVisible(section.key) {
+                let groups = section == .characterSets ? model.characterSetGroups : []
+                let rows = section == .characterSets ? [] : model.rows(for: section)
+                Section(isExpanded: expansion(section)) {
+                    if section == .characterSets {
+                        characterSetGroups(groups)
+                    } else {
+                        movableRows(rows, in: section.rawValue, section: section)
                     }
+                    if editing && rows.isEmpty && groups.isEmpty {
+                        Text("Nothing here yet")
+                            .foregroundStyle(.tertiary)
+                            .selectionDisabled()
+                    }
+                } header: {
+                    sectionHeader(section)
                 }
             }
-        }
-        .listStyle(.sidebar)
-        .animation(.snappy, value: editing)
-        .contextMenu {
-            Button(editing ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
         }
     }
 
@@ -52,8 +101,7 @@ struct SidebarView: View {
 
     /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Groups move
     /// among themselves, and sets within their group.
-    private var characterSetGroups: some View {
-        let groups = model.characterSetGroups
+    private func characterSetGroups(_ groups: [(id: String, title: String, rows: [SidebarRow])]) -> some View {
         let shownGroups = groups.filter { !shown($0.rows).isEmpty }
         func key(_ id: String) -> String { "charsetgroup.\(id)" }
         return ForEach(shownGroups, id: \.id) { group in
@@ -169,9 +217,10 @@ struct SidebarView: View {
 
     // MARK: Rows
 
+    @ViewBuilder
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
-        return HStack(spacing: 6) {
+        let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title) }
             Label(row.title, systemImage: row.icon).lineLimit(1)
         }
@@ -179,7 +228,13 @@ struct SidebarView: View {
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .tag(row.item)
         .contextMenu { menu(for: row) }
-        .dropDestination(for: String.self) { names, _ in _ = model.handleDrop(names, on: row.item) }
+        // Only rows that take family names are drop targets: being one makes a row much slower to appear,
+        // which shows when a section opens or a long one scrolls.
+        if model.takesFamilies(row.item) {
+            content.dropDestination(for: String.self) { names, _ in _ = model.handleDrop(names, on: row.item) }
+        } else {
+            content
+        }
     }
 
     @ViewBuilder
