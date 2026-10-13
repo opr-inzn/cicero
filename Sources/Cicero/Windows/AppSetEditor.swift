@@ -83,8 +83,13 @@ struct AppSetEditor: View {
 enum LoginItem {
     static var status: SMAppService.Status { SMAppService.mainApp.status }
 
-    /// Returns the status afterwards.
+    /// Returns the status afterwards. Outside the Applications folder, turning it on offers to move Cicero
+    /// there instead: a login item for a copy on a disk image or in Downloads breaks once that copy goes.
     static func set(_ enabled: Bool, model: AppModel) -> SMAppService.Status {
+        if enabled, !ApplicationsFolder.isInApplicationsFolder {
+            ApplicationsFolder.offerToMove(forOpenAtLogin: true)
+            return status
+        }
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {

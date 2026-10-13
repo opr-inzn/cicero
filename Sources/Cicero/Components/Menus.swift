@@ -27,8 +27,8 @@ struct FamilyMenu: View {
         if let app, families.contains(where: { $0.position != .app }) {
             Button("Use in \(app) Only") { model.useInAppOnly(families.flatMap(\.faces)) }
         }
-        if families.contains(where: \.hasActivatable) {
-            TemporaryMenu { model.activateTemporarily(families, scope: $0) }
+        if families.contains(where: \.hasTemporarilyActivatable) {
+            Button("Activate Temporarily") { model.activateTemporarily(families) }
         }
         if families.contains(where: \.hasDeactivatable) {
             // On in the app only, nothing is on in other apps: turning it off there is all deactivating does.
@@ -92,8 +92,8 @@ struct StyleMenu: View {
                 model.activate([face], title: "\(family.name) \(face.face.styleName)")
             }
         }
-        if face.canActivate {
-            TemporaryMenu { model.activateTemporarily([face], scope: $0) }
+        if face.canActivateTemporarily {
+            Button("Activate Temporarily") { model.activateTemporarily([face]) }
         }
         if face.canDeactivate {
             Button("Deactivate Style") { model.deactivate([face]) }
@@ -107,19 +107,6 @@ struct StyleMenu: View {
         Divider()
         Button("Move Style to Trash…") {
             model.requestTrash([face], removing: family.faces.count == 1 ? [family.id] : [], title: "“\(family.name) \(face.face.styleName)”")
-        }
-    }
-}
-
-/// "Activate Temporarily ▸ Until Cicero Quits / Until You Log Out".
-struct TemporaryMenu: View {
-    let action: (TemporaryScope) -> Void
-
-    var body: some View {
-        Menu("Activate Temporarily") {
-            ForEach(TemporaryScope.choices, id: \.self) { scope in
-                Button(scope.menuTitle) { action(scope) }
-            }
         }
     }
 }

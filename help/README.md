@@ -1,0 +1,39 @@
+# Cicero Help
+
+Cicero is a font manager for macOS 26 on Apple silicon. It shows every font on your Mac and in the folders you add, lets you try them out, and turns them on only when you need them.
+
+New to Cicero? Start with [Getting started](getting-started.md). To open this guide from the app, choose **Help → Cicero Help**.
+
+## Contents
+
+1. **[Getting started](getting-started.md)**\
+   [Install Cicero](getting-started.md#install-cicero) · [Move it to Applications](getting-started.md#move-cicero-to-applications) · [Find your way around](getting-started.md#find-your-way-around) · [Add your fonts](getting-started.md#add-your-fonts) · [Keep Cicero up to date](getting-started.md#keep-cicero-up-to-date)
+2. **[Browsing and previewing](browsing.md)**\
+   [List, grid and specimens](browsing.md#choose-a-view) · [Search](browsing.md#search) · [Select fonts](browsing.md#select-fonts) · [Quick Look](browsing.md#take-a-quick-look) · [Font pages](browsing.md#open-a-font-page) · [The Info panel](browsing.md#see-a-fonts-details) · [Features](browsing.md#try-opentype-features) · [Preview Options](browsing.md#change-the-sample-text-and-size) · [Compare](browsing.md#compare-fonts)
+3. **[Activating fonts](activating.md)**\
+   [How it works](activating.md#how-activation-works) · [Copy or use in place](activating.md#copy-or-use-in-place) · [Just for now](activating.md#turn-a-font-on-just-for-now) · [Turn fonts off](activating.md#turn-fonts-off) · [The Deactivated folder](activating.md#the-deactivated-folder) · [Fonts for Adobe apps](activating.md#fonts-for-adobe-apps) · [Application sets](activating.md#turn-fonts-on-with-an-app) · [Open at login](activating.md#open-cicero-at-login)
+4. **[Organizing your library](organizing.md)**\
+   [The sidebar](organizing.md#the-sidebar) · [Folders](organizing.md#folders) · [Sets](organizing.md#sets) · [Smart sets](organizing.md#smart-sets) · [Foundries](organizing.md#foundries) · [Classifications](organizing.md#classifications) · [System Fonts](organizing.md#system-fonts)
+5. **[Character sets and languages](character-sets.md)**\
+   [Character sets](character-sets.md#character-sets) · [Your own sets](character-sets.md#make-your-own-character-set) · [Character Toolbox](character-sets.md#the-character-toolbox) · [Languages](character-sets.md#how-cicero-decides-a-font-supports-a-language)
+6. **[Problems](problems.md)**\
+   [Installed Twice](problems.md#installed-twice) · [Missing Files](problems.md#missing-files) · [Damaged or Unreadable Files](problems.md#damaged-or-unreadable-files) · [Fonts on External Disks](problems.md#fonts-on-external-disks) · [Duplicates](problems.md#duplicates) · [Shared Style Names](problems.md#shared-style-names)
+7. **[Export, backup and restore](export-and-backup.md)**\
+   [Export fonts](export-and-backup.md#export-fonts) · [Back up](export-and-backup.md#back-up-your-library) · [Restore](export-and-backup.md#restore-a-backup)
+8. **[Troubleshooting](troubleshooting.md)**\
+   [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font) · [Font caches](troubleshooting.md#clear-the-font-caches) · [Rebuild Font List](troubleshooting.md#rescan-or-rebuild-the-font-list) · [FAQ](troubleshooting.md#questions-and-answers)
+9. **[Keyboard shortcuts](keyboard-shortcuts.md)**
+10. **[Privacy](privacy.md)**
+
+## Words this guide uses
+
+- **Family**: all the styles of one typeface, like Inter Regular, Inter Bold and Inter Italic. Cicero lists families, and you can open one to see its styles.
+- **Style**: one font in a family, usually one file or one face in a font collection.
+- **Activated**: on. macOS offers the font to every app. **Not activated** means the font is in your library but apps don’t see it.
+- **Library**: every font Cicero knows about: the ones macOS has on, the ones in your Fonts folder, and the ones in the folders you add.
+- **Your Fonts folder**: `~/Library/Fonts`, the Fonts folder in your home folder’s Library.
+
+## Get more help
+
+- **Help → Release Notes** opens the list of versions and what changed in each.
+- **Help → Report an Issue** opens a new issue on GitHub, where you can describe a problem or ask a question.

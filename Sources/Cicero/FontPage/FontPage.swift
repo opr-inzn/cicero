@@ -4,7 +4,10 @@ import SwiftUI
 /// One family's page, pushed over the browser: a type tester, every style, then the glyphs, one under the other.
 struct FontPage: View {
     @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
     let familyID: String
+    @State private var glyphColumns: Int?
+    @State private var glyphs: [GlyphSection]?
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -27,8 +30,18 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                GlyphsSection(family: family)
+                GlyphsSection(family: family, columns: glyphColumns, sections: glyphs)
             }
+            // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
+            // at once; only a change in the count redraws the glyphs.
+            .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
+        }
+        // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
+        .task(id: family.face(nearestWeight: preview.weight).face.id) {
+            let face = family.face(nearestWeight: preview.weight).face
+            glyphs = nil
+            let ranges = await model.coverage.coverage(computing: face).scalars
+            glyphs = await Task.detached(priority: .userInitiated) { GlyphSection.sections(for: ranges) }.value
         }
         .background(Color.canvas)
         .navigationTitle(family.name)
@@ -110,7 +123,7 @@ private struct TypeTester: View {
     var body: some View {
         let chosen = family.faces.first { $0.id == styleID }
         let face = chosen ?? family.face(nearestWeight: preview.weight)
-        let weight = chosen.map { Double($0.face.weight) } ?? preview.weight
+        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 if family.faces.count > 1 {
@@ -191,11 +204,11 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: Double(style.face.weight), features: features)
+                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight, features: features)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
-                    Text("\(style.face.weight)").monospacedDigit().foregroundStyle(.secondary)
+                    Text("\(Int(style.face.styleWeight.rounded()))").monospacedDigit().foregroundStyle(.secondary)
                 } status: {
                     HStack(spacing: 8) {
                         MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {

@@ -94,6 +94,12 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.axes = axes
     }
 
+    /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
+    /// axis, not the file's one weight class.
+    public var styleWeight: Double {
+        axes.first { $0.tag == "wght" }?.value ?? Double(weight)
+    }
+
     public var path: String { id.path }
     public var url: URL { URL(fileURLWithPath: id.path, isDirectory: false) }
 
@@ -109,12 +115,23 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
 // MARK: - State
 
 public enum TemporaryScope: String, Codable, Sendable, CaseIterable {
-    case untilQuit, untilLogout
+    /// Activated temporarily: on until Cicero quits.
+    case untilQuit
     /// On for an application set while one of its apps is open.
     case whileAppsRun
 
-    /// The ones to pick from when activating temporarily; application sets set the third themselves.
-    public static let choices: [TemporaryScope] = [.untilQuit, .untilLogout]
+    /// A scope as saved. "untilLogout", a choice there used to be, ends when Cicero quits now.
+    public init?(saved value: String) {
+        self.init(rawValue: value == "untilLogout" ? Self.untilQuit.rawValue : value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        guard let scope = Self(saved: value) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown scope “\(value)”"))
+        }
+        self = scope
+    }
 }
 
 /// Where an active face is activated from, which decides whether Cicero may turn it off.
@@ -177,7 +194,6 @@ public enum FaceState: Hashable, Sendable {
         case .active(.app): "Comes with an app"
         case .active(.adobeFonts): "Adobe Fonts"
         case .active(.temporary(.untilQuit)): "Active until Cicero quits"
-        case .active(.temporary(.untilLogout)): "Active until you log out"
         case .active(.temporary(.whileAppsRun)): "Active while its app is open"
         case .active: "Active"
         case .inactive: "Not activated"
@@ -208,6 +224,8 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
 
     public var id: FaceID { face.id }
     public var canActivate: Bool { !state.isActive || state.temporaryScope != nil }
+    /// Off, or on only while an application set's app is open.
+    public var canActivateTemporarily: Bool { !state.isActive || state.temporaryScope == .whileAppsRun }
     /// A face an app loads from its folder can be turned off there too, by moving it out.
     public var canDeactivate: Bool {
         if case .appOnly = state { return true }
@@ -244,13 +262,17 @@ public enum FamilyState: Hashable, Sendable {
 
 public enum Classification: String, CaseIterable, Codable, Sendable {
     case serif = "Serif"
-    case slabSerif = "Slab Serif"
     case sansSerif = "Sans Serif"
     case monospaced = "Monospaced"
     case script = "Script"
     case ornamental = "Ornamental"
     case symbol = "Symbol"
     case unclassified = "Unclassified"
+
+    /// A classification as saved. "Slab Serif", a classification there used to be, is part of Serif now.
+    public init?(saved value: String) {
+        self.init(rawValue: value == "Slab Serif" ? Self.serif.rawValue : value)
+    }
 }
 
 public enum FontFormat: String, CaseIterable, Codable, Sendable {
@@ -302,6 +324,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let activeCount: Int
     public let hasActive: Bool
     public let hasActivatable: Bool
+    public let hasTemporarilyActivatable: Bool
     public let hasDeactivatable: Bool
     /// Set when every active face is temporarily active with this scope.
     public let temporaryScope: TemporaryScope?
@@ -331,6 +354,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         activeCount = faces.count { $0.state.isActive }
         hasActive = activeCount > 0
         hasActivatable = faces.contains(where: \.canActivate)
+        hasTemporarilyActivatable = faces.contains(where: \.canActivateTemporarily)
         hasDeactivatable = faces.contains(where: \.canDeactivate)
         let scopes = Set(faces.filter(\.state.isActive).map(\.state.temporaryScope))
         temporaryScope = scopes.count == 1 ? scopes.first! : nil
@@ -529,8 +553,7 @@ extension Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
         let upright = faces.first { !$0.face.isItalic } ?? faces[0]
         switch upright.face.familyClass {
-        case 1, 2, 3, 7: return .serif
-        case 4, 5: return .slabSerif
+        case 1, 2, 3, 4, 5, 7: return .serif
         case 8: return .sansSerif
         case 9: return .ornamental
         case 10: return .script
@@ -540,9 +563,8 @@ extension Classification {
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
-            (.slabSerif, ["slab"]),
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
-            (.serif, ["serif", "garamond", "antiqua"]),
+            (.serif, ["serif", "slab", "garamond", "antiqua"]),
             (.script, ["script", "brush", "hand"]),
         ]
         for (classification, words) in hints where words.contains(where: name.contains) { return classification }

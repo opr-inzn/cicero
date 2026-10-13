@@ -1,7 +1,9 @@
 #!/bin/bash
 # Publishes build/Cicero-<version>.dmg (made by release.sh) as a GitHub release, using that
-# version's section of CHANGELOG.md as the notes. The asset is always named Cicero.dmg so
-# https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg stays the latest version.
+# version's section of CHANGELOG.md as the notes, with the appcast.xml Sparkle reads for updates
+# (see make-appcast.sh). The assets always have these names, so
+# https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg stays the latest version
+# and .../latest/download/appcast.xml offers it as an update.
 #   ./scripts/publish.sh                  publish the version in Resources/Info.plist
 #   ./scripts/publish.sh --allow-unsigned publish even if the DMG isn't notarized
 set -euo pipefail
@@ -24,8 +26,11 @@ if [[ -n "$(git status --porcelain)" ]] || [[ "$(git rev-parse HEAD)" != "$(git 
     exit 1
 fi
 
+./scripts/make-appcast.sh "$DMG"
+
 ASSET_DIR=$(mktemp -d)
 cp "$DMG" "$ASSET_DIR/Cicero.dmg"
-gh release create "v$VERSION" "$ASSET_DIR/Cicero.dmg" \
+cp build/appcast.xml "$ASSET_DIR/appcast.xml"
+gh release create "v$VERSION" "$ASSET_DIR/Cicero.dmg" "$ASSET_DIR/appcast.xml" \
     --title "Cicero $VERSION" --notes "$NOTES" --target "$(git rev-parse HEAD)" --latest
 rm -rf "$ASSET_DIR"

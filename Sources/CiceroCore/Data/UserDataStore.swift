@@ -134,7 +134,7 @@ enum LegacyImport {
         data.records.installedCopies = object["installedCopies"] as? [String: String] ?? [:]
         data.records.inPlace = Set(strings(object["registeredPaths"]))
         for (path, record) in object["temporaryActivations"] as? [String: [String: Any]] ?? [:] {
-            guard let scope = (record["scope"] as? String).flatMap(TemporaryScope.init(rawValue:)) else { continue }
+            guard let scope = (record["scope"] as? String).flatMap(TemporaryScope.init(saved:)) else { continue }
             data.records.temporary[path] = TemporaryRecord(scope: scope, session: record["session"] as? String ?? "")
         }
         return data
