@@ -153,14 +153,19 @@ public struct TrashPlan: Sendable, Identifiable {
     public var removedFamilies: [String]
     /// The paths are every copy of some fonts, wherever they are; false for files picked one by one.
     public var includesCopies: Bool
+    /// For files Problems offers to remove: this library's fonts must each keep a copy in another file
+    /// (the `otherFamilies` too), checked again right before trashing, since a copy may have gone since.
+    public var spareCopiesOf: Library?
 
-    public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String], includesCopies: Bool = true) {
+    public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String],
+                includesCopies: Bool = true, spareCopiesOf: Library? = nil) {
         self.title = title
         self.paths = paths
         self.otherFamilies = otherFamilies
         self.protectedCount = protectedCount
         self.removedFamilies = removedFamilies
         self.includesCopies = includesCopies
+        self.spareCopiesOf = spareCopiesOf
     }
 }
 
@@ -453,10 +458,34 @@ public struct ActivationEngine: Sendable {
         return TrashPlan(title: title, paths: paths, otherFamilies: otherFamilies, protectedCount: protectedCount, removedFamilies: removed)
     }
 
+    /// For a fix in Problems: files that are spare copies (or that nothing can read), picked one by one.
+    /// Names the families besides `family` with faces in them, which keep their other copies; `moveToTrash`
+    /// checks the files are still spare right before it trashes them. nil when every file is protected.
+    public func spareCopiesTrashPlan(_ paths: [String], family: String?, in library: Library) -> TrashPlan? {
+        let allowed = paths.filter { !Self.isProtected($0) }
+        guard !allowed.isEmpty else { return nil }
+        let set = Set(allowed)
+        let otherFamilies = library.families
+            .filter { $0.id != family && $0.faces.contains { set.contains($0.face.path) || $0.otherCopies.contains(where: set.contains) } }
+            .map(\.id)
+        return TrashPlan(
+            title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) files",
+            paths: allowed, otherFamilies: otherFamilies, protectedCount: paths.count - allowed.count, removedFamilies: [],
+            includesCopies: false, spareCopiesOf: library
+        )
+    }
+
     /// Files in use are unregistered first, so apps drop them at once.
     @concurrent
     public func moveToTrash(_ plan: TrashPlan, records: ActivationRecords) async -> ActivationResult {
         var records = records
+        if let library = plan.spareCopiesOf {
+            var copies = SpareCopies(library)
+            guard copies.areSpare(Set(plan.paths)) else {
+                let message = plan.paths.count == 1 ? "Kept the file: it holds the only copy of a font." : "Kept the files: some hold the only copy of a font."
+                return ActivationResult(records: records, succeeded: 0, failed: plan.paths, message: message)
+            }
+        }
         var failed: [String] = []
         var succeeded = 0
         let persistent = plan.paths.filter { records.inPlace.contains($0) || isInsideUserFonts($0) }

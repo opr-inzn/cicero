@@ -39,7 +39,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
-  font caches of macOS, Adobe apps and Microsoft Office.
+  font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
+  taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
+  asks it again for those files right before trashing them.
 - **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.

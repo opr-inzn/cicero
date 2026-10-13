@@ -104,22 +104,22 @@ private struct ProblemCard: View {
                         Text(problem.summary)
                     }
                     Spacer(minLength: 0)
-                    FixButtons(fixes: problem.fixes, kind: problem.kind)
+                    FixButtons(fixes: problem.fixes, kind: problem.kind, family: problem.family)
                 }
                 if problem.kind.groupsFilesByFolder {
                     ForEach(problem.folders, id: \.path) { folder in
                         Divider()
                         let isNewest = folder.path == problem.newestFolder
                         if folder.files.count == 1 {
-                            FileRow(file: folder.files[0], fixes: problem.fileFixes[folder.files[0].path] ?? [], kind: problem.kind, isNewest: isNewest)
+                            FileRow(file: folder.files[0], fixes: problem.fileFixes[folder.files[0].path] ?? [], kind: problem.kind, family: problem.family, isNewest: isNewest)
                         } else {
-                            FolderRow(folder: folder, fixes: problem.folderFixes[folder.path] ?? [], fileFixes: problem.fileFixes, kind: problem.kind, isNewest: isNewest)
+                            FolderRow(folder: folder, fixes: problem.folderFixes[folder.path] ?? [], fileFixes: problem.fileFixes, kind: problem.kind, family: problem.family, isNewest: isNewest)
                         }
                     }
                 } else {
                     ForEach(problem.files, id: \.path) { file in
                         Divider()
-                        FileRow(file: file, fixes: problem.fileFixes[file.path] ?? [], kind: problem.kind)
+                        FileRow(file: file, fixes: problem.fileFixes[file.path] ?? [], kind: problem.kind, family: problem.family)
                     }
                 }
             }
@@ -132,6 +132,7 @@ private struct FileRow: View {
     let file: ProblemFile
     let fixes: [ProblemFix]
     let kind: ProblemKind
+    var family: String?
     var isNewest = false
 
     var body: some View {
@@ -161,7 +162,7 @@ private struct FileRow: View {
                 }
             }
             Spacer(minLength: 0)
-            FixButtons(fixes: fixes, kind: kind).controlSize(.small)
+            FixButtons(fixes: fixes, kind: kind, family: family).controlSize(.small)
         }
     }
 
@@ -181,6 +182,7 @@ private struct FolderRow: View {
     let fixes: [ProblemFix]
     let fileFixes: [String: [ProblemFix]]
     let kind: ProblemKind
+    let family: String?
     let isNewest: Bool
     @State private var isExpanded = false
 
@@ -217,7 +219,7 @@ private struct FolderRow: View {
                     .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count) Files")
                 }
                 Spacer(minLength: 0)
-                FixButtons(fixes: fixes, kind: kind).controlSize(.small)
+                FixButtons(fixes: fixes, kind: kind, family: family).controlSize(.small)
             }
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
@@ -230,7 +232,7 @@ private struct FolderRow: View {
                                 }
                             }
                             Spacer(minLength: 0)
-                            FixButtons(fixes: fileFixes[file.path] ?? [], kind: kind).controlSize(.small)
+                            FixButtons(fixes: fileFixes[file.path] ?? [], kind: kind, family: family).controlSize(.small)
                         }
                     }
                 }
@@ -292,11 +294,13 @@ private struct FixButtons: View {
     @Environment(AppModel.self) private var model
     let fixes: [ProblemFix]
     let kind: ProblemKind
+    /// The family the problem is about, if any.
+    let family: String?
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(fixes, id: \.self) { fix in
-                Button(title(fix), role: isDestructive(fix) ? .destructive : nil) { model.apply(fix) }
+                Button(title(fix), role: isDestructive(fix) ? .destructive : nil) { model.apply(fix, family: family) }
             }
         }
     }
