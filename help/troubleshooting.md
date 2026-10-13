@@ -61,9 +61,9 @@ No. Cicero never edits a font file. It copies files into your Fonts folder when 
 
 Fonts you turned on stay on, whether Cicero copied them or uses them where they are. Fonts you turned on temporarily go off. Application sets stop following your apps until Cicero opens again; fonts already on for an open app stay on until then, or until you log out.
 
-### A font I turned off in Font Book shows as Not Activated
+### A font in my Fonts folder shows as Not Activated
 
-That’s right: its file is still in a Fonts folder, but macOS has it off. Turn it on in Cicero and Cicero turns it on where it is.
+That’s right: its file is still in a Fonts folder, but it’s turned off in macOS. Turn it on in Cicero and Cicero turns it on where it is.
 
 ### Why are some fonts tagged System?
 

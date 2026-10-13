@@ -36,7 +36,7 @@ Before you send fonts to someone, check that their licenses allow it.
 A backup is one `.cicerobackup` file with everything you set up in Cicero, and your font files if you like. Use it to keep your setup safe, or to move it to another Mac.
 
 1. Choose **File → Back Up Library…**, or click **Back Up…** under **Backup** in **Settings → General**.
-2. To put your fonts in the backup too, check **Include font files**. Cicero shows how many files that is and how much space they take, like “3,812 files, 2.4 GB”.
+2. **Include font files**, checked at first, puts your fonts in the backup too; uncheck it for a backup of your setup alone. Cicero shows how many files that is and how much space they take, like “3,812 files, 2.4 GB”.
 3. Click **Back Up…**, pick a place, and click **Back Up**. The name is like “Cicero Backup 2026-10-13” at first.
 
 A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero shows the file in the Finder.
@@ -49,7 +49,7 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 - the sidebar: what’s hidden, the order, and which sections are open
 - the settings for how Cicero activates fonts, **Show system fonts** and **Show fonts installed for Adobe apps**
 - which fonts Cicero turned on, and how
-- with **Include font files**: every font file in your library, other copies included, except the ones that come with macOS or an app
+- with **Include font files**: every font file in your library, other copies included, except the ones that come with macOS or an app, and Adobe Fonts
 
 A backup doesn’t hold settings that belong to one Mac: the appearance, **Open at login**, the update setting, the preview options and the list’s columns.
 

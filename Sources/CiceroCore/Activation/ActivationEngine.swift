@@ -22,7 +22,7 @@ public struct CoreTextRegistrar: FontRegistrar {
     public init() {}
 
     /// Returns once fontd has registered the files and told every app, so they're usable the moment this
-    /// returns. Files Font Book turned off stay off when registered again, so those are turned back on.
+    /// returns. Files turned off in macOS stay off when registered again, so those are turned back on.
     public func register(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> {
         guard !urls.isEmpty else { return [] }
         let result = await Self.perform(urls, ignoring: .alreadyRegistered) { handler in
@@ -185,8 +185,8 @@ public struct ActivationEngine: Sendable {
 
     /// Copies into ~/Library/Fonts or registers in place (`method` is `.copy` or `.inPlace`). Faces
     /// from app-only folders are always registered in place, after going back into the folder if Cicero
-    /// moved them out; faces in a Fonts folder that macOS has off (Font Book turned them off) are turned
-    /// on there. Temporarily active faces are made permanent.
+    /// moved them out; faces in a Fonts folder that macOS has off are turned on
+    /// there. Temporarily active faces are made permanent.
     ///
     /// Copies are registered too: left alone, they reach apps only when macOS notices the file, seconds
     /// later. A file counts as activated once macOS reports it active, so it's usable in every app as
@@ -615,7 +615,7 @@ public struct ActivationEngine: Sendable {
         path.hasPrefix(locations.userFonts.path + "/")
     }
 
-    /// ~/Library/Fonts or /Library/Fonts, where a file is active unless Font Book turned it off.
+    /// ~/Library/Fonts or /Library/Fonts, where a file is active unless it's turned off in macOS.
     private func isInsideFontsFolder(_ path: String) -> Bool {
         isInsideUserFonts(path) || path.hasPrefix(locations.allUsersFonts.path + "/")
     }

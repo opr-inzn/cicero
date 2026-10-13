@@ -34,7 +34,7 @@ When you make a new set or character set, or add a folder, its section shows aga
 
 ### Put items in your order
 
-Drag items to where you want them, as in the Finder’s sidebar. An item moves within its own section: sets among your sets, folders among your folders, and so on. Character sets move within their group. To reorder the groups in **Character Sets**, drag a group’s title onto another: the two swap places. The sections themselves stay in their place.
+Drag items to where you want them, as in the Finder’s sidebar. An item moves within its own section: sets among your sets, folders among your folders, and so on. Character sets move within their group. To reorder the groups in **Character Sets**, drag a group’s title onto another: it takes that group’s place, and the groups in between move up or down one. The sections themselves stay in their place.
 
 Items that are gone for now, like **System Fonts** while system fonts are hidden, keep their place. New items go at the end. To go back to the usual order, click **Reset Order** in **Settings → Sidebar**.
 

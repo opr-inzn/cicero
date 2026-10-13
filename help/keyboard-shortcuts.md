@@ -35,8 +35,9 @@ While you type in a text field, like the search field, the sample text or a font
 | ⌘A | Selects every family |
 | Esc | Selects none |
 | A letter or digit | Jumps to the first family starting with it |
-| ↑ ↓ | Moves the selection, in the list view |
-| ⇧↑ ⇧↓ | Extends the selection, in the list view |
+| ↑ ↓ | Moves the selection; in the grid, a row of tiles |
+| ← → | Moves the selection a tile, in the grid |
+| ⇧ with an arrow key | Extends the selection, or shrinks it again |
 | Space | Opens or closes Quick Look |
 | ↩ or double-click | Opens the selected family’s font page |
 
@@ -44,7 +45,8 @@ While you type in a text field, like the search field, the sample text or a font
 
 | Shortcut | Does |
 | --- | --- |
-| Arrow keys | Move the selection in the browser; the preview follows |
+| ↑ ↓ | Move the selection in the browser; the preview follows. In the grid, ← → do too |
+| ← → | With several families selected, in the list and specimens: show the next or previous one, while the selection stays |
 | ↩ | Opens the family’s font page |
 | Space or Esc | Closes the preview |
 
