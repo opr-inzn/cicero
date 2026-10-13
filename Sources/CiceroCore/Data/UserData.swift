@@ -334,7 +334,8 @@ public struct ActivationRecords: Codable, Equatable, Sendable {
 
 public struct TemporaryRecord: Codable, Equatable, Sendable {
     public var scope: TemporaryScope
-    /// Identifies the login session it was made in (see `ActivationEngine.currentSession`).
+    /// Identifies the login session it was made in (see `ActivationEngine.currentSession`), so an
+    /// application set's record from before a logout is forgotten.
     public var session: String
     /// For `.whileAppsRun`: the bundle IDs of the open apps whose application sets have the file.
     public var apps: [String]?

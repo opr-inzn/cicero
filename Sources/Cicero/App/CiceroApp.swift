@@ -17,6 +17,7 @@ struct CiceroApp: App {
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     Appearance.applySaved()
+                    TextEditingKeys.install()
                     model.start()
                     model.appSets.start(model)
                 }
@@ -88,13 +89,9 @@ struct CiceroCommands: Commands {
             Button("Activate") { model.activate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
-            Menu("Activate Temporarily") {
-                ForEach(TemporaryScope.choices, id: \.self) { scope in
-                    Button(scope.menuTitle) { model.activateTemporarily(selection, scope: scope) }
-                        .keyboardShortcut(scope == .untilQuit ? KeyboardShortcut(.return, modifiers: [.command, .option]) : nil)
-                }
-            }
-            .disabled(!selection.contains(where: \.hasActivatable))
+            Button("Activate Temporarily") { model.activateTemporarily(selection) }
+                .keyboardShortcut(.return, modifiers: [.command, .option])
+                .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
             Button("Deactivate") { model.deactivate(selection) }
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasDeactivatable))

@@ -54,6 +54,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   that scan (or one right after the operation, when it starts none). Lists it hands to views (`visibleFamilies`, sidebar rows,
   character set lookups) are cached and keyed on the inputs they depend on.
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
+- `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
+  focus, it hands ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Open) can take them.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
   `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
   are in `Components/`.

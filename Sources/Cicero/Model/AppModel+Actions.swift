@@ -29,16 +29,17 @@ extension AppModel {
         }
     }
 
-    func activateTemporarily(_ families: [Family], scope: TemporaryScope) {
-        activateTemporarily(families.flatMap(\.faces), scope: scope)
+    func activateTemporarily(_ families: [Family]) {
+        activateTemporarily(families.flatMap(\.faces))
     }
 
-    func activateTemporarily(_ faces: [LibraryFace], scope: TemporaryScope) {
-        let targets = faces.filter { !$0.state.isActive || ($0.state.temporaryScope.map { $0 != scope } ?? false) }
+    /// Until Cicero quits.
+    func activateTemporarily(_ faces: [LibraryFace]) {
+        let targets = faces.filter(\.canActivateTemporarily)
         guard !targets.isEmpty else { return showToast("Already on.") }
         let operation = expect(targets, at: .on)
         enqueue { model in
-            let result = await model.engine.activateTemporarily(targets, scope: scope, records: model.data.records)
+            let result = await model.engine.activateTemporarily(targets, records: model.data.records)
             model.finish(result, operation: operation)
         }
     }
