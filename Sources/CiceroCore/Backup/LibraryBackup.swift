@@ -95,8 +95,11 @@ public struct FontRestoreResult: Sendable, Equatable {
     public var skipped = 0
     /// Files that couldn't go back and went to the fallback folder instead.
     public var fallback = 0
-    /// Files that couldn't be written anywhere.
+    /// Files that couldn't be written anywhere, or that weren't restored at all: ones that aren't
+    /// fonts, or whose place in the archive leads out of it.
     public var failed = 0
+    /// Where files were put back, for taking over the backup's records about them.
+    public var restoredPaths: Set<String> = []
     /// The task was cancelled; the counts are what was done until then.
     public var cancelled = false
 
@@ -214,15 +217,21 @@ public struct LibraryBackup: Sendable {
     }
 
     /// Writes the archive: the font files first (unless `includeFonts` is off), then the manifest
-    /// and user data, then ditto zips it all. A file that disappeared since the inventory is left
-    /// out. Replaces an item at `destination` only by moving it to the Trash first, right before the
-    /// zip step, so a cancelled backup leaves it alone.
+    /// and user data, then ditto zips it all into a private folder on the destination's disk. A file
+    /// that disappeared since the inventory is left out. Only a complete archive takes the place of an
+    /// item at `destination`, which goes to the Trash then, so a cancelled or failed backup leaves the
+    /// item alone and nothing behind. An item that is or holds a font in the backup, a Fonts folder,
+    /// Cicero's folder or a watched folder is never replaced: this throws `KeptItemError` first.
     @concurrent
     public func write(
         to destination: URL, userData: UserData, fonts: [BackupFont], includeFonts: Bool, appVersion: String,
         progress: @escaping @Sendable (BackupProgress) -> Void
     ) async throws {
         let fm = FileManager.default
+        let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.deactivated.path]
+            + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) }
+        let replacement = try ItemReplacement(for: destination, keeping: kept)
+        defer { replacement.discard() }
         let staging = fm.temporaryDirectory.appendingPathComponent("Cicero Backup \(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: staging) }
         let folder = staging.appendingPathComponent(destination.deletingPathExtension().lastPathComponent, isDirectory: true)
@@ -248,8 +257,9 @@ public struct LibraryBackup: Sendable {
 
         try Task.checkCancellation()
         progress(.compressing)
-        if fm.fileExists(atPath: destination.path) { try trash(destination) }
-        try await Archive.zip(folder, to: destination)
+        try await Archive.zip(folder, to: replacement.staged)
+        try Task.checkCancellation()
+        try replacement.commit(trash: trash)
     }
 
     /// Saves the current setup as `Backups/Before Restore <date>.json` and returns the file.
@@ -303,24 +313,32 @@ public struct LibraryBackup: Sendable {
         }
     }
 
-    /// The archive's top folder (ditto keeps it) or the root itself, whichever has the manifest.
+    /// The archive's top folder (ditto keeps it) or the root itself, whichever has the manifest; never
+    /// a folder a symbolic link in the archive leads to.
     private static func manifestFolder(in root: URL) -> URL? {
         let fm = FileManager.default
         if fm.fileExists(atPath: root.appendingPathComponent("manifest.json").path) { return root }
-        let children = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
-        return children.first { fm.fileExists(atPath: $0.appendingPathComponent("manifest.json").path) }
+        let children = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey], options: .skipsHiddenFiles)) ?? []
+        return children.first { child in
+            (try? child.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true
+                && fm.fileExists(atPath: child.appendingPathComponent("manifest.json").path)
+        }
     }
 
     // MARK: Restoring
 
     /// Puts each font back where it was, "~" meaning this account's home folder, creating folders
-    /// as needed; a file already at the path is left alone. A file that can't go back (no
-    /// permission, or the folder belongs to an app that isn't installed) goes into the fallback
-    /// folder with its path kept under it. Runs off the main thread; cancelling stops it between files.
+    /// as needed; a file already at the path is left alone. A backup is a file anyone could have made,
+    /// so nothing in it is taken on trust: only font files go back, and only into font locations
+    /// (`fontLocations`). A file meant for anywhere else, or that can't go back (no permission, or the
+    /// folder belongs to an app that isn't installed), goes into the fallback folder with its path kept
+    /// under it. A file that isn't a font, or whose place in the archive leads out of the unzipped folder
+    /// or through a symbolic link, is left out. Runs off the main thread; cancelling stops it between files.
     @concurrent
     public func restoreFonts(_ contents: BackupContents, progress: @escaping @Sendable (Int, Int) -> Void) async -> FontRestoreResult {
         let fm = FileManager.default
         var result = FontRestoreResult()
+        let roots = fontLocations(watching: userData(from: contents).folders)
         let fonts = contents.manifest.fonts.filter { $0.archivePath != nil }
         for (index, font) in fonts.enumerated() {
             if Task.isCancelled {
@@ -328,17 +346,25 @@ public struct LibraryBackup: Sendable {
                 break
             }
             progress(index, fonts.count)
-            let source = contents.folder.appendingPathComponent(font.archivePath!, isDirectory: false)
             let target = expand(font.path)
-            if fm.fileExists(atPath: target) {
+            guard Self.isFontFile(target), let source = Self.archivedFile(font.archivePath!, in: contents.folder) else {
+                result.failed += 1
+                continue
+            }
+            if Self.isPlainPath(target), fm.fileExists(atPath: target) {
                 result.skipped += 1
                 continue
             }
-            if canGoBack(target), (try? Self.place(source, at: target)) != nil {
+            if Self.isFontLocation(target, in: roots), canGoBack(target), (try? Self.place(source, at: target)) != nil {
                 result.restored += 1
+                result.restoredPaths.insert(target)
                 continue
             }
-            let fallback = fallbackFolder.appendingPathComponent(fallbackPath(for: target), isDirectory: false).path
+            guard let relative = fallbackPath(for: target) else {
+                result.failed += 1
+                continue
+            }
+            let fallback = fallbackFolder.appendingPathComponent(relative, isDirectory: false).path
             if fm.fileExists(atPath: fallback) {
                 result.skipped += 1
             } else if (try? Self.place(source, at: fallback)) != nil {
@@ -360,9 +386,58 @@ public struct LibraryBackup: Sendable {
     }
 
     /// "~/Library/Fonts/A.otf" keeps "Library/Fonts/A.otf" under the fallback folder; any other path its whole path.
-    func fallbackPath(for path: String) -> String {
+    /// Without empty, "." and ".." parts, so it never leads out of the folder; nil when nothing is left.
+    func fallbackPath(for path: String) -> String? {
         let prefix = home.path + "/"
-        return path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : String(path.drop(while: { $0 == "/" }))
+        let relative = path.hasPrefix(prefix) ? path.dropFirst(prefix.count) : Substring(path)
+        let parts = relative.split(separator: "/").filter { $0 != "." && $0 != ".." }
+        return parts.isEmpty ? nil : parts.joined(separator: "/")
+    }
+
+    /// Where a restore puts fonts back and which paths it takes records about: ~/Library/Fonts,
+    /// /Library/Fonts, Cicero's Deactivated folder, the backup's watched folders and Adobe's shared font
+    /// folders (and the Fonts folder next to an Adobe app, see `isFontLocation`). Only plain absolute
+    /// paths, never macOS's folders.
+    private func fontLocations(watching folders: [WatchedFolder]) -> [String] {
+        let paths = [
+            locations.userFonts.path, locations.allUsersFonts.path, locations.deactivated.path,
+            "/Library/Application Support/Adobe/Fonts", home.appendingPathComponent("Library/Application Support/Adobe/Fonts").path,
+        ] + folders.map(\.path)
+        return paths.filter { Self.isPlainPath($0) && !ActivationEngine.isProtected($0 + "/") }
+    }
+
+    /// Whether a path is a font file in one of `roots` (from `fontLocations`) or in the Fonts folder next to
+    /// an Adobe app, named plainly, with nothing that leads elsewhere.
+    private static func isFontLocation(_ path: String, in roots: [String]) -> Bool {
+        guard isPlainPath(path), isFontFile(path), !ActivationEngine.isProtected(path) else { return false }
+        return roots.contains { path.hasPrefix($0 + "/") } || path.firstMatch(of: #/^/Applications/Adobe [^/]+/Fonts//#) != nil
+    }
+
+    /// An absolute path without empty, "." or ".." parts: one that says exactly where it leads.
+    static func isPlainPath(_ path: String) -> Bool {
+        guard path.hasPrefix("/"), path.count > 1 else { return false }
+        return path.dropFirst().split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
+    }
+
+    /// With one of the extensions the scanner reads.
+    private static func isFontFile(_ path: String) -> Bool {
+        FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
+    }
+
+    /// The file a font's place in the archive names in the unzipped folder: nil unless it's a relative
+    /// path without empty, "." or ".." parts, every part on the way is a folder (not a symbolic link to
+    /// one) and it ends at a plain file.
+    private static func archivedFile(_ archivePath: String, in folder: URL) -> URL? {
+        guard isPlainPath("/" + archivePath) else { return nil }
+        let parts = archivePath.split(separator: "/")
+        var url = folder
+        for (index, part) in parts.enumerated() {
+            let isLast = index == parts.count - 1
+            url = url.appendingPathComponent(String(part), isDirectory: !isLast)
+            var info = stat()
+            guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == (isLast ? S_IFREG : S_IFDIR) else { return nil }
+        }
+        return url
     }
 
     private static func place(_ source: URL, at path: String) throws {
@@ -373,7 +448,10 @@ public struct LibraryBackup: Sendable {
     }
 
     /// The backup's user data with every path moved from the home folder it was made in to this
-    /// one. Temporary activations are over; the other records are merged by `mergedRecords`.
+    /// one. Temporary activations are over. Records are kept only about font files in font locations
+    /// (`fontLocations`), installed copies only in ~/Library/Fonts and files kept out of an app's folder
+    /// only in Cicero's Deactivated folder: activating moves such a file back to the folder its record
+    /// names. The rest are merged by `mergedRecords`.
     public func userData(from contents: BackupContents) -> UserData {
         let oldHome = contents.manifest.home
         func map(_ path: String) -> String { Self.move(path, from: oldHome, to: home.path) }
@@ -382,23 +460,30 @@ public struct LibraryBackup: Sendable {
         }
         var data = contents.userData
         data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName) }
-        data.records.installedCopies = map(data.records.installedCopies)
-        data.records.inPlace = Set(data.records.inPlace.map(map))
+        let roots = fontLocations(watching: data.folders)
+        func isFont(_ path: String) -> Bool { Self.isFontLocation(path, in: roots) }
+        func isFont(_ path: String, in folder: URL) -> Bool { path.hasPrefix(folder.path + "/") && isFont(path) }
+        data.records.installedCopies = map(data.records.installedCopies).filter { isFont($0.key, in: locations.userFonts) && isFont($0.value) }
+        data.records.inPlace = Set(data.records.inPlace.map(map).filter(isFont))
         data.records.temporary = [:]
-        data.records.appFolderOrigins = map(data.records.appFolderOrigins)
+        data.records.appFolderOrigins = map(data.records.appFolderOrigins).filter { isFont($0.key, in: locations.deactivated) && isFont($0.value) }
         return data
     }
 
     /// Records for this Mac after a restore. The current ones stay where their file still exists;
-    /// the backup's installed copies count when both files exist, its files kept out of an app's
-    /// folder when they exist, and its in-place registrations are returned for activating again,
-    /// since macOS on this Mac doesn't know them.
+    /// the backup's installed copies count when both files exist and the copy is the backup's: this
+    /// restore put it back (`written`), or it has the origin's contents. A different file this Mac
+    /// already had at that path is no copy, and Cicero mustn't treat it as one. The backup's files kept
+    /// out of an app's folder count when they exist, and its in-place registrations are returned for
+    /// activating again, since macOS on this Mac doesn't know them.
     public static func mergedRecords(
-        current: ActivationRecords, backup: ActivationRecords, exists: (String) -> Bool
+        current: ActivationRecords, backup: ActivationRecords, written: Set<String> = [], exists: (String) -> Bool,
+        identical: (String, String) -> Bool = ActivationEngine.isIdenticalCopy(_:of:)
     ) -> (records: ActivationRecords, reactivate: [String]) {
         var records = current
         records.installedCopies = current.installedCopies.filter { exists($0.key) }
         for (copy, origin) in backup.installedCopies where records.installedCopies[copy] == nil && exists(copy) && exists(origin) {
+            guard written.contains(copy) || identical(copy, origin) else { continue }
             records.installedCopies[copy] = origin
         }
         records.appFolderOrigins = current.appFolderOrigins.filter { exists($0.key) }

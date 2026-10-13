@@ -52,11 +52,15 @@ extension AppModel {
         }
         let defaultName = name ?? (families.count == 1 ? families[0].name : "\(families.count) Families")
         guard let choice = ExportPanel.run(name: defaultName) else { return }
+        // Replace in the save panel must never trash the fonts themselves, or a folder holding them.
+        let kept = FontExporter.keptPaths(in: library, data: data, locations: locations)
         Task {
             do {
-                let result = try await FontExporter().export(plan, to: choice.url, format: choice.format)
+                let result = try await FontExporter().export(plan, to: choice.url, format: choice.format, keeping: kept)
                 NSWorkspace.shared.activateFileViewerSelecting([result])
                 showToast(plan.completionMessage)
+            } catch let refusal as KeptItemError {
+                showToast(refusal.message)
             } catch {
                 showToast("Couldn’t export the fonts.")
             }
@@ -131,8 +135,9 @@ extension AppModel {
             }
             if let fallbackFolder { model.addFallbackFolder(fallbackFolder) }
             let current = model.data.records
+            let written = fontResult?.restoredPaths ?? []
             let merged = await Task.detached(priority: .userInitiated) {
-                LibraryBackup.mergedRecords(current: current, backup: restored.records) { FileManager.default.fileExists(atPath: $0) }
+                LibraryBackup.mergedRecords(current: current, backup: restored.records, written: written) { FileManager.default.fileExists(atPath: $0) }
             }.value
             model.data.records = merged.records
             if !merged.reactivate.isEmpty {

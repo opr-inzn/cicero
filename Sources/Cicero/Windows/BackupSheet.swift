@@ -24,7 +24,7 @@ struct BackupSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Back Up Library").font(.title2.bold())
-                Text("The backup has everything set up in Cicero: sets, smart sets, character sets, folders, foundry names, the sidebar and settings.")
+                Text("The backup has everything set up in Cicero: sets, smart sets, character sets, folders, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
                     .foregroundStyle(.secondary)
             }
             Form {
@@ -100,6 +100,9 @@ struct BackupSheet: View {
                 dismiss()
             } catch is CancellationError {
                 dismiss()
+            } catch let refusal as KeptItemError {
+                progress = nil
+                model.showToast(refusal.message)
             } catch {
                 progress = nil
                 model.showToast("Couldn’t write the backup.")

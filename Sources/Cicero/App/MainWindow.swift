@@ -43,8 +43,8 @@ struct MainWindow: View {
             Button("Cancel", role: .cancel) {}
         } message: { prompt in
             Text(prompt.unmanagedCount == 1
-                ? "1 file wasn’t installed by Cicero, so there may be no other copy. Cicero will move it to its Deactivated folder, which stays in your library."
-                : "\(prompt.unmanagedCount) files weren’t installed by Cicero, so there may be no other copy. Cicero will move them to its Deactivated folder, which stays in your library.")
+                ? "1 file wasn’t installed by Cicero, so it may be your only copy. Cicero will move it to its Deactivated folder, which stays in your library."
+                : "\(prompt.unmanagedCount) files weren’t installed by Cicero, so they may be your only copies. Cicero will move them to its Deactivated folder, which stays in your library.")
         }
         .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",
@@ -85,8 +85,15 @@ struct MainWindow: View {
             ? "1 font file will be removed from your Mac and turned off in every app."
             : "\(plan.paths.count) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be removed from your Mac and turned off in every app."]
         if !plan.otherFamilies.isEmpty {
-            let names = ListFormatter.localizedString(byJoining: Array(plan.otherFamilies.prefix(3)))
-            parts.append("Some files also contain \(names)\(plan.otherFamilies.count > 3 ? " and others" : ""), which will be removed too.")
+            let names = ListFormatter.localizedString(byJoining: Array(plan.otherFamilies.prefix(3))) + (plan.otherFamilies.count > 3 ? " and others" : "")
+            if plan.spareCopiesOf != nil {
+                // Problems only removes files whose every font has a copy elsewhere.
+                let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
+                let keep = plan.otherFamilies.count == 1 ? "which keeps its other copies" : "which keep their other copies"
+                parts.append("\(files) \(names), \(keep).")
+            } else {
+                parts.append("Some files also contain \(names), which will be removed too.")
+            }
         }
         if plan.protectedCount > 0 { parts.append("Files that come with macOS or an app stay where they are.") }
         parts.append(plan.paths.count == 1 ? "You can put it back from the Trash." : "You can put them back from the Trash.")

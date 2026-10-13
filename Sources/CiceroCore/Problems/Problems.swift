@@ -75,7 +75,8 @@ public enum ProblemFix: Hashable, Sendable {
     case reveal([String])
     /// Deactivate these active copies (installed copies go to the Trash or the Deactivated folder).
     case deactivate([FaceID])
-    /// Move these files to the Trash (never protected paths, never the only copy).
+    /// Move these files to the Trash: never protected paths, and only spare copies (every face in them,
+    /// of every family, has a copy in another file), or files nothing can read.
     case trash([String])
     /// Forget a missing in-place registration and unregister it.
     case forgetInPlace(String)
@@ -102,6 +103,8 @@ public struct Problem: Identifiable, Hashable, Sendable {
     public var kind: ProblemKind
     /// e.g. the family names involved.
     public var title: String
+    /// The family the problem is about, when it's about one: removing its files names the other families in them.
+    public var family: String?
     /// e.g. "Active from 2 files."
     public var summary: String
     public var files: [ProblemFile]
@@ -114,11 +117,12 @@ public struct Problem: Identifiable, Hashable, Sendable {
     /// The folder with the newest version, when every other folder's files are older: usually the copy to keep.
     public var newestFolder: String?
 
-    public init(id: String, kind: ProblemKind, title: String, summary: String, files: [ProblemFile], fixes: [ProblemFix],
+    public init(id: String, kind: ProblemKind, title: String, family: String? = nil, summary: String, files: [ProblemFile], fixes: [ProblemFix],
                 fileFixes: [String: [ProblemFix]], folderFixes: [String: [ProblemFix]] = [:], newestFolder: String? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
+        self.family = family
         self.summary = summary
         self.files = files
         self.fixes = fixes
@@ -180,6 +184,8 @@ public enum ProblemDetector {
         let locations: Locations
         let folders: [WatchedFolder]
         let fileForName: (String) -> String?
+        /// Which files can go without taking a face's last copy with them.
+        var copies: SpareCopies
         private var versions: [String: String?] = [:]
 
         init(library: Library, data: UserData, locations: Locations, fileForName: @escaping (String) -> String?) {
@@ -188,6 +194,7 @@ public enum ProblemDetector {
             self.locations = locations
             self.fileForName = fileForName
             folders = data.scannedFolders()
+            copies = SpareCopies(library)
         }
 
         mutating func file(_ path: String) -> ProblemFile {
@@ -273,20 +280,22 @@ public enum ProblemDetector {
                 var fixes: [ProblemFix] = [.reveal([path])]
                 if let id = deactivatable[path] {
                     fixes.append(.deactivate([id]))
-                } else if !ActivationEngine.isProtected(path) {
+                } else if !ActivationEngine.isProtected(path), context.copies.areSpare([path]) {
+                    // Not when the file also holds styles, or other families, that are nowhere else.
                     fixes.append(.trash([path]))
                 }
                 fileFixes[path] = fixes
             }
             let files = paths.map { context.file($0) }
+            // Turning a folder's files off at once must leave every style active from another copy, and
+            // removing them every face in them a copy elsewhere.
+            let folderFixes = folderFixes(paths, fileFixes) { folder, trashing in
+                copies.allSatisfy { $0.contains { !folder.contains($0) } } && (!trashing || context.copies.areSpare(folder))
+            }
             problems.append(Problem(
-                id: "installedTwice.\(family.id)", kind: .installedTwice, title: family.name,
+                id: "installedTwice.\(family.id)", kind: .installedTwice, title: family.name, family: family.id,
                 summary: copies.count == 1 ? "Active from \(paths.count) files." : "\(copies.count) styles active from \(paths.count) files.",
-                files: files, fixes: [], fileFixes: fileFixes,
-                // Removing a folder's files at once must leave every style another copy.
-                folderFixes: folderFixes(paths, fileFixes) { folder in
-                    copies.allSatisfy { $0.contains { !folder.contains($0) } }
-                },
+                files: files, fixes: [], fileFixes: fileFixes, folderFixes: folderFixes,
                 newestFolder: context.newestFolder(of: paths)
             ))
         }
@@ -409,8 +418,10 @@ public enum ProblemDetector {
     }
 
     /// Reveal for each folder holding more than one of the paths, and the files' own Move to Trash or Deactivate
-    /// for all of them at once when every file has it and `canCombine` allows it for the folder's files.
-    private static func folderFixes(_ paths: [String], _ fileFixes: [String: [ProblemFix]], canCombine: (Set<String>) -> Bool) -> [String: [ProblemFix]] {
+    /// for all of them at once when every file has it and `canCombine` allows it for the folder's files (and
+    /// whether that's trashing them).
+    private static func folderFixes(_ paths: [String], _ fileFixes: [String: [ProblemFix]],
+                                    canCombine: (_ files: Set<String>, _ trashing: Bool) -> Bool) -> [String: [ProblemFix]] {
         var result: [String: [ProblemFix]] = [:]
         for (folder, files) in Dictionary(grouping: paths, by: { ($0 as NSString).deletingLastPathComponent }) where files.count > 1 {
             var fixes: [ProblemFix] = [.reveal(files)]
@@ -423,12 +434,10 @@ public enum ProblemDetector {
                 default: break
                 }
             }
-            if canCombine(Set(files)) {
-                if trash.count == files.count {
-                    fixes.append(.trash(trash))
-                } else if deactivate.count == files.count {
-                    fixes.append(.deactivate(deactivate))
-                }
+            if trash.count == files.count {
+                if canCombine(Set(files), true) { fixes.append(.trash(trash)) }
+            } else if deactivate.count == files.count {
+                if canCombine(Set(files), false) { fixes.append(.deactivate(deactivate)) }
             }
             result[folder] = fixes
         }
@@ -471,14 +480,19 @@ public enum ProblemDetector {
             }
             guard !paths.isEmpty else { continue }
             paths.sort()
-            let extras = paths.filter { !keep.contains($0) && !ActivationEngine.isProtected($0) }
+            // A file goes only when every face in it keeps a copy without it and the extras before it: a
+            // collection can also hold styles, or other families, that have no duplicate.
+            var extras: [String] = []
+            for path in paths where !keep.contains(path) && !ActivationEngine.isProtected(path) {
+                if context.copies.areSpare(Set(extras + [path])) { extras.append(path) }
+            }
             problems.append(Problem(
-                id: "duplicate.\(family.id)", kind: .duplicates, title: family.name,
+                id: "duplicate.\(family.id)", kind: .duplicates, title: family.name, family: family.id,
                 summary: styles == 1 ? "In \(paths.count) files." : "\(styles) styles in \(paths.count) files.",
                 files: paths.map { context.file($0) },
                 fixes: extras.isEmpty ? [] : [.trash(extras)],
                 fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal([$0])]) }),
-                folderFixes: folderFixes(paths, [:]) { _ in false }
+                folderFixes: folderFixes(paths, [:]) { _, _ in false }
             ))
         }
         return problems
@@ -555,5 +569,92 @@ public enum ProblemDetector {
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys) else { return nil }
         let external = values.volumeIsRemovable == true || values.volumeIsEjectable == true || values.volumeIsInternal == false || values.volumeIsLocal == false
         return external ? values.volumeLocalizedName ?? "an external disk" : nil
+    }
+}
+
+/// Tells whether font files are spare copies: whether every face in them, of every family, has a copy in
+/// another file that stays. Problems offers to remove a file only then. Which faces a file holds comes from
+/// the library; the file itself is read too, for faces the library leaves out (hidden families), and the
+/// other copies must still be there, and be other files rather than the same one by another path.
+public struct SpareCopies: Sendable {
+    private struct FaceKey: Hashable {
+        var family: String
+        var postScriptName: String
+        var isItalic: Bool
+
+        init(_ face: FontFace) {
+            family = face.familyName
+            postScriptName = face.postScriptName
+            isItalic = face.isItalic
+        }
+    }
+
+    private struct FileID: Hashable {
+        var device: Int32
+        var inode: UInt64
+    }
+
+    /// The faces the library knows in each file, and every file each face is in.
+    private var faces: [String: Set<FaceKey>] = [:]
+    private var files: [FaceKey: [String]] = [:]
+    private let unreadable: Set<String>
+    /// Read from disk once per file.
+    private var faceCounts: [String: Int] = [:]
+    private var fileIDs: [String: FileID?] = [:]
+
+    public init(_ library: Library) {
+        unreadable = Set(library.unreadableFiles)
+        for family in library.families {
+            for face in family.faces {
+                let key = FaceKey(face.face)
+                let paths = [face.face.path] + face.otherCopies
+                files[key] = paths
+                for path in paths { faces[path, default: []].insert(key) }
+            }
+        }
+    }
+
+    /// Whether all of `paths` can go without taking the last copy of any face with them. A file nothing could
+    /// read, and still can't, holds nothing to lose; a file the library knows nothing else about holds
+    /// something unknown, so it can't go.
+    public mutating func areSpare(_ paths: Set<String>) -> Bool {
+        var removed = Set<FileID>()
+        for path in paths {
+            if let id = fileID(of: path) { removed.insert(id) }
+        }
+        for path in paths {
+            guard let known = faces[path], !known.isEmpty else {
+                if unreadable.contains(path) && faceCount(of: path) == 0 { continue }
+                return false
+            }
+            // More faces in the file than the library lists: one of them may be nowhere else.
+            guard faceCount(of: path) <= known.count else { return false }
+            for key in known where !hasCopy(of: key, outside: paths, removed: removed) { return false }
+        }
+        return true
+    }
+
+    private mutating func hasCopy(of key: FaceKey, outside paths: Set<String>, removed: Set<FileID>) -> Bool {
+        for other in files[key] ?? [] where !paths.contains(other) {
+            if let id = fileID(of: other), !removed.contains(id) { return true }
+        }
+        return false
+    }
+
+    /// Distinct faces in the file, hidden families' included.
+    private mutating func faceCount(of path: String) -> Int {
+        if let count = faceCounts[path] { return count }
+        let count = Set(FontFileReader.faces(atPath: path).map(FaceKey.init)).count
+        faceCounts[path] = count
+        return count
+    }
+
+    /// The file a path leads to, through symbolic links; nil when there's none.
+    private mutating func fileID(of path: String) -> FileID? {
+        if let known = fileIDs[path] { return known }
+        var info = stat()
+        let id = stat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG ? FileID(device: info.st_dev, inode: info.st_ino) : nil
+        fileIDs[path] = id
+        return id
     }
 }
