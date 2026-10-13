@@ -69,7 +69,6 @@ extension Classification {
     var icon: String {
         switch self {
         case .serif: "textformat"
-        case .slabSerif: "rectangle.split.3x1"
         case .sansSerif: "textformat.alt"
         case .monospaced: "chevron.left.forwardslash.chevron.right"
         case .script: "scribble.variable"

@@ -262,13 +262,17 @@ public enum FamilyState: Hashable, Sendable {
 
 public enum Classification: String, CaseIterable, Codable, Sendable {
     case serif = "Serif"
-    case slabSerif = "Slab Serif"
     case sansSerif = "Sans Serif"
     case monospaced = "Monospaced"
     case script = "Script"
     case ornamental = "Ornamental"
     case symbol = "Symbol"
     case unclassified = "Unclassified"
+
+    /// A classification as saved. "Slab Serif", a classification there used to be, is part of Serif now.
+    public init?(saved value: String) {
+        self.init(rawValue: value == "Slab Serif" ? Self.serif.rawValue : value)
+    }
 }
 
 public enum FontFormat: String, CaseIterable, Codable, Sendable {
@@ -549,8 +553,7 @@ extension Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
         let upright = faces.first { !$0.face.isItalic } ?? faces[0]
         switch upright.face.familyClass {
-        case 1, 2, 3, 7: return .serif
-        case 4, 5: return .slabSerif
+        case 1, 2, 3, 4, 5, 7: return .serif
         case 8: return .sansSerif
         case 9: return .ornamental
         case 10: return .script
@@ -560,9 +563,8 @@ extension Classification {
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
-            (.slabSerif, ["slab"]),
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
-            (.serif, ["serif", "garamond", "antiqua"]),
+            (.serif, ["serif", "slab", "garamond", "antiqua"]),
             (.script, ["script", "brush", "hand"]),
         ]
         for (classification, words) in hints where words.contains(where: name.contains) { return classification }

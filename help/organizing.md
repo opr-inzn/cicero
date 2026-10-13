@@ -123,7 +123,7 @@ To change it later, right-click it and choose **Edit Smart Set…**. To remove i
 | --- | --- | --- |
 | Name | contains, doesn’t contain, begins with, is | Text |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
-| Classification | is, is not | Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
+| Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, or Adobe Apps |
 | Status | is, is not | Activated, Partly Activated, Not Activated, Active in Apps Only or Installed with macOS |
@@ -145,7 +145,7 @@ Cicero reads each family’s foundry from the manufacturer name in its files, an
 
 ## Classifications
 
-Cicero sorts families into Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol and Unclassified, and shows the ones your library has. It reads the classification the font gives itself, and when there’s none, looks for hints in the name, like “Mono”, “Slab”, “Sans”, “Grotesk” or “Script”.
+Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol and Unclassified, and shows the ones your library has. Slab serifs count as Serif. It reads the classification the font gives itself, and when there’s none, looks for hints in the name, like “Mono”, “Slab”, “Sans”, “Grotesk” or “Script”.
 
 ## System Fonts
 

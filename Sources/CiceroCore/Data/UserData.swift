@@ -195,6 +195,16 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
         self.value = value
     }
 
+    /// Rules for a classification there used to be pick the one it's part of now.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        field = try c.decode(Field.self, forKey: .field)
+        comparison = try c.decode(Comparison.self, forKey: .comparison)
+        let value = try c.decode(String.self, forKey: .value)
+        self.value = field == .classification ? Classification(saved: value)?.rawValue ?? value : value
+    }
+
     public enum Field: String, Codable, CaseIterable, Sendable {
         case name, foundry, classification, tag, set, folder, status, kind, format, styles, language, characterSet, added
 
