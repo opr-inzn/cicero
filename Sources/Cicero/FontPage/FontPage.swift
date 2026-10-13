@@ -5,6 +5,7 @@ import SwiftUI
 struct FontPage: View {
     @Environment(AppModel.self) private var model
     let familyID: String
+    @State private var glyphColumns: Int?
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -27,8 +28,11 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                GlyphsSection(family: family)
+                GlyphsSection(family: family, columns: glyphColumns)
             }
+            // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
+            // at once; only a change in the count redraws the glyphs.
+            .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
         }
         .background(Color.canvas)
         .navigationTitle(family.name)
