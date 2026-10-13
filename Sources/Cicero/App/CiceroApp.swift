@@ -126,19 +126,16 @@ struct CiceroCommands: Commands {
         }
     }
 
-    /// "Built by Maximilian Inzinger" under the version in the About panel, the name linking to the website.
+    /// A link to the website under the version in the About panel. The panel puts the copyright
+    /// (NSHumanReadableCopyright, "© 2026 Maximilian Inzinger") below it, so the name isn't repeated here.
     private static var credits: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        let base: [NSAttributedString.Key: Any] = [
+        return NSAttributedString(string: "maximilianinzinger.com", attributes: [
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
             .foregroundColor: NSColor.secondaryLabelColor,
             .paragraphStyle: paragraph,
-        ]
-        let credits = NSMutableAttributedString(string: "Built by ", attributes: base)
-        var link = base
-        link[.link] = URL(string: "https://maximilianinzinger.com")!
-        credits.append(NSAttributedString(string: "Maximilian Inzinger", attributes: link))
-        return credits
+            .link: URL(string: "https://maximilianinzinger.com")!,
+        ])
     }
 }

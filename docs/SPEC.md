@@ -108,6 +108,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 
 ## Menus
 
+- **Cicero**: About Cicero (the standard panel: version, a link to maximilianinzinger.com, "© 2026 Maximilian Inzinger").
 - **File**: Add Folder… ⇧⌘O, New Set… ⇧⌘N, New Smart Set… ⌥⌘N | Export Fonts… ⇧⌘E | Back Up Library…, Restore Library….
 - **View**: Edit Sidebar / Done Editing Sidebar.
 - **Fonts**: Activate ⌘↩, Activate Temporarily ▸ (Until Cicero Quits ⌥⌘↩ / Until You Log Out), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Reveal in Finder ⇧⌘R, Move to Trash…, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches…
