@@ -13,33 +13,34 @@ public protocol FontRegistrar: Sendable {
     func unregisterNow(_ urls: [URL], scope: CTFontManagerScope)
     /// Every font file the system has active.
     func activeFontURLs() -> [URL]
+    /// Whether the system has the file active, in any scope. Also true for files `activeFontURLs` leaves
+    /// out because their fonts have hidden names (starting with a dot).
+    func isActive(_ url: URL) -> Bool
 }
 
 public struct CoreTextRegistrar: FontRegistrar {
     public init() {}
 
+    /// Returns once fontd has registered the files and told every app, so they're usable the moment this
+    /// returns. Files Font Book turned off stay off when registered again, so those are turned back on.
     public func register(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> {
         guard !urls.isEmpty else { return [] }
-        return await withCheckedContinuation { continuation in
-            let collector = FailureCollector(ignoring: CTFontManagerError.alreadyRegistered)
-            CTFontManagerRegisterFontURLs(urls as CFArray, scope, true) { errors, done in
-                collector.add(errors as! [CFError])
-                if done { continuation.resume(returning: collector.failed) }
-                return true
-            }
+        let result = await Self.perform(urls, ignoring: .alreadyRegistered) { handler in
+            CTFontManagerRegisterFontURLs(urls as CFArray, scope, true, handler)
         }
+        let disabled = urls.filter { result.ignored.contains($0.path(percentEncoded: false)) && !isActive($0) }
+        if !disabled.isEmpty {
+            let descriptors = disabled.flatMap { CTFontManagerCreateFontDescriptorsFromURL($0 as CFURL) as? [CTFontDescriptor] ?? [] }
+            CTFontManagerEnableFontDescriptors(descriptors as CFArray, true)
+        }
+        return result.failed
     }
 
     public func unregister(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> {
         guard !urls.isEmpty else { return [] }
-        return await withCheckedContinuation { continuation in
-            let collector = FailureCollector(ignoring: CTFontManagerError.notRegistered)
-            CTFontManagerUnregisterFontURLs(urls as CFArray, scope) { errors, done in
-                collector.add(errors as! [CFError])
-                if done { continuation.resume(returning: collector.failed) }
-                return true
-            }
-        }
+        return await Self.perform(urls, ignoring: .notRegistered) { handler in
+            CTFontManagerUnregisterFontURLs(urls as CFArray, scope, handler)
+        }.failed
     }
 
     public func unregisterNow(_ urls: [URL], scope: CTFontManagerScope) {
@@ -56,30 +57,66 @@ public struct CoreTextRegistrar: FontRegistrar {
         CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []
     }
 
-    /// Gathers the files named by CoreText's errors; the handler can run more than once.
+    public func isActive(_ url: URL) -> Bool {
+        CTFontManagerGetScopeForURL(url as CFURL) != .none
+    }
+
+    /// Runs a CoreText registration call and waits for its last callback. fontd can hang, and an
+    /// operation that never finishes would hold up every one after it, so after a while every file counts
+    /// as failed (fontd takes a few milliseconds a file).
+    private static func perform(
+        _ urls: [URL], ignoring ignored: CTFontManagerError, _ start: (@escaping (CFArray, Bool) -> Bool) -> Void
+    ) async -> (failed: Set<String>, ignored: Set<String>) {
+        await withCheckedContinuation { continuation in
+            let collector = FailureCollector(ignoring: ignored, continuation: continuation)
+            start { errors, done in
+                collector.add(errors as! [CFError])
+                if done { collector.finish() }
+                return true
+            }
+            let timeout = 15 + 0.05 * Double(urls.count)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
+                collector.finish(failing: Set(urls.map { $0.path(percentEncoded: false) }))
+            }
+        }
+    }
+
+    /// Gathers the files named by CoreText's errors (the handler can run more than once) and resumes
+    /// the caller once, when CoreText is done or the wait times out.
     private final class FailureCollector: @unchecked Sendable {
         private let lock = NSLock()
-        private let ignored: CTFontManagerError
-        private var paths = Set<String>()
+        private let ignoredCode: CTFontManagerError
+        private var continuation: CheckedContinuation<(failed: Set<String>, ignored: Set<String>), Never>?
+        private var failed = Set<String>()
+        private var ignored = Set<String>()
 
-        init(ignoring: CTFontManagerError) {
-            ignored = ignoring
-        }
-
-        var failed: Set<String> {
-            lock.withLock { paths }
+        init(ignoring: CTFontManagerError, continuation: CheckedContinuation<(failed: Set<String>, ignored: Set<String>), Never>) {
+            ignoredCode = ignoring
+            self.continuation = continuation
         }
 
         func add(_ errors: [CFError]) {
             lock.withLock {
                 for error in errors {
-                    guard CFErrorGetCode(error) != ignored.rawValue else { continue }
                     let info = CFErrorCopyUserInfo(error) as? [String: Any]
-                    for url in info?[kCTFontManagerErrorFontURLsKey as String] as? [URL] ?? [] {
-                        paths.insert(url.path(percentEncoded: false))
+                    let paths = (info?[kCTFontManagerErrorFontURLsKey as String] as? [URL] ?? []).map { $0.path(percentEncoded: false) }
+                    if CFErrorGetCode(error) == ignoredCode.rawValue {
+                        ignored.formUnion(paths)
+                    } else {
+                        failed.formUnion(paths)
                     }
                 }
             }
+        }
+
+        func finish(failing extra: Set<String> = []) {
+            let resume = lock.withLock { () -> (CheckedContinuation<(failed: Set<String>, ignored: Set<String>), Never>, Set<String>, Set<String>)? in
+                guard let continuation else { return nil }
+                self.continuation = nil
+                return (continuation, failed.union(extra), ignored)
+            }
+            guard let (continuation, failed, ignored) = resume else { return }
+            continuation.resume(returning: (failed, ignored))
         }
     }
 }
@@ -142,13 +179,21 @@ public struct ActivationEngine: Sendable {
 
     /// Copies into ~/Library/Fonts or registers in place (`method` is `.copy` or `.inPlace`). Faces
     /// from app-only folders are always registered in place, after going back into the folder if Cicero
-    /// moved them out. Temporarily active faces are made permanent.
+    /// moved them out; faces in a Fonts folder that macOS has off (Font Book turned them off) are turned
+    /// on there. Temporarily active faces are made permanent.
+    ///
+    /// Copies are registered too: left alone, they reach apps only when macOS notices the file, seconds
+    /// later. A file counts as activated once macOS reports it active, so it's usable in every app as
+    /// soon as this returns.
+    @concurrent
     public func activate(_ faces: [LibraryFace], method: InstallMethod, records: ActivationRecords) async -> ActivationResult {
+        let signpost = Signposts.activation.beginInterval("Activate", "\(faces.count) faces")
+        defer { Signposts.activation.endInterval("Activate", signpost) }
         var records = records
         var failed: [String] = []
-        var succeeded = 0
         var toCopy: [String] = []
-        var toRegister: [String] = []
+        // Files to register where they are; `record` for those Cicero must remember to unregister.
+        var toRegister: [(path: String, record: Bool)] = []
         let targets = Self.uniqueByPath(faces).filter(\.canActivate)
         // A session registration of the same file would shadow the permanent one.
         let temporary = targets.map(\.face.path).filter { records.temporary[$0] != nil }
@@ -160,38 +205,52 @@ public struct ActivationEngine: Sendable {
             let path = face.face.path
             if records.appFolderOrigins[path] != nil {
                 do {
-                    toRegister.append(try moveBackToAppFolder(path, records: &records))
+                    toRegister.append((try moveBackToAppFolder(path, records: &records), true))
                 } catch {
                     failed.append(path)
                 }
+            } else if isInsideFontsFolder(path) {
+                toRegister.append((path, false))
             } else if face.app != nil || method == .inPlace {
-                toRegister.append(path)
+                toRegister.append((path, true))
             } else {
                 toCopy.append(path)
             }
         }
-        for path in toCopy {
-            do {
-                try installCopy(of: path, records: &records)
-                succeeded += 1
-            } catch {
-                failed.append(path)
+        var copies: [PlacedCopy] = []
+        Signposts.activation.withIntervalSignpost("Copy", "\(toCopy.count) files") {
+            for path in toCopy {
+                do {
+                    copies.append(try placeCopy(of: path))
+                } catch {
+                    failed.append(path)
+                }
             }
         }
-        if !toRegister.isEmpty {
-            let stuck = await registrar.register(toRegister.map(Self.url), scope: .persistent)
-            for path in toRegister {
-                if stuck.contains(path) {
-                    failed.append(path)
-                } else {
-                    records.inPlace.insert(path)
-                    succeeded += 1
-                }
+        let stuck = await registerAndConfirm(toRegister.map(\.path) + copies.map(\.destination), scope: .persistent)
+        var succeeded = 0
+        for (path, record) in toRegister {
+            if stuck.contains(path) {
+                failed.append(path)
+            } else {
+                if record { records.inPlace.insert(path) }
+                succeeded += 1
+            }
+        }
+        for copy in copies {
+            if stuck.contains(copy.destination) {
+                failed.append(copy.source)
+                // A copy macOS won't use only clutters the Fonts folder.
+                if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
+            } else {
+                records.installedCopies[copy.destination] = copy.source
+                succeeded += 1
             }
         }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count))
     }
 
+    @concurrent
     public func activateTemporarily(_ faces: [LibraryFace], scope: TemporaryScope, records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
@@ -207,15 +266,13 @@ public struct ActivationEngine: Sendable {
                 toRegister.append(path)
             }
         }
-        if !toRegister.isEmpty {
-            let stuck = await registrar.register(toRegister.map(Self.url), scope: .session)
-            for path in toRegister {
-                if stuck.contains(path) {
-                    failed.append(path)
-                } else {
-                    records.temporary[path] = TemporaryRecord(scope: scope, session: session)
-                    succeeded += 1
-                }
+        let stuck = await registerAndConfirm(toRegister, scope: .session)
+        for path in toRegister {
+            if stuck.contains(path) {
+                failed.append(path)
+            } else {
+                records.temporary[path] = TemporaryRecord(scope: scope, session: session)
+                succeeded += 1
             }
         }
         let until = scope == .untilQuit ? "until Cicero quits" : "until you log out"
@@ -237,12 +294,15 @@ public struct ActivationEngine: Sendable {
     }
 
     /// Faces an app loads from its own folder also leave that folder for Cicero's Deactivated folder,
-    /// so they're off in the app too.
+    /// so they're off in the app too. Files in ~/Library/Fonts are unregistered before they move, so
+    /// apps drop them at once rather than when macOS notices they're gone, seconds later.
+    @concurrent
     public func deactivate(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
         var locked: [String] = []
         var succeeded = 0
+        var installed: [LibraryFace] = []
         var persistent: [String] = []
         var session: [String] = []
         var leaving: [String] = []
@@ -261,13 +321,7 @@ public struct ActivationEngine: Sendable {
             case nil:
                 continue
             case .fontsFolder:
-                do {
-                    try moveOutOfFontsFolder(face, records: records)
-                    records.installedCopies[path] = nil
-                    succeeded += 1
-                } catch {
-                    failed.append(path)
-                }
+                installed.append(face)
             case .inPlace, .otherApp:
                 persistent.append(path)
             case .temporary:
@@ -275,6 +329,22 @@ public struct ActivationEngine: Sendable {
             case .macOS, .allUsers, .app, .adobeFonts:
                 locked.append(path)
             }
+        }
+        if !installed.isEmpty {
+            _ = await registrar.unregister(installed.map { Self.url($0.face.path) }, scope: .persistent)
+            var kept: [String] = []
+            for face in installed {
+                do {
+                    try moveOutOfFontsFolder(face, records: records)
+                    records.installedCopies[face.face.path] = nil
+                    succeeded += 1
+                } catch {
+                    failed.append(face.face.path)
+                    kept.append(face.face.path)
+                }
+            }
+            // Still in the Fonts folder, so back on, as macOS would soon make it anyway.
+            if !kept.isEmpty { _ = await registrar.register(kept.map(Self.url), scope: .persistent) }
         }
         if !persistent.isEmpty {
             var stuck = await registrar.unregister(persistent.map(Self.url), scope: .persistent)
@@ -317,6 +387,7 @@ public struct ActivationEngine: Sendable {
 
     /// Faces an app loads from its own folder go back to being on in that app only: files Cicero moved
     /// out of the folder go back, files it registered there are unregistered.
+    @concurrent
     public func useInAppOnly(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
@@ -383,11 +454,13 @@ public struct ActivationEngine: Sendable {
         return TrashPlan(title: title, paths: paths, otherFamilies: otherFamilies, protectedCount: protectedCount, removedFamilies: removed)
     }
 
+    /// Files in use are unregistered first, so apps drop them at once.
+    @concurrent
     public func moveToTrash(_ plan: TrashPlan, records: ActivationRecords) async -> ActivationResult {
         var records = records
         var failed: [String] = []
         var succeeded = 0
-        let persistent = plan.paths.filter { records.inPlace.contains($0) }
+        let persistent = plan.paths.filter { records.inPlace.contains($0) || isInsideUserFonts($0) }
         if !persistent.isEmpty {
             _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent)
         }
@@ -407,6 +480,9 @@ public struct ActivationEngine: Sendable {
                 failed.append(path)
             }
         }
+        // Files that stayed where they were stay in use.
+        let kept = persistent.filter(failed.contains)
+        if !kept.isEmpty { _ = await registrar.register(kept.map(Self.url), scope: .persistent) }
         let message: String
         if failed.isEmpty {
             message = succeeded <= 1 ? "Moved to the Trash." : "Moved \(succeeded) files to the Trash."
@@ -419,6 +495,7 @@ public struct ActivationEngine: Sendable {
     }
 
     /// Stops using a file registered in place (e.g. one whose file is gone) and forgets it.
+    @concurrent
     public func forgetInPlace(_ path: String, records: ActivationRecords) async -> ActivationRecords {
         var records = records
         _ = await registrar.unregister([Self.url(path)], scope: .persistent)
@@ -427,14 +504,17 @@ public struct ActivationEngine: Sendable {
     }
 
     /// Copies a font used in place into ~/Library/Fonts, then stops using the original in place.
+    @concurrent
     public func installCopy(of face: LibraryFace, records: ActivationRecords) async -> ActivationResult {
         var records = records
         let path = face.face.path
-        do {
-            try installCopy(of: path, records: &records)
-        } catch {
-            return ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy the font into your Fonts folder.")
+        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy the font into your Fonts folder.")
+        guard let copy = try? placeCopy(of: path) else { return failure }
+        guard await registerAndConfirm([copy.destination], scope: .persistent).isEmpty else {
+            if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
+            return failure
         }
+        records.installedCopies[copy.destination] = path
         if records.inPlace.contains(path) {
             _ = await registrar.unregister([Self.url(path)], scope: .persistent)
             records.inPlace.remove(path)
@@ -444,6 +524,7 @@ public struct ActivationEngine: Sendable {
 
     /// At launch: forgets temporary activations from an earlier login session and unregisters
     /// "until Cicero quits" ones left behind by a crash.
+    @concurrent
     public func reconcileTemporary(_ records: ActivationRecords) async -> ActivationRecords {
         var records = records
         let session = Self.currentSession()
@@ -505,21 +586,57 @@ public struct ActivationEngine: Sendable {
         path.hasPrefix(locations.userFonts.path + "/")
     }
 
-    /// Copies a file into ~/Library/Fonts and records it. A file of the same name and size is already installed.
-    private func installCopy(of path: String, records: inout ActivationRecords) throws {
+    /// ~/Library/Fonts or /Library/Fonts, where a file is active unless Font Book turned it off.
+    private func isInsideFontsFolder(_ path: String) -> Bool {
+        isInsideUserFonts(path) || path.hasPrefix(locations.allUsersFonts.path + "/")
+    }
+
+    /// Registers files and returns the ones that aren't active afterwards: those CoreText rejects and
+    /// any it accepts but doesn't turn on.
+    func registerAndConfirm(_ paths: [String], scope: CTFontManagerScope) async -> Set<String> {
+        guard !paths.isEmpty else { return [] }
+        let signpost = Signposts.activation.beginInterval("Register", "\(paths.count) files")
+        var stuck = await registrar.register(paths.map(Self.url), scope: scope)
+        Signposts.activation.endInterval("Register", signpost)
+        Signposts.activation.withIntervalSignpost("Confirm") {
+            for path in paths where !stuck.contains(path) && !registrar.isActive(Self.url(path)) {
+                stuck.insert(path)
+            }
+        }
+        return stuck
+    }
+
+    private struct PlacedCopy {
+        var destination: String
+        var source: String
+        /// False when an identical file was there already.
+        var isNew: Bool
+    }
+
+    /// Puts a copy of a file into ~/Library/Fonts. It's copied into Cicero's staging folder first (a clone,
+    /// on the same disk) and then moved in, so macOS never sees a half-written file. A file of the same
+    /// name with the same contents is already installed; another file of that name gets "Name 2.otf".
+    private func placeCopy(of path: String) throws -> PlacedCopy {
         let fm = FileManager.default
         let source = Self.url(path)
         try fm.createDirectory(at: locations.userFonts, withIntermediateDirectories: true)
         let name = source.lastPathComponent
         let first = locations.userFonts.appendingPathComponent(name, isDirectory: false)
-        let destination: URL
-        if fm.fileExists(atPath: first.path), Self.size(of: first) == Self.size(of: source) {
-            destination = first
-        } else {
-            destination = Self.uniqueURL(for: name, in: locations.userFonts)
-            try fm.copyItem(at: source, to: destination)
+        if fm.fileExists(atPath: first.path), Self.size(of: first) == Self.size(of: source), fm.contentsEqual(atPath: first.path, andPath: path) {
+            return PlacedCopy(destination: first.path, source: path, isNew: false)
         }
-        records.installedCopies[destination.path] = path
+        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+        let staged = staging.appendingPathComponent(UUID().uuidString + "-" + name, isDirectory: false)
+        let destination = Self.uniqueURL(for: name, in: locations.userFonts)
+        do {
+            try fm.copyItem(at: source, to: staged)
+            try fm.moveItem(at: staged, to: destination)
+        } catch {
+            try? fm.removeItem(at: staged)
+            throw error
+        }
+        return PlacedCopy(destination: destination.path, source: path, isNew: true)
     }
 
     /// Moves a file out of an app's folder into Cicero's Deactivated folder, so the app stops loading it,
