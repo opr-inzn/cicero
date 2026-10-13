@@ -4,3 +4,13 @@ build/
 .claude/
 .DS_Store
 Tests/
+# Signing material lives in the keychain; never commit an exported copy.
+*.p12
+*.cer
+*.pem
+*.p8
+*.key
+*.mobileprovision
+*.provisionprofile
+*.keychain-db
+.env*
