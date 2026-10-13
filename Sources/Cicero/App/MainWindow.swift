@@ -24,6 +24,7 @@ struct MainWindow: View {
             // Outside the stack, so the panel stays put when a font page opens or closes.
             .modifier(InfoPanelColumn())
         }
+        .background { QuickLookHost() }
         .sheet(item: $model.activationPrompt) { ActivationSheet(prompt: $0) }
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
