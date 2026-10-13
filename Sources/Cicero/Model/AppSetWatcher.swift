@@ -12,10 +12,11 @@ final class AppSetWatcher {
     @ObservationIgnored private weak var model: AppModel?
     @ObservationIgnored private var observation: NSKeyValueObservation?
     @ObservationIgnored private var pending: Task<Void, Never>?
-    /// Files on for application sets after the last sync.
-    @ObservationIgnored private var managed: Set<String> = []
-    /// Files the user turned off, or on for good, while an app wanted them: left alone until no open app
-    /// wants them, so the next time the app opens they come on again.
+    /// Files on for application sets after the last sync → the PostScript names of their faces.
+    @ObservationIgnored private var managed: [String: Set<String>] = [:]
+    /// PostScript names of fonts the user turned off, or on for good, while an app wanted them: left
+    /// alone until no open app wants them, so the next time the app opens they come on again. Names,
+    /// not paths: turning off a font from an app's folder moves its file.
     @ObservationIgnored private var dismissed: Set<String> = []
     /// Files that wouldn't turn on, with the apps that wanted them: tried again only once those change.
     @ObservationIgnored private var failed: [String: Set<String>] = [:]
@@ -75,8 +76,10 @@ final class AppSetWatcher {
     private func sync() {
         guard let model, model.hasScanned else { return }
         let current = Self.onForAppSets(model.data.records)
-        dismissed.formUnion(managed.subtracting(current))
-        managed = current
+        for (path, names) in managed where !current.contains(path) { dismissed.formUnion(names) }
+        managed = managed.filter { current.contains($0.key) }
+        // Ones on from before Cicero started, or before the library listed them.
+        for path in current where managed[path]?.isEmpty ?? true { managed[path] = Set(names(in: path)) }
         let (wanted, faces) = plan()
         let records = model.data.records
         let needsChange = current.contains { path in
@@ -94,7 +97,9 @@ final class AppSetWatcher {
             let result = await model.engine.syncAppSets(wanted, faces: faces, records: model.data.records)
             let changed = result.records != model.data.records
             model.data.records = result.records
-            self.managed = Self.onForAppSets(result.records)
+            self.managed = Dictionary(uniqueKeysWithValues: Self.onForAppSets(result.records).map { path in
+                (path, self.managed[path] ?? Set(self.names(in: path)))
+            })
             for path in result.failed { self.failed[path] = wanted[path] }
             if !result.failed.isEmpty {
                 model.showToast(result.message)
@@ -111,21 +116,30 @@ final class AppSetWatcher {
         guard let model else { return ([:], [:]) }
         var wanted: [String: Set<String>] = [:]
         var faces: [String: LibraryFace] = [:]
+        var wantedNames = Set<String>()
         for set in model.data.sets where !set.apps.isEmpty {
             let apps = Set(set.apps.map(\.bundleID)).intersection(running)
             guard !apps.isEmpty else { continue }
             for name in set.families {
                 guard let family = model.library.family(name) else { continue }
                 for face in family.faces where !ActivationEngine.isProtected(face.face.path) {
+                    wantedNames.insert(face.face.postScriptName)
+                    guard !dismissed.contains(face.face.postScriptName) else { continue }
                     wanted[face.face.path, default: []].formUnion(apps)
                     faces[face.face.path] = face
                 }
             }
         }
-        dismissed.formIntersection(wanted.keys)
+        dismissed.formIntersection(wantedNames)
         failed = failed.filter { wanted[$0.key] == $0.value }
-        for path in dismissed.union(failed.keys) { wanted[path] = nil }
+        for path in failed.keys { wanted[path] = nil }
         return (wanted, faces)
+    }
+
+    /// PostScript names of the library's faces in a file.
+    private func names(in path: String) -> [String] {
+        guard let model else { return [] }
+        return model.library.families.lazy.flatMap(\.faces).filter { $0.face.path == path }.map(\.face.postScriptName)
     }
 
     private func appNames(wanting wanted: [String: Set<String>]) -> String {
