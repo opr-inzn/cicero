@@ -45,7 +45,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.
-  Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
+  Restoring trusts nothing in the archive: only font files, only into font locations, and only
+  records about those. Exports and backups are built in a private folder on the destination's disk
+  and moved into place once complete (`ItemReplacement`), and never replace an item holding fonts
+  Cicero uses. Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
 
 ## The app
 
