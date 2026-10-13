@@ -71,7 +71,8 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | Select all | ⌘A |
 | Select none | Esc |
 | Jump to a family | Type its first letter |
-| Move up or down (list view) | ↑ or ↓; hold ⇧ to extend the selection |
+| Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
+| Extend the selection | Hold ⇧ with an arrow key |
 
 Right-click a family for its menu: activate or deactivate it, add it to a set, reveal its files, copy its name, export it, compare it, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
@@ -82,7 +83,7 @@ You can drag families onto a set or a foundry in the sidebar, or into the Compar
 Press Space, or choose **Fonts → Quick Look** (⌘Y), to see the selected family in a floating preview: a large sample, its styles, and its foundry, format and status.
 
 - Use the arrow keys to move the selection in the browser. The preview follows.
-- With several families selected, use **‹** and **›** to step through them. The preview shows where you are, like “2 of 5”.
+- With several families selected, use **‹** and **›** to step through them, or ← and → in the list and specimens. The preview shows where you are, like “2 of 5”.
 - Press ↩ to open the family’s font page.
 - Press Space or Esc to close the preview.
 
@@ -108,7 +109,7 @@ The panel describes the style being previewed, the one closest to the weight in 
 - weight, and the weight range of a variable font
 - number of glyphs, format and copyright
 - **Languages** the font supports, like “213 languages, including English, German, …”. **Show All** lists them by script, with a search field; a checkmark marks full support. See [Languages](character-sets.md#how-cicero-decides-a-font-supports-a-language).
-- **Character Sets**: the largest set of each kind the font has, like “Latin S, Adobe Latin 3, GF Latin Core”, and how close it is to the next one, like “Latin M needs 12 more characters”
+- **Character Sets**: the largest set of each kind the font has, like “Latin S, Adobe Latin 3, GF Latin Core”, and how close it is to the next Latin size, like “Latin M needs 12 more characters”
 - **Unicode Blocks** it covers completely, and how many more it covers in part. **Show All** lists every block with a count.
 - **Location**, the file’s path, with **Reveal in Finder**
 - **Other copies** of the same font elsewhere on your Mac. Click one to reveal it.

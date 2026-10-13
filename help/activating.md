@@ -37,13 +37,13 @@ Choose which one in **Settings → General → Activation**, next to **Activate 
 - **Copy into ~/Library/Fonts**
 - **Use the files where they are**
 
-With **Ask each time**, the **Activate** items in right-click menus and the **Activate** button on font pages end in “…”, because Cicero asks first.
+With **Ask each time**, the **Activate** items in right-click menus and the **Activate** button on font pages end in “…”, because Cicero asks first. Fonts from a folder an app loads itself don’t: Cicero always uses those where they are.
 
 A few things happen either way:
 
 - Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts for Adobe apps](#fonts-for-adobe-apps).
 - When a copy has the same name as a file already in your Fonts folder, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
-- A font in your Fonts folder that macOS has turned off, for example in Apple’s Font Book, is turned back on where it is.
+- A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
 
 ## Turn a font on just for now
 
