@@ -29,7 +29,7 @@ ellipsis character (…) for items that ask for more input.
   - **Sets** (+ menu: New Set…, New Smart Set…, New Application Set…). Sets (square.stack), application sets (app.badge.checkmark) and smart sets (gearshape). A set's menu has Activate with Apps… (Edit Apps… once it has some).
     Menus: Rename Set…, Delete Set; Edit Smart Set…, Delete Smart Set.
   - **Foundries**. Menu: Rename Foundry…
-  - **Classifications** (Serif, Slab Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
+  - **Classifications** (Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol, Unclassified — only the ones present).
   - **Character Sets** (+ new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Google Fonts, Unicode Blocks, Your Character Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Character Set…, Delete Character Set.
 - The menus of sets, smart sets, folders, foundries, classifications and character sets also have Export Fonts… (that row's families, see Export and backup). Every row menu also has Hide from Sidebar and Edit Sidebar.
 - Order: rows drag to a new place within their own section (character sets within their group), never
@@ -139,7 +139,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Families group faces by family name (hidden "."-prefixed families skipped). The same PostScript name in several files is one face: the active file wins, the others are "other copies"; Date Added is the earliest.
 - Face state: active (from macOS / installed for all users / inside an app / Adobe Fonts (CoreSync) / your Fonts folder / used in place by Cicero / temporarily until Cicero quits / for an application set / another app), inactive, or "active in <App> apps" for watched folders marked app-only and the Adobe Apps folders.
 - Family state: all active (system if all from macOS) / partly / inactive / app-only / system.
-- Classification from OS/2 family class (1,2,3,7 serif; 4,5 slab; 8 sans; 9 ornamental; 10 script; 12 symbol), monospace first, then name hints (mono/code, slab, sans/grotesk/gothic, serif/garamond/antiqua, script/brush/hand).
+- Classification from OS/2 family class (1,2,3,4,5,7 serif, slab serifs included; 8 sans; 9 ornamental; 10 script; 12 symbol), monospace first, then name hints (mono/code, sans/grotesk/gothic, serif/slab/garamond/antiqua, script/brush/hand).
 - Foundry: manufacturer name trimmed of Inc./LLC/GmbH/…, URLs and copyright lines dropped, casing unified; user can rename a foundry or set a family's foundry (drop onto foundry).
 - Rescan: on launch, right after activation changes, on CoreText's registered-fonts-changed notification (posted to the app's own notification center, for any app's changes; debounced; while an operation runs they wait for the scan it starts when it finishes, or one right after it when it starts none), when font files come or go in the scanned folders (FSEvents), and when the app becomes active after ≥60 s. An unchanged scan must cost almost nothing (fingerprint; no UI churn).
 - Show system fonts (Settings → General) off hides system families everywhere, and the System Fonts item with them.
