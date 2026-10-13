@@ -53,6 +53,8 @@ To try a font without installing it, turn it on until Cicero quits:
 - Or right-click a family, or a style on its font page, and choose **Activate Temporarily**.
 - Or choose **Activate Temporarily** when Cicero asks how to turn fonts on.
 
+These items aren’t there when the fonts are already on, for good or until Cicero quits.
+
 Nothing is copied. The family gets a blue **Temporary** tag, and its styles say “Active until Cicero quits”. When you quit Cicero, it turns the fonts off again. If Cicero quits unexpectedly, it turns them off the next time it opens.
 
 Fonts for Adobe apps can be turned on temporarily too: they’re on in every app until Cicero quits, then back to how they were.
