@@ -67,5 +67,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - Long lists of families are lazy stacks (`FontList`, `FamilyRowList`), never `Table` or `List`: AppKit's
   tables make every row whenever an accessibility client walks the window, which with a thousand
   families blocks the main thread for minutes. A lazy stack exposes only the rows on screen.
+- No lazy stack or grid inside another one. The outer one guesses the height of what it hasn't placed
+  from what it has; when that swings (a lazy grid of one row next to one of hundreds), every correction
+  moves the content and changes what's placed, and the page can lay itself out again and again at full
+  CPU. The font page's glyph blocks did that as `LazyVGrid`s in the page's `LazyVStack`; they're now rows
+  of fixed-size cells in the page's own stack, so every row is one height, with one popover per row.
+- Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
+  width that doesn't depend on them, so a layout settles in one pass.
 - Cicero never connects to the internet. Files it removes go to the Trash; it never deletes a
   user's only copy of a font.
