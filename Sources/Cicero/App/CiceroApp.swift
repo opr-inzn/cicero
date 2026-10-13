@@ -7,6 +7,7 @@ struct CiceroApp: App {
     @State private var model = AppModel()
     @State private var preview = PreviewSettings()
     @State private var backup = BackupPrompts()
+    @State private var updates = Updates()
 
     var body: some Scene {
         Window("Cicero", id: WindowID.main) {
@@ -22,7 +23,7 @@ struct CiceroApp: App {
                 }
         }
         .defaultSize(width: 1440, height: 900)
-        .commands { CiceroCommands(model: model, backup: backup) }
+        .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -45,6 +46,7 @@ struct CiceroApp: App {
             SettingsWindow()
                 .environment(model)
                 .environment(preview)
+                .environment(updates)
         }
     }
 }
@@ -52,6 +54,7 @@ struct CiceroApp: App {
 struct CiceroCommands: Commands {
     let model: AppModel
     let backup: BackupPrompts
+    let updates: Updates
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -59,6 +62,8 @@ struct CiceroCommands: Commands {
             Button("About Cicero") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
+            Button("Check for Updates…") { updates.checkForUpdates() }
+                .disabled(!updates.canCheckForUpdates)
         }
         CommandGroup(after: .newItem) {
             Button("Add Folder…") { model.presentAddFolderPanel() }
