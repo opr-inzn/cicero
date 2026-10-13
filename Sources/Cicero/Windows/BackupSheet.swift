@@ -100,6 +100,9 @@ struct BackupSheet: View {
                 dismiss()
             } catch is CancellationError {
                 dismiss()
+            } catch let refusal as KeptItemError {
+                progress = nil
+                model.showToast(refusal.message)
             } catch {
                 progress = nil
                 model.showToast("Couldn’t write the backup.")
