@@ -111,8 +111,8 @@ public final class FontLoader: Sendable {
         fileDescriptors(at: path).list
     }
 
-    /// Whether the file's faces have been read (prefetched or on demand).
-    func hasDescriptors(for path: String) -> Bool {
+    /// Whether the file's faces have been read (prefetched or on demand), so making a font from it won't read the file.
+    public func hasDescriptors(for path: String) -> Bool {
         state.withLock { $0.descriptors[path] != nil }
     }
 
