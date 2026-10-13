@@ -288,5 +288,5 @@ private nonisolated struct SectionDrag: Codable, Transferable {
 
 private extension UTType {
     /// Declared in Info.plist.
-    nonisolated static let ciceroSidebarSection = UTType(exportedAs: "local.cicero.sidebar-section")
+    nonisolated static let ciceroSidebarSection = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-section")
 }

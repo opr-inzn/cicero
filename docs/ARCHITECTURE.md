@@ -28,7 +28,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Every change goes through fontd and waits for it (copies are registered too, files are unregistered
   before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
-- **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem local.cicero.Cicero) for activation
+- **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
   (copy, register, confirm), scans (find, parse, build, save cache), applying a library, and coverage,
   for timing them in Instruments.
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),

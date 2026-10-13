@@ -13,7 +13,7 @@
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>local.cicero.Cicero</string>
+    <string>com.maximilianinzinger.Cicero</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -34,7 +34,7 @@
     <array>
         <dict>
             <key>UTTypeIdentifier</key>
-            <string>local.cicero.sidebar-section</string>
+            <string>com.maximilianinzinger.cicero.sidebar-section</string>
             <key>UTTypeDescription</key>
             <string>Cicero Sidebar Section</string>
             <key>UTTypeConformsTo</key>
@@ -44,7 +44,7 @@
         </dict>
         <dict>
             <key>UTTypeIdentifier</key>
-            <string>local.cicero.backup</string>
+            <string>com.maximilianinzinger.cicero.backup</string>
             <key>UTTypeDescription</key>
             <string>Cicero Library Backup</string>
             <key>UTTypeConformsTo</key>
