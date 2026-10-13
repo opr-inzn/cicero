@@ -135,8 +135,9 @@ extension AppModel {
             }
             if let fallbackFolder { model.addFallbackFolder(fallbackFolder) }
             let current = model.data.records
+            let written = fontResult?.restoredPaths ?? []
             let merged = await Task.detached(priority: .userInitiated) {
-                LibraryBackup.mergedRecords(current: current, backup: restored.records) { FileManager.default.fileExists(atPath: $0) }
+                LibraryBackup.mergedRecords(current: current, backup: restored.records, written: written) { FileManager.default.fileExists(atPath: $0) }
             }.value
             model.data.records = merged.records
             if !merged.reactivate.isEmpty {
