@@ -34,16 +34,6 @@
     <array>
         <dict>
             <key>UTTypeIdentifier</key>
-            <string>local.cicero.sidebar-section</string>
-            <key>UTTypeDescription</key>
-            <string>Cicero Sidebar Section</string>
-            <key>UTTypeConformsTo</key>
-            <array>
-                <string>public.data</string>
-            </array>
-        </dict>
-        <dict>
-            <key>UTTypeIdentifier</key>
             <string>local.cicero.backup</string>
             <key>UTTypeDescription</key>
             <string>Cicero Library Backup</string>

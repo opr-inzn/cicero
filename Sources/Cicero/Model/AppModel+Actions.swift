@@ -326,7 +326,8 @@ extension AppModel {
 
     // MARK: Sidebar
 
-    /// The sections below the library rows, in the user's order.
+    /// The sections below the library rows. They no longer move, but an order saved when they did is kept
+    /// (Reset Order puts them back).
     var sections: [SidebarSection] {
         data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
     }
@@ -476,13 +477,6 @@ extension AppModel {
     /// `shown` is what the list shows, `all` the keys of every item it has.
     func moveSidebarItems(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
         data.sidebar.move(source, to: destination, shown: shown, all: all, in: list)
-    }
-
-    /// Puts a section where `target` is; `target` moves aside, towards where the section was.
-    func moveSection(_ section: SidebarSection, onto target: SidebarSection) {
-        let keys = sections.map(\.key)
-        guard let from = keys.firstIndex(of: section.key), let to = keys.firstIndex(of: target.key), from != to else { return }
-        data.sidebar.move([from], to: from < to ? to + 1 : to, shown: keys, all: keys, in: "sections")
     }
 
     var hasSidebarOrder: Bool { !data.sidebar.order.isEmpty }
