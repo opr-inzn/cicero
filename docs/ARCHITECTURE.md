@@ -1,7 +1,7 @@
 # Architecture
 
-Cicero is a SwiftPM package with two targets and a test target. Its one dependency is Sparkle (a binary
-framework, used by the app target only) for updates.
+Cicero is a SwiftPM package with two targets and a test target, which stays out of the public
+repository. Its one dependency is Sparkle (a binary framework, used by the app target only) for updates.
 
 ```
 Sources/CiceroCore   fonts, the library, activation, coverage, user data — no UI

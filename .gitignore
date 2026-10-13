@@ -3,3 +3,4 @@ build/
 .swiftpm/
 .claude/
 .DS_Store
+Tests/
