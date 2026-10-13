@@ -49,9 +49,15 @@ ellipsis character (…) for items that ask for more input.
 - Title = selected item's name (several: "Serif and Script"); subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right with equal gaps (ToolbarSpacer(.fixed) between groups): view switcher
   [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field.
-- **List** (SwiftUI Table, sortable, column customisation saved): Status (switch) · Name (+ status tag) ·
-  Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL (largest of
-  Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) · Format (hidden).
+- **List** (rows under column headers in a lazy stack, like the grid: not a SwiftUI Table, which makes every
+  row's cells whenever an accessibility client — a password manager's autofill, say — walks the window, and
+  with a thousand families kept the app busy for minutes each time it came to the front): Status (switch) ·
+  Name (+ status tag) · Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL
+  (largest of Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · Date Added (hidden) ·
+  Format (hidden). Click a header to sort by it, again to reverse; right-click the headers to show or hide
+  columns (Status, Name and Preview always show); drag a header's right edge to resize it (shown columns and
+  widths saved). When the room runs short (the Info panel open), the preview gives way first, then the other
+  columns down to their minimums. Selection as in the grid, plus ↑/↓ (⇧ extends).
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
   text when set), name, and what the family's styles span, in Title Case, along the registered axes
   (MDN order: weight, width, italic, then optical size) and then the designer's own: "9 Weights · 3
