@@ -18,6 +18,10 @@ MINIMUM_SYSTEM=$(plist LSMinimumSystemVersion)
 [[ "$MINIMUM_SYSTEM" == *.*.* ]] || MINIMUM_SYSTEM="$MINIMUM_SYSTEM.0"
 DMG="${1:-build/Cicero-$VERSION.dmg}"
 [[ -f "$DMG" ]] || { echo "Missing $DMG — run ./scripts/release.sh first." >&2; exit 1; }
+# The feed must name the build the DMG holds, or Sparkle offers the update again and again.
+BUILT=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" build/Cicero.app/Contents/Info.plist 2>/dev/null || true)
+[[ "$BUILT" == "$BUILD" ]] ||
+    { echo "build/Cicero.app is build ${BUILT:-(missing)}, Info.plist says $BUILD — run ./scripts/release.sh again." >&2; exit 1; }
 
 NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / { exit } found' CHANGELOG.md)
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }
