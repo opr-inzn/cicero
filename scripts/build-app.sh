@@ -41,9 +41,10 @@ else
     SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
 fi
 # Inside out and without --deep, as Sparkle's documentation says: its helpers, the framework, the app.
-for CODE in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE" "$APP"; do
+for CODE in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
     "${SIGN[@]}" "$CODE"
 done
+"${SIGN[@]}" --entitlements Resources/Cicero.entitlements "$APP"
 codesign --verify --deep --strict "$APP"
 
 if [[ "${1:-}" == "--install" ]]; then

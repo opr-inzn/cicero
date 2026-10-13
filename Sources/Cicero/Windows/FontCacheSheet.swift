@@ -11,6 +11,7 @@ extension View {
 }
 
 private struct FontCacheSheetModifier: ViewModifier {
+    @Environment(AppModel.self) private var model
     @Binding var isPresented: Bool
     @State private var clearedSystemCaches = false
     @State private var isOfferingRestart = false
@@ -26,15 +27,20 @@ private struct FontCacheSheetModifier: ViewModifier {
                 FontCacheSheet { clearedSystemCaches = $0 }
             }
             .alert("Font caches cleared", isPresented: $isOfferingRestart) {
-                Button("Restart Now…") { Self.restart() }
+                Button("Restart Now…") {
+                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart.") }
+                }
                 Button("Later", role: .cancel) {}
             } message: {
                 Text("Apps that are open keep using the old caches until you restart your Mac.")
             }
     }
 
-    private static func restart() {
-        _ = NSAppleScript(source: "tell application \"loginwindow\" to «event aevtrrst»")?.executeAndReturnError(nil)
+    /// Asks loginwindow to restart, which asks apps to quit first; false when macOS refused.
+    private static func restart() -> Bool {
+        var error: NSDictionary?
+        _ = NSAppleScript(source: "tell application \"loginwindow\" to «event aevtrrst»")?.executeAndReturnError(&error)
+        return error == nil
     }
 }
 
