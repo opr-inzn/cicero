@@ -16,6 +16,7 @@ final class AppModel {
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
+    @ObservationIgnored let appSets = AppSetWatcher()
 
     // MARK: Library
 
@@ -86,6 +87,8 @@ final class AppModel {
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
     var editingSmartSet: SmartSet?
+    /// The set whose apps the application set sheet shows.
+    var editingAppsForSet: UUID?
     var editingCharacterSet: CustomCharacterSet?
     var isClearingCaches = false
     private(set) var toast: String?

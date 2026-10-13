@@ -26,6 +26,9 @@ struct MainWindow: View {
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }
+        .sheet(isPresented: Binding(get: { model.editingAppsForSet != nil }, set: { if !$0 { model.editingAppsForSet = nil } })) {
+            if let id = model.editingAppsForSet { AppSetEditor(setID: id) }
+        }
         .alert(
             "Deactivate fonts?",
             isPresented: Binding(get: { model.deactivationPrompt != nil }, set: { if !$0 { model.deactivationPrompt = nil } }),

@@ -131,7 +131,7 @@ public struct TrashPlan: Sendable, Identifiable {
 /// when another copy exists, other files in ~/Library/Fonts move to Cicero's Deactivated folder.
 public struct ActivationEngine: Sendable {
     private let locations: Locations
-    private let registrar: any FontRegistrar
+    let registrar: any FontRegistrar
     /// Moves a file to the Trash. Tests replace it so they don't fill the user's Trash.
     public var trash: @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
 

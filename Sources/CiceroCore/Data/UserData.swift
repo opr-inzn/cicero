@@ -118,17 +118,45 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// A hand-picked group of families.
+/// A hand-picked group of families. With apps, it's an application set: Cicero activates its fonts
+/// while one of those apps is open.
 public struct FontSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
     public var families: [String]
+    public var apps: [LinkedApp]
 
-    public init(id: UUID = UUID(), name: String, families: [String] = []) {
+    public init(id: UUID = UUID(), name: String, families: [String] = [], apps: [LinkedApp] = []) {
         self.id = id
         self.name = name
         self.families = families
+        self.apps = apps
     }
+
+    /// Sets saved before apps existed load without them.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        families = try c.decode([String].self, forKey: .families)
+        apps = try c.decodeIfPresent([LinkedApp].self, forKey: .apps) ?? []
+    }
+}
+
+/// An app an application set is for.
+public struct LinkedApp: Codable, Hashable, Identifiable, Sendable {
+    public var bundleID: String
+    public var name: String
+    /// Where the app was when it was picked; for its icon.
+    public var path: String
+
+    public init(bundleID: String, name: String, path: String) {
+        self.bundleID = bundleID
+        self.name = name
+        self.path = path
+    }
+
+    public var id: String { bundleID }
 }
 
 /// A set whose families are picked by rules.
@@ -308,9 +336,12 @@ public struct TemporaryRecord: Codable, Equatable, Sendable {
     public var scope: TemporaryScope
     /// Identifies the login session it was made in (see `ActivationEngine.currentSession`).
     public var session: String
+    /// For `.whileAppsRun`: the bundle IDs of the open apps whose application sets have the file.
+    public var apps: [String]?
 
-    public init(scope: TemporaryScope, session: String) {
+    public init(scope: TemporaryScope, session: String, apps: [String]? = nil) {
         self.scope = scope
         self.session = session
+        self.apps = apps
     }
 }

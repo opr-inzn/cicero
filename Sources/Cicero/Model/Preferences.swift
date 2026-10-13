@@ -97,6 +97,7 @@ extension TemporaryScope {
         switch self {
         case .untilQuit: "Until Cicero Quits"
         case .untilLogout: "Until You Log Out"
+        case .whileAppsRun: "While Its App Is Open"
         }
     }
 }
