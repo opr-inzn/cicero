@@ -474,8 +474,9 @@ public struct LibraryBackup: Sendable {
     /// the backup's installed copies count when both files exist and the copy is the backup's: this
     /// restore put it back (`written`), or it has the origin's contents. A different file this Mac
     /// already had at that path is no copy, and Cicero mustn't treat it as one. The backup's files kept
-    /// out of an app's folder count when they exist, and its in-place registrations are returned for
-    /// activating again, since macOS on this Mac doesn't know them.
+    /// out of an app's folder count when this restore put them back: activating would move a file this
+    /// Mac already had into that app's folder, where the app's uninstaller removes it. Its in-place
+    /// registrations are returned for activating again, since macOS on this Mac doesn't know them.
     public static func mergedRecords(
         current: ActivationRecords, backup: ActivationRecords, written: Set<String> = [], exists: (String) -> Bool,
         identical: (String, String) -> Bool = ActivationEngine.isIdenticalCopy(_:of:)
@@ -487,7 +488,7 @@ public struct LibraryBackup: Sendable {
             records.installedCopies[copy] = origin
         }
         records.appFolderOrigins = current.appFolderOrigins.filter { exists($0.key) }
-        for (path, origin) in backup.appFolderOrigins where records.appFolderOrigins[path] == nil && exists(path) {
+        for (path, origin) in backup.appFolderOrigins where records.appFolderOrigins[path] == nil && written.contains(path) && exists(path) {
             records.appFolderOrigins[path] = origin
         }
         let reactivate = backup.inPlace.filter { !current.inPlace.contains($0) && exists($0) }.sorted()
