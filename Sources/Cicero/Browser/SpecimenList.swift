@@ -61,7 +61,7 @@ private struct Specimen: View {
             if family.faces.count > 1 {
                 FlowLayout(spacing: 14, lineSpacing: 4) {
                     ForEach(family.faces.prefix(Self.styleLimit)) { face in
-                        FontText(text: face.face.styleName, face: face.face, size: 13)
+                        FontText(text: face.face.styleName, face: face.face, size: 13, weight: face.face.styleWeight)
                             .foregroundStyle(.secondary)
                     }
                     if family.faces.count > Self.styleLimit {
