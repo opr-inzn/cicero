@@ -20,6 +20,7 @@ struct CiceroApp: App {
                     Appearance.applySaved()
                     model.start()
                     model.appSets.start(model)
+                    ApplicationsFolder.checkAtLaunch(model: model)
                 }
         }
         .defaultSize(width: 1440, height: 900)

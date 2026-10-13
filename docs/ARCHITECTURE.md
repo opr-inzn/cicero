@@ -41,6 +41,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Feature groups, font info and glyph sections.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office.
+- **AppLocation** (`AppLocation.swift`): whether a bundle is in an Applications folder, where a moved copy
+  goes and what happens to the original (`move`), the path a translocated app was opened from
+  (Security.framework SPI looked up with dlsym), and the copy that strips quarantine (`install`, whose
+  Trash tests replace).
 - **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.
@@ -58,6 +62,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates… and the
   automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
   binary has no Info.plist with the feed.
+- `ApplicationsFolder` (`App/`) asks at launch to move Cicero into the Applications folder, and again
+  instead of registering a login item from elsewhere (`LoginItem.set`). It finds disk images with
+  DiskArbitration, moves through `AppLocation`, and relaunches the copy from a shell script that waits
+  for Cicero to quit and detaches the image.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,
   `Windows/` (Character Toolbox, Compare, Problems, sheets), `Settings/`. Shared pieces
   are in `Components/`.
