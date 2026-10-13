@@ -46,8 +46,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - `AppModel` (`Model/`) holds the current `Library`, the `UserData` and what the windows show. It
   starts scans, applies results, and runs activation-type operations one at a time so their record
   changes never overwrite each other. Switches move when clicked (`expect`) and the scan an operation
-  starts when it finishes confirms them; font-change notifications during and just after an operation
-  are left to that scan. Lists it hands to views (`visibleFamilies`, sidebar rows,
+  starts when it finishes confirms them; font-change notifications during an operation are left to
+  that scan (or one right after the operation, when it starts none). Lists it hands to views (`visibleFamilies`, sidebar rows,
   character set lookups) are cached and keyed on the inputs they depend on.
 - `PreviewSettings` holds sample text, size, weight and spacing; `Appearance` the light/dark choice.
 - Views are grouped by window: `Sidebar/`, `Browser/` (list, grid, specimens), `FontPage/`, `Info/`,

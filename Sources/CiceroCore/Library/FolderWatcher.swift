@@ -31,7 +31,8 @@ public final class FolderWatcher: @unchecked Sendable {
             let flags = UnsafeBufferPointer(start: eventFlags, count: count)
             if zip(paths, flags).contains(where: FolderWatcher.matters) { watcher.onChange() }
         }
-        let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents)
+        // WatchRoot: also when a watched folder itself is moved, deleted or comes back (a disk remounted).
+        let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot)
         guard let stream = FSEventStreamCreate(
             nil, callback, &context, paths as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5, flags
         ) else { return }

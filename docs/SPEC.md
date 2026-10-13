@@ -117,7 +117,7 @@ Sample field (placeholder "Font name"; empty = each family's name in list/specim
 - Family state: all active (system if all from macOS) / partly / inactive / app-only / system.
 - Classification from OS/2 family class (1,2,3,7 serif; 4,5 slab; 8 sans; 9 ornamental; 10 script; 12 symbol), monospace first, then name hints (mono/code, slab, sans/grotesk/gothic, serif/garamond/antiqua, script/brush/hand).
 - Foundry: manufacturer name trimmed of Inc./LLC/GmbH/…, URLs and copyright lines dropped, casing unified; user can rename a foundry or set a family's foundry (drop onto foundry).
-- Rescan: on launch, right after activation changes, on CoreText's registered-fonts-changed notification (posted to the app's own notification center, for any app's changes; debounced, and ignored while an operation runs and for 1.5 s after, since the operation rescans by itself), when font files come or go in the scanned folders (FSEvents), and when the app becomes active after ≥60 s. An unchanged scan must cost almost nothing (fingerprint; no UI churn).
+- Rescan: on launch, right after activation changes, on CoreText's registered-fonts-changed notification (posted to the app's own notification center, for any app's changes; debounced; while an operation runs they wait for the scan it starts when it finishes, or one right after it when it starts none), when font files come or go in the scanned folders (FSEvents), and when the app becomes active after ≥60 s. An unchanged scan must cost almost nothing (fingerprint; no UI churn).
 - Show system fonts (Settings → General) off hides system families everywhere, and the System Fonts item with them.
 
 ## Activation
