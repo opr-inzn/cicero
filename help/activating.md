@@ -53,7 +53,7 @@ To try a font without installing it, turn it on until Cicero quits:
 - Or right-click a family, or a style on its font page, and choose **Activate Temporarily**.
 - Or choose **Activate Temporarily** when Cicero asks how to turn fonts on.
 
-These items aren’t there when the fonts are already on, for good or until Cicero quits.
+When the fonts are already on, for good or until Cicero quits, these items are dimmed or left out.
 
 Nothing is copied. The family gets a blue **Temporary** tag, and its styles say “Active until Cicero quits”. When you quit Cicero, it turns the fonts off again. If Cicero quits unexpectedly, it turns them off the next time it opens.
 
@@ -75,7 +75,7 @@ Turning a font off never deletes your only copy of it. What happens to the file 
 | The font was | When you turn it off |
 | --- | --- |
 | Used where it is, or on temporarily | macOS stops using it. The file stays where it is. |
-| A copy Cicero installed in your Fonts folder, and the original is still there | The copy goes to the Trash. The original stays where it is, in your library. |
+| A copy Cicero installed in your Fonts folder, and the original is still there | The copy goes to the Trash. The original stays where it is. |
 | Any other file in your Fonts folder | The file moves to Cicero’s [Deactivated folder](#the-deactivated-folder). If Cicero didn’t install it, Cicero asks first. |
 | In a folder an app loads by itself, like Adobe’s | The file moves to the Deactivated folder, so the app stops loading it too. See [Fonts for Adobe apps](#fonts-for-adobe-apps). |
 
@@ -117,7 +117,7 @@ A family whose files are all in one app’s folder has a switch with three posit
 | On | On in every app | Turns it off everywhere, that app included |
 | Off | Off everywhere | Turns it back on in that app only |
 
-The family’s right-click menu has the same choices: **Activate in All Apps**, **Use in Adobe Apps Only**, **Deactivate in All Apps** and **Deactivate in Adobe Apps**. The switches in a font page’s **Styles** work the same way, one style at a time.
+The family’s right-click menu has the same choices: **Activate in All Apps**, **Use in Adobe Apps Only**, **Deactivate in All Apps** and **Deactivate in Adobe Apps**. For a single app’s folder, they name the app, like **Use in InDesign Only**. The switches in a font page’s **Styles** work the same way, one style at a time.
 
 - **On in every app** uses the file where it is. Nothing is copied.
 - **Off everywhere** moves the file into Cicero’s [Deactivated folder](#the-deactivated-folder) and remembers where it was, because the app would load it otherwise. Turning it on again, or **Use in Adobe Apps Only**, puts it back first.
