@@ -164,8 +164,9 @@ public struct TrashPlan: Sendable, Identifiable {
     }
 }
 
-/// Turns fonts on and off. Never deletes a user's only copy: installed copies go to the Trash only
-/// when another copy exists, other files in ~/Library/Fonts move to Cicero's Deactivated folder.
+/// Turns fonts on and off. Never deletes a user's only copy: a copy Cicero installed goes to the Trash
+/// only when the file it was copied from is still there with the same contents; every other file in
+/// ~/Library/Fonts moves to Cicero's Deactivated folder.
 public struct ActivationEngine: Sendable {
     private let locations: Locations
     let registrar: any FontRegistrar
@@ -285,12 +286,10 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
-    /// Faces in ~/Library/Fonts that Cicero didn't install and that have no other copy: deactivating
-    /// them moves the file into Cicero's Deactivated folder, so the app asks first.
+    /// Faces in ~/Library/Fonts whose file Cicero didn't install: deactivating them moves the file into
+    /// Cicero's Deactivated folder, other copies or not, so the app asks first.
     public func unmanaged(_ faces: [LibraryFace], records: ActivationRecords) -> [LibraryFace] {
-        faces.filter { face in
-            face.state.source == .fontsFolder && records.installedCopies[face.face.path] == nil && restorableOriginal(of: face, records: records) == nil
-        }
+        faces.filter { $0.state.source == .fontsFolder && records.installedCopies[$0.face.path] == nil }
     }
 
     /// Faces an app loads from its own folder also leave that folder for Cicero's Deactivated folder,
@@ -335,7 +334,7 @@ public struct ActivationEngine: Sendable {
             var kept: [String] = []
             for face in installed {
                 do {
-                    try moveOutOfFontsFolder(face, records: records)
+                    try moveOutOfFontsFolder(face.face.path, records: records)
                     records.installedCopies[face.face.path] = nil
                     succeeded += 1
                 } catch {
@@ -662,10 +661,14 @@ public struct ActivationEngine: Sendable {
         return destination.path
     }
 
-    /// Trashes an installed copy when its original is still there, else keeps the file in Cicero's Deactivated folder.
-    private func moveOutOfFontsFolder(_ face: LibraryFace, records: ActivationRecords) throws {
-        let url = Self.url(face.face.path)
-        if restorableOriginal(of: face, records: records) != nil {
+    /// Trashes a copy Cicero installed when the file it was copied from is still there, unchanged. Any
+    /// other file, the user's own or a copy whose origin is gone or changed, keeps its place in the library
+    /// in Cicero's Deactivated folder: another file with the same font names (macOS's, Adobe Fonts', another
+    /// version) is no copy of it. The whole file decides, so a collection or variable font goes to the
+    /// Trash only when every face in it is in the origin.
+    private func moveOutOfFontsFolder(_ path: String, records: ActivationRecords) throws {
+        let url = Self.url(path)
+        if let origin = records.installedCopies[path], Self.isIdenticalCopy(path, of: origin) {
             try trash(url)
         } else {
             let fm = FileManager.default
@@ -674,13 +677,18 @@ public struct ActivationEngine: Sendable {
         }
     }
 
-    /// The recorded origin, or another copy outside ~/Library/Fonts, when it still exists.
-    private func restorableOriginal(of face: LibraryFace, records: ActivationRecords) -> String? {
-        let fm = FileManager.default
-        var candidates: [String] = []
-        if let origin = records.installedCopies[face.face.path] { candidates.append(origin) }
-        candidates += face.otherCopies.filter { !isInsideUserFonts($0) }
-        return candidates.first { fm.fileExists(atPath: $0) }
+    /// Whether two paths are separate files with the same bytes, so one can go without losing any face in
+    /// it. The same file reached twice (a symbolic link, a hard link) is no copy. A file iCloud has taken off
+    /// the Mac is never read, which would download it, so it doesn't count either.
+    public static func isIdenticalCopy(_ path: String, of original: String) -> Bool {
+        var copy = stat(), source = stat()
+        guard stat(path, &copy) == 0, stat(original, &source) == 0,
+              copy.st_mode & S_IFMT == S_IFREG, source.st_mode & S_IFMT == S_IFREG,
+              copy.st_dev != source.st_dev || copy.st_ino != source.st_ino,
+              copy.st_size == source.st_size,
+              (copy.st_flags | source.st_flags) & UInt32(SF_DATALESS) == 0
+        else { return false }
+        return FileManager.default.contentsEqual(atPath: path, andPath: original)
     }
 
     /// "Name.otf", then "Name 2.otf", "Name 3.otf"…
