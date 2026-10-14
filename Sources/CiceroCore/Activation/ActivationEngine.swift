@@ -292,6 +292,64 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
+    /// Moves styles to other copies of them (see `CopyChooser.plan`): the old copies go off first, so the
+    /// new ones don't land beside them as "Name 2.otf", then the new ones go on. A style whose new copy
+    /// doesn't go on gets its old copies back rather than none; any that can't come back are among `failed`.
+    @concurrent
+    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords) async -> ActivationResult {
+        let origins = records.installedCopies
+        var moved: [String: String] = [:]
+        let off = await deactivate(switches.flatMap(\.others), records: records, moved: &moved)
+        let on = await activate(switches.compactMap(\.target), method: method, records: off.records)
+        var result = ActivationResult(records: on.records, succeeded: on.succeeded, failed: off.failed + on.failed, message: "Switched.")
+        let stuck = Set(on.failed)
+        let restoring = switches.filter { $0.target.map { stuck.contains($0.face.path) } ?? false }
+            .flatMap(\.others).filter { !off.failed.contains($0.face.path) }
+        if !restoring.isEmpty {
+            let restored = await restore(restoring, origins: origins, moved: moved, records: result.records)
+            result.records = restored.records
+            result.failed += restored.failed
+        }
+        if !result.failed.isEmpty {
+            result.message = Self.message("Switched", "switch", succeeded: result.succeeded, failed: Set(result.failed).count)
+        }
+        return result
+    }
+
+    /// Turns copies back on as they were: in place, until Cicero quits, or installed again from the file
+    /// that went to the Deactivated folder, or (when it went to the Trash, being the same as its original)
+    /// from its original.
+    private func restore(_ faces: [LibraryFace], origins: [String: String], moved: [String: String], records: ActivationRecords) async -> ActivationResult {
+        var inPlace: [LibraryFace] = [], temporary: [LibraryFace] = [], copies: [LibraryFace] = []
+        var failed: [String] = []
+        for face in faces {
+            let path = face.face.path
+            switch face.state.source {
+            case .inPlace: inPlace.append(LibraryFace(face: face.face, state: .inactive))
+            case .temporary: temporary.append(LibraryFace(face: face.face, state: .inactive))
+            case .fontsFolder:
+                if let source = moved[path] ?? origins[path], FileManager.default.fileExists(atPath: source) {
+                    copies.append(LibraryFace(face: face.face.at(source), state: .inactive))
+                } else {
+                    failed.append(path)
+                }
+            default: failed.append(path)
+            }
+        }
+        var records = records
+        for (faces, method) in [(inPlace, InstallMethod.inPlace), (copies, .copy)] where !faces.isEmpty {
+            let result = await activate(faces, method: method, records: records)
+            records = result.records
+            failed += result.failed
+        }
+        if !temporary.isEmpty {
+            let result = await activateTemporarily(temporary, records: records)
+            records = result.records
+            failed += result.failed
+        }
+        return ActivationResult(records: records, succeeded: 0, failed: failed, message: "")
+    }
+
     /// Faces in ~/Library/Fonts whose file Cicero didn't install: deactivating them moves the file into
     /// Cicero's Deactivated folder, other copies or not, so the app asks first.
     public func unmanaged(_ faces: [LibraryFace], records: ActivationRecords) -> [LibraryFace] {
@@ -303,6 +361,12 @@ public struct ActivationEngine: Sendable {
     /// apps drop them at once rather than when macOS notices they're gone, seconds later.
     @concurrent
     public func deactivate(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
+        var moved: [String: String] = [:]
+        return await deactivate(faces, records: records, moved: &moved)
+    }
+
+    /// `moved` gets where files that left the Fonts folder for the Deactivated folder went.
+    private func deactivate(_ faces: [LibraryFace], records: ActivationRecords, moved: inout [String: String]) async -> ActivationResult {
         var records = records
         var failed: [String] = []
         var locked: [String] = []
@@ -340,7 +404,7 @@ public struct ActivationEngine: Sendable {
             var kept: [String] = []
             for face in installed {
                 do {
-                    try moveOutOfFontsFolder(face.face.path, records: records)
+                    moved[face.face.path] = try moveOutOfFontsFolder(face.face.path, records: records)
                     records.installedCopies[face.face.path] = nil
                     succeeded += 1
                 } catch {
@@ -696,15 +760,19 @@ public struct ActivationEngine: Sendable {
     /// in Cicero's Deactivated folder: another file with the same font names (macOS's, Adobe Fonts', another
     /// version) is no copy of it. The whole file decides, so a collection or variable font goes to the
     /// Trash only when every face in it is in the origin.
-    private func moveOutOfFontsFolder(_ path: String, records: ActivationRecords) throws {
+    /// Returns where the file went when it went to the Deactivated folder, nil when it went to the Trash.
+    @discardableResult
+    private func moveOutOfFontsFolder(_ path: String, records: ActivationRecords) throws -> String? {
         let url = Self.url(path)
         if let origin = records.installedCopies[path], Self.isIdenticalCopy(path, of: origin) {
             try trash(url)
-        } else {
-            let fm = FileManager.default
-            try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true)
-            try fm.moveItem(at: url, to: Self.uniqueURL(for: url.lastPathComponent, in: locations.deactivated))
+            return nil
         }
+        let fm = FileManager.default
+        try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true)
+        let destination = Self.uniqueURL(for: url.lastPathComponent, in: locations.deactivated)
+        try fm.moveItem(at: url, to: destination)
+        return destination.path
     }
 
     /// Whether two paths are separate files with the same bytes, so one can go without losing any face in

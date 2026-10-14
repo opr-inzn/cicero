@@ -35,6 +35,9 @@ struct FamilyMenu: View {
             let title = app.map { families.contains(where: \.hasActive) ? "Deactivate in All Apps" : "Deactivate in \($0)" } ?? "Deactivate"
             Button(title) { model.deactivate(families) }
         }
+        if families.count == 1 {
+            CopySourcesMenu(styles: families[0].faces, title: families[0].name, model: model)
+        }
 
         Divider()
 
@@ -103,6 +106,7 @@ struct StyleMenu: View {
         if face.canDeactivate {
             Button("Deactivate Style") { model.deactivate([face]) }
         }
+        CopySourcesMenu(styles: [face], title: "\(family.name) \(face.face.styleName)", model: model)
         Divider()
         Button("Reveal in Finder") { model.reveal(path: face.face.path) }
         Button("Copy PostScript Name") {
@@ -113,5 +117,38 @@ struct StyleMenu: View {
         Button("Move Style to Trash…") {
             model.requestTrash([face], removing: family.faces.count == 1 ? [family.id] : [], title: "“\(family.name) \(face.face.styleName)”")
         }
+    }
+}
+
+/// Use Copy From, for styles that are in more than one place, like each client's folder: the places, the one
+/// in use checked. Picking one turns its copies on and the others Cicero turned on off.
+struct CopySourcesMenu: View {
+    let styles: [LibraryFace]
+    /// What the styles are called: "Helvetica", "Helvetica Bold".
+    let title: String
+    let model: AppModel
+
+    var body: some View {
+        let sources = model.copySources(of: styles)
+        if sources.count > 1 {
+            Menu("Use Copy From") {
+                ForEach(sources) { source in
+                    Toggle(label(source), isOn: Binding(
+                        get: { source.isInUse },
+                        set: { _ in model.useCopies(from: source, title: "\(title) from \(source.name)") }
+                    ))
+                }
+            }
+        }
+    }
+
+    /// "Acme — version 1.002, 2 styles": the version, and how many styles when it hasn't them all.
+    private func label(_ source: CopySource) -> String {
+        var details: [String] = []
+        if let version = source.version { details.append("version \(version)") }
+        if styles.count > 1 && source.choices.count < styles.count {
+            details.append(source.choices.count == 1 ? "1 style" : "\(source.choices.count) styles")
+        }
+        return details.isEmpty ? source.name : "\(source.name) — " + details.joined(separator: ", ")
     }
 }

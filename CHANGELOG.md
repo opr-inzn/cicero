@@ -15,6 +15,10 @@ Each version’s notes here become its release notes on the [releases page](http
 - The Info panel stays open on font pages.
 - Preview Options call the sample text Preview Text.
 - Backups hold your tags and added fonts.
+- Folders on a server or an external disk: while the disk isn’t connected, the folder has a question mark in the sidebar and says so, its fonts keep their tags and places in sets, Problems no longer lists them as missing, and they aren’t read again when it’s back.
+- Folders in iCloud Drive, Dropbox or Google Drive say how many of their fonts are online only, and **Download** brings them down. A cloud folder macOS hasn’t let Cicero read says so, with a way to System Settings.
+- **Use Copy From**: when a font is in more than one folder, like a copy from each client, right-click it to choose which folder’s copy is on. The others Cicero turned on go off.
+- Duplicates in Problems only lists copies in the same place, like twice in one client’s folder, not one copy in each client’s.
 
 ## 1.0
 

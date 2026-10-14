@@ -24,7 +24,7 @@ struct ActivationSheet: View {
             }
             Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
             HStack {
-                if prompt.faces.contains(where: \.canActivateTemporarily) {
+                if prompt.switching == nil && prompt.faces.contains(where: \.canActivateTemporarily) {
                     Button("Activate Temporarily") {
                         model.activateTemporarily(prompt.faces)
                         dismiss()
@@ -60,7 +60,11 @@ struct ActivationSheet: View {
 
     private func choose(_ method: InstallMethod) {
         if remember { model.data.installMethod = method }
-        model.performActivation(prompt.faces, method: method)
+        if let switching = prompt.switching {
+            model.performCopySwitch(switching, method: method)
+        } else {
+            model.performActivation(prompt.faces, method: method)
+        }
         dismiss()
     }
 }

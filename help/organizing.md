@@ -79,9 +79,23 @@ The fonts that Adobe apps load from their own folders are listed together as **A
 
 Cicero’s own folder for fonts it moved out of your Fonts folder or an app’s folder. It shows while it has fonts. See [The Deactivated folder](activating.md#the-deactivated-folder).
 
-### Folders in iCloud Drive
+### Folders in the cloud: iCloud Drive, Dropbox, Google Drive
 
-Files that iCloud Drive, or another service like it, keeps only online are skipped until they’re downloaded, because reading them would download them. Download them in the Finder and Cicero lists them.
+Cloud services can keep files online only: the Finder shows them, but their contents aren’t on your Mac. Cicero leaves those fonts out, because reading them would download them. When a folder has some, the browser says how many above its fonts, and **Settings → Folders** says so under the folder. Click **Download** to bring them down. The cloud service may take them off your Mac again later; to keep them, make the folder available offline in the Finder (right-click it and choose **Make Available Offline**, **Available offline** or **Keep Downloaded**, depending on the service).
+
+The first time Cicero looks in a cloud service’s folder, macOS asks whether it may. If you said no, the folder says “Cicero isn’t allowed to read it”: allow it in **System Settings → Privacy & Security → Files and Folders**, then click **Try Again**.
+
+### Folders on a server or an external disk
+
+Add a folder on a network disk or a USB drive like any other. While the disk isn’t connected, its folder has a question mark in the sidebar, its fonts are out of your library, and the folder says “Isn’t connected”. Its fonts are back as soon as you connect the disk, and they keep their tags and their places in sets; Problems doesn’t list them as missing meanwhile.
+
+Cicero sees fonts you add to a server folder from your Mac at once. Fonts someone else adds show up the next time Cicero looks, when you come back to it after a minute or more, or when you choose **Fonts → Rescan Library** (⌘R).
+
+A folder that’s gone for good, because it moved or was deleted, says “Can’t be found”. Remove it, and add it again from its new place if it moved.
+
+### The same font from several clients
+
+When a font is in more than one of your folders, like a copy from each client, right-click the family and choose **Use Copy From**. It lists the folders the copies are in, with each one’s version, and checks the one in use. Picking one turns its copies on and turns off the copies of the same styles that Cicero turned on from the other folders, so only one is on at a time. Styles only one folder has come from there. A style’s right-click menu on its font page has **Use Copy From** for just that style. See [Use another copy of a font](activating.md#use-another-copy-of-a-font).
 
 ## Added Fonts
 

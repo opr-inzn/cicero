@@ -216,15 +216,19 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
     public let state: FaceState
     /// Other files containing the same PostScript name (e.g. the original of an installed copy).
     public let otherCopies: [String]
+    /// The same files with what the library found in each, when the scanner made the face.
+    public let copies: [FaceCopy]
     public let dateAdded: Date?
     /// The app that loads the file from its own folder ("Adobe", "InDesign"), also while Cicero keeps
     /// it out of that folder to turn it off there.
     public let app: String?
 
-    public init(face: FontFace, state: FaceState, otherCopies: [String] = [], dateAdded: Date? = nil, app: String? = nil) {
+    /// Given `copies`, `otherCopies` are their paths.
+    public init(face: FontFace, state: FaceState, otherCopies: [String] = [], copies: [FaceCopy] = [], dateAdded: Date? = nil, app: String? = nil) {
         self.face = face
         self.state = state
-        self.otherCopies = otherCopies
+        self.otherCopies = copies.isEmpty ? otherCopies : copies.map(\.face.path)
+        self.copies = copies
         self.dateAdded = dateAdded
         self.app = app
     }
