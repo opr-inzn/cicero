@@ -31,7 +31,9 @@ ellipsis character (…) for items that ask for more input.
     Menus start with Activate Set (+ "…" when the install method is Ask), Activate Temporarily and Deactivate Set
     (Activate Smart Set, Deactivate Smart Set), for every family the row shows; then Rename Set…, Delete Set;
     Edit Smart Set…, Delete Smart Set.
-  - **Tags** (+ new tag). One row per tag in the order they were made, a dot in the tag's colour (or the tag
+  - **Tags** (+ new tag: the New Tag sheet, a name and a row of colour dots, None and the Finder's seven,
+    starting on the first colour no tag has; an empty name is the colour's; a name that's taken says so and
+    can't be created). A new library starts with Red, Yellow and Green. One row per tag in the order they were made, a dot in the tag's colour (or the tag
     symbol when it has none). Menu: Rename Tag… (a name that's taken says so), Color (None, Red, Orange, Yellow,
     Green, Blue, Purple, Gray), Delete Tag (off every family, and out of smart set rules).
   - **Foundries**. Menu: Rename Foundry…
@@ -231,7 +233,7 @@ Preview Text field (no section title; placeholder "Font name"; empty = each fami
 
 ## Sets, smart sets, character sets
 
-- Sets: ordered lists of family names, optionally with apps (application sets, see Activation). The apps sheet ("Activate “Name” with Apps"): the apps with their icons, "Open" next to running ones, − to remove, Add App… (an open panel in /Applications), and a line about opening Cicero at login. Tags: names in the order they were made, family → tags, tag → colour (Finder's seven; a new tag gets the first no tag has, red again once all are taken; a colour a later version adds loads as none). Given from the family menu's Tags ▸, the Info panel, or by dropping families on a tag.
+- Sets: ordered lists of family names, optionally with apps (application sets, see Activation). The apps sheet ("Activate “Name” with Apps"): the apps with their icons, "Open" next to running ones, − to remove, Add App… (an open panel in /Applications), and a line about opening Cicero at login. Tags: names in the order they were made, family → tags, tag → colour (Finder's seven or none; New Tag starts on the first no tag has, red again once all are taken; a colour a later version adds loads as none). A new library (no user-data.json and no library.json to import) starts with Red, Yellow and Green tags in their colours. Given from the family menu's Tags ▸, the Info panel, or by dropping families on a tag.
 - Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in; Adobe Apps and Added Fonts too), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Character Set (is supported / isn’t), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
 - Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
 - Settings → Coverage: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Character Sets" with + / − / Edit….

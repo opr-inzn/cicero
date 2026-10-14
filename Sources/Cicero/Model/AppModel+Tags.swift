@@ -1,20 +1,20 @@
 import CiceroCore
 
 extension AppModel {
-    /// Asks for a name and makes a tag, given to `families`.
+    /// Asks for a name and a colour, starting with the first colour no tag has, and makes a tag, given to `families`.
     func newTag(for families: [Family] = []) {
-        prompt("New Tag", confirm: "Create") { self.addTag(named: $0, to: families) }
+        newTagRequest = NewTagRequest(families: families, color: TagColor.next(after: data.tagColors.values))
     }
 
-    /// Makes a tag with the first colour no tag has, and gives it to the families. A name that's taken
-    /// gives them that tag.
-    func addTag(named name: String, to families: [Family] = []) {
+    /// Makes a tag in the colour (nil: none) and gives it to the families. A name that's taken gives them
+    /// that tag, in the colour it has.
+    func addTag(named name: String, color: TagColor?, to families: [Family] = []) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         var data = data
         if !data.tags.contains(trimmed) {
             data.tags.append(trimmed)
-            data.tagColors[trimmed] = TagColor.next(after: data.tagColors.values)
+            data.tagColors[trimmed] = color
             data.sidebar.hidden.remove(SidebarSection.tags.key)
         }
         Self.setTag(trimmed, true, for: families, in: &data)
