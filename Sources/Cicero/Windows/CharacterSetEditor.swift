@@ -35,7 +35,13 @@ struct CharacterSetEditor: View {
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(scalars.count == 1 ? "1 character" : "\(scalars.count.formatted()) characters").font(.headline)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Preview").font(.headline)
+                    Text(scalars.count == 1 ? "1 character" : "\(scalars.count.formatted()) characters")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
                 ScrollView {
                     Text(Self.preview(scalars))
                         .font(.title3)
