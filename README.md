@@ -1,6 +1,6 @@
 # Cicero
 
-![Cicero’s window: a set of fonts as a grid of tiles, with the sidebar on the left](docs/screenshot.png)
+![Cicero’s window: All Fonts as a grid of tiles, each family previewed in itself, with the sidebar on the left](docs/screenshot.png)
 
 **[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · Requires macOS 26 on Apple silicon.
 
