@@ -18,7 +18,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
   which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
   with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
-  lets the app skip rescans that changed nothing. `FolderWatcher` (FSEvents) says when font files come or go
+  lets the app skip rescans that changed nothing. `LibraryCache` saves each library a scan builds that differs from the
+  last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window. `FolderWatcher` (FSEvents) says when font files come or go
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
   only for that file.
 - **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
@@ -31,7 +32,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
 - **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
-  (copy, register, confirm), scans (find, parse, build, save cache), applying a library, and coverage,
+  (copy, register, confirm), scans (find, parse, build, save cache), restoring the saved library, applying a library, and coverage,
   for timing them in Instruments.
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
@@ -67,7 +68,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   starts scans, applies results, and runs activation-type operations one at a time so their record
   changes never overwrite each other. Switches move when clicked (`expect`) and the scan an operation
   starts when it finishes confirms them; font-change notifications during an operation are left to
-  that scan (or one right after the operation, when it starts none). Lists it hands to views (`visibleFamilies`, sidebar rows,
+  that scan (or one right after the operation, when it starts none). It's made before the window, and restores
+  the library the last scan saved and starts the first scan then, so the window opens with the fonts in it; `apply`
+  always takes that first scan's library, whatever its fingerprint. Lists it hands to views (`visibleFamilies`, sidebar rows,
   character set lookups, custom character sets) are cached and keyed on the inputs they depend on. The
   sidebar's choices (open sections, order, hidden items) are user data that no list depends on, so changing
   them leaves `dataRevision`, and the browser's list, as they are.

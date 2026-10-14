@@ -75,7 +75,7 @@ public struct Library: Sendable {
         var index: [String: Int] = [:]
         for (position, family) in families.enumerated() { index[family.id] = position }
         self.index = index
-        searchText = families.map { family in
+        searchText = families.concurrentMap { family in
             var words = [family.name, family.manufacturer ?? ""]
             var seen = Set<String>()
             for face in family.faces.map(\.face) {
@@ -134,6 +134,7 @@ public final class LibraryScanner: Sendable {
     private let locations: Locations
     private let registrar: any FontRegistrar
     private let cacheURL: URL
+    private let libraryURL: URL
     private let state = Mutex(State())
 
     private struct State {
@@ -146,6 +147,8 @@ public final class LibraryScanner: Sendable {
         var last: (inputs: Int, library: Library)?
         /// The stamps of the files the last library was built from.
         var lastStamps: [String: FaceStamp] = [:]
+        /// The fingerprint of the library last saved for the next launch.
+        var savedFingerprint: Int?
         /// Set by `clearCache`: the next scan reads every file it finds again, but keeps what it knows of the
         /// ones out of reach.
         var rereadAll = false
@@ -160,6 +163,23 @@ public final class LibraryScanner: Sendable {
         self.locations = locations
         self.registrar = registrar
         cacheURL = locations.caches.appendingPathComponent("faces.cache", isDirectory: false)
+        libraryURL = locations.caches.appendingPathComponent("library.cache", isDirectory: false)
+    }
+
+    /// The library the last scan built, as saved after it, for the window to show until this launch's first scan
+    /// is done. Faces turned on until Cicero quit, or for an application set before a logout or restart, are off again.
+    public func savedLibrary(records: ActivationRecords) -> Library? {
+        Signposts.library.withIntervalSignpost("Restore library") {
+            guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
+            let session = ActivationEngine.currentSession()
+            return LibraryCache.decode(data) { state, path, app in
+                guard case .active(.temporary) = state else { return state }
+                if let record = records.temporary[path], record.scope == .whileAppsRun, record.session == session { return state }
+                // What `faceState` says of a file that isn't active.
+                if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
+                return .inactive
+            }
+        }
     }
 
     @concurrent
@@ -201,7 +221,10 @@ public final class LibraryScanner: Sendable {
         }
         let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach) }
         state.withLock { $0.last = (inputs, library) }
-        signposter.withIntervalSignpost("Save cache") { saveCacheIfNeeded() }
+        signposter.withIntervalSignpost("Save cache") {
+            saveCacheIfNeeded()
+            saveLibraryIfNeeded(library)
+        }
         return library
     }
 
@@ -212,6 +235,7 @@ public final class LibraryScanner: Sendable {
             $0.rereadAll = true
             $0.dirty = true
             $0.last = nil
+            $0.savedFingerprint = nil
         }
     }
 
@@ -491,6 +515,19 @@ public final class LibraryScanner: Sendable {
         try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)
     }
 
+    /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last. Fingerprints
+    /// differ from one launch to the next, so each launch's first scan saves it again.
+    private func saveLibraryIfNeeded(_ library: Library) {
+        let changed = state.withLock { state in
+            guard state.savedFingerprint != library.fingerprint else { return false }
+            state.savedFingerprint = library.fingerprint
+            return true
+        }
+        guard changed else { return }
+        try? FileManager.default.createDirectory(at: locations.caches, withIntermediateDirectories: true)
+        try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)
+    }
+
     // MARK: Building
 
     private struct FaceKey: Hashable {
@@ -545,24 +582,25 @@ public final class LibraryScanner: Sendable {
             byFamily[winner.face.familyName, default: []].append((face, folderIDs, winner.stamp))
         }
 
-        var families: [Family] = []
-        families.reserveCapacity(byFamily.count)
         var stamps: [FaceID: FaceStamp] = [:]
+        for members in byFamily.values {
+            for (face, _, stamp) in members { stamps[face.id] = stamp }
+        }
         let names = sortedNames(Array(byFamily.keys))
-        for name in names {
-            let members = byFamily[name]!
+        let grouped = byFamily
+        var families = names.concurrentMap { name in
+            let members = grouped[name]!
             let faces = members.map(\.0).sorted { a, b in
                 if a.face.weight != b.face.weight { return a.face.weight < b.face.weight }
                 if a.face.isItalic != b.face.isItalic { return !a.face.isItalic }
                 if a.face.styleName != b.face.styleName { return a.face.styleName.caseInsensitiveCompare(b.face.styleName) == .orderedAscending }
                 return a.face.id < b.face.id
             }
-            for (face, _, stamp) in members { stamps[face.id] = stamp }
-            families.append(Family(
+            return Family(
                 name: name, faces: faces, state: Self.familyState(of: faces),
                 folderIDs: members.reduce(into: Set<UUID>()) { $0.formUnion($1.1) },
                 manufacturer: faces.lazy.compactMap { Foundry.normalized($0.face.manufacturer) }.first
-            ))
+            )
         }
         families = Self.unifyingManufacturerCase(families)
         unreadable.sort()
@@ -643,7 +681,7 @@ public final class LibraryScanner: Sendable {
         return .otherApp
     }
 
-    private static func familyState(of faces: [LibraryFace]) -> FamilyState {
+    static func familyState(of faces: [LibraryFace]) -> FamilyState {
         let active = faces.count { $0.state.isActive }
         if active == faces.count {
             return faces.allSatisfy { $0.state.source == .macOS } ? .system : .active
@@ -711,4 +749,23 @@ public enum Foundry {
         }
         return name.isEmpty ? nil : name
     }
+}
+
+extension Array where Element: Sendable {
+    /// `map` across all cores, for work done once per family that adds up to tens of milliseconds over a library.
+    func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
+        [T](unsafeUninitializedCapacity: count) { buffer, initialized in
+            guard let base = buffer.baseAddress else { return }
+            let slots = Slots(base: base)
+            DispatchQueue.concurrentPerform(iterations: count) { index in
+                (slots.base + index).initialize(to: transform(self[index]))
+            }
+            initialized = count
+        }
+    }
+}
+
+/// Where `concurrentMap` puts its results: each iteration writes its own element, so the threads never share one.
+private struct Slots<T>: @unchecked Sendable {
+    let base: UnsafeMutablePointer<T>
 }
