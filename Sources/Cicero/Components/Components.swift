@@ -339,6 +339,47 @@ final class PopUpTarget: NSObject {
     }
 }
 
+/// Icons side by side, one of them chosen, always the same width. A SwiftUI segmented picker (and an NSSegmentedControl
+/// sizing its own segments) measures 77 pt before it's in a window and 74 pt once it is, so a font page drew it wider
+/// at first, then narrower the next time the page was laid out: it, and the size beside it, moved as the page filled
+/// in. Segments of a set width measure the same either way.
+struct IconSegments<Value: Hashable>: NSViewRepresentable {
+    let title: String
+    let options: [(title: String, systemImage: String, value: Value)]
+    @Binding var selection: Value
+    private let segmentWidth: CGFloat = 24
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let images = options.map { NSImage(systemSymbolName: $0.systemImage, accessibilityDescription: $0.title) ?? NSImage() }
+        let control = NSSegmentedControl(images: images, trackingMode: .selectOne, target: context.coordinator,
+                                         action: #selector(SegmentTarget.choose(_:)))
+        for index in options.indices {
+            control.setWidth(segmentWidth, forSegment: index)
+        }
+        control.setAccessibilityLabel(title)
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        control.selectedSegment = options.firstIndex { $0.value == selection } ?? -1
+        context.coordinator.onChoose = { index in selection = options[index].value }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSSegmentedControl, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+
+    func makeCoordinator() -> SegmentTarget { SegmentTarget() }
+}
+
+final class SegmentTarget: NSObject {
+    var onChoose: (Int) -> Void = { _ in }
+
+    @objc func choose(_ sender: NSSegmentedControl) {
+        onChoose(sender.selectedSegment)
+    }
+}
+
 extension View {
     /// For a section footer in a grouped form: moves it closer to its card than the default gap.
     func formFooter() -> some View {

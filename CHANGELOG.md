@@ -12,6 +12,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - The first time it opens, Cicero reads every font file again, which takes a little longer in a large library.
 - Each tile in the grid says, at its bottom right, what kind of files the family comes in: OTF, TTF or Variable, for example.
 - The caption under a tile’s name counts just the weights, widths and styles: “8 Weights · 16 Styles” rather than “8 Weights · Italics”. Italics, optical sizes and a font’s own axes count as styles rather than being named.
+- A font page opens with its ligatures and glyphs already there, rather than filling in a section at a time, and nothing on it moves as they appear. Cicero starts on them when you select a font, before you open it.
+- Opening a font page no longer puts the cursor in the type tester’s size.
 - Cicero also counts how many people start using it: the first time it sends the usage statistics from your Mac, which for anyone already using it is the first time they open this version, it adds a note that your Mac is new, with that day’s date. Nothing else is sent, and Share usage statistics still turns it all off. [Privacy](help/privacy.md#usage-statistics) has the details.
 
 ## 1.2.1

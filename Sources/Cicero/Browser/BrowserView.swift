@@ -4,6 +4,7 @@ import SwiftUI
 /// The families of the sidebar selection as a list, a grid or specimens, or the Problems view.
 struct BrowserView: View {
     @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
     @AppStorage("browser.mode") private var mode: BrowserMode = .grid
 
     var body: some View {
@@ -38,9 +39,17 @@ struct BrowserView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
+        .onChange(of: model.selectedIDs, initial: true) { preparePage() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
         .toolbar { toolbar }
+    }
+
+    /// A family selected on its own is the one a double-click or Return opens: its page's ligatures and characters
+    /// are worked out now, so the page has them as it opens.
+    private func preparePage() {
+        guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
+        model.pageContents.prepare(family.face(nearestWeight: preview.weight).face)
     }
 
     private func subtitle(_ families: [Family]) -> String {

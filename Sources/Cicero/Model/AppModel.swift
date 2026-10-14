@@ -16,6 +16,7 @@ final class AppModel {
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
+    @ObservationIgnored let pageContents: PageContents
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
@@ -191,6 +192,7 @@ final class AppModel {
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
+        pageContents = PageContents(coverage: coverage)
         guesser = ClassificationGuesser(caches: locations.caches)
         guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
@@ -350,6 +352,7 @@ final class AppModel {
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
         FontLoader.shared.invalidate(paths: new.changedPaths)
+        pageContents.forget(paths: new.changedPaths)
         // What the browser shows first, then everything else.
         FontLoader.shared.prefetch((visibleFamilies + new.families).map(\.regular.face))
         updateCoverage()

@@ -7,8 +7,8 @@ import SwiftUI
 struct LigaturesSection: View {
     @Environment(PreviewSettings.self) private var preview
     let face: FontFace
-    /// Cells per row, from the page's width; nil until it's known.
-    let columns: Int?
+    /// Cells per row, from the page's width.
+    let columns: Int
     let groups: [LigatureGroup]
     /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
@@ -36,25 +36,23 @@ struct LigaturesSection: View {
         // Well clear of the styles above, and close to the features it heads.
         .padding(.top, 56)
         .padding(.bottom, 4)
-        if let columns {
-            ForEach(groups) { group in
-                Section {
-                    let rows = (group.ligatures.count + columns - 1) / columns
-                    ForEach(0..<rows, id: \.self) { row in
-                        ligatureRow(group.ligatures[row * columns ..< min((row + 1) * columns, group.ligatures.count)], in: group)
-                            .padding(.horizontal, Self.inset)
-                            .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
-                    }
-                } header: {
-                    HStack(spacing: 6) {
-                        Text(group.name).font(.headline)
-                        Text("— \(group.ligatures.count.formatted())").font(.callout).foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, Self.inset)
-                    .padding(.vertical, 4)
-                    .background(Color.canvas)
+        ForEach(groups) { group in
+            Section {
+                let rows = (group.ligatures.count + columns - 1) / columns
+                ForEach(0..<rows, id: \.self) { row in
+                    ligatureRow(group.ligatures[row * columns ..< min((row + 1) * columns, group.ligatures.count)], in: group)
+                        .padding(.horizontal, Self.inset)
+                        .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
                 }
+            } header: {
+                HStack(spacing: 6) {
+                    Text(group.name).font(.headline)
+                    Text("— \(group.ligatures.count.formatted())").font(.callout).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, Self.inset)
+                .padding(.vertical, 4)
+                .background(Color.canvas)
             }
         }
     }
