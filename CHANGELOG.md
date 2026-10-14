@@ -8,6 +8,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Shorter explanations in Settings → Folders and Sidebar, which now says individual foundries rather than single ones.
 - The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
 - Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.
+- Creating a coverage set or a smart set no longer flashes the editor’s Edit title, Delete button or Save button as the sheet closes.
 
 ## 1.4.2
 
