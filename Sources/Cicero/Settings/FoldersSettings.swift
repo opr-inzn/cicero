@@ -11,7 +11,7 @@ struct FoldersSettings: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 10) {
-            Text("Fonts in these folders are in your library without being installed. For a folder an app loads by itself, its fonts count as active in that app.")
+            Text("Cicero scans these folders for font files and includes them in your library without installing them on your Mac.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             List(selection: $selection) {

@@ -48,6 +48,12 @@ struct CharacterSetEditor: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
             }
             HStack {
+                if !isNew {
+                    Button("Delete", role: .destructive) {
+                        model.deleteCharacterSet(original.id)
+                        dismiss()
+                    }
+                }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button(isNew ? "Create" : "Save") {
