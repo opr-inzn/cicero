@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Settings → General is more compact: three groups instead of nine, with short explanations inside the rows that need them and none under the others.
 - Shorter explanations in Settings → Folders and Sidebar, which now says individual foundries rather than single ones.
 - The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
+- Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.
 
 ## 1.4.2
 

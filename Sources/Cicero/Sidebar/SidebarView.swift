@@ -353,7 +353,7 @@ private struct SidebarContent: View {
         case .characterSet(let id):
             if let custom = model.data.customCharacterSets.first(where: { $0.setID == id }) {
                 Button("Edit Coverage Set") { model.editingCharacterSet = custom }
-                Button("Delete Coverage Set") { model.deleteCharacterSet(custom.id) }
+                Button("Delete Coverage Set") { model.deletingCharacterSet = custom }
             }
         default:
             EmptyView()
