@@ -92,9 +92,9 @@ a toggle that's on and a button being pressed.
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
   text when set), name with tag dots, and what the family's styles span, in Title Case: "9 Weights · 3
   Widths", "8 Weights · 16 Styles"; at the bottom right, the kinds of file it comes in ("OTF",
-  "Variable TTF", "OTF · Variable TTF": extensions in capitals). No axis ranges: a variable font's
-  styles are its named instances, placed by their axis values; a static font's by its names and
-  classes. Weights count the words in style names (Bold, Bd, U Lt) first — many static files leave
+  "Variable", "OTF · Variable": extensions in capitals, variable fonts just "Variable"). No axis
+  ranges: a variable font's styles are its named instances, placed by their axis values; a static
+  font's by its names and classes. Weights count the words in style names (Bold, Bd, U Lt) first — many static files leave
   every class at 400 and variable fonts nudge instances off round values — then the axis value or
   OS/2 class. Widths: a variable instance's wdth value, with instances whose names write the same
   width words (Condensed, not XXX Condensed) counted once; a static font's OS/2 width class unless
