@@ -119,10 +119,10 @@ struct GeneralSettings: View {
 
     private var activationExplanation: String {
         switch model.data.installMethod {
-        case .ask: "Cicero asks each time whether to copy the fonts into your Fonts folder or leave them where they are."
-        case .copy: "Cicero copies the font files into your Fonts folder, fonts you open or drop on the window too."
-        case .move: "Cicero moves font files you open or drop on the window into your Fonts folder, and puts the folder they were in in the Trash once nothing else is left in it."
-        case .inPlace: "Cicero tells macOS to use the font files from where they are. Nothing is copied, but the fonts stop working if the files move or their disk is unplugged."
+        case .ask: "Cicero asks each time whether to copy font files into your user Fonts folder or activate them from their current location."
+        case .copy: "Copying duplicates font files into your user Fonts folder."
+        case .move: "Moving puts font files into your user Fonts folder, and a folder they leave empty goes to the Trash."
+        case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves."
         }
     }
 }
