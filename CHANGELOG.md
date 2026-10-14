@@ -19,6 +19,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Folders in iCloud Drive, Dropbox or Google Drive say how many of their fonts are online only, and **Download** brings them down. A cloud folder macOS hasn’t let Cicero read says so, with a way to System Settings.
 - **Use Copy From**: when a font is in more than one folder, like a copy from each client, right-click it to choose which folder’s copy is on. The others Cicero turned on go off.
 - Duplicates in Problems only lists copies in the same place, like twice in one client’s folder, not one copy in each client’s.
+- Help → Privacy Policy opens Cicero’s privacy policy on its website.
 
 ## 1.0
 

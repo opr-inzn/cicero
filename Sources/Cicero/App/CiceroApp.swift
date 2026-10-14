@@ -141,13 +141,15 @@ struct CiceroCommands: Commands {
             Button("Rebuild Font List") { model.rebuildFontList() }
             Button("Clear Font Caches…") { model.isClearingCaches = true }
         }
-        // The user guide and the project's pages on GitHub, opened in the default browser.
+        // The user guide, the project's pages on GitHub and the privacy policy on the website, opened in the
+        // default browser.
         CommandGroup(replacing: .help) {
             Button("Cicero Help") {
                 NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/README.md")!)
             }
             .keyboardShortcut("?", modifiers: .command)
             Button("Release Notes") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/releases")!) }
+            Button("Privacy Policy") { NSWorkspace.shared.open(URL(string: "https://cicero.maximilianinzinger.com/privacy")!) }
             Divider()
             Button("Report an Issue") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/issues/new")!) }
         }

@@ -4,6 +4,8 @@
 
 Cicero doesn’t track you. It has no analytics, no accounts and no ads, and nothing about you or your fonts leaves your Mac.
 
+The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Cicero and its website, is on the website. **Help → Privacy Policy** opens it.
+
 ## When Cicero goes online
 
 Only to check GitHub for a new version of Cicero, and to download it when you choose to install it.
@@ -11,7 +13,7 @@ Only to check GitHub for a new version of Cicero, and to download it when you ch
 - Cicero checks by itself while **Check for updates automatically** is on, under **Updates** in **Settings → General**. It’s on at first.
 - Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates…**
 
-The **Help** menu opens pages on GitHub, like this guide, in your web browser, and so do the links in **Settings → Coverage** and in **About Cicero**. Cicero itself doesn’t load them.
+The **Help** menu opens pages in your web browser, like this guide on GitHub and the privacy policy on Cicero’s website, and so do the links in **Settings → Coverage** and in **About Cicero**. Cicero itself doesn’t load them.
 
 ## What Cicero keeps on your Mac
 
