@@ -30,7 +30,7 @@ struct CharacterSetEditor: View {
                     .font(.body.monospaced())
                     .frame(minHeight: 120)
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-                Text("Type or paste characters, codes like U+00C1 or 0x00C1, and ranges like U+0100–U+017F. Spaces and line breaks are ignored.")
+                Text("Type or paste characters, codes like U+00C1 or 0x00C1, and ranges like U+0100–U+017F. Spaces and line breaks don’t count, so you can use them to lay things out.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
