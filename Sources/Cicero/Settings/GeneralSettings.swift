@@ -6,6 +6,7 @@ struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
     @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
+    @AppStorage(UsageStatistics.defaultsKey) private var sharesUsageStatistics = true
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
@@ -82,9 +83,17 @@ struct GeneralSettings: View {
             } footer: {
                 Text("Once a day, Cicero asks GitHub whether there’s a new version. Nothing about you or your fonts is sent.").formFooter()
             }
+            Section {
+                Toggle("Share usage statistics", isOn: $sharesUsageStatistics)
+            } header: {
+                Text("Usage Statistics")
+            } footer: {
+                Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac, to count how many people use Cicero. Nothing about you or your fonts is sent.").formFooter()
+            }
         }
         .formStyle(.grouped)
         .onChange(of: appearance) { appearance.apply() }
+        .onChange(of: sharesUsageStatistics) { if !sharesUsageStatistics { UsageStatistics.forgetID() } }
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)
         .restoreSheet(contents: $restoring)

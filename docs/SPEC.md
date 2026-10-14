@@ -292,7 +292,7 @@ may be needed afterwards): checkboxes macOS (my account) [`atsutil databases -re
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear); Backup (Back Up, Restore, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); Font Caches (Rebuild, a red Clear); Backup (Back Up, Restore, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends); Usage Statistics ("Share usage statistics", on by default, + what it sends).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
 - Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Coverage: the character sets, as above.
@@ -311,6 +311,7 @@ may be needed afterwards): checkboxes macOS (my account) [`atsutil databases -re
 
 ## Data and privacy
 
-- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). No analytics, nothing uploaded.
+- Everything local: ~/Library/Application Support/Cicero (user data, Deactivated folder), ~/Library/Caches/Cicero (face and coverage caches). Nothing about the user or their fonts is uploaded.
+- Usage statistics (`UsageStatistics`): when the app has finished launching, while Settings → General → "Share usage statistics" is on (it is from the start, without asking; `usageStatistics.isOn`), Cicero POSTs one TelemetryDeck signal to `https://nom.telemetrydeck.com/v2/` over an ephemeral URLSession: type `TelemetryDeck.Session.started`, a new session UUID, `clientUser` the SHA-256 of a random UUID kept in the defaults (`usageStatistics.id`), and the payload `TelemetryDeck.AppInfo.version` and `.buildNumber`, `TelemetryDeck.Device.platform` ("macOS"), `.systemVersion` ("macOS 26.1.0") and `.systemMajorVersion` ("macOS 26"). `isTestMode` is true for a build signed without a team, like build-app.sh's ad-hoc one. A failed send isn't retried. Turning the setting off removes the ID, so turning it on again makes a new one. Nothing is sent from a binary run from .build, or while `UsageStatistics.appID` is empty.
 - Updates (Sparkle 2): once a day, while Settings → General → "Check for updates automatically" is on (it is from the start, without asking), Cicero downloads the appcast from the latest GitHub release (`SUFeedURL`); Check for Updates does it at once. Sparkle's system profile stays off, so the request carries nothing but its user agent, "Cicero/1.0 Sparkle/2.10.0". An update the user accepts is downloaded from GitHub and installed only if its EdDSA signature matches `SUPublicEDKey`. The appcast holds the latest version only, with its CHANGELOG.md section as Markdown release notes.
 - The rewrite reads the existing user data file (library.json, read by `UserDataStore`) once and keeps working from its own file; the old file is never modified.
