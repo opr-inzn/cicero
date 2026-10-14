@@ -28,7 +28,7 @@ struct FamilyMenu: View {
             Button("Use in \(app) Only") { model.useInAppOnly(families.flatMap(\.faces)) }
         }
         if families.contains(where: \.hasTemporarilyActivatable) {
-            Button("Activate Temporarily") { model.activateTemporarily(families) }
+            Button(app != nil ? "Activate Temporarily in All Apps" : "Activate Temporarily") { model.activateTemporarily(families) }
         }
         if families.contains(where: \.hasDeactivatable) {
             // On in the app only, nothing is on in other apps: turning it off there is all deactivating does.
