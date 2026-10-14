@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## 1.2.1
 
+- Your fonts are there as soon as Cicero opens, as it last found them, rather than appearing a moment later. Anything that changed since follows right after.
 - The app icon’s background is the same as on the icons of the apps that come with macOS: white in light mode rather than light grey, and dark grey in dark mode rather than nearly black.
 
 ## 1.2

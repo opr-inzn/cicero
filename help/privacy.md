@@ -30,7 +30,7 @@ To stop it, open **Settings → General** and, under **Usage Statistics**, turn 
 | Where | What |
 | --- | --- |
 | `~/Library/Application Support/Cicero` | Your sets, smart sets, tags, coverage sets, folders, added fonts and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
-| `~/Library/Caches/Cicero` | What Cicero read from your font files, like names and characters, so it doesn’t have to read them again. **Fonts → Rebuild Font List** reads everything again. |
+| `~/Library/Caches/Cicero` | What Cicero read from your font files, like names and characters, so it doesn’t have to read them again, and your font list as Cicero last found it, to show as soon as it opens. **Fonts → Rebuild Font List** reads everything again. |
 
 Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way, and so is the random number for the usage statistics.
 

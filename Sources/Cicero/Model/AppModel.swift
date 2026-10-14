@@ -173,13 +173,15 @@ final class AppModel {
         data = store.load()
         refreshTagDots()
         restoreGroups()
+        restoreLibrary()
+        begin()
     }
 
     // MARK: Lifecycle
 
-    func start() {
-        guard !started else { return }
-        started = true
+    /// At launch, before the window is made: the first scan runs meanwhile, and the window shows the library the
+    /// last one found until it's done.
+    private func begin() {
         let center = NotificationCenter.default
         // Font changes and the watched folders are followed as they happen; this catches anything they miss,
         // like folders on network disks.
@@ -203,7 +205,22 @@ final class AppModel {
         }
         dropAdobeFolders()
         rescan()
+    }
+
+    /// Once the main window is there: files opened before it are added now.
+    func start() {
+        guard !started else { return }
+        started = true
         openWaitingFiles()
+    }
+
+    /// The library as the last scan found it, so the window opens with the fonts in it rather than empty until
+    /// this launch's first scan, which replaces it (see `apply`).
+    private func restoreLibrary() {
+        guard let saved = scanner.savedLibrary(records: data.records) else { return }
+        library = saved
+        // What the browser shows first, then everything else.
+        FontLoader.shared.prefetch((visibleFamilies + saved.families).map(\.regular.face))
     }
 
     /// Adobe's font folders used to be added to the user's folders; the Adobe Apps switch covers them now.
@@ -296,8 +313,11 @@ final class AppModel {
     private func apply(_ new: Library, scan id: Int) {
         let signpost = Signposts.library.beginInterval("Apply")
         defer { Signposts.library.endInterval("Apply", signpost) }
+        // The library restored at launch always gives way to the first scan's, and prefetches, coverage and problems
+        // start from that one.
+        let first = !hasScanned
         hasScanned = true
-        guard new.fingerprint != library.fingerprint else { return endScan(id) }
+        guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         library = new
         endScan(id)
         refreshGroups()

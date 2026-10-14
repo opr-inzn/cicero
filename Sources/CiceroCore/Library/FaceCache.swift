@@ -28,7 +28,8 @@ struct CachedFile: Hashable, Sendable {
 /// fast; a hand-written layout decodes in a few milliseconds where Codable takes tens.
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
-    private static let version: UInt32 = 5
+    /// Part of the library cache's version too, as it writes faces the same way.
+    static let version: UInt32 = 5
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -42,30 +43,7 @@ enum FaceCache {
             // Reference-date intervals round-trip exactly, so cached dates hash like fresh ones.
             writer.write(file.dateAdded?.timeIntervalSinceReferenceDate)
             writer.write(UInt32(file.faces.count))
-            for face in file.faces {
-                writer.write(UInt32(face.id.index))
-                writer.write(face.postScriptName)
-                writer.write(face.familyName)
-                writer.write(face.styleName)
-                writer.write(face.fullName)
-                writer.write(UInt32(face.weight))
-                writer.write(UInt8(face.familyClass))
-                writer.write(UInt8((face.isItalic ? 1 : 0) | (face.isMonospaced ? 2 : 0)))
-                writer.write(face.manufacturer)
-                writer.write(face.version)
-                writer.write(face.designer)
-                writer.write(face.vendorID)
-                writer.write(face.weightAxis?.minimum)
-                writer.write(face.weightAxis?.maximum)
-                writer.write(face.weightAxis?.defaultValue)
-                writer.write(UInt8(face.width))
-                writer.write(UInt32(face.axes.count))
-                for axis in face.axes {
-                    writer.write(axis.tag)
-                    writer.write(axis.name)
-                    writer.write(axis.value)
-                }
-            }
+            for face in file.faces { writer.write(face) }
         }
         return writer.data
     }
@@ -86,39 +64,7 @@ enum FaceCache {
                     let faceCount = Int(try reader.u32())
                     var faces: [FontFace] = []
                     faces.reserveCapacity(faceCount)
-                    for _ in 0..<faceCount {
-                        let index = Int(try reader.u32())
-                        let postScriptName = try reader.string()
-                        let familyName = try reader.string()
-                        let styleName = try reader.string()
-                        let fullName = try reader.string()
-                        let weight = Int(try reader.u32())
-                        let familyClass = Int(try reader.u8())
-                        let flags = try reader.u8()
-                        let manufacturer = try reader.optionalString()
-                        let version = try reader.optionalString()
-                        let designer = try reader.optionalString()
-                        let vendorID = try reader.optionalString()
-                        let minimum = try reader.optionalDouble()
-                        let maximum = try reader.optionalDouble()
-                        let defaultValue = try reader.optionalDouble()
-                        let width = Int(try reader.u8())
-                        let axisCount = Int(try reader.u32())
-                        var axes: [VariationAxis] = []
-                        for _ in 0..<axisCount {
-                            axes.append(VariationAxis(tag: try reader.string(), name: try reader.string(), value: try reader.double()))
-                        }
-                        var axis: WeightAxis?
-                        if let minimum, let maximum, let defaultValue {
-                            axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
-                        }
-                        faces.append(FontFace(
-                            id: FaceID(path: path, index: index), postScriptName: postScriptName, familyName: familyName,
-                            styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
-                            isMonospaced: flags & 2 != 0, familyClass: familyClass, manufacturer: manufacturer,
-                            version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes
-                        ))
-                    }
+                    for _ in 0..<faceCount { faces.append(try reader.face(path: path)) }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
                 }
                 return files
@@ -129,7 +75,8 @@ enum FaceCache {
     }
 }
 
-private struct ByteWriter {
+/// Little-endian values, and strings as a length and UTF-8; optionals start with 0 (nil) or 1.
+struct ByteWriter {
     var data = Data()
 
     mutating func write(_ value: UInt8) {
@@ -167,9 +114,39 @@ private struct ByteWriter {
         write(UInt8(1))
         write(string)
     }
+
+    mutating func write(_ id: UUID) {
+        withUnsafeBytes(of: id.uuid) { data.append(contentsOf: $0) }
+    }
+
+    /// Everything but the face's path, which the face cache writes once per file.
+    mutating func write(_ face: FontFace) {
+        write(UInt32(face.id.index))
+        write(face.postScriptName)
+        write(face.familyName)
+        write(face.styleName)
+        write(face.fullName)
+        write(UInt32(face.weight))
+        write(UInt8(face.familyClass))
+        write(UInt8((face.isItalic ? 1 : 0) | (face.isMonospaced ? 2 : 0)))
+        write(face.manufacturer)
+        write(face.version)
+        write(face.designer)
+        write(face.vendorID)
+        write(face.weightAxis?.minimum)
+        write(face.weightAxis?.maximum)
+        write(face.weightAxis?.defaultValue)
+        write(UInt8(face.width))
+        write(UInt32(face.axes.count))
+        for axis in face.axes {
+            write(axis.tag)
+            write(axis.name)
+            write(axis.value)
+        }
+    }
 }
 
-private struct ByteReader {
+struct ByteReader {
     struct Truncated: Error {}
 
     let buffer: UnsafeRawBufferPointer
@@ -213,5 +190,44 @@ private struct ByteReader {
 
     mutating func optionalString() throws -> String? {
         try u8() == 1 ? try string() : nil
+    }
+
+    mutating func uuid() throws -> UUID {
+        UUID(uuid: buffer.loadUnaligned(fromByteOffset: try take(16), as: uuid_t.self))
+    }
+
+    /// A face as `ByteWriter` writes it, from the file at `path`.
+    mutating func face(path: String) throws -> FontFace {
+        let index = Int(try u32())
+        let postScriptName = try string()
+        let familyName = try string()
+        let styleName = try string()
+        let fullName = try string()
+        let weight = Int(try u32())
+        let familyClass = Int(try u8())
+        let flags = try u8()
+        let manufacturer = try optionalString()
+        let version = try optionalString()
+        let designer = try optionalString()
+        let vendorID = try optionalString()
+        let minimum = try optionalDouble()
+        let maximum = try optionalDouble()
+        let defaultValue = try optionalDouble()
+        let width = Int(try u8())
+        let axisCount = Int(try u32())
+        var axes: [VariationAxis] = []
+        for _ in 0..<axisCount {
+            axes.append(VariationAxis(tag: try string(), name: try string(), value: try double()))
+        }
+        var axis: WeightAxis?
+        if let minimum, let maximum, let defaultValue {
+            axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
+        }
+        return FontFace(
+            id: FaceID(path: path, index: index), postScriptName: postScriptName, familyName: familyName,
+            styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
+            isMonospaced: flags & 2 != 0, familyClass: familyClass, manufacturer: manufacturer,
+            version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes
+        )
     }
 }
