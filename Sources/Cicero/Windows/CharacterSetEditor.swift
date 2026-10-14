@@ -22,7 +22,7 @@ struct CharacterSetEditor: View {
     var body: some View {
         let scalars = CharacterSetCatalog.parse(draft.characters)
         VStack(alignment: .leading, spacing: 14) {
-            Text(isNew ? "New Character Set" : "Edit Character Set").font(.title2.bold())
+            Text(isNew ? "New Coverage Set" : "Edit Coverage Set").font(.title2.bold())
             TextField("Name", text: $draft.name, prompt: Text("Name"))
             VStack(alignment: .leading, spacing: 6) {
                 Text("Characters").font(.headline)

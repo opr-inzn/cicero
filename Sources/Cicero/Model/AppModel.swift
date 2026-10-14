@@ -31,7 +31,8 @@ final class AppModel {
     /// nil when coverage is up to date.
     private(set) var coverageProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
-    private(set) var presentClassifications: [Classification] = []
+    /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
+    private(set) var presentClassifications: [String] = []
     /// Cicero's own folder items that have fonts now (Adobe Apps, Added Fonts, Deactivated): the sidebar lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
@@ -51,7 +52,8 @@ final class AppModel {
             // row, leaves the browser's list as it is instead of making and sorting it again.
             if data.sidebar == oldValue.sidebar || data.differs(besidesSidebar: oldValue) { dataRevision &+= 1 }
             if data.foundryOverrides != oldValue.foundryOverrides || data.foundryRenames != oldValue.foundryRenames
-                || data.showSystemFonts != oldValue.showSystemFonts {
+                || data.classifications != oldValue.classifications || data.classificationOverrides != oldValue.classificationOverrides
+                || data.classificationRenames != oldValue.classificationRenames || data.showSystemFonts != oldValue.showSystemFonts {
                 refreshGroups()
             }
             if !data.showSystemFonts { deselect { $0 == .system } }
@@ -456,22 +458,25 @@ final class AppModel {
 
     private func refreshGroups() {
         var names = Set<String>()
-        var classifications = Set<Classification>()
+        var classifications = Set<String>()
         var ownFolders = Set<UUID>()
         let foundryName = foundryNamer()
+        let classificationName = classificationNamer()
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
             if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.showSystemFonts || family.state != .system else { continue }
             if let name = foundryName(family) { names.insert(name) }
-            classifications.insert(family.classification)
+            classifications.insert(classificationName(family))
         }
         // Added fonts that are all online only still have their item, to download them from.
         if library.onlineOnlyFiles[WatchedFolder.addedFilesID] != nil { ownFolders.insert(WatchedFolder.addedFilesID) }
         let sorted = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         if sorted != foundryNames { foundryNames = sorted }
-        let present = Classification.allCases.filter(classifications.contains)
+        // Built-in ones with fonts and the user's, even without; Unclassified, what's left, last.
+        let builtIn = Classification.allCases.filter { $0 != .unclassified }.map(name(of:)).filter(classifications.contains)
+        let present = builtIn + data.classifications + [name(of: .unclassified)].filter(classifications.contains)
         if present != presentClassifications { presentClassifications = present }
         if ownFolders != ownFoldersWithFonts { ownFoldersWithFonts = ownFolders }
     }

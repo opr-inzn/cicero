@@ -203,6 +203,69 @@ struct ValueSlider: View {
     }
 }
 
+/// The number beside a slider, which takes one typed in as well: on Return, or when it loses focus, it's kept to
+/// the slider's range and rounded to its step. ↑ and ↓ step it, ten steps with ⇧.
+struct ValueField: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double = 1
+    /// After the number: " pt", "%".
+    var unit = ""
+    @State private var text = ""
+    @FocusState private var isFocused: Bool
+
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") {
+        self.title = title
+        _value = value
+        self.range = range
+        self.step = step
+        self.unit = unit
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            TextField(title, text: $text)
+                .labelsHidden()
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.trailing)
+                .focused($isFocused)
+                .onSubmit(commit)
+                .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                    let steps = press.modifiers.contains(.shift) ? 10.0 : 1
+                    set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
+                    return .handled
+                }
+            // In the number's colour: forms grey a row's value text.
+            Text(unit).foregroundStyle(.primary)
+        }
+        .monospacedDigit()
+        .frame(width: 52, alignment: .trailing)
+        .onAppear { text = formatted(value) }
+        // The slider moved; typing leaves the value alone until it's committed.
+        .onChange(of: value) { text = formatted($1) }
+        .onChange(of: isFocused) { if !$1 { commit() } }
+    }
+
+    /// What's typed, with a decimal comma or point.
+    private var typed: Double? {
+        Double(text.trimmingCharacters(in: .whitespaces).replacing(",", with: "."))
+    }
+
+    private func commit() {
+        if let typed { set(typed) } else { text = formatted(value) }
+    }
+
+    private func set(_ new: Double) {
+        value = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+        text = formatted(value)
+    }
+
+    private func formatted(_ value: Double) -> String {
+        String(format: step < 1 ? "%.1f" : "%.0f", value)
+    }
+}
+
 /// A borderless + or − under a list, as in System Settings. The default button style gives each
 /// a glass capsule on macOS 26, narrower when disabled.
 struct ListEditButton: View {
@@ -353,10 +416,10 @@ private struct PreviewOptions: View {
                 .fixedSize()
             }
             Section {
-                row("Size", "\(Int(preview.size)) pt") { ValueSlider(value: $preview.size, range: 8...160) }
-                row("Weight", "\(Int(preview.weight))") { ValueSlider(value: $preview.weight, range: 100...900) }
-                row("Letter Spacing", String(format: "%.1f%%", preview.tracking)) { ValueSlider(value: $preview.tracking, range: -10...40, step: 0.5) }
-                row("Line Spacing", "\(Int(preview.lineSpacing))%") { ValueSlider(value: $preview.lineSpacing, range: 80...250, step: 5) }
+                row("Size", $preview.size, range: 8...160, unit: " pt")
+                row("Weight", $preview.weight, range: 100...900)
+                row("Letter Spacing", $preview.tracking, range: -10...40, step: 0.5, unit: "%")
+                row("Line Spacing", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
                 LabeledContent("Alignment") {
                     Picker("Alignment", selection: $preview.alignment) {
@@ -375,18 +438,18 @@ private struct PreviewOptions: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func row(_ title: String, _ value: String, @ViewBuilder slider: () -> some View) -> some View {
+    private func row(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") -> some View {
         LabeledContent(title) {
             HStack {
-                slider()
-                Text(value).monospacedDigit().frame(width: 52, alignment: .trailing)
+                ValueSlider(value: value, range: range, step: step)
+                ValueField(title, value: value, range: range, step: step, unit: unit)
             }
         }
     }
 }
 
 /// The Info panel toggle, highlighted while the panel is open, like the view picker's choice; toolbars
-/// give it a group of its own with a fixed spacer.
+/// give it a capsule of its own.
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 

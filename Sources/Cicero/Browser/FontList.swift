@@ -32,7 +32,7 @@ nonisolated struct FontRow: Identifiable, Sendable {
         name = family.name
         foundry = model.foundryName(of: family) ?? ""
         styles = family.faces.count
-        classification = family.classification.rawValue
+        classification = model.classificationName(of: family)
         format = family.format.rawValue
         activation = switch family.state {
         case .active, .system: 0
@@ -211,6 +211,7 @@ struct FontList: View {
     @FocusState private var focused: Bool
     /// The rows' width: the scroll view's, less what the sidebar and Info panel cover.
     @State private var visibleWidth: CGFloat = 900
+    @State private var visibleHeight: CGFloat = 0
 
     var body: some View {
         let columns = shownColumns
@@ -236,7 +237,9 @@ struct FontList: View {
                 .padding(.bottom, 8)
                 // The columns always add up to this width, so it never depends on them.
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { visibleWidth = $0 }
+                .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
+            .visibleHeight($visibleHeight)
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
@@ -345,7 +348,7 @@ struct FontList: View {
                 toggle(column)
             }
             // The user's sets, then the built-in ones no series covers: a menu per group, unless it has just one.
-            Menu("Character Sets") {
+            Menu("Coverage") {
                 ForEach(model.data.customCharacterSets) { set in
                     toggle(.characterSet(set.setID))
                 }

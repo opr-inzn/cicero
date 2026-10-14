@@ -56,6 +56,8 @@ struct FoldersSettings: View {
                 Spacer()
                 Toggle("Show fonts installed for Adobe apps", isOn: $model.data.showAdobeFonts)
                     .toggleStyle(.switch)
+                    // The size grouped forms give switches, as in the other tabs: outside one it's the regular size.
+                    .controlSize(.mini)
                     .labelsHidden()
             }
         }
@@ -104,7 +106,7 @@ private struct FolderRow: View {
                 Text("Not activated until you activate them").tag("")
                 ForEach(apps, id: \.self) { Text("Active in \(FaceState.appDescription($0))").tag($0) }
                 Divider()
-                Text("Active in another app…").tag(Self.otherApp)
+                Text("Active in another app").tag(Self.otherApp)
             }
             .labelsHidden()
             .fixedSize()
@@ -123,14 +125,14 @@ private struct FolderRow: View {
         case .noAccess:
             HStack(spacing: 6) {
                 warning("Cicero isn’t allowed to read it")
-                Button("Allow…") { model.openFilesAndFoldersSettings() }
+                Button("Allow") { model.openFilesAndFoldersSettings() }
                     .buttonStyle(.link)
                     .font(.caption)
                     .help("Open Privacy & Security in System Settings, where Files and Folders lets Cicero in")
             }
         case nil where model.downloads[folder.id] != nil:
             let progress = model.downloads[folder.id]!
-            Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())…")
+            Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case nil where onlineOnly > 0:

@@ -29,7 +29,7 @@ Cicero looks for fonts in these places:
 
 Looking changes nothing: no font is turned on, off, copied or moved until you ask.
 
-When a scan takes a moment, a small capsule at the bottom right says what Cicero is doing, like “Identifying fonts… 200 of 4,000”. Cicero reads each font file once and remembers what it found, so later scans are quick.
+When a scan takes a moment, a small capsule at the bottom right says what Cicero is doing, like “Identifying fonts 200 of 4,000”. Cicero reads each font file once and remembers what it found, so later scans are quick.
 
 After that, Cicero checks which characters each font has, in the background. Lists that depend on it, like a [character set](character-sets.md), say “checking characters” in the window’s subtitle until it’s done.
 
@@ -37,7 +37,7 @@ After that, Cicero checks which characters each font has, in the background. Lis
 
 The main window has three parts:
 
-- **The sidebar** on the left chooses what to show: **All Fonts**, **Activated**, **Not Activated**, **System Fonts** and **Problems**, then your **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Character Sets**. See [Organizing your library](organizing.md).
+- **The sidebar** on the left chooses what to show: **All Fonts**, **Activated**, **Not Activated**, **System Fonts** and **Problems**, then your **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Coverage**. See [Organizing your library](organizing.md).
 - **The browser** in the middle shows the families of what you chose, as a list, a grid or specimens. The title is the sidebar item’s name, and the subtitle counts the families and how many are activated, like “1,298 families · 716 activated”. See [Browsing and previewing](browsing.md).
 - **The Info panel** on the right, shown with the **Info** button in the toolbar or **Fonts → Show Info** (⌘I), describes the selected font.
 
@@ -51,14 +51,14 @@ Short messages at the bottom of the window confirm what Cicero did, like “Acti
 
 Keep fonts you don’t always need in folders of your own, and add those folders to Cicero:
 
-1. Choose **File → Add Folder…** (⇧⌘O), or click **+** next to **Folders** in the sidebar.
+1. Choose **File → Add Folder** (⇧⌘O), or click **+** next to **Folders** in the sidebar.
 2. Pick one or more folders and click **Add**.
 
 Their fonts show up in your library without being installed. They’re listed under **Not Activated** until you turn them on. See [Folders](organizing.md#folders).
 
 You can add single font files too, without adding the folder they’re in:
 
-- Choose **File → Add Fonts…** (⌘O) and pick the files.
+- Choose **File → Add Fonts** (⌘O) and pick the files.
 - Drag font files from the Finder onto Cicero’s window.
 - In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
 
@@ -70,14 +70,14 @@ Click the switch next to a family. It’s on in every app as soon as the switch 
 
 ## Choose light or dark
 
-Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings…** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
+Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
 
 ## Keep Cicero up to date
 
 Cicero checks for new versions by itself and asks before it installs one.
 
-- To check now, choose **Cicero → Check for Updates…**
-- To stop checking by itself, open **Settings → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates…**
+- To check now, choose **Cicero → Check for Updates**
+- To stop checking by itself, open **Settings → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
 
 Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). **Help → Release Notes** opens it, so you can see what changed in each version.
 

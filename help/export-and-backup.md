@@ -9,17 +9,17 @@ Export copies font files into a folder or a ZIP archive, for sending them to som
 ### Export the fonts you choose
 
 1. Select the families in the browser.
-2. Choose **File → Export Fonts…** (⇧⌘E), or right-click them and choose **Export…**
+2. Choose **File → Export Fonts** (⇧⌘E), or right-click them and choose **Export**
 3. Pick a place and a name. Next to **Format**, choose **Folder** or **ZIP Archive**.
 4. Click **Export**. Cicero shows the result in the Finder.
 
-With no family selected, **File → Export Fonts…** exports every family in the browser: everything the sidebar item and search show.
+With no family selected, **File → Export Fonts** exports every family in the browser: everything the sidebar item and search show.
 
 ### Export a set, folder or other sidebar item
 
-Right-click a set, smart set, tag, folder, foundry, classification or character set in the sidebar and choose **Export Fonts…**. The export is named after it.
+Right-click a set, smart set, tag, folder, foundry, classification or set under Coverage in the sidebar and choose **Export Fonts**. The export is named after it.
 
-For **All Fonts**, **Activated**, **Not Activated** or **System Fonts**, select the item, make sure no family is selected, and choose **File → Export Fonts…**
+For **All Fonts**, **Activated**, **Not Activated** or **System Fonts**, select the item, make sure no family is selected, and choose **File → Export Fonts**
 
 ### What’s in an export
 
@@ -35,15 +35,15 @@ Before you send fonts to someone, check that their licenses allow it.
 
 A backup is one `.cicerobackup` file with everything you set up in Cicero, and your font files if you like. Use it to keep your setup safe, or to move it to another Mac.
 
-1. Choose **File → Back Up Library…**, or click **Back Up…** under **Backup** in **Settings → General**.
+1. Choose **File → Back Up Library**, or click **Back Up** under **Backup** in **Settings → General**.
 2. **Include font files**, checked at first, puts your fonts in the backup too; uncheck it for a backup of your setup alone. Cicero shows how many files that is and how much space they take, like “3,812 files, 2.4 GB”.
-3. Click **Back Up…**, pick a place, and click **Back Up**. The name is like “Cicero Backup 2026-10-13” at first.
+3. Click **Back Up**, pick a place, and click **Back Up**. The name is like “Cicero Backup 2026-10-13” at first.
 
 A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero shows the file in the Finder.
 
 ### What a backup holds
 
-- your sets (with the apps of application sets), smart sets and character sets
+- your sets (with the apps of application sets), smart sets and coverage sets
 - your tags, their colors, and which families have them
 - your folders, and what you chose under **Fonts in This Folder**
 - the font files you added one at a time, as **Added Fonts**
@@ -57,10 +57,10 @@ A backup doesn’t hold settings that belong to one Mac: the appearance, **Open 
 
 ## Restore a backup
 
-1. Choose **File → Restore Library…**, or click **Restore…** under **Backup** in **Settings → General**.
+1. Choose **File → Restore Library**, or click **Restore** under **Backup** in **Settings → General**.
 2. Choose a `.cicerobackup` file.
 3. Cicero asks “Restore the Backup from” and the date it was made. Choose what to restore:
-   - **Sets, folders and settings** says what’s in the backup, like “4 sets, 2 smart sets, 3 tags, 3 folders and 1 character set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
+   - **Sets, folders and settings** says what’s in the backup, like “4 sets, 2 smart sets, 3 tags, 3 folders and 1 coverage set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
    - **Font files**, when the backup has them, puts each font back where it was, unless a file is already there.
 4. Click **Restore**.
 

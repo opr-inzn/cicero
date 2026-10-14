@@ -57,7 +57,7 @@ struct CharacterSetsSettings: View {
 
     private var custom: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Your Character Sets").font(.headline)
+            Text("Your Coverage Sets").font(.headline)
             List(selection: $selection) {
                 ForEach(model.data.customCharacterSets) { set in
                     HStack {
@@ -85,14 +85,14 @@ struct CharacterSetsSettings: View {
                 }
             }
             HStack(spacing: 2) {
-                ListEditButton("New Character Set", systemImage: "plus") { editing = CustomCharacterSet(name: "", characters: "") }
-                ListEditButton("Delete Character Set", systemImage: "minus") {
+                ListEditButton("New Coverage Set", systemImage: "plus") { editing = CustomCharacterSet(name: "", characters: "") }
+                ListEditButton("Delete Coverage Set", systemImage: "minus") {
                     if let selection { model.deleteCharacterSet(selection) }
                     selection = nil
                 }
                 .disabled(selection == nil)
                 Spacer()
-                Button("Edit…") { editing = selected }
+                Button("Edit") { editing = selected }
                     .disabled(selected == nil)
             }
         }

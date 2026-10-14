@@ -8,8 +8,20 @@ Each version’s notes here become its release notes on the [releases page](http
 - New Tag lets you pick the tag’s color, or none, as well as its name. Leave the name empty to name the tag after its color.
 - A new library starts with Red, Yellow and Green tags.
 - For fonts in an Adobe app’s folder, the right-click menu says Activate Temporarily in All Apps, like Activate in All Apps beside it.
+- A font page’s Activate and Deactivate buttons say the same as the font’s right-click menu: Activate in All Apps for fonts in an Adobe app’s folder, for example.
 - The Info button in the toolbar is highlighted while the Info panel is open, like the chosen view beside it.
 - Nothing lights up under the pointer any more: not the toolbar’s view picker and buttons, in every window, nor the tiles in the grid.
+- The Info panel starts level with the first row of fonts in the grid and in specimens, rather than just below the toolbar, and sits as far from the grid as its tiles are from each other.
+- The toolbar’s buttons sit closer together, as close as the Info button is to the search field.
+- Specimens are set on light grey cards, like the tiles in the grid, so each family stands apart.
+- Click between fonts, or below the last, to deselect them.
+- Font pages keep the search field: type in it to go back to the fonts that match. They no longer show Preview Options, since they have their own size and alignment.
+- Type a number for Size, Weight, Letter Spacing and Line Spacing in Preview Options, and for a font page’s Size, or press ↑ and ↓ to step them.
+- Make classifications of your own, rename Cicero’s, and put families in another classification from their right-click menu, the Info panel, or by dragging them onto one in the sidebar.
+- Character sets are called coverage, like their tab in Settings: the sidebar section, the Info panel row, the list’s column menu and the smart set rule (“Coverage includes Latin S”). Sets of your own are coverage sets.
+- Menus and buttons no longer end in “…”, and progress messages don’t either.
+- Clear Font Caches, and its row in Settings, say you may need to restart your Mac afterwards.
+- The Show fonts installed for Adobe apps switch in Settings → Folders is as small as the other switches in Settings.
 
 ## 1.1
 

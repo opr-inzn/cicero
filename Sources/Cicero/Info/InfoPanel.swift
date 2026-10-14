@@ -2,14 +2,16 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar. Not
-/// SwiftUI's inspector, which runs the full window height under the search field. Over the split view rather
-/// than in its detail column, whose stack swaps the whole column for a pushed font page; each page makes room
-/// for it with `InfoPanelInset`.
+/// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar, its
+/// top level with the first fonts. Not SwiftUI's inspector, which runs the full window height under the search
+/// field. Over the split view rather than in its detail column, whose stack swaps the whole column for a pushed
+/// font page; each page makes room for it with `InfoPanelInset`.
 struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
     static let width: CGFloat = 300
     static let gap: CGFloat = 8
+    /// Level with the first row of the grid and of specimens, which start this far below the toolbar.
+    static let top: CGFloat = 16
 
     func body(content: Content) -> some View {
         let isPresented = model.isInfoPresented
@@ -27,6 +29,7 @@ struct InfoPanelOverlay: ViewModifier {
                         }
                         .clipShape(shape)
                         .padding([.horizontal, .bottom], Self.gap)
+                        .padding(.top, Self.top)
                         .transition(.move(edge: .trailing))
                 }
             }
@@ -127,6 +130,7 @@ private struct InfoRows: View {
         VStack(alignment: .leading, spacing: 14) {
             row("Status", face.state.label)
             TagsRow(family: family)
+            ClassificationRow(family: family)
             if let info {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
                     self.row(row.label, row.value)
@@ -173,6 +177,27 @@ private struct InfoRows: View {
         VStack(alignment: .leading, spacing: 2) {
             label(title)
             Text(value).font(.callout).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The family's classification, with a menu to put it in another.
+private struct ClassificationRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Classification").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Menu("Change") { ClassificationMenuItems(families: [family], model: model) }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .fixedSize()
+            }
+            Text(model.classificationName(of: family)).font(.callout)
         }
     }
 }

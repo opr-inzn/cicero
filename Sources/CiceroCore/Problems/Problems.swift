@@ -90,7 +90,7 @@ public enum ProblemFix: Hashable, Sendable {
         switch self {
         case .reveal: "Reveal"
         case .deactivate: "Deactivate"
-        case .trash(let paths): paths.count == 1 ? "Move to Trash…" : "Move Extra Copies to Trash…"
+        case .trash(let paths): paths.count == 1 ? "Move to Trash" : "Move Extra Copies to Trash"
         case .forgetInPlace, .forgetInstalledCopy: "Forget"
         case .removeFromSet: "Remove from Set"
         case .installCopy: "Install a Copy Instead"

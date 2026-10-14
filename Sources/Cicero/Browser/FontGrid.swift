@@ -9,12 +9,16 @@ struct FontGrid: View {
     @State private var anchor: String?
     @FocusState private var focused: Bool
     @State private var gridWidth: CGFloat = 0
+    @State private var visibleHeight: CGFloat = 0
+
+    /// Between tiles, and between the last column and the Info panel.
+    static let spacing: CGFloat = 12
 
     var body: some View {
         let width = max(240, preview.size * 8)
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: width, maximum: width * 1.6), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: width, maximum: width * 1.6), spacing: Self.spacing)], spacing: Self.spacing) {
                     ForEach(families) { family in
                         Tile(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
@@ -22,8 +26,10 @@ struct FontGrid: View {
                 }
                 .scrollTargetLayout()
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
-                .padding(16)
+                .cardsPadding(infoPresented: model.isInfoPresented)
+                .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
+            .visibleHeight($visibleHeight)
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
@@ -35,7 +41,7 @@ struct FontGrid: View {
 
     /// Tiles in a row, for ↑/↓: as many as fit at their narrowest, as the adaptive grid lays them out.
     private func columns(tile width: CGFloat) -> Int {
-        max(1, Int((gridWidth + 12) / (width + 12)))
+        max(1, Int((gridWidth + Self.spacing) / (width + Self.spacing)))
     }
 }
 
@@ -79,9 +85,28 @@ private struct Tile: View {
             }
         }
         .padding(14)
-        .background(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.4)), in: .rect(cornerRadius: 14))
-        .overlay {
-            if isSelected { RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, lineWidth: 2) }
-        }
+        .modifier(FamilyCard(isSelected: isSelected))
+    }
+}
+
+/// A family's card in the grid and specimens: light grey, or tinted and outlined while it's selected.
+struct FamilyCard: ViewModifier {
+    let isSelected: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.4)), in: .rect(cornerRadius: 14))
+            .overlay {
+                if isSelected { RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, lineWidth: 2) }
+            }
+    }
+}
+
+extension View {
+    /// Around the grid's tiles and the specimens' cards: 16 pt, and one gap between cards from the Info panel,
+    /// whose margin makes up the rest.
+    func cardsPadding(infoPresented: Bool) -> some View {
+        padding([.leading, .vertical], InfoPanelOverlay.top)
+            .padding(.trailing, infoPresented ? FontGrid.spacing - InfoPanelOverlay.gap : InfoPanelOverlay.top)
     }
 }

@@ -3,6 +3,17 @@ import SwiftUI
 // Toolbar controls that highlight only what's chosen or on, never what's under the pointer: AppKit's
 // light up on hover, in a gray of their own, and Cicero has no hover states.
 
+/// A toolbar item in a glass capsule of its own, 8 pt from the next as the Info button is from the search
+/// field. AppKit puts neighbouring items in one capsule, and a ToolbarSpacer between them leaves 16 pt.
+struct ToolbarCapsule<Content: View>: ToolbarContent {
+    @ViewBuilder let content: () -> Content
+
+    var body: some ToolbarContent {
+        ToolbarItem { content().glassEffect(.regular, in: .capsule) }
+            .sharedBackgroundVisibility(.hidden)
+    }
+}
+
 /// A segmented picker for toolbars, its choice highlighted like a toggle that's on. Segments show a
 /// symbol when there's one, else the title.
 struct ToolbarPicker<Value: Hashable>: View {
