@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - **Use the files where they are** in Settings → General is now **Leave the files where they are**, and Cicero’s question when you turn fonts on offers **Leave Files Where They Are**.
+- **Your Coverage Sets** come first in Settings → Coverage and scroll with the built-in sets. Each has an **Edit** button and a right-click menu, **+** next to the heading makes a new one, and the coverage set editor has a **Delete** button.
 
 ## 1.4
 
