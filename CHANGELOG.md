@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- **Use the files where they are** in Settings → General is now **Leave the files where they are**, and Cicero’s question when you turn fonts on offers **Leave Files Where They Are**.
+
 ## 1.4
 
 - With **Copy into ~/Library/Fonts** chosen in Settings → General, font files you open in Cicero, drop on its window or choose with File → Add Fonts are copied into your Fonts folder and turned on, and show up in All Fonts, rather than being listed where they are under Added Fonts without being installed. Reveal in Finder shows the copy in your Fonts folder. Cicero then selects the first font it installed in the browser and scrolls to it.
