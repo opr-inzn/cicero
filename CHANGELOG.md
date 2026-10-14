@@ -2,7 +2,9 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.1.1
+
+I haven’t tested this version on macOS 27 yet, so you may find UI bugs there. Please report them with Help → Report an Issue.
 
 - Cicero counts how many people use it: each time it opens, it sends TelemetryDeck its version, the macOS version and a hashed random number for your Mac, and nothing about you or your fonts. Turn it off in Settings → General → Usage Statistics. [Privacy](help/privacy.md#usage-statistics) has the details.
 - A new app icon: a glass cube with a C, an & and a g cut into its faces.
