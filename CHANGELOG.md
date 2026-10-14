@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- Settings → General is more compact: three groups instead of nine, with short explanations inside the rows that need them and none under the others.
+- Shorter explanations in Settings → Folders and Sidebar, which now says individual foundries rather than single ones.
 - The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
 
 ## 1.4.2

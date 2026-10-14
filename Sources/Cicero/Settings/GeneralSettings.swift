@@ -23,39 +23,29 @@ struct GeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .formRowCentered()
-            }
-            Section {
-                LabeledContent("Activate fonts by") {
+                LabeledContent {
                     PopUpPicker(options: InstallMethod.allCases.map { ($0.title, $0) }, selection: $model.data.installMethod)
+                } label: {
+                    Text("Activate fonts by")
+                    Text(activationExplanation)
                 }
-                .formRowCentered()
-            } header: {
-                Text("Activation")
-            } footer: {
-                Text(activationExplanation).formFooter()
-            }
-            Section {
-                Toggle("Open at login", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { loginItem == .enabled || loginItem == .requiresApproval },
                     set: { loginItem = LoginItem.set($0, model: model) }
-                ))
-            } footer: {
-                Text(loginItem == .requiresApproval
-                    ? "Allow Cicero in System Settings → General → Login Items."
-                    : "Application sets activate fonts only while Cicero is open.").formFooter()
-            }
-            Section {
+                )) {
+                    Text("Open at login")
+                    Text(loginItem == .requiresApproval
+                        ? "Allow Cicero in System Settings → General → Login Items."
+                        : "Application sets activate fonts only while Cicero is open.")
+                }
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
-            } footer: {
-                Text("Fonts that come with macOS. With this off, they’re hidden everywhere, System Fonts in the sidebar too.").formFooter()
+                Toggle(isOn: $model.guessesClassifications) {
+                    Text("Guess classifications from names")
+                    Text(guessingExplanation)
+                }
+                .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
             }
-            Section {
-                Toggle("Guess classifications from names", isOn: $model.guessesClassifications)
-                    .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
-            } footer: {
-                Text(guessingExplanation).formFooter()
-            }
-            Section {
+            Section("Font Caches") {
                 LabeledContent("Cicero’s font list") {
                     Button("Rebuild") { model.rebuildFontList() }
                 }
@@ -65,37 +55,20 @@ struct GeneralSettings: View {
                         .foregroundStyle(.red)
                 }
                 .formRowCentered()
-            } header: {
-                Text("Font Caches")
-            } footer: {
-                Text("Rebuild reads every font file again. Clearing the caches helps when fonts don’t show up in apps or look wrong; you may need to restart your Mac afterwards.").formFooter()
             }
             Section {
-                LabeledContent("Your library") {
+                LabeledContent("Library backup") {
                     HStack {
                         Button("Back Up") { isBackingUp = true }
                         Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
                 }
                 .formRowCentered()
-            } header: {
-                Text("Backup")
-            } footer: {
-                Text("A backup holds your sets, smart sets, tags, coverage sets, folders and added fonts, foundry names, sidebar, and the settings for activation, system fonts and Adobe fonts, and can include your font files.").formFooter()
-            }
-            Section {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
-            } header: {
-                Text("Updates")
-            } footer: {
-                Text("Once a day, Cicero asks GitHub whether there’s a new version. Nothing about you or your fonts is sent.").formFooter()
-            }
-            Section {
-                Toggle("Share usage statistics", isOn: $sharesUsageStatistics)
-            } header: {
-                Text("Usage Statistics")
-            } footer: {
-                Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac, to count how many people use Cicero. Nothing about you or your fonts is sent.").formFooter()
+                Toggle(isOn: $sharesUsageStatistics) {
+                    Text("Share usage statistics")
+                    Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac. Nothing about you or your fonts is sent.")
+                }
             }
         }
         .formStyle(.grouped)
@@ -108,7 +81,7 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
     private var guessingExplanation: String {
-        let what = "Cicero classifies fonts by what their files say and by the shapes of their letters. For fonts that leaves unclassified, Apple Intelligence guesses from the name, on this Mac. Nothing is sent."
+        let what = "When nothing else classifies a font, Apple Intelligence guesses from its name, on this Mac. Nothing is sent."
         return switch ClassificationGuesser.availability {
         case .available: what
         case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to use this."
