@@ -369,7 +369,7 @@ struct FolderActivationPicker: View {
                 Text("Active in \(FaceState.appDescription(app))").tag(app)
             }
             Divider()
-            Text("Active in Specific App…").tag(Self.specificApp)
+            Text("Active in Specific App").tag(Self.specificApp)
         }
     }
 }

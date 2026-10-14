@@ -524,8 +524,7 @@ extension AppModel {
             }
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
-                    : library.unavailableFolders[$0.id] != nil ? "questionmark.folder"
-                    : $0.appName == nil ? "folder" : "folder.badge.gearshape"
+                    : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
                 return SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:
