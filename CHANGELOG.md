@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Opening the Info panel no longer makes the grid’s tiles wider. They keep their width and place, and the panel takes a column away instead.
+
 ## 1.3.1
 
 - Typing a letter in the font list, grid or specimens jumps straight to the first family starting with it, rather than scrolling there.
