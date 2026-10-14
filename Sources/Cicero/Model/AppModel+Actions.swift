@@ -425,7 +425,7 @@ extension AppModel {
     /// Sidebar rows that family names can be dropped onto: sets, tags and foundries.
     func takesFamilies(_ item: SidebarItem) -> Bool {
         switch item {
-        case .set, .tag, .foundry: true
+        case .set, .tag, .foundry, .classification: true
         default: false
         }
     }
@@ -438,6 +438,7 @@ extension AppModel {
         case .set(let id): setMembership(true, for: families, in: id)
         case .tag(let name): setTag(name, true, for: families)
         case .foundry(let name): setFoundry(name, for: families)
+        case .classification(let name): setClassification(name, for: families)
         default: return false
         }
         return true
@@ -498,7 +499,7 @@ extension AppModel {
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", item: .foundry($0)) }
         case .classifications:
             return presentClassifications.map {
-                SidebarRow(key: "classification.\($0.rawValue)", title: $0.rawValue, icon: $0.icon, item: .classification($0))
+                SidebarRow(key: "classification.\($0)", title: $0, icon: classificationIcon($0), item: .classification($0))
             }
         case .characterSets:
             return characterSets.map {
@@ -593,7 +594,7 @@ extension AppModel {
         }
         var groups = characterSetCatalog.groups.map { (id: $0.id, title: $0.name, rows: $0.sets.map(row)) }
         if !data.customCharacterSets.isEmpty {
-            groups.append((id: CharacterSetDefinition.customGroupID, title: "Your Character Sets", rows: customCharacterSets.map(row)))
+            groups.append((id: CharacterSetDefinition.customGroupID, title: "Your Coverage Sets", rows: customCharacterSets.map(row)))
         }
         let ordered = groups.map { (id: $0.id, title: $0.title, rows: data.sidebar.ordered($0.rows, in: "charsetgroup.\($0.id)", key: \.key)) }
         return data.sidebar.ordered(ordered, in: SidebarSection.characterSets.rawValue) { "charsetgroup.\($0.id)" }

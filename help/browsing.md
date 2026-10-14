@@ -30,7 +30,7 @@ One row per family, under column headers:
 | Format | OpenType PostScript, OpenType TrueType, Font Collection and so on (hidden at first) |
 
 - **Sort:** click a column header. Click it again to reverse the order. A character set column sorts by the largest set a family has, or by how many of the set’s characters it has.
-- **Show or hide columns:** right-click the headers. Single character sets are under **Character Sets** in that menu: your own first, then GF Latin African and the Unicode blocks. Status, Name and Preview always show.
+- **Show or hide columns:** right-click the headers. Single sets are under **Coverage** in that menu: your own first, then GF Latin African and the Unicode blocks. Status, Name and Preview always show.
 - **Resize a column:** drag the right edge of its header.
 
 Cicero remembers the columns you show and their widths. When the window gets narrow, for example with the Info panel open, the preview gives way first.
@@ -117,7 +117,7 @@ The panel describes the style being previewed, the one closest to the weight in 
 - weight, and the weight range of a variable font
 - number of glyphs, format and copyright
 - **Languages** the font supports, like “213 languages, including English, German, …”. **Show All** lists them by script, with a search field; a checkmark marks full support. See [Languages](character-sets.md#how-cicero-decides-a-font-supports-a-language).
-- **Character Sets**: the largest set of each kind the font has, like “Latin S, Adobe Latin 3, GF Latin Core”, and how close it is to the next Latin size, like “Latin M needs 12 more characters”
+- **Coverage**: the largest set of each kind the font has, like “Latin S, Adobe Latin 3, GF Latin Core”, and how close it is to the next Latin size, like “Latin M needs 12 more characters”
 - **Unicode Blocks** it covers completely, and how many more it covers in part. **Show All** lists every block with a count.
 - **Location**, the file’s path, with **Reveal in Finder**
 - **Other copies** of the same font elsewhere on your Mac. Click one to reveal it.

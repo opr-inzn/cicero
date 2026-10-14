@@ -102,7 +102,7 @@ struct CharacterSetsRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Character Sets").font(.caption).foregroundStyle(.secondary)
+            Text("Coverage").font(.caption).foregroundStyle(.secondary)
             if let ranges {
                 let has = supported(by: ranges)
                 Text(has.isEmpty ? "None" : ListFormatter.localizedString(byJoining: has.map(\.name)))

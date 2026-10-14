@@ -11,7 +11,7 @@ The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Ci
 Only to check GitHub for a new version of Cicero, and to download it when you choose to install it.
 
 - Cicero checks by itself while **Check for updates automatically** is on, under **Updates** in **Settings → General**. It’s on at first.
-- Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates…**
+- Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates**
 
 The **Help** menu opens pages in your web browser, like this guide on GitHub and the privacy policy on Cicero’s website, and so do the links in **Settings → Coverage** and in **About Cicero**. Cicero itself doesn’t load them.
 
@@ -19,7 +19,7 @@ The **Help** menu opens pages in your web browser, like this guide on GitHub and
 
 | Where | What |
 | --- | --- |
-| `~/Library/Application Support/Cicero` | Your sets, smart sets, tags, character sets, folders, added fonts and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
+| `~/Library/Application Support/Cicero` | Your sets, smart sets, tags, coverage sets, folders, added fonts and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
 | `~/Library/Caches/Cicero` | What Cicero read from your font files, like names and characters, so it doesn’t have to read them again. **Fonts → Rebuild Font List** reads everything again. |
 
 Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way.

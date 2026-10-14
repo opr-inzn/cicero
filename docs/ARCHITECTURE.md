@@ -77,7 +77,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - Files come in through `AppModel.open` (`Model/AppModel+Files.swift`): from the Finder (Info.plist declares the
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from
-  Add Fonts…. It gathers URLs for a moment, adds folders and unlisted files to the user data, and shows
+  Add Fonts. It gathers URLs for a moment, adds folders and unlisted files to the user data, and shows
   their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends).
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Open) can take them.
@@ -88,7 +88,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   moving the selection the panel shows. `QuickLookHost`, in the main window, hands it the window (centred over, closed
   with, out of the way of its sheets) and the selection's changes. The panel is made once, ordered out when
   closed, and draws nothing then; a font file nothing has read yet is read off the main thread first.
-- `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates… and the
+- `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates and the
   automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
   binary has no Info.plist with the feed.
 - `ApplicationsFolder` (`App/`) asks at launch to move Cicero into the Applications folder, and again
@@ -137,6 +137,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   for sandboxed apps, and Cicero isn't. Code is signed inside out, never with `--deep`: Sparkle's
   Autoupdate and Updater.app, the framework, then the app. Dev builds are signed ad hoc; with
   `SIGN_IDENTITY` (a Developer ID) every piece gets the hardened runtime and a secure timestamp.
+  It hands the SDK to the link step as well (`-Xclang-linker -isysroot`): SwiftPM's build system leaves it
+  out, so the binary would record the deployment target's SDK (26) and a newer macOS would treat Cicero as
+  built for 26, with that release's behaviour. The script stops if the recorded SDK isn't the one it built with.
 - `scripts/release.sh` signs with the Developer ID, notarizes and staples the app (nested Sparkle code
   included) and then the DMG made by `make-dmg.sh`.
 - `scripts/publish.sh` runs `make-appcast.sh`, which signs the final DMG with the Sparkle EdDSA key (keychain

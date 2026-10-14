@@ -6,12 +6,12 @@
 
 | Shortcut | Command |
 | --- | --- |
-| ⌘, | **Cicero → Settings…** |
-| ⌘O | **File → Add Fonts…** |
-| ⇧⌘O | **File → Add Folder…** |
-| ⇧⌘N | **File → New Set…** |
-| ⌥⌘N | **File → New Smart Set…** |
-| ⇧⌘E | **File → Export Fonts…** |
+| ⌘, | **Cicero → Settings** |
+| ⌘O | **File → Add Fonts** |
+| ⇧⌘O | **File → Add Folder** |
+| ⇧⌘N | **File → New Set** |
+| ⌥⌘N | **File → New Smart Set** |
+| ⇧⌘E | **File → Export Fonts** |
 | ⌘↩ | **Fonts → Activate** |
 | ⌥⌘↩ | **Fonts → Activate Temporarily** |
 | ⌘⌫ | **Fonts → Deactivate** |
@@ -77,4 +77,4 @@ In the lists of families on both tabs:
 
 ## Sheets
 
-In sheets like the smart set editor, the character set editor and Clear Font Caches, ↩ clicks the blue button, like **Create**, **Save** or **Clear**.
+In sheets like the smart set editor, the coverage set editor and Clear Font Caches, ↩ clicks the blue button, like **Create**, **Save** or **Clear**.

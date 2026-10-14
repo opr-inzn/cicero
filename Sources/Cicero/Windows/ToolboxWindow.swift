@@ -25,11 +25,7 @@ struct ToolboxWindow: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("View", selection: $tab) {
-                    ForEach(ToolboxTab.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                ToolbarPicker(ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
     }

@@ -8,7 +8,8 @@ enum SidebarItem: Hashable {
     case smartSet(UUID)
     case tag(String)
     case foundry(String)
-    case classification(Classification)
+    /// By name: a built-in classification under the name the user gave it, or one of theirs.
+    case classification(String)
     case characterSet(String)
 }
 
@@ -25,7 +26,8 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
-        case .characterSets: "Character Sets"
+        // As in Settings: which fonts have every character of a set.
+        case .characterSets: "Coverage"
         }
     }
 
@@ -195,7 +197,9 @@ extension AppModel {
         case .foundry(let name):
             let foundryName = foundryNamer()
             return { foundryName($0) == name }
-        case .classification(let classification): return { $0.classification == classification }
+        case .classification(let name):
+            let classificationName = classificationNamer()
+            return { classificationName($0) == name }
         case .characterSet(let id):
             guard let set = characterSet(id) else { return { _ in false } }
             return { self.has(set, $0) == true }
@@ -233,7 +237,8 @@ extension AppModel {
             }
             return compare { self.foundryName(of: $0) == value }
         case .classification:
-            return compare { $0.classification.rawValue == value }
+            let classificationName = classificationNamer()
+            return compare { classificationName($0) == value }
         case .tag:
             let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
             return compare { tagged.contains($0.id) }

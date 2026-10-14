@@ -13,7 +13,7 @@ struct ProblemsView: View {
         Group {
             if groups.isEmpty {
                 ContentUnavailableView("No Problems", systemImage: "checkmark.circle",
-                                       description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts…"))
+                                       description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts"))
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {
@@ -37,6 +37,7 @@ struct ProblemsView: View {
         .toolbar {
             ToolbarItem {
                 Button("Check Again", systemImage: "arrow.clockwise") { model.rescan() }
+                    .buttonStyle(.toolbar)
                     .disabled(model.scanProgress != nil)
                     .help("Look through the library again")
             }
@@ -307,7 +308,7 @@ private struct FixButtons: View {
 
     /// Only in Installed Twice is a trashed file a spare copy of the same font.
     private func title(_ fix: ProblemFix) -> String {
-        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy…" : "Remove Copies…" }
+        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy" : "Remove Copies" }
         return fix.title
     }
 
