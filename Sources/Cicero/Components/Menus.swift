@@ -176,7 +176,7 @@ struct ClassificationMenuItems: View {
         let names = Set(families.map(model.classificationName(of:)))
         let automatic = families.allSatisfy { model.data.classificationOverrides[$0.id] == nil }
         // One family says which classification Automatic is.
-        let suggested = families.count == 1 ? families[0].classification : nil
+        let suggested = families.count == 1 ? model.suggestedClassification(of: families[0]) : nil
         Toggle(suggested.map { "Automatic (\(model.name(of: $0)))" } ?? "Automatic", isOn: Binding(
             get: { automatic },
             set: { if $0 { model.setClassification(nil, for: families) } }

@@ -63,6 +63,7 @@ struct VisibleKey: Equatable {
     var search: String
     var dataRevision: Int
     var coverageRevision: Int
+    var guessRevision: Int
 }
 
 /// What the cached rows of the font list were made from.
@@ -144,7 +145,7 @@ extension AppModel {
     private var visibleKey: VisibleKey {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
-            dataRevision: dataRevision, coverageRevision: coverageRevision
+            dataRevision: dataRevision, coverageRevision: coverageRevision, guessRevision: guessRevision
         )
     }
 

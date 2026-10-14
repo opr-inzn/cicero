@@ -20,7 +20,7 @@ One row per family, under column headers:
 | Name | The family name, the colors of [your tags](organizing.md#tags), and a status tag when it isn’t simply on or off (see [Status tags](#status-tags)) |
 | Preview | A sample in the font |
 | Styles | How many styles the family has |
-| Classification | Serif, Sans Serif, Script and so on, read from the font |
+| Classification | Serif, Sans Serif, Script and so on, from what the font says, the shapes of its letters, or its name (see [Classifications](organizing.md#classifications)) |
 | Foundry | Who made it |
 | Latin S–XL | The largest of Latin S, M, L and XL the family has every character of |
 | Adobe Latin | The largest Adobe Latin set it has, like “AL 3” |
