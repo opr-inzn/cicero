@@ -17,7 +17,8 @@ extension TagColor {
 
     var title: String { rawValue.capitalized }
 
-    /// A dot for menus, which draw SF Symbols as templates, in one colour.
+    /// A dot for menus, which draw SF Symbols as templates, in one colour. Its label needs `.titleAndIcon`: built
+    /// with the macOS 27 SDK, menus hide every other image.
     var menuImage: NSImage {
         let nsColor = NSColor(color)
         let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
@@ -63,6 +64,7 @@ struct TagMenuItems: View {
             )) {
                 if let color = model.data.tagColors[tag] {
                     Label { Text(tag) } icon: { Image(nsImage: color.menuImage) }
+                        .labelStyle(.titleAndIcon)
                 } else {
                     Text(tag)
                 }

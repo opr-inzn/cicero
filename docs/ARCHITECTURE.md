@@ -137,6 +137,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   for sandboxed apps, and Cicero isn't. Code is signed inside out, never with `--deep`: Sparkle's
   Autoupdate and Updater.app, the framework, then the app. Dev builds are signed ad hoc; with
   `SIGN_IDENTITY` (a Developer ID) every piece gets the hardened runtime and a secure timestamp.
+  It hands the SDK to the link step as well (`-Xclang-linker -isysroot`): SwiftPM's build system leaves it
+  out, so the binary would record the deployment target's SDK (26) and a newer macOS would treat Cicero as
+  built for 26, with that release's behaviour. The script stops if the recorded SDK isn't the one it built with.
 - `scripts/release.sh` signs with the Developer ID, notarizes and staples the app (nested Sparkle code
   included) and then the DMG made by `make-dmg.sh`.
 - `scripts/publish.sh` runs `make-appcast.sh`, which signs the final DMG with the Sparkle EdDSA key (keychain

@@ -43,7 +43,8 @@ a toggle that's on and a button being pressed.
     starting on the first colour no tag has; an empty name is the colour's; a name that's taken says so and
     can't be created). A new library starts with Red, Yellow and Green. One row per tag in the order they were made, a dot in the tag's colour (or the tag
     symbol when it has none). Menu: Rename Tag (a name that's taken says so), Color (None, Red, Orange, Yellow,
-    Green, Blue, Purple, Gray), Delete Tag (off every family, and out of smart set rules).
+    Green, Blue, Purple, Gray; each with its dot, as are tags in a family's Tags menu: `.titleAndIcon`, since
+    menus built with the macOS 27 SDK hide images otherwise), Delete Tag (off every family, and out of smart set rules).
   - **Foundries**. Menu: Rename Foundry
   - **Classifications** (+ new classification). Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol — only the ones
     with families — then the user's own (always shown, in the order they were made), then Unclassified. A family's
@@ -146,9 +147,9 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
 - Several families selected: one at a time, in the browser's order, with ‹ › and "2 of 5" in the bar (on past the last back to the first). ←/→ in the list and specimens go through them and leave the selection as it is; in the grid, where ←/→ move the selection, the panel follows that. A family just added to the selection (a click, ⇧↓) is the one shown; several added at once (⌘A, ⇧-click) keep the one shown.
 - Never holds up the selection: a font file nothing has read yet is read off the main thread while room is kept for its text, and only the styles on screen are made, so big variable families with many named instances step as fast as any.
 
-## Info panel (a pane floating at the trailing edge like the sidebar and in its colour, 300 pt wide, starts 16 pt below the toolbar, level with the first row of the grid and of specimens, and as far from the grid's last column as tiles are from each other (12 pt), stays put when a font page opens, toggled by ⓘ (a toolbar toggle, highlighted while the panel is open) / ⌘I; an overlay on the split view, since the detail column's stack swaps the whole column for a pushed page, and each page makes room for it)
+## Info panel (a pane floating at the trailing edge like the sidebar and in its colour, 300 pt wide, with 20 pt corners on macOS 26 and corners concentric with the window's on macOS 27, starts 16 pt below the toolbar, level with the first row of the grid and of specimens, and as far from the grid's last column as tiles are from each other (12 pt), stays put when a font page opens, toggled by ⓘ (a toolbar toggle, highlighted while the panel is open) / ⌘I; an overlay on the split view, since the detail column's stack swaps the whole column for a pushed page, and each page makes room for it)
 
-- Family name; segmented Info | Features (no style picker: it describes the style being previewed).
+- Family name; segmented Info | Features, in the tabs picker style on macOS 27 (no style picker: it describes the style being previewed).
 - Info: Status, Tags (the family's, each with its dot, and an Add Tag / Edit Tags menu: a toggle per tag, New Tag), Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Vendor ID (OS/2 achVendID, padding trimmed; left out when blank or not printable), Weight, Variable weight, Glyphs, Format, Copyright, Languages ("213 languages, including English, German, …" + Show All popover grouped by script with search; full support marked), Coverage (largest set per series the face has, e.g. "Latin S, Adobe Latin 3, GF Latin Core", plus "Latin M needs 12 more characters"), Location + Reveal in Finder, Other copies.
 - Features: the face's OpenType features, a box of switches per feature like the system Typography panel (in a one-at-a-time feature, switching one on switches the others off; switching the chosen one off goes back to the default); chosen features apply to that family everywhere it's previewed (list, grid, specimens, font page).
 - With nothing (or several fonts) selected: "No Selection" / "3 Fonts Selected".
@@ -156,7 +157,7 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
 ## Preview Options (popover)
 
 Preview Text field (no section title; placeholder "Font name"; empty = each family's name in list/specimens, "Aa Gg 123" in grid), Presets menu (Font Name; "Sphinx of black quartz, judge my vow."; "Hamburgefonstiv"; "0123456789 €$£¥ %&@"; "ÀÉÎÕÜ ñçß øæœ"), Size (8–160 pt), Weight (100–900, continuous for variable fonts), Letter Spacing (−10…40 % of the em, 0.5 steps), Line Spacing (80–250 % of the size, steps of 5, 120 at first, as layout apps' automatic leading; wherever a sample wraps: font pages and Quick Look), Alignment (left/center/right segments, left at first; specimens and Quick Look — font pages have their own). Each slider's value beside it takes a number typed in too (Return or leaving the field applies it, kept to the range
-and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font page's Size. Use custom-drawn sliders: system sliders lose their glass knob in toolbar popovers on macOS 26.
+and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font page's Size. Use custom-drawn sliders on macOS 26, whose system sliders lose their glass knob in toolbar popovers; the system slider on macOS 27, which draws it itself (continuous and rounded to the step, so it shows no ticks).
 
 ## Menus
 

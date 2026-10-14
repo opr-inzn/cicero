@@ -340,7 +340,9 @@ private struct SidebarContent: View {
                 Text("None").tag(TagColor?.none)
                 Divider()
                 ForEach(TagColor.allCases, id: \.self) { color in
-                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }.tag(Optional(color))
+                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }
+                        .labelStyle(.titleAndIcon)
+                        .tag(Optional(color))
                 }
             }
             Button("Delete Tag") { model.deleteTag(name) }
