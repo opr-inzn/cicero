@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Each tile in the grid says, at its bottom right, what kind of files the family comes in: OTF, TTF, or Variable TTF, for example.
+- The caption under a tile's name counts just the weights, widths and styles: “8 Weights · 16 Styles” rather than “8 Weights · Italics”. Italics, optical sizes and a font’s own axes count as styles rather than being named.
 
 ## 1.2.2
 
