@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Typing a letter in the font list, grid or specimens jumps straight to the first family starting with it, rather than scrolling there.
+- You can type more than one letter, as in Finder: E goes to the first family starting with E, and Ed then to the first starting with Ed.
 
 ## 1.3
 

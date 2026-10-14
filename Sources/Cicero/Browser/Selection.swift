@@ -86,14 +86,18 @@ extension View {
     }
 }
 
-/// Keyboard handling for the browser: Return opens, Escape deselects, ⌘A selects all, typing a letter jumps
-/// to the first family starting with it, Space opens and closes Quick Look, and the arrow keys as the layout has them.
+/// Keyboard handling for the browser: Return opens, Escape deselects, ⌘A selects all, typing the start of a name
+/// jumps to the first family starting with it, Space opens and closes Quick Look, and the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
     let families: [Family]
     @Binding var anchor: String?
     let proxy: ScrollViewProxy
     var layout = FamilyLayout.list
+    /// What's been typed so far, as in Finder: letters typed within a second of each other go together, so E and then d
+    /// jump to the first family starting with Ed.
+    @State private var typed = ""
+    @State private var lastTyped = Date.distantPast
 
     func body(content: Content) -> some View {
         let quickLook = model.quickLook
@@ -126,9 +130,17 @@ struct FamilyKeys: ViewModifier {
                     model.selectedIDs = Set(families.map(\.id))
                     return .handled
                 }
-                guard press.modifiers.isEmpty || press.modifiers == .shift,
-                      let target = families.first(where: { $0.name.lowercased().hasPrefix(press.characters.lowercased()) }) else {
-                    return .ignored
+                guard press.modifiers.isEmpty || press.modifiers == .shift else { return .ignored }
+                if Date.now.timeIntervalSince(lastTyped) > 1 { typed = "" }
+                typed += press.characters
+                lastTyped = .now
+                guard let target = families.first(where: {
+                    $0.name.range(of: typed, options: [.anchored, .caseInsensitive, .diacriticInsensitive]) != nil
+                }) else {
+                    // Nothing starts with what's been typed: the selection stays where the letters before took it.
+                    // A first letter that finds nothing isn't kept, so the next one starts afresh.
+                    if typed.count == 1 { typed = ""; return .ignored }
+                    return .handled
                 }
                 model.selectedIDs = [target.id]
                 anchor = target.id
