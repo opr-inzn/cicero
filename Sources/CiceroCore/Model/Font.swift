@@ -324,6 +324,9 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let manufacturer: String?
     public let dateAdded: Date?
     public let classification: Classification
+    /// Set when the letters of some of its styles are serif and of others sans serif, as in a family with both
+    /// (Crapola's Sans and Serif): it stays unclassified rather than going by its name.
+    public let mixesSerifAndSans: Bool
     public let format: FontFormat
     public let isVariable: Bool
     public let isMonospaced: Bool
@@ -367,6 +370,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         let formats = Set(faces.map { FontFormat.of(path: $0.face.path) })
         format = formats.count == 1 ? formats.first! : .mixed
         classification = Classification.of(name: name, faces: faces)
+        mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
         regular = Self.nearest(400, in: faces)
         activeCount = faces.count { $0.state.isActive }
         hasActive = activeCount > 0
@@ -582,8 +586,7 @@ extension Classification {
             (.symbol, ["symbol", "dingbat", "emoji"]),
         ]
         for (classification, words) in hints where words.contains(where: name.contains) { return classification }
-        let uprights = faces.filter { !$0.face.isItalic }
-        let judged = (uprights.isEmpty ? faces : uprights).map(\.face)
+        let judged = judged(faces)
         func agreed(_ answers: [Classification?]) -> Classification? {
             let found = Set(answers.compactMap { $0 })
             return found.count == 1 ? found.first : nil
@@ -591,5 +594,11 @@ extension Classification {
         if judged.allSatisfy({ $0.letterShape == .monospaced }) { return .monospaced }
         let shapes = judged.map(\.letterShape).filter { $0 != .monospaced }
         return agreed(shapes) ?? agreed(judged.map(\.panose)) ?? .unclassified
+    }
+
+    /// The faces whose letters and PANOSE digits count: the upright ones, or all of them in a family of italics.
+    static func judged(_ faces: [LibraryFace]) -> [FontFace] {
+        let uprights = faces.filter { !$0.face.isItalic }
+        return (uprights.isEmpty ? faces : uprights).map(\.face)
     }
 }
