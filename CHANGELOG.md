@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.3.1
 
 - Typing a letter in the font list, grid or specimens jumps straight to the first family starting with it, rather than scrolling there.
 - You can type more than one letter, as in Finder: E goes to the first family starting with E, and Ed then to the first starting with Ed.
