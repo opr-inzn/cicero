@@ -55,11 +55,9 @@ struct FontPage: View {
         }
         .background(Color.canvas)
         .navigationTitle(family.name)
-        .toolbar {
-            ToolbarItem { PreviewOptionsButton() }
-            ToolbarSpacer(.fixed)
-            ToolbarItem { InfoButton() }
-        }
+        // No Preview Options: the page has its own size and alignment, and takes the rest (text in the styles
+        // list, weight, spacing) from the browser's.
+        .toolbar { ToolbarCapsule { InfoButton() } }
         .onExitCommand { model.openFamilyID = nil }
     }
 }
@@ -80,13 +78,15 @@ private struct Header: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 16)
+            // Worded as in the family's right-click menu: "Activate in All Apps" for one in Adobe's folder.
+            let titles = ActivationTitles([family])
             HStack(spacing: 8) {
                 if family.hasActivatable {
-                    Button("Activate" + (model.data.installMethod == .ask && family.app == nil ? "…" : "")) { model.activate([family]) }
+                    Button(titles.activate) { model.activate([family]) }
                         .buttonStyle(.borderedProminent)
                 }
                 if family.hasDeactivatable {
-                    Button("Deactivate") { model.deactivate([family]) }
+                    Button(titles.deactivate) { model.deactivate([family]) }
                 } else if !family.hasActivatable {
                     Button("Deactivate") {}
                         .disabled(true)
@@ -149,7 +149,7 @@ private struct TypeTester: View {
                 HStack(spacing: 8) {
                     Text("Size").foregroundStyle(.secondary)
                     ValueSlider(value: $size, range: 12...240).frame(width: 160)
-                    Text("\(Int(size)) pt").monospacedDigit().frame(width: 52, alignment: .trailing)
+                    ValueField("Size", value: $size, range: 12...240, unit: " pt")
                 }
                 Picker("Alignment", selection: $alignment) {
                     ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }

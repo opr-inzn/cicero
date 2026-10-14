@@ -1,25 +1,29 @@
 import CiceroCore
 import SwiftUI
 
-/// Full-width specimens: the sample at the preview size, with the family's styles set in themselves.
+/// Full-width specimens on cards like the grid's: the sample at the preview size, with the family's styles set
+/// in themselves.
 struct SpecimenList: View {
     @Environment(AppModel.self) private var model
     let families: [Family]
     @State private var anchor: String?
     @FocusState private var focused: Bool
+    @State private var visibleHeight: CGFloat = 0
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: FontGrid.spacing) {
                     ForEach(families) { family in
                         Specimen(family: family, foundry: model.foundryName(of: family), isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
                     }
                 }
                 .scrollTargetLayout()
-                .padding(.vertical, 10)
+                .cardsPadding(infoPresented: model.isInfoPresented)
+                .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
+            .visibleHeight($visibleHeight)
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
@@ -72,10 +76,8 @@ private struct Specimen: View {
                 }
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? Color.accentColor.opacity(0.14) : .clear, in: .rect(cornerRadius: 10))
-        .padding(.horizontal, 10)
+        .modifier(FamilyCard(isSelected: isSelected))
     }
 }

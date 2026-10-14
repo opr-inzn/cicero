@@ -6,13 +6,23 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-swift build -c release --arch arm64
-BIN_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
+# SwiftPM's build system links without telling clang which SDK it is, so the app would say it was built
+# with the SDK of its deployment target (26), and a newer macOS would give it that release's look and
+# behaviour. Hand the SDK to the link step too.
+SDK="$(xcrun --sdk macosx --show-sdk-path)"
+BUILD=(swift build -c release --arch arm64 -Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$SDK")
+"${BUILD[@]}"
+BIN_DIR="$("${BUILD[@]}" --show-bin-path)"
 
 APP=build/Cicero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/Cicero" "$APP/Contents/MacOS/Cicero"
+BUILT_SDK="$(otool -l "$APP/Contents/MacOS/Cicero" | awk '/LC_BUILD_VERSION/ { found = 1 } found && $1 == "sdk" { print $2; exit }')"
+if [[ "$BUILT_SDK" != "$(xcrun --sdk macosx --show-sdk-version)" ]]; then
+    echo "Cicero says it was built with the macOS $BUILT_SDK SDK, not $(xcrun --sdk macosx --show-sdk-version)" >&2
+    exit 1
+fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Language data from Hyperglot (see scripts/update-languages.py) and its license.
 cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"

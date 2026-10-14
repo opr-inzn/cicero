@@ -115,7 +115,7 @@ private struct RuleRow: View {
         switch field {
         case .name: ""
         case .foundry: model.foundryNames.first ?? ""
-        case .classification: Classification.serif.rawValue
+        case .classification: model.classificationNames[0]
         case .tag: model.data.tags.first ?? ""
         case .set: model.data.sets.first?.id.uuidString ?? ""
         case .folder: folderOptions.first?.id ?? ""
@@ -141,7 +141,7 @@ private struct RuleRow: View {
                 options(model.foundryNames.map { ($0, $0) }, empty: "No foundries yet")
             }
         case .classification:
-            options(Classification.allCases.map { ($0.rawValue, $0.rawValue) })
+            options(model.classificationNames.map { ($0, $0) })
         case .tag:
             options(model.data.tags.map { ($0, $0) }, empty: "No tags yet")
         case .set:
@@ -197,7 +197,7 @@ private struct RuleRow: View {
     }
 
     private var characterSets: some View {
-        Picker("Character Set", selection: $rule.value) {
+        Picker("Coverage Set", selection: $rule.value) {
             ForEach(model.characterSetCatalog.groups) { group in
                 Section(group.name) {
                     ForEach(group.sets) { Text($0.name).tag($0.id) }
@@ -205,7 +205,7 @@ private struct RuleRow: View {
             }
             let custom = model.customCharacterSets
             if !custom.isEmpty {
-                Section("Your Character Sets") {
+                Section("Your Coverage Sets") {
                     ForEach(custom) { Text($0.name).tag($0.id) }
                 }
             }
@@ -244,7 +244,7 @@ private struct LanguagePicker: View {
             isPresented.toggle()
         } label: {
             HStack(spacing: 4) {
-                Text(catalog.language(selection)?.name ?? "Choose Language…")
+                Text(catalog.language(selection)?.name ?? "Choose Language")
                 Image(systemName: "chevron.up.chevron.down").font(.caption2)
             }
         }
@@ -303,22 +303,24 @@ private extension SmartRule.Field {
         case .format: "Format"
         case .styles: "Number of Styles"
         case .language: "Language"
-        case .characterSet: "Character Set"
+        case .characterSet: "Coverage"
         case .added: "Date Added"
         }
     }
 }
 
 private extension SmartRule.Comparison {
-    /// The wording depends on the field: a tag is "had", a set "is in", a language "is supported".
+    /// The wording depends on the field: a tag is "had", a set "is in", a language "is supported", coverage "includes".
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.tag, .is): "has"
         case (.tag, .isNot): "doesn’t have"
         case (.set, .is), (.folder, .is): "is in"
         case (.set, .isNot), (.folder, .isNot): "isn’t in"
-        case (.language, .is), (.characterSet, .is): "is supported"
-        case (.language, .isNot), (.characterSet, .isNot): "isn’t supported"
+        case (.language, .is): "is supported"
+        case (.language, .isNot): "isn’t supported"
+        case (.characterSet, .is): "includes"
+        case (.characterSet, .isNot): "doesn’t include"
         case (_, .contains): "contains"
         case (_, .doesNotContain): "doesn’t contain"
         case (_, .beginsWith): "begins with"

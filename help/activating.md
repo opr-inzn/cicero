@@ -41,8 +41,6 @@ Choose which one in **Settings → General → Activation**, next to **Activate 
 - **Copy into ~/Library/Fonts**
 - **Use the files where they are**
 
-With **Ask each time**, the **Activate** items in right-click menus and the **Activate** button on font pages end in “…”, because Cicero asks first. Fonts from a folder an app loads itself don’t: Cicero always uses those where they are.
-
 A few things happen either way:
 
 - Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts for Adobe apps](#fonts-for-adobe-apps).
@@ -145,13 +143,13 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 
 ### Your own folder that an app loads
 
-If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose an option under **Fonts in This Folder**, or pick one next to the folder in **Settings → Folders**, where **Active in another app…** lets you type the app’s name.
+If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose an option under **Fonts in This Folder**, or pick one next to the folder in **Settings → Folders**, where **Active in another app** lets you type the app’s name.
 
 ## Turn on the fonts a document uses
 
 To see which fonts a document needs, and turn on the ones you have:
 
-1. Choose **File → Find Fonts in Document…** and pick the document, or drag it from the Finder onto Cicero’s window.
+1. Choose **File → Find Fonts in Document** and pick the document, or drag it from the Finder onto Cicero’s window.
 2. Cicero lists every font the document uses, missing ones first:
    - **On** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
    - **Off** (a dashed circle): it’s in your library but not on. Click **Activate**.
@@ -170,11 +168,11 @@ An *application set* is a set with one or more apps. While one of its apps is op
 
 To make one:
 
-1. Click **+** next to **Sets** in the sidebar and choose **New Application Set…**, or choose **File → New Application Set…**. Name it and click **Create**.
-2. Click **Add App…** and choose one or more apps.
+1. Click **+** next to **Sets** in the sidebar and choose **New Application Set**, or choose **File → New Application Set**. Name it and click **Create**.
+2. Click **Add App** and choose one or more apps.
 3. Click **Done**, then drag the fonts you need onto the set.
 
-To give apps to a set you already have, right-click it and choose **Activate with Apps…** (**Edit Apps…** once it has some). In that window, “Open” marks apps that are running, and the remove button next to an app takes it out.
+To give apps to a set you already have, right-click it and choose **Activate with Apps** (**Edit Apps** once it has some). In that window, “Open” marks apps that are running, and the remove button next to an app takes it out.
 
 A few rules:
 
@@ -195,7 +193,7 @@ Turn on **Open at login** in **Settings → General**, or click **Open at Login*
 
 To delete fonts, not just turn them off:
 
-1. Select families and choose **Fonts → Move to Trash…**, or right-click a family and choose **Move to Trash…**. For one style, right-click it on the font page and choose **Move Style to Trash…**
+1. Select families and choose **Fonts → Move to Trash**, or right-click a family and choose **Move to Trash**. For one style, right-click it on the font page and choose **Move Style to Trash**
 2. Read the alert and click **Move to Trash**.
 
 Cicero turns the fonts off in every app and moves their files to the Trash, copies in other folders included. If a file also holds other families, as a font collection can, the alert names them. The families leave your sets too.

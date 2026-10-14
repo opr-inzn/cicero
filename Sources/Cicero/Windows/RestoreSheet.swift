@@ -43,10 +43,10 @@ struct RestoreSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let progress {
                         ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
-                        Text("Putting fonts back… \(progress.done.formatted()) of \(progress.total.formatted())")
+                        Text("Putting fonts back, \(progress.done.formatted()) of \(progress.total.formatted())")
                     } else {
                         ProgressView()
-                        Text("Restoring…")
+                        Text("Restoring")
                     }
                 }
                 .progressViewStyle(.linear)
@@ -87,7 +87,7 @@ struct RestoreSheet: View {
         let counts = [
             (data.sets.count, "set", "sets"), (data.smartSets.count, "smart set", "smart sets"), (data.tags.count, "tag", "tags"),
             (data.folders.count, "folder", "folders"), (data.fontFiles.count, "added font", "added fonts"),
-            (data.customCharacterSets.count, "character set", "character sets"),
+            (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]
         let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
         let inside = parts.isEmpty ? "No sets or folders, just settings." : parts.formatted(.list(type: .and)) + "."

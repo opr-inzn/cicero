@@ -20,6 +20,12 @@ public struct UserData: Codable, Equatable, Sendable {
     public var foundryOverrides: [String: String] = [:]
     /// Manufacturer as the files name it → the name to show.
     public var foundryRenames: [String: String] = [:]
+    /// Classifications the user made, in the order they were made.
+    public var classifications: [String] = []
+    /// Family name → the classification the user put it in, overriding the one its fonts suggest.
+    public var classificationOverrides: [String: String] = [:]
+    /// A built-in classification (`Classification.rawValue`) → the name to show.
+    public var classificationRenames: [String: String] = [:]
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
@@ -60,12 +66,26 @@ public struct UserData: Codable, Equatable, Sendable {
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
         foundryRenames = try value(.foundryRenames, d.foundryRenames)
+        classifications = try value(.classifications, d.classifications)
+        classificationOverrides = try value(.classificationOverrides, d.classificationOverrides)
+        classificationRenames = try value(.classificationRenames, d.classificationRenames)
         customCharacterSets = try value(.customCharacterSets, d.customCharacterSets)
         sidebar = try value(.sidebar, d.sidebar)
         installMethod = try value(.installMethod, d.installMethod)
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         showAdobeFonts = try value(.showAdobeFonts, d.showAdobeFonts)
         records = try value(.records, d.records)
+        // Rules for Slab Serif, a classification there used to be, pick Serif, which it's part of now; unless
+        // Slab Serif is one of the user's.
+        let serif = classificationRenames[Classification.serif.rawValue] ?? Classification.serif.rawValue
+        for set in smartSets.indices {
+            for rule in smartSets[set].rules.indices where smartSets[set].rules[rule].field == .classification {
+                let value = smartSets[set].rules[rule].value
+                if !classifications.contains(value), Classification(saved: value) == .serif, value != Classification.serif.rawValue {
+                    smartSets[set].rules[rule].value = serif
+                }
+            }
+        }
     }
 
     /// Whether anything but the sidebar's choices (order, hidden and collapsed items) differs.
@@ -235,15 +255,6 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
         self.value = value
     }
 
-    /// Rules for a classification there used to be pick the one it's part of now.
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(UUID.self, forKey: .id)
-        field = try c.decode(Field.self, forKey: .field)
-        comparison = try c.decode(Comparison.self, forKey: .comparison)
-        let value = try c.decode(String.self, forKey: .value)
-        self.value = field == .classification ? Classification(saved: value)?.rawValue ?? value : value
-    }
 
     public enum Field: String, Codable, CaseIterable, Sendable {
         case name, foundry, classification, tag, set, folder, status, kind, format, styles, language, characterSet, added

@@ -228,9 +228,9 @@ private struct SidebarContent: View {
             plus("Add a folder of fonts") { model.presentAddFolderPanel() }
         case .sets:
             Menu {
-                Button("New Set…") { model.prompt("New Set", confirm: "Create") { model.addSet(named: $0) } }
-                Button("New Smart Set…") { model.editingSmartSet = SmartSet(name: "") }
-                Button("New Application Set…") { model.newApplicationSet() }
+                Button("New Set") { model.prompt("New Set", confirm: "Create") { model.addSet(named: $0) } }
+                Button("New Smart Set") { model.editingSmartSet = SmartSet(name: "") }
+                Button("New Application Set") { model.newApplicationSet() }
             } label: {
                 Image(systemName: "plus")
             }
@@ -243,8 +243,10 @@ private struct SidebarContent: View {
         case .tags:
             plus("New tag") { model.newTag() }
         case .characterSets:
-            plus("New character set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
-        case .foundries, .classifications:
+            plus("New coverage set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
+        case .classifications:
+            plus("New classification") { model.newClassification() }
+        case .foundries:
             EmptyView()
         }
     }
@@ -267,7 +269,7 @@ private struct SidebarContent: View {
     /// Activate, Activate Temporarily and Deactivate for every font in a set or smart set.
     @ViewBuilder
     private func activation(for row: SidebarRow, kind: String) -> some View {
-        Button("Activate \(kind)" + (model.data.installMethod == .ask ? "…" : "")) { model.activateFonts(in: row.item, named: row.title) }
+        Button("Activate \(kind)") { model.activateFonts(in: row.item, named: row.title) }
         Button("Activate Temporarily") { model.activateFontsTemporarily(in: row.item) }
         Button("Deactivate \(kind)") { model.deactivateFonts(in: row.item) }
     }
@@ -321,40 +323,49 @@ private struct SidebarContent: View {
             if let set = model.data.sets.first(where: { $0.id == id }) {
                 activation(for: row, kind: "Set")
                 Divider()
-                Button("Rename Set…") { model.prompt("Rename Set", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
-                Button(set.apps.isEmpty ? "Activate with Apps…" : "Edit Apps…") { model.editingAppsForSet = id }
+                Button("Rename Set") { model.prompt("Rename Set", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
+                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps") { model.editingAppsForSet = id }
                 Button("Delete Set") { model.deleteSet(id) }
             }
         case .smartSet(let id):
             if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
                 activation(for: row, kind: "Smart Set")
                 Divider()
-                Button("Edit Smart Set…") { model.editingSmartSet = smartSet }
+                Button("Edit Smart Set") { model.editingSmartSet = smartSet }
                 Button("Delete Smart Set") { model.deleteSmartSet(id) }
             }
         case .tag(let name):
-            Button("Rename Tag…") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
+            Button("Rename Tag") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
             Picker("Color", selection: Binding(get: { model.data.tagColors[name] }, set: { model.setColor($0, forTag: name) })) {
                 Text("None").tag(TagColor?.none)
                 Divider()
                 ForEach(TagColor.allCases, id: \.self) { color in
-                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }.tag(Optional(color))
+                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }
+                        .labelStyle(.titleAndIcon)
+                        .tag(Optional(color))
                 }
             }
             Button("Delete Tag") { model.deleteTag(name) }
         case .foundry(let name):
-            Button("Rename Foundry…") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
+            Button("Rename Foundry") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
+        case .classification(let name):
+            Button("Rename Classification") {
+                model.prompt("Rename Classification", text: name, confirm: "Rename") { model.renameClassification(name, to: $0) }
+            }
+            if model.isUserClassification(name) {
+                Button("Delete Classification") { model.deleteClassification(name) }
+            }
         case .characterSet(let id):
             if let custom = model.data.customCharacterSets.first(where: { $0.setID == id }) {
-                Button("Edit Character Set…") { model.editingCharacterSet = custom }
-                Button("Delete Character Set") { model.deleteCharacterSet(custom.id) }
+                Button("Edit Coverage Set") { model.editingCharacterSet = custom }
+                Button("Delete Coverage Set") { model.deleteCharacterSet(custom.id) }
             }
         default:
             EmptyView()
         }
         if model.canExport(row.item) {
             Divider()
-            Button("Export Fonts…") { model.exportFonts(in: row.item, named: row.title) }
+            Button("Export Fonts") { model.exportFonts(in: row.item, named: row.title) }
         }
         Divider()
         if model.isVisible(row.key) {
