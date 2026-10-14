@@ -7,7 +7,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Far more fonts get a classification. When a font doesn’t say what it is, Cicero looks at its letters: an I and an l with feet are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing. After that, Cicero reads the font’s PANOSE numbers, another way fonts can say what they are. In a library of 1,415 families, mostly from small foundries, Unclassified went from 934 families to 231.
 - With Apple Intelligence on, Cicero guesses the classification of the fonts still left over from their names, on your Mac. Nothing is sent. The Info panel says when a classification is a guess. Turn it off in Settings → General → Guess classifications from names.
 - Fonts with “Symbol”, “Dingbat” or “Emoji” in their name count as Symbol.
-- Classifications you chose yourself stay as they are, but smart sets with a Classification rule may change as fonts move out of Unclassified.
+- Classifications you chose yourself stay as they are. To keep a family where Cicero put it, choose that classification from its right-click menu or in the Info panel: later versions of Cicero, or a new guess, won’t move it.
+- Smart sets with a Classification rule may change as fonts move out of Unclassified.
 - The first time it opens, Cicero reads every font file again, which takes a little longer in a large library.
 
 ## 1.2.1

@@ -49,7 +49,8 @@ a toggle that's on and a button being pressed.
   - **Classifications** (+ new classification). Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol — only the ones
     with families — then the user's own (always shown, in the order they were made), then Unclassified. A family's
     classification is the one its fonts suggest unless the user put it in another: the family menu's Classification
-    submenu (Automatic (Sans Serif), every classification, New Classification), the Info panel's Classification row
+    submenu (Automatic (Sans Serif), every classification, New Classification; a classification is checked when the
+    user put every family in it, so choosing the one Automatic suggests keeps the family there), the Info panel's Classification row
     (Change menu, the same items), or dropping families on a classification row. Menu: Rename Classification (built-in
     ones too; their own name back undoes it; a name that's taken says so; overrides, smart set rules and the sidebar
     follow), Delete Classification for the user's own (its families go back to Automatic, its smart set rules go).

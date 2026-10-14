@@ -166,15 +166,15 @@ struct CopySourcesMenu: View {
     }
 }
 
-/// Which classification families are in: Automatic, the one their fonts suggest, or any other, the user's
-/// own among them; and a new one.
+/// Which classification families are in: Automatic, the one their fonts suggest, or one the user puts them in, the
+/// one Automatic suggests too, which keeps them there whatever Cicero suggests later; and a new one.
 struct ClassificationMenuItems: View {
     let families: [Family]
     let model: AppModel
 
     var body: some View {
-        let names = Set(families.map(model.classificationName(of:)))
-        let automatic = families.allSatisfy { model.data.classificationOverrides[$0.id] == nil }
+        let overrides = model.data.classificationOverrides
+        let automatic = families.allSatisfy { overrides[$0.id] == nil }
         // One family says which classification Automatic is.
         let suggested = families.count == 1 ? model.suggestedClassification(of: families[0]) : nil
         Toggle(suggested.map { "Automatic (\(model.name(of: $0)))" } ?? "Automatic", isOn: Binding(
@@ -184,7 +184,7 @@ struct ClassificationMenuItems: View {
         Divider()
         ForEach(model.classificationNames, id: \.self) { name in
             Toggle(name, isOn: Binding(
-                get: { names == [name] },
+                get: { families.allSatisfy { overrides[$0.id] == name } },
                 set: { if $0 { model.setClassification(name, for: families) } }
             ))
         }

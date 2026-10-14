@@ -213,7 +213,7 @@ Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Sy
 A family none of them tells stays Unclassified, rather than ending up in the wrong classification.
 
 - **Make your own classification:** click **+** next to **Classifications**, or choose **Classification → New Classification** from a family’s right-click menu to put it straight in. Yours stay in the sidebar even while they’re empty.
-- **Put a family in another classification:** right-click it and choose one from **Classification**, use **Change** next to **Classification** in the Info panel, or drag it onto a classification in the sidebar. **Automatic** puts it back where its fonts say it belongs.
+- **Put a family in another classification:** right-click it and choose one from **Classification**, use **Change** next to **Classification** in the Info panel, or drag it onto a classification in the sidebar. To keep a family where Cicero put it, choose that classification: a later version of Cicero, or a new guess, won’t move it. **Automatic** puts it back where its fonts say it belongs. Your choices are saved with your library, so they’re the same each time Cicero opens, and backups include them.
 - **Rename a classification:** right-click it and choose **Rename Classification**. This works for Cicero’s own too; give one its old name back to undo that. Smart sets follow.
 - **Delete one of yours:** right-click it and choose **Delete Classification**. Its families go back to the classifications their fonts suggest.
 - **Hide a classification:** click **Edit** at the top of the sidebar and uncheck it, or choose **Hide from Sidebar** from its right-click menu.
