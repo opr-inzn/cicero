@@ -32,11 +32,11 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Back up and restore.** Save your sets, smart sets, tags, character sets, folders, added fonts, foundry names and sidebar, the fonts Cicero turned on, and its settings for activation, system fonts and Adobe fonts, with your font files if you like, as one `.cicerobackup` file, and restore it on this Mac or another (File → Back Up Library… and Restore Library…). Appearance and preview settings stay with each Mac. Each font goes back where it was unless a file is already there; nothing is ever written over.
 - **Updates.** Cicero checks GitHub for new versions and offers to install them. Check now with Cicero → Check for Updates…, or turn automatic checks off in Settings → General → Updates.
 - **Moves itself to Applications.** Opened from the disk image or your Downloads folder, Cicero offers to move itself to the Applications folder, where application sets, opening at login and updates work.
-- **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with Release Notes and Report an Issue next to it in the Help menu.
+- **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with Release Notes, Privacy Policy and Report an Issue next to it in the Help menu.
 
 ## Privacy
 
-Cicero doesn’t track you and has no analytics. Nothing about you or your fonts leaves your Mac: everything it knows about your fonts stays in local files. It only goes online to check GitHub for updates, which you can turn off in Settings → General → Updates. The Help menu opens web pages in your browser.
+Cicero doesn’t track you and has no analytics. Nothing about you or your fonts leaves your Mac: everything it knows about your fonts stays in local files. It only goes online to check GitHub for updates, which you can turn off in Settings → General → Updates. The Help menu opens web pages in your browser. The full [privacy policy](https://cicero.maximilianinzinger.com/privacy) is on Cicero’s website, and in Help → Privacy Policy.
 
 ## Credits
 
