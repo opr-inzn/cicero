@@ -29,9 +29,9 @@ Each card is one family, like “Active from 2 files” or “3 styles active fr
 
 Cicero remembers these files, but they’re gone.
 
-- **A font used where it was:** its file moved or its disk is unplugged, so the font no longer works. If you moved it on purpose, add its new folder and turn it on again. **Forget** tells macOS to stop looking for it, and clears Cicero’s note of it.
+- **A font used where it was:** its file moved, so the font no longer works. If you moved it on purpose, add its new folder and turn it on again. **Forget** tells macOS to stop looking for it, and clears Cicero’s note of it. A file on a disk that isn’t connected, or in one of your folders that can’t be found, is under [Fonts on External Disks](#fonts-on-external-disks) instead.
 - **A copy Cicero installed:** the copy is gone from your Fonts folder. **Forget** clears Cicero’s note of it.
-- **A family in a set that’s no longer in your library:** **Remove from Set** takes it out of the set.
+- **A family in a set that’s no longer in your library:** **Remove from Set** takes it out of the set. Families that are only away for now, on a disk that isn’t connected or online only in a cloud folder, aren’t listed.
 
 ## Damaged or Unreadable Files
 
@@ -41,9 +41,13 @@ Cicero couldn’t read these files. They may be damaged, or not font files at al
 
 These fonts are used from a disk that can be unplugged, like a USB drive or a network disk, so they turn off when it’s gone. **Install a Copy Instead** copies the font into your Fonts folder, so it keeps working without the disk.
 
+While the disk isn’t connected, its fonts are listed here as “Used where it is, on “Server”, which isn’t connected”. Connect it and they work again. If the disk is gone for good, **Forget** tells macOS to stop looking for the font and clears Cicero’s note of it.
+
 ## Duplicates
 
-The same font is in your folders more than once, as files that aren’t on.
+The same font is in one place in your folders more than once, as files that aren’t on, like twice in one client’s folder.
+
+Copies in different places, like one in each client’s folder, aren’t duplicates: they’re the places [Use Copy From](activating.md#use-another-copy-of-a-font) lets you choose between. Each folder you added is a place, unless it holds copies of a style in different folders inside it, like `Clients/Acme` and `Clients/Globex`: then those are places of their own.
 
 **Move Extra Copies to Trash…** keeps one copy of each style and moves the others to the Trash. It keeps the file Cicero installed a copy from, if there is one, and otherwise the one with the highest version, then the newest. With only one extra copy, the button says **Move to Trash…**
 
