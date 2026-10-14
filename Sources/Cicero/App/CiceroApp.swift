@@ -171,12 +171,17 @@ struct CiceroCommands: Commands {
 
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
 /// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
+/// Also counts the launch for the usage statistics.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set when the main window appears; files that come before wait for it.
     var model: AppModel? {
         didSet { flush() }
     }
     private var waiting: [URL] = []
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        UsageStatistics.sendLaunch()
+    }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         waiting += urls
