@@ -33,11 +33,11 @@ extension AppModel {
             let read = await Task.detached(priority: .userInitiated) { Result { try DocumentFonts.read(url) } }.value
             switch read {
             case .success(let fonts) where fonts.isEmpty:
-                showToast("“\(url.lastPathComponent)” doesn’t name any fonts.")
+                showToast("“\(url.lastPathComponent)” doesn’t name any fonts")
             case .success(let fonts):
                 documentFonts = DocumentFontsReport(url: url, fonts: fonts)
             case .failure:
-                showToast("Couldn’t read the fonts in “\(url.lastPathComponent)”.")
+                showToast("Couldn’t read the fonts in “\(url.lastPathComponent)”")
             }
         }
     }

@@ -1,8 +1,8 @@
 import CiceroCore
 import SwiftUI
 
-/// Asks how to activate when the install method is Ask: copy the files, use them where they are,
-/// or only for a while.
+/// Asks how to activate when the install method is Ask: copy the files, move the ones added one at a time,
+/// use them where they are, or only for a while.
 struct ActivationSheet: View {
     let prompt: ActivationPrompt
     @Environment(AppModel.self) private var model
@@ -19,6 +19,10 @@ struct ActivationSheet: View {
             HStack(spacing: 12) {
                 option("Install a Copy", icon: "doc.on.doc",
                        detail: "Copies the files into your Fonts folder. The originals stay where they are.") { choose(.copy) }
+                if offersMove {
+                    option("Move Into Fonts Folder", icon: "folder",
+                           detail: "Moves the files you added into your Fonts folder. A folder they leave empty goes to the Trash.") { choose(.move) }
+                }
                 option("Use Files Where They Are", icon: "link",
                        detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }
             }
@@ -36,7 +40,12 @@ struct ActivationSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 560)
+        .frame(width: offersMove ? 720 : 560)
+    }
+
+    /// Some of the files were added one at a time, so they can move (see `AppModel.movableFiles`).
+    private var offersMove: Bool {
+        prompt.switching == nil && !model.movableFiles(among: prompt.faces.map(\.face.path)).isEmpty
     }
 
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {

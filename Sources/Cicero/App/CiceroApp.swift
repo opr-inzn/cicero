@@ -27,7 +27,7 @@ struct CiceroApp: App {
                 }
                 // Fonts opened from the Finder (Open With, or a double-click when Cicero opens fonts): SwiftUI
                 // hands the first of them here and the others to the delegate.
-                .onOpenURL { model.open([$0], showsPage: true) }
+                .onOpenURL { model.open([$0]) }
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
@@ -188,7 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func flush() {
         guard let model, !waiting.isEmpty else { return }
-        model.open(waiting, showsPage: true)
+        model.open(waiting)
         waiting = []
     }
 }

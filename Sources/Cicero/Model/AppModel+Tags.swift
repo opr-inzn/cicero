@@ -24,7 +24,7 @@ extension AppModel {
     func renameTag(_ old: String, to new: String) {
         let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != old, let index = data.tags.firstIndex(of: old) else { return }
-        guard !data.tags.contains(trimmed) else { return showToast("There’s already a tag called “\(trimmed)”.") }
+        guard !data.tags.contains(trimmed) else { return showToast("There’s already a tag called “\(trimmed)”") }
         var data = data
         data.tags[index] = trimmed
         let color = data.tagColors.removeValue(forKey: old)

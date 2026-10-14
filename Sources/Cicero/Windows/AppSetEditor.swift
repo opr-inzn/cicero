@@ -93,7 +93,7 @@ enum LoginItem {
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {
-            model.showToast(enabled ? "Couldn’t add Cicero to your login items." : "Couldn’t remove Cicero from your login items.")
+            model.showToast(enabled ? "Couldn’t add Cicero to your login items" : "Couldn’t remove Cicero from your login items")
         }
         return status
     }
