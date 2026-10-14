@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.4.2
 
 - The coverage set editor explains that spaces and line breaks don’t count, so you can use them to lay out your characters.
 - The characters a coverage set will check for appear under **Preview** in its editor, with their count next to the heading.
