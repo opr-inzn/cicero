@@ -17,7 +17,7 @@ Go through these in order:
 
 macOS and some apps keep lists of fonts that can go stale after fonts change. Fonts then don’t show up in apps, show up twice, or look wrong. Clearing the caches makes the lists get rebuilt. You may need to restart your Mac afterwards.
 
-1. Choose **Fonts → Clear Font Caches**, or click **Clear** next to **macOS, Adobe and Office caches** in **Settings → General**.
+1. Choose **Fonts → Clear Font Caches**, or click **Clear** next to **macOS, Adobe and Office font caches** in **Settings → General**.
 2. Check the caches to clear:
    - **macOS (my account):** removes your account’s font caches and restarts the font service.
    - **macOS (all users):** the same for every account on the Mac. It needs an administrator password.

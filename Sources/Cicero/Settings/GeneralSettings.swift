@@ -23,6 +23,8 @@ struct GeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .formRowCentered()
+            }
+            Section("Fonts") {
                 LabeledContent {
                     PopUpPicker(options: InstallMethod.allCases.map { ($0.title, $0) }, selection: $model.data.installMethod)
                 } label: {
@@ -50,7 +52,7 @@ struct GeneralSettings: View {
                     Button("Rebuild") { model.rebuildFontList() }
                 }
                 .formRowCentered()
-                LabeledContent("macOS, Adobe and Office caches") {
+                LabeledContent("macOS, Adobe and Office font caches") {
                     Button("Clear") { isClearingCaches = true }
                         .foregroundStyle(.red)
                 }
