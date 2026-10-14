@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.4.3
 
 - A folder can be **Active**: Cicero turns on every font in it, where it is, and fonts you put in it later go on by themselves. Choose it next to the folder in Settings → Folders or under **Fonts in This Folder** in its menu in the sidebar, which now offers **Inactive**, **Active**, **Active in Adobe apps** and **Active in Specific App**. Choosing Inactive again, or removing the folder, turns its fonts off.
 - Settings → General is more compact: four groups instead of nine, with Appearance on its own, the settings for activation, opening at login, system fonts, Adobe fonts and classification under **Fonts**, **Library** with Rebuild, Back Up and Restore, and Clear for the font caches, under **Maintenance**, the switches for updates and usage statistics under **Updates**, and short explanations inside the rows that need them.
