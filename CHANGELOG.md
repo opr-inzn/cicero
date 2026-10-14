@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## 1.1.2
+## 1.2
 
 - The sidebar’s folders, foundries and classifications are there as soon as Cicero opens, rather than appearing a moment later.
 
