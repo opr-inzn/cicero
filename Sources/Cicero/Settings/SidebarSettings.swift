@@ -44,7 +44,7 @@ struct SidebarSettings: View {
             .formStyle(.grouped)
             Divider()
             HStack {
-                Text("Unchecked items stay out of the sidebar; Edit there does the same. Drag items in the sidebar to reorder them within their section.")
+                Text("Unchecked items stay out of the sidebar. Drag items in the sidebar to reorder them within their section.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()

@@ -1,39 +1,32 @@
 import CiceroCore
 import SwiftUI
 
-/// The built-in character sets by group, with a checkbox each for the sidebar, and the user's own.
+/// The user's own character sets, then the built-in ones by group, with a checkbox each for the sidebar.
 struct CharacterSetsSettings: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: UUID?
     @State private var editing: CustomCharacterSet?
 
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section {} footer: {
-                    Text("Checked sets appear in the sidebar, where you can see which fonts have every one of their characters. All of them are shown at first.").formFooter()
-                }
-                ForEach(model.characterSetCatalog.groups) { group in
-                    Section {
-                        ForEach(group.sets) { row($0) }
-                    } header: {
-                        Text(group.name)
-                    } footer: {
-                        Group {
-                            if let url = URL(string: group.url) {
-                                Link(group.credit, destination: url)
-                            } else {
-                                Text(group.credit)
-                            }
+        Form {
+            custom
+            ForEach(model.characterSetCatalog.groups) { group in
+                Section {
+                    ForEach(group.sets) { row($0) }
+                } header: {
+                    Text(group.name)
+                } footer: {
+                    Group {
+                        if let url = URL(string: group.url) {
+                            Link(group.credit, destination: url)
+                        } else {
+                            Text(group.credit)
                         }
-                        .formFooter()
                     }
+                    .formFooter()
                 }
             }
-            .formStyle(.grouped)
-            Divider()
-            custom
         }
+        .formStyle(.grouped)
         .sheet(item: $editing) { CharacterSetEditor(original: $0) }
     }
 
@@ -55,52 +48,36 @@ struct CharacterSetsSettings: View {
         }
     }
 
+    /// Rows of the form rather than a list of their own, so they scroll with the built-in sets.
     private var custom: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Your Coverage Sets").font(.headline)
-            List(selection: $selection) {
-                ForEach(model.data.customCharacterSets) { set in
-                    HStack {
-                        Toggle(set.name, isOn: visibility(set.setID))
-                            .toggleStyle(.checkbox)
-                        Spacer()
-                        Text(count(CharacterSetCatalog.parse(set.characters).count))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    .tag(set.id)
-                }
-            }
-            .listStyle(.bordered)
-            // No stripes behind the empty-state note.
-            .alternatingRowBackgrounds(model.data.customCharacterSets.isEmpty ? .disabled : .enabled)
-            .frame(height: 110)
-            .overlay {
-                if model.data.customCharacterSets.isEmpty {
-                    Text("Make a set from the characters you need, like a client’s name or a language’s alphabet.")
-                        .font(.callout)
+        Section {
+            ForEach(model.data.customCharacterSets) { set in
+                HStack(alignment: .firstTextBaseline) {
+                    Toggle(set.name, isOn: visibility(set.setID))
+                        .toggleStyle(.checkbox)
+                    Spacer()
+                    Text(count(CharacterSetCatalog.parse(set.characters).count))
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
+                        .monospacedDigit()
+                    Button("Edit") { editing = set }
+                }
+                .contextMenu {
+                    Button("Edit Coverage Set") { editing = set }
+                    Button("Delete Coverage Set") { model.deleteCharacterSet(set.id) }
                 }
             }
-            HStack(spacing: 2) {
-                ListEditButton("New Coverage Set", systemImage: "plus") { editing = CustomCharacterSet(name: "", characters: "") }
-                ListEditButton("Delete Coverage Set", systemImage: "minus") {
-                    if let selection { model.deleteCharacterSet(selection) }
-                    selection = nil
-                }
-                .disabled(selection == nil)
+            if model.data.customCharacterSets.isEmpty {
+                Text("Make a set from the characters you need, like a client’s name or a language’s alphabet.")
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                Text("Your Coverage Sets")
                 Spacer()
-                Button("Edit") { editing = selected }
-                    .disabled(selected == nil)
+                ListEditButton("New Coverage Set", systemImage: "plus") { editing = CustomCharacterSet(name: "", characters: "") }
+                    .help("Make a coverage set")
             }
         }
-        .padding(16)
-    }
-
-    private var selected: CustomCharacterSet? {
-        model.data.customCharacterSets.first { $0.id == selection }
     }
 
     private func count(_ characters: Int) -> String {
