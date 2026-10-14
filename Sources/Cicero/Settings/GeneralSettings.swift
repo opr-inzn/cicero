@@ -45,7 +45,7 @@ struct GeneralSettings: View {
                 }
                 .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
             }
-            Section("Font Caches") {
+            Section("Maintenance") {
                 LabeledContent("Cicero’s font list") {
                     Button("Rebuild") { model.rebuildFontList() }
                 }
@@ -55,8 +55,6 @@ struct GeneralSettings: View {
                         .foregroundStyle(.red)
                 }
                 .formRowCentered()
-            }
-            Section {
                 LabeledContent("Library backup") {
                     HStack {
                         Button("Back Up") { isBackingUp = true }
@@ -64,6 +62,8 @@ struct GeneralSettings: View {
                     }
                 }
                 .formRowCentered()
+            }
+            Section("Updates and Privacy") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
