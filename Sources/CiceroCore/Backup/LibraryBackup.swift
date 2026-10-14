@@ -460,7 +460,7 @@ public struct LibraryBackup: Sendable {
             Dictionary(dictionary.map { (map($0.key), map($0.value)) }, uniquingKeysWith: { first, _ in first })
         }
         var data = contents.userData
-        data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName) }
+        data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName, isActive: $0.isActive) }
         data.fontFiles = data.fontFiles.map(map)
         let roots = fontLocations(watching: data.folders)
         func isFont(_ path: String) -> Bool { Self.isFontLocation(path, in: roots) }

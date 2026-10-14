@@ -10,16 +10,17 @@ struct AppSetEditor: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var loginItem = LoginItem.status
+    @State private var selection: Set<String> = []
 
     var body: some View {
         let set = model.data.sets.first { $0.id == setID }
         VStack(alignment: .leading, spacing: 14) {
             Text("Activate “\(set?.name ?? "")” with Apps").font(.title2.bold())
-            Text("When one of these apps opens, Cicero activates the set’s fonts that are off, and deactivates them when the app quits. Fonts you turned on yourself stay on.")
+            Text("When one of these apps opens, Cicero activates the set’s fonts that are off, and deactivates them when the app quits. Fonts you turned on yourself stay on. This works while Cicero is open.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            List {
-                ForEach(set?.apps ?? []) { app in
+            List(selection: $selection) {
+                ForEach(Array((set?.apps ?? []).enumerated()), id: \.element.bundleID) { index, app in
                     HStack(spacing: 8) {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
                             .resizable()
@@ -29,22 +30,26 @@ struct AppSetEditor: View {
                         if model.appSets.isRunning(app) {
                             Text("Open").foregroundStyle(.secondary)
                         }
-                        Button("Remove \(app.name)", systemImage: "minus.circle") { model.removeApp(app.bundleID, from: setID) }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
                     }
+                    .cardRow(index)
                 }
             }
-            .listStyle(.bordered)
-            .frame(height: 150)
             .overlay {
                 if set?.apps.isEmpty ?? true {
                     Text("No apps yet").foregroundStyle(.secondary)
                 }
             }
-            Button("Add App") { model.presentAppPicker(for: setID) }
-            loginNote
+            .inCard(
+                add: CardListButton(title: "Add App", help: "Add the apps that need this set’s fonts") { model.presentAppPicker(for: setID) },
+                remove: CardListButton(title: "Remove Apps", help: "Remove the selected apps") {
+                    for bundleID in selection { model.removeApp(bundleID, from: setID) }
+                    selection = []
+                },
+                canRemove: !selection.isEmpty
+            )
+            .frame(height: 170)
             HStack {
+                loginToggle
                 Spacer()
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
@@ -57,25 +62,18 @@ struct AppSetEditor: View {
         }
     }
 
-    /// Application sets need Cicero to be open, so this offers to open it at login.
+    /// Application sets need Cicero to be open, so this offers to open it at login, next to Done.
     @ViewBuilder
-    private var loginNote: some View {
-        HStack(alignment: .firstTextBaseline) {
-            switch loginItem {
-            case .enabled:
-                Text("Cicero opens when you log in, so this works from the start.")
-            case .requiresApproval:
-                Text("Allow Cicero in Login Items to have it open when you log in.")
-                Spacer()
-                Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
-            default:
-                Text("This works while Cicero is open.")
-                Spacer()
-                Button("Open at Login") { loginItem = LoginItem.set(true, model: model) }
-            }
+    private var loginToggle: some View {
+        Toggle("Open Cicero at login", isOn: Binding(
+            get: { loginItem == .enabled || loginItem == .requiresApproval },
+            set: { loginItem = LoginItem.set($0, model: model) }
+        ))
+        .toggleStyle(.checkbox)
+        if loginItem == .requiresApproval {
+            Button("Allow in Login Items") { SMAppService.openSystemSettingsLoginItems() }
+                .buttonStyle(.link)
         }
-        .font(.callout)
-        .foregroundStyle(.secondary)
     }
 }
 

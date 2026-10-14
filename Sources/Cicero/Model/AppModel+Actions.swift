@@ -221,7 +221,7 @@ extension AppModel {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        panel.message = "Choose folders that contain fonts. They’re listed in your library without being installed."
+        panel.message = "Choose folders that contain fonts. They’re listed in your library without being activated."
         guard panel.runModal() == .OK else { return }
         addFolders(panel.urls)
     }
@@ -243,9 +243,15 @@ extension AppModel {
     }
 
     func removeFolder(_ id: UUID) {
-        data.folders.removeAll { $0.id == id }
-        data.sidebar.forget("folder.\(id)")
-        deselect { $0 == .folder(id) }
+        removeFolders([id])
+    }
+
+    /// Several at once with one rescan, as Settings → Folders removes the selected ones.
+    func removeFolders(_ ids: Set<UUID>) {
+        turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
+        data.folders.removeAll { ids.contains($0.id) }
+        for id in ids { data.sidebar.forget("folder.\(id)") }
+        deselect { item in ids.contains { item == .folder($0) } }
         rescan()
     }
 
@@ -287,11 +293,41 @@ extension AppModel {
         NSWorkspace.shared.open(url)
     }
 
-    func setAppName(_ name: String?, forFolder id: UUID) {
+    /// Inactive, Active (Cicero turns on every font in the folder where it is, and keeps new ones on: see
+    /// `activateAddedFonts`), or loaded by `app` by itself. Leaving Active turns off what it turned on.
+    func setActivation(ofFolder id: UUID, active: Bool, app: String?) {
         guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
-        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
-        data.folders[index].appName = trimmed?.isEmpty == false ? trimmed : nil
+        let folder = data.folders[index]
+        let trimmed = app?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let app = active || trimmed?.isEmpty != false ? nil : trimmed
+        guard folder.isActive != active || folder.appName != app else { return }
+        if folder.isActive && !active { turnOffKeptFonts(in: [folder]) }
+        data.folders[index].isActive = active
+        data.folders[index].appName = app
+        if active { keepOn(faces(in: [folder])) }
         rescan()
+    }
+
+    /// The library's fonts whose files are in these folders.
+    func faces(in folders: [WatchedFolder]) -> [LibraryFace] {
+        let prefixes = folders.map { $0.path + "/" }
+        guard !prefixes.isEmpty else { return [] }
+        return library.families.flatMap(\.faces).filter { face in prefixes.contains { face.face.path.hasPrefix($0) } }
+    }
+
+    /// Turned on where they are, whatever Activate fonts by says: moving or copying them would take them out of
+    /// the folder that keeps them on.
+    func keepOn(_ faces: [LibraryFace]) {
+        let targets = faces.filter(\.canActivate)
+        guard !targets.isEmpty else { return }
+        performActivation(targets, method: .inPlace)
+    }
+
+    /// What Cicero turned on where it is in these folders, as it does for Active ones.
+    private func turnOffKeptFonts(in folders: [WatchedFolder]) {
+        let targets = faces(in: folders).filter { $0.canDeactivate && data.records.inPlace.contains($0.face.path) }
+        guard !targets.isEmpty else { return }
+        performDeactivation(targets)
     }
 
     /// Every added font file there is, for Reveal in Finder on Added Fonts.
@@ -488,8 +524,7 @@ extension AppModel {
             }
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
-                    : library.unavailableFolders[$0.id] != nil ? "questionmark.folder"
-                    : $0.appName == nil ? "folder" : "folder.badge.gearshape"
+                    : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
                 return SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:

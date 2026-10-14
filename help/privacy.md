@@ -8,7 +8,7 @@ The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Ci
 
 ## When Cicero goes online
 
-- **Each time it opens**, to count how many people use Cicero, while **Share usage statistics** is on, under **Usage Statistics** in **Settings → General**. It’s on at first. See [Usage statistics](#usage-statistics).
+- **Each time it opens**, to count how many people use Cicero, while **Share usage statistics** is on, under **Updates** in **Settings → General**. It’s on at first. See [Usage statistics](#usage-statistics).
 - **To check GitHub for a new version** of Cicero, and to download it when you choose to install it. Cicero checks by itself while **Check for updates automatically** is on, under **Updates** in **Settings → General**. It’s on at first. Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates**
 
 ## Apple Intelligence
@@ -29,7 +29,7 @@ The first time, it also sends a second note saying your Mac is new, with that da
 
 That’s all: not your name, your Mac’s name, where you are or anything about your fonts. TelemetryDeck sees your IP address, as any website does, but doesn’t store it, and hashes the number again before it keeps it. The code that sends the note is in [UsageStatistics.swift](https://github.com/opr-inzn/cicero/blob/main/Sources/Cicero/App/UsageStatistics.swift).
 
-To stop it, open **Settings → General** and, under **Usage Statistics**, turn off **Share usage statistics**. Cicero sends nothing more and forgets the random number; if you turn it on again, it makes a new one.
+To stop it, open **Settings → General** and, under **Updates**, turn off **Share usage statistics**. Cicero sends nothing more and forgets the random number; if you turn it on again, it makes a new one.
 
 ## What Cicero keeps on your Mac
 

@@ -2,6 +2,18 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- A folder can be **Active**: Cicero turns on every font in it, where it is, and fonts you put in it later go on by themselves. Choose it next to the folder in Settings → Folders or under **Fonts in This Folder** in its menu in the sidebar, which now offers **Inactive**, **Active**, **Active in Adobe apps** and **Active in Specific App**. Choosing Inactive again, or removing the folder, turns its fonts off.
+- Settings → General is more compact: four groups instead of nine, with Appearance on its own, the settings for activation, opening at login, system fonts, Adobe fonts and classification under **Fonts**, **Library** with Rebuild, Back Up and Restore, and Clear for the font caches, under **Maintenance**, the switches for updates and usage statistics under **Updates**, and short explanations inside the rows that need them.
+- Settings → Folders lists your folders in a card with **+** and **−** along its bottom, like the lists in System Settings, and you can select several to remove them together. **Show fonts installed for Adobe apps** is in Settings → General now. Folders always have the plain folder icon, whatever they’re set to.
+- The window for an application set’s apps lists them in the same kind of card, with **+** and **−**, and you can select several to remove them together. **Open Cicero at login** is a checkbox next to **Done**.
+- Settings → Sidebar says individual foundries rather than single ones, with a shorter note at the bottom.
+- Fonts you add are described as listed without being activated, rather than without being installed.
+- The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
+- Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.
+- Creating a coverage set or a smart set no longer flashes the editor’s Edit title, Delete button or Save button as the sheet closes.
+
 ## 1.4.2
 
 - The coverage set editor explains that spaces and line breaks don’t count, so you can use them to lay out your characters.
