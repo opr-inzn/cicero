@@ -42,14 +42,6 @@ public struct VariationAxis: Hashable, Codable, Sendable {
         self.name = name
         self.value = value
     }
-
-    /// The registered axes, in the order of MDN's variable fonts guide.
-    static let registered = ["wght", "wdth", "ital", "slnt", "opsz"]
-
-    /// The name in Title Case, for the designer's own axes ("Grade").
-    var title: String {
-        name.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
-    }
 }
 
 /// What a font file says about one of its faces. Read once and cached by file stamp.
@@ -328,8 +320,10 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let isVariable: Bool
     public let isMonospaced: Bool
     public let hasItalics: Bool
-    /// What the faces span, for tile captions: "9 Weights · 3 Widths · Italics", "8 Weights · Italics · 3 Optical Sizes".
+    /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
     public let rangeLabel: String
+    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable", "OTF · Variable".
+    public let formatLabel: String
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
     public let position: SwitchPosition
@@ -358,6 +352,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         isMonospaced = faces.contains { $0.face.isMonospaced }
         hasItalics = faces.contains { $0.face.isItalic }
         rangeLabel = Self.rangeLabel(of: faces.map(\.face))
+        formatLabel = Self.formatLabel(of: faces.map(\.face))
         let apps = Set(faces.map(\.app))
         app = apps.count == 1 ? apps.first! : nil
         position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
@@ -398,10 +393,9 @@ public struct Family: Identifiable, Hashable, Sendable {
         return best ?? faces[0]
     }
 
-    /// Counts the styles along the registered axes (weight, width, italic, optical size), then names the
-    /// designer's own axes the styles step along. A variable font's styles are its named instances, placed by
-    /// their axis values; a static font's by its style names and classes. Families with more styles than
-    /// that tells apart (hidden axes, small caps cut as fonts of their own) also get the style count.
+    /// Counts the weights and widths. A variable font's styles are its named instances, placed by their axis
+    /// values; a static font's by its style names and classes. Families with more styles than weight and width
+    /// tell apart (italics, optical sizes, other axes, small caps cut as fonts of their own) also get the style count.
     static func rangeLabel(of faces: [FontFace]) -> String {
         let styleNames = faces.map { StyleName($0.styleName) }
         func value(_ face: FontFace, _ tag: String) -> Double? { face.axes.first { $0.tag == tag }?.value }
@@ -427,28 +421,20 @@ public struct Family: Identifiable, Hashable, Sendable {
             if let raw = value(face, "wdth") { return (raw, name.widthWords.isEmpty ? nil : name.widthWords) }
             return (Double(face.width == 5 ? name.width ?? 5 : face.width), nil)
         })
-        let sloped = faces.map { face in face.isItalic || (value(face, "ital") ?? 0) >= 0.5 || (value(face, "slnt") ?? 0) != 0 }
-        var custom: [VariationAxis] = []
-        for axis in faces.flatMap(\.axes) where !VariationAxis.registered.contains(axis.tag) && !custom.contains(where: { $0.tag == axis.tag }) {
-            custom.append(axis)
-        }
-
         var parts: [String] = []
         let weightCount = Set(weights).count, widthCount = Set(widthGroups).count
         parts.append(weightCount == 1 ? "1 Weight" : "\(weightCount) Weights")
         if widthCount > 1 { parts.append("\(widthCount) Widths") }
-        let italics = sloped.count { $0 }
-        if italics == faces.count { parts.append("Italic") } else if italics > 0 { parts.append("Italics") }
-        let opticalSizes = Set(faces.compactMap { value($0, "opsz") }).count
-        if opticalSizes > 1 { parts.append("\(opticalSizes) Optical Sizes") }
-        let stepped = custom.filter { axis in Set(faces.compactMap { value($0, axis.tag) }).count > 1 }
-        parts += stepped.map(\.title)
-        let told = Set(faces.indices.map { index -> [Double] in
-            let place: [Double] = [weights[index], Double(widthGroups[index]), sloped[index] ? 1 : 0, value(faces[index], "opsz") ?? 0]
-            return place + stepped.map { value(faces[index], $0.tag) ?? 0 }
-        })
+        let told = Set(faces.indices.map { [weights[$0], Double(widthGroups[$0])] })
         if told.count < faces.count { parts.append("\(faces.count) Styles") }
         return parts.joined(separator: " · ")
+    }
+
+    /// The files' extensions in capitals, "Variable" for variable fonts whatever their extension, in alphabetical order.
+    static func formatLabel(of faces: [FontFace]) -> String {
+        Set(faces.map { face in face.axes.isEmpty ? (face.path as NSString).pathExtension.uppercased() : "Variable" })
+            .sorted()
+            .joined(separator: " · ")
     }
 
     /// Each style's group, where styles at the same place or with the same word (when they have one) are one group.
