@@ -11,6 +11,25 @@ struct FoldersSettings: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 10) {
+            // A card like the grouped forms' in the other tabs, which draw their second line this size too.
+            GroupBox {
+                HStack(alignment: .firstTextBaseline, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show fonts installed for Adobe apps")
+                        Text("Listed under Adobe Apps in the sidebar.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Toggle("Show fonts installed for Adobe apps", isOn: $model.data.showAdobeFonts)
+                        .toggleStyle(.switch)
+                        // The size grouped forms give switches, as in the other tabs: outside one it's the regular size.
+                        .controlSize(.mini)
+                        .labelsHidden()
+                }
+                .padding(6)
+            }
+            .padding(.bottom, 6)
             Text("Fonts in these folders are in your library without being installed.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -44,25 +63,6 @@ struct FoldersSettings: View {
                 .disabled(selection == nil)
                 .help("Remove the folder from the library; its files stay where they are")
             }
-            // A card like the grouped forms' in the other tabs, which draw their second line this size too.
-            GroupBox {
-                HStack(alignment: .firstTextBaseline, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show fonts installed for Adobe apps")
-                        Text("Listed under Adobe Apps in the sidebar.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Toggle("Show fonts installed for Adobe apps", isOn: $model.data.showAdobeFonts)
-                        .toggleStyle(.switch)
-                        // The size grouped forms give switches, as in the other tabs: outside one it's the regular size.
-                        .controlSize(.mini)
-                        .labelsHidden()
-                }
-                .padding(6)
-            }
-            .padding(.top, 6)
         }
         .padding(20)
         .alert(
