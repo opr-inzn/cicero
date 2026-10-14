@@ -137,7 +137,7 @@ A family whose files are all in one app’s folder has a switch with three posit
 | On | On in every app | Turns it off everywhere, that app included |
 | Off | Off everywhere | Turns it back on in that app only |
 
-The family’s right-click menu has the same choices: **Activate in All Apps**, **Use in Adobe Apps Only**, **Deactivate in All Apps** and **Deactivate in Adobe Apps**. For a single app’s folder, they name the app, like **Use in InDesign Only**. The switches in a font page’s **Styles** work the same way, one style at a time.
+The family’s right-click menu has the same choices: **Activate in All Apps**, **Activate Temporarily in All Apps**, **Use in Adobe Apps Only**, **Deactivate in All Apps** and **Deactivate in Adobe Apps**. For a single app’s folder, they name the app, like **Use in InDesign Only**. The switches in a font page’s **Styles** work the same way, one style at a time.
 
 - **On in every app** uses the file where it is. Nothing is copied.
 - **Off everywhere** moves the file into Cicero’s [Deactivated folder](#the-deactivated-folder) and remembers where it was, because the app would load it otherwise. Turning it on again, or **Use in Adobe Apps Only**, puts it back first.
