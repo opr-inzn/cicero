@@ -35,7 +35,7 @@ There are two ways to turn on a font that isn’t in a Fonts folder:
 | Good for | Fonts you always need, or fonts on a disk you unplug | Large libraries you keep in one place |
 | Watch out | Takes disk space | The fonts stop working if their files move or their disk is unplugged |
 
-Choose which one in **Settings → General → Activation**, next to **Activate fonts by**:
+Choose which one in **Settings → General**, next to **Activate fonts by**:
 
 - **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Check **Remember this choice** to stop being asked; you can change it again in Settings.
 - **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).

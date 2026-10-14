@@ -28,7 +28,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 
 To hide one item quickly, right-click it and choose **Hide from Sidebar**.
 
-The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide single foundries, use **Edit** in the sidebar.
+The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
 
 When you make a new set or coverage set, or add a folder, its section shows again if you’d hidden it.
 

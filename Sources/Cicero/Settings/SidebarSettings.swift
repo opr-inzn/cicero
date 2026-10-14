@@ -25,7 +25,7 @@ struct SidebarSettings: View {
                             }
                         // A library can have hundreds: just the section's checkbox here.
                         case .foundries:
-                            note("Hide single foundries with Edit in the sidebar.")
+                            note("Hide individual foundries with Edit in the sidebar.")
                         default:
                             // A section without rows still gets a card, or its header runs into the next one.
                             let rows = model.rows(for: section)
@@ -44,7 +44,7 @@ struct SidebarSettings: View {
             .formStyle(.grouped)
             Divider()
             HStack {
-                Text("Unchecked items stay out of the sidebar. Drag items in the sidebar to reorder them within their section.")
+                Text("Drag items in the sidebar to reorder them.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()
