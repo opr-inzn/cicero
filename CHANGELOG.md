@@ -10,6 +10,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Classifications you chose yourself stay as they are. To keep a family where Cicero put it, choose that classification from its right-click menu or in the Info panel: later versions of Cicero, or a new guess, won’t move it.
 - Smart sets with a Classification rule may change as fonts move out of Unclassified.
 - The first time it opens, Cicero reads every font file again, which takes a little longer in a large library.
+- In the sidebar’s Edit mode, sections open and close as they do outside it, and stay as they were, so you can close Foundries to get to Coverage faster.
+- Clicking Edit or Done in the sidebar no longer makes its rows run into each other for a moment.
 - Each tile in the grid says, at its bottom right, what kind of files the family comes in: OTF, TTF or Variable, for example.
 - The caption under a tile’s name counts just the weights, widths and styles: “8 Weights · 16 Styles” rather than “8 Weights · Italics”. Italics, optical sizes and a font’s own axes count as styles rather than being named.
 - A font page opens with its ligatures and glyphs already there, rather than filling in a section at a time, and nothing on it moves as they appear. Cicero starts on them when you select a font, before you open it.

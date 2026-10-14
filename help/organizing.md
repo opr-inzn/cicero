@@ -22,7 +22,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 
 ### Hide items you don’t use
 
-1. Click **Edit** next to **Fonts** at the top of the sidebar, or choose **View → Edit Sidebar**. Every item and section gets a checkbox.
+1. Click **Edit** next to **Fonts** at the top of the sidebar, or choose **View → Edit Sidebar**. Every item and section gets a checkbox. Sections stay open or closed as they were: click a section’s title to open or close it, for example to close **Foundries** and get to **Coverage** faster.
 2. Uncheck what you don’t want. Unchecked items are dimmed.
 3. Click **Done**. The unchecked items disappear.
 
