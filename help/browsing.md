@@ -37,7 +37,7 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, and what the family’s styles span, like “9 Weights · 3 Widths · Italics”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF”, “TTF” or “Variable”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
 
 The grid is the view Cicero starts with.
 
