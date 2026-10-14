@@ -30,12 +30,18 @@ struct CharacterSetEditor: View {
                     .font(.body.monospaced())
                     .frame(minHeight: 120)
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-                Text("Type or paste characters, codes like U+00C1 or 0x00C1, and ranges like U+0100–U+017F. Spaces and line breaks are ignored.")
+                Text("Type or paste characters, codes like U+00C1 or 0x00C1, and ranges like U+0100–U+017F. Spaces and line breaks don’t count, so you can use them to lay things out.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(scalars.count == 1 ? "1 character" : "\(scalars.count.formatted()) characters").font(.headline)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Preview").font(.headline)
+                    Text(scalars.count == 1 ? "1 character" : "\(scalars.count.formatted()) characters")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
                 ScrollView {
                     Text(Self.preview(scalars))
                         .font(.title3)
