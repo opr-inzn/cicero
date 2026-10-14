@@ -90,18 +90,17 @@ a toggle that's on and a button being pressed.
   right edge to resize it (shown columns and widths saved). When the room runs short (the Info panel open),
   the preview gives way first, then the other columns down to their minimums. Selection as in the other views.
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
-  text when set), name with tag dots, and what the family's styles span, in Title Case, along the registered axes
-  (MDN order: weight, width, italic, then optical size) and then the designer's own: "9 Weights · 3
-  Widths · Italics", "8 Weights · Italics · 3 Optical Sizes · Grade". No axis ranges: a variable font's
+  text when set), name with tag dots, and what the family's styles span, in Title Case: "9 Weights · 3
+  Widths", "8 Weights · 16 Styles"; at the bottom right, the kinds of file it comes in ("OTF",
+  "Variable TTF", "OTF · Variable TTF": extensions in capitals). No axis ranges: a variable font's
   styles are its named instances, placed by their axis values; a static font's by its names and
   classes. Weights count the words in style names (Bold, Bd, U Lt) first — many static files leave
   every class at 400 and variable fonts nudge instances off round values — then the axis value or
   OS/2 class. Widths: a variable instance's wdth value, with instances whose names write the same
   width words (Condensed, not XXX Condensed) counted once; a static font's OS/2 width class unless
-  it's normal, then the name. Slanted or italic styles make "Italics" ("Italic" when all are). Optical
-  sizes and custom axes (by the name the font gives them, else their tag) show when the styles step
-  along them. A family with more styles than these tell apart (hidden axes, small caps cut as fonts of
-  their own) adds "N Styles". The full caption is the tooltip. Tiles scale with the preview size.
+  it's normal, then the name. A family with more styles than weight and width tell apart (italics,
+  optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
+  the tooltip. Tiles scale with the preview size.
 - **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dots, status tag, "Foundry · N styles", switch; the sample at preview size, lined up as Preview Options' alignment says; up to 14 style names set in themselves (+N more).
 - Tag dots: the family's tags that have a colour, in the order the tags were made, as 8 pt circles overlapping like the Finder's.
 - Selection: click, ⌘-click, ⇧-click, ⌘A, arrow keys (↑/↓ in the list and specimens; in the grid ←/→ a tile and ↑/↓ a row; ⇧ extends), Esc clears (closing Quick Look first when it's open), and so does a click between families or below the last, typing a letter jumps, Return or double-click opens the font page, Space opens Quick Look; rows are draggable as family names. Right-click → family menu.
