@@ -22,6 +22,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Menus and buttons no longer end in “…”, and progress messages don’t either.
 - Clear Font Caches, and its row in Settings, say you may need to restart your Mac afterwards.
 - The Show fonts installed for Adobe apps switch in Settings → Folders is as small as the other switches in Settings.
+- Built for macOS 27: there, the Info panel’s corners follow the window’s, sliders are the system’s, tag colors still show in menus, and the Info panel’s Info and Features tabs look like tabs.
 
 ## 1.1
 
