@@ -72,12 +72,8 @@ struct BrowserView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem {
-            Picker("View", selection: $mode) {
-                ForEach(BrowserMode.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelStyle(.iconOnly)
-            .help("Show as a list, a grid or specimens")
+            ToolbarPicker(BrowserMode.allCases, selection: $mode, title: \.title, symbol: \.icon)
+                .help("Show as a list, a grid or specimens")
         }
         ToolbarSpacer(.fixed)
         ToolbarItem { PreviewOptionsButton() }
