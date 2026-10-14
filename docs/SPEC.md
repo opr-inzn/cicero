@@ -27,7 +27,9 @@ a toggle that's on and a button being pressed.
 ## Sidebar
 
 - Header "Fonts" with an **Edit**/**Done** button. Edit mode shows a checkbox on every row and every
-  section header; unchecked items are dimmed, and disappear when you click Done.
+  section header; unchecked items are dimmed, and disappear when you click Done. Sections and character set
+  groups stay open or closed as outside it, and open and close the same way (one state for both). Switching
+  isn't animated: hundreds of rows animating in and out ran into each other.
 - Fixed rows: All Fonts (books.vertical), Activated (checkmark.circle), Not Activated (circle.dashed),
   System Fonts (apple.logo, only while system fonts are shown), Problems (exclamationmark.triangle, count badge).
 - Sections, each collapsible and hideable:
