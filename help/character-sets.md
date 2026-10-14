@@ -39,12 +39,12 @@ You can also hide sets with **Edit** in the sidebar, like any other item. See [H
 
 Make a set from the characters you need, like a client’s name or a language’s alphabet:
 
-1. Click **+** next to **Coverage** in the sidebar, or **+** under **Your Coverage Sets** in **Settings → Coverage**.
+1. Click **+** next to **Coverage** in the sidebar, or **+** next to **Your Coverage Sets** at the top of **Settings → Coverage**.
 2. Give it a name.
 3. Under **Characters**, type or paste them. You can also use codes like `U+00C1` or `0x00C1`, and ranges like `U+0100–U+017F`. Spaces and line breaks are ignored.
 4. Check the preview of the characters and their count, and click **Create**.
 
-Your sets appear under **Your Coverage Sets** in the sidebar. To change one, right-click it and choose **Edit Coverage Set**; to remove it, choose **Delete Coverage Set**. In **Settings → Coverage** you can do the same with **Edit** and **−**.
+Your sets appear under **Your Coverage Sets** in the sidebar. To change one, right-click it and choose **Edit Coverage Set**; to remove it, choose **Delete Coverage Set**. In **Settings → Coverage** you can right-click them too, or click **Edit**; the editor has a **Delete** button as well.
 
 ## The Character Toolbox
 
