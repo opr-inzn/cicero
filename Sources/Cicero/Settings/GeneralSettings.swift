@@ -41,6 +41,10 @@ struct GeneralSettings: View {
                         : "Application sets activate fonts only while Cicero is open.")
                 }
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
+                Toggle(isOn: $model.data.showAdobeFonts) {
+                    Text("Show fonts installed for Adobe apps")
+                    Text("Listed under Adobe Apps in the sidebar.")
+                }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Guess classifications from names")
                     Text(guessingExplanation)

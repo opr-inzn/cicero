@@ -221,7 +221,7 @@ extension AppModel {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        panel.message = "Choose folders that contain fonts. They’re listed in your library without being installed."
+        panel.message = "Choose folders that contain fonts. They’re listed in your library without being activated."
         guard panel.runModal() == .OK else { return }
         addFolders(panel.urls)
     }
@@ -243,9 +243,14 @@ extension AppModel {
     }
 
     func removeFolder(_ id: UUID) {
-        data.folders.removeAll { $0.id == id }
-        data.sidebar.forget("folder.\(id)")
-        deselect { $0 == .folder(id) }
+        removeFolders([id])
+    }
+
+    /// Several at once with one rescan, as Settings → Folders removes the selected ones.
+    func removeFolders(_ ids: Set<UUID>) {
+        data.folders.removeAll { ids.contains($0.id) }
+        for id in ids { data.sidebar.forget("folder.\(id)") }
+        deselect { item in ids.contains { item == .folder($0) } }
         rescan()
     }
 
