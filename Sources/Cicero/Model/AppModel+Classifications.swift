@@ -1,8 +1,8 @@
 import CiceroCore
 import Foundation
 
-/// Classifications: the one a family's fonts suggest, unless the user put it in another, the user's own among
-/// them. Built-in ones keep their place under the names the user gave them.
+/// Classifications: the one a family's fonts suggest (or for one they don't, the guess from its name), unless the
+/// user put it in another, the user's own among them. Built-in ones keep their place under the names the user gave them.
 extension AppModel {
     /// Every classification, for menus: the built-in ones under their names, then the user's.
     var classificationNames: [String] {
@@ -22,9 +22,23 @@ extension AppModel {
     func classificationNamer() -> (Family) -> String {
         let overrides = data.classificationOverrides
         let renames = data.classificationRenames
+        let guesses = classificationGuesses
         return { family in
-            overrides[family.id] ?? renames[family.classification.rawValue] ?? family.classification.rawValue
+            if let override = overrides[family.id] { return override }
+            let classification = family.classification == .unclassified ? guesses[family.id] ?? .unclassified : family.classification
+            return renames[classification.rawValue] ?? classification.rawValue
         }
+    }
+
+    /// The classification Automatic puts a family in: the one its fonts suggest, or the guess from its name.
+    func suggestedClassification(of family: Family) -> Classification {
+        guessedClassification(of: family) ?? family.classification
+    }
+
+    /// What Apple Intelligence guessed from the name of a family its fonts don't classify; nil without a guess.
+    func guessedClassification(of family: Family) -> Classification? {
+        guard family.classification == .unclassified, let guess = classificationGuesses[family.id], guess != .unclassified else { return nil }
+        return guess
     }
 
     func isUserClassification(_ name: String) -> Bool {
