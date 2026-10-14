@@ -4,7 +4,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
-/// choices are in Settings → Sidebar. Rows drag to a new place within their section (or character set
+/// choices are in Settings → Sidebar. Sections and groups stay open or closed as they were, and open and close
+/// the same way while editing, so a long one like Foundries can be closed to get past it. Edit and Done switch
+/// at once: animated, hundreds of rows coming and going ran into each other. Rows drag to a new place within their section (or character set
 /// group), several at once when they're selected together, and the rows they pass slide apart to open a
 /// gap where they'll land. Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
@@ -20,7 +22,6 @@ struct SidebarView: View {
             SidebarContent()
         }
         .listStyle(.sidebar)
-        .animation(.snappy, value: model.isEditingSidebar)
         .contextMenu {
             Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
         }
@@ -119,8 +120,8 @@ private struct SidebarContent: View {
         }
         return ForEach(shownGroups, id: \.id) { group in
             DisclosureGroup(isExpanded: Binding(
-                get: { model.isEditingSidebar || model.isGroupExpanded(group.id) },
-                set: { if !model.isEditingSidebar { model.setGroupExpanded(group.id, $0) } }
+                get: { model.isGroupExpanded(group.id) },
+                set: { model.setGroupExpanded(group.id, $0) }
             )) {
                 movableRows(group.rows, in: key(group.id), section: .characterSets)
             } label: {
@@ -132,7 +133,6 @@ private struct SidebarContent: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
                     .onTapGesture {
-                        guard !model.isEditingSidebar else { return }
                         withAnimation(.snappy) { model.setGroupExpanded(group.id, !model.isGroupExpanded(group.id)) }
                     }
                     .background {
@@ -178,10 +178,7 @@ private struct SidebarContent: View {
     }
 
     private func expansion(_ section: SidebarSection) -> Binding<Bool> {
-        Binding(
-            get: { model.isEditingSidebar || model.isExpanded(section) },
-            set: { if !model.isEditingSidebar { model.setExpanded(section, $0) } }
-        )
+        Binding(get: { model.isExpanded(section) }, set: { model.setExpanded(section, $0) })
     }
 
     // MARK: Headers
@@ -190,9 +187,7 @@ private struct SidebarContent: View {
         HStack {
             Text("Fonts")
             Spacer()
-            Button(model.isEditingSidebar ? "Done" : "Edit") {
-                withAnimation(.snappy) { model.isEditingSidebar.toggle() }
-            }
+            Button(model.isEditingSidebar ? "Done" : "Edit") { model.isEditingSidebar.toggle() }
             .buttonStyle(.plain)
             .font(.subheadline.weight(model.isEditingSidebar ? .semibold : .regular))
             .foregroundStyle(model.isEditingSidebar ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))

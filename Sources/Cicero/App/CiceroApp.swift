@@ -96,9 +96,7 @@ struct CiceroCommands: Commands {
             Button("Restore Library") { Task { backup.restoring = await model.chooseBackupToRestore() } }
         }
         CommandGroup(after: .sidebar) {
-            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
-                withAnimation(.snappy) { model.isEditingSidebar.toggle() }
-            }
+            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") { model.isEditingSidebar.toggle() }
             Divider()
         }
         CommandMenu("Fonts") {
