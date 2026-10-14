@@ -232,7 +232,7 @@ private struct EmptyBrowser: View {
             ContentUnavailableView {
                 Label("Everything Is Activated", systemImage: "checkmark.circle")
             } description: {
-                Text("Every font in your library is turned on. Add a folder of fonts to keep more here without installing them.")
+                Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")
             } actions: {
                 Button("Add Folder") { model.presentAddFolderPanel() }
             }

@@ -25,6 +25,10 @@ To turn on a single style, open the font page and use the style’s switch in **
 
 Right-click a set or smart set in the sidebar and choose **Activate Set** or **Activate Smart Set** to turn on every font in it. **Activate Temporarily** there turns them on until Cicero quits, and **Deactivate Set** or **Deactivate Smart Set** turns them off again. Like any activation, they follow your choice in [Copy or use in place](#copy-or-use-in-place), and ask first with **Ask each time**.
 
+### Keep a folder’s fonts on
+
+Choose **Active** for one of your folders, next to it in **Settings → Folders** or under **Fonts in This Folder** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off. Choose **Inactive** again, or remove the folder, and Cicero turns off the fonts it turned on.
+
 ## Copy or use in place
 
 There are two ways to turn on a font that isn’t in a Fonts folder:
@@ -35,7 +39,7 @@ There are two ways to turn on a font that isn’t in a Fonts folder:
 | Good for | Fonts you always need, or fonts on a disk you unplug | Large libraries you keep in one place |
 | Watch out | Takes disk space | The fonts stop working if their files move or their disk is unplugged |
 
-Choose which one in **Settings → General → Activation**, next to **Activate fonts by**:
+Choose which one in **Settings → General**, next to **Activate fonts by**:
 
 - **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Check **Remember this choice** to stop being asked; you can change it again in Settings.
 - **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
@@ -144,7 +148,7 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 
 ### Your own folder that an app loads
 
-If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose an option under **Fonts in This Folder**, or pick one next to the folder in **Settings → Folders**, where **Active in another app** lets you type the app’s name.
+If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose **Active in Adobe apps**, or **Active in Specific App** to type the app’s name, under **Fonts in This Folder**. The same choices are next to the folder in **Settings → Folders**.
 
 ## Turn on the fonts a document uses
 
@@ -170,10 +174,10 @@ An *application set* is a set with one or more apps. While one of its apps is op
 To make one:
 
 1. Click **+** next to **Sets** in the sidebar and choose **New Application Set**, or choose **File → New Application Set**. Name it and click **Create**.
-2. Click **Add App** and choose one or more apps.
+2. Click **+** under the list and choose one or more apps.
 3. Click **Done**, then drag the fonts you need onto the set.
 
-To give apps to a set you already have, right-click it and choose **Activate with Apps** (**Edit Apps** once it has some). In that window, “Open” marks apps that are running, and the remove button next to an app takes it out.
+To give apps to a set you already have, right-click it and choose **Activate with Apps** (**Edit Apps** once it has some). In that window, “Open” marks apps that are running. To take apps out, select them and click **−**.
 
 A few rules:
 
@@ -185,7 +189,7 @@ A few rules:
 
 ## Open Cicero at login
 
-Turn on **Open at login** in **Settings → General**, or click **Open at Login** in an application set’s apps window.
+Turn on **Open at login** in **Settings → General**, or check **Open Cicero at login** in an application set’s apps window.
 
 - If macOS needs your approval, allow Cicero in **System Settings → General → Login Items**.
 - Cicero has to be in your Applications folder for this. If it isn’t, it offers to move there.

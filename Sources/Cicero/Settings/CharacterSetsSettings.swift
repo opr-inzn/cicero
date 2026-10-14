@@ -5,6 +5,7 @@ import SwiftUI
 struct CharacterSetsSettings: View {
     @Environment(AppModel.self) private var model
     @State private var editing: CustomCharacterSet?
+    @State private var deleting: CustomCharacterSet?
 
     var body: some View {
         Form {
@@ -28,6 +29,7 @@ struct CharacterSetsSettings: View {
         }
         .formStyle(.grouped)
         .sheet(item: $editing) { CharacterSetEditor(original: $0) }
+        .confirmsCoverageSetDeletion($deleting)
     }
 
     private func row(_ set: CharacterSetDefinition) -> some View {
@@ -63,7 +65,7 @@ struct CharacterSetsSettings: View {
                 }
                 .contextMenu {
                     Button("Edit Coverage Set") { editing = set }
-                    Button("Delete Coverage Set") { model.deleteCharacterSet(set.id) }
+                    Button("Delete Coverage Set") { deleting = set }
                 }
             }
             if model.data.customCharacterSets.isEmpty {

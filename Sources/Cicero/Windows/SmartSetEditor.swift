@@ -7,13 +7,15 @@ struct SmartSetEditor: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SmartSet
+    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
+    @State private var openedAsNew: Bool?
 
     init(original: SmartSet) {
         self.original = original
         _draft = State(initialValue: original)
     }
 
-    private var isNew: Bool { !model.data.smartSets.contains { $0.id == original.id } }
+    private var isNew: Bool { openedAsNew ?? !model.data.smartSets.contains { $0.id == original.id } }
     private var name: String { draft.name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
@@ -53,6 +55,7 @@ struct SmartSetEditor: View {
             .padding()
         }
         .frame(width: 700, height: 480)
+        .onAppear { openedAsNew = isNew }
     }
 
     private var matchSummary: String {

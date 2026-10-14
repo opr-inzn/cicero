@@ -7,6 +7,9 @@ struct CharacterSetEditor: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: CustomCharacterSet
+    @State private var deleting: CustomCharacterSet?
+    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
+    @State private var openedAsNew: Bool?
 
     /// More than this and the preview stops being useful.
     private static let previewLimit = 600
@@ -16,7 +19,7 @@ struct CharacterSetEditor: View {
         _draft = State(initialValue: original)
     }
 
-    private var isNew: Bool { !model.data.customCharacterSets.contains { $0.id == original.id } }
+    private var isNew: Bool { openedAsNew ?? !model.data.customCharacterSets.contains { $0.id == original.id } }
     private var name: String { draft.name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
@@ -55,10 +58,8 @@ struct CharacterSetEditor: View {
             }
             HStack {
                 if !isNew {
-                    Button("Delete", role: .destructive) {
-                        model.deleteCharacterSet(original.id)
-                        dismiss()
-                    }
+                    Button("Delete", role: .destructive) { deleting = original }
+                        .foregroundStyle(.red)
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
@@ -72,10 +73,41 @@ struct CharacterSetEditor: View {
         }
         .padding(20)
         .frame(width: 520, height: 520)
+        .onAppear { openedAsNew = isNew }
+        .confirmsCoverageSetDeletion($deleting) { dismiss() }
     }
 
     private static func preview(_ scalars: [UInt32]) -> String {
         let shown = scalars.prefix(previewLimit).compactMap { Unicode.Scalar($0) }.map { String(Character($0)) }
         return shown.joined(separator: " ") + (scalars.count > previewLimit ? " …" : "")
+    }
+}
+
+extension View {
+    /// Asks before deleting the coverage set, then calls `deleted`.
+    func confirmsCoverageSetDeletion(_ set: Binding<CustomCharacterSet?>, deleted: @escaping () -> Void = {}) -> some View {
+        modifier(CoverageSetDeletion(set: set, deleted: deleted))
+    }
+}
+
+private struct CoverageSetDeletion: ViewModifier {
+    @Binding var set: CustomCharacterSet?
+    let deleted: () -> Void
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content.alert(
+            set.map { "Delete the coverage set “\($0.name)”?" } ?? "",
+            isPresented: Binding(get: { set != nil }, set: { if !$0 { set = nil } }),
+            presenting: set
+        ) { set in
+            Button("Delete", role: .destructive) {
+                model.deleteCharacterSet(set.id)
+                deleted()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("You can’t undo this.")
+        }
     }
 }
