@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- Settings → General is more compact: four groups instead of nine, with Appearance on its own, the settings for activation, system fonts and classification under **Fonts**, Rebuild, Clear and the library backup under **Maintenance**, the switches for updates and usage statistics under **Updates and Privacy**, and short explanations inside the rows that need them.
+- Settings → General is more compact: four groups instead of nine, with Appearance on its own, the settings for activation, system fonts and classification under **Fonts**, **Library** with Rebuild, Back Up and Restore, and Clear for the font caches, under **Maintenance**, the switches for updates and usage statistics under **Updates**, and short explanations inside the rows that need them.
 - Shorter explanations in Settings → Folders and Sidebar, which now says individual foundries rather than single ones.
 - The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
 - Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.

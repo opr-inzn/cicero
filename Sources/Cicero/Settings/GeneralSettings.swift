@@ -48,8 +48,12 @@ struct GeneralSettings: View {
                 .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
             }
             Section("Maintenance") {
-                LabeledContent("Cicero’s font list") {
-                    Button("Rebuild") { model.rebuildFontList() }
+                LabeledContent("Library") {
+                    HStack {
+                        Button("Rebuild") { model.rebuildFontList() }
+                        Button("Back Up") { isBackingUp = true }
+                        Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
+                    }
                 }
                 .formRowCentered()
                 LabeledContent("macOS, Adobe and Office font caches") {
@@ -57,15 +61,8 @@ struct GeneralSettings: View {
                         .foregroundStyle(.red)
                 }
                 .formRowCentered()
-                LabeledContent("Library backup") {
-                    HStack {
-                        Button("Back Up") { isBackingUp = true }
-                        Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
-                    }
-                }
-                .formRowCentered()
             }
-            Section("Updates and Privacy") {
+            Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
