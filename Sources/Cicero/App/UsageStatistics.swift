@@ -10,7 +10,7 @@ enum UsageStatistics {
     static let defaultsKey = "usageStatistics.isOn"
     private static let idKey = "usageStatistics.id"
     /// Cicero's app in TelemetryDeck, from its dashboard. Nothing is sent while it's empty.
-    private static let appID = ""
+    private static let appID = "E1677081-90F9-4658-91F1-B9C63EFDAEAD"
 
     /// Sends this launch's signal. Once, when the app has finished launching; a signal that fails isn't
     /// sent again.
