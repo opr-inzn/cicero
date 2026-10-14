@@ -77,11 +77,17 @@ private struct Tile: View {
                         .lineLimit(1)
                     TagDots(colors: model.tagColors(of: family))
                 }
-                Text(family.rangeLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help(family.rangeLabel)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(family.rangeLabel)
+                        .lineLimit(1)
+                        .help(family.rangeLabel)
+                    Spacer(minLength: 0)
+                    Text(family.formatLabel)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(14)
