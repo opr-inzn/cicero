@@ -322,7 +322,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let hasItalics: Bool
     /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
     public let rangeLabel: String
-    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable TTF", "OTF · Variable TTF".
+    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable", "OTF · Variable".
     public let formatLabel: String
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
@@ -430,9 +430,9 @@ public struct Family: Identifiable, Hashable, Sendable {
         return parts.joined(separator: " · ")
     }
 
-    /// The files' extensions in capitals, a variable font's after "Variable", in alphabetical order.
+    /// The files' extensions in capitals, "Variable" for variable fonts whatever their extension, in alphabetical order.
     static func formatLabel(of faces: [FontFace]) -> String {
-        Set(faces.map { face in (face.axes.isEmpty ? "" : "Variable ") + (face.path as NSString).pathExtension.uppercased() })
+        Set(faces.map { face in face.axes.isEmpty ? (face.path as NSString).pathExtension.uppercased() : "Variable" })
             .sorted()
             .joined(separator: " · ")
     }
