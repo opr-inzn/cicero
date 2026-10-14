@@ -330,6 +330,8 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let hasItalics: Bool
     /// What the faces span, for tile captions: "9 Weights · 3 Widths · Italics", "8 Weights · Italics · 3 Optical Sizes".
     public let rangeLabel: String
+    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable TTF", "OTF · Variable TTF".
+    public let formatLabel: String
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
     public let position: SwitchPosition
@@ -358,6 +360,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         isMonospaced = faces.contains { $0.face.isMonospaced }
         hasItalics = faces.contains { $0.face.isItalic }
         rangeLabel = Self.rangeLabel(of: faces.map(\.face))
+        formatLabel = Self.formatLabel(of: faces.map(\.face))
         let apps = Set(faces.map(\.app))
         app = apps.count == 1 ? apps.first! : nil
         position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
@@ -449,6 +452,13 @@ public struct Family: Identifiable, Hashable, Sendable {
         })
         if told.count < faces.count { parts.append("\(faces.count) Styles") }
         return parts.joined(separator: " · ")
+    }
+
+    /// The files' extensions in capitals, a variable font's after "Variable", in alphabetical order.
+    static func formatLabel(of faces: [FontFace]) -> String {
+        Set(faces.map { face in (face.axes.isEmpty ? "" : "Variable ") + (face.path as NSString).pathExtension.uppercased() })
+            .sorted()
+            .joined(separator: " · ")
     }
 
     /// Each style's group, where styles at the same place or with the same word (when they have one) are one group.
