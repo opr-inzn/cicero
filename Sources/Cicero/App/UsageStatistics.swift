@@ -10,7 +10,7 @@ enum UsageStatistics {
     static let defaultsKey = "usageStatistics.isOn"
     private static let idKey = "usageStatistics.id"
     /// Cicero's app in TelemetryDeck, from its dashboard. Nothing is sent while it's empty.
-    private static let appID = "E1677081-90F9-4658-91F1-B9C63EFDAEAD"
+    private nonisolated static let appID = "E1677081-90F9-4658-91F1-B9C63EFDAEAD"
 
     /// Sends this launch's signal. Once, when the app has finished launching; a signal that fails isn't
     /// sent again.
@@ -23,6 +23,11 @@ enum UsageStatistics {
               let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String else { return }
         let id = defaults.string(forKey: idKey) ?? UUID().uuidString
         defaults.set(id, forKey: idKey)
+        // Reading the code signature takes milliseconds the window, still being made, needs more.
+        DispatchQueue.global(qos: .utility).async { send(id: id, version: version, build: build) }
+    }
+
+    private nonisolated static func send(id: String, version: String, build: String) {
         let system = ProcessInfo.processInfo.operatingSystemVersion
         // TelemetryDeck's own signal and parameter names, which its dashboard charts.
         let signal: [String: Any] = [
@@ -56,7 +61,7 @@ enum UsageStatistics {
 
     /// Whether this copy was built with build-app.sh, signed ad hoc and so without a team, unlike a release.
     /// TelemetryDeck keeps test signals apart from the others.
-    private static var isTestBuild: Bool {
+    private nonisolated static var isTestBuild: Bool {
         var code: SecCode?
         var staticCode: SecStaticCode?
         var information: CFDictionary?
