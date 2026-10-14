@@ -16,7 +16,7 @@ struct InfoPanelOverlay: ViewModifier {
         content.overlay(alignment: .trailing) {
             ZStack {
                 if isPresented {
-                    let shape = RoundedRectangle(cornerRadius: 20)
+                    let shape = Self.shape
                     InfoPanel()
                         .frame(width: Self.width)
                         .frame(maxHeight: .infinity)
@@ -31,6 +31,16 @@ struct InfoPanelOverlay: ViewModifier {
                 }
             }
             .animation(.snappy, value: isPresented)
+        }
+    }
+
+    /// Concentric with the window's corners on macOS 27, which tightens them; 20 pt on macOS 26, where
+    /// concentric comes out rounder than the panel has been.
+    private static var shape: AnyShape {
+        if #available(macOS 27, *) {
+            AnyShape(ConcentricRectangle(corners: .concentric(minimum: 12), isUniform: true))
+        } else {
+            AnyShape(RoundedRectangle(cornerRadius: 20))
         }
     }
 }
@@ -105,7 +115,7 @@ private struct FamilyInfo: View {
             Picker("Tab", selection: $model.infoTab) {
                 ForEach(InfoTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
-            .pickerStyle(.segmented)
+            .tabsPickerStyle()
             .labelsHidden()
             .padding(12)
             Divider()
@@ -293,5 +303,12 @@ private struct FeatureControls: View {
                 set(list)
             }
         )
+    }
+}
+
+private extension View {
+    /// Info and Features are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
+    @ViewBuilder func tabsPickerStyle() -> some View {
+        if #available(macOS 27, *) { pickerStyle(.tabs) } else { pickerStyle(.segmented) }
     }
 }

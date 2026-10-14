@@ -159,7 +159,9 @@ struct StatusTag: View {
     }
 }
 
-/// A slider drawn by Cicero: the system slider's glass knob disappears in toolbar popovers on macOS 26.
+/// The system slider on macOS 27, which draws it itself, and one drawn by Cicero on macOS 26, whose slider's
+/// glass knob disappears in toolbar popovers. Continuous, rounded to the step: a stepped system slider can
+/// show a tick for every step.
 struct ValueSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -169,6 +171,14 @@ struct ValueSlider: View {
     private let knob: CGFloat = 18
 
     var body: some View {
+        if #available(macOS 27, *) {
+            Slider(value: Binding(get: { value }, set: { value = rounded($0) }), in: range)
+        } else {
+            drawn
+        }
+    }
+
+    private var drawn: some View {
         GeometryReader { geometry in
             let travel = max(geometry.size.width - knob, 1)
             let fraction = (min(max(value, range.lowerBound), range.upperBound) - range.lowerBound) / (range.upperBound - range.lowerBound)
