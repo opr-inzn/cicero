@@ -351,7 +351,9 @@ final class AppModel {
         // Also when nothing changed, in case Apple Intelligence was turned on meanwhile.
         defer { guessClassifications() }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
+        let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
         library = new
+        activateAddedFonts(knowing: known)
         endScan(id)
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
@@ -362,6 +364,14 @@ final class AppModel {
         FontLoader.shared.prefetch((visibleFamilies + new.families).map(\.regular.face))
         updateCoverage()
         updateProblems()
+    }
+
+    /// Fonts in Active folders that weren't in the library before this scan, like files just put in one. With nothing
+    /// to compare against (no saved library at launch), none: a font turned off by hand would come back on.
+    private func activateAddedFonts(knowing known: Set<String>) {
+        let active = data.folders.filter(\.isActive)
+        guard !active.isEmpty, !known.isEmpty else { return }
+        keepOn(faces(in: active).filter { !known.contains($0.face.path) })
     }
 
     private func updateCoverage() {

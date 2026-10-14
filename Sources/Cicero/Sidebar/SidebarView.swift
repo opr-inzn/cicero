@@ -301,15 +301,8 @@ private struct SidebarContent: View {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
                 if id != WatchedFolder.deactivatedID {
                     Divider()
-                    Picker("Fonts in This Folder", selection: Binding(
-                        get: { folder.appName ?? "" },
-                        set: { model.setAppName($0, forFolder: id) }
-                    )) {
-                        Text("Not activated until you activate them").tag("")
-                        Text("Active in Adobe apps").tag("Adobe")
-                        if let custom = folder.appName, custom != "Adobe" {
-                            Text("Active in \(FaceState.appDescription(custom))").tag(custom)
-                        }
+                    FolderActivationPicker(folder: folder) {
+                        model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
                     }
                     Button("Remove Folder from Library") { model.removeFolder(id) }
                 }
