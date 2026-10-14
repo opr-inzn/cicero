@@ -511,7 +511,9 @@ final class AppModel {
     /// Asks Apple Intelligence about the families nothing classifies, when it's on and the setting is.
     private func guessClassifications() {
         guard guessesClassifications else { return }
-        guesser.guess(library.families.filter { $0.classification == .unclassified }) { [weak self] in self?.guessesChanged() }
+        // A family whose letters disagree is unclassified for a reason the name can't undo.
+        let open = library.families.filter { $0.classification == .unclassified && !$0.mixesSerifAndSans }
+        guesser.guess(open) { [weak self] in self?.guessesChanged() }
     }
 
     private func guessesChanged() {

@@ -25,7 +25,8 @@ extension AppModel {
         let guesses = classificationGuesses
         return { family in
             if let override = overrides[family.id] { return override }
-            let classification = family.classification == .unclassified ? guesses[family.id] ?? .unclassified : family.classification
+            let guessable = family.classification == .unclassified && !family.mixesSerifAndSans
+            let classification = guessable ? guesses[family.id] ?? .unclassified : family.classification
             return renames[classification.rawValue] ?? classification.rawValue
         }
     }
@@ -37,7 +38,8 @@ extension AppModel {
 
     /// What Apple Intelligence guessed from the name of a family its fonts don't classify; nil without a guess.
     func guessedClassification(of family: Family) -> Classification? {
-        guard family.classification == .unclassified, let guess = classificationGuesses[family.id], guess != .unclassified else { return nil }
+        guard family.classification == .unclassified, !family.mixesSerifAndSans,
+              let guess = classificationGuesses[family.id], guess != .unclassified else { return nil }
         return guess
     }
 
