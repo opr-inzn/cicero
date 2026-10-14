@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.2.1
+
+- The app icon’s background is the same as on the icons of the apps that come with macOS: white in light mode rather than light grey, and dark grey in dark mode rather than nearly black.
+
 ## 1.2
 
 - The sidebar’s folders, foundries and classifications are there as soon as Cicero opens, rather than appearing a moment later.
