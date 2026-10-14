@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- The sidebar’s folders, foundries and classifications are there as soon as Cicero opens, rather than appearing a moment later.
+
 ## 1.1.1
 
 I haven’t tested this version on macOS 27 yet, so you may find UI bugs there. Please report them with Help → Report an Issue.

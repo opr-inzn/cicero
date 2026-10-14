@@ -159,6 +159,8 @@ final class AppModel {
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
+    /// The sidebar items the last scan found, as saved for the next launch.
+    @ObservationIgnored private var savedGroups: ScannedGroups?
 
     init() {
         let locations = Locations.standard
@@ -170,6 +172,7 @@ final class AppModel {
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
         data = store.load()
         refreshTagDots()
+        restoreGroups()
     }
 
     // MARK: Lifecycle
@@ -457,6 +460,8 @@ final class AppModel {
     }
 
     private func refreshGroups() {
+        // Until the first scan, the sidebar lists what the last one found (see `restoreGroups`).
+        guard hasScanned else { return }
         var names = Set<String>()
         var classifications = Set<String>()
         var ownFolders = Set<UUID>()
@@ -479,7 +484,31 @@ final class AppModel {
         let present = builtIn + data.classifications + [name(of: .unclassified)].filter(classifications.contains)
         if present != presentClassifications { presentClassifications = present }
         if ownFolders != ownFoldersWithFonts { ownFoldersWithFonts = ownFolders }
+        let groups = ScannedGroups(ownFolders: ownFolders, foundries: sorted, classifications: present)
+        if groups != savedGroups {
+            savedGroups = groups
+            UserDefaults.standard.set(try? JSONEncoder().encode(groups), forKey: ScannedGroups.defaultsKey)
+        }
     }
+
+    /// The sidebar items a scan finds (Cicero's own folders, foundries and classifications) as the last scan
+    /// found them, so the window opens with them in place rather than having them appear a moment later.
+    private func restoreGroups() {
+        guard let saved = UserDefaults.standard.data(forKey: ScannedGroups.defaultsKey),
+              let groups = try? JSONDecoder().decode(ScannedGroups.self, from: saved) else { return }
+        savedGroups = groups
+        ownFoldersWithFonts = groups.ownFolders
+        foundryNames = groups.foundries
+        presentClassifications = groups.classifications
+    }
+}
+
+/// What `refreshGroups` last found, kept for the next launch.
+private struct ScannedGroups: Codable, Equatable {
+    static let defaultsKey = "sidebar.scannedGroups"
+    var ownFolders: Set<UUID>
+    var foundries: [String]
+    var classifications: [String]
 }
 
 struct CoverageProgress: Equatable {
