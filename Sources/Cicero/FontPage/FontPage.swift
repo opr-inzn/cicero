@@ -8,10 +8,10 @@ struct FontPage: View {
     @Environment(PreviewSettings.self) private var preview
     let familyID: String
     @State private var glyphColumns: Int?
-    @State private var glyphs: [GlyphSection]?
     @State private var ligatureColumns: Int?
-    /// The style's ligatures; nil while loading.
-    @State private var ligatures: [LigatureGroup]?
+    /// The ligatures and characters of the face shown, when they weren't ready as the page opened.
+    @State private var loaded: (face: FaceID, content: PageContent)?
+    @FocusState private var focused: Bool
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -24,7 +24,10 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        ScrollView {
+        let face = family.face(nearestWeight: preview.weight).face
+        // Usually ready before the page opens: the browser starts on a family when it's selected.
+        let content = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        return ScrollView {
             // Lazy for the glyphs, which can run to thousands of cells; their block headers stay pinned.
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
                 Header(family: family)
@@ -34,10 +37,18 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                if let ligatures, !ligatures.isEmpty {
-                    LigaturesSection(face: family.face(nearestWeight: preview.weight).face, columns: ligatureColumns, groups: ligatures)
+                // Ligatures and glyphs together, once the page's width is known: one arriving after the other, or
+                // their cells after their titles, moved what was already there.
+                if let content {
+                    if let ligatureColumns, let glyphColumns {
+                        if !content.ligatures.isEmpty {
+                            LigaturesSection(face: face, columns: ligatureColumns, groups: content.ligatures)
+                        }
+                        GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs)
+                    }
+                } else {
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                 }
-                GlyphsSection(family: family, columns: glyphColumns, sections: glyphs)
             }
             // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
             // at once; only a change in the count redraws the glyphs.
@@ -45,15 +56,15 @@ struct FontPage: View {
             .onGeometryChange(for: Int.self) { LigaturesSection.columns(fitting: $0.size.width) } action: { ligatureColumns = $0 }
         }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
-        .task(id: family.face(nearestWeight: preview.weight).face.id) {
-            let face = family.face(nearestWeight: preview.weight).face
-            glyphs = nil
-            ligatures = nil
-            ligatures = await Task.detached(priority: .userInitiated) { LigatureGroup.read(face) }.value
-            let ranges = await model.coverage.coverage(computing: face).scalars
-            glyphs = await Task.detached(priority: .userInitiated) { GlyphSection.sections(for: ranges) }.value
+        .task(id: face.id) {
+            loaded = (face.id, await model.pageContents.content(loading: face))
         }
         .background(Color.canvas)
+        // The page takes focus when it opens, rather than the first field on it, the type tester's size.
+        .focusable()
+        .focused($focused)
+        .focusEffectDisabled()
+        .defaultFocus($focused, true)
         .navigationTitle(family.name)
         // No Preview Options: the page has its own size and alignment, and takes the rest (text in the styles
         // list, weight, spacing) from the browser's.
@@ -151,14 +162,8 @@ private struct TypeTester: View {
                     ValueSlider(value: $size, range: 12...240).frame(width: 160)
                     ValueField("Size", value: $size, range: 12...240, unit: " pt")
                 }
-                Picker("Alignment", selection: $alignment) {
-                    ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelStyle(.iconOnly)
-                .labelsHidden()
-                .fixedSize()
-                .help("Align left, center or right")
+                IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
+                    .help("Align left, center or right")
             }
             .padding(.top, 12)
             let font = Font(FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family)))
