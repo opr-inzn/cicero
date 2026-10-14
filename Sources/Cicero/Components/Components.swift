@@ -384,16 +384,16 @@ private struct PreviewOptions: View {
     }
 }
 
-/// The Info panel toggle; toolbars give it a group of its own with a fixed spacer.
+/// The Info panel toggle, highlighted while the panel is open, like the view picker's choice; toolbars
+/// give it a group of its own with a fixed spacer.
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button {
-            model.isInfoPresented.toggle()
-        } label: {
+        Toggle(isOn: Binding(get: { model.isInfoPresented }, set: { model.isInfoPresented = $0 })) {
             Label("Info", systemImage: "info.circle")
         }
+        .toggleStyle(.button)
         .help("Info")
     }
 }

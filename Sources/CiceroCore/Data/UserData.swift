@@ -30,6 +30,18 @@ public struct UserData: Codable, Equatable, Sendable {
 
     public init() {}
 
+    /// What a new library starts with: Red, Yellow and Green tags in their colours, as the Finder starts
+    /// with its colour tags.
+    public static var newLibrary: UserData {
+        var data = UserData()
+        for color in [TagColor.red, .yellow, .green] {
+            let name = color.rawValue.capitalized
+            data.tags.append(name)
+            data.tagColors[name] = color
+        }
+        return data
+    }
+
     /// Missing keys take their defaults, so files from older versions keep loading.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)

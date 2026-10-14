@@ -37,7 +37,7 @@ public final class UserDataStore: Sendable {
             queue.sync { write(imported) }
             return imported
         }
-        return UserData()
+        return .newLibrary
     }
 
     /// Schedules a save of this value (the latest one wins).

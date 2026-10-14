@@ -105,6 +105,7 @@ final class AppModel {
     var copySwitchPrompt: CopySwitchRequest?
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
+    var newTagRequest: NewTagRequest?
     var editingSmartSet: SmartSet?
     /// The set whose apps the application set sheet shows.
     var editingAppsForSet: UUID?
@@ -513,6 +514,13 @@ struct DeactivationPrompt: Identifiable {
     let id = UUID()
     var faces: [LibraryFace]
     var unmanagedCount: Int
+}
+
+/// New Tag…: the families that get the tag, and the colour the sheet starts with.
+struct NewTagRequest: Identifiable {
+    let id = UUID()
+    var families: [Family]
+    var color: TagColor?
 }
 
 struct TextPrompt: Identifiable {
