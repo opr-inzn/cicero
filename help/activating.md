@@ -49,6 +49,20 @@ A few things happen either way:
 - When a copy has the same name as a file already in your Fonts folder, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
 - A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
 
+## Use another copy of a font
+
+When the same font is in more than one place, like a copy from each client, **Use Copy From** in the family’s right-click menu chooses which copy is on. It lists the folders the copies are in, named where their paths part (“Acme” and “Globex” for `Clients/Acme` and `Clients/Globex`), with each one’s version and how many styles it has when it hasn’t them all. The one in use is checked.
+
+Picking a folder:
+
+- turns on its copies, following your choice in [Copy or use in place](#copy-or-use-in-place),
+- turns off the other copies of those styles that Cicero turned on, so they don’t clash, and
+- leaves styles that folder doesn’t have as they are.
+
+Copies Cicero didn’t turn on, like macOS’s, an app’s, or one you put in your Fonts folder yourself, stay on, and so do copies an [application set](#turn-fonts-on-with-an-app) has on; the message says so, and [Problems](problems.md#installed-twice) shows them as installed twice. When a file that goes off also holds other styles, as a font collection can, Cicero names them and asks first. If a new copy can’t be turned on, the old one comes back on.
+
+To choose for one style, open the font page and right-click the style.
+
 ## Turn a font on just for now
 
 To try a font without installing it, turn it on until Cicero quits:

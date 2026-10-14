@@ -34,6 +34,8 @@ final class AppModel {
     private(set) var presentClassifications: [Classification] = []
     /// Cicero's own folder items that have fonts now (Adobe Apps, Added Fonts, Deactivated): the sidebar lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
+    /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
+    var downloads: [UUID: DownloadProgress] = [:]
     /// Where operations in progress will put switches, shown from the click until the scan after the
     /// operation confirms it (see `expect`).
     private(set) var expectedFamilyPositions: [String: SwitchPosition] = [:]
@@ -99,6 +101,8 @@ final class AppModel {
 
     var activationPrompt: ActivationPrompt?
     var deactivationPrompt: DeactivationPrompt?
+    /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
+    var copySwitchPrompt: CopySwitchRequest?
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
     var editingSmartSet: SmartSet?
@@ -462,6 +466,8 @@ final class AppModel {
             if let name = foundryName(family) { names.insert(name) }
             classifications.insert(family.classification)
         }
+        // Added fonts that are all online only still have their item, to download them from.
+        if library.onlineOnlyFiles[WatchedFolder.addedFilesID] != nil { ownFolders.insert(WatchedFolder.addedFilesID) }
         let sorted = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         if sorted != foundryNames { foundryNames = sorted }
         let present = Classification.allCases.filter(classifications.contains)
@@ -475,6 +481,11 @@ struct CoverageProgress: Equatable {
     var total: Int
 }
 
+struct DownloadProgress: Equatable {
+    var done: Int
+    var total: Int
+}
+
 enum InfoTab: String, CaseIterable {
     case info = "Info"
     case features = "Features"
@@ -484,6 +495,18 @@ struct ActivationPrompt: Identifiable {
     let id = UUID()
     var title: String
     var faces: [LibraryFace]
+    /// Set when the faces are copies taking over from others.
+    var switching: CopySwitchRequest?
+}
+
+/// Using a place's copies of some styles (see `AppModel.useCopies`).
+struct CopySwitchRequest: Identifiable {
+    let id = UUID()
+    /// The place's name: "Acme".
+    var source: String
+    /// What the activation sheet calls it: "Helvetica from Acme".
+    var title: String
+    var plan: CopySwitchPlan
 }
 
 struct DeactivationPrompt: Identifiable {

@@ -109,6 +109,48 @@ extension AppModel {
         families.count == 1 ? families[0].name : "\(families.count) families"
     }
 
+    // MARK: Copies
+
+    /// The places these styles can be used from, when some are in more than one, like each client's folder
+    /// (see `CopyChooser`).
+    func copySources(of styles: [LibraryFace]) -> [CopySource] {
+        CopyChooser.sources(of: styles, folders: data.folders, records: data.records, locations: locations)
+    }
+
+    /// Uses a place's copies of the styles it has and turns off the other copies of them Cicero turned on.
+    /// Asks first when that turns off other styles too, and how to activate when the install method is Ask.
+    func useCopies(from source: CopySource, title: String) {
+        let plan = CopyChooser.plan(source, records: data.records, library: library)
+        guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name).") }
+        let request = CopySwitchRequest(source: source.name, title: title, plan: plan)
+        if plan.alsoTurnsOff.isEmpty {
+            confirmCopySwitch(request)
+        } else {
+            copySwitchPrompt = request
+        }
+    }
+
+    func confirmCopySwitch(_ request: CopySwitchRequest) {
+        let targets = request.plan.switches.compactMap(\.target)
+        if data.installMethod == .ask && !targets.isEmpty {
+            activationPrompt = ActivationPrompt(title: request.title, faces: targets, switching: request)
+        } else {
+            performCopySwitch(request, method: data.installMethod == .ask ? .inPlace : data.installMethod)
+        }
+    }
+
+    func performCopySwitch(_ request: CopySwitchRequest, method: InstallMethod) {
+        let operation = expect(request.plan.styles, at: .on)
+        enqueue { model in
+            var result = await model.engine.switchCopies(request.plan.switches, method: method, records: model.data.records)
+            if result.failed.isEmpty {
+                result.message = "Using the copies from \(request.source)."
+                    + (request.plan.leavesOtherCopiesOn ? " Another copy Cicero didn’t turn on is still on, so apps may use that one." : "")
+            }
+            model.finish(result, operation: operation)
+        }
+    }
+
     // MARK: Trash
 
     func requestTrash(_ families: [Family]) {
@@ -203,6 +245,44 @@ extension AppModel {
         data.sidebar.forget("folder.\(id)")
         deselect { $0 == .folder(id) }
         rescan()
+    }
+
+    /// Why a watched folder's fonts are out of reach, if they are.
+    func availability(ofFolder id: UUID) -> FolderAvailability? {
+        library.unavailableFolders[id]
+    }
+
+    /// Font files in a watched folder (or among the added fonts) that a cloud service keeps online only.
+    func onlineOnlyCount(inFolder id: UUID) -> Int {
+        library.onlineOnlyFiles[id]?.count ?? 0
+    }
+
+    /// Downloads the font files a cloud service keeps online only in a watched folder (or among the added
+    /// fonts), so the library lists them. The cloud service may take them off the Mac again later; making the
+    /// folder available offline in the Finder keeps them.
+    func downloadOnlineOnlyFonts(inFolder id: UUID) {
+        let paths = library.onlineOnlyFiles[id] ?? []
+        guard !paths.isEmpty, downloads[id] == nil else { return }
+        downloads[id] = DownloadProgress(done: 0, total: paths.count)
+        Task { [weak self] in
+            let failed = await Reachability.download(paths) { [weak self] done in
+                Task { @MainActor in self?.downloads[id]?.done = done }
+            }
+            guard let self else { return }
+            downloads[id] = nil
+            if failed.isEmpty {
+                showToast(paths.count == 1 ? "Downloaded 1 font file." : "Downloaded \(paths.count.formatted()) font files.")
+            } else {
+                showToast("Couldn’t download \(failed.count.formatted()) of \(paths.count.formatted()) font files. Check the connection and try again.")
+            }
+            rescan()
+        }
+    }
+
+    /// System Settings at Privacy & Security → Files and Folders, where Cicero can be let into a folder.
+    func openFilesAndFoldersSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func setAppName(_ name: String?, forFolder id: UUID) {
@@ -404,7 +484,9 @@ extension AppModel {
                 folders.append(WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path))
             }
             return folders.map {
-                let icon = $0.id == WatchedFolder.addedFilesID ? "doc" : $0.appName == nil ? "folder" : "folder.badge.gearshape"
+                let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
+                    : library.unavailableFolders[$0.id] != nil ? "questionmark.folder"
+                    : $0.appName == nil ? "folder" : "folder.badge.gearshape"
                 return SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:
