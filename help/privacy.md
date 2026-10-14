@@ -21,6 +21,8 @@ Each time Cicero opens, it sends [TelemetryDeck](https://telemetrydeck.com), a G
 - the version of macOS
 - a random number Cicero made on your Mac, hashed, so each Mac counts once however often it opens Cicero
 
+The first time, it also sends a second note saying your Mac is new, with that day’s date, to count how many people start using Cicero.
+
 That’s all: not your name, your Mac’s name, where you are or anything about your fonts. TelemetryDeck sees your IP address, as any website does, but doesn’t store it, and hashes the number again before it keeps it. The code that sends the note is in [UsageStatistics.swift](https://github.com/opr-inzn/cicero/blob/main/Sources/Cicero/App/UsageStatistics.swift).
 
 To stop it, open **Settings → General** and, under **Usage Statistics**, turn off **Share usage statistics**. Cicero sends nothing more and forgets the random number; if you turn it on again, it makes a new one.
