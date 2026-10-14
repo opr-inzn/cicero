@@ -33,9 +33,9 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .unreadable:
             "Cicero couldn’t read these files. They may be damaged, or not font files at all."
         case .external:
-            "These fonts are used from a disk that can be unplugged. They turn off when it’s gone."
+            "These fonts are used from a disk that can be unplugged, or a server. They turn off while it’s gone."
         case .duplicates:
-            "The same font is in your folders more than once."
+            "The same font is in one of your folders more than once. Copies in different folders, like each client’s, aren’t listed: choose between them with Use Copy From."
         }
     }
 }
@@ -233,6 +233,16 @@ public enum ProblemDetector {
             return "Not activated"
         }
 
+        /// Where a missing file may only be out of reach for now: "on “Server”, which isn’t connected" for a disk
+        /// under /Volumes that isn't there, or the like for a watched folder Cicero can't read. nil when it's just gone.
+        func unreachable(_ path: String) -> String? {
+            if let volume = Reachability.disconnectedVolume(of: path) { return "on “\(volume)”, which isn’t connected" }
+            guard let folder = folders.first(where: { library.unavailableFolders[$0.id] != nil && path.hasPrefix($0.path + "/") }) else { return nil }
+            return library.unavailableFolders[folder.id] == .noAccess
+                ? "in “\(folder.displayName)”, which Cicero isn’t allowed to read"
+                : "in “\(folder.displayName)”, which can’t be found"
+        }
+
         func isInWatchedFolder(_ path: String) -> Bool {
             path.hasPrefix(locations.deactivated.path + "/") || folders.contains { path.hasPrefix($0.path + "/") }
         }
@@ -241,9 +251,7 @@ public enum ProblemDetector {
         /// `lexicographicallyPrecedes`. Empty when there's no version.
         func versionNumber(of path: String) -> [Double] {
             guard let version = versions[path] ?? nil else { return [] }
-            let parts = version.drop { !$0.isNumber }.prefix { $0.isNumber || $0 == "." }.split(separator: ".")
-            guard let major = parts.first else { return [] }
-            return [Double(parts.count > 1 ? "\(major).\(parts[1])" : String(major)) ?? 0] + parts.dropFirst(2).compactMap { Double($0) }
+            return FontVersion.number(version)
         }
 
         /// The folder whose files include the newest version, when every other folder's are all older.
@@ -457,26 +465,49 @@ public enum ProblemDetector {
 
     // MARK: Duplicates
 
-    /// The same font more than once among the inactive files in the user's folders.
+    /// The same font more than once among the inactive files in one place in the user's folders. Copies in
+    /// different places, like each client's folder, are for Use Copy From to choose between (see
+    /// `CopyChooser.places`), not spares.
     private static func duplicates(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
-        let origins = Set(context.data.records.installedCopies.values)
+        let records = context.data.records
+        let origins = Set(records.installedCopies.values)
         for family in context.library.families {
+            // The family's copies Use Copy From would list, each in its place.
+            var copies: [(style: FaceID, folder: String)] = []
+            var copyPaths: [(style: FaceID, path: String)] = []
+            for face in family.faces {
+                for path in [face.face.path] + face.otherCopies where !ActivationEngine.isProtected(path) {
+                    let origin = records.installedCopies[path]
+                    let isActive = context.library.activePaths.contains(path)
+                    guard origin != nil || (isActive ? records.inPlace.contains(path) || records.temporary[path] != nil : context.isInWatchedFolder(path))
+                    else { continue }
+                    copies.append((face.id, ((origin ?? path) as NSString).deletingLastPathComponent))
+                    copyPaths.append((face.id, path))
+                }
+            }
+            let placed = CopyChooser.places(of: copies, folders: context.data.folders, locations: context.locations)
+            var place: [String: String] = [:]
+            for (copy, spot) in zip(copyPaths, placed) { place[copy.path] = spot.key }
+
             var paths: [String] = []
             var keep = Set<String>()
             var styles = 0
             for face in family.faces {
-                let copies = ([face.face.path] + face.otherCopies).filter { !context.library.activePaths.contains($0) && context.isInWatchedFolder($0) }
-                guard copies.count >= 2 else { continue }
+                let inactive = ([face.face.path] + face.otherCopies).filter { !context.library.activePaths.contains($0) && context.isInWatchedFolder($0) }
+                let spares = Dictionary(grouping: inactive) { place[$0] ?? ($0 as NSString).deletingLastPathComponent }.values.filter { $0.count >= 2 }
+                guard !spares.isEmpty else { continue }
                 styles += 1
-                for path in copies where !paths.contains(path) { paths.append(path) }
-                for path in copies { _ = context.version(of: path) }
-                let kept = copies.first { origins.contains($0) } ?? copies.max { a, b in
-                    let (va, vb) = (context.versionNumber(of: a), context.versionNumber(of: b))
-                    if va != vb { return va.lexicographicallyPrecedes(vb) }
-                    return (Context.modified(a) ?? .distantPast) < (Context.modified(b) ?? .distantPast)
-                }!
-                keep.insert(kept)
+                for copies in spares {
+                    for path in copies where !paths.contains(path) { paths.append(path) }
+                    for path in copies { _ = context.version(of: path) }
+                    let kept = copies.first { origins.contains($0) } ?? copies.max { a, b in
+                        let (va, vb) = (context.versionNumber(of: a), context.versionNumber(of: b))
+                        if va != vb { return va.lexicographicallyPrecedes(vb) }
+                        return (Context.modified(a) ?? .distantPast) < (Context.modified(b) ?? .distantPast)
+                    }!
+                    keep.insert(kept)
+                }
             }
             guard !paths.isEmpty else { continue }
             paths.sort()
@@ -503,7 +534,8 @@ public enum ProblemDetector {
     private static func missing(_ context: inout Context) -> [Problem] {
         let fm = FileManager.default
         var problems: [Problem] = []
-        for path in context.data.records.inPlace.sorted() where !fm.fileExists(atPath: path) {
+        // A file on a disk that isn't connected is under Fonts on External Disks instead.
+        for path in context.data.records.inPlace.sorted() where !fm.fileExists(atPath: path) && context.unreachable(path) == nil {
             problems.append(Problem(
                 id: "missing.inplace.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
                 summary: "Used where it was.",
@@ -519,8 +551,9 @@ public enum ProblemDetector {
                 fixes: [.forgetInstalledCopy(path)], fileFixes: [:]
             ))
         }
+        // A family out of reach for now, on a disk that isn't connected, say, comes back with it.
         for set in context.data.sets {
-            for family in set.families where context.library.family(family) == nil {
+            for family in set.families where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
                 problems.append(Problem(
                     id: "missing.set.\(set.id.uuidString).\(family)", kind: .missing, title: family,
                     summary: "In the set “\(set.name)”, but not in the library.",
@@ -548,10 +581,20 @@ public enum ProblemDetector {
 
     // MARK: External
 
-    /// Fonts used in place from disks that can go away.
+    /// Fonts used in place from disks that can go away, and from ones that are gone for now.
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         for path in context.data.records.inPlace.sorted() {
+            if !FileManager.default.fileExists(atPath: path), let place = context.unreachable(path) {
+                problems.append(Problem(
+                    id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
+                    summary: "Used where it is, \(place).",
+                    files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Out of reach for now")],
+                    // For a disk that's gone for good.
+                    fixes: [.forgetInPlace(path)], fileFixes: [:]
+                ))
+                continue
+            }
             guard let volume = externalVolumeName(of: path) else { continue }
             let family = context.library.families.first { $0.faces.contains { $0.face.path == path } }
             problems.append(Problem(

@@ -54,6 +54,19 @@ struct MainWindow: View {
                 : "\(prompt.unmanagedCount) files weren’t installed by Cicero, so they may be your only copies. Cicero will move them to its Deactivated folder, which stays in your library.")
         }
         .alert(
+            "Turn Off Other Styles Too?",
+            isPresented: Binding(get: { model.copySwitchPrompt != nil }, set: { if !$0 { model.copySwitchPrompt = nil } }),
+            presenting: model.copySwitchPrompt
+        ) { request in
+            Button("Use \(request.source)’s Copies") { model.confirmCopySwitch(request) }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            let styles = request.plan.alsoTurnsOff
+            let shown = styles.count > 6 ? Array(styles.prefix(5)) + ["\(styles.count - 5) more"] : styles
+            let named = shown.count > 1 ? shown.dropLast().joined(separator: ", ") + " and " + shown.last! : shown.joined()
+            Text("A file that goes off holds \(named) too. \(styles.count == 1 ? "It goes" : "They go") off with it.")
+        }
+        .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",
             isPresented: Binding(get: { model.trashPlan != nil }, set: { if !$0 { model.trashPlan = nil } }),
             presenting: model.trashPlan

@@ -31,6 +31,12 @@ struct BrowserView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            // With nothing listed, the empty view says it instead.
+            if case .folder(let id) = model.selection, !families.isEmpty, model.onlineOnlyCount(inFolder: id) > 0 {
+                OnlineOnlyBar(folderID: id)
+            }
+        }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
@@ -105,6 +111,95 @@ private struct ScanCapsule: View {
     }
 }
 
+/// Says that some of a folder's fonts are online only, so they aren't listed, with a button to download them.
+private struct OnlineOnlyBar: View {
+    @Environment(AppModel.self) private var model
+    let folderID: UUID
+
+    var body: some View {
+        let count = model.onlineOnlyCount(inFolder: folderID)
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "icloud.and.arrow.down")
+                    .foregroundStyle(.secondary)
+                if let progress = model.downloads[folderID] {
+                    Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())…")
+                    Spacer()
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text(count == 1 ? "1 font file here is online only, so it isn’t listed." : "\(count.formatted()) font files here are online only, so they aren’t listed.")
+                    Spacer()
+                    Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
+                        .controlSize(.small)
+                        .help("Download them from the cloud service so they’re listed. To keep them on this Mac, make the folder available offline in the Finder.")
+                }
+            }
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            Divider()
+        }
+        .background(.bar)
+    }
+}
+
+/// A watched folder Cicero can't read now, or one whose fonts are all online only.
+private struct FolderOutOfReach: View {
+    @Environment(AppModel.self) private var model
+    let folderID: UUID
+
+    var body: some View {
+        let folder = model.folder(folderID)
+        let name = folder?.displayName ?? "This folder"
+        switch model.availability(ofFolder: folderID) {
+        case .noAccess:
+            ContentUnavailableView {
+                Label("Cicero Can’t Read “\(name)”", systemImage: "lock")
+            } description: {
+                Text("macOS hasn’t let Cicero into this folder. Allow it in System Settings → Privacy & Security → Files and Folders, then try again.")
+            } actions: {
+                Button("Open Privacy & Security") { model.openFilesAndFoldersSettings() }
+                Button("Try Again") { model.rescan() }
+            }
+        case .notFound:
+            if let volume = folder.flatMap({ Reachability.disconnectedVolume(of: $0.path) }) {
+                ContentUnavailableView {
+                    Label("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark")
+                } description: {
+                    Text("The fonts in “\(name)” are back as soon as you connect it. Their sets and tags stay as they are.")
+                } actions: {
+                    Button("Try Again") { model.rescan() }
+                }
+            } else {
+                ContentUnavailableView {
+                    Label("Can’t Find “\(name)”", systemImage: "questionmark.folder")
+                } description: {
+                    Text("Nothing is at \(((folder?.path ?? "") as NSString).abbreviatingWithTildeInPath) now. If it’s on a disk or a server, connect it. If it moved, remove it from the library and add it again.")
+                } actions: {
+                    Button("Try Again") { model.rescan() }
+                    Button("Remove Folder from Library") { model.removeFolder(folderID) }
+                }
+            }
+        case nil:
+            let count = model.onlineOnlyCount(inFolder: folderID)
+            ContentUnavailableView {
+                Label("Online Only", systemImage: "icloud.and.arrow.down")
+            } description: {
+                Text(count == 1
+                    ? "The font file here is online only: the cloud service keeps it off this Mac. Download it to see it. To keep it on this Mac, make the folder available offline in the Finder."
+                    : "The \(count.formatted()) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")
+            } actions: {
+                if let progress = model.downloads[folderID] {
+                    ProgressView("Downloading \(progress.done.formatted()) of \(progress.total.formatted())…")
+                        .controlSize(.small)
+                } else {
+                    Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
+                }
+            }
+        }
+    }
+}
+
 private struct EmptyBrowser: View {
     @Environment(AppModel.self) private var model
 
@@ -120,6 +215,8 @@ private struct EmptyBrowser: View {
     @ViewBuilder
     private var content: some View {
         switch model.selection ?? .all {
+        case .folder(let id) where model.availability(ofFolder: id) != nil || model.onlineOnlyCount(inFolder: id) > 0:
+            FolderOutOfReach(folderID: id)
         case .inactive where model.data.folders.isEmpty && model.data.fontFiles.isEmpty:
             ContentUnavailableView {
                 Label("No Watched Folders", systemImage: "folder.badge.plus")
