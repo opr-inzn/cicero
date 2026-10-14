@@ -132,7 +132,7 @@ struct FamilyKeys: ViewModifier {
                 }
                 model.selectedIDs = [target.id]
                 anchor = target.id
-                withAnimation { proxy.scrollTo(target.id, anchor: .top) }
+                proxy.scrollTo(target.id, anchor: .top)
                 return .handled
             }
             // Opened from the menu, or open while the view changes: several families go in the order this view shows them.

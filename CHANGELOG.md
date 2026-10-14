@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Typing a letter in the font list, grid or specimens jumps straight to the first family starting with it, rather than scrolling there.
+
 ## 1.3
 
 - Far more fonts get a classification. When a font doesn’t say what it is, Cicero looks at its letters: an I and an l with feet are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing. After that, Cicero reads the font’s PANOSE numbers, another way fonts can say what they are. In a library of 1,415 families, mostly from small foundries, Unclassified went from 934 families to 231.
