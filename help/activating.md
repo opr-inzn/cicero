@@ -148,7 +148,7 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 
 ### Your own folder that an app loads
 
-If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose **Active in Adobe apps**, or **Active in Specific App…** to type the app’s name, under **Fonts in This Folder**. The same choices are next to the folder in **Settings → Folders**.
+If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose **Active in Adobe apps**, or **Active in Specific App** to type the app’s name, under **Fonts in This Folder**. The same choices are next to the folder in **Settings → Folders**.
 
 ## Turn on the fonts a document uses
 

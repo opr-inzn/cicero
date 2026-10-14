@@ -57,8 +57,7 @@ private struct FolderRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: model.availability(ofFolder: folder.id) != nil ? "questionmark.folder"
-                  : folder.appName == nil ? "folder" : "folder.badge.gearshape")
+            Image(systemName: model.availability(ofFolder: folder.id) != nil ? "questionmark.folder" : "folder")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(folder.displayName)
