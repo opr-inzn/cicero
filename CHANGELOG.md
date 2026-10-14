@@ -4,7 +4,14 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- With **Copy into ~/Library/Fonts** chosen in Settings → General, font files you open in Cicero, drop on its window or choose with File → Add Fonts are copied into your Fonts folder and turned on, and show up in All Fonts, rather than being listed where they are under Added Fonts without being installed. Reveal in Finder shows the copy in your Fonts folder. Cicero then selects the first font it installed in the browser and scrolls to it.
+- **Move into ~/Library/Fonts**, a new way to activate fonts in Settings → General: font files you open, drop or add are moved into your Fonts folder and turned on, and a folder they leave empty, like a font download’s folder, goes to the Trash. A folder with anything else in it stays, and fonts in your folders are still copied. With Ask each time, Cicero offers Move Into Fonts Folder for fonts you added one at a time.
+- Fonts already under Added Fonts leave it once Cicero installs a copy of them, when you turn them on by copying or moving or open them again.
+- Fonts you open from the Finder no longer open on their font page, whichever way you activate fonts: Cicero selects the first of them in the browser and scrolls to it, there and when you drop or add fonts.
+- Turning off a copy Cicero installed sends it to the Trash only when its original is in your library too. Otherwise, as for a font installed by opening it, the copy moves to Cicero’s Deactivated folder, so the font stays in your library.
 - Opening the Info panel no longer makes the grid’s tiles wider. They keep their width and place, and the panel takes a column away instead.
+- Typing the start of a name in the list now shows the family it jumps to below the column headers, rather than under them.
+- The messages at the bottom of the window no longer end with a full stop: “Activated 8 files” rather than “Activated 8 files.”
 
 ## 1.3.1
 

@@ -7,7 +7,7 @@ public struct KeptItemError: Error, Sendable {
     public var isFolder: Bool
 
     public var message: String {
-        "“\(name)” \(isFolder ? "holds fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or place."
+        "“\(name)” \(isFolder ? "holds fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or place"
     }
 }
 

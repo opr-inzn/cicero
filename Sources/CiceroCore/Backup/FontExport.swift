@@ -56,13 +56,13 @@ public struct FontExportPlan: Sendable {
     public var isEmpty: Bool { items.isEmpty }
     public var fileCount: Int { items.reduce(0) { $0 + $1.paths.count } }
 
-    /// "Exported 12 families." with a note about files left out, for a toast.
+    /// "Exported 12 families" with a note about files left out, for a toast.
     public var completionMessage: String {
-        var message = familyCount == 1 ? "Exported 1 family." : "Exported \(familyCount) families."
+        var message = familyCount == 1 ? "Exported 1 family" : "Exported \(familyCount) families"
         if protectedCount > 0 {
             message += protectedCount == 1
-                ? " Left out 1 font that comes with macOS or an app."
-                : " Left out \(protectedCount) fonts that come with macOS or an app."
+                ? ". Left out 1 font that comes with macOS or an app"
+                : ". Left out \(protectedCount) fonts that come with macOS or an app"
         }
         return message
     }

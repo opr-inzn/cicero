@@ -71,7 +71,8 @@ public struct UserData: Codable, Equatable, Sendable {
         classificationRenames = try value(.classificationRenames, d.classificationRenames)
         customCharacterSets = try value(.customCharacterSets, d.customCharacterSets)
         sidebar = try value(.sidebar, d.sidebar)
-        installMethod = try value(.installMethod, d.installMethod)
+        // A way a later version adds is Ask here, rather than a file that doesn't load.
+        installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         showAdobeFonts = try value(.showAdobeFonts, d.showAdobeFonts)
         records = try value(.records, d.records)
@@ -373,6 +374,9 @@ public enum InstallMethod: String, Codable, CaseIterable, Sendable {
     case ask
     /// Copy into ~/Library/Fonts.
     case copy
+    /// Move files added one at a time into ~/Library/Fonts, putting the folders they leave empty in the Trash;
+    /// copy the rest, so the user's folders stay as they are.
+    case move
     /// Register the files where they are.
     case inPlace
 }

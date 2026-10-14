@@ -45,7 +45,7 @@ Double-click a family to open its **font page**, with a large text to type into,
 
 The toolbar has, from left to right, the view switcher (List, Grid, Specimens), **Preview Options**, **Info** and the search field.
 
-Short messages at the bottom of the window confirm what Cicero did, like “Activated.” or “Moved to the Trash.”
+Short messages at the bottom of the window confirm what Cicero did, like “Activated” or “Moved to the Trash”.
 
 ## Add your fonts
 
@@ -62,11 +62,11 @@ You can add single font files too, without adding the folder they’re in:
 - Drag font files from the Finder onto Cicero’s window.
 - In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
 
-They’re listed where they are, under **Added Fonts**, without being installed. See [Added Fonts](organizing.md#added-fonts).
+They’re listed where they are, under **Added Fonts**, without being installed. If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** in Settings → General, they’re copied or moved into your Fonts folder instead and turned on, and they’re in **All Fonts** like any font you’ve installed. See [Added Fonts](organizing.md#added-fonts).
 
 ## Turn a font on
 
-Click the switch next to a family. It’s on in every app as soon as the switch settles and the message says “Activated.” To learn how Cicero turns fonts on, and the choices you have, see [Activating fonts](activating.md).
+Click the switch next to a family. It’s on in every app as soon as the switch settles and the message says “Activated”. To learn how Cicero turns fonts on, and the choices you have, see [Activating fonts](activating.md).
 
 ## Choose light or dark
 
