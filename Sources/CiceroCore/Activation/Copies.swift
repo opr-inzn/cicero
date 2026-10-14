@@ -276,7 +276,7 @@ extension FontFace {
         FontFace(
             id: FaceID(path: path, index: id.index), postScriptName: postScriptName, familyName: familyName, styleName: styleName,
             fullName: fullName, weight: weight, isItalic: isItalic, isMonospaced: isMonospaced, familyClass: familyClass,
-            manufacturer: manufacturer, version: version, designer: designer, vendorID: vendorID, weightAxis: weightAxis,
+            panose: panose, letterShape: letterShape, manufacturer: manufacturer, version: version, designer: designer, vendorID: vendorID, weightAxis: weightAxis,
             width: width, axes: axes
         )
     }

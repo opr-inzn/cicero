@@ -24,12 +24,17 @@ struct CachedFile: Hashable, Sendable {
     var faces: [FontFace]
 }
 
+extension Classification {
+    /// The classifications a face's PANOSE digits or letters can say, in the order the caches number them.
+    fileprivate static let saved: [Classification] = [.serif, .sansSerif, .monospaced, .script, .ornamental, .symbol]
+}
+
 /// The on-disk face cache: a flat little-endian binary file. It's read once per launch and must be
 /// fast; a hand-written layout decodes in a few milliseconds where Codable takes tens.
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
     /// Part of the library cache's version too, as it writes faces the same way.
-    static let version: UInt32 = 5
+    static let version: UInt32 = 6
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -119,6 +124,11 @@ struct ByteWriter {
         withUnsafeBytes(of: id.uuid) { data.append(contentsOf: $0) }
     }
 
+    /// 0 for none, else its place in `Classification.saved` plus one.
+    mutating func write(_ classification: Classification?) {
+        write(UInt8(classification.flatMap { Classification.saved.firstIndex(of: $0) }.map { $0 + 1 } ?? 0))
+    }
+
     /// Everything but the face's path, which the face cache writes once per file.
     mutating func write(_ face: FontFace) {
         write(UInt32(face.id.index))
@@ -128,6 +138,8 @@ struct ByteWriter {
         write(face.fullName)
         write(UInt32(face.weight))
         write(UInt8(face.familyClass))
+        write(face.panose)
+        write(face.letterShape)
         write(UInt8((face.isItalic ? 1 : 0) | (face.isMonospaced ? 2 : 0)))
         write(face.manufacturer)
         write(face.version)
@@ -196,6 +208,13 @@ struct ByteReader {
         UUID(uuid: buffer.loadUnaligned(fromByteOffset: try take(16), as: uuid_t.self))
     }
 
+    mutating func classification() throws -> Classification? {
+        let code = Int(try u8())
+        guard code > 0 else { return nil }
+        guard code <= Classification.saved.count else { throw Truncated() }
+        return Classification.saved[code - 1]
+    }
+
     /// A face as `ByteWriter` writes it, from the file at `path`.
     mutating func face(path: String) throws -> FontFace {
         let index = Int(try u32())
@@ -205,6 +224,8 @@ struct ByteReader {
         let fullName = try string()
         let weight = Int(try u32())
         let familyClass = Int(try u8())
+        let panose = try classification()
+        let letterShape = try classification()
         let flags = try u8()
         let manufacturer = try optionalString()
         let version = try optionalString()
@@ -226,7 +247,7 @@ struct ByteReader {
         return FontFace(
             id: FaceID(path: path, index: index), postScriptName: postScriptName, familyName: familyName,
             styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
-            isMonospaced: flags & 2 != 0, familyClass: familyClass, manufacturer: manufacturer,
+            isMonospaced: flags & 2 != 0, familyClass: familyClass, panose: panose, letterShape: letterShape, manufacturer: manufacturer,
             version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes
         )
     }

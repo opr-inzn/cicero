@@ -14,7 +14,10 @@ Tests/CiceroCoreTests
 Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendable`.
 
 - **Model** (`Model/Font.swift`): `FontFace` (what a file says about one face), `LibraryFace` (a face's
-  state in the library), `Family` (faces plus everything lists and filters need, computed once).
+  state in the library), `Family` (faces plus everything lists and filters need, computed once, the
+  classification among them). `LetterShapes` (`Library/`) judges serif, sans serif or monospaced from the
+  outlines and widths of a few letters when the scanner reads a face whose file doesn't say; the answer is
+  cached with the face.
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
   which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
   with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
@@ -74,6 +77,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   character set lookups, custom character sets) are cached and keyed on the inputs they depend on. The
   sidebar's choices (open sections, order, hidden items) are user data that no list depends on, so changing
   them leaves `dataRevision`, and the browser's list, as they are.
+- `ClassificationGuesser` (`Model/`) asks Apple Intelligence's on-device model to guess, from their names,
+  the classification of families nothing in their files classifies, one at a time after scans, and keeps the
+  answers in the caches. `classificationNamer` applies them below the user's choices; `guessRevision`, in
+  `VisibleKey`, refills lists as they come.
 - `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
   light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
   `TextEditor` follows too, so the font page's text and the hidden copy that sizes it agree.

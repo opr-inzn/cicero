@@ -57,6 +57,12 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var isMonospaced: Bool
     /// OS/2 family class (high byte of sFamilyClass); 0 when unknown.
     public var familyClass: Int
+    /// What the OS/2 table's PANOSE digits say the face is; nil when they say nothing.
+    public var panose: Classification?
+    /// Serif or sans serif, as the shapes of its I and l say, or monospaced when its letters are all as wide (see
+    /// `LetterShapes`); nil when they don't tell, or weren't looked at because the family class or the monospaced
+    /// flag says what the face is.
+    public var letterShape: Classification?
     public var manufacturer: String?
     public var version: String?
     /// The designer the name table credits (name ID 9).
@@ -71,7 +77,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
 
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
-        weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int,
+        weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
         weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = []
     ) {
@@ -84,6 +90,8 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.isItalic = isItalic
         self.isMonospaced = isMonospaced
         self.familyClass = familyClass
+        self.panose = panose
+        self.letterShape = letterShape
         self.manufacturer = manufacturer
         self.version = version
         self.designer = designer
@@ -548,7 +556,11 @@ struct StyleName {
 }
 
 extension Classification {
-    /// The OS/2 family class of the regular upright face, then hints in the name.
+    /// The monospaced flag, the OS/2 family class of the upright face, then words in the name. For the families
+    /// none of those classify, the shapes of their letters, then their PANOSE digits, as far as the upright faces
+    /// (all the faces, in a family of italics) agree: those digits are often copied from another font, and where
+    /// both say something and differ, the letters are right. A family is monospaced by its letters only when all
+    /// of it is: a family's Mono styles don't count against its others.
     static func of(name: String, faces: [LibraryFace]) -> Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
         let upright = faces.first { !$0.face.isItalic } ?? faces[0]
@@ -566,8 +578,18 @@ extension Classification {
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
             (.serif, ["serif", "slab", "garamond", "antiqua"]),
             (.script, ["script", "brush", "hand"]),
+            // Symbol fonts' letters, when they have any, are often plain.
+            (.symbol, ["symbol", "dingbat", "emoji"]),
         ]
         for (classification, words) in hints where words.contains(where: name.contains) { return classification }
-        return .unclassified
+        let uprights = faces.filter { !$0.face.isItalic }
+        let judged = (uprights.isEmpty ? faces : uprights).map(\.face)
+        func agreed(_ answers: [Classification?]) -> Classification? {
+            let found = Set(answers.compactMap { $0 })
+            return found.count == 1 ? found.first : nil
+        }
+        if judged.allSatisfy({ $0.letterShape == .monospaced }) { return .monospaced }
+        let shapes = judged.map(\.letterShape).filter { $0 != .monospaced }
+        return agreed(shapes) ?? agreed(judged.map(\.panose)) ?? .unclassified
     }
 }

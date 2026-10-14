@@ -56,12 +56,17 @@ enum FontFileReader {
             axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
         }
         let os2 = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), CTFontTableOptions(rawValue: 0)) as Data?
+        let familyClass = Int((symbolic.rawValue >> 28) & 0xF)
+        let isMonospaced = symbolic.contains(.monoSpaceTrait)
         return FontFace(
             id: id, postScriptName: postScriptName, familyName: familyName, styleName: styleName, fullName: fullName,
             weight: weightClass(of: font, os2: os2),
             isItalic: symbolic.contains(.italicTrait) || lowercasedStyle.contains("italic") || lowercasedStyle.contains("oblique"),
-            isMonospaced: symbolic.contains(.monoSpaceTrait),
-            familyClass: Int((symbolic.rawValue >> 28) & 0xF),
+            isMonospaced: isMonospaced,
+            familyClass: familyClass,
+            panose: panose(os2),
+            // The letters are looked at only when the file doesn't say what the face is.
+            letterShape: familyClass == 0 && !isMonospaced ? LetterShapes.classification(of: font) : nil,
             manufacturer: name(kCTFontManufacturerNameKey, of: font),
             version: name(kCTFontVersionNameKey, of: font),
             designer: name(kCTFontDesignerNameKey, of: font),
@@ -100,6 +105,25 @@ enum FontFileReader {
         guard bytes.allSatisfy({ $0 == 0 || (0x20...0x7E).contains($0) }) else { return nil }
         let id = String(decoding: bytes.filter { $0 != 0 }, as: UTF8.self).trimmingCharacters(in: .whitespaces)
         return id.isEmpty ? nil : id
+    }
+
+    /// What the OS/2 PANOSE digits say: the kind of font, and for text faces the serif style. Flared and rounded
+    /// serifs could go either way, and the proportion digit often says monospaced of fonts that aren't.
+    static func panose(_ table: Data?) -> Classification? {
+        guard let table, table.count >= 34 else { return nil }
+        let kind = table[table.startIndex + 32], serifStyle = table[table.startIndex + 33]
+        switch kind {
+        case 2:  // Latin text
+            switch serifStyle {
+            case 2...10: return .serif  // cove, square, thin, oval, exaggerated, triangle
+            case 11...13: return .sansSerif  // normal, obtuse and perpendicular sans
+            default: return nil
+            }
+        case 3: return .script  // Latin hand written
+        case 4: return .ornamental  // Latin decorative
+        case 5: return .symbol  // Latin symbol
+        default: return nil
+        }
     }
 
     /// OS/2 usWidthClass when it's in range, else normal.
