@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
+
 ## 1.4.2
 
 - The coverage set editor explains that spaces and line breaks don’t count, so you can use them to lay out your characters.

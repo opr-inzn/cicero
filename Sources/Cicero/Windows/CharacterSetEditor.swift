@@ -59,6 +59,7 @@ struct CharacterSetEditor: View {
                         model.deleteCharacterSet(original.id)
                         dismiss()
                     }
+                    .foregroundStyle(.red)
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
