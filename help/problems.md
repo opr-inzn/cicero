@@ -21,8 +21,8 @@ The same font is on from more than one file. macOS uses only one of them, so app
 Each card is one family, like “Active from 2 files” or “3 styles active from 6 files”, with every file and where it is. To fix it, keep one copy and take the others away:
 
 - **Deactivate** turns off a copy Cicero can turn off. See [Turn fonts off](activating.md#turn-fonts-off) for what happens to its file.
-- **Remove Copy…** moves a copy Cicero can’t turn off to the Trash, when every style in it has another copy.
-- A folder’s row has **Deactivate** or **Remove Copies…** for all its files at once, when every style keeps a copy outside that folder.
+- **Remove Copy** moves a copy Cicero can’t turn off to the Trash, when every style in it has another copy.
+- A folder’s row has **Deactivate** or **Remove Copies** for all its files at once, when every style keeps a copy outside that folder.
 - A green **Newest** tag marks the folder or file with the highest version, when all the others are older. It’s usually the one to keep.
 
 ## Missing Files
@@ -35,7 +35,7 @@ Cicero remembers these files, but they’re gone.
 
 ## Damaged or Unreadable Files
 
-Cicero couldn’t read these files. They may be damaged, or not font files at all. Use **Reveal** to look at them, or **Move to Trash…** to remove one.
+Cicero couldn’t read these files. They may be damaged, or not font files at all. Use **Reveal** to look at them, or **Move to Trash** to remove one.
 
 ## Fonts on External Disks
 
@@ -49,7 +49,7 @@ The same font is in one place in your folders more than once, as files that aren
 
 Copies in different places, like one in each client’s folder, aren’t duplicates: they’re the places [Use Copy From](activating.md#use-another-copy-of-a-font) lets you choose between. Each folder you added is a place, unless it holds copies of a style in different folders inside it, like `Clients/Acme` and `Clients/Globex`: then those are places of their own.
 
-**Move Extra Copies to Trash…** keeps one copy of each style and moves the others to the Trash. It keeps the file Cicero installed a copy from, if there is one, and otherwise the one with the highest version, then the newest. With only one extra copy, the button says **Move to Trash…**
+**Move Extra Copies to Trash** keeps one copy of each style and moves the others to the Trash. It keeps the file Cicero installed a copy from, if there is one, and otherwise the one with the highest version, then the newest. With only one extra copy, the button says **Move to Trash**
 
 ## Shared Style Names
 

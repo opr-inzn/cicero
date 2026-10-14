@@ -2,6 +2,24 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
+/// What activating and deactivating families are called, in their right-click menu and on a font page alike.
+struct ActivationTitles {
+    /// The app every family is one that loads from its own folder ("Adobe Apps"), where on and off mean in
+    /// every app, that one's included.
+    let app: String?
+    let activate: String
+    let deactivate: String
+
+    init(_ families: [Family]) {
+        app = families.allSatisfy { $0.app != nil } ? families.first?.app.map { $0 == "Adobe" ? "Adobe Apps" : $0 } : nil
+        let temporary = families.allSatisfy { $0.temporaryScope != nil }
+        let partial = families.contains { $0.hasActive && $0.temporaryScope == nil }
+        activate = temporary ? "Activate Permanently" : app != nil ? "Activate in All Apps" : partial ? "Activate Remaining Styles" : "Activate"
+        // On in the app only, nothing is on in other apps: turning it off there is all deactivating does.
+        deactivate = app.map { families.contains(where: \.hasActive) ? "Deactivate in All Apps" : "Deactivate in \($0)" } ?? "Deactivate"
+    }
+}
+
 /// The right-click menu for one or more families.
 struct FamilyMenu: View {
     let families: [Family]
@@ -15,14 +33,10 @@ struct FamilyMenu: View {
             Text(note)
         }
 
-        let ellipsis = model.data.installMethod == .ask ? "…" : ""
-        // Every family is one an app loads from its own folder: on and off mean in every app, Adobe's included.
-        let app = families.allSatisfy { $0.app != nil } ? families.first?.app.map { $0 == "Adobe" ? "Adobe Apps" : $0 } : nil
+        let titles = ActivationTitles(families)
+        let app = titles.app
         if families.contains(where: \.hasActivatable) {
-            let temporary = families.allSatisfy { $0.temporaryScope != nil }
-            let partial = families.contains { $0.hasActive && $0.temporaryScope == nil }
-            let title = temporary ? "Activate Permanently" : app != nil ? "Activate in All Apps" : partial ? "Activate Remaining Styles" : "Activate"
-            Button(title + (app != nil ? "" : ellipsis)) { model.activate(families) }
+            Button(titles.activate) { model.activate(families) }
         }
         if let app, families.contains(where: { $0.position != .app }) {
             Button("Use in \(app) Only") { model.useInAppOnly(families.flatMap(\.faces)) }
@@ -31,9 +45,7 @@ struct FamilyMenu: View {
             Button(app != nil ? "Activate Temporarily in All Apps" : "Activate Temporarily") { model.activateTemporarily(families) }
         }
         if families.contains(where: \.hasDeactivatable) {
-            // On in the app only, nothing is on in other apps: turning it off there is all deactivating does.
-            let title = app.map { families.contains(where: \.hasActive) ? "Deactivate in All Apps" : "Deactivate in \($0)" } ?? "Deactivate"
-            Button(title) { model.deactivate(families) }
+            Button(titles.deactivate) { model.deactivate(families) }
         }
         if families.count == 1 {
             CopySourcesMenu(styles: families[0].faces, title: families[0].name, model: model)
@@ -49,11 +61,12 @@ struct FamilyMenu: View {
                 ))
             }
             if !model.data.sets.isEmpty { Divider() }
-            Button("New Set from Selection…") {
+            Button("New Set from Selection") {
                 model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
             }
         }
         Menu("Tags") { TagMenuItems(families: families, model: model) }
+        Menu("Classification") { ClassificationMenuItems(families: families, model: model) }
 
         Divider()
 
@@ -62,7 +75,7 @@ struct FamilyMenu: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(families.map(\.name).joined(separator: "\n"), forType: .string)
         }
-        Button("Export…") { model.exportFonts(families, named: nil) }
+        Button("Export") { model.exportFonts(families, named: nil) }
         if families.count > 1 {
             Button("Compare") {
                 model.compare(families)
@@ -75,7 +88,7 @@ struct FamilyMenu: View {
         if model.canRemoveFromLibrary(families) {
             Button("Remove from Library") { model.removeFromLibrary(families) }
         }
-        Button("Move to Trash…") { model.requestTrash(families) }
+        Button("Move to Trash") { model.requestTrash(families) }
     }
 
     private var note: String? {
@@ -96,7 +109,7 @@ struct StyleMenu: View {
     var body: some View {
         Text(face.state.label)
         if face.canActivate {
-            Button("Activate Style" + (model.data.installMethod == .ask ? "…" : "")) {
+            Button("Activate Style") {
                 model.activate([face], title: "\(family.name) \(face.face.styleName)")
             }
         }
@@ -114,7 +127,7 @@ struct StyleMenu: View {
             NSPasteboard.general.setString(face.face.postScriptName, forType: .string)
         }
         Divider()
-        Button("Move Style to Trash…") {
+        Button("Move Style to Trash") {
             model.requestTrash([face], removing: family.faces.count == 1 ? [family.id] : [], title: "“\(family.name) \(face.face.styleName)”")
         }
     }
@@ -150,5 +163,32 @@ struct CopySourcesMenu: View {
             details.append(source.choices.count == 1 ? "1 style" : "\(source.choices.count) styles")
         }
         return details.isEmpty ? source.name : "\(source.name) — " + details.joined(separator: ", ")
+    }
+}
+
+/// Which classification families are in: Automatic, the one their fonts suggest, or any other, the user's
+/// own among them; and a new one.
+struct ClassificationMenuItems: View {
+    let families: [Family]
+    let model: AppModel
+
+    var body: some View {
+        let names = Set(families.map(model.classificationName(of:)))
+        let automatic = families.allSatisfy { model.data.classificationOverrides[$0.id] == nil }
+        // One family says which classification Automatic is.
+        let suggested = families.count == 1 ? families[0].classification : nil
+        Toggle(suggested.map { "Automatic (\(model.name(of: $0)))" } ?? "Automatic", isOn: Binding(
+            get: { automatic },
+            set: { if $0 { model.setClassification(nil, for: families) } }
+        ))
+        Divider()
+        ForEach(model.classificationNames, id: \.self) { name in
+            Toggle(name, isOn: Binding(
+                get: { names == [name] },
+                set: { if $0 { model.setClassification(name, for: families) } }
+            ))
+        }
+        Divider()
+        Button("New Classification") { model.newClassification(for: families) }
     }
 }

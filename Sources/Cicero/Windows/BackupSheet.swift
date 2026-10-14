@@ -24,7 +24,7 @@ struct BackupSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Back Up Library").font(.title2.bold())
-                Text("The backup has everything set up in Cicero: sets, smart sets, tags, character sets, folders and added fonts, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
+                Text("The backup has everything set up in Cicero: sets, smart sets, tags, coverage sets, folders and added fonts, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
                     .foregroundStyle(.secondary)
             }
             Form {
@@ -45,10 +45,10 @@ struct BackupSheet: View {
                     switch progress {
                     case .copying(let done, let total):
                         ProgressView(value: Double(done), total: Double(max(total, 1)))
-                        Text("Copying fonts… \(done.formatted()) of \(total.formatted())")
+                        Text("Copying fonts, \(done.formatted()) of \(total.formatted())")
                     case .compressing:
                         ProgressView()
-                        Text("Compressing…")
+                        Text("Compressing")
                     }
                 }
                 .progressViewStyle(.linear)
@@ -62,7 +62,7 @@ struct BackupSheet: View {
                     task?.cancel()
                     dismiss()
                 }
-                Button("Back Up…") { backUp() }
+                Button("Back Up") { backUp() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(progress != nil || (includeFonts && fonts == nil))
             }
@@ -73,7 +73,7 @@ struct BackupSheet: View {
     }
 
     private var fontsDetail: String {
-        guard let fonts else { return "Counting…" }
+        guard let fonts else { return "Counting" }
         if fonts.isEmpty { return "There are no font files in your library." }
         let size = fonts.reduce(Int64(0)) { $0 + $1.size }
         return "\(fonts.count.formatted()) files, \(size.formatted(.byteCount(style: .file)))"

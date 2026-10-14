@@ -42,7 +42,7 @@ struct AppSetEditor: View {
                     Text("No apps yet").foregroundStyle(.secondary)
                 }
             }
-            Button("Add App…") { model.presentAppPicker(for: setID) }
+            Button("Add App") { model.presentAppPicker(for: setID) }
             loginNote
             HStack {
                 Spacer()

@@ -21,13 +21,13 @@ You can also make your own (see below).
 
 ### Find fonts that have a set
 
-Click a set under **Character Sets** in the sidebar. The browser shows the families that have every one of its characters.
+Click a set under **Coverage** in the sidebar. The browser shows the families that have every one of its characters.
 
 You can also:
 
 - show a character set as a column in the [list view](browsing.md#list) and sort by it: **Latin S–XL**, **Adobe Latin**, **GF Latin**, **GF Cyrillic** and **GF Greek** show the largest set of that kind a family has, and any other set shows whether a family has all of it or how many characters it lacks
-- see the sets a font has, and how many characters it lacks for the next Latin size, under **Character Sets** in the [Info panel](browsing.md#see-a-fonts-details)
-- use a set in a [smart set](organizing.md#smart-sets) rule, like “Character Set is supported Adobe Latin 3”
+- see the sets a font has, and how many characters it lacks for the next Latin size, under **Coverage** in the [Info panel](browsing.md#see-a-fonts-details)
+- use a set in a [smart set](organizing.md#smart-sets) rule, like “Coverage includes Adobe Latin 3”
 
 ### Choose which sets the sidebar shows
 
@@ -35,16 +35,16 @@ Open **Settings → Coverage**. Each group lists its sets with a checkbox, a sho
 
 You can also hide sets with **Edit** in the sidebar, like any other item. See [Hide items you don’t use](organizing.md#hide-items-you-dont-use).
 
-## Make your own character set
+## Make your own coverage set
 
 Make a set from the characters you need, like a client’s name or a language’s alphabet:
 
-1. Click **+** next to **Character Sets** in the sidebar, or **+** under **Your Character Sets** in **Settings → Coverage**.
+1. Click **+** next to **Coverage** in the sidebar, or **+** under **Your Coverage Sets** in **Settings → Coverage**.
 2. Give it a name.
 3. Under **Characters**, type or paste them. You can also use codes like `U+00C1` or `0x00C1`, and ranges like `U+0100–U+017F`. Spaces and line breaks are ignored.
 4. Check the preview of the characters and their count, and click **Create**.
 
-Your sets appear under **Your Character Sets** in the sidebar. To change one, right-click it and choose **Edit Character Set…**; to remove it, choose **Delete Character Set**. In **Settings → Coverage** you can do the same with **Edit…** and **−**.
+Your sets appear under **Your Coverage Sets** in the sidebar. To change one, right-click it and choose **Edit Coverage Set**; to remove it, choose **Delete Coverage Set**. In **Settings → Coverage** you can do the same with **Edit** and **−**.
 
 ## The Character Toolbox
 

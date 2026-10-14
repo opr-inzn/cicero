@@ -49,7 +49,7 @@ struct DocumentFontsSheet: View {
                 Spacer()
                 Button("Make Set") { message = model.makeSet(for: report) }
                     .help("A set named “\(report.setName)” with the document’s fonts that are in your library")
-                Button("Activate All" + (model.data.installMethod == .ask ? "…" : "")) { model.activateAll(in: report) }
+                Button("Activate All") { model.activateAll(in: report) }
                     .disabled(off.isEmpty)
                     .help("Turns on every font of the document that’s in your library")
                 Button("Done") { dismiss() }
@@ -108,7 +108,7 @@ struct DocumentFontsSheet: View {
         if let face = match.face { return face.state.label }
         if match.isInstalled { return "Installed with macOS" }
         switch searches[match.id] {
-        case .searching: return "Searching…"
+        case .searching: return "Searching"
         case .found(let path): return "Found “\(URL(fileURLWithPath: path).lastPathComponent)”"
         case .notFound: return "Not found on this Mac"
         case nil: return "Not in your library"
@@ -119,7 +119,7 @@ struct DocumentFontsSheet: View {
     private func action(_ match: DocumentFontMatch) -> some View {
         if let face = match.face {
             if face.canActivate && !isOn(match) {
-                Button("Activate" + (model.data.installMethod == .ask && face.app == nil ? "…" : "")) {
+                Button("Activate") {
                     model.activate([face], title: match.font.displayName)
                 }
             }

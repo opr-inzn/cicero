@@ -60,20 +60,20 @@ struct GeneralSettings: View {
             } header: {
                 Text("Font Caches")
             } footer: {
-                Text("Rebuild reads every font file again. Clearing the caches helps when fonts don’t show up in apps or look wrong.").formFooter()
+                Text("Rebuild reads every font file again. Clearing the caches helps when fonts don’t show up in apps or look wrong; you may need to restart your Mac afterwards.").formFooter()
             }
             Section {
                 LabeledContent("Your library") {
                     HStack {
-                        Button("Back Up…") { isBackingUp = true }
-                        Button("Restore…") { Task { restoring = await model.chooseBackupToRestore() } }
+                        Button("Back Up") { isBackingUp = true }
+                        Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
                 }
                 .formRowCentered()
             } header: {
                 Text("Backup")
             } footer: {
-                Text("A backup holds your sets, smart sets, tags, character sets, folders and added fonts, foundry names, sidebar, and the settings for activation, system fonts and Adobe fonts, and can include your font files.").formFooter()
+                Text("A backup holds your sets, smart sets, tags, coverage sets, folders and added fonts, foundry names, sidebar, and the settings for activation, system fonts and Adobe fonts, and can include your font files.").formFooter()
             }
             Section {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)

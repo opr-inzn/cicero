@@ -69,6 +69,6 @@ struct TagMenuItems: View {
             }
         }
         if !model.data.tags.isEmpty { Divider() }
-        Button("New Tag…") { model.newTag(for: families) }
+        Button("New Tag") { model.newTag(for: families) }
     }
 }

@@ -41,7 +41,6 @@ struct BrowserView: View {
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
         .toolbar { toolbar }
-        .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search")
     }
 
     private func subtitle(_ families: [Family]) -> String {
@@ -71,14 +70,12 @@ struct BrowserView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem {
+        ToolbarCapsule {
             ToolbarPicker(BrowserMode.allCases, selection: $mode, title: \.title, symbol: \.icon)
                 .help("Show as a list, a grid or specimens")
         }
-        ToolbarSpacer(.fixed)
-        ToolbarItem { PreviewOptionsButton() }
-        ToolbarSpacer(.fixed)
-        ToolbarItem { InfoButton() }
+        ToolbarCapsule { PreviewOptionsButton() }
+        ToolbarCapsule { InfoButton() }
     }
 }
 
@@ -101,8 +98,8 @@ private struct ScanCapsule: View {
 
     private func text(for progress: ScanProgress) -> String {
         switch progress {
-        case .finding: "Finding fonts…"
-        case .identifying(let done, let total): "Identifying fonts… \(done.formatted()) of \(total.formatted())"
+        case .finding: "Finding fonts"
+        case .identifying(let done, let total): "Identifying fonts, \(done.formatted()) of \(total.formatted())"
         }
     }
 }
@@ -119,7 +116,7 @@ private struct OnlineOnlyBar: View {
                 Image(systemName: "icloud.and.arrow.down")
                     .foregroundStyle(.secondary)
                 if let progress = model.downloads[folderID] {
-                    Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())…")
+                    Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
                     Spacer()
                     ProgressView().controlSize(.small)
                 } else {
@@ -186,7 +183,7 @@ private struct FolderOutOfReach: View {
                     : "The \(count.formatted()) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")
             } actions: {
                 if let progress = model.downloads[folderID] {
-                    ProgressView("Downloading \(progress.done.formatted()) of \(progress.total.formatted())…")
+                    ProgressView("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
                         .controlSize(.small)
                 } else {
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
@@ -219,8 +216,8 @@ private struct EmptyBrowser: View {
             } description: {
                 Text("Add a folder of fonts, or font files, to browse them here. Nothing gets installed until you activate it.")
             } actions: {
-                Button("Add Folder…") { model.presentAddFolderPanel() }
-                Button("Add Fonts…") { model.presentAddFontsPanel() }
+                Button("Add Folder") { model.presentAddFolderPanel() }
+                Button("Add Fonts") { model.presentAddFontsPanel() }
             }
         case .inactive:
             ContentUnavailableView {
@@ -228,7 +225,7 @@ private struct EmptyBrowser: View {
             } description: {
                 Text("Every font in your library is turned on. Add a folder of fonts to keep more here without installing them.")
             } actions: {
-                Button("Add Folder…") { model.presentAddFolderPanel() }
+                Button("Add Folder") { model.presentAddFolderPanel() }
             }
         case .active:
             ContentUnavailableView("Nothing Activated", systemImage: "circle.dashed",
@@ -243,11 +240,11 @@ private struct EmptyBrowser: View {
                 Text("No fonts in your library match this smart set’s rules.")
             } actions: {
                 if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                    Button("Edit Smart Set…") { model.editingSmartSet = smartSet }
+                    Button("Edit Smart Set") { model.editingSmartSet = smartSet }
                 }
             }
         case .characterSet(let id) where model.coverageProgress != nil:
-            ContentUnavailableView("Checking Characters…", systemImage: "character.textbox",
+            ContentUnavailableView("Checking Characters", systemImage: "character.textbox",
                                    description: Text("Fonts that have every character of \(model.characterSet(id)?.name ?? "this set") will show up here."))
         case .characterSet(let id):
             ContentUnavailableView("No Fonts with Every Character", systemImage: "character.textbox",

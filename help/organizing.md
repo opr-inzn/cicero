@@ -14,11 +14,11 @@ At the top of the sidebar are five items that are always there:
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Problems | Things worth fixing, with a count. See [Problems](problems.md) |
 
-Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Character Sets**.
+Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Coverage**.
 
 ### Open or close a section
 
-Click anywhere on a section’s title. The groups inside **Character Sets** open and close the same way. **Foundries**, **Classifications**, and the **Unicode Blocks** and **Google Fonts** groups start closed.
+Click anywhere on a section’s title. The groups inside **Coverage** open and close the same way. **Foundries**, **Classifications**, and the **Unicode Blocks** and **Google Fonts** groups start closed.
 
 ### Hide items you don’t use
 
@@ -30,11 +30,11 @@ To hide one item quickly, right-click it and choose **Hide from Sidebar**.
 
 The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide single foundries, use **Edit** in the sidebar.
 
-When you make a new set or character set, or add a folder, its section shows again if you’d hidden it.
+When you make a new set or coverage set, or add a folder, its section shows again if you’d hidden it.
 
 ### Put items in your order
 
-Drag items to where you want them, as in the Finder’s sidebar. An item moves within its own section: sets among your sets, folders among your folders, and so on. Character sets move within their group. To reorder the groups in **Character Sets**, drag a group’s title onto another: it takes that group’s place, and the groups in between move up or down one. The sections themselves stay in their place.
+Drag items to where you want them, as in the Finder’s sidebar. An item moves within its own section: sets among your sets, folders among your folders, and so on. Sets under **Coverage** move within their group. To reorder the groups in **Coverage**, drag a group’s title onto another: it takes that group’s place, and the groups in between move up or down one. The sections themselves stay in their place.
 
 Items that are gone for now, like **System Fonts** while system fonts are hidden, keep their place. New items go at the end. To go back to the usual order, click **Reset Order** in **Settings → Sidebar**.
 
@@ -42,7 +42,7 @@ Items that are gone for now, like **System Fonts** while system fonts are hidden
 
 ⌘-click or ⇧-click items in the same section to select several. The browser then shows the fonts in any of them, and the window title names them, like “Serif and Script”. Drag them to move them together.
 
-Selected items have to be in one section, or in one group of character sets. ⌘-clicking an item somewhere else starts a new selection there.
+Selected items have to be in one section, or in one group under **Coverage**. ⌘-clicking an item somewhere else starts a new selection there.
 
 ### Drop fonts onto the sidebar
 
@@ -58,7 +58,7 @@ Add folders of fonts to see them in your library without installing them. Cicero
 
 ### Add a folder
 
-Choose **File → Add Folder…** (⇧⌘O), click **+** next to **Folders**, or click **+** in **Settings → Folders**. You can pick several folders at once.
+Choose **File → Add Folder** (⇧⌘O), click **+** next to **Folders**, or click **+** in **Settings → Folders**. You can pick several folders at once.
 
 A folder called “Fonts” is shown with the name of the folder it’s in, like “Projects Fonts”.
 
@@ -69,7 +69,7 @@ Right-click a folder in the sidebar:
 - **Reveal in Finder**
 - **Fonts in This Folder**: whether its fonts are **Not activated until you activate them** (the usual choice), or active in an app that loads them by itself, like **Active in Adobe apps**. See [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads).
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are.
-- **Export Fonts…**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
+- **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
 ### Adobe Apps
 
@@ -103,9 +103,9 @@ Font files you add one at a time are listed where they are, without being instal
 
 ### Add font files
 
-- Choose **File → Add Fonts…** (⌘O) and pick one or more font files.
+- Choose **File → Add Fonts** (⌘O) and pick one or more font files.
 - Drag font files from the Finder onto the browser or a font page. Drop them while the browser shows a set, and they join that set too.
-- In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All…**
+- In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All**
 
 Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). When you open one family from the Finder, its font page opens. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder.
 
@@ -123,9 +123,9 @@ A set is a list of families you put together by hand, like the fonts for one pro
 
 ### Make a set
 
-- Choose **File → New Set…** (⇧⌘N). The families you’ve selected go into it.
-- Or click **+** next to **Sets** and choose **New Set…**
-- Or right-click selected families and choose **Add to Set → New Set from Selection…**
+- Choose **File → New Set** (⇧⌘N). The families you’ve selected go into it.
+- Or click **+** next to **Sets** and choose **New Set**
+- Or right-click selected families and choose **Add to Set → New Set from Selection**
 
 ### Add and remove fonts
 
@@ -134,7 +134,7 @@ A set is a list of families you put together by hand, like the fonts for one pro
 
 ### Rename or delete a set
 
-Right-click the set and choose **Rename Set…** or **Delete Set**. Deleting a set keeps its fonts in your library. Smart set rules that use the set are removed.
+Right-click the set and choose **Rename Set** or **Delete Set**. Deleting a set keeps its fonts in your library. Smart set rules that use the set are removed.
 
 ### Turn a set’s fonts on or off
 
@@ -148,13 +148,13 @@ A smart set picks its families by rules, and stays up to date as your library ch
 
 ### Make a smart set
 
-1. Choose **File → New Smart Set…** (⌥⌘N), or click **+** next to **Sets** and choose **New Smart Set…**
+1. Choose **File → New Smart Set** (⌥⌘N), or click **+** next to **Sets** and choose **New Smart Set**
 2. Give it a name.
 3. Next to **Match**, choose **All of the rules** or **Any of the rules**.
 4. Set up each rule: a field, a comparison and a value. Click the **+** at the end of a rule to add one after it, or **−** to remove it.
 5. Watch the count at the bottom, like “24 families match”, and click **Create**.
 
-To change it later, right-click it and choose **Edit Smart Set…**. To remove it, choose **Delete Smart Set**.
+To change it later, right-click it and choose **Edit Smart Set**. To remove it, choose **Delete Smart Set**.
 
 ### Rules you can use
 
@@ -171,10 +171,10 @@ To change it later, right-click it and choose **Edit Smart Set…**. To remove i
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
 | Number of Styles | is, is more than, is less than | A number |
 | Language | is supported, isn’t supported | A language, chosen from a searchable list that starts with yours |
-| Character Set | is supported, isn’t supported | Any built-in character set or one of yours |
+| Coverage | includes, doesn’t include | Any built-in set or one of your coverage sets |
 | Date Added | is in the last, isn’t in the last | A number of days |
 
-A smart set with a language or character set rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
+A smart set with a language or coverage rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
 
 ## Tags
 
@@ -182,14 +182,14 @@ Tags are labels you give families, like “Licensed”, “Client approved” or
 
 ### Tag fonts
 
-- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked tag to take it off. **New Tag…** makes a tag and gives it to them.
+- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked tag to take it off. **New Tag** makes a tag and gives it to them.
 - Drag families onto a tag in the sidebar.
 - In the [Info panel](browsing.md#see-a-fonts-details), click **Add Tag** or **Edit Tags** next to **Tags**.
 
 ### Make, change and delete tags
 
 - Click **+** next to **Tags** in the sidebar to make a tag. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other tag has. Leave the name empty to name the tag after its color, like **Orange**.
-- Right-click a tag and choose **Rename Tag…**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
+- Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
 
 Select a tag in the sidebar to see the families that have it. To find families with several tags, or without one, make a [smart set](#smart-sets) with **Tag** rules.
 
@@ -197,12 +197,18 @@ Select a tag in the sidebar to see the families that have it. To find families w
 
 Cicero reads each family’s foundry from the manufacturer name in its files, and tidies it up: it drops endings like “Inc.” or “GmbH”, leaves out web addresses and copyright lines, and puts names that differ only in capitals together.
 
-- **Rename a foundry:** right-click it and choose **Rename Foundry…**. Every family from that foundry follows.
+- **Rename a foundry:** right-click it and choose **Rename Foundry**. Every family from that foundry follows.
 - **Change a family’s foundry:** drag the family onto another foundry in the sidebar.
 
 ## Classifications
 
 Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol and Unclassified, and shows the ones your library has. Slab serifs count as Serif. It reads the classification the font gives itself, and when there’s none, looks for hints in the name, like “Mono”, “Slab”, “Sans”, “Grotesk” or “Script”.
+
+- **Make your own classification:** click **+** next to **Classifications**, or choose **Classification → New Classification** from a family’s right-click menu to put it straight in. Yours stay in the sidebar even while they’re empty.
+- **Put a family in another classification:** right-click it and choose one from **Classification**, use **Change** next to **Classification** in the Info panel, or drag it onto a classification in the sidebar. **Automatic** puts it back where its fonts say it belongs.
+- **Rename a classification:** right-click it and choose **Rename Classification**. This works for Cicero’s own too; give one its old name back to undo that. Smart sets follow.
+- **Delete one of yours:** right-click it and choose **Delete Classification**. Its families go back to the classifications their fonts suggest.
+- **Hide a classification:** click **Edit** at the top of the sidebar and uncheck it, or choose **Hide from Sidebar** from its right-click menu.
 
 ## System Fonts
 
@@ -210,6 +216,6 @@ Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Sy
 
 To keep them out of your lists, open **Settings → General** and turn off **Show system fonts**. They’re then hidden everywhere: in every list, in smart sets, in the Character Toolbox, and **System Fonts** leaves the sidebar too.
 
-## Character Sets
+## Coverage
 
-The **Character Sets** section shows which fonts have every character of a set, like Latin S or Adobe Latin 3. See [Character sets and languages](character-sets.md).
+The **Coverage** section shows which fonts have every character of a set, like Latin S or Adobe Latin 3. See [Character sets and languages](character-sets.md).

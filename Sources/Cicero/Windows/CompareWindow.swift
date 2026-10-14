@@ -44,12 +44,11 @@ struct CompareWindow: View {
         .dropDestination(for: String.self) { names, _ in _ = model.addToCompare(names) }
         .navigationSubtitle(samples.count == 1 ? "1 family" : "\(samples.count) families")
         .toolbar {
-            ToolbarItem {
+            ToolbarCapsule {
                 ToolbarPicker(CompareLayout.allCases, selection: $layout, title: \.title)
                     .help("One row per font, or every font over each other")
             }
-            ToolbarSpacer(.fixed)
-            ToolbarItem { PreviewOptionsButton() }
+            ToolbarCapsule { PreviewOptionsButton() }
         }
     }
 }

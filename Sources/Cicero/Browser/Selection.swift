@@ -57,6 +57,35 @@ enum FamilyLayout {
     case grid(columns: Int)
 }
 
+/// Clicking between families, or below the last, deselects them as Escape does, as in the Finder. For a scroll
+/// view's content: it fills the visible height (`visibleHeight(_:)`), so a click below a short list counts too,
+/// and the click target sits behind the families, which take their own clicks.
+struct DeselectsOnEmptyClick: ViewModifier {
+    let model: AppModel
+    let height: CGFloat
+    let focus: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: .infinity, minHeight: height, alignment: .top)
+            .background {
+                Color.clear
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        focus()
+                        model.selectedIDs = []
+                    }
+            }
+    }
+}
+
+extension View {
+    /// For a scroll view: the height it shows, less what runs under the toolbar.
+    func visibleHeight(_ height: Binding<CGFloat>) -> some View {
+        onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { height.wrappedValue = $1 }
+    }
+}
+
 /// Keyboard handling for the browser: Return opens, Escape deselects, ⌘A selects all, typing a letter jumps
 /// to the first family starting with it, Space opens and closes Quick Look, and the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {

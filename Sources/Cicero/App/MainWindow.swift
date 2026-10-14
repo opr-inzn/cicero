@@ -25,6 +25,13 @@ struct MainWindow: View {
                     .navigationDestination(for: String.self) { FontPage(familyID: $0).modifier(DetailPage()) }
             }
         }
+        // On the split view, so font pages keep the field too (on the stack it doesn't show at all); typing in
+        // it on one goes back to the matches.
+        .searchable(text: Binding(get: { model.searchText }, set: { text in
+            guard text != model.searchText else { return }
+            model.searchText = text
+            model.openFamilyID = nil
+        }), placement: .toolbar, prompt: "Search")
         // Over the split view, so the panel stays put when a font page opens or closes.
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }

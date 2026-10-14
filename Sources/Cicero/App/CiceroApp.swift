@@ -72,28 +72,28 @@ struct CiceroCommands: Commands {
             Button("About Cicero") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
-            Button("Check for Updates…") { updates.checkForUpdates() }
+            Button("Check for Updates") { updates.checkForUpdates() }
                 .disabled(!updates.canCheckForUpdates)
         }
         CommandGroup(after: .newItem) {
-            Button("Add Fonts…") { model.presentAddFontsPanel() }
+            Button("Add Fonts") { model.presentAddFontsPanel() }
                 .keyboardShortcut("o", modifiers: .command)
-            Button("Add Folder…") { model.presentAddFolderPanel() }
+            Button("Add Folder") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("Find Fonts in Document…") { model.presentFindFontsPanel() }
-            Button("New Set…") {
+            Button("Find Fonts in Document") { model.presentFindFontsPanel() }
+            Button("New Set") {
                 model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("New Smart Set…") { model.editingSmartSet = SmartSet(name: "") }
+            Button("New Smart Set") { model.editingSmartSet = SmartSet(name: "") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
-            Button("New Application Set…") { model.newApplicationSet(with: model.selectedFamilies) }
+            Button("New Application Set") { model.newApplicationSet(with: model.selectedFamilies) }
             Divider()
-            Button("Export Fonts…") { model.exportSelectionOrList() }
+            Button("Export Fonts") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             Divider()
-            Button("Back Up Library…") { backup.isBackingUp = true }
-            Button("Restore Library…") { Task { backup.restoring = await model.chooseBackupToRestore() } }
+            Button("Back Up Library") { backup.isBackingUp = true }
+            Button("Restore Library") { Task { backup.restoring = await model.chooseBackupToRestore() } }
         }
         CommandGroup(after: .sidebar) {
             Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar") {
@@ -124,7 +124,7 @@ struct CiceroCommands: Commands {
             Button("Reveal in Finder") { model.reveal(selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
-            Button("Move to Trash…") { model.requestTrash(selection) }
+            Button("Move to Trash") { model.requestTrash(selection) }
                 .disabled(selection.isEmpty)
             Divider()
             Button("Compare") {
@@ -139,7 +139,7 @@ struct CiceroCommands: Commands {
             Button("Rescan Library") { model.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
             Button("Rebuild Font List") { model.rebuildFontList() }
-            Button("Clear Font Caches…") { model.isClearingCaches = true }
+            Button("Clear Font Caches") { model.isClearingCaches = true }
         }
         // The user guide, the project's pages on GitHub and the privacy policy on the website, opened in the
         // default browser.
