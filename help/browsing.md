@@ -70,7 +70,7 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | Select a range | Click one, then ⇧-click another |
 | Select all | ⌘A |
 | Select none | Esc |
-| Jump to a family | Type its first letter |
+| Jump to a family | Type the start of its name |
 | Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
 | Extend the selection | Hold ⇧ with an arrow key |
 
