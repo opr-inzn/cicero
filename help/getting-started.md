@@ -77,7 +77,7 @@ Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (
 Cicero checks for new versions by itself and asks before it installs one.
 
 - To check now, choose **Cicero → Check for Updates**
-- To stop checking by itself, open **Settings → General** and turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
+- To stop checking by itself, open **Settings → General** and, under **Updates and Privacy**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
 
 Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). **Help → Release Notes** opens it, so you can see what changed in each version.
 
