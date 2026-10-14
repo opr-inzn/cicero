@@ -47,7 +47,7 @@ extension AppModel {
     func exportFonts(_ families: [Family], named name: String?) {
         let plan = FontExportPlan(families: families)
         guard !plan.isEmpty else {
-            return showToast(families.isEmpty ? "No fonts to export." : "Fonts that come with macOS or an app can’t be exported.")
+            return showToast(families.isEmpty ? "No fonts to export" : "Fonts that come with macOS or an app can’t be exported")
         }
         let defaultName = name ?? (families.count == 1 ? families[0].name : "\(families.count) Families")
         guard let choice = ExportPanel.run(name: defaultName) else { return }
@@ -61,7 +61,7 @@ extension AppModel {
             } catch let refusal as KeptItemError {
                 showToast(refusal.message)
             } catch {
-                showToast("Couldn’t export the fonts.")
+                showToast("Couldn’t export the fonts")
             }
         }
     }
@@ -103,7 +103,7 @@ extension AppModel {
         } catch let failure as LibraryBackup.Failure {
             showToast(failure.message)
         } catch {
-            showToast("Couldn’t read the backup.")
+            showToast("Couldn’t read the backup")
         }
         return nil
     }
@@ -115,7 +115,7 @@ extension AppModel {
         let backup = backup
         let current = data
         let saved = await Task.detached(priority: .userInitiated) { (try? backup.saveSnapshot(current)) != nil }.value
-        guard saved else { return showToast("Couldn’t save the current setup first, so nothing was restored.") }
+        guard saved else { return showToast("Couldn’t save the current setup first, so nothing was restored") }
 
         var fontResult: FontRestoreResult?
         if fonts { fontResult = await backup.restoreFonts(contents, progress: progress) }
@@ -123,7 +123,7 @@ extension AppModel {
         if let fontResult, fontResult.cancelled {
             if let fallbackFolder { addFallbackFolder(fallbackFolder) }
             rescan()
-            return showToast("Stopped restoring.")
+            return showToast("Stopped restoring")
         }
 
         let restored = backup.userData(from: contents)
@@ -176,7 +176,7 @@ extension AppModel {
         }
     }
 
-    /// "Restored 4 sets and 3,790 fonts; 22 were already there."
+    /// "Restored 4 sets and 3,790 fonts; 22 were already there"
     private static func restoreSummary(settings: Bool, data: UserData, fonts: FontRestoreResult?) -> String {
         var parts: [String] = []
         if settings {
@@ -197,7 +197,7 @@ extension AppModel {
         if let fonts, fonts.failed > 0 {
             notes.append("\(fonts.failed.formatted()) couldn’t be written")
         }
-        return (["Restored " + parts.formatted(.list(type: .and))] + notes).joined(separator: "; ") + "."
+        return (["Restored " + parts.formatted(.list(type: .and))] + notes).joined(separator: "; ")
     }
 }
 

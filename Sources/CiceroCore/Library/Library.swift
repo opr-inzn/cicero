@@ -14,13 +14,17 @@ public struct Locations: Sendable {
     /// The folders macOS keeps its own fonts in, /System/Library/Fonts. CoreText's lists of fonts leave some of
     /// them out (Times, Courier, Iowan Old Style, Seravek, many Noto fonts), though every app can use them.
     public var systemFonts: [URL]
+    /// The user's home folder, whose own folders (Downloads, Desktop…) moving fonts never puts in the Trash. By
+    /// default the one `userFonts` is in.
+    public var home: URL
 
-    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = []) {
+    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
         self.allUsersFonts = allUsersFonts
         self.systemFonts = systemFonts
+        self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
     }
 
     public static var standard: Locations {
@@ -31,8 +35,16 @@ public struct Locations: Sendable {
             caches: fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("Cicero", isDirectory: true),
             userFonts: home.appendingPathComponent("Library/Fonts", isDirectory: true),
             allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true),
-            systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)]
+            systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)],
+            home: realHome
         )
+    }
+
+    /// The home folder from the user's account, also when a test run gives Cicero another one (CFFIXED_USER_HOME),
+    /// so its Downloads and Desktop stay safe from moving fonts too.
+    private static var realHome: URL? {
+        guard let entry = getpwuid(getuid()), let directory = entry.pointee.pw_dir else { return nil }
+        return URL(fileURLWithPath: String(cString: directory), isDirectory: true)
     }
 
     /// Fonts Cicero moved out of ~/Library/Fonts because it had no other copy.

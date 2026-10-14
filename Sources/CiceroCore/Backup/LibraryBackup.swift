@@ -121,9 +121,9 @@ public struct LibraryBackup: Sendable {
 
         public var message: String {
             switch self {
-            case .notABackup: "This file isn’t a Cicero backup."
-            case .newerFormat: "This backup was made by a newer version of Cicero."
-            case .archive: "Couldn’t read or write the archive."
+            case .notABackup: "This file isn’t a Cicero backup"
+            case .newerFormat: "This backup was made by a newer version of Cicero"
+            case .archive: "Couldn’t read or write the archive"
             }
         }
     }

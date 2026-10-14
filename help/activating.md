@@ -6,7 +6,7 @@
 
 Apps only offer fonts that macOS has turned on, or *activated*. Cicero lists every font in your library, on or off, and turns them on and off for you.
 
-A font counts as activated once macOS says it is. So when the message at the bottom says “Activated.”, the font is in every app’s font menu. Most apps show it right away; if one doesn’t, see [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font).
+A font counts as activated once macOS says it is. So when the message at the bottom says “Activated”, the font is in every app’s font menu. Most apps show it right away; if one doesn’t, see [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font).
 
 A switch moves the moment you click it and stays there while Cicero works. If something goes wrong, it moves back and a message says what happened. While a switch is moving, clicking it again does nothing.
 
@@ -37,8 +37,9 @@ There are two ways to turn on a font that isn’t in a Fonts folder:
 
 Choose which one in **Settings → General → Activation**, next to **Activate fonts by**:
 
-- **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Use Files Where They Are**, or **Activate Temporarily**. Check **Remember this choice** to stop being asked; you can change it again in Settings.
-- **Copy into ~/Library/Fonts**
+- **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Use Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Check **Remember this choice** to stop being asked; you can change it again in Settings.
+- **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
+- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. When that leaves the folder they were in empty, like a font download’s folder in Downloads, the folder goes to the Trash. A folder with anything else left in it, like a license, stays. Fonts in your [folders](organizing.md#folders) are copied, so your folders stay as they are, and so is a file **Find on This Mac** finds for a document.
 - **Use the files where they are**
 
 A few things happen either way:
@@ -93,8 +94,8 @@ Turning a font off never deletes your only copy of it. What happens to the file 
 | The font was | When you turn it off |
 | --- | --- |
 | Used where it is, or on temporarily | macOS stops using it. The file stays where it is. |
-| A copy Cicero installed in your Fonts folder, and the original is still there, unchanged | The copy goes to the Trash. The original stays where it is. |
-| Any other file in your Fonts folder | The file moves to Cicero’s [Deactivated folder](#the-deactivated-folder). If Cicero didn’t install it, Cicero asks first. |
+| A copy Cicero installed in your Fonts folder, and the original is still there, unchanged, in your library | The copy goes to the Trash. The original stays where it is. |
+| Any other file in your Fonts folder, like a font you installed by opening it | The file moves to Cicero’s [Deactivated folder](#the-deactivated-folder), so the font stays in your library. If Cicero didn’t install it, Cicero asks first. |
 | In a folder an app loads by itself, like Adobe’s | The file moves to the Deactivated folder, so the app stops loading it too. See [Fonts for Adobe apps](#fonts-for-adobe-apps). |
 
 Files in your Fonts folder are turned off before they move, so apps let go of them at once. If a file can’t be moved, Cicero turns it back on and says so.
@@ -153,7 +154,7 @@ To see which fonts a document needs, and turn on the ones you have:
 2. Cicero lists every font the document uses, missing ones first:
    - **On** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
    - **Off** (a dashed circle): it’s in your library but not on. Click **Activate**.
-   - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders; see [Privacy](privacy.md#when-macos-asks-for-permission).
+   - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. With **Copy into ~/Library/Fonts** chosen, the button says **Install** and copies it into your Fonts folder, on. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders; see [Privacy](privacy.md#when-macos-asks-for-permission).
 3. **Activate All** turns on every font of the document that’s in your library. **Make Set** makes a set named after the document with its fonts that are in your library, or adds them to a set of that name.
 
 Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`) and Illustrator files (`.ai`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.

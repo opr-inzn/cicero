@@ -64,7 +64,7 @@ A backup doesn’t hold settings that belong to one Mac: the appearance, **Open 
    - **Font files**, when the backup has them, puts each font back where it was, unless a file is already there.
 4. Click **Restore**.
 
-When it’s done, a message says what came back, like “Restored 4 sets and 3,790 fonts; 22 were already there.”
+When it’s done, a message says what came back, like “Restored 4 sets and 3,790 fonts; 22 were already there”.
 
 ### How fonts go back
 

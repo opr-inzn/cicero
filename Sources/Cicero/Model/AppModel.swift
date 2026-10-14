@@ -110,6 +110,9 @@ final class AppModel {
     var selectedIDs: Set<String> = []
     /// The family whose page is pushed over the browser.
     var openFamilyID: String?
+    /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
+    /// them, brings it into view, and clears this.
+    var jumpTargets: Set<String>?
     var searchText = "" {
         didSet { scheduleSearch() }
     }
@@ -147,7 +150,7 @@ final class AppModel {
     // MARK: Opening files
 
     /// Files and folders opened or dropped, gathered for a moment so several arriving one by one are added together.
-    @ObservationIgnored var openQueue: (urls: [URL], set: UUID?, showsPage: Bool, task: Task<Void, Never>?) = ([], nil, false, nil)
+    @ObservationIgnored var openQueue: (urls: [URL], set: UUID?, task: Task<Void, Never>?) = ([], nil, nil)
     /// Files the browser shows once the scan that lists them is done.
     @ObservationIgnored var awaitingScan: OpenedFiles?
 
@@ -546,7 +549,13 @@ final class AppModel {
         let builtIn = Classification.allCases.filter { $0 != .unclassified }.map(name(of:)).filter(classifications.contains)
         let present = builtIn + data.classifications + [name(of: .unclassified)].filter(classifications.contains)
         if present != presentClassifications { presentClassifications = present }
-        if ownFolders != ownFoldersWithFonts { ownFoldersWithFonts = ownFolders }
+        if ownFolders != ownFoldersWithFonts {
+            // One that's emptied, like Added Fonts once its fonts are installed, leaves the sidebar; shown, All Fonts
+            // takes its place.
+            let emptied = ownFoldersWithFonts.subtracting(ownFolders)
+            ownFoldersWithFonts = ownFolders
+            deselect { if case .folder(let id) = $0 { emptied.contains(id) } else { false } }
+        }
         let groups = ScannedGroups(ownFolders: ownFolders, foundries: sorted, classifications: present)
         if groups != savedGroups {
             savedGroups = groups

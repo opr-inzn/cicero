@@ -12,7 +12,7 @@ extension AppModel {
     /// an app loads by itself (those are always used where they are).
     func activate(_ faces: [LibraryFace], title: String) {
         let targets = faces.filter(\.canActivate)
-        guard !targets.isEmpty else { return showToast("Already on.") }
+        guard !targets.isEmpty else { return showToast("Already on") }
         let needsChoice = targets.contains { $0.app == nil }
         if data.installMethod == .ask && needsChoice {
             activationPrompt = ActivationPrompt(title: title, faces: targets)
@@ -23,8 +23,9 @@ extension AppModel {
 
     func performActivation(_ faces: [LibraryFace], method: InstallMethod) {
         let operation = expect(faces, at: .on)
+        let movable = movableFiles(among: faces.map(\.face.path))
         enqueue { model in
-            let result = await model.engine.activate(faces, method: method, records: model.data.records)
+            let result = await model.engine.activate(faces, method: method, records: model.data.records, movable: movable)
             model.finish(result, operation: operation)
         }
     }
@@ -36,7 +37,7 @@ extension AppModel {
     /// Until Cicero quits.
     func activateTemporarily(_ faces: [LibraryFace]) {
         let targets = faces.filter(\.canActivateTemporarily)
-        guard !targets.isEmpty else { return showToast("Already on.") }
+        guard !targets.isEmpty else { return showToast("Already on") }
         let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, records: model.data.records)
@@ -51,7 +52,7 @@ extension AppModel {
     func deactivate(_ faces: [LibraryFace]) {
         let targets = faces.filter(\.canDeactivate)
         guard !targets.isEmpty else {
-            return showToast(faces.contains { $0.state.isActive } ? "These fonts are managed by macOS or another app." : "Nothing to deactivate.")
+            return showToast(faces.contains { $0.state.isActive } ? "These fonts are managed by macOS or another app" : "Nothing to deactivate")
         }
         let unmanaged = engine.unmanaged(targets, records: data.records)
         if unmanaged.isEmpty {
@@ -100,6 +101,7 @@ extension AppModel {
     /// The engine has waited for macOS, so a scan now sees what the operation did.
     func finish(_ result: ActivationResult, operation: Int? = nil) {
         data.records = result.records
+        forgetInstalledAddedFiles()
         showToast(result.message)
         let scan = rescan()
         if let operation { settle(operation, after: scan) }
@@ -121,7 +123,7 @@ extension AppModel {
     /// Asks first when that turns off other styles too, and how to activate when the install method is Ask.
     func useCopies(from source: CopySource, title: String) {
         let plan = CopyChooser.plan(source, records: data.records, library: library)
-        guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name).") }
+        guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name)") }
         let request = CopySwitchRequest(source: source.name, title: title, plan: plan)
         if plan.alsoTurnsOff.isEmpty {
             confirmCopySwitch(request)
@@ -144,8 +146,8 @@ extension AppModel {
         enqueue { model in
             var result = await model.engine.switchCopies(request.plan.switches, method: method, records: model.data.records)
             if result.failed.isEmpty {
-                result.message = "Using the copies from \(request.source)."
-                    + (request.plan.leavesOtherCopiesOn ? " Another copy Cicero didn’t turn on is still on, so apps may use that one." : "")
+                result.message = "Using the copies from \(request.source)"
+                    + (request.plan.leavesOtherCopiesOn ? ". Another copy Cicero didn’t turn on is still on, so apps may use that one" : "")
             }
             model.finish(result, operation: operation)
         }
@@ -160,7 +162,7 @@ extension AppModel {
 
     func requestTrash(_ faces: [LibraryFace], removing families: [String], title: String) {
         guard let plan = engine.trashPlan(for: faces, removing: families, in: library, title: title) else {
-            return showToast("Fonts that come with macOS or an app can’t be moved to the Trash.")
+            return showToast("Fonts that come with macOS or an app can’t be moved to the Trash")
         }
         trashPlan = plan
     }
@@ -271,9 +273,9 @@ extension AppModel {
             guard let self else { return }
             downloads[id] = nil
             if failed.isEmpty {
-                showToast(paths.count == 1 ? "Downloaded 1 font file." : "Downloaded \(paths.count.formatted()) font files.")
+                showToast(paths.count == 1 ? "Downloaded 1 font file" : "Downloaded \(paths.count.formatted()) font files")
             } else {
-                showToast("Couldn’t download \(failed.count.formatted()) of \(paths.count.formatted()) font files. Check the connection and try again.")
+                showToast("Couldn’t download \(failed.count.formatted()) of \(paths.count.formatted()) font files. Check the connection and try again")
             }
             rescan()
         }
@@ -347,19 +349,19 @@ extension AppModel {
     /// Activate Set on a set's or smart set's menu: every font in it, asking how when the install method is Ask.
     func activateFonts(in item: SidebarItem, named name: String) {
         let families = families(in: item)
-        guard !families.isEmpty else { return showToast("There are no fonts in “\(name)”.") }
+        guard !families.isEmpty else { return showToast("There are no fonts in “\(name)”") }
         activate(families.flatMap(\.faces), title: "“\(name)”")
     }
 
     func activateFontsTemporarily(in item: SidebarItem) {
         let families = families(in: item)
-        guard !families.isEmpty else { return showToast("Nothing to activate.") }
+        guard !families.isEmpty else { return showToast("Nothing to activate") }
         activateTemporarily(families)
     }
 
     func deactivateFonts(in item: SidebarItem) {
         let families = families(in: item)
-        guard !families.isEmpty else { return showToast("Nothing to deactivate.") }
+        guard !families.isEmpty else { return showToast("Nothing to deactivate") }
         deactivate(families)
     }
 
@@ -677,13 +679,13 @@ extension AppModel {
                 clearedSystem = true
             } catch SystemFontCaches.Failure.cancelled {
             } catch {
-                showToast("Couldn’t clear the macOS font caches.")
+                showToast("Couldn’t clear the macOS font caches")
             }
         }
         if failures > 0 {
-            showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash." : "Couldn’t move \(failures) cache items to the Trash.")
+            showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures) cache items to the Trash")
         } else if !trashed.isEmpty && !clearedSystem {
-            showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash.")
+            showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash")
         }
         if clearedSystem || !trashed.isEmpty { rebuildFontList() }
         return clearedSystem

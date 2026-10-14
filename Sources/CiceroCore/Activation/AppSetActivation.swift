@@ -45,8 +45,8 @@ extension ActivationEngine {
             }
         }
         let message = failed.isEmpty
-            ? (succeeded == 1 ? "Activated 1 file." : "Activated \(succeeded) files.")
-            : "Couldn’t activate \(failed.count) of \(failed.count + succeeded) files."
+            ? (succeeded == 1 ? "Activated 1 file" : "Activated \(succeeded) files")
+            : "Couldn’t activate \(failed.count) of \(failed.count + succeeded) files"
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 }
