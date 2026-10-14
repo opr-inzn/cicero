@@ -44,7 +44,6 @@ private struct Tile: View {
     let family: Family
     let isSelected: Bool
     let model: AppModel
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -80,10 +79,9 @@ private struct Tile: View {
             }
         }
         .padding(14)
-        .background(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(isHovered ? 0.7 : 0.4)), in: .rect(cornerRadius: 14))
+        .background(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.4)), in: .rect(cornerRadius: 14))
         .overlay {
             if isSelected { RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, lineWidth: 2) }
         }
-        .onHover { isHovered = $0 }
     }
 }

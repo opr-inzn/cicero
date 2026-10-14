@@ -8,6 +8,11 @@ Writing rules for all UI text: macOS HIG — Title Case for menu items, buttons 
 sentence case for descriptions; short plain words; typographic apostrophes (’) in every string;
 ellipsis character (…) for items that ask for more input.
 
+No hover states: nothing changes under the pointer (tooltips and the column-resize cursor aside). AppKit's
+toolbar buttons and segmented pickers light up on hover in a grey of their own, so the toolbars use Cicero's
+(ToolbarPicker, the .toolbar button and toggle styles, at AppKit's sizes): one grey for the chosen segment,
+a toggle that's on and a button being pressed.
+
 ## Windows
 
 1. **Main window** — sidebar | browser (or a font page pushed over it) | optional Info panel.

@@ -9,6 +9,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A new library starts with Red, Yellow and Green tags.
 - For fonts in an Adobe app’s folder, the right-click menu says Activate Temporarily in All Apps, like Activate in All Apps beside it.
 - The Info button in the toolbar is highlighted while the Info panel is open, like the chosen view beside it.
+- Nothing lights up under the pointer any more: not the toolbar’s view picker and buttons, in every window, nor the tiles in the grid.
 
 ## 1.1
 

@@ -327,6 +327,7 @@ struct PreviewOptionsButton: View {
         } label: {
             Label("Preview Options", systemImage: "textformat.size")
         }
+        .buttonStyle(.toolbar)
         .help("Preview text, size, weight, spacing and alignment")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions() }
     }
@@ -393,7 +394,7 @@ struct InfoButton: View {
         Toggle(isOn: Binding(get: { model.isInfoPresented }, set: { model.isInfoPresented = $0 })) {
             Label("Info", systemImage: "info.circle")
         }
-        .toggleStyle(.button)
+        .toggleStyle(.toolbar)
         .help("Info")
     }
 }
