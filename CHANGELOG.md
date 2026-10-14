@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- A new app icon: a glass cube with a C, an & and a g cut into its faces.
 - New Tag lets you pick the tag’s color, or none, as well as its name. Leave the name empty to name the tag after its color.
 - A new library starts with Red, Yellow and Green tags.
 - For fonts in an Adobe app’s folder, the right-click menu says Activate Temporarily in All Apps, like Activate in All Apps beside it.

@@ -3,8 +3,8 @@
     {
       "value": {
         "linear-gradient": [
-          "srgb:0.98431,0.97647,0.96078,1",
-          "srgb:0.90588,0.89412,0.86667,1"
+          "srgb:0.96078,0.96078,0.95294,1.00000",
+          "srgb:0.86275,0.86275,0.84706,1.00000"
         ],
         "orientation": {
           "start": {
@@ -22,8 +22,8 @@
       "appearance": "dark",
       "value": {
         "linear-gradient": [
-          "srgb:0.18039,0.18039,0.19216,1",
-          "srgb:0.07059,0.07059,0.07451,1"
+          "srgb:0.10980,0.10980,0.12157,1.00000",
+          "srgb:0.02353,0.02353,0.02745,1.00000"
         ],
         "orientation": {
           "start": {
@@ -40,31 +40,77 @@
   ],
   "groups": [
     {
-      "name": "Accent",
+      "name": "Top",
       "layers": [
         {
-          "name": "Accent",
-          "image-name": "Accent.svg",
+          "name": "Edges",
+          "image-name": "edges.svg",
+          "glass": false
+        },
+        {
+          "name": "Top Gloss",
+          "image-name": "top-gloss.svg",
+          "glass": false
+        },
+        {
+          "name": "Top Face",
+          "image-name": "top-face.svg",
           "glass": true,
           "fill-specializations": [
             {
               "value": {
-                "solid": "srgb:0.84314,0.23137,0.13725,1"
+                "linear-gradient": [
+                  "srgb:1.00000,0.54118,0.43922,1.00000",
+                  "srgb:0.90980,0.26275,0.17255,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 0.15625
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.4931640625
+                  }
+                }
               }
             },
             {
               "appearance": "dark",
               "value": {
-                "solid": "srgb:0.94118,0.33725,0.21961,1"
-              }
-            },
-            {
-              "appearance": "tinted",
-              "value": {
-                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+                "linear-gradient": [
+                  "srgb:0.94118,0.39216,0.29804,1.00000",
+                  "srgb:0.69412,0.16471,0.10588,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 0.15625
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.4931640625
+                  }
+                }
               }
             }
           ]
+        },
+        {
+          "name": "Top Floor",
+          "image-name": "top-floor.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.23922,0.03529,0.01569,1.00000"
+          }
+        },
+        {
+          "name": "Top Wall",
+          "image-name": "top-wall.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.64706,0.14902,0.09412,1.00000"
+          }
         }
       ],
       "shadow": {
@@ -78,31 +124,156 @@
       }
     },
     {
-      "name": "Letter",
+      "name": "Left",
       "layers": [
         {
-          "name": "Letter",
-          "image-name": "Letter.svg",
+          "name": "Left Gloss",
+          "image-name": "left-gloss.svg",
+          "glass": false
+        },
+        {
+          "name": "Left Face",
+          "image-name": "left-face.svg",
           "glass": true,
           "fill-specializations": [
             {
               "value": {
-                "solid": "srgb:0.07059,0.07059,0.07059,1"
+                "linear-gradient": [
+                  "srgb:0.35686,0.50196,1.00000,1.00000",
+                  "srgb:0.11373,0.21176,0.85490,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 0.32470703125
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.830078125
+                  }
+                }
               }
             },
             {
               "appearance": "dark",
               "value": {
-                "solid": "srgb:0.96078,0.95294,0.93333,1"
-              }
-            },
-            {
-              "appearance": "tinted",
-              "value": {
-                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+                "linear-gradient": [
+                  "srgb:0.25098,0.37647,0.94118,1.00000",
+                  "srgb:0.08627,0.13333,0.56078,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 0.32470703125
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.830078125
+                  }
+                }
               }
             }
           ]
+        },
+        {
+          "name": "Left Floor",
+          "image-name": "left-floor.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.01961,0.03922,0.22745,1.00000"
+          }
+        },
+        {
+          "name": "Left Wall",
+          "image-name": "left-wall.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.07843,0.15294,0.62745,1.00000"
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Right",
+      "layers": [
+        {
+          "name": "Right Gloss",
+          "image-name": "right-gloss.svg",
+          "glass": false
+        },
+        {
+          "name": "Right Face",
+          "image-name": "right-face.svg",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.52549,0.94902,0.44314,1.00000",
+                  "srgb:0.18824,0.69412,0.25882,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 0.32470703125
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.830078125
+                  }
+                }
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.32157,0.81176,0.28235,1.00000",
+                  "srgb:0.11373,0.45490,0.14118,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 0.32470703125
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.830078125
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Right Floor",
+          "image-name": "right-floor.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.02353,0.18824,0.04314,1.00000"
+          }
+        },
+        {
+          "name": "Right Wall",
+          "image-name": "right-wall.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.13333,0.52549,0.17255,1.00000"
+          }
+        },
+        {
+          "name": "Shadow",
+          "image-name": "shadow.svg",
+          "glass": false
         }
       ],
       "shadow": {
