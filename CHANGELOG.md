@@ -5,7 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Settings → General is more compact: four groups instead of nine, with Appearance on its own, the settings for activation, system fonts and classification under **Fonts**, **Library** with Rebuild, Back Up and Restore, and Clear for the font caches, under **Maintenance**, the switches for updates and usage statistics under **Updates**, and short explanations inside the rows that need them.
-- Shorter explanations in Settings → Folders and Sidebar, which now says individual foundries rather than single ones. In Folders, **Show fonts installed for Adobe apps** sits in a card like the settings in General.
+- Shorter explanations in Settings → Folders and Sidebar, which now says individual foundries rather than single ones. In Folders, **Show fonts installed for Adobe apps** sits at the top, in a card like the settings in General.
 - The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
 - Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.
 - Creating a coverage set or a smart set no longer flashes the editor’s Edit title, Delete button or Save button as the sheet closes.
