@@ -174,10 +174,10 @@ An *application set* is a set with one or more apps. While one of its apps is op
 To make one:
 
 1. Click **+** next to **Sets** in the sidebar and choose **New Application Set**, or choose **File → New Application Set**. Name it and click **Create**.
-2. Click **Add App** and choose one or more apps.
+2. Click **+** under the list and choose one or more apps.
 3. Click **Done**, then drag the fonts you need onto the set.
 
-To give apps to a set you already have, right-click it and choose **Activate with Apps** (**Edit Apps** once it has some). In that window, “Open” marks apps that are running, and the remove button next to an app takes it out.
+To give apps to a set you already have, right-click it and choose **Activate with Apps** (**Edit Apps** once it has some). In that window, “Open” marks apps that are running. To take apps out, select them and click **−**.
 
 A few rules:
 
@@ -189,7 +189,7 @@ A few rules:
 
 ## Open Cicero at login
 
-Turn on **Open at login** in **Settings → General**, or click **Open at Login** in an application set’s apps window.
+Turn on **Open at login** in **Settings → General**, or check **Open Cicero at login** in an application set’s apps window.
 
 - If macOS needs your approval, allow Cicero in **System Settings → General → Login Items**.
 - Cicero has to be in your Applications folder for this. If it isn’t, it offers to move there.

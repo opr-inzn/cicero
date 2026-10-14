@@ -9,6 +9,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Settings → Sidebar says individual foundries rather than single ones, with a shorter note at the bottom.
 - Fonts you add are described as listed without being activated, rather than without being installed.
 - A folder can be **Active**: Cicero turns on every font in it, where it is, and fonts you put in it later go on by themselves. Choose it next to the folder in Settings → Folders or under **Fonts in This Folder** in its menu in the sidebar, which now offers **Inactive**, **Active**, **Active in Adobe apps** and **Active in Specific App…**. Choosing Inactive again, or removing the folder, turns its fonts off.
+- The window for an application set’s apps lists them in the same kind of card, with **+** and **−**, and you can select several to remove them together. **Open Cicero at login** is a checkbox next to **Done**.
 - The **Delete** button in the coverage set editor is red, like **Clear** in Settings → General.
 - Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.
 - Creating a coverage set or a smart set no longer flashes the editor’s Edit title, Delete button or Save button as the sheet closes.
