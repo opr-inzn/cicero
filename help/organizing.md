@@ -54,7 +54,7 @@ Drag families from the browser onto:
 
 ## Folders
 
-Add folders of fonts to see them in your library without installing them. Cicero watches these folders, so fonts you add to them or take out show up or go away by themselves.
+Add folders of fonts to see them in your library without activating them. Cicero watches these folders, so fonts you add to them or take out show up or go away by themselves.
 
 ### Add a folder
 
@@ -68,12 +68,12 @@ Right-click a folder in the sidebar:
 
 - **Reveal in Finder**
 - **Fonts in This Folder**: whether its fonts are **Not activated until you activate them** (the usual choice), or active in an app that loads them by itself, like **Active in Adobe apps**. See [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads).
-- **Remove Folder from Library**: Cicero stops listing it. The files stay where they are.
+- **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
 ### Adobe Apps
 
-The fonts that Adobe apps load from their own folders are listed together as **Adobe Apps**, while there are any. It isn’t one of your folders: you turn it on or off with **Show fonts installed for Adobe apps** in **Settings → Folders** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Adobe Apps** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts for Adobe apps](activating.md#fonts-for-adobe-apps).
+The fonts that Adobe apps load from their own folders are listed together as **Adobe Apps**, while there are any. It isn’t one of your folders: you turn it on or off with **Show fonts installed for Adobe apps** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Adobe Apps** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts for Adobe apps](activating.md#fonts-for-adobe-apps).
 
 ### Deactivated
 
@@ -99,7 +99,7 @@ When a font is in more than one of your folders, like a copy from each client, r
 
 ## Added Fonts
 
-Font files you add one at a time are listed where they are, without being installed, like the fonts in a folder. They show up together as **Added Fonts** under **Folders**, while there are any.
+Font files you add one at a time are listed where they are, without being activated, like the fonts in a folder. They show up together as **Added Fonts** under **Folders**, while there are any.
 
 If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next to **Activate fonts by** in Settings → General, font files you add are installed instead: Cicero copies or moves them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed, not under Added Fonts. Copied, the originals stay where they are. Moved, they’re gone from there, and a folder they leave empty goes to the Trash; see [Copy or use in place](activating.md#copy-or-use-in-place). Fonts already under Added Fonts that you open again, or turn on by copying or moving, leave Added Fonts the same way.
 

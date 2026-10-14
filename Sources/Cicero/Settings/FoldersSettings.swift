@@ -3,67 +3,56 @@ import SwiftUI
 
 struct FoldersSettings: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: UUID?
+    @State private var selection: Set<UUID> = []
     /// The folder being marked as loaded by an app Cicero doesn't know.
     @State private var namingFolder: WatchedFolder?
     @State private var appName = ""
 
     var body: some View {
-        @Bindable var model = model
-        VStack(alignment: .leading, spacing: 10) {
-            // A card like the grouped forms' in the other tabs, which draw their second line this size too.
-            GroupBox {
-                HStack(alignment: .firstTextBaseline, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show fonts installed for Adobe apps")
-                        Text("Listed under Adobe Apps in the sidebar.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Toggle("Show fonts installed for Adobe apps", isOn: $model.data.showAdobeFonts)
-                        .toggleStyle(.switch)
-                        // The size grouped forms give switches, as in the other tabs: outside one it's the regular size.
-                        .controlSize(.mini)
-                        .labelsHidden()
-                }
-                .padding(6)
-            }
-            .padding(.bottom, 6)
-            Text("Fonts in these folders are in your library without being installed.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+        // A list in a card with + and − along its bottom, like the lists in System Settings.
+        VStack(spacing: 0) {
             List(selection: $selection) {
-                ForEach(model.data.folders) { folder in
+                ForEach(Array(model.data.folders.enumerated()), id: \.element.id) { index, folder in
                     FolderRow(folder: folder, model: model) {
                         appName = ""
                         namingFolder = folder
                     }
+                    // A list's own stripes are opaque: these tint the card instead.
+                    .listRowBackground(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
+                    .listRowSeparator(.hidden)
                 }
             }
-            .listStyle(.bordered)
-            // No stripes behind the empty-state note.
-            .alternatingRowBackgrounds(model.data.folders.isEmpty ? .disabled : .enabled)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .overlay {
                 if model.data.folders.isEmpty {
-                    Text("Add a folder of fonts to browse them without installing them.")
+                    Text("Add a folder of fonts to browse them without activating them.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                 }
             }
-            HStack(spacing: 2) {
+            Divider()
+            HStack(spacing: 0) {
                 ListEditButton("Add Folder", systemImage: "plus") { model.presentAddFolderPanel() }
                     .help("Add a folder of fonts")
-                ListEditButton("Remove Folder", systemImage: "minus") {
-                    if let selection { model.removeFolder(selection) }
-                    selection = nil
+                Divider()
+                    .frame(height: 14)
+                ListEditButton("Remove Folders", systemImage: "minus") {
+                    model.removeFolders(selection)
+                    selection = []
                 }
-                .disabled(selection == nil)
-                .help("Remove the folder from the library; its files stay where they are")
+                .disabled(selection.isEmpty)
+                .help("Remove the selected folders from the library; their files stay where they are")
+                Spacer()
             }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
         }
+        // The fill and corners of the grouped forms' cards in the other tabs.
+        .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
+        .clipShape(.rect(cornerRadius: 12, style: .continuous))
         .padding(20)
         .alert(
             "Active in Another App",
