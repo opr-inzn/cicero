@@ -8,6 +8,8 @@ struct CharacterSetEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: CustomCharacterSet
     @State private var deleting: CustomCharacterSet?
+    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
+    @State private var openedAsNew: Bool?
 
     /// More than this and the preview stops being useful.
     private static let previewLimit = 600
@@ -17,7 +19,7 @@ struct CharacterSetEditor: View {
         _draft = State(initialValue: original)
     }
 
-    private var isNew: Bool { !model.data.customCharacterSets.contains { $0.id == original.id } }
+    private var isNew: Bool { openedAsNew ?? !model.data.customCharacterSets.contains { $0.id == original.id } }
     private var name: String { draft.name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
@@ -71,6 +73,7 @@ struct CharacterSetEditor: View {
         }
         .padding(20)
         .frame(width: 520, height: 520)
+        .onAppear { openedAsNew = isNew }
         .confirmsCoverageSetDeletion($deleting) { dismiss() }
     }
 
