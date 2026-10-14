@@ -7,10 +7,10 @@ struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    /// Cells per row, from the page's width; nil until it's known.
-    let columns: Int?
-    /// The style's characters, loaded by the page; nil while loading.
-    let sections: [GlyphSection]?
+    /// Cells per row, from the page's width.
+    let columns: Int
+    /// The style's characters.
+    let sections: [GlyphSection]
     @State private var query = ""
     @State private var popover: UInt32?
 
@@ -25,16 +25,14 @@ struct GlyphsSection: View {
 
     var body: some View {
         let face = family.face(nearestWeight: preview.weight).face
-        let shown = filtered(sections ?? [])
+        let shown = filtered(sections)
         HStack(spacing: 12) {
             Text("Glyphs").font(.title2.weight(.semibold))
-            if let sections {
-                let total = sections.reduce(0) { $0 + $1.scalars.count }
-                Text(total == 1 ? "1 character" : "\(total.formatted()) characters")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
+            let total = sections.reduce(0) { $0 + $1.scalars.count }
+            Text(total == 1 ? "1 character" : "\(total.formatted()) characters")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
             Spacer()
             TextField("Filter", text: $query, prompt: Text("Character, name or U+ code"))
                 .textFieldStyle(.roundedBorder)
@@ -44,13 +42,11 @@ struct GlyphsSection: View {
         // Well clear of the styles above, and close to the blocks it heads.
         .padding(.top, 56)
         .padding(.bottom, 4)
-        if sections == nil {
-            ProgressView().frame(maxWidth: .infinity).padding(40)
-        } else if shown.isEmpty {
+        if shown.isEmpty {
             ContentUnavailableView(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
                                    description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
-        } else if let columns {
+        } else {
             ForEach(shown) { section in
                 Section {
                     // Rows of the page's stack, not a LazyVGrid per block in it. The stack guesses the height of blocks
