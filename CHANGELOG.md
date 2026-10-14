@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- Cicero counts how many people use it: each time it opens, it sends TelemetryDeck its version, the macOS version and a hashed random number for your Mac, and nothing about you or your fonts. Turn it off in Settings → General → Usage Statistics. [Privacy](help/privacy.md#usage-statistics) has the details.
 - A new app icon: a glass cube with a C, an & and a g cut into its faces.
 - New Tag lets you pick the tag’s color, or none, as well as its name. Leave the name empty to name the tag after its color.
 - A new library starts with Red, Yellow and Green tags.
