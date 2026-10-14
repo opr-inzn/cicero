@@ -67,7 +67,7 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 Right-click a folder in the sidebar:
 
 - **Reveal in Finder**
-- **Fonts in This Folder**: whether its fonts are **Not activated until you activate them** (the usual choice), or active in an app that loads them by itself, like **Active in Adobe apps**. See [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads).
+- **Fonts in This Folder**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a folder’s fonts on](activating.md#keep-a-folders-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 

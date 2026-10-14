@@ -300,6 +300,40 @@ struct ListEditButton: View {
     }
 }
 
+/// What a folder's fonts are, in its row in Settings → Folders and its menu in the sidebar: Inactive, Active
+/// (Cicero keeps them on), or active in an app that loads the folder by itself. `askForApp` asks for that app's name.
+struct FolderActivationPicker: View {
+    let folder: WatchedFolder
+    let askForApp: () -> Void
+    @Environment(AppModel.self) private var model
+
+    /// Tags that aren't app names.
+    private static let active = "\u{0}active", specificApp = "\u{0}app"
+
+    var body: some View {
+        Picker("Fonts in This Folder", selection: Binding(
+            get: { folder.isActive ? Self.active : folder.appName ?? "" },
+            set: { choice in
+                switch choice {
+                case Self.specificApp: askForApp()
+                case Self.active: model.setActivation(ofFolder: folder.id, active: true, app: nil)
+                default: model.setActivation(ofFolder: folder.id, active: false, app: choice)
+                }
+            }
+        )) {
+            Text("Inactive").tag("")
+            Text("Active").tag(Self.active)
+            Text("Active in Adobe apps").tag("Adobe")
+            // One typed in, or InDesign from before there was Active in Specific App.
+            if let app = folder.appName, app != "Adobe" {
+                Text("Active in \(FaceState.appDescription(app))").tag(app)
+            }
+            Divider()
+            Text("Active in Specific App…").tag(Self.specificApp)
+        }
+    }
+}
+
 /// A pop-up menu that always shows its background. In grouped forms on macOS 26, a SwiftUI Picker
 /// (and a plain NSPopUpButton) is only its text and a chevron until the pointer is over it.
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {

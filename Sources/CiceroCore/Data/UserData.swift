@@ -124,6 +124,8 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     public var path: String
     /// When set, the folder's fonts count as active inside this app (e.g. "Adobe") rather than inactive.
     public var appName: String?
+    /// Active: Cicero keeps every font in the folder on, where it is, including ones added to it later.
+    public var isActive: Bool
 
     /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
     public static let deactivatedID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
@@ -133,10 +135,22 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     /// The font files added one at a time, which the sidebar lists as one item with the folders.
     public static let addedFilesID = UUID(uuidString: "00000000-0000-0000-0000-0000000ADDED")!
 
-    public init(id: UUID = UUID(), path: String, appName: String? = nil) {
+    public init(id: UUID = UUID(), path: String, appName: String? = nil, isActive: Bool = false) {
         self.id = id
         self.path = path
         self.appName = appName
+        self.isActive = isActive
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, path, appName, isActive }
+
+    /// Folders saved before there was Active have no `isActive`.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        path = try container.decode(String.self, forKey: .path)
+        appName = try container.decodeIfPresent(String.self, forKey: .appName)
+        isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
     }
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }

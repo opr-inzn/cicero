@@ -25,6 +25,10 @@ To turn on a single style, open the font page and use the style’s switch in **
 
 Right-click a set or smart set in the sidebar and choose **Activate Set** or **Activate Smart Set** to turn on every font in it. **Activate Temporarily** there turns them on until Cicero quits, and **Deactivate Set** or **Deactivate Smart Set** turns them off again. Like any activation, they follow your choice in [Copy or use in place](#copy-or-use-in-place), and ask first with **Ask each time**.
 
+### Keep a folder’s fonts on
+
+Choose **Active** for one of your folders, next to it in **Settings → Folders** or under **Fonts in This Folder** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off. Choose **Inactive** again, or remove the folder, and Cicero turns off the fonts it turned on.
+
 ## Copy or use in place
 
 There are two ways to turn on a font that isn’t in a Fonts folder:
@@ -144,7 +148,7 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 
 ### Your own folder that an app loads
 
-If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose an option under **Fonts in This Folder**, or pick one next to the folder in **Settings → Folders**, where **Active in another app** lets you type the app’s name.
+If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder in the sidebar and choose **Active in Adobe apps**, or **Active in Specific App…** to type the app’s name, under **Fonts in This Folder**. The same choices are next to the folder in **Settings → Folders**.
 
 ## Turn on the fonts a document uses
 

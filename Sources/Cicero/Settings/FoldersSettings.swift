@@ -55,12 +55,12 @@ struct FoldersSettings: View {
         .clipShape(.rect(cornerRadius: 12, style: .continuous))
         .padding(20)
         .alert(
-            "Active in Another App",
+            "Active in Specific App",
             isPresented: Binding(get: { namingFolder != nil }, set: { if !$0 { namingFolder = nil } }),
             presenting: namingFolder
         ) { folder in
             TextField("App name", text: $appName, prompt: Text("App name"))
-            Button("OK") { model.setAppName(appName, forFolder: folder.id) }
+            Button("OK") { model.setActivation(ofFolder: folder.id, active: false, app: appName) }
             Button("Cancel", role: .cancel) {}
         } message: { folder in
             Text("Cicero lists the fonts in “\(folder.displayName)” as active in that app, which loads them by itself.")
@@ -72,9 +72,6 @@ private struct FolderRow: View {
     let folder: WatchedFolder
     let model: AppModel
     let nameApp: () -> Void
-
-    /// Picking this asks for an app name instead of storing a value.
-    private static let otherApp = "\u{0}other"
 
     var body: some View {
         HStack(spacing: 10) {
@@ -91,15 +88,7 @@ private struct FolderRow: View {
                 status
             }
             Spacer()
-            Picker("Fonts in This Folder", selection: Binding(
-                get: { folder.appName ?? "" },
-                set: { $0 == Self.otherApp ? nameApp() : model.setAppName($0, forFolder: folder.id) }
-            )) {
-                Text("Not activated until you activate them").tag("")
-                ForEach(apps, id: \.self) { Text("Active in \(FaceState.appDescription($0))").tag($0) }
-                Divider()
-                Text("Active in another app").tag(Self.otherApp)
-            }
+            FolderActivationPicker(folder: folder, askForApp: nameApp)
             .labelsHidden()
             .fixedSize()
         }
@@ -146,11 +135,5 @@ private struct FolderRow: View {
         Label(text, systemImage: "exclamationmark.triangle.fill")
             .font(.caption)
             .foregroundStyle(.orange)
-    }
-
-    private var apps: [String] {
-        var apps = ["Adobe", "InDesign"]
-        if let custom = folder.appName, !apps.contains(custom) { apps.append(custom) }
-        return apps
     }
 }
