@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - New Tag lets you pick the tag’s color, or none, as well as its name. Leave the name empty to name the tag after its color.
 - A new library starts with Red, Yellow and Green tags.
 - For fonts in an Adobe app’s folder, the right-click menu says Activate Temporarily in All Apps, like Activate in All Apps beside it.
+- The Info button in the toolbar is highlighted while the Info panel is open, like the chosen view beside it.
 
 ## 1.1
 
