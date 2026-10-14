@@ -238,7 +238,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 
 ## Activation
 
-- Install method (Settings → General → Activation): Ask each time / Copy into ~/Library/Fonts / Use the files where they are. "Ask" shows a sheet: Install a Copy, Use Files Where They Are, an Activate Temporarily button (until Cicero quits; hidden when the fonts are already on until then), "Remember this choice (you can change it in Settings → General)".
+- Install method (Settings → General → Activation): Ask each time / Copy into ~/Library/Fonts / Move into ~/Library/Fonts / Leave the files where they are. "Ask" shows a sheet: Install a Copy, Move Into Fonts Folder (files added one at a time), Leave Files Where They Are, an Activate Temporarily button (until Cicero quits; hidden when the fonts are already on until then), "Remember this choice (you can change it in Settings → General)".
 - Every switch moves the moment it's clicked and stays there while the operation runs; the scan after it confirms or corrects it. A switch that's moving ignores clicks.
 - Copy: copied into Cicero's staging folder (~/Library/Application Support/Cicero/Staging) and moved into ~/Library/Fonts, so macOS never sees a half-written file (unique name if needed; a file of the same name with the same contents counts as already there), then registered (persistent) so apps get it at once — macOS takes seconds to notice a new file by itself. Remembered as installed copy → origin. A copy macOS won't turn on is taken out again and the font counts as failed.
 - In place: CoreText persistent registration, remembered.

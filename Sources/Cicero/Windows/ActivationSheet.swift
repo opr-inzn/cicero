@@ -2,7 +2,7 @@ import CiceroCore
 import SwiftUI
 
 /// Asks how to activate when the install method is Ask: copy the files, move the ones added one at a time,
-/// use them where they are, or only for a while.
+/// leave them where they are, or only for a while.
 struct ActivationSheet: View {
     let prompt: ActivationPrompt
     @Environment(AppModel.self) private var model
@@ -23,7 +23,7 @@ struct ActivationSheet: View {
                     option("Move Into Fonts Folder", icon: "folder",
                            detail: "Moves the files you added into your Fonts folder. A folder they leave empty goes to the Trash.") { choose(.move) }
                 }
-                option("Use Files Where They Are", icon: "link",
+                option("Leave Files Where They Are", icon: "link",
                        detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }
             }
             Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
