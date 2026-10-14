@@ -178,7 +178,7 @@ A smart set with a language or character set rule can grow for a while after lau
 
 ## Tags
 
-Tags are labels you give families, like “Licensed”, “Client approved” or “Try later”, each with a color if you like. A family can have any number of them, and its tags show as colored dots next to its name in the list, grid and specimens.
+Tags are labels you give families, like “Licensed”, “Client approved” or “Try later”, each with a color if you like. A family can have any number of them, and its tags show as colored dots next to its name in the list, grid and specimens. A new library starts with Red, Yellow and Green tags, ready to use.
 
 ### Tag fonts
 
@@ -188,7 +188,7 @@ Tags are labels you give families, like “Licensed”, “Client approved” or
 
 ### Make, change and delete tags
 
-- Click **+** next to **Tags** in the sidebar to make a tag. A new tag gets the first color no other tag has.
+- Click **+** next to **Tags** in the sidebar to make a tag. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other tag has. Leave the name empty to name the tag after its color, like **Orange**.
 - Right-click a tag and choose **Rename Tag…**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
 
 Select a tag in the sidebar to see the families that have it. To find families with several tags, or without one, make a [smart set](#smart-sets) with **Tag** rules.
