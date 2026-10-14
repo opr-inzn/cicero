@@ -202,7 +202,15 @@ Cicero reads each family’s foundry from the manufacturer name in its files, an
 
 ## Classifications
 
-Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol and Unclassified, and shows the ones your library has. Slab serifs count as Serif. It reads the classification the font gives itself, and when there’s none, looks for hints in the name, like “Mono”, “Slab”, “Sans”, “Grotesk” or “Script”.
+Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol and Unclassified, and shows the ones your library has. Slab serifs count as Serif. To decide, it goes through these in turn and stops at the first that says something:
+
+1. The classification the font gives itself.
+2. Words in the name, like “Mono”, “Slab”, “Sans”, “Grotesk”, “Script” or “Symbol”.
+3. The shapes of the letters. An I and an l with feet on both sides are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing.
+4. The font’s PANOSE numbers, another way fonts can say what they are.
+5. With Apple Intelligence on, a guess from the family’s name, made on your Mac. The Info panel says “Guessed from the name by Apple Intelligence” under such a classification. To stop the guessing, turn off **Guess classifications from names** in **Settings → General**.
+
+A family none of them tells stays Unclassified, rather than ending up in the wrong classification.
 
 - **Make your own classification:** click **+** next to **Classifications**, or choose **Classification → New Classification** from a family’s right-click menu to put it straight in. Yours stay in the sidebar even while they’re empty.
 - **Put a family in another classification:** right-click it and choose one from **Classification**, use **Change** next to **Classification** in the Info panel, or drag it onto a classification in the sidebar. **Automatic** puts it back where its fonts say it belongs.

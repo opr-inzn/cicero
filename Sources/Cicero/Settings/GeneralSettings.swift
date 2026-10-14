@@ -1,4 +1,5 @@
 import CiceroCore
+import FoundationModels
 import ServiceManagement
 import SwiftUI
 
@@ -49,6 +50,12 @@ struct GeneralSettings: View {
                 Text("Fonts that come with macOS. With this off, they’re hidden everywhere, System Fonts in the sidebar too.").formFooter()
             }
             Section {
+                Toggle("Guess classifications from names", isOn: $model.guessesClassifications)
+                    .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
+            } footer: {
+                Text(guessingExplanation).formFooter()
+            }
+            Section {
                 LabeledContent("Cicero’s font list") {
                     Button("Rebuild") { model.rebuildFontList() }
                 }
@@ -97,6 +104,17 @@ struct GeneralSettings: View {
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)
         .restoreSheet(contents: $restoring)
+    }
+
+    /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
+    private var guessingExplanation: String {
+        let what = "Cicero classifies fonts by what their files say and by the shapes of their letters. For fonts that leaves unclassified, Apple Intelligence guesses from the name, on this Mac. Nothing is sent."
+        return switch ClassificationGuesser.availability {
+        case .available: what
+        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to use this."
+        case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
+        case .unavailable: "Guessing needs Apple Intelligence, which this Mac doesn’t have."
+        }
     }
 
     private var activationExplanation: String {

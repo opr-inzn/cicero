@@ -208,6 +208,9 @@ private struct ClassificationRow: View {
                     .fixedSize()
             }
             Text(model.classificationName(of: family)).font(.callout)
+            if model.data.classificationOverrides[family.id] == nil, model.guessedClassification(of: family) != nil {
+                Text("Guessed from the name by Apple Intelligence").font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 }

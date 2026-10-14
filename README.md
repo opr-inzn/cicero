@@ -12,7 +12,7 @@ A font manager for macOS 26. Browse every font on your Mac and in your font fold
 - **Preview Options.** Preview text, size, weight, letter and line spacing, and alignment, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.
 - **Customizable sidebar.** Click **Edit** next to Fonts and every item and group gets a checkbox; uncheck what you don’t want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*. Drag items into the order you like within their section, as in the Finder, and ⌘- or ⇧-click several items in a section to drag them together or see all their fonts at once. A click anywhere on a section’s title opens or closes it.
-- **Sets and smart sets.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, set, folder, status, kind, format, number of styles, language, coverage, or date added. Turn every font in a set on or off from its sidebar menu. Browse by foundry or by classification, which Cicero reads from the fonts themselves, or make classifications of your own.
+- **Sets and smart sets.** Group fonts by hand, or with rules that keep a set current: name, foundry, classification, tag, set, folder, status, kind, format, number of styles, language, coverage, or date added. Turn every font in a set on or off from its sidebar menu. Browse by foundry or by classification, which Cicero reads from the fonts themselves and the shapes of their letters (with Apple Intelligence, it guesses the rest from their names, on your Mac), or make classifications of your own.
 - **Tags.** Label families with tags of your own, each with a Finder color if you like, from their right-click menu, the Info panel, or by dropping them on a tag in the sidebar. The colors show as dots next to their names, and every tag has its own sidebar item.
 - **Coverage.** See which fonts have every character of Latin S–XL, Adobe Latin 1–5, Google Fonts’ Latin, Cyrillic and Greek sets, a Unicode block (Latin-1 Supplement, Latin Extended-A and -B, Greek, Cyrillic and more), or a coverage set you define yourself.
 - **Character Toolbox** (⌥⌘T). Paste any text to find the fonts that have every character, or pick one of 780 languages to see which fonts support it.
@@ -41,7 +41,7 @@ Cicero has no accounts and no ads, and nothing about you or your fonts leaves yo
 - **Usage statistics.** Each time Cicero opens, it sends [TelemetryDeck](https://telemetrydeck.com) its version, the macOS version and a hashed random number that stands for your Mac, to count how many people use Cicero. That’s all it sends; the code is in [UsageStatistics.swift](Sources/Cicero/App/UsageStatistics.swift). Turn it off with Share usage statistics.
 - **Updates.** Once a day, Cicero checks GitHub for a new version. Turn it off with Check for updates automatically.
 
-The Help menu opens web pages in your browser.
+Classifications Apple Intelligence guesses are worked out on your Mac too. The Help menu opens web pages in your browser.
 
 ## Credits
 

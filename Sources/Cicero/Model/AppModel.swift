@@ -18,6 +18,7 @@ final class AppModel {
     @ObservationIgnored let coverage: CoverageIndex
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let quickLook = QuickLook()
+    @ObservationIgnored let guesser: ClassificationGuesser
 
     // MARK: Library
 
@@ -28,6 +29,11 @@ final class AppModel {
     private(set) var problems: [Problem] = []
     /// Bumped whenever coverage results arrive; anything showing coverage depends on it.
     private(set) var coverageRevision = 0
+    /// Family → the classification Apple Intelligence guessed from its name (see `ClassificationGuesser`);
+    /// `.unclassified` where it couldn't tell.
+    private(set) var classificationGuesses: [String: Classification] = [:]
+    /// Bumped whenever guesses arrive or go; cached lists depend on it.
+    private(set) var guessRevision = 0
     /// nil when coverage is up to date.
     private(set) var coverageProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
@@ -66,6 +72,21 @@ final class AppModel {
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
     private(set) var dataRevision = 0
+    /// Settings → General → Guess classifications from names (see `ClassificationGuesser`). Saved in user defaults.
+    var guessesClassifications: Bool {
+        didSet {
+            guard guessesClassifications != oldValue else { return }
+            UserDefaults.standard.set(guessesClassifications, forKey: Self.guessesClassificationsKey)
+            if guessesClassifications {
+                guessClassifications()
+            } else {
+                // Turned on again, it asks again.
+                guesser.forget()
+                guessesChanged()
+            }
+        }
+    }
+    static let guessesClassificationsKey = "classification.guessesFromNames"
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
     private(set) var tagDots: [String: [TagColor]] = [:]
@@ -170,7 +191,10 @@ final class AppModel {
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
+        guesser = ClassificationGuesser(caches: locations.caches)
+        guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
+        if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
         restoreGroups()
         restoreLibrary()
@@ -317,6 +341,8 @@ final class AppModel {
         // start from that one.
         let first = !hasScanned
         hasScanned = true
+        // Also when nothing changed, in case Apple Intelligence was turned on meanwhile.
+        defer { guessClassifications() }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         library = new
         endScan(id)
@@ -477,6 +503,18 @@ final class AppModel {
             if !colors.isEmpty { dots[family] = colors }
         }
         if dots != tagDots { tagDots = dots }
+    }
+
+    /// Asks Apple Intelligence about the families nothing classifies, when it's on and the setting is.
+    private func guessClassifications() {
+        guard guessesClassifications else { return }
+        guesser.guess(library.families.filter { $0.classification == .unclassified }) { [weak self] in self?.guessesChanged() }
+    }
+
+    private func guessesChanged() {
+        classificationGuesses = guesser.guesses
+        guessRevision &+= 1
+        refreshGroups()
     }
 
     private func refreshGroups() {
