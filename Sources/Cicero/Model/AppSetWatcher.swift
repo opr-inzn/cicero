@@ -112,7 +112,7 @@ final class AppSetWatcher {
             if !result.failed.isEmpty {
                 model.showToast(result.message)
             } else if result.succeeded > 0 {
-                model.showToast("Activated fonts for \(self.appNames(wanting: wanted)).")
+                model.showToast("Activated fonts for \(self.appNames(wanting: wanted))")
             }
             // The engine has waited for macOS, so a scan now sees what the sync did.
             let scan = model.rescan()

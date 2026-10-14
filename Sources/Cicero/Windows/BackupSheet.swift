@@ -96,7 +96,7 @@ struct BackupSheet: View {
                     Task { @MainActor in progress = step }
                 }
                 NSWorkspace.shared.activateFileViewerSelecting([destination])
-                model.showToast(include ? "Backed up your library and \(fonts.count.formatted()) fonts." : "Backed up your library.")
+                model.showToast(include ? "Backed up your library and \(fonts.count.formatted()) fonts" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {
                 dismiss()
@@ -105,7 +105,7 @@ struct BackupSheet: View {
                 model.showToast(refusal.message)
             } catch {
                 progress = nil
-                model.showToast("Couldn’t write the backup.")
+                model.showToast("Couldn’t write the backup")
             }
         }
     }

@@ -144,13 +144,31 @@ struct FamilyKeys: ViewModifier {
                 }
                 model.selectedIDs = [target.id]
                 anchor = target.id
-                proxy.scrollTo(target.id, anchor: .top)
+                scrollToTop(target.id)
                 return .handled
+            }
+            // After installing fonts: the first of them, selected and in view at once (see `AppModel.jumpTargets`).
+            .onChange(of: model.jumpTargets, initial: true) { _, targets in
+                guard let targets, let first = families.first(where: { targets.contains($0.id) }) else { return }
+                model.selectedIDs = [first.id]
+                anchor = first.id
+                scrollToTop(first.id)
+                model.jumpTargets = nil
             }
             // Opened from the menu, or open while the view changes: several families go in the order this view shows them.
             .onChange(of: quickLook.isOpen, initial: true) { _, isOpen in
                 if isOpen { quickLook.updateOrder(families.map(\.id)) }
             }
+    }
+
+    /// Brings a family to the top of the view at once. The list's column headers stay pinned over its top row, so
+    /// there the row before goes under them instead (they're as tall as a row).
+    private func scrollToTop(_ id: String) {
+        if case .list = layout, let index = families.firstIndex(where: { $0.id == id }), index > 0 {
+            proxy.scrollTo(families[index - 1].id, anchor: .top)
+        } else {
+            proxy.scrollTo(id, anchor: .top)
+        }
     }
 
     private func arrow(_ press: KeyPress) -> KeyPress.Result {

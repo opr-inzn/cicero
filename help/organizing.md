@@ -101,13 +101,15 @@ When a font is in more than one of your folders, like a copy from each client, r
 
 Font files you add one at a time are listed where they are, without being installed, like the fonts in a folder. They show up together as **Added Fonts** under **Folders**, while there are any.
 
+If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next to **Activate fonts by** in Settings → General, font files you add are installed instead: Cicero copies or moves them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed, not under Added Fonts. Copied, the originals stay where they are. Moved, they’re gone from there, and a folder they leave empty goes to the Trash; see [Copy or use in place](activating.md#copy-or-use-in-place). Fonts already under Added Fonts that you open again, or turn on by copying or moving, leave Added Fonts the same way.
+
 ### Add font files
 
 - Choose **File → Add Fonts** (⌘O) and pick one or more font files.
 - Drag font files from the Finder onto the browser or a font page. Drop them while the browser shows a set, and they join that set too.
 - In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All**
 
-Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). When you open one family from the Finder, its font page opens. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder.
+Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). Cicero then shows them in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder, whichever way you activate fonts.
 
 When a file you added changes, as when you build a new version of a font you’re making, Cicero reads it again.
 

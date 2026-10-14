@@ -19,6 +19,12 @@ public struct FaceCopy: Hashable, Sendable {
 
     /// The copy as a face of its own, to turn on or off.
     public var libraryFace: LibraryFace { LibraryFace(face: face, state: state, app: app) }
+
+    /// The copy as a face of its own, with the style's other copies (`all` may have this one too), so that turning
+    /// it off knows whether the file an installed copy came from is in the library.
+    func libraryFace(among all: [FaceCopy]) -> LibraryFace {
+        LibraryFace(face: face, state: state, copies: all.filter { $0.face.path != face.path }, app: app)
+    }
 }
 
 /// A place a family's styles can be used from when they're in more than one, like each client's folder
@@ -162,7 +168,7 @@ public enum CopyChooser {
             var others: [LibraryFace] = []
             for copy in all where copy.state.isActive && !staying.contains(copy.face.path) {
                 if isManaged(copy, records: records) {
-                    others.append(copy.libraryFace)
+                    others.append(copy.libraryFace(among: all))
                     leaving.insert(copy.face.path)
                 } else {
                     leavesOtherCopiesOn = true

@@ -28,7 +28,7 @@ private struct FontCacheSheetModifier: ViewModifier {
             }
             .alert("Font caches cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
-                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart.") }
+                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart") }
                 }
                 Button("Later", role: .cancel) {}
             } message: {

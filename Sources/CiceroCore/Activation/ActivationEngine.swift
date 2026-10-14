@@ -128,7 +128,7 @@ public struct ActivationResult: Sendable {
     public var succeeded: Int
     /// Paths that couldn't be handled.
     public var failed: [String]
-    /// A short toast, e.g. "Activated." or "Couldn’t activate 2 of 5 files."
+    /// A short toast, without a full stop at the end, e.g. "Activated" or "Couldn’t activate 2 of 5 files"
     public var message: String
 
     public init(records: ActivationRecords, succeeded: Int, failed: [String], message: String) {
@@ -170,8 +170,8 @@ public struct TrashPlan: Sendable, Identifiable {
 }
 
 /// Turns fonts on and off. Never deletes a user's only copy: a copy Cicero installed goes to the Trash
-/// only when the file it was copied from is still there with the same contents; every other file in
-/// ~/Library/Fonts moves to Cicero's Deactivated folder.
+/// only when the file it was copied from is still there with the same contents, in the library; every
+/// other file in ~/Library/Fonts moves to Cicero's Deactivated folder.
 public struct ActivationEngine: Sendable {
     private let locations: Locations
     let registrar: any FontRegistrar
@@ -183,16 +183,17 @@ public struct ActivationEngine: Sendable {
         self.registrar = registrar
     }
 
-    /// Copies into ~/Library/Fonts or registers in place (`method` is `.copy` or `.inPlace`). Faces
-    /// from app-only folders are always registered in place, after going back into the folder if Cicero
-    /// moved them out; faces in a Fonts folder that macOS has off are turned on
+    /// Copies into ~/Library/Fonts or registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`,
+    /// files in `movable` (ones the user added one at a time) are moved there instead (see `removeOriginals`), and
+    /// the rest copied. Faces from app-only folders are always registered in place, after going back into the
+    /// folder if Cicero moved them out; faces in a Fonts folder that macOS has off are turned on
     /// there. Temporarily active faces are made permanent.
     ///
     /// Copies are registered too: left alone, they reach apps only when macOS notices the file, seconds
     /// later. A file counts as activated once macOS reports it active, so it's usable in every app as
     /// soon as this returns.
     @concurrent
-    public func activate(_ faces: [LibraryFace], method: InstallMethod, records: ActivationRecords) async -> ActivationResult {
+    public func activate(_ faces: [LibraryFace], method: InstallMethod, records: ActivationRecords, movable: Set<String> = []) async -> ActivationResult {
         let signpost = Signposts.activation.beginInterval("Activate", "\(faces.count) faces")
         defer { Signposts.activation.endInterval("Activate", signpost) }
         var records = records
@@ -243,17 +244,101 @@ public struct ActivationEngine: Sendable {
                 succeeded += 1
             }
         }
+        let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
+        succeeded += installed.count
+        var message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
+        if method == .move { message += Self.trashedNote(removeOriginals(of: installed.filter { movable.contains($0.source) })) }
+        return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
+    }
+
+    /// Copies font files into ~/Library/Fonts and turns them on, as opening files the library doesn't have does when
+    /// fonts are activated by copying. The originals stay where they are, out of the library, so deactivating a copy
+    /// moves it to the Deactivated folder rather than to the Trash (see `moveOutOfFontsFolder`). `moving`, as when
+    /// fonts are activated by moving, they go (see `removeOriginals`).
+    @concurrent
+    public func install(_ paths: [String], moving: Bool = false, records: ActivationRecords) async -> ActivationResult {
+        var records = records
+        var failed: [String] = []
+        var copies: [PlacedCopy] = []
+        for path in Set(paths).sorted() {
+            do {
+                copies.append(try placeCopy(of: path))
+            } catch {
+                failed.append(path)
+            }
+        }
+        let stuck = await registerAndConfirm(copies.map(\.destination), scope: .persistent)
+        let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
+        var message = Self.message("Installed", "install", succeeded: installed.count, failed: failed.count)
+        if moving { message += Self.trashedNote(removeOriginals(of: installed)) }
+        return ActivationResult(records: records, succeeded: installed.count, failed: failed, message: message)
+    }
+
+    /// Remembers what each copy macOS turned on was copied from, and takes out the ones it didn't: a copy macOS
+    /// won't use only clutters the Fonts folder. Returns the ones it kept.
+    private func keep(_ copies: [PlacedCopy], stuck: Set<String>, records: inout ActivationRecords, failed: inout [String]) -> [PlacedCopy] {
+        var kept: [PlacedCopy] = []
         for copy in copies {
             if stuck.contains(copy.destination) {
                 failed.append(copy.source)
-                // A copy macOS won't use only clutters the Fonts folder.
                 if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
             } else {
                 records.installedCopies[copy.destination] = copy.source
-                succeeded += 1
+                kept.append(copy)
             }
         }
-        return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count))
+        return kept
+    }
+
+    /// Finishes moving files whose copies are on: deletes each original whose copy has the same contents, then puts
+    /// the folders they were in in the Trash when they're left empty, like a download's folder once its fonts are
+    /// installed (see `isDisposableFolder`). An original that can't go, on a disk that's read only say, stays, as
+    /// a copy's would. Returns the folders that went to the Trash.
+    private func removeOriginals(of copies: [PlacedCopy]) -> [String] {
+        let fm = FileManager.default
+        var folders = Set<String>()
+        for copy in copies where !Self.isProtected(copy.source) && Self.isIdenticalCopy(copy.destination, of: copy.source) {
+            guard (try? fm.removeItem(atPath: copy.source)) != nil else { continue }
+            folders.insert((copy.source as NSString).deletingLastPathComponent)
+        }
+        return folders.sorted().filter { folder in
+            guard Self.isDisposableFolder(folder, home: locations.home.path) else { return false }
+            return (try? trash(URL(fileURLWithPath: folder, isDirectory: true))) != nil
+        }
+    }
+
+    /// Whether a folder files were moved out of can go to the Trash: nothing is left in it but hidden files, like
+    /// .DS_Store, and it's a folder inside one of the user's, in the home folder (a download's folder in Downloads,
+    /// never Downloads or the home folder itself, nor anything in ~/Library) or on a disk in /Volumes (not one
+    /// at its top). Never a package, a link or a folder Cicero never touches.
+    static func isDisposableFolder(_ path: String, home: String) -> Bool {
+        let components = (path as NSString).pathComponents
+        let homeComponents = (home as NSString).pathComponents
+        let below: ArraySlice<String>
+        if components.starts(with: homeComponents) {
+            below = components.dropFirst(homeComponents.count)
+            guard below.first != "Library" else { return false }
+        } else if components.count > 3, components[0] == "/", components[1] == "Volumes" {
+            below = components.dropFirst(3)
+        } else {
+            return false
+        }
+        guard below.count >= 2, !isProtected(path + "/") else { return false }
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey]),
+              values.isDirectory == true, values.isSymbolicLink != true, values.isPackage != true,
+              let contents = try? FileManager.default.contentsOfDirectory(atPath: path)
+        else { return false }
+        return contents.allSatisfy { $0.hasPrefix(".") }
+    }
+
+    /// ". Put “Name” in the Trash" for the folders moving files emptied, or nothing.
+    private static func trashedNote(_ folders: [String]) -> String {
+        switch folders.count {
+        case 0: ""
+        case 1: ". Put “\((folders[0] as NSString).lastPathComponent)” in the Trash"
+        default: ". Put \(folders.count) empty folders in the Trash"
+        }
     }
 
     /// Registers for the session until Cicero quits. Faces already on for an application set stay on
@@ -285,7 +370,7 @@ public struct ActivationEngine: Sendable {
         }
         let message: String
         if failed.isEmpty {
-            message = succeeded <= 1 ? "Activated until Cicero quits." : "Activated \(succeeded) files until Cicero quits."
+            message = succeeded <= 1 ? "Activated until Cicero quits" : "Activated \(succeeded) files until Cicero quits"
         } else {
             message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
         }
@@ -301,7 +386,7 @@ public struct ActivationEngine: Sendable {
         var moved: [String: String] = [:]
         let off = await deactivate(switches.flatMap(\.others), records: records, moved: &moved)
         let on = await activate(switches.compactMap(\.target), method: method, records: off.records)
-        var result = ActivationResult(records: on.records, succeeded: on.succeeded, failed: off.failed + on.failed, message: "Switched.")
+        var result = ActivationResult(records: on.records, succeeded: on.succeeded, failed: off.failed + on.failed, message: "Switched")
         let stuck = Set(on.failed)
         let restoring = switches.filter { $0.target.map { stuck.contains($0.face.path) } ?? false }
             .flatMap(\.others).filter { !off.failed.contains($0.face.path) }
@@ -375,6 +460,9 @@ public struct ActivationEngine: Sendable {
         var persistent: [String] = []
         var session: [String] = []
         var leaving: [String] = []
+        // The library's other files with the same fonts as each file, among which an installed copy's original must be.
+        var listed: [String: Set<String>] = [:]
+        for face in faces { listed[face.face.path, default: []].formUnion(face.otherCopies) }
         for face in Self.uniqueByPath(faces) {
             let path = face.face.path
             if face.app != nil, records.appFolderOrigins[path] == nil {
@@ -404,7 +492,7 @@ public struct ActivationEngine: Sendable {
             var kept: [String] = []
             for face in installed {
                 do {
-                    moved[face.face.path] = try moveOutOfFontsFolder(face.face.path, records: records)
+                    moved[face.face.path] = try moveOutOfFontsFolder(face.face.path, listed: listed[face.face.path] ?? [], records: records)
                     records.installedCopies[face.face.path] = nil
                     succeeded += 1
                 } catch {
@@ -449,7 +537,7 @@ public struct ActivationEngine: Sendable {
             }
         }
         let message = failed.isEmpty && succeeded == 0 && !locked.isEmpty
-            ? "These fonts are managed by macOS or another app."
+            ? "These fonts are managed by macOS or another app"
             : Self.message("Deactivated", "deactivate", succeeded: succeeded, failed: failed.count + locked.count)
         return ActivationResult(records: records, succeeded: succeeded, failed: failed + locked, message: message)
     }
@@ -495,7 +583,7 @@ public struct ActivationEngine: Sendable {
         let succeeded = Set(persistent + session + returning).subtracting(failed).count
         let app = faces.lazy.compactMap(\.app).first.map(FaceState.appDescription) ?? "the app"
         let message = failed.isEmpty
-            ? "On in \(app) only."
+            ? "On in \(app) only"
             : Self.message("Done", "move", succeeded: succeeded, failed: failed.count)
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
@@ -547,7 +635,7 @@ public struct ActivationEngine: Sendable {
         if let library = plan.spareCopiesOf {
             var copies = SpareCopies(library)
             guard copies.areSpare(Set(plan.paths)) else {
-                let message = plan.paths.count == 1 ? "Kept the file: it holds the only copy of a font." : "Kept the files: some hold the only copy of a font."
+                let message = plan.paths.count == 1 ? "Kept the file: it holds the only copy of a font" : "Kept the files: some hold the only copy of a font"
                 return ActivationResult(records: records, succeeded: 0, failed: plan.paths, message: message)
             }
         }
@@ -578,11 +666,11 @@ public struct ActivationEngine: Sendable {
         if !kept.isEmpty { _ = await registrar.register(kept.map(Self.url), scope: .persistent) }
         let message: String
         if failed.isEmpty {
-            message = succeeded <= 1 ? "Moved to the Trash." : "Moved \(succeeded) files to the Trash."
+            message = succeeded <= 1 ? "Moved to the Trash" : "Moved \(succeeded) files to the Trash"
         } else if succeeded == 0 {
-            message = failed.count == 1 ? "Couldn’t move the file to the Trash." : "Couldn’t move \(failed.count) files to the Trash."
+            message = failed.count == 1 ? "Couldn’t move the file to the Trash" : "Couldn’t move \(failed.count) files to the Trash"
         } else {
-            message = "Couldn’t move \(failed.count) of \(succeeded + failed.count) files to the Trash."
+            message = "Couldn’t move \(failed.count) of \(succeeded + failed.count) files to the Trash"
         }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
@@ -601,7 +689,7 @@ public struct ActivationEngine: Sendable {
     public func installCopy(of face: LibraryFace, records: ActivationRecords) async -> ActivationResult {
         var records = records
         let path = face.face.path
-        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy the font into your Fonts folder.")
+        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy the font into your Fonts folder")
         guard let copy = try? placeCopy(of: path) else { return failure }
         guard await registerAndConfirm([copy.destination], scope: .persistent).isEmpty else {
             if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
@@ -612,7 +700,7 @@ public struct ActivationEngine: Sendable {
             _ = await registrar.unregister([Self.url(path)], scope: .persistent)
             records.inPlace.remove(path)
         }
-        return ActivationResult(records: records, succeeded: 1, failed: [], message: "Installed a copy.")
+        return ActivationResult(records: records, succeeded: 1, failed: [], message: "Installed a copy")
     }
 
     /// At launch: unregisters "until Cicero quits" activations left behind by a crash, and forgets
@@ -755,16 +843,17 @@ public struct ActivationEngine: Sendable {
         return destination.path
     }
 
-    /// Trashes a copy Cicero installed when the file it was copied from is still there, unchanged. Any
-    /// other file, the user's own or a copy whose origin is gone or changed, keeps its place in the library
-    /// in Cicero's Deactivated folder: another file with the same font names (macOS's, Adobe Fonts', another
-    /// version) is no copy of it. The whole file decides, so a collection or variable font goes to the
-    /// Trash only when every face in it is in the origin.
+    /// Trashes a copy Cicero installed when the file it was copied from is still there, unchanged, and in the
+    /// library (among `listed`, the library's other files with the same fonts). Any other file, the user's own or
+    /// a copy whose origin is gone, changed or not in the library (like a font installed by opening it), keeps its
+    /// place in the library in Cicero's Deactivated folder: another file with the same font names (macOS's, Adobe
+    /// Fonts', another version) is no copy of it. The whole file decides, so a collection or variable font goes to
+    /// the Trash only when every face in it is in the origin.
     /// Returns where the file went when it went to the Deactivated folder, nil when it went to the Trash.
     @discardableResult
-    private func moveOutOfFontsFolder(_ path: String, records: ActivationRecords) throws -> String? {
+    private func moveOutOfFontsFolder(_ path: String, listed: Set<String>, records: ActivationRecords) throws -> String? {
         let url = Self.url(path)
-        if let origin = records.installedCopies[path], Self.isIdenticalCopy(path, of: origin) {
+        if let origin = records.installedCopies[path], listed.contains(origin), Self.isIdenticalCopy(path, of: origin) {
             try trash(url)
             return nil
         }
@@ -808,8 +897,8 @@ public struct ActivationEngine: Sendable {
     }
 
     private static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int) -> String {
-        if failed == 0 { return succeeded <= 1 ? "\(past)." : "\(past) \(succeeded) files." }
-        if succeeded == 0 { return failed == 1 ? "Couldn’t \(verb) the font." : "Couldn’t \(verb) \(failed) files." }
-        return "Couldn’t \(verb) \(failed) of \(succeeded + failed) files."
+        if failed == 0 { return succeeded <= 1 ? past : "\(past) \(succeeded) files" }
+        if succeeded == 0 { return failed == 1 ? "Couldn’t \(verb) the font" : "Couldn’t \(verb) \(failed) files" }
+        return "Couldn’t \(verb) \(failed) of \(succeeded + failed) files"
     }
 }

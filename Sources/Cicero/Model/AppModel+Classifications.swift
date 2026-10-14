@@ -81,7 +81,7 @@ extension AppModel {
     func renameClassification(_ old: String, to new: String) {
         let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != old else { return }
-        guard !classificationNames.contains(trimmed) else { return showToast("There’s already a classification called “\(trimmed)”.") }
+        guard !classificationNames.contains(trimmed) else { return showToast("There’s already a classification called “\(trimmed)”") }
         var data = data
         if let index = data.classifications.firstIndex(of: old) {
             data.classifications[index] = trimmed
