@@ -9,50 +9,32 @@ struct FoldersSettings: View {
     @State private var appName = ""
 
     var body: some View {
-        // A list in a card with + and − along its bottom, like the lists in System Settings.
-        VStack(spacing: 0) {
-            List(selection: $selection) {
-                ForEach(Array(model.data.folders.enumerated()), id: \.element.id) { index, folder in
-                    FolderRow(folder: folder, model: model) {
-                        appName = ""
-                        namingFolder = folder
-                    }
-                    // A list's own stripes are opaque: these tint the card instead.
-                    .listRowBackground(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
-                    .listRowSeparator(.hidden)
+        List(selection: $selection) {
+            ForEach(Array(model.data.folders.enumerated()), id: \.element.id) { index, folder in
+                FolderRow(folder: folder, model: model) {
+                    appName = ""
+                    namingFolder = folder
                 }
+                .cardRow(index)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .overlay {
-                if model.data.folders.isEmpty {
-                    Text("Add a folder of fonts to browse them without activating them.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                }
-            }
-            Divider()
-            HStack(spacing: 0) {
-                ListEditButton("Add Folder", systemImage: "plus") { model.presentAddFolderPanel() }
-                    .help("Add a folder of fonts")
-                Divider()
-                    .frame(height: 14)
-                ListEditButton("Remove Folders", systemImage: "minus") {
-                    model.removeFolders(selection)
-                    selection = []
-                }
-                .disabled(selection.isEmpty)
-                .help("Remove the selected folders from the library; their files stay where they are")
-                Spacer()
-            }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 3)
         }
-        // The fill and corners of the grouped forms' cards in the other tabs.
-        .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
-        .clipShape(.rect(cornerRadius: 12, style: .continuous))
+        .overlay {
+            if model.data.folders.isEmpty {
+                Text("Add a folder of fonts to browse them without activating them.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+        }
+        .inCard(
+            add: CardListButton(title: "Add Folder", help: "Add a folder of fonts") { model.presentAddFolderPanel() },
+            remove: CardListButton(title: "Remove Folders", help: "Remove the selected folders from the library; their files stay where they are") {
+                model.removeFolders(selection)
+                selection = []
+            },
+            canRemove: !selection.isEmpty
+        )
         .padding(20)
         .alert(
             "Active in Specific App",

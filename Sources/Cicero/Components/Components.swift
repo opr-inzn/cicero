@@ -300,6 +300,46 @@ struct ListEditButton: View {
     }
 }
 
+/// A + or − under a list in a card (see `inCard`).
+struct CardListButton {
+    let title: String
+    let help: String
+    let action: () -> Void
+}
+
+extension View {
+    /// A list in a card with + and − along its bottom, like the lists in System Settings: Settings → Folders,
+    /// and the apps of an application set. Its rows take `cardRow`.
+    func inCard(add: CardListButton, remove: CardListButton, canRemove: Bool) -> some View {
+        VStack(spacing: 0) {
+            listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            Divider()
+            HStack(spacing: 0) {
+                ListEditButton(add.title, systemImage: "plus", action: add.action)
+                    .help(add.help)
+                Divider()
+                    .frame(height: 14)
+                ListEditButton(remove.title, systemImage: "minus", action: remove.action)
+                    .disabled(!canRemove)
+                    .help(remove.help)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+        }
+        // The fill and corners of the grouped forms' cards.
+        .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
+        .clipShape(.rect(cornerRadius: 12, style: .continuous))
+    }
+
+    /// Every other row tinted, without separators. A list's own stripes are opaque and would hide the card.
+    func cardRow(_ index: Int) -> some View {
+        listRowBackground(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
+            .listRowSeparator(.hidden)
+    }
+}
+
 /// What a folder's fonts are, in its row in Settings → Folders and its menu in the sidebar: Inactive, Active
 /// (Cicero keeps them on), or active in an app that loads the folder by itself. `askForApp` asks for that app's name.
 struct FolderActivationPicker: View {
