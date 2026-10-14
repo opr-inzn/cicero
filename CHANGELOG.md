@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.1
 
 - Add font files without adding their folder: open them from the Finder (Open With → Cicero), drop them on the window, or choose File → Add Fonts… (⌘O). They’re listed where they are, under Added Fonts in the sidebar, without being installed, and read again when they change. Right-click to remove them from the library; the files stay. Dropping fonts while a set is shown adds them to the set, and dropping a folder adds the folder.
 - Tags: label families with tags of your own, each with a Finder color, from their right-click menu, the Info panel, or by dropping them on a tag. Tags have their own sidebar section, show as colored dots next to family names, and work in smart set rules.
@@ -19,6 +19,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Folders in iCloud Drive, Dropbox or Google Drive say how many of their fonts are online only, and **Download** brings them down. A cloud folder macOS hasn’t let Cicero read says so, with a way to System Settings.
 - **Use Copy From**: when a font is in more than one folder, like a copy from each client, right-click it to choose which folder’s copy is on. The others Cicero turned on go off.
 - Duplicates in Problems only lists copies in the same place, like twice in one client’s folder, not one copy in each client’s.
+- Character set groups in the sidebar have an icon, and titles as strong as the rows around them.
 - Help → Privacy Policy opens Cicero’s privacy policy on its website.
 
 ## 1.0
