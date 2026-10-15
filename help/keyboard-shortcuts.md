@@ -14,17 +14,20 @@
 | ⇧⌘E | **File → Export Fonts** |
 | ⌘↩ | **Fonts → Activate** |
 | ⌥⌘↩ | **Fonts → Activate Temporarily** |
-| ⌘⌫ | **Fonts → Deactivate** |
+| ⌫ | **Fonts → Deactivate** |
 | ⌘Y | **Fonts → Quick Look** |
 | ⌘↓ | **Fonts → Open** (one family selected) |
 | ⌘I | **Fonts → Show Info** |
 | ⇧⌘R | **Fonts → Reveal in Finder** |
+| ⌘⌫ | **Fonts → Move to Trash** |
 | ⌥⌘C | **Fonts → Compare** (two or more families selected) |
 | ⌥⌘T | **Fonts → Character Toolbox** |
 | ⌘R | **Fonts → Rescan Library** |
 | ⌘? | **Help → Cicero Help** |
 
-While you type in a text field, like the search field, the preview text or a font page’s text, ⌘⌫ and ⌘ with an arrow key edit the text, as in any Mac app: ⌘⌫ deletes to the start of the line, and ⌘↓ moves to the end. They don’t deactivate or open fonts then. ⌘↩ and ⌥⌘↩ still activate the selected fonts.
+While you type in a text field, like the search field, the preview text or a font page’s text, ⌫, ⌘⌫ and ⌘ with an arrow key edit the text, as in any Mac app: ⌘⌫ deletes to the start of the line, and ⌘↓ moves to the end. They don’t deactivate, trash or open fonts then. ⌘↩ and ⌥⌘↩ still activate the selected fonts.
+
+⌫ and ⌘⌫ act on the fonts selected in the main window, so they do nothing to them in the Compare window, the Character Toolbox or Settings.
 
 ## The browser
 
@@ -32,7 +35,7 @@ While you type in a text field, like the search field, the preview text or a fon
 | --- | --- |
 | Click | Selects a family |
 | ⌘-click | Adds a family to the selection, or takes it out |
-| ⇧-click | Selects every family from the last one you clicked |
+| ⇧-click | Selects every family from the last one you clicked, keeping the ones you ⌘-clicked before |
 | ⌘A | Selects every family |
 | Esc | Selects none |
 | A letter or digit | Jumps to the first family starting with it |

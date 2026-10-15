@@ -3,47 +3,68 @@ import CiceroCore
 import SwiftUI
 
 extension AppModel {
-    func click(_ family: Family, in families: [Family], anchor: inout String?) {
+    func click(_ family: Family, in families: [Family], anchor: inout SelectionAnchor) {
         FamilySelection.click(family.id, in: families.map(\.id), selection: &selectedIDs, anchor: &anchor)
     }
+}
+
+/// Where ⇧-clicks and ⇧-arrows extend the selection from, as in the Finder: the family clicked last, and
+/// what else was selected then, which stays while Shift adds the range from the anchor.
+struct SelectionAnchor {
+    var id: String?
+    /// Selected apart from the anchor's range: families ⌘-clicked before it.
+    var base: Set<String> = []
+    /// The end of the range away from the anchor, which ⇧-arrows move.
+    var head: String?
 }
 
 /// How clicks and arrow keys select in every list of families, the browser's and the Character Toolbox's.
 enum FamilySelection {
     /// Command toggles, Shift extends from the anchor, a plain click selects one.
-    static func click(_ id: String, in ids: [String], selection: inout Set<String>, anchor: inout String?) {
+    static func click(_ id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) {
         let modifiers = NSEvent.modifierFlags
         if modifiers.contains(.command) {
             if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
-            anchor = id
-        } else if modifiers.contains(.shift), let start = anchor,
-                  let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) {
-            selection = Set(ids[min(a, b)...max(a, b)])
-        } else {
-            selection = [id]
-            anchor = id
+            anchor = SelectionAnchor(id: id, base: selection)
+            return
         }
+        if modifiers.contains(.shift), extend(to: id, in: ids, selection: &selection, anchor: &anchor) { return }
+        selection = [id]
+        anchor = SelectionAnchor(id: id)
     }
 
     /// ↑ and ↓ move the selection a row, Shift extending it from the anchor. Returns the row to scroll to.
-    static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout String?, extending: Bool) -> String? {
+    static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor, extending: Bool) -> String? {
         guard !ids.isEmpty else { return nil }
+        if extending, let start = anchor.id, selection.contains(start), let a = ids.firstIndex(of: start) {
+            // The end of the range away from the anchor moves, so Shift grows and shrinks it either way.
+            let head: Int
+            if let id = anchor.head, selection.contains(id), let index = ids.firstIndex(of: id) {
+                head = index
+            } else {
+                let first = ids.firstIndex { selection.contains($0) } ?? a
+                head = first < a ? first : ids.lastIndex { selection.contains($0) } ?? a
+            }
+            let target = ids[min(max(head + step, 0), ids.count - 1)]
+            if extend(to: target, in: ids, selection: &selection, anchor: &anchor) { return target }
+        }
         let first = ids.firstIndex { selection.contains($0) }
-        let current: Int?
-        if extending, let start = anchor, selection.contains(start), let a = ids.firstIndex(of: start), let first {
-            // The end of the selection away from the anchor moves, so Shift grows and shrinks it either way.
-            current = first < a ? first : ids.lastIndex { selection.contains($0) }
-        } else {
-            current = ids.lastIndex { selection.contains($0) && (extending || $0 != anchor) } ?? first
-        }
+        let current = ids.lastIndex { selection.contains($0) && $0 != anchor.id } ?? first
         let index = current.map { min(max($0 + step, 0), ids.count - 1) } ?? (step > 0 ? 0 : ids.count - 1)
-        if extending, let start = anchor, let a = ids.firstIndex(of: start) {
-            selection = Set(ids[min(a, index)...max(a, index)])
-        } else {
-            selection = [ids[index]]
-            anchor = ids[index]
-        }
+        selection = [ids[index]]
+        anchor = SelectionAnchor(id: ids[index])
         return ids[index]
+    }
+
+    /// Selects from the anchor to `id` and keeps what was selected besides, so families ⌘-clicked before stay
+    /// while a range Shift made before gives way to the new one. False without an anchor in `ids`.
+    private static func extend(to id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) -> Bool {
+        guard let start = anchor.id, let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) else { return false }
+        // Cleared or changed elsewhere since (Escape, a click between families): nothing of it to keep.
+        if !anchor.base.isSubset(of: selection) { anchor.base = [] }
+        selection = anchor.base.union(ids[min(a, b)...max(a, b)])
+        anchor.head = id
+        return true
     }
 }
 
@@ -91,7 +112,7 @@ extension View {
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
     let families: [Family]
-    @Binding var anchor: String?
+    @Binding var anchor: SelectionAnchor
     let proxy: ScrollViewProxy
     var layout = FamilyLayout.list
     /// What's been typed so far, as in Finder: letters typed within a second of each other go together, so E and then d
@@ -143,7 +164,7 @@ struct FamilyKeys: ViewModifier {
                     return .handled
                 }
                 model.selectedIDs = [target.id]
-                anchor = target.id
+                anchor = SelectionAnchor(id: target.id)
                 scrollToTop(target.id)
                 return .handled
             }
@@ -151,7 +172,7 @@ struct FamilyKeys: ViewModifier {
             .onChange(of: model.jumpTargets, initial: true) { _, targets in
                 guard let targets, let first = families.first(where: { targets.contains($0.id) }) else { return }
                 model.selectedIDs = [first.id]
-                anchor = first.id
+                anchor = SelectionAnchor(id: first.id)
                 scrollToTop(first.id)
                 model.jumpTargets = nil
             }
@@ -161,14 +182,9 @@ struct FamilyKeys: ViewModifier {
             }
     }
 
-    /// Brings a family to the top of the view at once. The list's column headers stay pinned over its top row, so
-    /// there the row before goes under them instead (they're as tall as a row).
+    /// Brings a family to the top of the view at once, below the list's column headers.
     private func scrollToTop(_ id: String) {
-        if case .list = layout, let index = families.firstIndex(where: { $0.id == id }), index > 0 {
-            proxy.scrollTo(families[index - 1].id, anchor: .top)
-        } else {
-            proxy.scrollTo(id, anchor: .top)
-        }
+        proxy.scrollTo(id, anchor: .top)
     }
 
     private func arrow(_ press: KeyPress) -> KeyPress.Result {
@@ -203,7 +219,7 @@ struct FamilyItem: ViewModifier {
     let family: Family
     let families: [Family]
     let model: AppModel
-    @Binding var anchor: String?
+    @Binding var anchor: SelectionAnchor
     let focus: () -> Void
 
     func body(content: Content) -> some View {

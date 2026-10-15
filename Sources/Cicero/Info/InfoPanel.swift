@@ -90,9 +90,9 @@ private struct InfoPanel: View {
     @Environment(PreviewSettings.self) private var preview
 
     var body: some View {
+        // The same view from one family to the next, so what its rows work out stays until the next family's is ready.
         if let family = model.inspectedFamily {
             FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
-                .id(family.id)
         } else {
             let count = model.selectedIDs.count
             ContentUnavailableView(count > 1 ? "\(count) Fonts Selected" : "No Selection", systemImage: "info.circle",
@@ -134,14 +134,14 @@ private struct InfoRows: View {
     @Environment(AppModel.self) private var model
     let family: Family
     let face: LibraryFace
-    @State private var info: CiceroCore.FontInfo?
+    @State private var info: Loaded<CiceroCore.FontInfo>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             row("Status", face.state.label)
             TagsRow(family: family)
             ClassificationRow(family: family)
-            if let info {
+            if let info = info?.value {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
                     self.row(row.label, row.value)
                 }
@@ -172,10 +172,8 @@ private struct InfoRows: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: face.id) {
-            info = nil
-            let face = face.face
-            info = await Task.detached(priority: .userInitiated) { CiceroCore.FontInfo.read(face) }.value
+        .loading($info, for: face.id) { [face = face.face] in
+            await Task.detached(priority: .userInitiated) { CiceroCore.FontInfo.read(face) }.value
         }
     }
 
@@ -254,9 +252,10 @@ private struct FeatureControls: View {
     @Environment(AppModel.self) private var model
     let family: Family
     let face: FontFace
-    @State private var groups: [FontFeatureGroup]?
+    @State private var loaded: Loaded<[FontFeatureGroup]>?
 
     var body: some View {
+        let groups = loaded?.value
         Group {
             if let groups, groups.isEmpty {
                 ContentUnavailableView("No Features", systemImage: "textformat.abc",
@@ -280,9 +279,8 @@ private struct FeatureControls: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: face.id) {
-            let face = face
-            groups = await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
+        .loading($loaded, for: face.id) { [face] in
+            await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
         }
     }
 
@@ -331,6 +329,28 @@ private struct FeatureControls: View {
                 set(list)
             }
         )
+    }
+}
+
+/// Something an Info panel row works out for one font, and which font.
+struct Loaded<Value> {
+    let id: AnyHashable
+    let value: Value
+}
+
+extension View {
+    /// Works out `state` for the font `id` without clearing it first: going to another font keeps the last
+    /// one's on screen until the new one is ready, a moment later, so the panel doesn't flash its spinners.
+    /// One that takes longer than that clears it, for the row's spinner.
+    func loading<ID: Hashable, Value>(_ state: Binding<Loaded<Value>?>, for id: ID, _ work: @escaping @MainActor () async -> Value) -> some View {
+        task(id: id) {
+            let value = await work()
+            if !Task.isCancelled { state.wrappedValue = Loaded(id: id, value: value) }
+        }
+        .task(id: id) {
+            try? await Task.sleep(for: .milliseconds(250))
+            if !Task.isCancelled, state.wrappedValue?.id != AnyHashable(id) { state.wrappedValue = nil }
+        }
     }
 }
 

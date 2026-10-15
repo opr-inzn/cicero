@@ -114,7 +114,7 @@ struct ActivationSwitch: View {
     }
 }
 
-/// A small tinted capsule with a word or two.
+/// A small tinted capsule with a word or two, never shortened: a name next to it gives way instead.
 struct Tag: View {
     let text: String
     let tint: Color
@@ -126,6 +126,7 @@ struct Tag: View {
             .padding(.vertical, 1.5)
             .background(tint.opacity(0.14), in: .capsule)
             .foregroundStyle(tint.opacity(0.9))
+            .fixedSize()
     }
 }
 

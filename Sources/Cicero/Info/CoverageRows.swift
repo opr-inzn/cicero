@@ -5,7 +5,7 @@ import SwiftUI
 struct LanguagesRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var coverage: FaceCoverage?
+    @State private var loaded: Loaded<FaceCoverage>?
     @State private var showsAll = false
 
     /// The user's languages lead; then by number of speakers.
@@ -16,7 +16,7 @@ struct LanguagesRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Languages").font(.caption).foregroundStyle(.secondary)
-            if let coverage {
+            if let coverage = loaded?.value {
                 let languages = ranked(coverage.supportedLanguages.compactMap(model.languages.language))
                 if languages.isEmpty {
                     Text("None").font(.callout)
@@ -33,9 +33,8 @@ struct LanguagesRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .task(id: face.id) {
-            coverage = nil
-            coverage = await model.coverage.coverage(computing: face)
+        .loading($loaded, for: face.id) { [face] in
+            await model.coverage.coverage(computing: face)
         }
     }
 
@@ -98,12 +97,12 @@ private struct LanguageList: View {
 struct CharacterSetsRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var ranges: ScalarRanges?
+    @State private var loaded: Loaded<ScalarRanges>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Coverage").font(.caption).foregroundStyle(.secondary)
-            if let ranges {
+            if let ranges = loaded?.value {
                 let has = supported(by: ranges)
                 Text(has.isEmpty ? "None" : ListFormatter.localizedString(byJoining: has.map(\.name)))
                     .font(.callout)
@@ -116,9 +115,8 @@ struct CharacterSetsRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .task(id: face.id) {
-            ranges = nil
-            ranges = await model.coverage.coverage(computing: face).scalars
+        .loading($loaded, for: face.id) { [face] in
+            await model.coverage.coverage(computing: face).scalars
         }
     }
 
@@ -151,13 +149,13 @@ struct CharacterSetsRow: View {
 struct UnicodeBlocksRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var coverage: [(block: CharacterSetDefinition, has: Int)]?
+    @State private var loaded: Loaded<[(block: CharacterSetDefinition, has: Int)]>?
     @State private var showsAll = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Unicode Blocks").font(.caption).foregroundStyle(.secondary)
-            if let coverage {
+            if let coverage = loaded?.value {
                 let complete = coverage.filter { $0.has == $0.block.scalars.count }.map(\.block.name)
                 let partial = coverage.count { $0.has > 0 && $0.has < $0.block.scalars.count }
                 Text(complete.isEmpty ? "None complete" : "Complete: " + ListFormatter.localizedString(byJoining: complete))
@@ -177,11 +175,10 @@ struct UnicodeBlocksRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .task(id: face.id) {
-            coverage = nil
+        .loading($loaded, for: face.id) { [face] in
             let ranges = await model.coverage.coverage(computing: face).scalars
             let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
-            coverage = blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
+            return blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
         }
     }
 
