@@ -117,6 +117,8 @@ When a file you added changes, as when you build a new version of a font you’r
 
 Right-click families from added files and choose **Remove from Library**. Cicero stops listing them; the files stay where they are. A font you turned on stays listed until you turn it off.
 
+A file you added that’s deleted later, or whose folder you move or rename, leaves the library by itself. One on a disk that isn’t connected stays, and is back when you connect the disk.
+
 Right-click **Added Fonts** and choose **Reveal in Finder** to see the files.
 
 ## Sets
