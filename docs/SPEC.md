@@ -83,7 +83,9 @@ a toggle that's on and a button being pressed.
 - **List** (rows under column headers in a lazy stack, like the grid: not a SwiftUI Table, which makes every
   row's cells whenever an accessibility client — a password manager's autofill, say — walks the window, and
   with a thousand families kept the app busy for minutes each time it came to the front): Status (switch) ·
-  Name (+ tag dots, status tag) · Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL
+  Name (+ tag dots, status tag) · Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Year
+  (hidden; the earliest year among the family's faces: each face's earliest 1950-or-later year in its copyright notice, else
+  its head table's created year from 1985 on; read when scanning and kept in the face cache) · Latin S–XL
   (largest of Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · GF Latin, GF Cyrillic,
   GF Greek (hidden; largest of each script's Google sets, shown as "Plus"; GF Latin African branches off
   Core, so it isn't in the series) · any set no series covers: a Unicode block, GF Latin African, a custom

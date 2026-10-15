@@ -74,12 +74,14 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var width: Int
     /// A variable font's axes, without the ones it hides, with this instance's position on each; empty for a static font.
     public var axes: [VariationAxis]
+    /// When the face came out, as near as its file says (see `FontFileReader.year`).
+    public var year: Int?
 
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
-        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = []
+        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], year: Int? = nil
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -99,6 +101,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.weightAxis = weightAxis
         self.width = width
         self.axes = axes
+        self.year = year
     }
 
     /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
@@ -350,6 +353,8 @@ public struct Family: Identifiable, Hashable, Sendable {
 
     public var name: String { id }
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
+    /// When the family came out: its earliest face's year.
+    public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
 
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         precondition(!faces.isEmpty, "A family has at least one face")

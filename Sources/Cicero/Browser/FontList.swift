@@ -14,6 +14,8 @@ nonisolated struct FontRow: Identifiable, Sendable {
     /// What each shown character set column says; nothing while the family is still being checked.
     let coverage: [FontListColumn: CoverageCell]
     let added: Date
+    /// 0 when the files don't say.
+    let year: Int
     let tags: [TagColor]
 
     var id: String { family.id }
@@ -55,6 +57,7 @@ nonisolated struct FontRow: Identifiable, Sendable {
         }
         self.coverage = coverage
         added = family.dateAdded ?? .distantPast
+        year = family.year ?? 0
         tags = model.tagColors(of: family)
     }
 
@@ -81,7 +84,7 @@ nonisolated enum CoverageCell: Sendable {
 
 /// A column of the font list.
 nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
-    case status, name, preview, styles, classification, foundry, added, format
+    case status, name, preview, styles, classification, foundry, year, added, format
     /// The largest set of a series the family has.
     case series(String)
     /// Whether the family has every character of one set, else how many it lacks.
@@ -100,6 +103,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .styles: "styles"
         case .classification: "classification"
         case .foundry: "foundry"
+        case .year: "year"
         case .added: "added"
         case .format: "format"
         case .series(CharacterSetCatalog.latinSeriesID): "latin"
@@ -110,7 +114,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
     }
 
     init?(id: String) {
-        if let column = [Self.status, .name, .preview, .styles, .classification, .foundry, .latin, .adobe, .added, .format].first(where: { $0.id == id }) {
+        if let column = [Self.status, .name, .preview, .styles, .classification, .foundry, .year, .latin, .adobe, .added, .format].first(where: { $0.id == id }) {
             self = column
         } else if id.hasPrefix("series.") {
             self = .series(String(id.dropFirst(7)))
@@ -129,6 +133,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .styles: "Styles"
         case .classification: "Classification"
         case .foundry: "Foundry"
+        case .year: "Year"
         case .added: "Date Added"
         case .format: "Format"
         case .series(let id): model.characterSetSeries(id)?.name ?? ""
@@ -145,6 +150,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .styles: 54
         case .classification: 110
         case .foundry: 150
+        case .year: 56
         case .series: 96
         case .characterSet: 110
         case .added: 100
@@ -157,7 +163,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .status: 52
         case .name: 140
         case .preview: 160
-        case .styles: 44
+        case .styles, .year: 44
         case .classification, .foundry, .added, .format: 80
         case .series, .characterSet: 60
         }
@@ -174,11 +180,11 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         if case .characterSet = self { true } else { false }
     }
 
-    /// Shown unless hidden, where the other series and single sets are hidden unless added.
+    /// Shown unless hidden, where the year, the other series and single sets are hidden unless added.
     var isStandard: Bool {
         switch self {
         case .series(let id): id == CharacterSetCatalog.latinSeriesID || id == CharacterSetCatalog.adobeSeriesID
-        case .characterSet: false
+        case .year, .characterSet: false
         default: true
         }
     }
@@ -191,6 +197,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .styles: KeyPathComparator(\.styles)
         case .classification: KeyPathComparator(\.classification)
         case .foundry: KeyPathComparator(\.foundry, comparator: .localizedStandard)
+        case .year: KeyPathComparator(\.year)
         case .series, .characterSet: KeyPathComparator(\FontRow.[rank: self])
         case .added: KeyPathComparator(\.added)
         case .format: KeyPathComparator(\.format)
@@ -208,7 +215,7 @@ struct FontList: View {
     @State private var ascending = true
     /// Standard columns turned off.
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
-    /// Other series and single sets turned on.
+    /// The year, other series and single sets turned on.
     @AppStorage("fontList.characterSetColumns") private var addedColumns = ""
     @AppStorage("fontList.columnWidths") private var columnWidths = ""
     @State private var anchor = SelectionAnchor()
@@ -267,11 +274,11 @@ struct FontList: View {
         return [comparator]
     }
 
-    /// Every column there is, in order: the series, then single sets (the user's last), between Foundry and Date Added.
+    /// Every column there is, in order: the year, the series, then single sets (the user's last), between Foundry and Date Added.
     private var allColumns: [FontListColumn] {
         let series = model.characterSetCatalog.series.map { FontListColumn.series($0.id) }
         let sets = singleSetGroups.flatMap(\.sets).map(\.id) + model.data.customCharacterSets.map(\.setID)
-        return [.status, .name, .preview, .styles, .classification, .foundry] + series + sets.map(FontListColumn.characterSet) + [.added, .format]
+        return [.status, .name, .preview, .styles, .classification, .foundry, .year] + series + sets.map(FontListColumn.characterSet) + [.added, .format]
     }
 
     /// Built-in sets by group, less the ones in a series: its column says already.
@@ -552,6 +559,10 @@ private struct FontListRow: View {
             Text(row.classification).foregroundStyle(.secondary).lineLimit(1)
         case .foundry:
             Text(row.foundry).foregroundStyle(.secondary).lineLimit(1)
+        case .year:
+            if row.year > 0 {
+                Text(String(row.year)).monospacedDigit().foregroundStyle(.secondary)
+            }
         case .series:
             if case .largest(let name, _) = row.coverage[column] {
                 Text(name).foregroundStyle(.secondary).lineLimit(1)
