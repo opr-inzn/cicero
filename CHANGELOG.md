@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.4.4
 
 - You can change the order of the fonts in the Compare window by dragging a row in Stacked, or a name below the fonts in Overlay, where the last one is drawn on top.
 - Each font in the Compare window keeps its color when you move or remove the others.
