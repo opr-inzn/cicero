@@ -682,17 +682,29 @@ extension AppModel {
     // MARK: Compare
 
     func compare(_ families: [Family]) {
-        compareIDs = families.map(\.id)
+        compareIDs = []
+        compareTints = [:]
+        _ = addToCompare(families.map(\.id))
     }
 
     func addToCompare(_ names: [String]) -> Bool {
         let new = names.filter { family($0) != nil && !compareIDs.contains($0) }
+        for id in new {
+            compareTints[id] = (0...).first { !compareTints.values.contains($0) }
+        }
         compareIDs += new
         return !new.isEmpty
     }
 
     func removeFromCompare(_ id: String) {
         compareIDs.removeAll { $0 == id }
+        compareTints[id] = nil
+    }
+
+    /// Puts a compared family where another one is, moving the others along.
+    func moveInCompare(_ id: String, to target: String) {
+        guard let from = compareIDs.firstIndex(of: id), let to = compareIDs.firstIndex(of: target), from != to else { return }
+        compareIDs.insert(compareIDs.remove(at: from), at: to)
     }
 
     // MARK: Font caches

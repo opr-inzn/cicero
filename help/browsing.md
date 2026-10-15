@@ -155,6 +155,8 @@ The same options apply to every view, font pages and the Compare window. Cicero 
 The Compare window shows them with the preview text, size, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
 
 - **Stacked:** one row per font, all on the same baseline, with the name and style under each.
-- **Overlay:** every font drawn over the others in its own color, with small marks for each font’s x-height and cap height.
+- **Overlay:** every font drawn over the others in its own color, with small marks for each font’s x-height and cap height, and their names below. The last one is drawn on top.
+
+To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
 
 To add fonts, drag families from the main window into the Compare window. To take one out, click its remove button. Choosing **Compare** again starts over with the new selection.
