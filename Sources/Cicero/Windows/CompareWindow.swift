@@ -82,19 +82,12 @@ private struct StackedLayout: View {
         let ascent = samples.map(\.line.ascent).max() ?? 0
         let descent = samples.map(\.line.descent).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
-        Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample, isEmpty in
-            // While it's dragged, the row leaves an empty card where it will land.
+        Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
             row(sample, ascent: ascent, descent: descent, width: width)
-                .opacity(isEmpty ? 0 : 1)
-                .background {
-                    if isEmpty { RoundedRectangle(cornerRadius: 10).fill(.fill.quaternary).padding(-8) }
-                }
         } lifted: { sample in
+            // Opaque, so the rows it passes don't show through.
             row(sample, ascent: ascent, descent: descent, width: width)
-                .background {
-                    RoundedRectangle(cornerRadius: 10).fill(Color.canvas).padding(-8)
-                        .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
-                }
+                .background { Color.canvas.padding(-8) }
         }
     }
 
@@ -143,23 +136,20 @@ private struct OverlayLayout: View {
                 }
             }
             .frame(width: width, height: ascent + descent)
-            Reorderable(samples: samples, layout: AnyLayout(FlowLayout(spacing: 8, lineSpacing: 8)), axis: .horizontal) { sample, isEmpty in
-                // While it's dragged, the chip leaves an empty capsule where it will land.
-                chip(sample, isEmpty: isEmpty)
+            Reorderable(samples: samples, layout: AnyLayout(FlowLayout(spacing: 8, lineSpacing: 8)), axis: .horizontal) { sample in
+                chip(sample)
                     .help("Drag to change the order")
             } lifted: { sample in
-                chip(sample, isEmpty: false)
+                chip(sample)
                     .background(Color.canvas, in: .capsule)
-                    .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
             }
             .frame(width: max(width, 480), alignment: .leading)
         }
     }
 
-    private func chip(_ sample: CompareSample, isEmpty: Bool) -> some View {
+    private func chip(_ sample: CompareSample) -> some View {
         SampleCaption(sample: sample, showsTint: true)
             .font(.callout)
-            .opacity(isEmpty ? 0 : 1)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(.fill.tertiary, in: .capsule)
@@ -169,16 +159,16 @@ private struct OverlayLayout: View {
     private func crisp(_ y: CGFloat) -> CGFloat { y.rounded() + 0.5 }
 }
 
-/// Samples laid out by `layout` that can be dragged to new places among each other. The dragged one is
-/// lifted and follows the pointer, and the others make way as it passes their middle.
+/// Samples laid out by `layout` that can be dragged to new places among each other. The dragged one follows
+/// the pointer, leaving a gap where it will land, and the others make way as it passes their middle.
 private struct Reorderable<Item: View, Lifted: View>: View {
     @Environment(AppModel.self) private var model
     let samples: [CompareSample]
     let layout: AnyLayout
     /// The way samples pass each other: down a column of rows, or along lines of chips.
     let axis: Axis
-    /// A sample in its place, which is empty while the sample is dragged.
-    @ViewBuilder let item: (CompareSample, _ isEmpty: Bool) -> Item
+    /// A sample in its place.
+    @ViewBuilder let item: (CompareSample) -> Item
     /// The sample under the pointer while it's dragged.
     @ViewBuilder let lifted: (CompareSample) -> Lifted
     private static var space: String { "compare.reorderable" }
@@ -189,7 +179,10 @@ private struct Reorderable<Item: View, Lifted: View>: View {
     var body: some View {
         layout {
             ForEach(samples) { sample in
-                item(sample, drag?.id == sample.id)
+                item(sample)
+                    .opacity(drag?.id == sample.id ? 0 : 1)
+                    // Keeps the gap hit-testable, so the drag that started on it carries on.
+                    .background { Color.clear.contentShape(.rect) }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[sample.id] = $0 }
                     .gesture(reorder(sample.id))
             }
