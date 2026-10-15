@@ -34,7 +34,7 @@ extension Classification {
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
     /// Part of the library cache's version too, as it writes faces the same way.
-    static let version: UInt32 = 6
+    static let version: UInt32 = 7
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -155,6 +155,7 @@ struct ByteWriter {
             write(axis.name)
             write(axis.value)
         }
+        write(UInt32(face.year ?? 0))
     }
 }
 
@@ -240,6 +241,7 @@ struct ByteReader {
         for _ in 0..<axisCount {
             axes.append(VariationAxis(tag: try string(), name: try string(), value: try double()))
         }
+        let year = Int(try u32())
         var axis: WeightAxis?
         if let minimum, let maximum, let defaultValue {
             axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
@@ -248,7 +250,8 @@ struct ByteReader {
             id: FaceID(path: path, index: index), postScriptName: postScriptName, familyName: familyName,
             styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
             isMonospaced: flags & 2 != 0, familyClass: familyClass, panose: panose, letterShape: letterShape, manufacturer: manufacturer,
-            version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes
+            version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes,
+            year: year == 0 ? nil : year
         )
     }
 }

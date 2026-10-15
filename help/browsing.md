@@ -22,6 +22,7 @@ One row per family, under column headers:
 | Styles | How many styles the family has |
 | Classification | Serif, Sans Serif, Script and so on, from what the font says, the shapes of its letters, or its name (see [Classifications](organizing.md#classifications)) |
 | Foundry | Who made it |
+| Year | When it came out, as near as its files say: the earliest year in its copyright notice, like 2014 for “© 2014–2021”, else the year its files were made (hidden at first) |
 | Latin S–XL | The largest of Latin S, M, L and XL the family has every character of |
 | Adobe Latin | The largest Adobe Latin set it has, like “AL 3” |
 | GF Latin, GF Cyrillic, GF Greek | The largest Google Fonts set of that script it has, like “Plus” (hidden at first) |
