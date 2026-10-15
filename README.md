@@ -4,7 +4,7 @@
 
 **[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · Requires macOS 26 on Apple silicon.
 
-A font manager for macOS 26. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
+A font manager for macOS. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
 - **Three ways to browse.** A sortable list with an on/off switch for each family, a preview in the font itself, the colors of its tags, and columns you can show or hide (classification, foundry, Latin S–XL, Adobe Latin and Google Fonts coverage, any Unicode block or coverage set of your own, date added, format). A grid of tiles. Or full-width specimens with every style set in itself.
 - **Quick Look.** Press Space, or choose Fonts → Quick Look (⌘Y), for a floating preview of the selected family: a large sample, its styles, and its foundry, format and status. The arrow keys move through the list and the preview follows; with several families selected, ‹ and › step through them.
