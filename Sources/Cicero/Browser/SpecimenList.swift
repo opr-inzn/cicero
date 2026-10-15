@@ -6,7 +6,7 @@ import SwiftUI
 struct SpecimenList: View {
     @Environment(AppModel.self) private var model
     let families: [Family]
-    @State private var anchor: String?
+    @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
     @State private var visibleHeight: CGFloat = 0
 

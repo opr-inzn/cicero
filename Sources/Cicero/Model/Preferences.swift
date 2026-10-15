@@ -94,6 +94,14 @@ enum SampleAlignment: String, CaseIterable {
         }
     }
 
+    var paragraph: NSTextAlignment {
+        switch self {
+        case .leading: .natural
+        case .center: .center
+        case .trailing: .right
+        }
+    }
+
     var horizontal: HorizontalAlignment {
         switch self {
         case .leading: .leading

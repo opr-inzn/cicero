@@ -22,6 +22,7 @@ One row per family, under column headers:
 | Styles | How many styles the family has |
 | Classification | Serif, Sans Serif, Script and so on, from what the font says, the shapes of its letters, or its name (see [Classifications](organizing.md#classifications)) |
 | Foundry | Who made it |
+| Year | When it came out, as near as its files say: the earliest year in its copyright notice, like 2014 for “© 2014–2021”, else the year its files were made (hidden at first) |
 | Latin S–XL | The largest of Latin S, M, L and XL the family has every character of |
 | Adobe Latin | The largest Adobe Latin set it has, like “AL 3” |
 | GF Latin, GF Cyrillic, GF Greek | The largest Google Fonts set of that script it has, like “Plus” (hidden at first) |
@@ -30,8 +31,8 @@ One row per family, under column headers:
 | Format | OpenType PostScript, OpenType TrueType, Font Collection and so on (hidden at first) |
 
 - **Sort:** click a column header. Click it again to reverse the order. A character set column sorts by the largest set a family has, or by how many of the set’s characters it has.
-- **Show or hide columns:** right-click the headers. Single sets are under **Coverage** in that menu: your own first, then GF Latin African and the Unicode blocks. Status, Name and Preview always show.
-- **Resize a column:** drag the right edge of its header.
+- **Show or hide columns:** right-click the headers. The character set columns are under **Coverage** in that menu: Latin S–XL, Adobe Latin, the GF sets and the Unicode blocks, then your own sets. Status, Name and Preview always show.
+- **Resize a column:** drag the edge between two headers. Left of the preview, that’s the column’s right edge; right of it, its left edge. The preview gets narrower or wider to make up the difference.
 
 Cicero remembers the columns you show and their widths. When the window gets narrow, for example with the Info panel open, the preview gives way first.
 
@@ -67,7 +68,7 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | --- | --- |
 | Select a family | Click it |
 | Add or remove one | ⌘-click it |
-| Select a range | Click one, then ⇧-click another |
+| Select a range | Click one, then ⇧-click another. Families you ⌘-clicked before stay selected |
 | Select all | ⌘A |
 | Select none | Esc |
 | Jump to a family | Type the start of its name |
@@ -93,7 +94,7 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 
 From top to bottom, a font page has:
 
-- **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many are activated. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why.
+- **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why.
 - **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text.
 - **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash.
 - **Ligatures,** when the style has any: see [See a font’s ligatures](#see-a-fonts-ligatures).

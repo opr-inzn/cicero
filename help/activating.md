@@ -88,7 +88,7 @@ To keep a temporary font, right-click it and choose **Activate Permanently**.
 Any of these work:
 
 - Click the family’s switch.
-- Select families and choose **Fonts → Deactivate** (⌘⌫).
+- Select families and press ⌫, or choose **Fonts → Deactivate**.
 - Right-click a family and choose **Deactivate**, or a style and choose **Deactivate Style**.
 - Right-click a set or smart set in the sidebar and choose **Deactivate Set** or **Deactivate Smart Set**.
 - On a font page, click **Deactivate**.
@@ -198,7 +198,7 @@ Turn on **Open at login** in **Settings → General**, or check **Open Cicero at
 
 To delete fonts, not just turn them off:
 
-1. Select families and choose **Fonts → Move to Trash**, or right-click a family and choose **Move to Trash**. For one style, right-click it on the font page and choose **Move Style to Trash**
+1. Select families and press ⌘⌫ (**Fonts → Move to Trash**), or right-click a family and choose **Move to Trash**. For one style, right-click it on the font page and choose **Move Style to Trash**
 2. Read the alert and click **Move to Trash**.
 
 Cicero turns the fonts off in every app and moves their files to the Trash, copies in other folders included. If a file also holds other families, as a font collection can, the alert names them. The families leave your sets too.

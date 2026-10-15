@@ -140,8 +140,8 @@ private struct TextTab: View {
                         features: model.features(for: family), kerning: preview.kerning(at: 17)
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // Glyphs taller than the row run over its edges rather than be cut off.
                     .frame(height: 22)
-                    .clipped()
                     Text(Self.characters(missing[family.id] ?? [])).foregroundStyle(.secondary).lineLimit(1)
                         .frame(width: 160, alignment: .leading)
                 }
@@ -306,7 +306,6 @@ private struct LanguagesTab: View {
                         FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .frame(height: 22)
-                            .clipped()
                     }
                 }
             }
