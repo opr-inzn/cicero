@@ -19,8 +19,8 @@ struct CompareWindow: View {
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
 
     var body: some View {
-        let samples = model.compareIDs.compactMap(model.family).enumerated().map {
-            CompareSample($1, index: $0, model: model, preview: preview)
+        let samples = model.compareIDs.compactMap(model.family).map {
+            CompareSample($0, tint: model.compareTints[$0.id] ?? 0, model: model, preview: preview)
         }
         Group {
             if samples.isEmpty {
@@ -64,12 +64,12 @@ private struct CompareSample: Identifiable {
 
     var id: String { family.id }
 
-    init(_ family: Family, index: Int, model: AppModel, preview: PreviewSettings) {
+    init(_ family: Family, tint: Int, model: AppModel, preview: PreviewSettings) {
         self.family = family
         face = family.face(nearestWeight: preview.weight)
         let font = FontLoader.shared.font(face.face, size: preview.size, weight: preview.weight, features: model.features(for: family))
         line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: preview.kerning(at: preview.size))
-        tint = Self.tints[index % Self.tints.count]
+        self.tint = Self.tints[tint % Self.tints.count]
     }
 }
 
@@ -97,10 +97,16 @@ private struct StackedLayout: View {
 }
 
 /// Every sample over the others, each in its tint, with its x-height and cap height ticked at the left.
+/// Dragging a chip in the legend below changes the order, so the last one is drawn on top.
 private struct OverlayLayout: View {
+    @Environment(AppModel.self) private var model
     let samples: [CompareSample]
     /// Room for the ticks.
     private let inset: CGFloat = 28
+    private static let legend = "compare.legend"
+    @State private var drag: ChipDrag?
+    /// Where each chip is laid out, in the legend's coordinates.
+    @State private var chipFrames: [String: CGRect] = [:]
 
     var body: some View {
         let ascent = samples.map(\.line.ascent).max() ?? 0
@@ -128,19 +134,91 @@ private struct OverlayLayout: View {
             .frame(width: width, height: ascent + descent)
             FlowLayout(spacing: 8, lineSpacing: 8) {
                 ForEach(samples) { sample in
-                    SampleCaption(sample: sample, showsTint: true)
-                        .font(.callout)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.fill.tertiary, in: .capsule)
+                    // While it's dragged, the chip leaves an empty capsule where it will land.
+                    chip(sample, isEmpty: drag?.id == sample.id)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.legend)) } action: { chipFrames[sample.id] = $0 }
+                        .gesture(reorder(sample.id))
+                        .help("Drag to change the order")
+                }
+            }
+            .coordinateSpace(.named(Self.legend))
+            .overlay(alignment: .topLeading) {
+                if let drag, let sample = samples.first(where: { $0.id == drag.id }) {
+                    chip(sample, isEmpty: false)
+                        .background(Color.canvas, in: .capsule)
+                        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+                        .offset(x: drag.location.x - drag.grab.width, y: drag.location.y - drag.grab.height)
+                        .allowsHitTesting(false)
                 }
             }
             .frame(width: max(width, 480), alignment: .leading)
         }
     }
 
+    private func chip(_ sample: CompareSample, isEmpty: Bool) -> some View {
+        SampleCaption(sample: sample, showsTint: true)
+            .font(.callout)
+            .opacity(isEmpty ? 0 : 1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.fill.tertiary, in: .capsule)
+    }
+
+    /// Picks the chip up and carries it under the pointer; the others make way as it passes them.
+    private func reorder(_ id: String) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.legend))
+            .onChanged { value in
+                if drag?.id != id || drag?.isSettling == true, let frame = chipFrames[id] {
+                    drag = ChipDrag(id: id, grab: CGSize(width: value.startLocation.x - frame.minX, height: value.startLocation.y - frame.minY),
+                                    location: value.location)
+                }
+                drag?.location = value.location
+                if let target = target(at: value.location, dragging: id) {
+                    withAnimation(.snappy) { model.moveInCompare(id, to: target) }
+                }
+            }
+            .onEnded { _ in settle() }
+    }
+
+    /// The chip under `point` the dragged one should take the place of. Only once the pointer is past its
+    /// middle, coming from the dragged chip's side, so a wide chip and a narrow one don't keep trading places.
+    private func target(at point: CGPoint, dragging id: String) -> String? {
+        guard let from = model.compareIDs.firstIndex(of: id) else { return nil }
+        for (index, other) in model.compareIDs.enumerated() where index != from {
+            guard let frame = chipFrames[other], frame.contains(point) else { continue }
+            return (index < from ? point.x < frame.midX : point.x > frame.midX) ? other : nil
+        }
+        return nil
+    }
+
+    /// Glides the dropped chip into its place, then shows it there.
+    private func settle() {
+        guard let drag, let frame = chipFrames[drag.id] else {
+            self.drag = nil
+            return
+        }
+        let settled = ChipDrag(id: drag.id, grab: drag.grab, location: CGPoint(x: frame.minX + drag.grab.width, y: frame.minY + drag.grab.height),
+                               isSettling: true)
+        withAnimation(.snappy(duration: 0.25)) {
+            self.drag = settled
+        } completion: {
+            if self.drag == settled { self.drag = nil }
+        }
+    }
+
     /// Centres a one-point line on a pixel row.
     private func crisp(_ y: CGFloat) -> CGFloat { y.rounded() + 0.5 }
+}
+
+/// A legend chip being dragged.
+private struct ChipDrag: Equatable {
+    let id: String
+    /// Where the pointer took hold of the chip, from its top-left corner.
+    let grab: CGSize
+    /// The pointer, in the legend's coordinates.
+    var location: CGPoint
+    /// Dropped, and on its way into its place.
+    var isSettling = false
 }
 
 /// Name, style and a remove button, as a row caption or a legend chip.
