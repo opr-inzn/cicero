@@ -37,6 +37,14 @@ public enum Reachability {
         return volume.st_dev == volumes.st_dev ? name : nil
     }
 
+    /// Whether a file is gone for good: deleted, or its folder moved. Not when macOS won't let Cicero look (it
+    /// may well be there), nor when its disk isn't connected.
+    public static func isGone(_ path: String) -> Bool {
+        var info = stat()
+        guard lstat(path, &info) != 0 else { return false }
+        return (errno == ENOENT || errno == ENOTDIR) && disconnectedVolume(of: path) == nil
+    }
+
     /// Whether a cloud service has taken the file's contents off the Mac. Reading it would download it.
     public static func isOnlineOnly(_ path: String) -> Bool {
         var info = stat()
