@@ -358,16 +358,12 @@ struct FontList: View {
             ForEach(allColumns.filter { $0.canHide && ![.added, .format].contains($0) && !$0.isSeries && !$0.isSingleSet }) { column in
                 toggle(column)
             }
-            // The series, the user's sets, then the built-in ones no series covers: a menu per group, unless it has just one.
+            // The series, then the built-in sets no series covers, a menu per group unless it has just one, then the
+            // user's own sets.
             Menu("Coverage") {
                 ForEach(allColumns.filter(\.isSeries)) { column in
                     toggle(column)
                 }
-                Divider()
-                ForEach(model.data.customCharacterSets) { set in
-                    toggle(.characterSet(set.setID))
-                }
-                if !model.data.customCharacterSets.isEmpty { Divider() }
                 ForEach(singleSetGroups, id: \.name) { group in
                     if group.sets.count == 1 {
                         toggle(.characterSet(group.sets[0].id))
@@ -379,10 +375,17 @@ struct FontList: View {
                         }
                     }
                 }
+                if !model.data.customCharacterSets.isEmpty { Divider() }
+                ForEach(model.data.customCharacterSets) { set in
+                    toggle(.characterSet(set.setID))
+                }
             }
             toggle(.added)
             toggle(.format)
         }
+        // As wide as the bar, whatever the columns add up to: while a font page covers the list, its width isn't
+        // measured again, and columns wider than the bar would widen the whole stack, page included.
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
     }
 
     private func toggle(_ column: FontListColumn) -> some View {

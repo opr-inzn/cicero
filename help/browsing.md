@@ -30,7 +30,7 @@ One row per family, under column headers:
 | Format | OpenType PostScript, OpenType TrueType, Font Collection and so on (hidden at first) |
 
 - **Sort:** click a column header. Click it again to reverse the order. A character set column sorts by the largest set a family has, or by how many of the set’s characters it has.
-- **Show or hide columns:** right-click the headers. The character set columns are under **Coverage** in that menu: Latin S–XL, Adobe Latin and the GF sets first, then your own sets, then GF Latin African and the Unicode blocks. Status, Name and Preview always show.
+- **Show or hide columns:** right-click the headers. The character set columns are under **Coverage** in that menu: Latin S–XL, Adobe Latin, the GF sets and the Unicode blocks, then your own sets. Status, Name and Preview always show.
 - **Resize a column:** drag the edge between two headers. Left of the preview, that’s the column’s right edge; right of it, its left edge. The preview gets narrower or wider to make up the difference.
 
 Cicero remembers the columns you show and their widths. When the window gets narrow, for example with the Info panel open, the preview gives way first.
