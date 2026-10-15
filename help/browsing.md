@@ -93,7 +93,7 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 
 From top to bottom, a font page has:
 
-- **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many are activated. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why.
+- **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why.
 - **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text.
 - **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash.
 - **Ligatures,** when the style has any: see [See a font’s ligatures](#see-a-fonts-ligatures).
