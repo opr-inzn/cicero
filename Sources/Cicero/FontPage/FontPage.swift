@@ -166,9 +166,12 @@ private struct TypeTester: View {
                     .help("Align left, center or right")
             }
             .padding(.top, 12)
-            let font = Font(FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family)))
+            let ctFont = FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family))
+            let font = Font(ctFont)
             let kerning = preview.kerning(at: size)
             let lineHeight = preview.lineHeight(at: size)
+            let lineHeightPoints = size * preview.lineSpacing / 100
+            let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
             // An invisible copy of the text sets the editor's height, so it grows with the page instead of
             // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
             Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
@@ -178,15 +181,11 @@ private struct TypeTester: View {
                 .multilineTextAlignment(alignment.text)
                 .frame(maxWidth: .infinity, alignment: alignment.frame)
                 .padding(.horizontal, 5)
+                .padding(.vertical, overhang)
                 .hidden()
                 .overlay {
-                    TextEditor(text: $text)
-                        .font(font)
-                        .kerning(kerning)
-                        .lineHeight(lineHeight)
-                        .multilineTextAlignment(alignment.text)
-                        .scrollContentBackground(.hidden)
-                        .scrollDisabled(true)
+                    SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+                                 alignment: alignment.paragraph, overhang: overhang)
                 }
                 .frame(minHeight: 280)
                 .padding(.vertical, 20)
@@ -196,6 +195,15 @@ private struct TypeTester: View {
 }
 
 private extension TypeTester {
+    /// Room above and below the lines for glyphs that reach past them, which the editor would cut off at its
+    /// edges: as much of the text's height as the line spacing leaves out, at either end, as the editor may
+    /// put it either side, and a quarter of the size more, as it sets its lines a few points lower than the
+    /// copy that sizes it.
+    static func overhang(of text: String, in font: CTFont, kerning: Double, lineHeight: Double) -> CGFloat {
+        let line = TextLine(text, font: font, kerning: kerning)
+        return max(0, line.ascent + line.descent - lineHeight) + CTFontGetSize(font) / 4
+    }
+
     /// Centered, unless the left alignment was chosen when there were only those two.
     static var savedAlignment: SampleAlignment {
         UserDefaults.standard.object(forKey: "typeTester.centered") as? Bool == false ? .leading : .center
