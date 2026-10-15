@@ -90,7 +90,7 @@ a toggle that's on and a button being pressed.
   set (hidden; ✓ when the family has all of it, "12 missing" when some) · Date Added (hidden) · Format
   (hidden). The headers are a bar under the toolbar (`safeAreaBar`, with the hard scroll edge effect), so
   the rows go under both together. Click a header to sort by it, again to reverse; right-click the headers to
-  show or hide columns, the character set columns (series first, then single sets) under Coverage (Status,
+  show or hide columns, the character set columns (series, then built-in single sets, then the user's own after a separator) under Coverage (Status,
   Name and Preview always show); drag the gap between two headers to resize the column on the side away from
   the preview, which makes up the difference, so the edge follows the pointer (shown columns and widths saved).
   When the room runs short (the Info panel open), the preview gives way first, then the other columns down to
