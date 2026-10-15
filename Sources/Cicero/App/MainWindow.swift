@@ -24,6 +24,11 @@ struct MainWindow: View {
                     .modifier(DetailPage())
                     .navigationDestination(for: String.self) { FontPage(familyID: $0).modifier(DetailPage()) }
             }
+            // A font page appears and goes at once, never sliding in, whatever else is animating.
+            .transaction(value: model.openFamilyID) { transaction in
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+            }
         }
         // On the split view, so font pages keep the field too (on the stack it doesn't show at all); typing in
         // it on one goes back to the matches.
@@ -35,6 +40,7 @@ struct MainWindow: View {
         // Over the split view, so the panel stays put when a font page opens or closes.
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
+        .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
         // While the Fonts in Document sheet is up, it asks how to activate itself: a window shows one sheet.
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.activationPrompt : nil }, set: { model.activationPrompt = $0 })) {
             ActivationSheet(prompt: $0)
@@ -96,17 +102,21 @@ struct MainWindow: View {
         }
         .onChange(of: model.textPrompt?.id) { promptText = model.textPrompt?.initialText ?? "" }
         .overlay(alignment: .bottom) {
-            if let toast = model.toast {
-                Text(toast)
-                    .font(.callout)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect(.regular, in: .capsule)
-                    .padding(.bottom, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            // Animated in here only: on the window, everything that changed with a toast (fonts trashed, the
+            // Info panel showing another) would slide into place too.
+            ZStack {
+                if let toast = model.toast {
+                    Text(toast)
+                        .font(.callout)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .glassEffect(.regular, in: .capsule)
+                        .padding(.bottom, 24)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(.snappy, value: model.toast)
         }
-        .animation(.snappy, value: model.toast)
     }
 
     static func trashMessage(_ plan: TrashPlan) -> String {

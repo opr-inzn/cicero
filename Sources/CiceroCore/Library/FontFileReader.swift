@@ -56,6 +56,7 @@ enum FontFileReader {
             axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
         }
         let os2 = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), CTFontTableOptions(rawValue: 0)) as Data?
+        let head = CTFontCopyTable(font, CTFontTableTag(kCTFontTableHead), CTFontTableOptions(rawValue: 0)) as Data?
         let familyClass = Int((symbolic.rawValue >> 28) & 0xF)
         let isMonospaced = symbolic.contains(.monoSpaceTrait)
         return FontFace(
@@ -73,8 +74,32 @@ enum FontFileReader {
             vendorID: vendorID(os2),
             weightAxis: axis,
             width: widthClass(os2),
-            axes: axes
+            axes: axes,
+            year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head))
         )
+    }
+
+    /// When a face came out, as near as its file says: the earliest year in its copyright notice ("© 2014–2021"
+    /// is 2014), else the year the head table says the file was made. Nil when neither gives a likely year.
+    static func year(copyright: String?, created: Date?) -> Int? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let latest = calendar.component(.year, from: .now) + 1
+        if let copyright {
+            let years = copyright.matches(of: /(?:^|[^0-9])((?:19|20)[0-9]{2})(?![0-9])/).compactMap { Int($0.output.1) }
+            if let earliest = years.filter({ (1950...latest).contains($0) }).min() { return earliest }
+        }
+        // Files that don't set it say 1904, when the head table's dates begin, or something as unlikely.
+        guard let created else { return nil }
+        let year = calendar.component(.year, from: created)
+        return (1985...latest).contains(year) ? year : nil
+    }
+
+    /// The head table's created date: seconds since the start of 1904, big-endian, 20 bytes in.
+    static func created(_ table: Data?) -> Date? {
+        guard let table, table.count >= 28 else { return nil }
+        let seconds = table[(table.startIndex + 20)..<(table.startIndex + 28)].reduce(Int64(0)) { $0 << 8 | Int64($1) }
+        return Date(timeIntervalSince1970: TimeInterval(seconds) - 2_082_844_800)
     }
 
     private static let weightAxisTag: UInt32 = 0x7767_6874  // 'wght'

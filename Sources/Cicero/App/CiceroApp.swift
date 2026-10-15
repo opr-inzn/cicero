@@ -108,7 +108,7 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
             Button("Deactivate") { model.deactivate(selection) }
-                .keyboardShortcut(.delete, modifiers: .command)
+                .keyboardShortcut(.delete, modifiers: [])
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()
             Button("Open") { model.openFamilyID = selection.first?.id }
@@ -123,6 +123,7 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
             Button("Move to Trash") { model.requestTrash(selection) }
+                .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(selection.isEmpty)
             Divider()
             Button("Compare") {

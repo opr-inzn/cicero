@@ -6,7 +6,7 @@ struct FontGrid: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let families: [Family]
-    @State private var anchor: String?
+    @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
     @State private var gridWidth: CGFloat = 0
     @State private var visibleHeight: CGFloat = 0

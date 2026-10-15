@@ -20,8 +20,10 @@ final class QuickLook {
     @ObservationIgnored private var mainWindowObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var panel: QuickLookPanel?
 
-    private static let sizeKey = "quickLook.size"
-    private static let defaultSize = NSSize(width: 680, height: 620)
+    /// Saved once the user resizes it. (The size under "quickLook.size" was saved on every close, so it was
+    /// the old default, 680 × 620, for most.)
+    private static let sizeKey = "quickLook.panelSize"
+    private static let defaultSize = NSSize(width: 520, height: 440)
 
     // MARK: What it shows
 
@@ -93,7 +95,6 @@ final class QuickLook {
 
     func close() {
         guard isOpen else { return }
-        saveSize()
         isOpen = false
         panel?.orderOut(nil)
     }
@@ -175,11 +176,12 @@ final class QuickLook {
 }
 
 /// A floating panel that never becomes key: the main window keeps the keyboard, so the browser's arrow
-/// keys move the selection while the panel shows it. Hides while Cicero isn't the active app.
+/// keys move the selection while the panel shows it. Hides while Cicero isn't the active app. A full title
+/// bar, not a utility window's, whose buttons and title are smaller than other windows'.
 final class QuickLookPanel: NSPanel {
     convenience init(size: NSSize) {
         self.init(contentRect: NSRect(origin: .zero, size: size),
-                  styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
+                  styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
                   backing: .buffered, defer: true)
         isFloatingPanel = true
         level = .floating
@@ -219,14 +221,14 @@ struct QuickLookHost: View {
 }
 
 /// Calls `found` with the window the view is in, once it's in one.
-private struct WindowReader: NSViewRepresentable {
+struct WindowReader: NSViewRepresentable {
     let found: (NSWindow) -> Void
 
     func makeNSView(context: Context) -> WindowReaderView { WindowReaderView(found: found) }
     func updateNSView(_ view: WindowReaderView, context: Context) {}
 }
 
-private final class WindowReaderView: NSView {
+final class WindowReaderView: NSView {
     let found: (NSWindow) -> Void
 
     init(found: @escaping (NSWindow) -> Void) {

@@ -129,7 +129,8 @@ struct GlyphImage: View {
             guard let outline = CTFontCreatePathForGlyph(font, glyph, nil) else { return }
             var bounds = CGRect.zero
             CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyph, &bounds, 1)
-            let ascent = CTFontGetAscent(font), descent = CTFontGetDescent(font)
+            // The font's ascent and descent, or as far as the glyph reaches past them: all of it fits the cell.
+            let ascent = max(CTFontGetAscent(font), bounds.maxY), descent = max(CTFontGetDescent(font), -bounds.minY)
             let scale = min(1, (area.width - 6) / max(bounds.width, 1), area.height / max(ascent + descent, 1))
             let x = (area.width - bounds.width * scale) / 2 - bounds.minX * scale
             let baseline = (area.height + (ascent - descent) * scale) / 2

@@ -83,15 +83,21 @@ a toggle that's on and a button being pressed.
 - **List** (rows under column headers in a lazy stack, like the grid: not a SwiftUI Table, which makes every
   row's cells whenever an accessibility client — a password manager's autofill, say — walks the window, and
   with a thousand families kept the app busy for minutes each time it came to the front): Status (switch) ·
-  Name (+ tag dots, status tag) · Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Latin S–XL
+  Name (+ tag dots, status tag) · Preview (sample in the font, 17 pt) · Styles · Classification · Foundry · Year
+  (hidden; the earliest year among the family's faces: each face's earliest 1950-or-later year in its copyright notice, else
+  its head table's created year from 1985 on; read when scanning and kept in the face cache) · Latin S–XL
   (largest of Latin S/M/L/XL the family fully has) · Adobe Latin (shown as "AL 3") · GF Latin, GF Cyrillic,
   GF Greek (hidden; largest of each script's Google sets, shown as "Plus"; GF Latin African branches off
   Core, so it isn't in the series) · any set no series covers: a Unicode block, GF Latin African, a custom
   set (hidden; ✓ when the family has all of it, "12 missing" when some) · Date Added (hidden) · Format
-  (hidden). Click a header to sort by it, again to reverse; right-click the headers to show or hide
-  columns, those single sets under Coverage (Status, Name and Preview always show); drag a header's
-  right edge to resize it (shown columns and widths saved). When the room runs short (the Info panel open),
-  the preview gives way first, then the other columns down to their minimums. Selection as in the other views.
+  (hidden). The headers are a bar under the toolbar (`safeAreaBar`, with the hard scroll edge effect), so
+  the rows go under both together. Click a header to sort by it, again to reverse; right-click the headers to
+  show or hide columns, the character set columns (series, then built-in single sets, then the user's own after a separator) under Coverage (Status,
+  Name and Preview always show); drag the gap between two headers to resize the column on the side away from
+  the preview, which makes up the difference, so the edge follows the pointer (shown columns and widths saved).
+  When the room runs short (the Info panel open), the preview gives way first, then the other columns down to
+  their minimums. The preview isn't clipped to its row: tall glyphs run over the row's edges rather than lose
+  their descenders. Selection as in the other views.
 - **Grid**: tiles — status tag + switch on top, big centered sample ("Aa Gg 123", or the sample
   text when set), name with tag dots, and what the family's styles span, in Title Case: "9 Weights · 3
   Widths", "8 Weights · 16 Styles"; at the bottom right, the kinds of file it comes in ("OTF",
@@ -126,14 +132,14 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
 
 - Toolbar: Info · the search field, as in the browser (typing in it goes back to the browser with the matches). No Preview
   Options: the page has its own size and alignment, and takes preview text (styles list), weight and spacing from the browser's.
-- Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate, worded as in the family's right-click menu (Activate in All Apps and
+- Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 Styles · 1 active · 1 inactive" (no classification; how many styles are active, partly active — on in one app only — and inactive, leaving out the kinds with none: "2 partly active", "3 active · 2 partly active · 1 inactive"), and on the right Activate (prominent) / Deactivate, worded as in the family's right-click menu (Activate in All Apps and
   Deactivate in Adobe Apps for a family in an app's folder, Activate Permanently, Activate Remaining Styles); locked families get a disabled Deactivate with the reason as tooltip.
-- **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center/right (its own, centered at first; a left alignment chosen when there were two stays), a big editable text (default "Sphinx of black quartz, judge my vow.") that grows with what's typed, remembered. Lines are the Preview Options line spacing apart (an exact line height, so tighter than the font's own works too).
+- **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center/right (its own, centered at first; a left alignment chosen when there were two stays), a big editable text (default "Sphinx of black quartz, judge my vow.") that grows with what's typed, remembered. Lines are the Preview Options line spacing apart (an exact line height, so tighter than the font's own works too). Every glyph draws whole, however far past its line it reaches: the editor keeps room above and below the lines and its lines draw outside themselves (TextEditor cut them off at the font's ascent and descent). Esc goes back, as elsewhere on the page.
 - **Styles** (only when the family has more than one style): laid out like a table — Preview, Style, Weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
 - **Ligatures** (only when the style has any): heading with "12 ligatures", then a pinned header per feature —
   Standard (liga), Discretionary (dlig), Historical (hlig), Contextual (clig), Required (rlig) Ligatures, with
   counts — and rows of 76 × 72 cells: the ligature glyph drawn from its outline by glyph ID (a ligature has no
-  character to set; centred on the ascender and descender, scaled down when wide), the characters under it; click
+  character to set; centred on the ascender and descender, or the glyph where it reaches past them, scaled down when wide or tall), the characters under it; click
   for a popover with it large, "f + f + i", the U+ codes and the feature. Read from the GSUB table: ligature
   lookups (type 4), through extensions (7), and the lookups contextual ones (5, 6) apply. Components map to
   characters through the cmap (the lowest code point when several share a glyph), a component that is itself a
@@ -144,7 +150,7 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
 ## Quick Look (Space in the browser; Fonts → Quick Look ⌘Y)
 
 - A floating panel with the family selected in the list, grid or specimens. Space or ⌘Y opens it and closes it again; Esc closes it before it clears the selection. It opens only with families selected and never over a font page, and closes when nothing is selected any more, when a font page opens (↩ opens the family the panel shows, double-click and ⌘↓ as usual) and when the main window closes. The menu item reads "Close Quick Look" while it's open. Space never jumps to a family by its letter.
-- The panel never takes the keyboard (an NSPanel that can't become key: non-activating, floating, hidden while Cicero isn't the active app). The main window stays key, so ↑/↓ (and ←/→ in the grid) go on moving the browser's selection and the panel follows at once. It opens centred over the main window at the size it was last left at (resizable; 680 × 620 at first), and steps aside while the main window shows a sheet or alert, so the activation prompt its switch can bring up isn't hidden.
+- The panel never takes the keyboard (an NSPanel that can't become key: non-activating, floating, hidden while Cicero isn't the active app). The main window stays key, so ↑/↓ (and ←/→ in the grid) go on moving the browser's selection and the panel follows at once. It opens centred over the main window at the size it was last resized to (520 × 440 at first), with a full title bar (not a utility window's small buttons and title), and steps aside while the main window shows a sheet or alert, so the activation prompt its switch can bring up isn't hidden.
 - Content: the family name as the window title (the title bar in the page's colour); a large sample in the regular style — the Preview Options preview text (56 pt, wrapping), or when that's empty "Aa Gg 123" (96 pt, shrinking to fit) over A–Z, a–z and 0–9 (24 pt) — with the family's chosen OpenType features, the preview letter and line spacing and alignment; below it, when the family has more than one style, every style's name set in itself (a variable font's named instances at their own weight), scrolling with the sample; and a glass bar at the bottom: "Foundry · OpenType PostScript · Variable · 12 styles · Active" (the styles' status when they share one, else "3 of 12 activated") and the family's switch.
 - Several families selected: one at a time, in the browser's order, with ‹ › and "2 of 5" in the bar (on past the last back to the first). ←/→ in the list and specimens go through them and leave the selection as it is; in the grid, where ←/→ move the selection, the panel follows that. A family just added to the selection (a click, ⇧↓) is the one shown; several added at once (⌘A, ⇧-click) keep the one shown.
 - Never holds up the selection: a font file nothing has read yet is read off the main thread while room is kept for its text, and only the styles on screen are made, so big variable families with many named instances step as fast as any.
@@ -166,11 +172,11 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 - **Cicero**: About Cicero (the standard panel: version, a link to maximilianinzinger.com, "© 2026 Maximilian Inzinger"), Check for Updates (disabled while a check runs).
 - **File**: Add Fonts ⌘O, Add Folder ⇧⌘O, Find Fonts in Document, New Set ⇧⌘N, New Smart Set ⌥⌘N, New Application Set | Export Fonts ⇧⌘E | Back Up Library, Restore Library.
 - **View**: Edit Sidebar / Done Editing Sidebar.
-- **Fonts**: Activate ⌘↩, Activate Temporarily ⌥⌘↩ (until Cicero quits), Deactivate ⌘⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Quick Look ⌘Y (families selected; Close Quick Look while it's open), Reveal in Finder ⇧⌘R, Move to Trash, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches
+- **Fonts**: Activate ⌘↩, Activate Temporarily ⌥⌘↩ (until Cicero quits), Deactivate ⌫, Open ⌘↓ (one family selected), Show Info ⌘I, Quick Look ⌘Y (families selected; Close Quick Look while it's open), Reveal in Finder ⇧⌘R, Move to Trash ⌘⌫, Compare ⌥⌘C, Character Toolbox ⌥⌘T, Rescan Library ⌘R, Rebuild Font List, Clear Font Caches
 - **Help** (replaces SwiftUI's default, which says help isn't available): Cicero Help ⌘? (the user guide, help/README.md on GitHub), Release Notes (the GitHub releases page) | Report an Issue (a new GitHub issue). Each opens in the default browser.
 - **Family context menu**: "3 Families" header for multiple; a status note ("Available in Adobe apps only", "Installed with macOS"); Activate / Activate Remaining Styles / Activate in All Apps (app-folder fonts: they're used where they are); Use in Adobe Apps Only (app-folder fonts not already there); Activate Temporarily (until Cicero quits; "in All Apps" for app-folder fonts; hidden when everything is already on, for good or until then); Activate Permanently (temporary fonts); Deactivate / Deactivate in All Apps (app-folder fonts on everywhere) / Deactivate in Adobe Apps (app-folder fonts on in Adobe apps only); Add to Set ▸ (checkmark toggles, New Set from Selection); Tags ▸ (checkmark toggles with each tag's dot, New Tag); Reveal in Finder; Copy Family Name(s); Export; Compare; Remove from Library (when every style's file was added one at a time); Move to Trash
 - **Style menu**: status label, Activate Style, Activate Temporarily (hidden when the style is already on, for good or until Cicero quits), Deactivate Style, Reveal in Finder, Copy PostScript Name, Move Style to Trash
-- Text editing keeps its shortcuts: when an editable text has the focus (the search field, the preview text field, the font page's text, a sheet's fields), ⌘⌫ and ⌘ or ⇧⌘ with an arrow key go to the text, as in any Mac app (⌘⌫ deletes to the start of the line, ⌘↓ moves to the end), not to Deactivate or Open. Menu shortcuts come before the focused view, so a key-down monitor hands those to the text view first. ⌘A selects the text there (Edit → Select All); in a font list it selects every family. ⌘↩ and ⌥⌘↩ mean nothing to text and stay with the Fonts menu.
+- Text editing keeps its shortcuts: when an editable text has the focus (the search field, the preview text field, the font page's text, a sheet's fields), ⌫, ⌘⌫ and ⌘ or ⇧⌘ with an arrow key go to the text, as in any Mac app (⌘⌫ deletes to the start of the line, ⌘↓ moves to the end), not to Deactivate, Move to Trash or Open. Menu shortcuts come before the focused view, so a key-down monitor hands those to the text view first. ⌫ and ⌘⌫ act on the main window's selection, so in other windows (Compare, Character Toolbox, Settings, sheets) the monitor hands them to that window instead of the menus. ⌘A selects the text there (Edit → Select All); in a font list it selects every family. ⌘↩ and ⌥⌘↩ mean nothing to text and stay with the Fonts menu.
 
 ## Library and fonts
 
@@ -274,7 +280,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 
 ## Compare
 
-Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a shared baseline, name + style + remove button under each) and Overlay (all samples drawn over each other in tints, x-height/cap-height ticks, legend chips with remove). Uses the preview sample (or "Hamburgefonstiv"), size, weight, spacing; Preview Options in its toolbar; drop families from the main window; choosing Compare again replaces the set. Content starts top-left.
+Window "Compare", subtitle "3 families". Layouts Stacked (one row per font on a shared baseline, name + style + remove button under each) and Overlay (all samples drawn over each other in tints, x-height/cap-height ticks, legend chips with remove). Each sample gets room for the furthest its glyphs reach, above, below and to the left, not just the font's ascent and descent (about one font in ten draws descenders below its descent), so nothing is cut off. Uses the preview sample (or "Hamburgefonstiv"), size, weight, spacing; Preview Options in its toolbar; drop families from the main window; choosing Compare again replaces the set. Content starts top-left.
 
 
 ## Problems

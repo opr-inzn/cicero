@@ -83,14 +83,20 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `VisibleKey`, refills lists as they come.
 - `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
   light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
-  `TextEditor` follows too, so the font page's text and the hidden copy that sizes it agree.
+  the font page's editor (`SampleEditor`, an NSTextView with the same line height) follows too, so its text
+  and the hidden copy that sizes it agree. Not SwiftUI's `TextEditor`, which, like `Text`, cuts glyphs off at
+  the font's ascent and descent: `SampleEditor`'s layout fragments (`UnclippedFragment`) widen their rendering
+  surface to the glyphs' ink, and `FontText` draws through `UnclippedText`, a text renderer whose display
+  padding gives room above and below. About one font in ten draws past its own descent.
 - Files come in through `AppModel.open` (`Model/AppModel+Files.swift`): from the Finder (Info.plist declares the
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from
   Add Fonts. It gathers URLs for a moment, adds folders and unlisted files to the user data, and shows
   their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends).
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
-  focus, it hands ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Open) can take them.
+  focus, it hands ⌫, ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Move to Trash, Open) can
+  take them. In any window but the main one (its `mainWindow`, set by a `WindowReader` in `MainWindow`), it
+  hands ⌫ and ⌘⌫ to that window, since the menus would act on the main window's selection.
 - `QuickLook` (`Windows/QuickLook.swift`, owned by `AppModel` like `AppSetWatcher`) runs the Quick Look
   panel: a `QuickLookPanel`, an NSPanel that can't become key, hosting SwiftUI in an NSHostingView with the
   model and preview settings in its environment. The main window keeps the keyboard, so the browser's keys
