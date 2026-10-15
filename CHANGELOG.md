@@ -2,6 +2,11 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Font files you added that have since been deleted, or whose folder was moved or renamed, leave your library, rather than staying there unseen. Cicero no longer looks for them every time it opens, which could have macOS ask again about the folder they were in. Files on a disk that isn't connected stay.
+- When macOS asks whether Cicero may read your Documents, Desktop or Downloads folder, its message says why: to read fonts in your library that are kept there, like files you added from a download, and for **Find on This Mac**. Before, it only mentioned Find on This Mac.
+
 ## 1.4.5
 
 - ⌫ turns the selected fonts off and ⌘⌫ moves them to the Trash, asking first, as in the Finder. Before, ⌘⌫ turned them off. While you type in a text field, both edit the text, and in the Compare window, the Character Toolbox and Settings they leave the main window’s fonts alone.

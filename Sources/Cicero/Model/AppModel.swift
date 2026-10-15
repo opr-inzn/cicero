@@ -276,6 +276,9 @@ final class AppModel {
         lastScan = Date()
         scanCount += 1
         let id = scanCount
+        // Added files that are gone leave the library: nothing would show them, and looking for them every time
+        // touches their folder, which may be one macOS asks about, like Downloads.
+        if data.fontFiles.contains(where: Reachability.isGone) { data.fontFiles.removeAll(where: Reachability.isGone) }
         let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
         folderWatcher.watch(input.folders.map(\.path), files: input.files)
         // Most scans take a fraction of a second; the capsule only shows for one that takes longer.
