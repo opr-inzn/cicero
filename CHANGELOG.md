@@ -2,6 +2,22 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.4.5
+
+- ⌫ turns the selected fonts off and ⌘⌫ moves them to the Trash, asking first, as in the Finder. Before, ⌘⌫ turned them off. While you type in a text field, both edit the text, and in the Compare window, the Character Toolbox and Settings they leave the main window’s fonts alone.
+- ⇧-click keeps the fonts you ⌘-clicked before and adds the range from the last one you clicked, as in the Finder, rather than selecting only that range.
+- The list’s column headers sit in one bar with the toolbar, so rows no longer show between the two as you scroll.
+- Resizing a column in the list works: drag the edge between two headers and it follows the pointer, with the preview getting narrower or wider to make up the difference. Before, the column jumped to its narrowest.
+- Latin S–XL, Adobe Latin and the GF sets are under **Coverage** in the column headers’ menu, with the other character sets.
+- A **Year** column for the list, in the column headers’ menu: when a family came out, as near as its files say, from the earliest year in its copyright notice (2014 for “© 2014–2021”), else the year its files were made. Cicero reads your font files again once after updating to find it.
+- Descenders and swashes are no longer cut off. About one font in ten draws below the depth it states, and every sample stopped there: in the list, the grid, specimens, Quick Look, the Compare window, the Character Toolbox and on font pages, where the text you type also lost the descenders of its last line, and with tight line spacing the parts of each line that reached past it. Glyphs may now run over the edge of a row or into the line next to them instead.
+- A status tag like **Adobe** is never shortened next to a name about as wide as itself, like Astra; the name would give way instead.
+- Quick Look is smaller, 520 × 440 at first, and has a title bar and buttons the size of other windows’. It keeps a size only once you resize it.
+- Quick Look, specimens and font pages say “1 Style” and “12 Styles”, as the grid does.
+- A font page says how many of the family’s styles are active, partly active (on in Adobe apps only) and inactive, like “3 active · 2 partly active”, rather than “0 activated” for a family that’s on in Adobe apps.
+- The Info panel no longer flashes as you go from one font to the next.
+- When a message comes up at the bottom of the window, like after moving fonts to the Trash, the Info panel and the browser no longer slide into place with it, and font pages always appear at once.
+
 ## 1.4.4
 
 - You can change the order of the fonts in the Compare window by dragging a row in Stacked, or a name below the fonts in Overlay, where the last one is drawn on top.
