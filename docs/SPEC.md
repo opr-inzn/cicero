@@ -130,14 +130,14 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
 
 - Toolbar: Info · the search field, as in the browser (typing in it goes back to the browser with the matches). No Preview
   Options: the page has its own size and alignment, and takes preview text (styles list), weight and spacing from the browser's.
-- Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate, worded as in the family's right-click menu (Activate in All Apps and
+- Header: family name in its own regular face (34 pt), then "Foundry · OpenType PostScript · Variable · 2 Styles · 1 activated" (no classification), and on the right Activate (prominent) / Deactivate, worded as in the family's right-click menu (Activate in All Apps and
   Deactivate in Adobe Apps for a family in an app's folder, Activate Permanently, Activate Remaining Styles); locked families get a disabled Deactivate with the reason as tooltip.
-- **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center/right (its own, centered at first; a left alignment chosen when there were two stays), a big editable text (default "Sphinx of black quartz, judge my vow.") that grows with what's typed, remembered. Lines are the Preview Options line spacing apart (an exact line height, so tighter than the font's own works too).
+- **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center/right (its own, centered at first; a left alignment chosen when there were two stays), a big editable text (default "Sphinx of black quartz, judge my vow.") that grows with what's typed, remembered. Lines are the Preview Options line spacing apart (an exact line height, so tighter than the font's own works too). Every glyph draws whole, however far past its line it reaches: the editor keeps room above and below the lines and its lines draw outside themselves (TextEditor cut them off at the font's ascent and descent). Esc goes back, as elsewhere on the page.
 - **Styles** (only when the family has more than one style): laid out like a table — Preview, Style, Weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu.
 - **Ligatures** (only when the style has any): heading with "12 ligatures", then a pinned header per feature —
   Standard (liga), Discretionary (dlig), Historical (hlig), Contextual (clig), Required (rlig) Ligatures, with
   counts — and rows of 76 × 72 cells: the ligature glyph drawn from its outline by glyph ID (a ligature has no
-  character to set; centred on the ascender and descender, scaled down when wide), the characters under it; click
+  character to set; centred on the ascender and descender, or the glyph where it reaches past them, scaled down when wide or tall), the characters under it; click
   for a popover with it large, "f + f + i", the U+ codes and the feature. Read from the GSUB table: ligature
   lookups (type 4), through extensions (7), and the lookups contextual ones (5, 6) apply. Components map to
   characters through the cmap (the lowest code point when several share a glyph), a component that is itself a

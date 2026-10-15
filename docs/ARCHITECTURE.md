@@ -83,7 +83,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `VisibleKey`, refills lists as they come.
 - `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
   light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
-  `TextEditor` follows too, so the font page's text and the hidden copy that sizes it agree.
+  the font page's editor (`SampleEditor`, an NSTextView with the same line height) follows too, so its text
+  and the hidden copy that sizes it agree. Not SwiftUI's `TextEditor`, which, like `Text`, cuts glyphs off at
+  the font's ascent and descent: `SampleEditor`'s layout fragments (`UnclippedFragment`) widen their rendering
+  surface to the glyphs' ink, and `FontText` draws through `UnclippedText`, a text renderer whose display
+  padding gives room above and below. About one font in ten draws past its own descent.
 - Files come in through `AppModel.open` (`Model/AppModel+Files.swift`): from the Finder (Info.plist declares the
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from

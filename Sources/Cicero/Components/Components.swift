@@ -20,11 +20,34 @@ struct FontText: View {
     var lineHeight: AttributedString.LineHeight?
 
     var body: some View {
+        let font = FontLoader.shared.font(face, size: size, weight: weight, features: features)
         Text(text.isEmpty ? " " : text)
-            .font(Font(FontLoader.shared.font(face, size: size, weight: weight, features: features)))
+            .font(Font(font))
             .kerning(kerning)
             .lineLimit(lineLimit)
             .lineHeight(lineHeight)
+            .textRenderer(UnclippedText(font: font))
+    }
+}
+
+/// Draws text as usual, but with room above and below its lines for glyphs reaching past the font's ascent
+/// and descent, like a descender lower than the font says or a swash, which SwiftUI otherwise cuts off: as far
+/// as any of the font's glyphs reach, and at least half the size, for the fonts that stand in for missing
+/// characters. None at the sides, where text isn't cut off, and room there puts a "…" out of place.
+nonisolated struct UnclippedText: TextRenderer {
+    let room: EdgeInsets
+
+    init(font: CTFont) {
+        let box = CTFontGetBoundingBox(font)
+        let half = CTFontGetSize(font) / 2
+        room = EdgeInsets(top: max(box.maxY - CTFontGetAscent(font), half), leading: 0,
+                          bottom: max(-box.minY - CTFontGetDescent(font), half), trailing: 0)
+    }
+
+    var displayPadding: EdgeInsets { room }
+
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        for line in layout { context.draw(line) }
     }
 }
 
@@ -114,7 +137,9 @@ struct ActivationSwitch: View {
     }
 }
 
-/// A small tinted capsule with a word or two, never shortened: a name next to it gives way instead.
+/// A small tinted capsule with a word or two, never shortened: a name next to it gives way instead. (A list
+/// cell lays its row out again at the row's own width, where a stack offers each text half of what's left,
+/// so beside a name about as wide as itself, "Adobe" got less than it needs.)
 struct Tag: View {
     let text: String
     let tint: Color
