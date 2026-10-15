@@ -115,8 +115,16 @@ private struct Header: View {
         if let foundry = model.foundryName(of: family) { parts.append(foundry) }
         parts.append(family.format.rawValue)
         if family.isVariable { parts.append("Variable") }
-        parts.append("\(family.stylesLabel) · \(family.activeCount) activated")
+        parts.append("\(family.stylesLabel) · \(activation)")
         return parts.joined(separator: " · ")
+    }
+
+    /// How many styles are active, partly active (on in one app only, like those in an Adobe folder) and
+    /// inactive, leaving out the kinds with none: "3 active · 2 partly active", "2 inactive".
+    private var activation: String {
+        let partly = family.faces.count { if case .appOnly = $0.state { true } else { false } }
+        let counts = [(family.activeCount, "active"), (partly, "partly active"), (family.faces.count - family.activeCount - partly, "inactive")]
+        return counts.filter { $0.0 > 0 }.map { "\($0.0.formatted()) \($0.1)" }.joined(separator: " · ")
     }
 
     private var lockedReason: String {
