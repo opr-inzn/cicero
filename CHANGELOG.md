@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- In the Compare window’s Overlay layout, you can drag the names below the fonts to change their order, and so which font is drawn on top. Stacked shows them in the same order.
+- You can change the order of the fonts in the Compare window by dragging a row in Stacked, or a name below the fonts in Overlay, where the last one is drawn on top.
 - Each font in the Compare window keeps its color when you move or remove the others.
 
 ## 1.4.3
