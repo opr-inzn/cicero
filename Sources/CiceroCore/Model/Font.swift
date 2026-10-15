@@ -349,7 +349,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let temporaryScope: TemporaryScope?
 
     public var name: String { id }
-    public var stylesLabel: String { faces.count == 1 ? "1 style" : "\(faces.count) styles" }
+    public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
 
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         precondition(!faces.isEmpty, "A family has at least one face")

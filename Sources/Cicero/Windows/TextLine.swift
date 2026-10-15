@@ -5,7 +5,12 @@ import Foundation
 /// into a flipped (top-left origin) context in the context's fill colour.
 struct TextLine {
     let line: CTLine
+    /// From the start of the line to its end, or to the furthest a glyph reaches past it.
     let width: CGFloat
+    /// How far glyphs reach to the left of the line's start, like an italic's j.
+    let overhang: CGFloat
+    /// Above and below the baseline: the font's ascent and descent, or as far as its glyphs go beyond them, so
+    /// room for the line never cuts off a descender.
     let ascent: CGFloat
     let descent: CGFloat
     let xHeight: CGFloat
@@ -18,9 +23,11 @@ struct TextLine {
             NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
         ]
         line = CTLineCreateWithAttributedString(NSAttributedString(string: text.isEmpty ? " " : text, attributes: attributes))
-        width = CTLineGetTypographicBounds(line, nil, nil, nil)
-        ascent = CTFontGetAscent(font)
-        descent = CTFontGetDescent(font)
+        let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+        width = max(CTLineGetTypographicBounds(line, nil, nil, nil), ink.maxX.rounded(.up))
+        overhang = max(0, -ink.minX.rounded(.down))
+        ascent = max(CTFontGetAscent(font), ink.maxY.rounded(.up))
+        descent = max(CTFontGetDescent(font), -ink.minY.rounded(.down))
         xHeight = CTFontGetXHeight(font)
         capHeight = CTFontGetCapHeight(font)
     }

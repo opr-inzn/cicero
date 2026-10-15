@@ -81,23 +81,26 @@ private struct StackedLayout: View {
     var body: some View {
         let ascent = samples.map(\.line.ascent).max() ?? 0
         let descent = samples.map(\.line.descent).max() ?? 0
+        let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
-            row(sample, ascent: ascent, descent: descent, width: width)
+            row(sample, ascent: ascent, descent: descent, overhang: overhang, width: width)
         } lifted: { sample in
             // Opaque, so the rows it passes don't show through.
-            row(sample, ascent: ascent, descent: descent, width: width)
+            row(sample, ascent: ascent, descent: descent, overhang: overhang, width: width)
                 .background { Color.canvas.padding(-8) }
         }
     }
 
-    private func row(_ sample: CompareSample, ascent: CGFloat, descent: CGFloat, width: CGFloat) -> some View {
+    private func row(_ sample: CompareSample, ascent: CGFloat, descent: CGFloat, overhang: CGFloat, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.primary.resolve(in: context.environment).cgColor
-                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: 0, y: ascent), color: color) }
+                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
             }
-            .frame(width: width, height: ascent + descent)
+            .frame(width: overhang + width, height: ascent + descent)
+            .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
         }
@@ -115,6 +118,7 @@ private struct OverlayLayout: View {
     var body: some View {
         let ascent = samples.map(\.line.ascent).max() ?? 0
         let descent = samples.map(\.line.descent).max() ?? 0
+        // The ticks' room takes glyphs reaching left of the start too.
         let width = (samples.map(\.line.width).max() ?? 0) + inset + 2
         VStack(alignment: .leading, spacing: 16) {
             Canvas { context, size in

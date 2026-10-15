@@ -20,7 +20,7 @@ struct FamilyRowList<Row: View>: View {
     @Binding var selection: Set<String>
     let open: (String) -> Void
     @ViewBuilder let row: (Family) -> Row
-    @State private var anchor: String?
+    @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
 
     var body: some View {
