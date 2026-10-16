@@ -615,14 +615,14 @@ public struct ActivationEngine: Sendable {
     }
 
     /// For a fix in Problems: files that are spare copies (or that nothing can read), picked one by one.
-    /// Names the families besides `family` with faces in them, which keep their other copies; `moveToTrash`
-    /// checks the files are still spare right before it trashes them. nil when every file is protected.
-    public func spareCopiesTrashPlan(_ paths: [String], family: String?, in library: Library) -> TrashPlan? {
+    /// Names the families besides `families` (the problems') with faces in them, which keep their other copies;
+    /// `moveToTrash` checks the files are still spare right before it trashes them. nil when every file is protected.
+    public func spareCopiesTrashPlan(_ paths: [String], families: Set<String>, in library: Library) -> TrashPlan? {
         let allowed = paths.filter { !Self.isProtected($0) }
         guard !allowed.isEmpty else { return nil }
         let set = Set(allowed)
         let otherFamilies = library.families
-            .filter { $0.id != family && $0.faces.contains { set.contains($0.face.path) || $0.otherCopies.contains(where: set.contains) } }
+            .filter { !families.contains($0.id) && $0.faces.contains { set.contains($0.face.path) || $0.otherCopies.contains(where: set.contains) } }
             .map(\.id)
         return TrashPlan(
             title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) files",
