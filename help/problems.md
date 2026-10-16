@@ -12,7 +12,7 @@ Problems are in groups. Each group starts with a short explanation, then shows a
 - **Reveal** shows the files in the Finder.
 - Buttons that move files to the Trash ask first, and you can put the files back from the Trash.
 
-Cicero never moves files that come with macOS or an app to the Trash, and never offers to remove a file that holds the only copy of a style.
+Cicero never moves files that come with macOS or an app to the Trash, and never offers to remove a file that holds the only copy of a style. A copy from Adobe Fonts doesn’t count as one: Creative Cloud takes it away when the font is turned off there, so one of your own copies always stays.
 
 ## Installed Twice
 

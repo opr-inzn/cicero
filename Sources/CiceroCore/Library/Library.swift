@@ -17,14 +17,19 @@ public struct Locations: Sendable {
     /// The user's home folder, whose own folders (Downloads, Desktop…) moving fonts never puts in the Trash. By
     /// default the one `userFonts` is in.
     public var home: URL
+    /// Where Creative Cloud keeps the Adobe Fonts that Adobe apps turned on for themselves, as for a document
+    /// that uses them: a hidden folder whose fonts only Adobe apps load, under hidden names.
+    public var adobeFontsInAdobeApps: URL?
 
-    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil) {
+    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
+                adobeFontsInAdobeApps: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
         self.allUsersFonts = allUsersFonts
         self.systemFonts = systemFonts
         self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
+        self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
     }
 
     public static var standard: Locations {
@@ -36,7 +41,8 @@ public struct Locations: Sendable {
             userFonts: home.appendingPathComponent("Library/Fonts", isDirectory: true),
             allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true),
             systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)],
-            home: realHome
+            home: realHome,
+            adobeFontsInAdobeApps: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.w", isDirectory: true)
         )
     }
 
@@ -208,6 +214,7 @@ public final class LibraryScanner: Sendable {
         let known = loadCache()
         let activeURLs = await active
         addActive(activeURLs, to: &found)
+        for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
         confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
         confirmRegistered(&found, records: input.records)
         reach.leaveOut(found)
@@ -363,6 +370,13 @@ public final class LibraryScanner: Sendable {
                 if found[path]!.appName == nil { found[path]!.appName = folder.appName }
             }
         }
+        // Adobe Fonts that Adobe apps turned on for themselves are on in those apps, and Creative Cloud's to switch.
+        if let folder = locations.adobeFontsInAdobeApps {
+            Self.enumerate(folder, includingHidden: true) { path, stamp in
+                if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
+                found[path]!.appName = "Adobe"
+            }
+        }
         for path in input.files where Self.isFontFile(path) {
             guard let stamp = Self.stamp(ofPath: path) else {
                 if Reachability.disconnectedVolume(of: path) != nil { reach.disconnectedFiles.insert(path) }
@@ -423,10 +437,11 @@ public final class LibraryScanner: Sendable {
     /// Paths start with the folder's own path, as the user chose it, even when it goes through a symlink.
     /// With `onlineOnly`, files a cloud service has taken off the Mac go there instead: reading one would
     /// download it.
-    private static func enumerate(_ folder: URL, onlineOnly: ((String) -> Void)? = nil, _ body: (String, FaceStamp) -> Void) {
+    private static func enumerate(_ folder: URL, includingHidden: Bool = false, onlineOnly: ((String) -> Void)? = nil,
+                                  _ body: (String, FaceStamp) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
         guard let enumerator = FileManager.default.enumerator(
-            at: folder, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            at: folder, includingPropertiesForKeys: Array(keys), options: includingHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return }
         let chosen = folder.path + "/"
         let resolved = realPath(folder.path) + "/"
@@ -656,10 +671,17 @@ public final class LibraryScanner: Sendable {
     }
 
     /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate — then by path.
+    /// Adobe Fonts only Adobe apps load come last: they stand for a font only when the library has no other copy of it,
+    /// so one of the user's own stays theirs to switch.
     private static func precedes(_ a: Candidate, _ b: Candidate) -> Bool {
-        let rankA = rank(a.state), rankB = rank(b.state)
+        let rankA = rank(a), rankB = rank(b)
         if rankA != rankB { return rankA < rankB }
         return a.face.id < b.face.id
+    }
+
+    private static func rank(_ candidate: Candidate) -> Int {
+        if case .appOnly = candidate.state, ActiveSource.isAdobeFonts(candidate.face.path) { return 10 }
+        return rank(candidate.state)
     }
 
     private static func rank(_ state: FaceState) -> Int {
@@ -689,7 +711,7 @@ public final class LibraryScanner: Sendable {
         if locations.systemFonts.contains(where: { path.hasPrefix($0.path + "/") }) { return .macOS }
         if path.hasPrefix(locations.allUsersFonts.path + "/") { return .allUsers }
         if path.hasPrefix(locations.userFonts.path + "/") { return .fontsFolder }
-        if path.contains("/Adobe/CoreSync/") { return .adobeFonts }
+        if ActiveSource.isAdobeFonts(path) { return .adobeFonts }
         if let temporary = records.temporary[path] { return .temporary(temporary.scope) }
         if records.inPlace.contains(path) { return .inPlace }
         if path.contains(".app/") { return .app }

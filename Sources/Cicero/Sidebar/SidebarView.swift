@@ -294,6 +294,8 @@ private struct SidebarContent: View {
         switch row.item {
         case .folder(WatchedFolder.adobeAppsID):
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }
+        case .folder(WatchedFolder.adobeFontsID):
+            Button("Manage in Creative Cloud") { CreativeCloud.open() }
         case .folder(WatchedFolder.addedFilesID):
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(model.addedFileURLs) }
         case .folder(let id):

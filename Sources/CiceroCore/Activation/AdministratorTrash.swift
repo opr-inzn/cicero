@@ -1,8 +1,8 @@
 import Foundation
 
 /// Moves files the user may not change to the Trash, once macOS has asked for an administrator's password, as the
-/// Finder does: for a file in a folder an installer made, like Adobe's Fonts folder, FileManager's `trashItem` only
-/// reports that permission was denied.
+/// Finder does: for a file in a folder only an administrator can change, like the Fonts folder InDesign's installer
+/// makes next to the app, FileManager's `trashItem` only reports that permission was denied.
 enum AdministratorTrash {
     /// Returns the paths that went: none when the password was cancelled or wrong.
     @concurrent

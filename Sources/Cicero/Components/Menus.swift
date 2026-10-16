@@ -47,6 +47,9 @@ struct FamilyMenu: View {
         if families.contains(where: \.hasDeactivatable) {
             Button(titles.deactivate) { model.deactivate(families) }
         }
+        if families.contains(where: { $0.faces.contains(where: \.isAdobeFonts) }) {
+            Button("Manage in Creative Cloud") { CreativeCloud.open() }
+        }
         if families.count == 1 {
             CopySourcesMenu(styles: families[0].faces, title: families[0].name, model: model)
         }
@@ -92,7 +95,9 @@ struct FamilyMenu: View {
     }
 
     private var note: String? {
-        switch families.first?.state {
+        // One only Adobe apps use says so, like the fonts in Adobe's folders.
+        if families.first?.isAdobeFonts == true, families.first?.state == .active { return "From Adobe Fonts" }
+        return switch families.first?.state {
         case .appOnly(let app): "Available in \(FaceState.appDescription(app)) only"
         case .system: "Installed with macOS"
         default: nil
