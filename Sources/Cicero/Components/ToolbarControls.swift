@@ -17,16 +17,23 @@ struct ToolbarCapsule<Content: View>: ToolbarContent {
 /// A segmented picker for toolbars, its choice highlighted like a toggle that's on. Segments show a
 /// symbol when there's one, else the title.
 struct ToolbarPicker<Value: Hashable>: View {
+    /// What VoiceOver calls the control.
+    let label: String
     let values: [Value]
     @Binding var selection: Value
     let title: (Value) -> String
     let symbol: ((Value) -> String)?
+    /// Each segment's tooltip.
+    let help: String?
 
-    init(_ values: [Value], selection: Binding<Value>, title: @escaping (Value) -> String, symbol: ((Value) -> String)? = nil) {
+    init(_ label: String, values: [Value], selection: Binding<Value>, title: @escaping (Value) -> String,
+         symbol: ((Value) -> String)? = nil, help: String? = nil) {
+        self.label = label
         self.values = values
         _selection = selection
         self.title = title
         self.symbol = symbol
+        self.help = help
     }
 
     var body: some View {
@@ -39,10 +46,19 @@ struct ToolbarPicker<Value: Hashable>: View {
                     if let symbol { Label(title(value), systemImage: symbol(value)) } else { Text(title(value)) }
                 }
                 .buttonStyle(ToolbarButtonStyle(isOn: selection == value, segment: symbol == nil ? .title : .symbol))
-                .accessibilityAddTraits(selection == value ? .isSelected : [])
+                .help(help ?? "")
             }
         }
         .fixedSize()
+        // To accessibility, a segmented control: as buttons in a toolbar item, every segment took its name from the
+        // item, the first segment's title, as soon as the window updated.
+        .accessibilityRepresentation {
+            Picker(label, selection: $selection) {
+                ForEach(values, id: \.self) { Text(title($0)).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel(label)
+        }
     }
 }
 
