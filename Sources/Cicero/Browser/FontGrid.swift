@@ -14,6 +14,11 @@ struct FontGrid: View {
     /// Between tiles, and between the last column and the Info panel.
     static let spacing: CGFloat = 12
 
+    /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
+    /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
+    private static let infoPanelRoom = InfoPanelOverlay.width + InfoPanelOverlay.gap * 2
+        + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
+
     var body: some View {
         let tile = tileWidth(minimum: max(240, preview.size * 8))
         let count = columns(tile: tile)
@@ -44,11 +49,16 @@ struct FontGrid: View {
         }
     }
 
-    /// As wide as fills the rows, with the Info panel open or closed, and up to 1.6 times the narrowest a tile goes.
+    /// As wide as fills the rows, and up to 1.6 times the narrowest a tile goes. The Info panel keeps the columns
+    /// the rows have without it, the tiles narrowing instead, as far as 0.6 times that (their sample shrinks to fit),
+    /// and never below 240 points; past that it takes a column away.
     private func tileWidth(minimum: CGFloat) -> CGFloat {
         guard gridWidth > 0 else { return minimum }
-        let count = max(1, ((gridWidth + Self.spacing) / (minimum + Self.spacing)).rounded(.down))
-        return min((gridWidth - Self.spacing * (count - 1)) / count, minimum * 1.6, gridWidth)
+        let closed = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
+        var count = max(1, ((closed + Self.spacing) / (minimum + Self.spacing)).rounded(.down))
+        func filling(_ count: CGFloat) -> CGFloat { (gridWidth - Self.spacing * (count - 1)) / count }
+        while count > 1 && filling(count) < max(240, minimum * 0.6) { count -= 1 }
+        return min(filling(count), minimum * 1.6, gridWidth)
     }
 
     /// Tiles in a row, also for ↑/↓: as many as fit, with half a point to spare for rounding where they fill it.
