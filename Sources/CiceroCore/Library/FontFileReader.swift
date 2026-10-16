@@ -13,8 +13,10 @@ enum FontFileReader {
     /// The faces, and the descriptors they were read from; both empty when CoreText can't read the file.
     static func read(atPath path: String) -> (faces: [FontFace], descriptors: [CTFontDescriptor]) {
         let descriptors = FontFiles.descriptors(at: path)
-        let faces = descriptors.enumerated().compactMap { index, descriptor in
-            face(from: descriptor, id: FaceID(path: path, index: index))
+        var axes: [Data: [[String: Any]]] = [:]
+        var faces: [FontFace] = []
+        for (index, descriptor) in descriptors.enumerated() {
+            if let face = face(from: descriptor, id: FaceID(path: path, index: index), axes: &axes) { faces.append(face) }
         }
         return (faces, descriptors)
     }
@@ -26,7 +28,8 @@ enum FontFileReader {
         return values?.addedToDirectoryDate ?? values?.creationDate
     }
 
-    private static func face(from descriptor: CTFontDescriptor, id: FaceID) -> FontFace? {
+    /// - Parameter axes: the variation axes read so far from the file's faces, by their fvar table.
+    private static func face(from descriptor: CTFontDescriptor, id: FaceID, axes knownAxes: inout [Data: [[String: Any]]]) -> FontFace? {
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         let postScriptName = CTFontCopyPostScriptName(font) as String
         guard !postScriptName.isEmpty else { return nil }
@@ -41,7 +44,7 @@ enum FontFileReader {
         // would also hold the optical size CoreText picks for its point size.)
         let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
             .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
-        for entry in CTFontCopyVariationAxes(font) as? [[String: Any]] ?? [] {
+        for entry in variationAxes(of: font, known: &knownAxes) {
             guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double
             else { continue }
@@ -79,14 +82,25 @@ enum FontFileReader {
         )
     }
 
+    /// The font's variation axes, none without an fvar table. A variable font's named instances are faces of one font
+    /// and share its axes, and CoreText looks up every axis's localized name, under a lock all reading threads
+    /// wait on, for each of them: a file of fifty instances read its axes fifty times, and axes were a quarter of
+    /// reading a library.
+    private static func variationAxes(of font: CTFont, known: inout [Data: [[String: Any]]]) -> [[String: Any]] {
+        guard let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), CTFontTableOptions(rawValue: 0)) as Data? else { return [] }
+        if let axes = known[fvar] { return axes }
+        let axes = CTFontCopyVariationAxes(font) as? [[String: Any]] ?? []
+        known[fvar] = axes
+        return axes
+    }
+
     /// When a face came out, as near as its file says: the earliest year in its copyright notice ("© 2014–2021"
     /// is 2014), else the year the head table says the file was made. Nil when neither gives a likely year.
     static func year(copyright: String?, created: Date?) -> Int? {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let calendar = utcCalendar
         let latest = calendar.component(.year, from: .now) + 1
         if let copyright {
-            let years = copyright.matches(of: /(?:^|[^0-9])((?:19|20)[0-9]{2})(?![0-9])/).compactMap { Int($0.output.1) }
+            let years = copyright.matches(of: yearPattern).compactMap { Int($0.output.1) }
             if let earliest = years.filter({ (1950...latest).contains($0) }).min() { return earliest }
         }
         // Files that don't set it say 1904, when the head table's dates begin, or something as unlikely.
@@ -94,6 +108,14 @@ enum FontFileReader {
         let year = calendar.component(.year, from: created)
         return (1985...latest).contains(year) ? year : nil
     }
+
+    /// Made once: a regex literal is compiled each time it's evaluated, which was most of the time `year` took.
+    private nonisolated(unsafe) static let yearPattern = /(?:^|[^0-9])((?:19|20)[0-9]{2})(?![0-9])/
+    private static let utcCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
 
     /// The head table's created date: seconds since the start of 1904, big-endian, 20 bytes in.
     static func created(_ table: Data?) -> Date? {
