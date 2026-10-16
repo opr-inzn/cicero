@@ -2,6 +2,11 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.4.8
+
+- **Remove All Extra Copies**, at the top of Installed Twice in Problems, deals with every font there at once, after asking: it keeps the newest copy of each font and moves the others to the Trash. Of copies with the same version, it keeps one that comes with macOS or an app, then one in your own folders, then one installed for all users, before one in your Fonts folder. Duplicates has **Move All Extra Copies to Trash** too.
+- Moving fonts to the Trash works when they’re in a folder only an administrator can change, like an Adobe Fonts folder an installer made: macOS asks for your password, as when you drag them to the Trash in the Finder. Before, Cicero said it couldn’t move them, for instance when moving the extra copies of a font to the Trash in Problems.
+
 ## 1.4.7
 
 - Fonts that are on are called active, and those that are off inactive, as on font pages and in Settings → Folders: the sidebar’s **Active** and **Inactive** rather than Activated and Not Activated, “1,298 families · 716 active” under the title, **Active only** in the Character Toolbox, and **Inactive** for a style that’s off, in Quick Look, on font pages, in Problems and as a smart set’s Status.
