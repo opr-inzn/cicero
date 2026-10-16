@@ -751,7 +751,7 @@ extension AppModel {
             let faces = library.families.flatMap(\.faces).filter { ids.contains($0.id) }
             if !faces.isEmpty { deactivate(faces) }
         case .trash(let paths):
-            guard let plan = engine.spareCopiesTrashPlan(paths, family: family, in: library) else { return }
+            guard let plan = engine.spareCopiesTrashPlan(paths, families: Set([family].compactMap(\.self)), in: library) else { return }
             trashPlan = plan
         case .forgetInPlace(let path):
             enqueue { model in
@@ -774,5 +774,14 @@ extension AppModel {
                 model.finish(result)
             }
         }
+    }
+
+    /// Remove All Extra Copies: every problem's extra copies at once, after asking.
+    func trashExtraCopies(of problems: [Problem]) {
+        var seen = Set<String>()
+        let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
+        guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
+        plan.title = plan.paths.count == 1 ? "1 extra copy" : "\(plan.paths.count) extra copies"
+        trashPlan = plan
     }
 }

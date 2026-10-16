@@ -128,7 +128,7 @@ Adobe apps load fonts from folders of their own, without installing them:
 - `/Library/Application Support/Adobe/Fonts` and `~/Library/Application Support/Adobe/Fonts`, for all Adobe apps
 - the Fonts folder next to an Adobe app, like `/Applications/Adobe InDesign 2026/Fonts`, for that app only
 
-Cicero lists the fonts in all of them together as **Adobe Apps** under **Folders**, while there are any. They show as active in those apps, with a red tag like **Adobe** or **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for Adobe apps** in **Settings → Folders**.
+Cicero lists the fonts in all of them together as **Adobe Apps** under **Folders**, while there are any. They show as active in those apps, with a red tag like **Adobe** or **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for Adobe apps** in **Settings → General**.
 
 ### The three-position switch
 
