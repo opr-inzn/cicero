@@ -96,7 +96,7 @@ private struct TextTab: View {
             Stepper(value: $maxMissing, in: 0...20) {
                 Text("Include fonts missing up to \(maxMissing) \(maxMissing == 1 ? "character" : "characters")")
             }
-            Toggle("Activated only", isOn: $activatedOnly)
+            Toggle("Active only", isOn: $activatedOnly)
             Spacer()
             Text(summary).foregroundStyle(.secondary).monospacedDigit()
         }

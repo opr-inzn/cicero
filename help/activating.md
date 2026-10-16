@@ -109,7 +109,7 @@ Files in your Fonts folder are turned off before they move, so apps let go of th
 Cicero keeps the files it moves out of your Fonts folder and out of app font folders in its Deactivated folder, `~/Library/Application Support/Cicero/Deactivated`.
 
 - While it has fonts, the folder shows up as **Deactivated** under **Folders** in the sidebar.
-- Its fonts stay in your library, listed as not activated. Turn one on again whenever you like.
+- Its fonts stay in your library, listed as inactive. Turn one on again whenever you like.
 - To see the files, right-click **Deactivated** and choose **Reveal in Finder**.
 
 ## Fonts Cicero can’t turn off
@@ -128,7 +128,7 @@ Adobe apps load fonts from folders of their own, without installing them:
 - `/Library/Application Support/Adobe/Fonts` and `~/Library/Application Support/Adobe/Fonts`, for all Adobe apps
 - the Fonts folder next to an Adobe app, like `/Applications/Adobe InDesign 2026/Fonts`, for that app only
 
-Cicero lists the fonts in all of them together as **Adobe Apps** under **Folders**, while there are any. They show as active in those apps, with a red tag like **Adobe** or **InDesign**, instead of as not activated. To hide them, turn off **Show fonts installed for Adobe apps** in **Settings → Folders**.
+Cicero lists the fonts in all of them together as **Adobe Apps** under **Folders**, while there are any. They show as active in those apps, with a red tag like **Adobe** or **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for Adobe apps** in **Settings → Folders**.
 
 ### The three-position switch
 

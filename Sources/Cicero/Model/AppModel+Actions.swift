@@ -493,8 +493,8 @@ extension AppModel {
     var libraryRows: [SidebarRow] {
         let rows = [
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
-            SidebarRow(key: "library.active", title: "Activated", icon: "checkmark.circle", item: .active),
-            SidebarRow(key: "library.inactive", title: "Not Activated", icon: "circle.dashed", item: .inactive),
+            SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", item: .active),
+            SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", item: .inactive),
             // With system fonts off in Settings, they're nowhere, this item included.
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),

@@ -206,7 +206,7 @@ public enum FaceState: Hashable, Sendable {
         case .active(.temporary(.untilQuit)): "Active until Cicero quits"
         case .active(.temporary(.whileAppsRun)): "Active while its app is open"
         case .active: "Active"
-        case .inactive: "Not activated"
+        case .inactive: "Inactive"
         case .appOnly(let app): "Active in \(FaceState.appDescription(app))"
         }
     }

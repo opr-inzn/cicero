@@ -9,8 +9,8 @@ At the top of the sidebar are five items that are always there:
 | Item | Shows |
 | --- | --- |
 | All Fonts | Every family in your library |
-| Activated | Families with at least one style on |
-| Not Activated | Families with at least one style off |
+| Active | Families with at least one style on |
+| Inactive | Families with at least one style off |
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Problems | Things worth fixing, with a count. See [Problems](problems.md) |
 
@@ -170,7 +170,7 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Tag | has, doesn’t have | One of your tags |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Adobe Apps, or Added Fonts |
-| Status | is, is not | Activated, Partly Activated, Not Activated, Active in Apps Only or Installed with macOS |
+| Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
 | Kind | is, is not | Variable, Monospaced or Has Italics |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
 | Number of Styles | is, is more than, is less than | A number |

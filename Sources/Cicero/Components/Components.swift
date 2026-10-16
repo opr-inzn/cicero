@@ -112,7 +112,7 @@ struct ActivationSwitch: View {
         MiniSwitch(position: model.position(of: family), isEnabled: isEnabled) { model.toggle(family) }
             .help(help)
             .accessibilityElement()
-            .accessibilityLabel("Activated")
+            .accessibilityLabel("Active")
             .accessibilityValue(accessibilityValue)
             .accessibilityAddTraits(.isToggle)
             .accessibilityAction { if isEnabled { model.toggle(family) } }

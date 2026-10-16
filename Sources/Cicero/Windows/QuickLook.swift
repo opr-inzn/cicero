@@ -362,11 +362,11 @@ private struct FamilyQuickLook: View {
         return parts.joined(separator: " · ")
     }
 
-    /// The styles' status when they share one ("Not activated", "Active until Cicero quits"), else how many are on.
+    /// The styles' status when they share one ("Inactive", "Active until Cicero quits"), else how many are on.
     private var status: String {
         let labels = Set(family.faces.map(\.state.label))
         if labels.count == 1, let label = labels.first { return label }
-        return family.activeCount == family.faces.count ? "Active" : "\(family.activeCount) of \(family.faces.count) activated"
+        return family.activeCount == family.faces.count ? "Active" : "\(family.activeCount) of \(family.faces.count) active"
     }
 }
 
