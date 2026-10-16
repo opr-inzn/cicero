@@ -116,9 +116,12 @@ public struct Problem: Identifiable, Hashable, Sendable {
     public var folderFixes: [String: [ProblemFix]]
     /// The folder with the newest version, when every other folder's files are older: usually the copy to keep.
     public var newestFolder: String?
+    /// The files that can go so that one copy of each font is left: what Remove All Extra Copies moves to the Trash.
+    public var extraCopies: [String]
 
     public init(id: String, kind: ProblemKind, title: String, family: String? = nil, summary: String, files: [ProblemFile], fixes: [ProblemFix],
-                fileFixes: [String: [ProblemFix]], folderFixes: [String: [ProblemFix]] = [:], newestFolder: String? = nil) {
+                fileFixes: [String: [ProblemFix]], folderFixes: [String: [ProblemFix]] = [:], newestFolder: String? = nil,
+                extraCopies: [String] = []) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -129,6 +132,7 @@ public struct Problem: Identifiable, Hashable, Sendable {
         self.fileFixes = fileFixes
         self.folderFixes = folderFixes
         self.newestFolder = newestFolder
+        self.extraCopies = extraCopies
     }
 
     /// The files by the folder they're in, in order.
@@ -254,6 +258,29 @@ public enum ProblemDetector {
             return FontVersion.number(version)
         }
 
+        /// The copy of a style active from several files to keep: the newest version. Of equal versions, one that
+        /// can't go anyway (macOS's or an app's), then one in the user's own folders, then one for all users, then one
+        /// in the user's Fonts folder, and one active only for now last.
+        func keeper(of paths: [String]) -> String {
+            func rank(_ path: String) -> Int {
+                if ActivationEngine.isProtected(path) { return 5 }
+                switch LibraryScanner.activeSource(of: path, locations: locations, records: data.records) {
+                case .macOS, .app, .adobeFonts: return 5
+                case .inPlace, .otherApp: return 4
+                case .allUsers: return 3
+                case .fontsFolder: return 2
+                case .temporary: return 1
+                }
+            }
+            return paths.max { a, b in
+                let (va, vb) = (versionNumber(of: a), versionNumber(of: b))
+                if va != vb { return va.lexicographicallyPrecedes(vb) }
+                let (ra, rb) = (rank(a), rank(b))
+                if ra != rb { return ra < rb }
+                return a > b
+            }!
+        }
+
         /// The folder whose files include the newest version, when every other folder's are all older.
         func newestFolder(of paths: [String]) -> String? {
             let ranked = Dictionary(grouping: paths) { ($0 as NSString).deletingLastPathComponent }
@@ -269,6 +296,8 @@ public enum ProblemDetector {
     /// The same font active from more than one file, grouped by family.
     private static func installedTwice(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
+        // Each problem's active copies of each style.
+        var styles: [[[String]]] = []
         for family in context.library.families {
             var paths: [String] = []
             var copies: [[String]] = []
@@ -306,6 +335,18 @@ public enum ProblemDetector {
                 files: files, fixes: [], fileFixes: fileFixes, folderFixes: folderFixes,
                 newestFolder: context.newestFolder(of: paths)
             ))
+            styles.append(copies)
+        }
+        // The copy each style keeps, of every family: a collection one family keeps can be another's extra copy.
+        let kept = Set(styles.joined().map { context.keeper(of: $0) })
+        // Spare all together, so every problem's extra copies can go at once.
+        var extras: [String] = []
+        for index in problems.indices {
+            for path in problems[index].files.map(\.path) where !kept.contains(path) && !ActivationEngine.isProtected(path) {
+                guard context.copies.areSpare(Set(extras + [path])) else { continue }
+                extras.append(path)
+                problems[index].extraCopies.append(path)
+            }
         }
         return problems
     }
@@ -523,7 +564,8 @@ public enum ProblemDetector {
                 files: paths.map { context.file($0) },
                 fixes: extras.isEmpty ? [] : [.trash(extras)],
                 fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal([$0])]) }),
-                folderFixes: folderFixes(paths, [:]) { _, _ in false }
+                folderFixes: folderFixes(paths, [:]) { _, _ in false },
+                extraCopies: extras
             ))
         }
         return problems

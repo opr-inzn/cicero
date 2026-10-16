@@ -54,12 +54,26 @@ struct ProblemsView: View {
 }
 
 private struct ProblemGroup: View {
+    @Environment(AppModel.self) private var model
     let kind: ProblemKind
     let problems: [Problem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(kind.title).font(.title2.bold())
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(kind.title).font(.title2.bold())
+                Spacer(minLength: 0)
+                // One problem's extra copies have their own buttons.
+                let extras = problems.filter { !$0.extraCopies.isEmpty }
+                if extras.count > 1 {
+                    Button(kind == .installedTwice ? "Remove All Extra Copies" : "Move All Extra Copies to Trash", role: .destructive) {
+                        model.trashExtraCopies(of: extras)
+                    }
+                    .help(kind == .installedTwice
+                        ? "Keeps the newest copy of each font and moves the others to the Trash."
+                        : "Keeps the newest copy of each font in each folder and moves the others to the Trash.")
+                }
+            }
             Text(kind.explanation).foregroundStyle(.secondary)
             ForEach(problems) { ProblemCard(problem: $0) }
         }
