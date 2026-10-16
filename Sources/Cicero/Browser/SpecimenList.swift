@@ -16,7 +16,8 @@ struct SpecimenList: View {
                 LazyVStack(alignment: .leading, spacing: FontGrid.spacing) {
                     ForEach(families) { family in
                         Specimen(family: family, foundry: model.foundryName(of: family), isSelected: model.selectedIDs.contains(family.id), model: model)
-                            .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
+                            .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                            .onAppear { prefetchStyles(near: family) }
                     }
                 }
                 .scrollTargetLayout()
@@ -29,8 +30,18 @@ struct SpecimenList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy, layout: .specimens))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .specimens))
         }
+    }
+
+    /// Scans prefetch each family's regular face, which the grid and list show. Specimens also set every style's
+    /// name in the style, and with files not read since the Mac started, reading them as cards came into view held
+    /// up scrolling: the cards around one that appears have their styles read in the background, mostly those it
+    /// scrolls towards. Only those, not every card's: reading thousands of files at once slowed drawing down.
+    private func prefetchStyles(near family: Family) {
+        guard let index = families.firstIndex(where: { $0.id == family.id }) else { return }
+        let near = families[max(0, index - 4) ..< min(families.count, index + 12)]
+        FontLoader.shared.prefetch(near.flatMap { $0.faces.prefix(Specimen.styleLimit).map(\.face) })
     }
 }
 
@@ -42,7 +53,7 @@ private struct Specimen: View {
     let model: AppModel
 
     /// Long families show their first styles and a count, so rows stay a readable height.
-    private static let styleLimit = 14
+    static let styleLimit = 14
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

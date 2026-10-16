@@ -41,7 +41,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
-  preview) and prefetches them after scans, four files at a time, what the browser shows first. It keeps
+  preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
+  prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead
+  (`F_RDADVISE`), glyphs included, not just the tables a descriptor needs. It keeps
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
   (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
@@ -138,6 +140,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   moves the content and changes what's placed, and the page can lay itself out again and again at full
   CPU. The font page's glyph blocks did that as `LazyVGrid`s in the page's `LazyVStack`; they're now rows
   of fixed-size cells in the page's own stack, so every row is one height, with one popover per row.
+  Only rows of about one height go in a lazy stack: the page's header, type tester and styles sit in a
+  plain stack above the lazy one, since a family's fifty styles, one 2,000 pt row of it, made the guesses
+  swing the same way whenever the page was scrolled to its end.
+- A row of a lazy stack doesn't hold the whole list it's in. SwiftUI compares every row's inputs whenever
+  it updates, and arrays of families compare every family in them unless they're the same array: the
+  browser's tiles and rows hold a `FamilyOrder`, equal only to itself, for selecting ranges.
 - Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
   width that doesn't depend on them, so a layout settles in one pass.
 - The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
