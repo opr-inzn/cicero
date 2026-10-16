@@ -108,7 +108,7 @@ extension View {
 }
 
 /// Keyboard handling for the browser: Return opens, Escape deselects, ⌘A selects all, typing the start of a name
-/// jumps to the first family starting with it, Space opens and closes Quick Look, and the arrow keys as the layout has them.
+/// jumps to the first family starting with it (spaces included while typing), Space opens and closes Quick Look, and the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
     let families: [Family]
@@ -119,6 +119,8 @@ struct FamilyKeys: ViewModifier {
     /// jump to the first family starting with Ed.
     @State private var typed = ""
     @State private var lastTyped = Date.distantPast
+    /// Quick Look, opening unless a letter follows the space just typed.
+    @State private var pendingQuickLook: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         let quickLook = model.quickLook
@@ -140,8 +142,25 @@ struct FamilyKeys: ViewModifier {
             }
             .onKeyPress(.space, phases: [.down, .repeat]) { press in
                 guard press.modifiers.isDisjoint(with: [.command, .option, .control, .shift]) else { return .ignored }
-                // Holding the bar down opens or closes it once.
-                if press.phase == .down { quickLook.toggle(order: families.map(\.id)) }
+                guard press.phase == .down else { return .handled }  // Holding the bar down opens or closes it once.
+                // While a name is being typed, a space is part of it ("New York") if a letter follows it at once;
+                // otherwise it opens Quick Look a moment later, as it would have straight away.
+                if pendingQuickLook == nil, !typed.hasSuffix(" "), !typed.isEmpty, Date.now.timeIntervalSince(lastTyped) <= 1 {
+                    typed += " "
+                    lastTyped = .now
+                    pendingQuickLook = Task {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        guard !Task.isCancelled else { return }
+                        pendingQuickLook = nil
+                        typed = ""
+                        quickLook.toggle(order: families.map(\.id))
+                    }
+                    return .handled
+                }
+                pendingQuickLook?.cancel()
+                pendingQuickLook = nil
+                typed = ""
+                quickLook.toggle(order: families.map(\.id))
                 return .handled
             }
             .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { arrow($0) }
@@ -152,6 +171,8 @@ struct FamilyKeys: ViewModifier {
                     return .handled
                 }
                 guard press.modifiers.isEmpty || press.modifiers == .shift else { return .ignored }
+                pendingQuickLook?.cancel()
+                pendingQuickLook = nil
                 if Date.now.timeIntervalSince(lastTyped) > 1 { typed = "" }
                 typed += press.characters
                 lastTyped = .now
