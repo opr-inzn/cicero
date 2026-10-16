@@ -14,11 +14,6 @@ struct FontGrid: View {
     /// Between tiles, and between the last column and the Info panel.
     static let spacing: CGFloat = 12
 
-    /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
-    /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
-    private static let infoPanelRoom = InfoPanelOverlay.width + InfoPanelOverlay.gap * 2
-        + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
-
     var body: some View {
         let tile = tileWidth(minimum: max(240, preview.size * 8))
         let count = columns(tile: tile)
@@ -31,10 +26,10 @@ struct FontGrid: View {
                     }
                 }
                 .scrollTargetLayout()
-                // From the leading edge, so the tiles stay where they are as the Info panel takes columns away;
-                // the grid would centre them.
                 .frame(width: CGFloat(count) * (tile + Self.spacing) - Self.spacing)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as
+                // before the Info panel opened kept its columns and pushed the window's panes aside.
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
                 .cardsPadding(infoPresented: model.isInfoPresented)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
@@ -49,14 +44,11 @@ struct FontGrid: View {
         }
     }
 
-    /// As wide as fills the rows with the Info panel closed, and up to 1.6 times the narrowest a tile goes. Just
-    /// as wide while the panel is open, which takes columns away rather than widening the rest; narrower only
-    /// where it leaves less room than that for one.
+    /// As wide as fills the rows, with the Info panel open or closed, and up to 1.6 times the narrowest a tile goes.
     private func tileWidth(minimum: CGFloat) -> CGFloat {
         guard gridWidth > 0 else { return minimum }
-        let width = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
-        let count = max(1, ((width + Self.spacing) / (minimum + Self.spacing)).rounded(.down))
-        return min((width - Self.spacing * (count - 1)) / count, minimum * 1.6, gridWidth)
+        let count = max(1, ((gridWidth + Self.spacing) / (minimum + Self.spacing)).rounded(.down))
+        return min((gridWidth - Self.spacing * (count - 1)) / count, minimum * 1.6, gridWidth)
     }
 
     /// Tiles in a row, also for ↑/↓: as many as fit, with half a point to spare for rounding where they fill it.

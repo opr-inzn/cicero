@@ -110,6 +110,13 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         axes.first { $0.tag == "wght" }?.value ?? Double(weight)
     }
 
+    /// How wide the face is, as a percentage of normal: a variable font's named instance at its own place on the
+    /// width axis, else the OS/2 width class as the spec has it in percent.
+    public var styleWidth: Double {
+        if let value = axes.first(where: { $0.tag == "wdth" })?.value { return value }
+        return [50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200][min(max(width, 1), 9) - 1]
+    }
+
     public var path: String { id.path }
     public var url: URL { URL(fileURLWithPath: id.path, isDirectory: false) }
 
