@@ -35,20 +35,23 @@ struct FamilyMenu: View {
 
         let titles = ActivationTitles(families)
         let app = titles.app
+        // The symbols of the sidebar's Active and Inactive, and half for the switch's middle position.
         if families.contains(where: \.hasActivatable) {
-            Button(titles.activate) { model.activate(families) }
+            Button(titles.activate, systemImage: "checkmark.circle") { model.activate(families) }
         }
         if let app, families.contains(where: { $0.position != .app }) {
-            Button("Use in \(app) Only") { model.useInAppOnly(families.flatMap(\.faces)) }
+            Button("Use in \(app) Only", systemImage: "circle.lefthalf.filled") { model.useInAppOnly(families.flatMap(\.faces)) }
         }
         if families.contains(where: \.hasTemporarilyActivatable) {
-            Button(app != nil ? "Activate Temporarily in All Apps" : "Activate Temporarily") { model.activateTemporarily(families) }
+            Button(app != nil ? "Activate Temporarily in All Apps" : "Activate Temporarily", systemImage: "clock") {
+                model.activateTemporarily(families)
+            }
         }
         if families.contains(where: \.hasDeactivatable) {
-            Button(titles.deactivate) { model.deactivate(families) }
+            Button(titles.deactivate, systemImage: "circle.dashed") { model.deactivate(families) }
         }
         if families.contains(where: { $0.faces.contains(where: \.isAdobeFonts) }) {
-            Button("Manage in Creative Cloud") { CreativeCloud.open() }
+            Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
         }
         if families.count == 1 {
             CopySourcesMenu(styles: families[0].faces, title: families[0].name, model: model)
@@ -56,7 +59,8 @@ struct FamilyMenu: View {
 
         Divider()
 
-        Menu("Add to Set") {
+        // The symbols of the sidebar's sections.
+        Menu {
             ForEach(model.data.sets) { set in
                 Toggle(set.name, isOn: Binding(
                     get: { families.allSatisfy { model.isMember($0, of: set.id) } },
@@ -64,23 +68,27 @@ struct FamilyMenu: View {
                 ))
             }
             if !model.data.sets.isEmpty { Divider() }
-            Button("New Set from Selection") {
+            Button("New Set from Selection", systemImage: "plus") {
                 model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
             }
+        } label: {
+            Label("Add to Set", systemImage: SidebarSection.sets.icon)
         }
-        Menu("Tags") { TagMenuItems(families: families, model: model) }
-        Menu("Classification") { ClassificationMenuItems(families: families, model: model) }
+        Menu { TagMenuItems(families: families, model: model) } label: { Label("Tags", systemImage: SidebarSection.tags.icon) }
+        Menu { ClassificationMenuItems(families: families, model: model) } label: {
+            Label("Classification", systemImage: SidebarSection.classifications.icon)
+        }
 
         Divider()
 
-        Button("Reveal in Finder") { model.reveal(families) }
-        Button(families.count == 1 ? "Copy Family Name" : "Copy Family Names") {
+        Button("Reveal in Finder", systemImage: "finder") { model.reveal(families) }
+        Button(families.count == 1 ? "Copy Family Name" : "Copy Family Names", systemImage: "doc.on.clipboard") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(families.map(\.name).joined(separator: "\n"), forType: .string)
         }
-        Button("Export") { model.exportFonts(families, named: nil) }
+        Button("Export", systemImage: "square.and.arrow.up") { model.exportFonts(families, named: nil) }
         if families.count > 1 {
-            Button("Compare") {
+            Button("Compare", systemImage: "rectangle.split.1x2") {
                 model.compare(families)
                 openWindow(id: WindowID.compare)
             }
@@ -89,9 +97,9 @@ struct FamilyMenu: View {
 
         // Added one at a time, they can leave the library and stay where they are.
         if model.canRemoveFromLibrary(families) {
-            Button("Remove from Library") { model.removeFromLibrary(families) }
+            Button("Remove from Library", systemImage: "minus.circle") { model.removeFromLibrary(families) }
         }
-        Button("Move to Trash") { model.requestTrash(families) }
+        Button("Move to Trash", systemImage: "trash") { model.requestTrash(families) }
     }
 
     private var note: String? {
@@ -114,25 +122,25 @@ struct StyleMenu: View {
     var body: some View {
         Text(face.state.label)
         if face.canActivate {
-            Button("Activate Style") {
+            Button("Activate Style", systemImage: "checkmark.circle") {
                 model.activate([face], title: "\(family.name) \(face.face.styleName)")
             }
         }
         if face.canActivateTemporarily {
-            Button("Activate Temporarily") { model.activateTemporarily([face]) }
+            Button("Activate Temporarily", systemImage: "clock") { model.activateTemporarily([face]) }
         }
         if face.canDeactivate {
-            Button("Deactivate Style") { model.deactivate([face]) }
+            Button("Deactivate Style", systemImage: "circle.dashed") { model.deactivate([face]) }
         }
         CopySourcesMenu(styles: [face], title: "\(family.name) \(face.face.styleName)", model: model)
         Divider()
-        Button("Reveal in Finder") { model.reveal(path: face.face.path) }
-        Button("Copy PostScript Name") {
+        Button("Reveal in Finder", systemImage: "finder") { model.reveal(path: face.face.path) }
+        Button("Copy PostScript Name", systemImage: "doc.on.clipboard") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(face.face.postScriptName, forType: .string)
         }
         Divider()
-        Button("Move Style to Trash") {
+        Button("Move Style to Trash", systemImage: "trash") {
             model.requestTrash([face], removing: family.faces.count == 1 ? [family.id] : [], title: "“\(family.name) \(face.face.styleName)”")
         }
     }
@@ -149,13 +157,15 @@ struct CopySourcesMenu: View {
     var body: some View {
         let sources = model.copySources(of: styles)
         if sources.count > 1 {
-            Menu("Use Copy From") {
+            Menu {
                 ForEach(sources) { source in
                     Toggle(label(source), isOn: Binding(
                         get: { source.isInUse },
                         set: { _ in model.useCopies(from: source, title: "\(title) from \(source.name)") }
                     ))
                 }
+            } label: {
+                Label("Use Copy From", systemImage: "doc.on.doc")
             }
         }
     }
@@ -194,6 +204,6 @@ struct ClassificationMenuItems: View {
             ))
         }
         Divider()
-        Button("New Classification") { model.newClassification(for: families) }
+        Button("New Classification", systemImage: "plus") { model.newClassification(for: families) }
     }
 }

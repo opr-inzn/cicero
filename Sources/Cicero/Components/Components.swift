@@ -384,7 +384,7 @@ struct FolderActivationPicker: View {
     private static let active = "\u{0}active", specificApp = "\u{0}app"
 
     var body: some View {
-        Picker("Fonts in This Folder", selection: Binding(
+        Picker(selection: Binding(
             get: { folder.isActive ? Self.active : folder.appName ?? "" },
             set: { choice in
                 switch choice {
@@ -403,6 +403,8 @@ struct FolderActivationPicker: View {
             }
             Divider()
             Text("Active in Specific App").tag(Self.specificApp)
+        } label: {
+            Label("Fonts in This Folder", systemImage: "switch.2")
         }
     }
 }
