@@ -41,7 +41,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
-  preview) and prefetches them after scans, four files at a time, what the browser shows first. It keeps
+  preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
+  prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead
+  (`F_RDADVISE`), glyphs included, not just the tables a descriptor needs. It keeps
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
   (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
