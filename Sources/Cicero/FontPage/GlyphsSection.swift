@@ -75,16 +75,21 @@ struct GlyphsSection: View {
     }
 
     /// One popover per row, pointing at the clicked cell, rather than one per cell: each is worked out
-    /// again whenever the page updates.
+    /// again whenever the page updates. The cells share out the row's width, so they reach the page's edge
+    /// whatever it is, without the page drawing them again as it changes; a short last row keeps their width.
     private func glyphRow(_ scalars: ArraySlice<UInt32>, face: FontFace) -> some View {
         let column = popover.flatMap { scalars.firstIndex(of: $0) }.map { $0 - scalars.startIndex }
-        let anchor = CGRect(x: CGFloat(column ?? 0) * (Self.cell + Self.spacing), y: 0, width: Self.cell, height: Self.cell)
+        // The clicked cell's bottom middle, within two points: the cells are as wide as the row allows.
+        let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
         return HStack(spacing: Self.spacing) {
             ForEach(scalars, id: \.self) { scalar in
                 glyph(scalar, face: face)
             }
+            ForEach(scalars.count..<columns, id: \.self) { _ in
+                Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell)
+            }
         }
-        .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .rect(.rect(anchor))) {
+        .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let popover {
                 VStack(spacing: 10) {
                     FontText(text: String(Character(Unicode.Scalar(popover)!)), face: face, size: 96, weight: preview.weight)
@@ -100,7 +105,7 @@ struct GlyphsSection: View {
 
     private func glyph(_ scalar: UInt32, face: FontFace) -> some View {
         FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: face, size: 26, weight: preview.weight, features: model.features(for: family))
-            .frame(width: Self.cell, height: Self.cell)
+            .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
             .background(.quaternary.opacity(popover == scalar ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
             .contentShape(.rect)
             .onTapGesture { popover = scalar }
