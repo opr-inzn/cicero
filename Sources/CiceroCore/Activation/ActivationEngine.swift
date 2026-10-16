@@ -353,7 +353,8 @@ public struct ActivationEngine: Sendable {
         var succeeded = 0
         var toRegister: [String] = []
         let session = Self.currentSession()
-        for face in Self.uniqueByPath(faces) {
+        // Never one of Creative Cloud's: one only Adobe apps load would be on in every app.
+        for face in Self.uniqueByPath(faces) where !face.isAdobeFonts {
             let path = face.face.path
             if records.temporary[path] != nil {
                 records.temporary[path] = TemporaryRecord(scope: .untilQuit, session: session)
@@ -468,6 +469,11 @@ public struct ActivationEngine: Sendable {
         for face in faces { listed[face.face.path, default: []].formUnion(face.otherCopies) }
         for face in Self.uniqueByPath(faces) {
             let path = face.face.path
+            // Creative Cloud's files never move, also those only Adobe apps load.
+            if face.isAdobeFonts {
+                locked.append(path)
+                continue
+            }
             if face.app != nil, records.appFolderOrigins[path] == nil {
                 leaving.append(path)
                 switch face.state.source {
@@ -670,7 +676,7 @@ public struct ActivationEngine: Sendable {
                 failed.append(path)
             }
         }
-        // Files in a folder the user may not change, like an Adobe folder an installer made, go once macOS has
+        // Files in a folder the user may not change, like the Fonts folder next to InDesign, go once macOS has
         // asked for an administrator's password, as in the Finder.
         if !forbidden.isEmpty {
             let moved = await trashAsAdministrator(forbidden.map(Self.url))
@@ -766,7 +772,7 @@ public struct ActivationEngine: Sendable {
     /// Paths Cicero never moves, trashes or modifies.
     public static func isProtected(_ path: String) -> Bool {
         ["/System/", "/Library/Application Support/Apple/", "/usr/", "/private/"].contains(where: path.hasPrefix)
-            || path.contains(".app/") || path.contains("/Adobe/CoreSync/")
+            || path.contains(".app/") || ActiveSource.isAdobeFonts(path)
     }
 
     // MARK: Files

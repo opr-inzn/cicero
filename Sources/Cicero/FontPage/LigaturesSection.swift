@@ -57,18 +57,21 @@ struct LigaturesSection: View {
         }
     }
 
-    /// One popover per row, pointing at the clicked cell, as for the glyphs.
+    /// One popover per row, pointing at the clicked cell, and cells sharing out the row's width, as for the glyphs.
     private func ligatureRow(_ ligatures: ArraySlice<Ligature>, in group: LigatureGroup) -> some View {
         let column = popover.flatMap { shown in
             shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
         }.map { $0 - ligatures.startIndex }
-        let anchor = CGRect(x: CGFloat(column ?? 0) * (Self.cell.width + Self.spacing), y: 0, width: Self.cell.width, height: Self.cell.height)
+        let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
         return HStack(spacing: Self.spacing) {
             ForEach(ligatures) { ligature in
                 cell(ligature, in: group)
             }
+            ForEach(ligatures.count..<columns, id: \.self) { _ in
+                Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell.height)
+            }
         }
-        .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .rect(.rect(anchor))) {
+        .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let column {
                 details(ligatures[ligatures.startIndex + column], in: group)
             }
@@ -87,7 +90,7 @@ struct LigaturesSection: View {
                 .truncationMode(.middle)
         }
         .padding(.horizontal, 4)
-        .frame(width: Self.cell.width, height: Self.cell.height)
+        .frame(minWidth: Self.cell.width, maxWidth: .infinity, minHeight: Self.cell.height, maxHeight: Self.cell.height)
         .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
         .contentShape(.rect)
         .onTapGesture { popover = (group.tag, ligature.characters) }

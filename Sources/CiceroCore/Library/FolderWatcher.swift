@@ -13,6 +13,8 @@ public final class FolderWatcher: @unchecked Sendable {
     private var folders: [String] = []
     private var fileFolders: [String] = []
     private var files: Set<String> = []
+    /// Watched folders whose fonts have hidden names, like Creative Cloud's.
+    private var hiddenFolders: [String] = []
 
     public init(onChange: @escaping @Sendable () -> Void) {
         self.onChange = onChange
@@ -24,15 +26,17 @@ public final class FolderWatcher: @unchecked Sendable {
 
     /// Watches these folders, and these files, instead of the ones before. A file is watched through its
     /// folder, which only says something when the file changes; files right in the home folder (or above
-    /// it) aren't watched, as everything in it would go through the watcher.
-    public func watch(_ paths: [String], files: [String] = []) {
+    /// it) aren't watched, as everything in it would go through the watcher. In `hidden` folders, files with
+    /// hidden names count too.
+    public func watch(_ paths: [String], files: [String] = [], hidden: [String] = []) {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let parents = Set(files.map { ($0 as NSString).deletingLastPathComponent }).filter { !(home + "/").hasPrefix($0 + "/") }
-        let watched = paths + parents.sorted()
+        let watched = paths + hidden + parents.sorted()
         guard watched != self.watched else { return }
         stop()
         self.watched = watched
-        folders = paths.map { Self.realPath($0) + "/" }
+        folders = (paths + hidden).map { Self.realPath($0) + "/" }
+        hiddenFolders = hidden.map { Self.realPath($0) + "/" }
         fileFolders = parents.map { Self.realPath($0) + "/" }
         self.files = Set(files.map(Self.realPath))
         guard !watched.isEmpty else { return }
@@ -70,7 +74,7 @@ public final class FolderWatcher: @unchecked Sendable {
         func isIn(_ folder: String) -> Bool { path.hasPrefix(folder) || path + "/" == folder }
         if fileFolders.contains(where: isIn), !folders.contains(where: isIn) { return false }
         let name = (path as NSString).lastPathComponent
-        guard !name.hasPrefix(".") else { return false }
+        guard !name.hasPrefix(".") || hiddenFolders.contains(where: isIn) else { return false }
         if flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir) != 0 { return true }
         return FontFileReader.fontExtensions.contains((name as NSString).pathExtension.lowercased())
     }

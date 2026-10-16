@@ -231,9 +231,9 @@ extension AppModel {
         let new = urls.map(\.standardizedFileURL.path).filter { !existing.contains($0) }
         guard !new.isEmpty else { return }
         for path in new {
-            // Adobe's folders come with the Adobe Apps switch rather than one by one.
+            // Adobe's folders come with the Testing switch rather than one by one.
             if WatchedFolder.detectAppName(forPath: path) != nil {
-                data.showAdobeFonts = true
+                data.showAdobeAppFolders = true
             } else {
                 data.folders.append(WatchedFolder(path: path))
             }
@@ -515,6 +515,10 @@ extension AppModel {
             // Every folder Adobe apps load by themselves is one item.
             if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
+            }
+            // Adobe Fonts, from Creative Cloud, apart from the fonts the user put in Adobe's folders.
+            if ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) {
+                folders.append(WatchedFolder(id: WatchedFolder.adobeFontsID, path: ""))
             }
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))

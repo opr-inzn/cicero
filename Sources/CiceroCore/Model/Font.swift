@@ -159,7 +159,8 @@ public enum ActiveSource: Hashable, Sendable {
     case allUsers
     /// Inside an app bundle.
     case app
-    /// Synced by Adobe Creative Cloud (CoreSync).
+    /// Adobe Fonts, the service: turned on in Creative Cloud, which syncs the files (CoreSync) and has macOS
+    /// use them. Not the fonts in Adobe apps' own Fonts folders, which are `FaceState.appOnly("Adobe")`.
     case adobeFonts
     /// ~/Library/Fonts.
     case fontsFolder
@@ -175,6 +176,12 @@ public enum ActiveSource: Hashable, Sendable {
         case .fontsFolder, .inPlace, .temporary, .otherApp: true
         case .macOS, .allUsers, .app, .adobeFonts: false
         }
+    }
+
+    /// Whether a file is Creative Cloud's, from Adobe Fonts: those it turned on for every app, and those Adobe apps
+    /// turned on for themselves. Creative Cloud alone turns them on and off, and moves them.
+    public static func isAdobeFonts(_ path: String) -> Bool {
+        path.contains("/Adobe/CoreSync/")
     }
 }
 
@@ -232,6 +239,9 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
     /// The app that loads the file from its own folder ("Adobe", "InDesign"), also while Cicero keeps
     /// it out of that folder to turn it off there.
     public let app: String?
+    /// The file is Creative Cloud's, from Adobe Fonts, so Cicero never switches it: neither one on for every app
+    /// nor one Adobe apps turned on for themselves, which stays on in Adobe apps only.
+    public let isAdobeFonts: Bool
 
     /// Given `copies`, `otherCopies` are their paths.
     public init(face: FontFace, state: FaceState, otherCopies: [String] = [], copies: [FaceCopy] = [], dateAdded: Date? = nil, app: String? = nil) {
@@ -241,15 +251,16 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
         self.copies = copies
         self.dateAdded = dateAdded
         self.app = app
+        isAdobeFonts = ActiveSource.isAdobeFonts(face.path)
     }
 
     public var id: FaceID { face.id }
-    public var canActivate: Bool { !state.isActive || state.temporaryScope != nil }
+    public var canActivate: Bool { !isAdobeFonts && (!state.isActive || state.temporaryScope != nil) }
     /// Off, or on only while an application set's app is open.
-    public var canActivateTemporarily: Bool { !state.isActive || state.temporaryScope == .whileAppsRun }
+    public var canActivateTemporarily: Bool { !isAdobeFonts && (!state.isActive || state.temporaryScope == .whileAppsRun) }
     /// A face an app loads from its folder can be turned off there too, by moving it out.
     public var canDeactivate: Bool {
-        if case .appOnly = state { return true }
+        if case .appOnly = state { return !isAdobeFonts }
         return state.source?.canDeactivate ?? false
     }
 
@@ -347,6 +358,8 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let formatLabel: String
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
+    /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
+    public let isAdobeFonts: Bool
     public let position: SwitchPosition
     /// The regular upright face, which stands for the family in previews and coverage.
     public let regular: LibraryFace
@@ -378,6 +391,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         formatLabel = Self.formatLabel(of: faces.map(\.face))
         let apps = Set(faces.map(\.app))
         app = apps.count == 1 ? apps.first! : nil
+        isAdobeFonts = faces.allSatisfy(\.isAdobeFonts)
         position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
         let formats = Set(faces.map { FontFormat.of(path: $0.face.path) })
         format = formats.count == 1 ? formats.first! : .mixed

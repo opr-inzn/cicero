@@ -120,6 +120,7 @@ struct ActivationSwitch: View {
 
     private var help: String {
         if family.state == .system { return "Installed with macOS" }
+        if family.isAdobeFonts { return "From Adobe Fonts, which Creative Cloud turns on and off" }
         guard let app = family.app.map(FaceState.appDescription) else { return family.hasActive ? "Deactivate" : "Activate" }
         return switch model.position(of: family) {
         case .app: "On in \(app) only. Click to turn on in every app."
@@ -168,19 +169,25 @@ struct StatusTag: View {
     private var content: (String, Color)? {
         if family.temporaryScope == .whileAppsRun { return ("App Set", .blue) }
         if family.temporaryScope != nil { return ("Temporary", .blue) }
+        // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
+        if family.isAdobeFonts { return ("Adobe Fonts", .purple) }
         switch family.state {
         case .system: return ("System", .secondary)
         case .partial: return ("Partly active", .orange)
-        case .appOnly(let app): return (app, .red)
+        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red)
         case .active, .inactive: return nil
         }
     }
 
     private var help: String {
-        switch family.temporaryScope {
-        case .untilQuit: "Active until Cicero quits"
-        case .whileAppsRun: "Active while an app it’s set up for is open"
-        case nil: ""
+        switch (family.temporaryScope, family.state) {
+        case (.untilQuit, _): "Active until Cicero quits"
+        case (.whileAppsRun, _): "Active while an app it’s set up for is open"
+        case (nil, .appOnly) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud. Active in Adobe apps only."
+        case (nil, _) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud"
+        case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load fonts from by themselves"
+        case (nil, .appOnly(let app)): "Active in \(app) only, from a folder it loads fonts from by itself"
+        case (nil, _): ""
         }
     }
 }
@@ -377,7 +384,7 @@ struct FolderActivationPicker: View {
     private static let active = "\u{0}active", specificApp = "\u{0}app"
 
     var body: some View {
-        Picker("Fonts in This Folder", selection: Binding(
+        Picker(selection: Binding(
             get: { folder.isActive ? Self.active : folder.appName ?? "" },
             set: { choice in
                 switch choice {
@@ -396,6 +403,8 @@ struct FolderActivationPicker: View {
             }
             Divider()
             Text("Active in Specific App").tag(Self.specificApp)
+        } label: {
+            Label("Fonts in This Folder", systemImage: "switch.2")
         }
     }
 }
