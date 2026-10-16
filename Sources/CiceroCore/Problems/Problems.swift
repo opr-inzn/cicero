@@ -230,6 +230,7 @@ public enum ProblemDetector {
                 case .otherApp: return "Activated by another app"
                 }
             }
+            if ActiveSource.isAdobeFonts(path) { return "Active in Adobe apps" }
             if path.hasPrefix(locations.deactivated.path + "/") { return "In Cicero’s Deactivated folder" }
             if let folder = folders.first(where: { path.hasPrefix($0.path + "/") }) {
                 return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
@@ -260,12 +261,15 @@ public enum ProblemDetector {
 
         /// The copy of a style active from several files to keep: the newest version. Of equal versions, one that
         /// can't go anyway (macOS's or an app's), then one in the user's own folders, then one for all users, then one
-        /// in the user's Fonts folder, and one active only for now last.
+        /// in the user's Fonts folder, then one active only for now, and one from Adobe Fonts last: Creative Cloud
+        /// may take it away, so one of the user's own stays too (see `SpareCopies`).
         func keeper(of paths: [String]) -> String {
             func rank(_ path: String) -> Int {
-                if ActivationEngine.isProtected(path) { return 5 }
-                switch LibraryScanner.activeSource(of: path, locations: locations, records: data.records) {
-                case .macOS, .app, .adobeFonts: return 5
+                let source = LibraryScanner.activeSource(of: path, locations: locations, records: data.records)
+                if source != .adobeFonts, ActivationEngine.isProtected(path) { return 5 }
+                switch source {
+                case .adobeFonts: return 0
+                case .macOS, .app: return 5
                 case .inPlace, .otherApp: return 4
                 case .allUsers: return 3
                 case .fontsFolder: return 2
@@ -692,7 +696,10 @@ public struct SpareCopies: Sendable {
         for family in library.families {
             for face in family.faces {
                 let key = FaceKey(face.face)
-                let paths = [face.face.path] + face.otherCopies
+                // A copy from Adobe Fonts is Creative Cloud's to take away whenever it likes (when the font is turned
+                // off there, or the subscription ends), and one only Adobe apps load no other app has: it leaves no file
+                // of the user's spare.
+                let paths = ([face.face.path] + face.otherCopies).filter { !ActiveSource.isAdobeFonts($0) }
                 files[key] = paths
                 for path in paths { faces[path, default: []].insert(key) }
             }

@@ -48,7 +48,7 @@ Choose which one in **Settings → General**, next to **Activate fonts by**:
 
 A few things happen either way:
 
-- Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts for Adobe apps](#fonts-for-adobe-apps).
+- Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders).
 - When a copy has the same name as a file already in your Fonts folder, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
 - A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
 
@@ -100,7 +100,7 @@ Turning a font off never deletes your only copy of it. What happens to the file 
 | Used where it is, or on temporarily | macOS stops using it. The file stays where it is. |
 | A copy Cicero installed in your Fonts folder, and the original is still there, unchanged, in your library | The copy goes to the Trash. The original stays where it is. |
 | Any other file in your Fonts folder, like a font you installed by opening it | The file moves to Cicero’s [Deactivated folder](#the-deactivated-folder), so the font stays in your library. If Cicero didn’t install it, Cicero asks first. |
-| In a folder an app loads by itself, like Adobe’s | The file moves to the Deactivated folder, so the app stops loading it too. See [Fonts for Adobe apps](#fonts-for-adobe-apps). |
+| In a folder an app loads by itself, like Adobe’s | The file moves to the Deactivated folder, so the app stops loading it too. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders). |
 
 Files in your Fonts folder are turned off before they move, so apps let go of them at once. If a file can’t be moved, Cicero turns it back on and says so.
 
@@ -119,16 +119,30 @@ Some fonts belong to macOS or another app. Their switch is dimmed, and holding t
 - **Installed with macOS:** macOS needs them.
 - **Installed for all users,** in `/Library/Fonts`: an administrator has to remove them.
 - **Comes with an app:** the app manages them.
-- **Adobe Fonts:** fonts you turned on in Adobe Creative Cloud are managed there.
+- **Adobe Fonts:** Creative Cloud manages them. See [Adobe Fonts](#adobe-fonts).
 
-## Fonts for Adobe apps
+## Adobe Fonts
 
-Adobe apps load fonts from folders of their own, without installing them:
+The fonts you turn on in Adobe Fonts, in Creative Cloud, are on in every app. Cicero always lists them, with a purple **Adobe Fonts** tag, and together as **Adobe Fonts** under **Folders**.
+
+Adobe apps can also turn on Adobe Fonts by themselves, for instance for a document that uses them. Those are on in Adobe apps only: their switch sits halfway, and their styles say **Active in Adobe apps**, like the fonts in Adobe’s folders.
+
+Creative Cloud turns these fonts on and off, so their switches don’t move. To change them, click **Manage in Creative Cloud** on the font page, or choose it from the family’s right-click menu. It opens the Creative Cloud app.
+
+A font you also have yourself is listed as your copy, which you turn on and off as usual. A copy from Adobe Fonts never makes yours a spare one, which [Problems](problems.md) would offer to remove: Creative Cloud takes its copy away when the font is turned off there.
+
+## Fonts in Adobe apps’ folders
+
+Adobe apps load the fonts in folders of their own, without the fonts being installed:
 
 - `/Library/Application Support/Adobe/Fonts` and `~/Library/Application Support/Adobe/Fonts`, for all Adobe apps
 - the Fonts folder next to an Adobe app, like `/Applications/Adobe InDesign 2026/Fonts`, for that app only
 
-Cicero lists the fonts in all of them together as **Adobe Apps** under **Folders**, while there are any. They show as active in those apps, with a red tag like **Adobe** or **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for Adobe apps** in **Settings → General**.
+Type designers export fonts there to test them: an Adobe app picks up a new version straight away, with no font cache in the way. Glyphs explains how in [Testing your fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps).
+
+These folders have nothing to do with Adobe Fonts, the fonts you turn on in Creative Cloud (see [Adobe Fonts](#adobe-fonts)).
+
+Cicero lists the fonts in all of them together as **Testing** under **Folders**, while there are any. They show as active in those apps, with a red tag, **Testing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show test fonts installed for Adobe apps** under **Type Designer Mode** in **Settings → General**. Adobe Fonts stay listed either way.
 
 ### The three-position switch
 

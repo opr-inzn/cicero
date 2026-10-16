@@ -40,7 +40,7 @@ final class AppModel {
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
-    /// Cicero's own folder items that have fonts now (Adobe Apps, Added Fonts, Deactivated): the sidebar lists them.
+    /// Cicero's own folder items that have fonts now (Testing, Adobe Fonts, Added Fonts, Deactivated): the sidebar lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
     var downloads: [UUID: DownloadProgress] = [:]
@@ -68,7 +68,7 @@ final class AppModel {
             if data.tags != oldValue.tags || data.familyTags != oldValue.familyTags || data.tagColors != oldValue.tagColors {
                 refreshTagDots()
             }
-            if data.showAdobeFonts != oldValue.showAdobeFonts { rescan() }
+            if data.showAdobeAppFolders != oldValue.showAdobeAppFolders { rescan() }
         }
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
@@ -257,7 +257,7 @@ final class AppModel {
         FontLoader.shared.prefetch((visibleFamilies + saved.families).map(\.regular.face))
     }
 
-    /// Adobe's font folders used to be added to the user's folders; the Adobe Apps switch covers them now.
+    /// Adobe's font folders used to be added to the user's folders; the Testing switch covers them now.
     private func dropAdobeFolders() {
         data.folders.removeAll { WatchedFolder.detectAppName(forPath: $0.path) != nil }
     }
@@ -280,7 +280,7 @@ final class AppModel {
         // touches their folder, which may be one macOS asks about, like Downloads.
         if data.fontFiles.contains(where: Reachability.isGone) { data.fontFiles.removeAll(where: Reachability.isGone) }
         let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
-        folderWatcher.watch(input.folders.map(\.path), files: input.files)
+        folderWatcher.watch(input.folders.map(\.path), files: input.files, hidden: [locations.adobeFontsInAdobeApps?.path].compactMap { $0 })
         // Most scans take a fraction of a second; the capsule only shows for one that takes longer.
         latestProgress = .finding
         revealProgress?.cancel()
@@ -553,6 +553,7 @@ final class AppModel {
         let classificationName = classificationNamer()
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
+            if family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
             if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.showSystemFonts || family.state != .system else { continue }

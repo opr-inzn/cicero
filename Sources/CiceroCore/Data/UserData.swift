@@ -30,8 +30,9 @@ public struct UserData: Codable, Equatable, Sendable {
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
     public var showSystemFonts = true
-    /// List the fonts in the folders Adobe apps load by themselves, as one Adobe Apps item.
-    public var showAdobeFonts = true
+    /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
+    /// as one Testing item. Not Adobe Fonts from Creative Cloud, which are always listed, as Adobe Fonts.
+    public var showAdobeAppFolders = true
     public var records = ActivationRecords()
 
     public init() {}
@@ -74,7 +75,10 @@ public struct UserData: Codable, Equatable, Sendable {
         // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
-        showAdobeFonts = try value(.showAdobeFonts, d.showAdobeFonts)
+        // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
+        showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
+            ?? decoder.container(keyedBy: FormerKeys.self).decodeIfPresent(Bool.self, forKey: .showAdobeFonts)
+            ?? d.showAdobeAppFolders
         records = try value(.records, d.records)
         // Rules for Slab Serif, a classification there used to be, pick Serif, which it's part of now; unless
         // Slab Serif is one of the user's.
@@ -96,9 +100,11 @@ public struct UserData: Codable, Equatable, Sendable {
         return self != other
     }
 
+    private enum FormerKeys: String, CodingKey { case showAdobeFonts }
+
     /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
     public func scannedFolders() -> [WatchedFolder] {
-        folders + (showAdobeFonts ? WatchedFolder.appFontFolders() : [])
+        folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : [])
     }
 
     /// The tags a family has, in the order they were made.
@@ -132,6 +138,8 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
     /// them as one item.
     public static let adobeAppsID = UUID(uuidString: "00000000-0000-0000-0000-00000000AD0B")!
+    /// Adobe Fonts from Creative Cloud, wherever it keeps them: an item of their own, apart from Adobe's folders.
+    public static let adobeFontsID = UUID(uuidString: "00000000-0000-0000-0000-0000AD0BEF00")!
     /// The font files added one at a time, which the sidebar lists as one item with the folders.
     public static let addedFilesID = UUID(uuidString: "00000000-0000-0000-0000-0000000ADDED")!
 
@@ -155,11 +163,12 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// "Deactivated", "Adobe Apps" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other
-    /// folders called Fonts, else the name.
+    /// "Deactivated", "Testing" (Adobe's folders, where type designers test fonts), "Adobe Fonts" and "Added Fonts"
+    /// for Cicero's own items, "<Parent> Fonts" for other folders called Fonts, else the name.
     public var displayName: String {
         if id == Self.deactivatedID { return "Deactivated" }
-        if id == Self.adobeAppsID { return "Adobe Apps" }
+        if id == Self.adobeAppsID { return "Testing" }
+        if id == Self.adobeFontsID { return "Adobe Fonts" }
         if id == Self.addedFilesID { return "Added Fonts" }
         let last = url.lastPathComponent
         guard last.caseInsensitiveCompare("Fonts") == .orderedSame else { return last }

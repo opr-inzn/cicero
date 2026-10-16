@@ -32,6 +32,8 @@ extension AppModel {
     /// Sidebar rows whose fonts can be exported: sets, tags, folders, foundries, classifications and character sets.
     func canExport(_ item: SidebarItem) -> Bool {
         switch item {
+        // Creative Cloud's files never leave it.
+        case .folder(WatchedFolder.adobeFontsID): false
         case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
         case .all, .active, .inactive, .system, .problems: false
         }
