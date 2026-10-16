@@ -2,6 +2,24 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.4.9
+
+- Adobe Fonts from Creative Cloud are told apart from the fonts you install to test in Adobe apps. They have a purple **Adobe Fonts** tag, and an **Adobe Fonts** item under **Folders** while Creative Cloud has fonts on your Mac.
+- Cicero lists the Adobe Fonts an Adobe app turned on by itself, for instance for a document that uses them. They’re on in Adobe apps only, so they show as **Active in Adobe apps**, with their switch halfway.
+- Creative Cloud turns Adobe Fonts on and off, so their switches don’t move. **Manage in Creative Cloud**, on the font page and in the right-click menu, opens the Creative Cloud app.
+- The fonts you put in Adobe’s Fonts folders to test them, as [Glyphs explains](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps), are tagged and listed as **Testing**, rather than Adobe and Adobe Apps.
+- The switch for those test fonts, **Show test fonts installed for Adobe apps**, is under **Type Designer Mode** in Settings → General. It hides only your test fonts; Adobe Fonts are always listed.
+- A copy from Adobe Fonts no longer counts as a spare of one of your own files. **Remove All Extra Copies** and **Remove Copy** in Problems always leave one of yours, because Creative Cloud takes its copy away when the font is turned off there. Before, they could keep Creative Cloud’s copy and move yours to the Trash.
+- Menus have icons, as on macOS 26: the commands in the menu bar, the sidebar’s menus and the right-click menus of fonts and styles.
+- With the Info panel open, the grid keeps its columns and the tiles get narrower, so its rows reach the panel. Before, the panel took columns away and could leave a gap beside it.
+- On a font page, the glyph and ligature cells reach the right edge, rather than leaving a gap at the end of each row.
+- In Settings → Sidebar, each coverage set has a row of its own, as tall as the other sections’ rows, under its group’s title, which opens and closes it.
+- A family’s styles are listed from narrowest and lightest, by where each sits on the width and weight axes, a variable font’s named instances included.
+- When you type to jump to a family, a space within the name counts as part of it, as in Times New Roman. A space with nothing after it still opens Quick Look.
+- A font page no longer locks up at full CPU once you scroll to the end of a family with dozens of styles.
+- Switching to specimens is up to a second faster, a first scan reads font files about twice as fast, and scrolling through specimens no longer waits on the disk for fonts not read since the Mac started.
+- VoiceOver names each segment of the toolbar’s view and layout pickers, rather than all of them after the first.
+
 ## 1.4.8
 
 - **Remove All Extra Copies**, at the top of Installed Twice in Problems, deals with every font there at once, after asking: it keeps the newest copy of each font and moves the others to the Trash. Of copies with the same version, it keeps one that comes with macOS or an app, then one in your own folders, then one installed for all users, before one in your Fonts folder. Duplicates has **Move All Extra Copies to Trash** too.
