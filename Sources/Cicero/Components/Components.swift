@@ -498,11 +498,21 @@ struct FlowLayout: Layout {
     var spacing: CGFloat
     var lineSpacing: CGFloat
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    /// The children's sizes, measured once per update rather than for every proposal and again to place them:
+    /// specimens are a lazy stack's rows, which it measures over and over while scrolling, and each child is
+    /// text in a face of its own.
+    func makeCache(subviews: Subviews) -> [CGSize] {
+        subviews.map { $0.sizeThatFits(.unspecified) }
+    }
+
+    func updateCache(_ cache: inout [CGSize], subviews: Subviews) {
+        cache = makeCache(subviews: subviews)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) -> CGSize {
         let width = proposal.width ?? .infinity
         var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+        for size in cache {
             if x > 0 && x + size.width > width {
                 y += lineHeight + lineSpacing
                 x = 0
@@ -515,10 +525,9 @@ struct FlowLayout: Layout {
         return CGSize(width: min(widest, width), height: y + lineHeight)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) {
         var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+        for (subview, size) in zip(subviews, cache) {
             if x > bounds.minX && x + size.width > bounds.maxX {
                 y += lineHeight + lineSpacing
                 x = bounds.minX

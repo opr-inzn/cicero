@@ -111,7 +111,7 @@ extension View {
 /// jumps to the first family starting with it (spaces included while typing), Space opens and closes Quick Look, and the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
-    let families: [Family]
+    let order: FamilyOrder
     @Binding var anchor: SelectionAnchor
     let proxy: ScrollViewProxy
     var layout = FamilyLayout.list
@@ -121,6 +121,8 @@ struct FamilyKeys: ViewModifier {
     @State private var lastTyped = Date.distantPast
     /// Quick Look, opening unless a letter follows the space just typed.
     @State private var pendingQuickLook: Task<Void, Never>?
+
+    private var families: [Family] { order.families }
 
     func body(content: Content) -> some View {
         let quickLook = model.quickLook
@@ -235,10 +237,29 @@ struct FamilyKeys: ViewModifier {
     }
 }
 
+/// The families a browser view shows, in its order, for its keys and for each tile or row to select ranges in.
+/// SwiftUI compares a view's inputs whenever it updates, and comparing two arrays of families compares every
+/// family in them unless they're the same array: with one in every tile, a list made again with the same
+/// families (a classification guessed, coverage worked out, another layout) took most of a second. Equal only when
+/// it's the same array, which is enough to keep the views that hold it up to date.
+struct FamilyOrder: Equatable {
+    let families: [Family]
+
+    init(_ families: [Family]) {
+        self.families = families
+    }
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.families.withUnsafeBufferPointer { x in
+            b.families.withUnsafeBufferPointer { $0.baseAddress == x.baseAddress && $0.count == x.count }
+        }
+    }
+}
+
 /// Clicking, double-clicking, dragging, the right-click menu and accessibility for one family's tile or row.
 struct FamilyItem: ViewModifier {
     let family: Family
-    let families: [Family]
+    let order: FamilyOrder
     let model: AppModel
     @Binding var anchor: SelectionAnchor
     let focus: () -> Void
@@ -251,14 +272,14 @@ struct FamilyItem: ViewModifier {
             .onTapGesture(count: 2) { model.openFamilyID = family.id }
             .simultaneousGesture(TapGesture().onEnded {
                 focus()
-                model.click(family, in: families, anchor: &anchor)
+                model.click(family, in: order.families, anchor: &anchor)
             })
             .contextMenu { FamilyMenu(families: model.targets(for: family), model: model) }
             .draggable(family.name)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.openFamilyID = family.id }
-            .accessibilityAction(named: "Select") { model.click(family, in: families, anchor: &anchor) }
+            .accessibilityAction(named: "Select") { model.click(family, in: order.families, anchor: &anchor) }
             .accessibilityAction(named: family.hasActive ? "Deactivate" : "Activate") { model.toggle(family) }
     }
 }

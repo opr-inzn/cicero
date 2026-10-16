@@ -141,6 +141,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Only rows of about one height go in a lazy stack: the page's header, type tester and styles sit in a
   plain stack above the lazy one, since a family's fifty styles, one 2,000 pt row of it, made the guesses
   swing the same way whenever the page was scrolled to its end.
+- A row of a lazy stack doesn't hold the whole list it's in. SwiftUI compares every row's inputs whenever
+  it updates, and arrays of families compare every family in them unless they're the same array: the
+  browser's tiles and rows hold a `FamilyOrder`, equal only to itself, for selecting ranges.
 - Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
   width that doesn't depend on them, so a layout settles in one pass.
 - The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
