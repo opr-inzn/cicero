@@ -177,6 +177,9 @@ public struct ActivationEngine: Sendable {
     let registrar: any FontRegistrar
     /// Moves a file to the Trash. Tests replace it so they don't fill the user's Trash.
     public var trash: @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+    /// Moves files `trash` wasn't allowed to move, after macOS asks for an administrator's password, and returns
+    /// the paths that went. Tests replace it so no password is asked for.
+    public var trashAsAdministrator: @Sendable ([URL]) async -> Set<String> = { await AdministratorTrash.move($0) }
 
     public init(locations: Locations, registrar: any FontRegistrar = CoreTextRegistrar()) {
         self.locations = locations
@@ -649,16 +652,30 @@ public struct ActivationEngine: Sendable {
         if !session.isEmpty {
             _ = await registrar.unregister(session.map(Self.url), scope: .session)
         }
+        func trashed(_ path: String) {
+            records.installedCopies[path] = nil
+            records.inPlace.remove(path)
+            records.temporary[path] = nil
+            records.appFolderOrigins[path] = nil
+            succeeded += 1
+        }
+        var forbidden: [String] = []
         for path in plan.paths {
             do {
                 try trash(Self.url(path))
-                records.installedCopies[path] = nil
-                records.inPlace.remove(path)
-                records.temporary[path] = nil
-                records.appFolderOrigins[path] = nil
-                succeeded += 1
+                trashed(path)
+            } catch CocoaError.fileWriteNoPermission where !Self.isLocked(path) {
+                forbidden.append(path)
             } catch {
                 failed.append(path)
+            }
+        }
+        // Files in a folder the user may not change, like an Adobe folder an installer made, go once macOS has
+        // asked for an administrator's password, as in the Finder.
+        if !forbidden.isEmpty {
+            let moved = await trashAsAdministrator(forbidden.map(Self.url))
+            for path in forbidden {
+                if moved.contains(path) { trashed(path) } else { failed.append(path) }
             }
         }
         // Files that stayed where they were stay in use.
@@ -756,6 +773,11 @@ public struct ActivationEngine: Sendable {
 
     private static func url(_ path: String) -> URL {
         URL(fileURLWithPath: path, isDirectory: false)
+    }
+
+    /// Locked in the Finder's Get Info: not even an administrator can move it then.
+    private static func isLocked(_ path: String) -> Bool {
+        (try? FileManager.default.attributesOfItem(atPath: path)[.immutable] as? Bool) == true
     }
 
     private static func uniqueByPath(_ faces: [LibraryFace]) -> [LibraryFace] {
