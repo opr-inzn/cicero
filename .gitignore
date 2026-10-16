@@ -14,3 +14,6 @@ Tests/
 *.provisionprofile
 *.keychain-db
 .env*
+# Instruments recordings and their exports stay local.
+*.trace
+*.xctrace
