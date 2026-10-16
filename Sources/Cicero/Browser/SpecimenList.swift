@@ -16,7 +16,7 @@ struct SpecimenList: View {
                 LazyVStack(alignment: .leading, spacing: FontGrid.spacing) {
                     ForEach(families) { family in
                         Specimen(family: family, foundry: model.foundryName(of: family), isSelected: model.selectedIDs.contains(family.id), model: model)
-                            .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
+                            .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
                 .scrollTargetLayout()
@@ -29,7 +29,7 @@ struct SpecimenList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy, layout: .specimens))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .specimens))
         }
     }
 }

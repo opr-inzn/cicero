@@ -149,12 +149,12 @@ extension AppModel {
         )
     }
 
-    /// The font list's rows for `visibleFamilies`, sorted, with what the shown character set columns say.
-    /// Cached: making and sorting thousands of rows takes tens of milliseconds, and the table asks again
-    /// on every update, a click included.
-    func fontRows(sortedBy order: [KeyPathComparator<FontRow>], columns: [FontListColumn]) -> [FontRow] {
+    /// The font list's rows for `visibleFamilies`, sorted, with what the shown character set columns say, and
+    /// their families in that order. Cached: making and sorting thousands of rows takes tens of milliseconds,
+    /// and the table asks again on every update, a click included.
+    func fontRows(sortedBy order: [KeyPathComparator<FontRow>], columns: [FontListColumn]) -> (rows: [FontRow], families: [Family]) {
         let key = FontRowsKey(visible: visibleKey, order: order, columns: columns)
-        if let cached = fontRowsCache, cached.key == key { return cached.rows }
+        if let cached = fontRowsCache, cached.key == key { return (cached.rows, cached.families) }
         let custom = customCharacterSets
         let sources: [(FontListColumn, CoverageSource)] = columns.compactMap { column in
             switch column {
@@ -164,8 +164,9 @@ extension AppModel {
             }
         }
         let rows = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }.sorted(using: order)
-        fontRowsCache = (key, rows)
-        return rows
+        let families = rows.map(\.family)
+        fontRowsCache = (key, rows, families)
+        return (rows, families)
     }
 
     private func computeVisibleFamilies() -> [Family] {
