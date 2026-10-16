@@ -138,6 +138,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   moves the content and changes what's placed, and the page can lay itself out again and again at full
   CPU. The font page's glyph blocks did that as `LazyVGrid`s in the page's `LazyVStack`; they're now rows
   of fixed-size cells in the page's own stack, so every row is one height, with one popover per row.
+  Only rows of about one height go in a lazy stack: the page's header, type tester and styles sit in a
+  plain stack above the lazy one, since a family's fifty styles, one 2,000 pt row of it, made the guesses
+  swing the same way whenever the page was scrolled to its end.
 - Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
   width that doesn't depend on them, so a layout settles in one pass.
 - The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
