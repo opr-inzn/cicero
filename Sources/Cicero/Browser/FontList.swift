@@ -9,7 +9,7 @@ nonisolated struct FontRow: Identifiable, Sendable {
     let styles: Int
     let classification: String
     let format: String
-    /// Activated, then partly, then app-only, then off.
+    /// Active, then partly, then app-only, then off.
     let activation: Int
     /// What each shown character set column says; nothing while the family is still being checked.
     let coverage: [FontListColumn: CoverageCell]

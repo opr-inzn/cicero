@@ -218,9 +218,9 @@ private struct RuleRow: View {
 
     private static func statusTitle(_ value: String) -> String {
         switch value {
-        case "active": "Activated"
-        case "partial": "Partly Activated"
-        case "inactive": "Not Activated"
+        case "active": "Active"
+        case "partial": "Partly Active"
+        case "inactive": "Inactive"
         case "appOnly": "Active in Apps Only"
         default: "Installed with macOS"
         }

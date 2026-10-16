@@ -57,8 +57,8 @@ struct BrowserView: View {
         if let progress = model.coverageProgress, dependsOnCoverage {
             return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
         }
-        var parts = [count, "\(families.count(where: \.hasActive).formatted()) activated"]
-        // On in one app only (like Adobe's fonts folder): neither activated nor not, so counted apart.
+        var parts = [count, "\(families.count(where: \.hasActive).formatted()) active"]
+        // On in one app only (like Adobe's fonts folder): neither active nor inactive, so counted apart.
         let apps = families.compactMap { if case .appOnly(let app) = $0.state { app } else { nil } }
         if !apps.isEmpty {
             let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
@@ -230,14 +230,14 @@ private struct EmptyBrowser: View {
             }
         case .inactive:
             ContentUnavailableView {
-                Label("Everything Is Activated", systemImage: "checkmark.circle")
+                Label("Everything Is Active", systemImage: "checkmark.circle")
             } description: {
                 Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")
             } actions: {
                 Button("Add Folder") { model.presentAddFolderPanel() }
             }
         case .active:
-            ContentUnavailableView("Nothing Activated", systemImage: "circle.dashed",
+            ContentUnavailableView("Nothing Active", systemImage: "circle.dashed",
                                    description: Text("Turn a font on and it shows up here."))
         case .set:
             ContentUnavailableView("Empty Set", systemImage: "square.stack",

@@ -30,11 +30,11 @@ a toggle that's on and a button being pressed.
   section header; unchecked items are dimmed, and disappear when you click Done. Sections and character set
   groups stay open or closed as outside it, and open and close the same way (one state for both). Switching
   isn't animated: hundreds of rows animating in and out ran into each other.
-- Fixed rows: All Fonts (books.vertical), Activated (checkmark.circle), Not Activated (circle.dashed),
+- Fixed rows: All Fonts (books.vertical), Active (checkmark.circle), Inactive (circle.dashed),
   System Fonts (apple.logo, only while system fonts are shown), Problems (exclamationmark.triangle, count badge).
 - Sections, each collapsible and hideable:
   - **Folders** (+ adds folders). The folders Adobe apps load fonts from by themselves — /Library/Application Support/Adobe/Fonts, ~/Library/Application Support/Adobe/Fonts (all Adobe apps) and the Fonts folder next to any Adobe app, like /Applications/Adobe InDesign 2026/Fonts (that app only) — are one "Adobe Apps" item, shown while it has fonts (row menu: Reveal in Finder). They aren't in the user's folders: Settings → Folders → "Show fonts installed for Adobe apps" (on by default) switches them; adding one of them with + turns the switch on. Row menu for the user's folders: Reveal in Finder; "Fonts in This Folder" picker —
-    "Not activated until you activate them" / "Active in Adobe apps" / a custom app name; Remove Folder from Library.
+    "Inactive" / "Active" / "Active in Adobe apps" / "Active in Specific App" (asks for its name); Remove Folder from Library.
     Cicero's own Deactivated folder appears here when it has fonts, and so does "Added Fonts" (doc), the
     files added one at a time (see Opening and adding files; row menu: Reveal in Finder, which selects them).
   - **Sets** (+ menu: New Set, New Smart Set, New Application Set). Sets (square.stack), application sets (app.badge.checkmark) and smart sets (gearshape). A set's menu has Activate with Apps (Edit Apps once it has some).
@@ -76,7 +76,7 @@ a toggle that's on and a button being pressed.
 
 ## Browser
 
-- Title = selected item's name (several: "Serif and Script"); subtitle "1.298 families · 716 activated" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
+- Title = selected item's name (several: "Serif and Script"); subtitle "1.298 families · 716 active" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right, each in a glass capsule of its own, 8 pt apart like the Info button and the search field
   (ToolbarCapsule: AppKit merges neighbouring items into one capsule, and ToolbarSpacer(.fixed) leaves 16 pt): view switcher
   [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field.
@@ -114,7 +114,7 @@ a toggle that's on and a button being pressed.
 - Tag dots: the family's tags that have a colour, in the order the tags were made, as 8 pt circles overlapping like the Finder's.
 - Selection: click, ⌘-click, ⇧-click, ⌘A, arrow keys (↑/↓ in the list and specimens; in the grid ←/→ a tile and ↑/↓ a row; ⇧ extends), Esc clears (closing Quick Look first when it's open), and so does a click between families or below the last, typing a letter jumps, Return or double-click opens the font page, Space opens Quick Look; rows are draggable as family names. Right-click → family menu.
 - Search matches a family's name or foundry, or a style's PostScript name, designer or vendor ID.
-- Empty states per selection (no folders or added fonts → Add Folder, Add Fonts; nothing activated; empty set; smart set with no matches → Edit Smart Set; character set still being checked; search with no results).
+- Empty states per selection (no folders or added fonts → Add Folder, Add Fonts; nothing active; empty set; smart set with no matches → Edit Smart Set; character set still being checked; search with no results).
 - A small glass capsule bottom-right while a scan takes longer than 0.4 s ("Finding fonts", "Identifying fonts 200 of 4000"); quicker scans show nothing.
 - Selecting Problems shows the Problems view instead of a list.
 - Status tags (small capsules): System; Partly active (orange); app name e.g. "Adobe" (red) for app-only; "Temporary" (blue) for temporarily active; "App Set" (blue) for on for an application set.
@@ -264,7 +264,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 ## Sets, smart sets, character sets
 
 - Sets: ordered lists of family names, optionally with apps (application sets, see Activation). The apps sheet ("Activate “Name” with Apps"): the apps with their icons, "Open" next to running ones, − to remove, Add App (an open panel in /Applications), and a line about opening Cicero at login. Tags: names in the order they were made, family → tags, tag → colour (Finder's seven or none; New Tag starts on the first no tag has, red again once all are taken; a colour a later version adds loads as none). A new library (no user-data.json and no library.json to import) starts with Red, Yellow and Green tags in their colours. Given from the family menu's Tags ▸, the Info panel, or by dropping families on a tag.
-- Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in; Adobe Apps and Added Fonts too), Status (Activated / Partly Activated / Not Activated / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Coverage (includes / doesn’t include), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
+- Smart sets: name, match all/any, rules (field · comparison · value): Name (contains / doesn’t contain / begins with / is), Foundry (is / is not / contains), Classification, Tag (has / doesn’t have), Set (is in / isn’t in), Folder (is in / isn’t in; Adobe Apps and Added Fonts too), Status (Active / Partly Active / Inactive / Active in Apps Only / Installed with macOS), Kind (Variable / Monospaced / Has Italics), Format, Number of Styles (is / is more than / is less than), Language (is supported / isn’t supported; Hyperglot languages, searchable picker defaulting to the user's language), Coverage (includes / doesn’t include), Date Added (is in the last / isn’t in the last N days). Editor sheet with live "N families match".
 - Character sets: built-in from Resources/CharacterSets.json (Latin S–XL; Adobe Latin 1–5; 38 Unicode blocks such as Basic Latin, Latin-1 Supplement, Latin Extended-A/B/Additional, IPA Extensions, Greek and Coptic, Cyrillic, General Punctuation, Currency Symbols — only their assigned, visible characters; Google Fonts Latin Kernel/Core/Plus/African, Cyrillic Core/Plus/Pro, Greek Core/Plus/Pro); custom sets (name + characters typed or pasted, U+ codes, 0x codes, ranges U+0100–U+017F). A family "has" a set when its regular upright face covers every character.
 - Settings → Coverage: groups with checkboxes (show in sidebar, all on by default), counts, summaries, credit links; "Your Coverage Sets" first, scrolling with the rest: rows with checkbox, count and Edit, + in the header, menu Edit Coverage Set / Delete Coverage Set; the editor has Delete for an existing set.
 
@@ -275,7 +275,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 
 ## Character Toolbox
 
-- Text: a field; lists families with every character (sample = the text in each font), count, "Include fonts missing up to N" stepper, "Activated only"; shows missing characters per row; double-click opens the family in the main window.
+- Text: a field; lists families with every character (sample = the text in each font), count, "Include fonts missing up to N" stepper, "Active only"; shows missing characters per row; double-click opens the family in the main window.
 - Languages: search (language, autonym or script), sort by speakers or name, list with speakers; selecting shows the language's characters and two sections: Fully Supported, Base Characters Only.
 
 ## Compare

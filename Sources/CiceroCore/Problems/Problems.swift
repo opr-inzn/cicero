@@ -230,7 +230,7 @@ public enum ProblemDetector {
             if let folder = folders.first(where: { path.hasPrefix($0.path + "/") }) {
                 return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
             }
-            return "Not activated"
+            return "Inactive"
         }
 
         /// Where a missing file may only be out of reach for now: "on “Server”, which isn’t connected" for a disk

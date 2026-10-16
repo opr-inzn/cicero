@@ -58,7 +58,7 @@ Choose **Fonts → Character Toolbox** (⌥⌘T). The window has two tabs, **Tex
 Cicero lists the families that have every character, each showing your text in its own font.
 
 - To see fonts that come close, raise **Include fonts missing up to** a number of characters. The **Missing** column shows which characters each one lacks.
-- Check **Activated only** to see just the fonts that are on.
+- Check **Active only** to see just the fonts that are on.
 - Double-click a family, or select it and press ↩, to open it in the main window. Right-click it for the same menu as in the browser.
 
 ### Find fonts for a language
