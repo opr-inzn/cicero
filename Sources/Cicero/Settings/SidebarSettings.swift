@@ -4,6 +4,8 @@ import SwiftUI
 /// Finder-style checkboxes for every sidebar row and section, in the sidebar's order.
 struct SidebarSettings: View {
     @Environment(AppModel.self) private var model
+    /// The coverage groups that are open.
+    @State private var expanded: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,12 +17,12 @@ struct SidebarSettings: View {
                     Section {
                         switch section {
                         case .characterSets:
+                            // Each set is a row of the form, like the other sections' rows: a DisclosureGroup's
+                            // content is one row, its checkboxes packed together without lines between them.
                             ForEach(model.characterSetGroups, id: \.id) { group in
-                                DisclosureGroup(group.title) {
-                                    // A grouped form centres what's inside a disclosure group.
-                                    ForEach(group.rows) {
-                                        checkbox($0, in: section).frame(maxWidth: .infinity, alignment: .leading)
-                                    }
+                                groupRow(group.id, title: group.title)
+                                if expanded.contains(group.id) {
+                                    ForEach(group.rows) { checkbox($0, in: section).padding(.leading, 26) }
                                 }
                             }
                         // A library can have hundreds: just the section's checkbox here.
@@ -54,6 +56,27 @@ struct SidebarSettings: View {
             }
             .padding()
         }
+    }
+
+    /// A coverage group's title, which opens and closes it.
+    private func groupRow(_ id: String, title: String) -> some View {
+        let isExpanded = expanded.contains(id)
+        return Button {
+            if isExpanded { expanded.remove(id) } else { expanded.insert(id) }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: 20)
+                Text(title)
+                Spacer()
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
     }
 
     private func note(_ text: String) -> some View {
