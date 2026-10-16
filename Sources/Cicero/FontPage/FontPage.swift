@@ -28,8 +28,7 @@ struct FontPage: View {
         // Usually ready before the page opens: the browser starts on a family when it's selected.
         let content = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
         return ScrollView {
-            // Lazy for the glyphs, which can run to thousands of cells; their block headers stay pinned.
-            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+            VStack(alignment: .leading, spacing: 0) {
                 Header(family: family)
                 Divider()
                 TypeTester(family: family)
@@ -37,17 +36,23 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                // Ligatures and glyphs together, once the page's width is known: one arriving after the other, or
-                // their cells after their titles, moved what was already there.
-                if let content {
-                    if let ligatureColumns, let glyphColumns {
-                        if !content.ligatures.isEmpty {
-                            LigaturesSection(face: face, columns: ligatureColumns, groups: content.ligatures)
+                // Lazy for the glyphs, which can run to thousands of cells; their block headers stay pinned. Only
+                // rows about one height go in it: it guesses the height of rows it hasn't placed from those it has,
+                // and with the styles in it too (fifty of them are 2,000 pt) the guesses swung so far that, scrolled
+                // to the end, the page laid itself out again and again at full CPU.
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                    // Ligatures and glyphs together, once the page's width is known: one arriving after the other, or
+                    // their cells after their titles, moved what was already there.
+                    if let content {
+                        if let ligatureColumns, let glyphColumns {
+                            if !content.ligatures.isEmpty {
+                                LigaturesSection(face: face, columns: ligatureColumns, groups: content.ligatures)
+                            }
+                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs)
                         }
-                        GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs)
+                    } else {
+                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                     }
-                } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                 }
             }
             // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles

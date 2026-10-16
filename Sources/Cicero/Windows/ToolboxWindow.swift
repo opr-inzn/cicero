@@ -25,7 +25,7 @@ struct ToolboxWindow: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                ToolbarPicker(ToolboxTab.allCases, selection: $tab, title: \.title)
+                ToolbarPicker("View", values: ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
     }

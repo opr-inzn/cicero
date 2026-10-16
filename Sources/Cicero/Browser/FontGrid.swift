@@ -22,7 +22,7 @@ struct FontGrid: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
                     ForEach(families) { family in
                         Tile(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
-                            .modifier(FamilyItem(family: family, families: families, model: model, anchor: $anchor) { focused = true })
+                            .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
                 .scrollTargetLayout()
@@ -40,7 +40,7 @@ struct FontGrid: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy, layout: .grid(columns: count)))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .grid(columns: count)))
         }
     }
 

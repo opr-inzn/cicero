@@ -80,8 +80,8 @@ struct BrowserView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarCapsule {
-            ToolbarPicker(BrowserMode.allCases, selection: $mode, title: \.title, symbol: \.icon)
-                .help("Show as a list, a grid or specimens")
+            ToolbarPicker("View", values: BrowserMode.allCases, selection: $mode, title: \.title, symbol: \.icon,
+                          help: "Show as a list, a grid or specimens")
         }
         ToolbarCapsule { PreviewOptionsButton() }
         ToolbarCapsule { InfoButton() }

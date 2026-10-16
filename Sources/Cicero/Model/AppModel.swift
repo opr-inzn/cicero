@@ -186,7 +186,7 @@ final class AppModel {
         MainActor.assumeIsolated { self?.fontsChanged() }
     }
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
-    @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow])?
+    @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
     /// The sidebar items the last scan found, as saved for the next launch.

@@ -231,8 +231,7 @@ struct FontList: View {
         let columns = shownColumns
         // A column that's been turned off, or whose set was deleted, no longer sorts the list.
         let sort = columns.contains(sortColumn) ? sortColumn : .name
-        let rows = model.fontRows(sortedBy: order(sort), columns: columns)
-        let families = rows.map(\.family)
+        let (rows, families) = model.fontRows(sortedBy: order(sort), columns: columns)
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
         ScrollViewReader { proxy in
             ScrollView {
@@ -240,7 +239,7 @@ struct FontList: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         FontListRow(row: row, columns: columns, widths: widths, isStriped: !index.isMultiple(of: 2),
                                     isSelected: model.selectedIDs.contains(row.id), model: model)
-                            .modifier(FamilyItem(family: row.family, families: families, model: model, anchor: $anchor) { focused = true })
+                            .modifier(FamilyItem(family: row.family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
                 .scrollTargetLayout()
@@ -261,7 +260,7 @@ struct FontList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(families: families, anchor: $anchor, proxy: proxy))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy))
             .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                 move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)
             }

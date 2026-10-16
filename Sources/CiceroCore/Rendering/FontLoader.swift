@@ -90,12 +90,26 @@ public final class FontLoader: Sendable {
             return path
         }) {
             guard state.withLock({ $0.pending.contains(path) }) else { continue }
+            Self.readAhead(path)
             let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
                 // Still pending means nothing read or invalidated the file in the meantime.
                 if state.pending.remove(path) != nil { state.descriptors[path] = descriptors }
             }
         }
+    }
+
+    /// Has the whole file read into memory in the background, not only the tables a descriptor needs: drawing text
+    /// reads the glyphs, which in a file not read since the Mac started came off the disk as the text was drawn, and
+    /// prefetching descriptors alone left scrolling as slow as before.
+    private static func readAhead(_ path: String) {
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { return }
+        defer { close(fd) }
+        var info = stat()
+        guard fstat(fd, &info) == 0, info.st_size > 0 else { return }
+        var advice = radvisory(ra_offset: 0, ra_count: Int32(min(info.st_size, Int64(Int32.max))))
+        _ = fcntl(fd, F_RDADVISE, &advice)
     }
 
     /// Keeps descriptors read elsewhere: the scanner reads every new file.
