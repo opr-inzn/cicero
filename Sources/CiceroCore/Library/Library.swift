@@ -603,7 +603,10 @@ public final class LibraryScanner: Sendable {
         var families = names.concurrentMap { name in
             let members = grouped[name]!
             let faces = members.map(\.0).sorted { a, b in
-                if a.face.weight != b.face.weight { return a.face.weight < b.face.weight }
+                // Narrowest first, then lightest: by each named instance's place on the axes, as a variable
+                // font's instances share one width and weight class.
+                if a.face.styleWidth != b.face.styleWidth { return a.face.styleWidth < b.face.styleWidth }
+                if a.face.styleWeight != b.face.styleWeight { return a.face.styleWeight < b.face.styleWeight }
                 if a.face.isItalic != b.face.isItalic { return !a.face.isItalic }
                 if a.face.styleName != b.face.styleName { return a.face.styleName.caseInsensitiveCompare(b.face.styleName) == .orderedAscending }
                 return a.face.id < b.face.id
