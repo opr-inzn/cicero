@@ -103,10 +103,14 @@ private struct Header: View {
                 }
                 if family.hasDeactivatable {
                     Button(titles.deactivate) { model.deactivate([family]) }
-                } else if !family.hasActivatable {
+                } else if !family.hasActivatable && !hasAdobeFonts {
                     Button("Deactivate") {}
                         .disabled(true)
                         .help(lockedReason)
+                }
+                // Creative Cloud turns Adobe Fonts on and off, not Cicero.
+                if hasAdobeFonts {
+                    Button("Manage in Creative Cloud") { CreativeCloud.open() }
                 }
             }
         }
@@ -132,12 +136,13 @@ private struct Header: View {
         return counts.filter { $0.0 > 0 }.map { "\($0.0.formatted()) \($0.1)" }.joined(separator: " · ")
     }
 
+    private var hasAdobeFonts: Bool { family.faces.contains(where: \.isAdobeFonts) }
+
     private var lockedReason: String {
         switch family.faces.first?.state.source {
         case .macOS: "Installed with macOS, so it can’t be turned off"
         case .allUsers: "Installed for all users; an administrator has to remove it"
         case .app: "Comes with an app, which manages it"
-        case .adobeFonts: "Managed by Adobe Creative Cloud"
         default: "Managed outside Cicero"
         }
     }

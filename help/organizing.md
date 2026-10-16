@@ -71,9 +71,13 @@ Right-click a folder in the sidebar:
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
-### Adobe Apps
+### Testing
 
-The fonts that Adobe apps load from their own folders are listed together as **Adobe Apps**, while there are any. It isn’t one of your folders: you turn it on or off with **Show fonts installed for Adobe apps** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Adobe Apps** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts for Adobe apps](activating.md#fonts-for-adobe-apps).
+The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Testing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Testing** isn’t one of your folders: you turn it on or off with **Show test fonts installed for Adobe apps** under **Type Designer Mode** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Testing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
+
+### Adobe Fonts
+
+The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show test fonts installed for Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
 
 ### Deactivated
 
@@ -169,7 +173,7 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | has, doesn’t have | One of your tags |
 | Set | is in, isn’t in | One of your sets |
-| Folder | is in, isn’t in | One of your folders, Adobe Apps, or Added Fonts |
+| Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
 | Kind | is, is not | Variable, Monospaced or Has Italics |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
