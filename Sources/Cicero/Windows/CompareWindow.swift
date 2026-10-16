@@ -45,8 +45,8 @@ struct CompareWindow: View {
         .navigationSubtitle(samples.count == 1 ? "1 family" : "\(samples.count) families")
         .toolbar {
             ToolbarCapsule {
-                ToolbarPicker(CompareLayout.allCases, selection: $layout, title: \.title)
-                    .help("One row per font, or every font over each other")
+                ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
+                              help: "One row per font, or every font over each other")
             }
             ToolbarCapsule { PreviewOptionsButton() }
         }
