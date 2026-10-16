@@ -64,8 +64,8 @@ struct CharacterSetsSettings: View {
                     Button("Edit") { editing = set }
                 }
                 .contextMenu {
-                    Button("Edit Coverage Set") { editing = set }
-                    Button("Delete Coverage Set") { deleting = set }
+                    Button("Edit Coverage Set", systemImage: "pencil") { editing = set }
+                    Button("Delete Coverage Set", systemImage: "trash") { deleting = set }
                 }
             }
             if model.data.customCharacterSets.isEmpty {
