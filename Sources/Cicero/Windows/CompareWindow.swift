@@ -315,14 +315,15 @@ private struct SampleCaption: View {
                 }
             }
         } label: {
-            // One text, as a menu's label puts an image of its own first.
+            // One text, as a menu's label puts an image of its own first. Grey here only: on the menu, the grey
+            // would reach its items' icons too.
             Text("\(sample.face.face.styleName) \(Image(systemName: "chevron.down"))")
+                .foregroundStyle(.secondary)
+                .tint(.secondary)
         }
         .menuStyle(.button)
         .buttonStyle(.borderless)
         .menuIndicator(.hidden)
-        .foregroundStyle(.secondary)
-        .tint(.secondary)
         .fixedSize()
         .help("Choose the style to compare")
     }
