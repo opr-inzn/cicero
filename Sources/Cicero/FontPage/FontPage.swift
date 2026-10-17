@@ -35,11 +35,13 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                // Lazy for the glyphs, which can run to thousands of cells; their group headers stay pinned. Only
-                // rows about one height go in it: it guesses the height of rows it hasn't placed from those it has,
-                // and with the styles in it too (fifty of them are 2,000 pt) the guesses swung so far that, scrolled
-                // to the end, the page laid itself out again and again at full CPU.
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                // Lazy for the glyphs, which can run to thousands of cells. Their group titles scroll with them
+                // rather than pin, so the cells only meet the toolbar, where they fade out, instead of showing
+                // between it and a pinned title and ending at the title's edge. Only rows about one height go in it:
+                // it guesses the height of rows it hasn't placed from those it has, and with the styles in it too
+                // (fifty of them are 2,000 pt) the guesses swung so far that, scrolled to the end, the page laid
+                // itself out again and again at full CPU.
+                LazyVStack(alignment: .leading, spacing: 0) {
                     // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
                     // their cells after their titles, moved what was already there.
                     if let content {

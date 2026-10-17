@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph in a cell
 /// like a character's, in the same columns, the characters it stands for in its tooltip and popover. Like the glyphs'
-/// groups, rows of fixed cells in the page's stack, under a header per feature like a group's, which pins.
+/// groups, rows of fixed cells in the page's stack, under a header per feature like a group's.
 struct LigaturesSection: View {
     @Environment(PreviewSettings.self) private var preview
     let face: FontFace
@@ -37,7 +37,6 @@ struct LigaturesSection: View {
                 }
                 .padding(.horizontal, Self.inset)
                 .padding(.vertical, 4)
-                .background(Color.canvas)
             }
         }
     }
