@@ -280,7 +280,9 @@ final class AppModel {
         // touches their folder, which may be one macOS asks about, like Downloads.
         if data.fontFiles.contains(where: Reachability.isGone) { data.fontFiles.removeAll(where: Reachability.isGone) }
         let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
-        folderWatcher.watch(input.folders.map(\.path), files: input.files, hidden: [locations.adobeFontsInAdobeApps?.path].compactMap { $0 })
+        // The Fonts folders too, so a font dropped into one shows without waiting for macOS to register it.
+        let fontsFolders = [locations.userFonts.path, locations.allUsersFonts.path]
+        folderWatcher.watch(fontsFolders + input.folders.map(\.path), files: input.files, hidden: [locations.adobeFontsInAdobeApps?.path].compactMap { $0 })
         // Most scans take a fraction of a second; the capsule only shows for one that takes longer.
         latestProgress = .finding
         revealProgress?.cancel()
