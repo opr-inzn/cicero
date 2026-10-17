@@ -102,7 +102,7 @@ From top to bottom, a font page has:
 
 ## See a font’s ligatures
 
-Under **Glyphs**, after the characters, a font page lists the ligatures the style makes: the single glyphs that stand for several characters, like ﬁ for “fi”. They’re grouped by the OpenType feature that makes them: **Standard Ligatures**, which apps use unless you turn them off, then **Discretionary**, **Historical**, **Contextual** and **Required Ligatures**. Each shows the ligature’s glyph with the characters it stands for under it. Click one to see it large, with its characters, their codes and its feature.
+Under **Glyphs**, after the characters, a font page lists the ligatures the style makes: the single glyphs that stand for several characters, like ﬁ for “fi”. They’re grouped by the OpenType feature that makes them: **Standard Ligatures**, which apps use unless you turn them off, then **Discretionary**, **Historical**, **Contextual** and **Required Ligatures**. Each shows the ligature’s glyph in a cell like a character’s; hold the pointer over it to see the characters it stands for. Click one to see it large, with its characters, their codes and its feature.
 
 Cicero lists the ligatures of characters you can type. Ligatures of alternates, or of forms only other features make, are left out, and so are fonts that make ligatures the Apple way (AAT) rather than the OpenType way. To try discretionary ligatures in previews, turn them on in the [Features](#try-opentype-features) tab.
 
