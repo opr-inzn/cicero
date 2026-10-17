@@ -308,17 +308,28 @@ private struct SidebarContent: View {
         }
     }
 
+    /// Shows the folder under another name in Cicero; the folder on disk keeps its own. Left empty, it goes back to that.
+    private func renameFolder(_ id: UUID) -> some View {
+        Button("Rename Folder", systemImage: "pencil") {
+            model.prompt("Rename Folder", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+        }
+    }
+
     @ViewBuilder
     private func menu(for row: SidebarRow) -> some View {
         switch row.item {
         case .folder(WatchedFolder.adobeAppsID):
+            renameFolder(WatchedFolder.adobeAppsID)
             Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }
         case .folder(WatchedFolder.adobeFontsID):
+            renameFolder(WatchedFolder.adobeFontsID)
             Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
         case .folder(WatchedFolder.addedFilesID):
+            renameFolder(WatchedFolder.addedFilesID)
             Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(model.addedFileURLs) }
         case .folder(let id):
             if let folder = model.folder(id) {
+                renameFolder(id)
                 Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
                 if id != WatchedFolder.deactivatedID {
                     Divider()
