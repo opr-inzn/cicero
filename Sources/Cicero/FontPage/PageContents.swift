@@ -1,9 +1,36 @@
 import CiceroCore
+import CoreText
 
-/// What a font page lists under its styles for one face: the ligatures it makes and its characters by block.
+/// What a font page lists under its styles for one face: its characters by block and the ligatures it makes. A ligature
+/// whose glyph a character has too, like ﬁ, which fonts usually give U+FB01 (Alphabetic Presentation Forms), is listed
+/// once, as that character, which says which feature makes it.
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
     let glyphs: [GlyphSection]
+    /// Characters a ligature feature makes too: character → the feature's tag and the characters it's made from.
+    let madeByLigatures: [UInt32: (tag: String, characters: [UInt32])]
+
+    init(ligatures: [LigatureGroup], glyphs: [GlyphSection], font: CTFont) {
+        self.glyphs = glyphs
+        var characters: [CGGlyph: UInt32] = [:]
+        // Each character's glyph, the lowest character's where several share one; none needed without ligatures.
+        for scalar in ligatures.isEmpty ? [] : glyphs.flatMap(\.scalars).reversed() {
+            guard let character = Unicode.Scalar(scalar) else { continue }
+            var units = Array(String(Character(character)).utf16)
+            var glyph = [CGGlyph](repeating: 0, count: units.count)
+            if CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), glyph[0] != 0 { characters[glyph[0]] = scalar }
+        }
+        var made: [UInt32: (tag: String, characters: [UInt32])] = [:]
+        self.ligatures = ligatures.compactMap { group in
+            let own = group.ligatures.filter { ligature in
+                guard let scalar = characters[ligature.glyph] else { return true }
+                if made[scalar] == nil { made[scalar] = (group.tag, ligature.characters) }
+                return false
+            }
+            return own.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: own)
+        }
+        madeByLigatures = made
+    }
 }
 
 /// Font pages' ligatures and characters, worked out off the main thread and kept for the faces shown last. The
@@ -77,6 +104,6 @@ final class PageContents {
     private static func read(_ face: FontFace, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
         let scalars = await coverage.coverage(computing: face).scalars
-        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars))
+        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars), font: FontLoader.shared.font(face, size: 12))
     }
 }
