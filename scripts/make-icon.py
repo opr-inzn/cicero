@@ -4,7 +4,7 @@ left, top and right faces.
 
 Each letter is a hole as deep as DEPTH, its floor the letter moved straight into the cube along the
 face's normal, and its walls, the sides of the hole that face the viewer, shaded by the way they face
-the light. Writes the layers of Resources/AppIcon.icon, whose icon.json colours the faces and floors
+the light and darkening as they go down. Writes the layers of Resources/AppIcon.icon, whose icon.json colours the faces and floors
 (the walls bring their own), and, with --web, the website's icon.svg and Mark.astro too.
 
     scripts/make-icon.py path/to/AMGaonkar-Display-Medium.otf [--web path/to/cicero-website] [--preview out.svg]
@@ -65,7 +65,10 @@ FACES = {
 CAP = 0.64
 DEPTH = 0.04
 
-# Per face: the floor, and the darkest and lightest a wall can be (sRGB).
+# How far a wall goes toward its floor's colour at the bottom.
+OCCLUSION = 0.7
+
+# Per face: the floor, and the darkest and lightest a wall can be at its top (sRGB).
 COLORS = {
     "top": dict(floor="#3D0904", dark=(0x5A, 0x10, 0x08), light=(0xB4, 0x30, 0x1E)),
     "left": dict(floor="#050A3A", dark=(0x0A, 0x14, 0x60), light=(0x22, 0x3A, 0xBC)),
@@ -195,8 +198,8 @@ def face_corners(face):
     return [project(add(add(o, r, a), u, b)) for a, b in ((0, 0), (1, 0), (1, 1), (0, 1))]
 
 
-def build(font_path, longest=2.5, places=2, shades=32):
-    """The layers: walls in pieces no longer than longest pixels and in that many shades, to places decimals."""
+def build(font_path, longest=2.5, places=2, shades=32, bands=12):
+    """The layers: walls in pieces no longer than longest pixels, in that many shades and bands of depth, to places decimals."""
     font = TTFont(font_path)
     glyphs = font.getGlyphSet()
     cap = font["OS/2"].sCapHeight
@@ -230,7 +233,7 @@ def build(font_path, longest=2.5, places=2, shades=32):
             if (signed_area(polygon) > 0) != (nesting % 2 == 0):
                 polygon.reverse()
 
-        walls = []
+        edges = []
         colors = COLORS[name]
         for polygon in polygons:
             for i, b in enumerate(polygon):
@@ -246,23 +249,32 @@ def build(font_path, longest=2.5, places=2, shades=32):
                 light = round((0.18 + 0.82 * max(0.0, dot(normal, LIGHT))) * shades) / shades
                 # Of two walls on one line of sight into the hole, the one met first lies further along it.
                 key = dot(((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2), along)
-                walls.append((key, hex_color(mix(colors["dark"], colors["light"], light)), [pa, pb, add(pb, depth), add(pa, depth)]))
-        # Nearest first, each wall keeping only what no nearer one hides, then each shade in one piece.
-        walls.sort(key=lambda w: -w[0])
-        covered, shaded = [], {}
-        for _, color, quad in walls:
-            quad = [(round(x * UNITS), round(y * UNITS)) for x, y in quad]
-            shaded.setdefault(color, []).extend(clip(pyclipper.CT_DIFFERENCE, [quad], covered) if covered else [quad])
-            covered = clip(pyclipper.CT_UNION, covered + [quad])
+                edges.append((key, light, pa, pb))
+        # Nearest first, so each wall keeps only what no nearer one hides.
+        edges.sort(key=lambda e: -e[0])
+        floor_rgb = tuple(int(colors["floor"][i:i + 2], 16) for i in (1, 3, 5))
         wall_paths = []
-        for color, pieces in shaded.items():
-            # A little larger, so no seam shows between shades.
-            offset = pyclipper.PyclipperOffset()
-            offset.AddPaths(clip(pyclipper.CT_UNION, pieces), pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
-            region = offset.Execute(0.3 * UNITS)
-            if region:
-                wall_paths.append((color, "".join(
-                    "M" + "L".join(f"{fmt(x / UNITS, places)} {fmt(y / UNITS, places)}" for x, y in ring) + "Z" for ring in region)))
+        # The walls darken as they go down, which tells a wall seen through a narrow gap from the edge in
+        # front of it. The walls down to each depth, the deepest first, each band drawn over the one below:
+        # a point shows the band of the depth where its line of sight first meets a wall.
+        for band in range(bands, 0, -1):
+            reach = band / bands
+            shadow = OCCLUSION * ((band - 0.5) / bands) ** 1.3
+            covered, shaded = [], {}
+            for _, light, pa, pb in edges:
+                color = hex_color(mix(mix(colors["dark"], colors["light"], light), floor_rgb, shadow))
+                quad = [pa, pb, add(pb, depth, reach), add(pa, depth, reach)]
+                quad = [(round(x * UNITS), round(y * UNITS)) for x, y in quad]
+                shaded.setdefault(color, []).extend(clip(pyclipper.CT_DIFFERENCE, [quad], covered) if covered else [quad])
+                covered = clip(pyclipper.CT_UNION, covered + [quad])
+            for color, pieces in shaded.items():
+                # A little larger, so no seam shows between shades.
+                offset = pyclipper.PyclipperOffset()
+                offset.AddPaths(clip(pyclipper.CT_UNION, pieces), pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
+                region = offset.Execute(0.3 * UNITS)
+                if region:
+                    wall_paths.append((color, "".join(
+                        "M" + "L".join(f"{fmt(x / UNITS, places)} {fmt(y / UNITS, places)}" for x, y in ring) + "Z" for ring in region)))
 
         corners = face_corners(face)
         outline = "M" + "L".join(f"{fmt(p[0])} {fmt(p[1])}" for p in corners) + "Z"
@@ -348,8 +360,8 @@ def main():
     if args.preview:
         Path(args.preview).write_text(svg('<rect x="0" y="0" width="1024" height="1024" fill="#fff"/>' + flat(layers)))
     if args.web:
-        # Drawn at most a few dozen pixels wide, so in fewer pieces.
-        layers = build(args.font, longest=8, places=1, shades=8)
+        # Drawn at most a few dozen pixels wide, so in fewer pieces, and the walls in one band.
+        layers = build(args.font, longest=8, places=1, shades=8, bands=1)
         web = Path(args.web)
         dark = "".join(f".{n}0{{stop-color:{GRADIENTS[n][1][0]}}}.{n}1{{stop-color:{GRADIENTS[n][1][1]}}}" for n in ("top", "left", "right"))
         (web / "public" / "icon.svg").write_text(svg(
