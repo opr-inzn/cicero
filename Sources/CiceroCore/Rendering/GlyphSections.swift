@@ -4,7 +4,7 @@ import Foundation
 /// then signs, symbols and accents, and last the letters, marks and signs of scripts other than Latin.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
-    case dingbatNumerals, currencyAndMath, superscripts, subscripts, fractions, ordinals, punctuationAndSymbols
+    case dingbatNumerals, currency, mathematicalOperators, superscripts, subscripts, fractions, ordinals, punctuationAndSymbols
     case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
 
     public var title: String {
@@ -17,7 +17,8 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
         case .dingbatNumerals: "Dingbat Numerals"
-        case .currencyAndMath: "Currency and Mathematical Operators"
+        case .currency: "Currency"
+        case .mathematicalOperators: "Mathematical Operators"
         case .superscripts: "Superscript"
         case .subscripts: "Subscript"
         case .fractions: "Fractions"
@@ -63,8 +64,10 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
             return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .global
         case .decimalNumber:
             return block == "Basic Latin" ? .proportionalFigures : .global
-        case .currencySymbol, .mathSymbol:
-            return .currencyAndMath
+        case .currencySymbol:
+            return .currency
+        case .mathSymbol:
+            return .mathematicalOperators
         case .nonspacingMark, .spacingMark, .enclosingMark:
             // The accents letters take, like U+0301; other scripts' own marks go with their letters.
             return block.hasPrefix("Combining") ? .combiningMarks : .global
