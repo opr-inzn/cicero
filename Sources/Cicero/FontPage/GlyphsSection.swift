@@ -4,7 +4,7 @@ import SwiftUI
 /// Every character a style has, and the glyphs its features draw in place of characters', like tabular figures, by
 /// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
 /// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
-/// Several views in a row, so each group's header pins in the page's lazy stack and its cells are rows of it.
+/// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -97,7 +97,6 @@ struct GlyphsSection: View {
             }
             .padding(.horizontal, Self.inset)
             .padding(.vertical, 4)
-            .background(Color.canvas)
         }
     }
 
