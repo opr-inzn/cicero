@@ -182,9 +182,14 @@ final class AppModel {
     @ObservationIgnored private var changeSeenBeforeScan: Int?
     @ObservationIgnored private var operationCount = 0
     @ObservationIgnored private var expectations: [Expectation] = []
-    @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] in
-        MainActor.assumeIsolated { self?.fontsChanged() }
+    @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] changed in
+        MainActor.assumeIsolated { self?.fontsChanged(changed) }
     }
+    /// The files that changed since the last scan started, for the next one to look at instead of every folder;
+    /// nil when it has to look at everything.
+    @ObservationIgnored private var pendingChanges: Set<String>? = []
+    /// The running scan's number and the files it looks at, nil for all of them.
+    @ObservationIgnored private var runningScan: (id: Int, changes: Set<String>?)?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
@@ -269,13 +274,18 @@ final class AppModel {
 
     // MARK: Scanning
 
-    /// Returns the scan's number.
+    /// Returns the scan's number. With `changes`, only those files are looked at again (see `LibraryScanner.scan`).
     @discardableResult
-    func rescan() -> Int {
+    func rescan(changes: Set<String>? = nil) -> Int {
+        // A scan this one replaces is cancelled, so this one looks at whatever that one would have.
+        var changes = changes
+        if let running = runningScan { changes = running.changes.flatMap { looked in changes?.union(looked) } }
+        pendingChanges = []
         scanTask?.cancel()
-        lastScan = Date()
+        if changes == nil { lastScan = Date() }
         scanCount += 1
         let id = scanCount
+        runningScan = (id, changes)
         // Added files that are gone leave the library: nothing would show them, and looking for them every time
         // touches their folder, which may be one macOS asks about, like Downloads.
         if data.fontFiles.contains(where: Reachability.isGone) { data.fontFiles.removeAll(where: Reachability.isGone) }
@@ -302,14 +312,20 @@ final class AppModel {
         }
         scanTask = Task { [weak self] in
             do {
-                let library = try await scanner.scan(input, progress: report)
+                let library = try await scanner.scan(input, changes: changes, progress: report)
+                self?.finishScan(id)
                 self?.apply(library, scan: id)
             } catch is CancellationError {
             } catch {
+                self?.finishScan(id)
                 self?.endScan(id)
             }
         }
         return id
+    }
+
+    private func finishScan(_ id: Int) {
+        if runningScan?.id == id { runningScan = nil }
     }
 
     private func endScan(_ id: Int) {
@@ -325,20 +341,24 @@ final class AppModel {
     /// CoreText's fonts-changed notification, or font files coming or going in a watched folder.
     /// During an operation (whose own changes set these off) they wait for the scan the operation starts
     /// when it finishes; `enqueue` scans afterwards when it started none.
-    private func fontsChanged() {
+    /// `changed` are the files a watched folder says changed, nil for anything. Those few are looked at again
+    /// almost at once; anything else waits a little, as CoreText's notifications tend to come in bursts.
+    private func fontsChanged(_ changed: Set<String>? = nil) {
         if runningOperations > 0 {
             if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
             return
         }
-        scheduleRescan(after: 0.3)
+        if let changed, let pending = pendingChanges { pendingChanges = pending.union(changed) } else { pendingChanges = nil }
+        scheduleRescan(after: pendingChanges == nil ? 0.3 : 0.05)
     }
 
-    func scheduleRescan(after delay: Double) {
+    /// The scan looks only at the files changed meanwhile, if it can.
+    private func scheduleRescan(after delay: Double) {
         rescanTask?.cancel()
         rescanTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
-            self?.rescan()
+            guard !Task.isCancelled, let self else { return }
+            self.rescan(changes: self.pendingChanges)
         }
     }
 

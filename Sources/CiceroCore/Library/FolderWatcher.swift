@@ -2,10 +2,12 @@ import CoreServices
 import Foundation
 
 /// Says when font files come or go in some folders (FSEvents), so the library follows files added or
-/// removed in Finder, and when some single files change. Events arrive on the main queue, coalesced over
-/// half a second. Use it from the main thread only.
+/// removed in Finder, and when some single files change. Events arrive on the main queue: the first right
+/// away, any after it coalesced over half a second. Use it from the main thread only.
 public final class FolderWatcher: @unchecked Sendable {
-    private let onChange: @Sendable () -> Void
+    /// Given the files that changed, as the scan finds them (by the folder's path as given, not with its
+    /// symlinks resolved), or nil when FSEvents can't say, as for a folder moved in or out.
+    private let onChange: @Sendable (Set<String>?) -> Void
     private var stream: FSEventStreamRef?
     private var watched: [String] = []
     /// The watched folders, the folders watched only for files in them, and those files, symlinks resolved
@@ -15,8 +17,10 @@ public final class FolderWatcher: @unchecked Sendable {
     private var files: Set<String> = []
     /// Watched folders whose fonts have hidden names, like Creative Cloud's.
     private var hiddenFolders: [String] = []
+    /// Each watched folder's resolved path and its path as given, both with a "/" at the end, longest first.
+    private var aliases: [(resolved: String, given: String)] = []
 
-    public init(onChange: @escaping @Sendable () -> Void) {
+    public init(onChange: @escaping @Sendable (Set<String>?) -> Void) {
         self.onChange = onChange
     }
 
@@ -39,6 +43,7 @@ public final class FolderWatcher: @unchecked Sendable {
         hiddenFolders = hidden.map { Self.realPath($0) + "/" }
         fileFolders = parents.map { Self.realPath($0) + "/" }
         self.files = Set(files.map(Self.realPath))
+        aliases = Set(watched).map { (Self.realPath($0) + "/", $0 + "/") }.sorted { $0.resolved.count > $1.resolved.count }
         guard !watched.isEmpty else { return }
         var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
         let callback: FSEventStreamCallback = { _, info, count, eventPaths, eventFlags, _ in
@@ -46,10 +51,19 @@ public final class FolderWatcher: @unchecked Sendable {
             let watcher = Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue()
             let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String] ?? []
             let flags = UnsafeBufferPointer(start: eventFlags, count: count)
-            if zip(paths, flags).contains(where: watcher.matters) { watcher.onChange() }
+            var changed: Set<String>? = []
+            var matters = false
+            for (path, flag) in zip(paths, flags) where watcher.matters(path, flag) {
+                matters = true
+                if let given = watcher.followed(path, flag) { changed?.insert(given) } else { changed = nil }
+            }
+            if matters { watcher.onChange(changed) }
         }
         // WatchRoot: also when a watched folder itself is moved, deleted or comes back (a disk remounted).
-        let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot)
+        // NoDefer: an event on its own comes at once rather than half a second later.
+        let flags = FSEventStreamCreateFlags(
+            kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot | kFSEventStreamCreateFlagNoDefer
+        )
         guard let stream = FSEventStreamCreate(
             nil, callback, &context, watched as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5, flags
         ) else { return }
@@ -77,6 +91,18 @@ public final class FolderWatcher: @unchecked Sendable {
         guard !name.hasPrefix(".") || hiddenFolders.contains(where: isIn) else { return false }
         if flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir) != 0 { return true }
         return FontFileReader.fontExtensions.contains((name as NSString).pathExtension.lowercased())
+    }
+
+    /// A file's path as the scan finds it, when FSEvents followed it file by file; nil for a folder, a symlink,
+    /// or a change it couldn't follow.
+    private func followed(_ path: String, _ flags: FSEventStreamEventFlags) -> String? {
+        let whole = FSEventStreamEventFlags(
+            kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged | kFSEventStreamEventFlagItemIsDir | kFSEventStreamEventFlagItemIsSymlink
+        )
+        guard flags & whole == 0, flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsFile) != 0,
+              let alias = aliases.first(where: { path.hasPrefix($0.resolved) })
+        else { return nil }
+        return alias.given + path.dropFirst(alias.resolved.count)
     }
 
     /// The path with every symlink resolved, as FSEvents reports it (e.g. /private/var for /var); as it is

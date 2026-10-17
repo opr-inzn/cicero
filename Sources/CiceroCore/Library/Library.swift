@@ -129,7 +129,7 @@ public enum ScanProgress: Sendable, Equatable {
 }
 
 /// What a scan needs to know besides the disk.
-public struct ScanInput: Sendable {
+public struct ScanInput: Equatable, Sendable {
     public var folders: [WatchedFolder]
     /// Font files added one at a time, listed where they are like a folder's (see `WatchedFolder.addedFilesID`).
     public var files: [String]
@@ -154,6 +154,8 @@ public final class LibraryScanner: Sendable {
     private let cacheURL: URL
     private let libraryURL: URL
     private let state = Mutex(State())
+    /// Writes the caches in the order scans finish.
+    private let saving: DispatchQueue
 
     private struct State {
         var files: [String: CachedFile] = [:]
@@ -170,6 +172,20 @@ public final class LibraryScanner: Sendable {
         /// Set by `clearCache`: the next scan reads every file it finds again, but keeps what it knows of the
         /// ones out of reach.
         var rereadAll = false
+        /// The files the latest scan found, for a scan told which files changed to start from; and that scan's
+        /// number, so a scan that started earlier but found its files later doesn't replace them.
+        var lastFind: Find?
+        var lastFindScan = 0
+        var scans = 0
+    }
+
+    /// What a scan found on disk and from fontd, before reading any file.
+    private struct Find {
+        var input: ScanInput
+        var found: [String: FoundFile]
+        var reach: OutOfReach
+        /// Whether fontd gave its list of active files (see `confirmFontsFolders`).
+        var listed: Bool
     }
 
     public convenience init(locations: Locations) {
@@ -179,6 +195,7 @@ public final class LibraryScanner: Sendable {
     /// `registrar` supplies the system's active font files; tests pass a fake.
     public init(locations: Locations, registrar: any FontRegistrar) {
         self.locations = locations
+        saving = DispatchQueue(label: "com.maximilianinzinger.Cicero.library-save", qos: .utility)
         self.registrar = registrar
         cacheURL = locations.caches.appendingPathComponent("faces.cache", isDirectory: false)
         libraryURL = locations.caches.appendingPathComponent("library.cache", isDirectory: false)
@@ -200,28 +217,47 @@ public final class LibraryScanner: Sendable {
         }
     }
 
+    /// With `changes`, the files FSEvents says changed since the last scan (as `FolderWatcher` reports them),
+    /// only those are looked at again, which takes a few milliseconds instead of a walk through every folder
+    /// and fontd's whole list, which can take seconds on a busy Mac. It scans everything when the input
+    /// changed or a change needs it, such as a file in a folder whose fonts are online only.
     @concurrent
-    public func scan(_ input: ScanInput, progress: @escaping @Sendable (ScanProgress) -> Void) async throws -> Library {
+    public func scan(_ input: ScanInput, changes: Set<String>? = nil, progress: @escaping @Sendable (ScanProgress) -> Void) async throws -> Library {
         let signposter = Signposts.library
         let scan = signposter.beginInterval("Scan")
         defer { signposter.endInterval("Scan", scan) }
         progress(.finding)
-        // Asking fontd for the active files takes ~100 ms, as long as walking the folders; do both at once.
-        let registrar = registrar
+        let (number, last, rereadAll) = state.withLock { state in
+            state.scans += 1
+            return (state.scans, state.lastFind, state.rereadAll)
+        }
         let finding = signposter.beginInterval("Find")
-        async let active = Self.activeFontURLs(registrar)
-        var (found, reach) = enumerateFolders(input)
         let known = loadCache()
-        let activeURLs = await active
-        addActive(activeURLs, to: &found)
-        for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
-        confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
-        confirmRegistered(&found, records: input.records)
-        reach.leaveOut(found)
+        let find: Find
+        if let changes, !rereadAll, let last, last.input == input, let refound = refind(last, changes: changes) {
+            find = refound
+        } else {
+            // Asking fontd for the active files takes ~100 ms, as long as walking the folders; do both at once.
+            let registrar = registrar
+            async let active = Self.activeFontURLs(registrar)
+            var (found, reach) = enumerateFolders(input)
+            let activeURLs = await active
+            addActive(activeURLs, to: &found)
+            for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
+            confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
+            confirmRegistered(&found, records: input.records)
+            reach.leaveOut(found)
+            find = Find(input: input, found: found, reach: reach, listed: !activeURLs.isEmpty)
+        }
+        state.withLock { state in
+            guard number > state.lastFindScan else { return }
+            state.lastFind = find
+            state.lastFindScan = number
+        }
+        let (found, reach) = (find.found, find.reach)
         signposter.endInterval("Find", finding)
         try Task.checkCancellation()
 
-        let rereadAll = state.withLock { $0.rereadAll }
         let stale = rereadAll ? found : found.filter { known[$0.key]?.stamp != $0.value.stamp }
         var parsed: [String: CachedFile] = [:]
         if !stale.isEmpty {
@@ -240,11 +276,97 @@ public final class LibraryScanner: Sendable {
         }
         let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach) }
         state.withLock { $0.last = (inputs, library) }
-        signposter.withIntervalSignpost("Save cache") {
-            saveCacheIfNeeded()
-            saveLibraryIfNeeded(library)
+        // After a few changed files the caches are written once the library is back, as on a busy Mac that can
+        // take longer than everything else.
+        let save = { [self] in
+            signposter.withIntervalSignpost("Save cache") {
+                saveCacheIfNeeded()
+                saveLibraryIfNeeded(library)
+            }
         }
+        if changes != nil { saving.async(execute: save) } else { saving.sync(execute: save) }
         return library
+    }
+
+    /// The last scan's files with the changed ones looked at again, as a full scan would find them; nil when one
+    /// needs a full scan: one Cicero moved out of an app's folder, one out of reach, on a disk that isn't
+    /// connected or online only, a symlink, or one outside the folders scanned.
+    private func refind(_ last: Find, changes: Set<String>) -> Find? {
+        guard changes.count <= 200 else { return nil }
+        let input = last.input
+        var found = last.found
+        for path in changes where Self.isFontFile(path) {
+            if input.records.appFolderOrigins[path] != nil || last.reach.onlineOnlyPaths.contains(path) || last.reach.disconnectedFiles.contains(path) {
+                return nil
+            }
+            func isIn(_ folder: URL) -> Bool { path.hasPrefix(folder.path + "/") }
+            if locations.systemFonts.contains(where: isIn) || isIn(locations.deactivated) { return nil }
+            let fontsFolder = [locations.userFonts, locations.allUsersFonts].first(where: isIn)
+            let folders = input.folders.filter { path.hasPrefix($0.path + "/") }
+            let adobe = locations.adobeFontsInAdobeApps.flatMap { isIn($0) ? $0 : nil }
+            let added = input.files.contains(path)
+            guard fontsFolder != nil || !folders.isEmpty || adobe != nil || added else { return nil }
+            if folders.contains(where: { last.reach.folders[$0.id] != nil }) { return nil }
+
+            var info = stat()
+            guard lstat(path, &info) == 0 else {
+                if added, Reachability.disconnectedVolume(of: path) != nil { return nil }
+                found[path] = nil
+                continue
+            }
+            guard info.st_mode & S_IFMT != S_IFLNK else { return nil }
+            guard let stamp = Self.stamp(ofPath: path) else {
+                found[path] = nil
+                continue
+            }
+            // As `enumerateFolders` finds it, folder by folder.
+            let previous = found[path]
+            var file = FoundFile(stamp: stamp, isActive: false)
+            var listed = added
+            if let fontsFolder, Self.isListed(path, in: fontsFolder, includingHidden: false) {
+                file.inFontsFolder = true
+                listed = true
+            }
+            for folder in folders where Self.isListed(path, in: folder.url, includingHidden: false) {
+                if Reachability.isOnlineOnly(path) { return nil }
+                file.folderIDs.append(folder.id)
+                if file.appName == nil { file.appName = folder.appName }
+                listed = true
+            }
+            if let adobe, Self.isListed(path, in: adobe, includingHidden: true) {
+                file.appName = "Adobe"
+                listed = true
+            }
+            if added { file.folderIDs.append(WatchedFolder.addedFilesID) }
+            guard listed else {
+                if previous?.isActive == true { return nil }
+                found[path] = nil
+                continue
+            }
+            // A file that was there keeps what fontd said of it; a new one is off, unless macOS turns on whatever
+            // is in its Fonts folders, or Cicero registered it before (both as `confirmFontsFolders` and
+            // `confirmRegistered` ask).
+            file.isActive = previous?.isActive ?? false
+            if !file.isActive, file.inFontsFolder || input.records.inPlace.contains(path) || input.records.temporary[path] != nil {
+                file.isActive = (file.inFontsFolder && !last.listed) || registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+            }
+            if ActiveSource.isAdobeFonts(path) { file.folderIDs.append(WatchedFolder.adobeFontsID) }
+            found[path] = file
+        }
+        return Find(input: input, found: found, reach: last.reach, listed: last.listed)
+    }
+
+    /// Whether `enumerate` lists a file under a folder: none of the folders between them, nor the file, is
+    /// hidden (unless `includingHidden`) or a package.
+    private static func isListed(_ path: String, in folder: URL, includingHidden: Bool) -> Bool {
+        let components = path.dropFirst(folder.path.count + 1).split(separator: "/")
+        if !includingHidden, components.contains(where: { $0.hasPrefix(".") }) { return false }
+        var url = folder
+        for component in components.dropLast() {
+            url.appendPathComponent(String(component), isDirectory: true)
+            if (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return false }
+        }
+        return true
     }
 
     /// Has the next scan read every file it finds again. What was read from files out of reach for now is
