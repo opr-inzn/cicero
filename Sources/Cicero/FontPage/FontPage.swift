@@ -44,7 +44,8 @@ struct FontPage: View {
                     // their cells after their titles, moved what was already there.
                     if let content {
                         if let glyphColumns {
-                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, ligatures: content.ligatures)
+                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, ligatures: content.ligatures,
+                                          madeByLigatures: content.madeByLigatures)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
