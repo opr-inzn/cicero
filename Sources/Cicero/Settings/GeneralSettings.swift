@@ -48,13 +48,6 @@ struct GeneralSettings: View {
                 }
                 .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
             }
-            // The folders type designers export fonts to, to test them in Adobe apps.
-            Section("Type Designer Mode") {
-                Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    Text("Show test fonts installed for Adobe apps")
-                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
-                }
-            }
             Section("Maintenance") {
                 LabeledContent("Library") {
                     HStack {
@@ -69,6 +62,13 @@ struct GeneralSettings: View {
                         .foregroundStyle(.red)
                 }
                 .formRowCentered()
+            }
+            // The folders type designers export fonts to, to test them in Adobe apps.
+            Section("Type Designer Mode") {
+                Toggle(isOn: $model.data.showAdobeAppFolders) {
+                    Text("Show test fonts installed for Adobe apps")
+                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                }
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
