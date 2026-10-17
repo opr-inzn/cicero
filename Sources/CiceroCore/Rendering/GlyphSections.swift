@@ -83,6 +83,30 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         }
     }
 
+    /// The order a type designer would list these groups' characters in, rather than where Unicode put them. For
+    /// punctuation and symbols: the stops, then slashes and bars, brackets, dashes, quotes, then the signs.
+    private static let orders: [GlyphGroup: [UInt32: Int]] = [
+        .punctuationAndSymbols: ".,:;\u{2026}!\u{A1}?\u{BF}\u{203D}\u{B7}\u{2022}*#/\\\u{A6}()[]{}\u{2329}\u{232A}\u{27E8}\u{27E9}-\u{AD}\u{2010}\u{2011}\u{2012}\u{2013}\u{2014}\u{2015}_'\"\u{2018}\u{2019}\u{201A}\u{201B}\u{201C}\u{201D}\u{201E}\u{201F}\u{2039}\u{203A}\u{AB}\u{BB}\u{2032}\u{2033}@&\u{B6}\u{A7}\u{A9}\u{AE}\u{2117}\u{2122}\u{B0}\u{2020}\u{2021}%\u{2030}\u{2031}\u{212E}^`",
+        .mathematicalOperators: "+\u{2212}\u{B1}\u{D7}\u{F7}=\u{2260}\u{2248}~\u{223C}<>\u{2264}\u{2265}\u{AC}|\u{2215}\u{2219}\u{221E}\u{221A}\u{2202}\u{2206}\u{220F}\u{2211}\u{222B}\u{2205}\u{2227}\u{2228}\u{2229}\u{222A}\u{2208}\u{2209}\u{2200}\u{2203}\u{25CA}",
+        .currency: "$\u{20AC}\u{A3}\u{A5}\u{A2}\u{20B9}\u{20BD}\u{20A9}\u{20BA}\u{20B4}\u{20AA}\u{20AB}\u{20A6}\u{20B1}\u{20BF}\u{E3F}\u{20A1}\u{20B5}\u{20B8}\u{20AE}\u{A4}",
+    ].mapValues { list in
+        Dictionary(list.unicodeScalars.enumerated().map { ($1.value, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// Where a character goes in such a group: its place in the order, else after those, by kind, then code point.
+    public static func order(of value: UInt32, in group: GlyphGroup) -> [Int] {
+        if let index = orders[group]?[value] { return [0, index] }
+        let kind: Int = switch Unicode.Scalar(value)?.properties.generalCategory {
+        case .otherPunctuation: 1
+        case .openPunctuation, .closePunctuation: 2
+        case .dashPunctuation, .connectorPunctuation: 3
+        case .initialPunctuation, .finalPunctuation: 4
+        case .otherSymbol: 5
+        default: 6
+        }
+        return [kind, Int(value)]
+    }
+
     /// The letter an accented one is made from, for listing Á, Â and Ä together: its decomposition's first character,
     /// else the letter its name says it is ("O" in LATIN CAPITAL LETTER O WITH STROKE).
     static func base(of value: UInt32) -> UInt32 {
@@ -141,6 +165,11 @@ public struct GlyphSection: Identifiable, Sendable {
             if group == .fractions, var list = buckets[group], let slash = list.firstIndex(of: 0x2044) {
                 list.insert(list.remove(at: slash), at: 0)
                 buckets[group] = list
+            }
+        }
+        for group in [GlyphGroup.punctuationAndSymbols, .mathematicalOperators, .currency] {
+            buckets[group] = buckets[group]?.sorted {
+                GlyphGroup.order(of: $0, in: group).lexicographicallyPrecedes(GlyphGroup.order(of: $1, in: group))
             }
         }
         let glyphs = Dictionary(grouping: features, by: \.group)
