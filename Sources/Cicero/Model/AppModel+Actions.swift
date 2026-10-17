@@ -699,10 +699,10 @@ extension AppModel {
         return !new.isEmpty
     }
 
-    /// The same family again, after it, in its first style not in Compare yet.
-    func compareAnotherStyle(of id: UUID) {
+    /// The same family again, after it, in its first style not in `shown`: the styles Compare shows it in, those that
+    /// follow the preview weight included.
+    func compareAnotherStyle(of id: UUID, besides shown: Set<FaceID>) {
         guard let index = compareEntries.firstIndex(where: { $0.id == id }), let family = family(compareEntries[index].familyID) else { return }
-        let shown = Set(compareEntries.filter { $0.familyID == family.id }.compactMap(\.style))
         let style = family.faces.first { !shown.contains($0.id) }?.id
         compareEntries.insert(CompareEntry(familyID: family.id, style: style, tint: nextCompareTint), at: index + 1)
     }
