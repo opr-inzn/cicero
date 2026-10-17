@@ -2,26 +2,21 @@ import CiceroCore
 import CoreText
 import SwiftUI
 
-/// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph, with the
-/// characters it stands for under it. Like the glyphs' blocks, rows of fixed cells in the page's stack, under a header
-/// per feature like a block's, which pins.
+/// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph in a cell
+/// like a character's, in the same columns, the characters it stands for in its tooltip and popover. Like the glyphs'
+/// blocks, rows of fixed cells in the page's stack, under a header per feature like a block's, which pins.
 struct LigaturesSection: View {
     @Environment(PreviewSettings.self) private var preview
     let face: FontFace
-    /// Cells per row, from the page's width.
+    /// Cells per row: the glyphs'.
     let columns: Int
     let groups: [LigatureGroup]
     /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
 
-    private nonisolated static let cell = CGSize(width: 76, height: 72)
-    private nonisolated static let spacing: CGFloat = 4
-    private nonisolated static let inset: CGFloat = 24
-
-    /// How many cells fit across a page this wide.
-    nonisolated static func columns(fitting width: CGFloat) -> Int {
-        max(1, Int((width - 2 * inset + spacing) / (cell.width + spacing)))
-    }
+    private static var cell: CGFloat { GlyphsSection.cell }
+    private static var spacing: CGFloat { GlyphsSection.spacing }
+    private static var inset: CGFloat { GlyphsSection.inset }
 
     var body: some View {
         ForEach(groups) { group in
@@ -56,7 +51,7 @@ struct LigaturesSection: View {
                 cell(ligature, in: group)
             }
             ForEach(ligatures.count..<columns, id: \.self) { _ in
-                Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell.height)
+                Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell)
             }
         }
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
@@ -68,20 +63,14 @@ struct LigaturesSection: View {
 
     private func cell(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         let isShown = popover?.tag == group.tag && popover?.characters == ligature.characters
-        return VStack(spacing: 2) {
-            GlyphImage(face: face, glyph: ligature.glyph, size: 28, weight: preview.weight)
-                .frame(height: 46)
-            Text(ligature.text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .padding(.horizontal, 4)
-        .frame(minWidth: Self.cell.width, maxWidth: .infinity, minHeight: Self.cell.height, maxHeight: Self.cell.height)
-        .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-        .contentShape(.rect)
-        .onTapGesture { popover = (group.tag, ligature.characters) }
+        // The glyphs' size; a long one is scaled down to fit.
+        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: preview.weight)
+            .padding(.horizontal, 2)
+            .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
+            .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
+            .contentShape(.rect)
+            .help(ligature.text)
+            .onTapGesture { popover = (group.tag, ligature.characters) }
         .accessibilityElement()
         .accessibilityLabel("Ligature of \(ligature.text)")
         .accessibilityAddTraits(.isButton)

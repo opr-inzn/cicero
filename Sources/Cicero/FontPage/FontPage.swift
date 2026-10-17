@@ -8,7 +8,6 @@ struct FontPage: View {
     @Environment(PreviewSettings.self) private var preview
     let familyID: String
     @State private var glyphColumns: Int?
-    @State private var ligatureColumns: Int?
     /// The ligatures and characters of the face shown, when they weren't ready as the page opened.
     @State private var loaded: (face: FaceID, content: PageContent)?
     @FocusState private var focused: Bool
@@ -44,9 +43,8 @@ struct FontPage: View {
                     // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
                     // their cells after their titles, moved what was already there.
                     if let content {
-                        if let ligatureColumns, let glyphColumns {
-                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs,
-                                          ligatures: content.ligatures, ligatureColumns: ligatureColumns)
+                        if let glyphColumns {
+                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, ligatures: content.ligatures)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
@@ -56,7 +54,6 @@ struct FontPage: View {
             // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
             // at once; only a change in the count redraws the glyphs.
             .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
-            .onGeometryChange(for: Int.self) { LigaturesSection.columns(fitting: $0.size.width) } action: { ligatureColumns = $0 }
         }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
         .task(id: face.id) {
