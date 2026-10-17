@@ -2,6 +2,22 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.5
+
+- Tags are now license statuses, to keep track of what you may do with each family. Cicero comes with **Licensed**, **Licensed + Non-Commercial**, **Unlicensed**, **Partially Licensed**, **Public Domain**, **Open Source** and **Trial**, each with its color, and you can make your own. A family has one status at a time, shown as a colored dot next to its name; give it one from its right-click menu, the Info panel, or by dropping it on a status under **License** in the sidebar. Smart sets have a **License Status** rule.
+- Your tags become license statuses, once, and families keep them. A family that had several tags keeps them all until you give it a status. The Red, Yellow and Green tags a library started with go if you never used them. A backup from before 1.5 gets the statuses as it’s restored.
+- A set can have single styles of a family, like just the Regular and Bold: drag a style’s row from a font page onto the set, or right-click the style and choose **Add Style to Set**. Activating, deactivating and exporting the set, and an application set, then take only those styles.
+- Folders in the sidebar can be renamed, Cicero’s own Testing, Adobe Fonts, Added Fonts and Deactivated too: right-click one and choose **Rename Folder**. The name shows in the sidebar, Settings, smart set rules and Problems; the folder on disk keeps its own, so apps still find it.
+- A font page’s glyphs are grouped by kind, in the order a type designer would list them, rather than by Unicode block: **Uppercase** and **Lowercase** from A to Z, their accented letters with Æ, Þ, ß and the like, **Ligatures**, figures, **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Punctuation and Symbols**, marks, **Case Sensitive Forms**, **Arrows**, and **Global** for other scripts.
+- The glyphs a font’s features draw are in those groups too: tabular figures, superscripts, scientific inferiors, numerators, denominators, ordinals and case-sensitive forms. Click one to see which feature draws it.
+- The glyphs come straight after a font page’s styles, with its ligatures in the Ligatures group, in cells the size of the characters’; hold the pointer over one to see what it stands for. Ligatures that are characters too, like ﬁ, are listed once, and the filter finds ligatures by their characters: “f” finds ff, fi and ffl.
+- Accents that combine with the letter before them, like those in Combining Diacritical Marks, show on font pages, rather than leaving their cells empty.
+- A font page’s group titles scroll with the glyphs, so glyphs no longer show between a title and the toolbar.
+- On a font page, right-click the text, the header or a style for the family’s menu: add it to a set, give it a license status or change its classification.
+- In Compare, each family can be in a style of your choosing: click the style next to its name. **Compare Another Style** adds the family again in another style, to set a family’s styles against each other.
+- The sidebar’s top section is called **Library**. The selected item is in the accent color, and so is the item you drag fonts over. **View → Hide Sidebar** (⌃⌘S) hides it, and **Edit Sidebar** has moved from the View menu to the sidebar’s right-click menu, beside the **Edit** button.
+- The toolbar’s pickers have an even inset and a glass lens on the chosen item, the Character Toolbox’s lists fade out under their bars, and cards you drag stay opaque.
+
 ## 1.4.9
 
 - Adobe Fonts from Creative Cloud are told apart from the fonts you install to test in Adobe apps. They have a purple **Adobe Fonts** tag, and an **Adobe Fonts** item under **Folders** while Creative Cloud has fonts on your Mac.
