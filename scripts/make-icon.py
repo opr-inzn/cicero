@@ -301,8 +301,22 @@ def gloss_gradient(opacity, id="g"):
             f'<stop offset=".6" stop-color="#fff" stop-opacity="0"/></radialGradient>')
 
 
-EDGES = ('<path d="M810.78 332.50L810.78 677.50L512.00 850.00L213.22 677.50L213.22 332.50" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="4" stroke-linejoin="round"/>'
-         '<path d="M213.22 332.50L512.00 160.00L810.78 332.50M213.22 332.50L512.00 505.00L810.78 332.50M512.00 505.00L512.00 850.00" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>')
+def edges(width=3.0):
+    """The cube's edges catching the light: a line width pixels wide just inside its outline, and one
+    twice that along each edge between two faces. Both stay inside the cube, so none shows past it on a
+    dark background."""
+    corner = lambda v: tuple(round(c * UNITS) for c in project(v))
+    outline = [corner(v) for v in ((0, 0, 1), (0, 1, 1), (0, 1, 0), (1, 1, 0), (1, 0, 0), (1, 0, 1))]
+    inset = pyclipper.PyclipperOffset()
+    inset.AddPath(outline, pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
+    rim = clip(pyclipper.CT_DIFFERENCE, [outline], inset.Execute(-width * UNITS))
+    seams = pyclipper.PyclipperOffset()
+    for v in ((1, 0, 1), (0, 1, 1), (1, 1, 0)):
+        seams.AddPath([corner((1, 1, 1)), corner(v)], pyclipper.JT_MITER, pyclipper.ET_OPENBUTT)
+    lines = clip(pyclipper.CT_UNION, rim + clip(pyclipper.CT_INTERSECTION, seams.Execute(width * UNITS), [outline]))
+    rings = "".join("M" + "L".join(f"{fmt(x / UNITS)} {fmt(y / UNITS)}" for x, y in ring) + "Z" for ring in lines)
+    return f'<path fill="#fff" fill-opacity=".8" d="{rings}"/>'
+
 
 SHADOW = ('<defs><radialGradient id="g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000" stop-opacity=".34"/>'
           '<stop offset=".55" stop-color="#000" stop-opacity=".16"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>'
@@ -316,7 +330,7 @@ def write_assets(layers):
         (ASSETS / f"{name}-wall.svg").write_text(svg("".join(f'<path fill="{c}" d="{d}"/>' for c, d in layer["walls"])))
         (ASSETS / f"{name}-gloss.svg").write_text(svg(
             f'<defs>{gloss_gradient(GLOSS[name])}</defs><path d="{layer["face"]}" fill-rule="evenodd" fill="url(#g)"/>'))
-    (ASSETS / "edges.svg").write_text(svg(EDGES))
+    (ASSETS / "edges.svg").write_text(svg(edges()))
     (ASSETS / "shadow.svg").write_text(svg(SHADOW))
 
 
@@ -344,7 +358,7 @@ def flat(layers, prefix="", dark_classes=False):
         body.extend(f'<path fill="{c}" d="{d}"/>' for c, d in layer["walls"])
         body.append(f'<path fill="url(#{prefix}{name})" fill-rule="evenodd" d="{layer["face"]}"/>')
         body.append(f'<path fill="url(#{prefix}{name}-gloss)" fill-rule="evenodd" d="{layer["face"]}"/>')
-    body.append(EDGES)
+    body.append(edges())
     return "\n  <defs>" + "".join(defs) + "</defs>\n  " + "\n  ".join(body) + "\n"
 
 
