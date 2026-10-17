@@ -42,7 +42,7 @@ capsule on every side, that slides to the next one chosen.
     Menus start with Activate Set, Activate Temporarily and Deactivate Set
     (Activate Smart Set, Deactivate Smart Set), for every family the row shows; then Rename Set, Delete Set;
     Edit Smart Set, Delete Smart Set.
-  - **License Status** (saved as tags, `SidebarSection.tags`; + new status: the New License Status sheet, a name and a
+  - **License** (a family's license status; saved as tags, `SidebarSection.tags`; + new status: the New License Status sheet, a name and a
     row of colour dots, None, the Finder's seven and sand, starting on the first colour no status has; an empty name
     is the colour's; a name that's taken says so and can't be created). A new library starts with Licensed (green),
     Licensed + Non-Commercial (sand), Unlicensed (red), Partially Licensed (yellow), Public Domain (purple), Open
@@ -137,7 +137,7 @@ capsule on every side, that slides to the next one chosen.
 
 ## Font page (pushed over the browser; Esc or Back returns)
 
-One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no tabs).
+One scrolling page, top to bottom: header, text, styles, glyphs with the ligatures after the characters (no tabs).
 
 - Toolbar: Info · the search field, as in the browser (typing in it goes back to the browser with the matches). No Preview
   Options: the page has its own size and alignment, and takes preview text (styles list), weight and spacing from the browser's.
@@ -146,7 +146,8 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
 - **Text**: Style picker (Automatic = follows preview weight; or a specific style), Size slider 12–240 pt, alignment left/center/right (its own, centered at first; a left alignment chosen when there were two stays), a big editable text (default "Sphinx of black quartz, judge my vow.") that grows with what's typed, remembered. Lines are the Preview Options line spacing apart (an exact line height, so tighter than the font's own works too). Every glyph draws whole, however far past its line it reaches: the editor keeps room above and below the lines and its lines draw outside themselves (TextEditor cut them off at the font's ascent and descent). Esc goes back, as elsewhere on the page.
 - **Styles** (only when the family has more than one style): laid out like a table — Preview, Style, Weight, Status (the style's switch and its state, e.g. "Active until Cicero quits"); right-click → style menu, which ends with the family's Add to Set, License Status and Classification under the family's name.
 - Right-click on the header or the text → the family menu, as in the browser. The text, an NSTextView, shows it after Cut, Copy and Paste (an NSHostingMenu made at each right-click; macOS adds AutoFill).
-- **Ligatures** (only when the style has any): heading with "12 ligatures", then a pinned header per feature —
+- **Glyphs**: heading 56 pt below the styles with "404 characters" (and "· 12 ligatures" when the style makes any) and a filter field (character, Unicode name or U+ code; ligatures whose characters hold the text, or with that code, too), then one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), block headers pinned while scrolling, cells set in the font; click a cell for a popover with the character large, its name, code point.
+- **Ligatures** (only when the style has any), after the blocks, in the Glyphs section: a pinned header per feature like a block's —
   Standard (liga), Discretionary (dlig), Historical (hlig), Contextual (clig), Required (rlig) Ligatures, with
   counts — and rows of 76 × 72 cells: the ligature glyph drawn from its outline by glyph ID (a ligature has no
   character to set; centred on the ascender and descender, or the glyph where it reaches past them, scaled down when wide or tall), the characters under it; click
@@ -155,7 +156,6 @@ One scrolling page, top to bottom: header, text, styles, ligatures, glyphs (no t
   characters through the cmap (the lowest code point when several share a glyph), a component that is itself a
   ligature to its characters; ligatures of other glyphs (alternates, positional forms no character maps to) are
   left out. AAT-only fonts (morx) list none. Up to 3,000 per feature.
-- **Glyphs**: heading 26 pt below the ligatures (56 pt below the styles when there are none) with "404 characters" total and a filter field (character, Unicode name or U+ code), then one section per Unicode block with counts (Basic Latin, Latin-1 Supplement, Latin Extended-A, …), block headers pinned while scrolling, cells set in the font; click a cell for a popover with the character large, its name, code point.
 
 ## Quick Look (Space in the browser; Fonts → Quick Look ⌘Y)
 

@@ -2,8 +2,9 @@ import CiceroCore
 import CoreText
 import SwiftUI
 
-/// The ligatures a style makes, by feature: each drawn from its glyph, with the characters it stands for
-/// under it. Like the glyphs, rows of fixed cells in the page's stack, with a header per feature that pins.
+/// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph, with the
+/// characters it stands for under it. Like the glyphs' blocks, rows of fixed cells in the page's stack, under a header
+/// per feature like a block's, which pins.
 struct LigaturesSection: View {
     @Environment(PreviewSettings.self) private var preview
     let face: FontFace
@@ -23,19 +24,6 @@ struct LigaturesSection: View {
     }
 
     var body: some View {
-        let total = groups.reduce(0) { $0 + $1.ligatures.count }
-        HStack(spacing: 12) {
-            Text("Ligatures").font(.title2.weight(.semibold))
-            Text(total == 1 ? "1 ligature" : "\(total.formatted()) ligatures")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-            Spacer()
-        }
-        .padding(.horizontal, Self.inset)
-        // Well clear of the styles above, and close to the features it heads.
-        .padding(.top, 56)
-        .padding(.bottom, 4)
         ForEach(groups) { group in
             Section {
                 let rows = (group.ligatures.count + columns - 1) / columns

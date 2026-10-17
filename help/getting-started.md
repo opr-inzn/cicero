@@ -38,11 +38,11 @@ After that, Cicero checks which characters each font has, in the background. Lis
 
 The main window has three parts:
 
-- **The sidebar** on the left chooses what to show: **All Fonts**, **Active**, **Inactive**, **System Fonts** and **Problems**, then your **Folders**, **Sets**, **License Status**, **Foundries**, **Classifications** and **Coverage**. See [Organizing your library](organizing.md).
+- **The sidebar** on the left chooses what to show: **All Fonts**, **Active**, **Inactive**, **System Fonts** and **Problems**, then your **Folders**, **Sets**, **License**, **Foundries**, **Classifications** and **Coverage**. See [Organizing your library](organizing.md).
 - **The browser** in the middle shows the families of what you chose, as a list, a grid or specimens. The title is the sidebar item’s name, and the subtitle counts the families and how many are active, like “1,298 families · 716 active”. See [Browsing and previewing](browsing.md).
 - **The Info panel** on the right, shown with the **Info** button in the toolbar or **Fonts → Show Info** (⌘I), describes the selected font.
 
-Double-click a family to open its **font page**, with a large text to type into, its styles, its ligatures and its characters.
+Double-click a family to open its **font page**, with a large text to type into, its styles, and its characters and ligatures.
 
 The toolbar has, from left to right, the view switcher (List, Grid, Specimens), **Preview Options**, **Info** and the search field.
 

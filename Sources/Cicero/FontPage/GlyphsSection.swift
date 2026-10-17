@@ -1,18 +1,20 @@
 import CiceroCore
 import SwiftUI
 
-/// Every character a style has, grouped, with a filter by character, Unicode name or U+ code. Several
-/// views in a row, so each block's header pins in the page's lazy stack and its cells are rows of it.
+/// Every character a style has, grouped by Unicode block, then the ligatures it makes, by feature, under headers like
+/// the blocks'; with a filter by character, Unicode name or U+ code that takes in the ligatures too. Several views in a
+/// row, so each block's header pins in the page's lazy stack and its cells are rows of it.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
     /// Cells per row, from the page's width.
     let columns: Int
-    /// Whether the ligatures are above, rather than the styles, which want more room.
-    var followsLigatures = false
     /// The style's characters.
     let sections: [GlyphSection]
+    let ligatures: [LigatureGroup]
+    /// Ligature cells per row: they're wider.
+    let ligatureColumns: Int
     @State private var query = ""
     @State private var popover: UInt32?
 
@@ -28,10 +30,10 @@ struct GlyphsSection: View {
     var body: some View {
         let face = family.face(nearestWeight: preview.weight).face
         let shown = filtered(sections)
+        let shownLigatures = filtered(ligatures)
         HStack(spacing: 12) {
             Text("Glyphs").font(.title2.weight(.semibold))
-            let total = sections.reduce(0) { $0 + $1.scalars.count }
-            Text(total == 1 ? "1 character" : "\(total.formatted()) characters")
+            Text(count)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -41,10 +43,10 @@ struct GlyphsSection: View {
                 .frame(maxWidth: 280)
         }
         .padding(.horizontal, Self.inset)
-        // Well clear of the styles above, a little less of the ligatures, and close to the blocks it heads.
-        .padding(.top, followsLigatures ? 26 : 56)
+        // Well clear of the styles above, and close to the blocks it heads.
+        .padding(.top, 56)
         .padding(.bottom, 4)
-        if shown.isEmpty {
+        if shown.isEmpty && shownLigatures.isEmpty {
             ContentUnavailableView(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
                                    description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
@@ -72,8 +74,21 @@ struct GlyphsSection: View {
                     .background(Color.canvas)
                 }
             }
+            // Glyphs with no character of their own, after those with one.
+            if !shownLigatures.isEmpty {
+                LigaturesSection(face: face, columns: ligatureColumns, groups: shownLigatures)
+            }
             Color.clear.frame(height: 6)
         }
+    }
+
+    /// "124 characters", and the ligatures when there are any: "124 characters · 3 ligatures".
+    private var count: String {
+        let characters = sections.reduce(0) { $0 + $1.scalars.count }
+        let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
+        let text = characters == 1 ? "1 character" : "\(characters.formatted()) characters"
+        guard ligatureCount > 0 else { return text }
+        return text + " · " + (ligatureCount == 1 ? "1 ligature" : "\(ligatureCount.formatted()) ligatures")
     }
 
     /// One popover per row, pointing at the clicked cell, rather than one per cell: each is worked out
@@ -126,6 +141,19 @@ struct GlyphsSection: View {
                     || (trimmed.count > 1 && (GlyphSection.name(of: scalar)?.lowercased().contains(lower) ?? false))
             }
             return matches.isEmpty ? nil : GlyphSection(title: section.title, scalars: matches)
+        }
+    }
+
+    /// The ligatures whose characters hold what's typed ("f" finds ff, fi and ffl), or one with that U+ code.
+    private func filtered(_ groups: [LigatureGroup]) -> [LigatureGroup] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return groups }
+        let code = UInt32(trimmed.uppercased().replacingOccurrences(of: "U+", with: "").replacingOccurrences(of: "0X", with: ""), radix: 16)
+        return groups.compactMap { group in
+            let matches = group.ligatures.filter { ligature in
+                ligature.text.localizedCaseInsensitiveContains(trimmed) || code.map(ligature.characters.contains) ?? false
+            }
+            return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches)
         }
     }
 }
