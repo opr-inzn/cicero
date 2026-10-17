@@ -1,35 +1,40 @@
 import CiceroCore
 import CoreText
 
-/// What a font page lists under its styles for one face: its characters by block and the ligatures it makes. A ligature
-/// whose glyph a character has too, like ﬁ, which fonts usually give U+FB01 (Alphabetic Presentation Forms), is listed
-/// once, as that character, which says which feature makes it.
+/// What a font page lists under its styles for one face: its characters by block and the ligatures it makes. A character
+/// whose glyph a ligature feature makes, like ﬁ, which fonts usually give U+FB01 (Alphabetic Presentation Forms) too, is
+/// listed once, as a ligature, which says the character.
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
+    /// The characters by block, but those listed as ligatures.
     let glyphs: [GlyphSection]
-    /// Characters a ligature feature makes too: character → the feature's tag and the characters it's made from.
-    let madeByLigatures: [UInt32: (tag: String, characters: [UInt32])]
+    /// Every character the face has, those listed as ligatures included.
+    let characterCount: Int
+    /// The character a ligature's glyph is too, by glyph.
+    let ligatureCharacters: [CGGlyph: UInt32]
 
     init(ligatures: [LigatureGroup], glyphs: [GlyphSection], font: CTFont) {
-        self.glyphs = glyphs
+        characterCount = glyphs.reduce(0) { $0 + $1.scalars.count }
+        let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
-        // Each character's glyph, the lowest character's where several share one; none needed without ligatures.
-        for scalar in ligatures.isEmpty ? [] : glyphs.flatMap(\.scalars).reversed() {
+        var listed: Set<UInt32> = []
+        // The characters whose glyph a ligature is (the lowest, for its popover, where several share one); none to look
+        // for without ligatures.
+        for scalar in made.isEmpty ? [] : glyphs.flatMap(\.scalars).reversed() {
             guard let character = Unicode.Scalar(scalar) else { continue }
             var units = Array(String(Character(character)).utf16)
             var glyph = [CGGlyph](repeating: 0, count: units.count)
-            if CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), glyph[0] != 0 { characters[glyph[0]] = scalar }
-        }
-        var made: [UInt32: (tag: String, characters: [UInt32])] = [:]
-        self.ligatures = ligatures.compactMap { group in
-            let own = group.ligatures.filter { ligature in
-                guard let scalar = characters[ligature.glyph] else { return true }
-                if made[scalar] == nil { made[scalar] = (group.tag, ligature.characters) }
-                return false
+            if CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), made.contains(glyph[0]) {
+                characters[glyph[0]] = scalar
+                listed.insert(scalar)
             }
-            return own.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: own)
         }
-        madeByLigatures = made
+        self.ligatures = ligatures
+        self.glyphs = listed.isEmpty ? glyphs : glyphs.compactMap { section in
+            let left = section.scalars.filter { !listed.contains($0) }
+            return left.isEmpty ? nil : GlyphSection(title: section.title, scalars: left)
+        }
+        ligatureCharacters = characters
     }
 }
 

@@ -11,6 +11,8 @@ struct LigaturesSection: View {
     /// Cells per row: the glyphs'.
     let columns: Int
     let groups: [LigatureGroup]
+    /// The character a ligature's glyph is too, like U+FB01 for ﬁ.
+    let characters: [CGGlyph: UInt32]
     /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
 
@@ -87,6 +89,13 @@ struct LigaturesSection: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Text("\(group.name) (\(group.tag))").font(.callout).foregroundStyle(.secondary)
+            if let character = characters[ligature.glyph] {
+                Text("Also \(String(format: "U+%04X", character))\(GlyphSection.name(of: character).map { ", \($0.capitalized)" } ?? "")")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+            }
         }
         .padding(16)
         .frame(maxWidth: 300)
