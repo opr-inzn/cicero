@@ -116,7 +116,7 @@ extension AppModel {
     /// The places these styles can be used from, when some are in more than one, like each client's folder
     /// (see `CopyChooser`).
     func copySources(of styles: [LibraryFace]) -> [CopySource] {
-        CopyChooser.sources(of: styles, folders: data.folders, records: data.records, locations: locations)
+        CopyChooser.sources(of: styles, folders: data.namedFolders, records: data.records, locations: locations)
     }
 
     /// Uses a place's copies of the styles it has and turns off the other copies of them Cicero turned on.
@@ -250,7 +250,10 @@ extension AppModel {
     func removeFolders(_ ids: Set<UUID>) {
         turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
         data.folders.removeAll { ids.contains($0.id) }
-        for id in ids { data.sidebar.forget("folder.\(id)") }
+        for id in ids {
+            data.sidebar.forget("folder.\(id)")
+            data.folderNames[id.uuidString] = nil
+        }
         deselect { item in ids.contains { item == .folder($0) } }
         rescan()
     }
@@ -335,9 +338,25 @@ extension AppModel {
         data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
+    /// The user's folder, or Cicero's Deactivated folder, with the name the user gave it.
     func folder(_ id: UUID) -> WatchedFolder? {
-        if id == WatchedFolder.deactivatedID { return WatchedFolder(id: id, path: locations.deactivated.path) }
-        return data.folders.first { $0.id == id }
+        if id == WatchedFolder.deactivatedID { return data.named(WatchedFolder(id: id, path: locations.deactivated.path)) }
+        return data.folders.first { $0.id == id }.map(data.named)
+    }
+
+    /// What the sidebar calls a folder or one of Cicero's own items (Testing, Adobe Fonts, Added Fonts): the name the
+    /// user gave it, else its own.
+    func folderName(_ id: UUID) -> String {
+        (folder(id) ?? data.named(WatchedFolder(id: id, path: ""))).displayName
+    }
+
+    /// Shows a folder under another name; the folder on disk keeps its own. An empty name, or the folder's own, goes
+    /// back to that.
+    func renameFolder(_ id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var own = folder(id) ?? WatchedFolder(id: id, path: "")
+        own.customName = nil
+        data.folderNames[id.uuidString] = trimmed.isEmpty || trimmed == own.displayName ? nil : trimmed
     }
 
     // MARK: Sets
@@ -529,7 +548,7 @@ extension AppModel {
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
-                return SidebarRow(key: "folder.\($0.id)", title: $0.displayName, icon: icon, item: .folder($0.id))
+                return SidebarRow(key: "folder.\($0.id)", title: data.named($0).displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:
             return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "square.stack" : "app.badge.checkmark", item: .set($0.id)) }

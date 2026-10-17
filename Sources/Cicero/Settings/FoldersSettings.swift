@@ -45,7 +45,7 @@ struct FoldersSettings: View {
             Button("OK") { model.setActivation(ofFolder: folder.id, active: false, app: appName) }
             Button("Cancel", role: .cancel) {}
         } message: { folder in
-            Text("Cicero lists the fonts in “\(folder.displayName)” as active in that app, which loads them by itself.")
+            Text("Cicero lists the fonts in “\(model.data.named(folder).displayName)” as active in that app, which loads them by itself.")
         }
     }
 }
@@ -60,7 +60,7 @@ private struct FolderRow: View {
             Image(systemName: model.availability(ofFolder: folder.id) != nil ? "questionmark.folder" : "folder")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(folder.displayName)
+                Text(model.data.named(folder).displayName)
                 Text((folder.path as NSString).abbreviatingWithTildeInPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
