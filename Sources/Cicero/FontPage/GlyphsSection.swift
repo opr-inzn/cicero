@@ -10,12 +10,13 @@ struct GlyphsSection: View {
     let family: Family
     /// Cells per row, from the page's width.
     let columns: Int
-    /// The style's characters.
+    /// The style's characters, but those listed as ligatures.
     let sections: [GlyphSection]
-    /// The ligatures without a character of their own.
+    /// All of them.
+    let characterCount: Int
     let ligatures: [LigatureGroup]
-    /// Characters a ligature feature makes too, which the popover says.
-    let madeByLigatures: [UInt32: (tag: String, characters: [UInt32])]
+    /// The character a ligature's glyph is too, like U+FB01 for ﬁ.
+    let ligatureCharacters: [CGGlyph: UInt32]
     @State private var query = ""
     @State private var popover: UInt32?
 
@@ -79,7 +80,7 @@ struct GlyphsSection: View {
             }
             // Glyphs with no character of their own, after those with one.
             if !shownLigatures.isEmpty {
-                LigaturesSection(face: face, columns: columns, groups: shownLigatures)
+                LigaturesSection(face: face, columns: columns, groups: shownLigatures, characters: ligatureCharacters)
             }
             Color.clear.frame(height: 6)
         }
@@ -87,7 +88,7 @@ struct GlyphsSection: View {
 
     /// "124 characters", and the ligatures when there are any: "124 characters · 3 ligatures".
     private var count: String {
-        let characters = sections.reduce(0) { $0 + $1.scalars.count }
+        let characters = characterCount
         let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
         let text = characters == 1 ? "1 character" : "\(characters.formatted()) characters"
         guard ligatureCount > 0 else { return text }
@@ -116,14 +117,6 @@ struct GlyphsSection: View {
                         .frame(minWidth: 160, minHeight: 130)
                     Text(GlyphSection.name(of: popover)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                     Text(String(format: "U+%04X", popover)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                    if let made = madeByLigatures[popover] {
-                        let name = LigatureGroup.features.first { $0.tag == made.tag }?.name ?? made.tag
-                        let parts = made.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }
-                        Text("Made from \(parts.joined(separator: " + ")) by \(name) (\(made.tag))")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
                 }
                 .padding(16)
                 .frame(maxWidth: 260)
@@ -183,14 +176,19 @@ struct GlyphsSection: View {
         }
     }
 
-    /// The ligatures whose characters hold what's typed ("f" finds ff, fi and ffl), or one with that U+ code.
+    /// The ligatures whose characters hold what's typed ("f" finds ff, fi and ffl), with that U+ code, or that are the
+    /// character typed.
     private func filtered(_ groups: [LigatureGroup]) -> [LigatureGroup] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return groups }
         let code = UInt32(trimmed.uppercased().replacingOccurrences(of: "U+", with: "").replacingOccurrences(of: "0X", with: ""), radix: 16)
         return groups.compactMap { group in
             let matches = group.ligatures.filter { ligature in
-                ligature.text.localizedCaseInsensitiveContains(trimmed) || code.map(ligature.characters.contains) ?? false
+                // Its own character too, like ﬁ or U+FB01.
+                let own = ligatureCharacters[ligature.glyph]
+                return ligature.text.localizedCaseInsensitiveContains(trimmed)
+                    || code.map { ligature.characters.contains($0) || own == $0 } ?? false
+                    || own.flatMap(Unicode.Scalar.init).map { String(Character($0)) == trimmed } ?? false
             }
             return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches)
         }
