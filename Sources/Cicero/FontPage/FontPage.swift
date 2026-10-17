@@ -35,7 +35,7 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                // Lazy for the glyphs, which can run to thousands of cells; their block headers stay pinned. Only
+                // Lazy for the glyphs, which can run to thousands of cells; their group headers stay pinned. Only
                 // rows about one height go in it: it guesses the height of rows it hasn't placed from those it has,
                 // and with the styles in it too (fifty of them are 2,000 pt) the guesses swung so far that, scrolled
                 // to the end, the page laid itself out again and again at full CPU.
@@ -274,6 +274,14 @@ private struct StyleRows: View {
                 .padding(.vertical, 8)
                 .contentShape(.rect)
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
+                // Onto a set in the sidebar, which takes just this style.
+                .draggable(FontDrag(family: family.id, style: style.face.postScriptName)) {
+                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20,
+                             weight: style.face.styleWeight, features: features)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.background, in: .rect(cornerRadius: 8))
+                }
             }
             Divider()
         }

@@ -255,28 +255,75 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// A hand-picked group of families. With apps, it's an application set: Cicero activates its fonts
-/// while one of those apps is open.
+/// A hand-picked group of families, or of some of their styles. With apps, it's an application set: Cicero activates its
+/// fonts while one of those apps is open.
 public struct FontSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
+    /// The families it has whole.
     public var families: [String]
+    /// Family name → the styles of it the set has, by PostScript name, for families only some of whose styles are in it.
+    public var styles: [String: [String]]
     public var apps: [LinkedApp]
 
-    public init(id: UUID = UUID(), name: String, families: [String] = [], apps: [LinkedApp] = []) {
+    public init(id: UUID = UUID(), name: String, families: [String] = [], styles: [String: [String]] = [:], apps: [LinkedApp] = []) {
         self.id = id
         self.name = name
         self.families = families
+        self.styles = styles
         self.apps = apps
     }
 
-    /// Sets saved before apps existed load without them.
+    /// Sets saved before apps, or styles, existed load without them.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         families = try c.decode([String].self, forKey: .families)
+        styles = try c.decodeIfPresent([String: [String]].self, forKey: .styles) ?? [:]
         apps = try c.decodeIfPresent([LinkedApp].self, forKey: .apps) ?? []
+    }
+
+    /// Every family it has, whole or in part: the whole ones in their order, then the others by name.
+    public var memberFamilies: [String] {
+        families + styles.filter { !$0.value.isEmpty && !families.contains($0.key) }.keys.sorted()
+    }
+
+    /// Whether it has this style of the family (by PostScript name): the whole family, or that style.
+    public func contains(style: String, of family: String) -> Bool {
+        families.contains(family) || (styles[family] ?? []).contains(style)
+    }
+
+    /// Puts families in whole, after the others, in place of the styles of them it had.
+    public mutating func add(families names: [String]) {
+        for name in names where !families.contains(name) { families.append(name) }
+        for name in names { styles[name] = nil }
+    }
+
+    /// Takes families out, whole or in part.
+    public mutating func remove(families names: Set<String>) {
+        families.removeAll { names.contains($0) }
+        for name in names { styles[name] = nil }
+    }
+
+    /// Adds a style of a family; a family it has whole stays so.
+    public mutating func add(style: String, of family: String) {
+        guard !families.contains(family) else { return }
+        var list = styles[family] ?? []
+        if !list.contains(style) { list.append(style) }
+        styles[family] = list
+    }
+
+    /// Takes a style out. A family it has whole keeps its other styles, `all` of them (by PostScript name) but this one.
+    public mutating func remove(style: String, of family: String, all: [String]) {
+        let left: [String]
+        if let index = families.firstIndex(of: family) {
+            families.remove(at: index)
+            left = all.filter { $0 != style }
+        } else {
+            left = (styles[family] ?? []).filter { $0 != style }
+        }
+        styles[family] = left.isEmpty ? nil : left
     }
 }
 

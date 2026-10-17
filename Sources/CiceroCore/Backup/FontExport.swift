@@ -28,7 +28,9 @@ public struct FontExportPlan: Sendable {
     /// Files left out because they come with macOS or an app.
     public var protectedCount: Int
 
-    public init(families: [Family]) {
+    /// `including` picks the faces of a family to export (all of them unless it says otherwise), for a set with only
+    /// some of a family's styles.
+    public init(families: [Family], including: (Family, LibraryFace) -> Bool = { _, _ in true }) {
         var seen = Set<String>()
         var items: [Item] = []
         var familyCount = 0
@@ -36,7 +38,7 @@ public struct FontExportPlan: Sendable {
         for family in families {
             var paths: [String] = []
             var exported = false
-            for face in family.faces {
+            for face in family.faces where including(family, face) {
                 let path = face.face.path
                 if ActivationEngine.isProtected(path) {
                     if seen.insert(path).inserted { protectedCount += 1 }
