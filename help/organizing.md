@@ -133,7 +133,7 @@ Right-click **Added Fonts** and choose **Reveal in Finder** to see the files.
 
 ## Sets
 
-A set is a list of families you put together by hand, like the fonts for one project.
+A set is a list of families you put together by hand, like the fonts for one project. It can have some styles of a family rather than all of them, like just the Regular and Bold you use.
 
 ### Make a set
 
@@ -145,6 +145,7 @@ A set is a list of families you put together by hand, like the fonts for one pro
 
 - Drag families onto the set in the sidebar.
 - Or right-click families and choose **Add to Set**, then the set. A checkmark shows the sets they’re already in; choose a checked set to take them out again.
+- To add a single style, open the family’s font page and drag the style’s row from **Styles** onto the set, or right-click the style and choose **Add Style to Set**, then the set, or **New Set with Style**. A checkmark shows the sets that have the style; choose a checked set to take it out. Activating, deactivating and exporting the set then take only the styles it has, and so does an [application set](activating.md#turn-fonts-on-with-an-app).
 
 ### Rename or delete a set
 
