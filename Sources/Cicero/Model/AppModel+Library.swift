@@ -23,7 +23,8 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "Folders"
         case .sets: "Sets"
-        case .tags: "Tags"
+        // Tags before 1.5, still `tags` in what's saved.
+        case .tags: "License Status"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
         // As in Settings: which fonts have every character of a set.
@@ -35,12 +36,22 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "folder"
         case .sets: "square.stack"
-        case .tags: "tag"
+        case .tags: "checkmark.seal"
         case .foundries: "building.2"
         case .classifications: "textformat"
         case .characterSets: "character.textbox"
         }
     }
+}
+
+/// A family in Compare, in a style.
+struct CompareEntry: Identifiable, Equatable {
+    let id = UUID()
+    let familyID: String
+    /// nil: the one nearest the preview weight.
+    var style: FaceID?
+    /// Its place among the tints, kept while it stays, so moving or removing the others doesn't change its colour.
+    let tint: Int
 }
 
 struct SidebarRow: Identifiable, Hashable {
@@ -50,7 +61,7 @@ struct SidebarRow: Identifiable, Hashable {
     var icon: String
     var item: SidebarItem
     var badge = 0
-    /// A tag's colour, drawn as a dot instead of the icon; nil for a tag without one and every other row.
+    /// A license status's colour, drawn as a dot instead of the icon; nil for one without and every other row.
     var color: TagColor?
 
     var id: String { key }

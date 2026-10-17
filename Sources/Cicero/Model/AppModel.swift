@@ -147,10 +147,8 @@ final class AppModel {
 
     // MARK: Compare
 
-    var compareIDs: [String] = []
-    /// Each compared family's place among the tints, kept while it stays, so moving or removing the
-    /// others doesn't change its color.
-    var compareTints: [String: Int] = [:]
+    /// What Compare shows, in order: families, each in a style, some more than once in other styles.
+    var compareEntries: [CompareEntry] = []
 
     // MARK: Opening files
 

@@ -9,6 +9,8 @@ struct GlyphsSection: View {
     let family: Family
     /// Cells per row, from the page's width.
     let columns: Int
+    /// Whether the ligatures are above, rather than the styles, which want more room.
+    var followsLigatures = false
     /// The style's characters.
     let sections: [GlyphSection]
     @State private var query = ""
@@ -39,8 +41,8 @@ struct GlyphsSection: View {
                 .frame(maxWidth: 280)
         }
         .padding(.horizontal, Self.inset)
-        // Well clear of the styles above, and close to the blocks it heads.
-        .padding(.top, 56)
+        // Well clear of the styles above, a little less of the ligatures, and close to the blocks it heads.
+        .padding(.top, followsLigatures ? 26 : 56)
         .padding(.bottom, 4)
         if shown.isEmpty {
             ContentUnavailableView(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",

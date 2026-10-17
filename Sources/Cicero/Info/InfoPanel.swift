@@ -213,7 +213,7 @@ private struct ClassificationRow: View {
     }
 }
 
-/// The family's tags, with a menu to give it others or take them off.
+/// The family's license status, with a menu to change it.
 private struct TagsRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -222,16 +222,16 @@ private struct TagsRow: View {
         let tags = model.data.tags(of: family.id)
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Tags").font(.caption).foregroundStyle(.secondary)
+                Text("License Status").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Menu(tags.isEmpty ? "Add Tag" : "Edit Tags") { TagMenuItems(families: [family], model: model) }
+                Menu("Change") { TagMenuItems(families: [family], model: model) }
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .controlSize(.small)
                     .fixedSize()
             }
             if tags.isEmpty {
-                Text("None").font(.callout).foregroundStyle(.secondary)
+                Text("No Status").font(.callout).foregroundStyle(.secondary)
             } else {
                 FlowLayout(spacing: 10, lineSpacing: 4) {
                     ForEach(tags, id: \.self) { tag in

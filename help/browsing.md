@@ -17,7 +17,7 @@ One row per family, under column headers:
 | Column | Shows |
 | --- | --- |
 | Status | The family’s on/off switch |
-| Name | The family name, the colors of [your tags](organizing.md#tags), and a status tag when it isn’t simply on or off (see [Status tags](#status-tags)) |
+| Name | The family name, the color of its [license status](organizing.md#license-status), and a status tag when it isn’t simply on or off (see [Status tags](#status-tags)) |
 | Preview | A sample in the font |
 | Styles | How many styles the family has |
 | Classification | Serif, Sans Serif, Script and so on, from what the font says, the shapes of its letters, or its name (see [Classifications](organizing.md#classifications)) |
@@ -76,9 +76,9 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
 | Extend the selection | Hold ⇧ with an arrow key |
 
-Right-click a family for its menu: activate or deactivate it, add it to a set, give it tags, reveal its files, copy its name, export it, compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
+Right-click a family for its menu: activate or deactivate it, add it to a set, give it a license status or a classification, reveal its files, copy its name, export it, compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
-You can drag families onto a set or a foundry in the sidebar, or into the Compare window.
+You can drag families onto a set, a license status, a foundry or a classification in the sidebar, or into the Compare window.
 
 ## Take a quick look
 
@@ -96,8 +96,8 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 From top to bottom, a font page has:
 
 - **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why. A family from [Adobe Fonts](activating.md#adobe-fonts) has **Manage in Creative Cloud** instead.
-- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text.
-- **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash.
+- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it a license status, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**.
+- **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash. Under the family’s name, it has the family’s **Add to Set**, **License Status** and **Classification** too.
 - **Ligatures,** when the style has any: see [See a font’s ligatures](#see-a-fonts-ligatures).
 - **Glyphs:** every character in the font, in one section per Unicode block, like Basic Latin or Latin-1 Supplement. To find characters, type into **Filter**: a character, part of its Unicode name, or a code like U+00E9. Click a character to see it large, with its name and code.
 
@@ -114,7 +114,7 @@ Click **Info** in the toolbar, or choose **Fonts → Show Info** (⌘I). The Inf
 The panel describes the style being previewed, the one closest to the weight in Preview Options. Its **Info** tab shows:
 
 - **Status**, and the font’s names: family, style, full name and PostScript name
-- **Tags**: the family’s tags. **Add Tag** or **Edit Tags** gives it others or takes them off.
+- **License Status**: the family’s license status, or **No Status**. **Change** gives it another or takes it off.
 - version, designer, manufacturer, and the vendor ID: the four letters a foundry registers, like ADBE for Adobe
 - weight, and the weight range of a variable font
 - number of glyphs, format and copyright
@@ -157,7 +157,9 @@ The same options apply to every view, font pages and the Compare window. Cicero 
 The Compare window shows them with the preview text, size, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
 
 - **Stacked:** one row per font, all on the same baseline, with the name and style under each.
-- **Overlay:** every font drawn over the others in its own color, with small marks for each font’s x-height and cap height, and their names below. The last one is drawn on top.
+- **Overlay:** every font drawn over the others in its own color, on a shared baseline, with their names below. The last one is drawn on top.
+
+Each font is in the style nearest the weight in Preview Options at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to following the weight. **Compare Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
 
 To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
 

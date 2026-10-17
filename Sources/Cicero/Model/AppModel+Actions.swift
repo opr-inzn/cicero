@@ -460,7 +460,7 @@ extension AppModel {
 
     // MARK: Drag and drop
 
-    /// Sidebar rows that family names can be dropped onto: sets, tags and foundries.
+    /// Sidebar rows that family names can be dropped onto: sets, license statuses, foundries and classifications.
     func takesFamilies(_ item: SidebarItem) -> Bool {
         switch item {
         case .set, .tag, .foundry, .classification: true
@@ -474,7 +474,7 @@ extension AppModel {
         guard !families.isEmpty else { return false }
         switch item {
         case .set(let id): setMembership(true, for: families, in: id)
-        case .tag(let name): setTag(name, true, for: families)
+        case .tag(let name): setLicenseStatus(name, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         case .classification(let name): setClassification(name, for: families)
         default: return false
@@ -535,7 +535,7 @@ extension AppModel {
             return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "square.stack" : "app.badge.checkmark", item: .set($0.id)) }
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
         case .tags:
-            return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: "tag", item: .tag($0), color: data.tagColors[$0]) }
+            return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: SidebarSection.tags.icon, item: .tag($0), color: data.tagColors[$0]) }
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", item: .foundry($0)) }
         case .classifications:
@@ -686,29 +686,47 @@ extension AppModel {
     // MARK: Compare
 
     func compare(_ families: [Family]) {
-        compareIDs = []
-        compareTints = [:]
+        compareEntries = []
         _ = addToCompare(families.map(\.id))
     }
 
+    /// Adds the families that aren't in Compare yet, in the style the preview weight picks.
     func addToCompare(_ names: [String]) -> Bool {
-        let new = names.filter { family($0) != nil && !compareIDs.contains($0) }
-        for id in new {
-            compareTints[id] = (0...).first { !compareTints.values.contains($0) }
+        let new = names.filter { name in family(name) != nil && !compareEntries.contains { $0.familyID == name } }
+        for name in new {
+            compareEntries.append(CompareEntry(familyID: name, tint: nextCompareTint))
         }
-        compareIDs += new
         return !new.isEmpty
     }
 
-    func removeFromCompare(_ id: String) {
-        compareIDs.removeAll { $0 == id }
-        compareTints[id] = nil
+    /// The same family again, after it, in its first style not in Compare yet.
+    func compareAnotherStyle(of id: UUID) {
+        guard let index = compareEntries.firstIndex(where: { $0.id == id }), let family = family(compareEntries[index].familyID) else { return }
+        let shown = Set(compareEntries.filter { $0.familyID == family.id }.compactMap(\.style))
+        let style = family.faces.first { !shown.contains($0.id) }?.id
+        compareEntries.insert(CompareEntry(familyID: family.id, style: style, tint: nextCompareTint), at: index + 1)
+    }
+
+    /// nil: the style the preview weight picks.
+    func setCompareStyle(_ style: FaceID?, of id: UUID) {
+        guard let index = compareEntries.firstIndex(where: { $0.id == id }) else { return }
+        compareEntries[index].style = style
+    }
+
+    func removeFromCompare(_ id: UUID) {
+        compareEntries.removeAll { $0.id == id }
     }
 
     /// Puts a compared family where another one is, moving the others along.
-    func moveInCompare(_ id: String, to target: String) {
-        guard let from = compareIDs.firstIndex(of: id), let to = compareIDs.firstIndex(of: target), from != to else { return }
-        compareIDs.insert(compareIDs.remove(at: from), at: to)
+    func moveInCompare(_ id: UUID, to target: UUID) {
+        guard let from = compareEntries.firstIndex(where: { $0.id == id }), let to = compareEntries.firstIndex(where: { $0.id == target }),
+              from != to else { return }
+        compareEntries.insert(compareEntries.remove(at: from), at: to)
+    }
+
+    /// The first tint no compared family has.
+    private var nextCompareTint: Int {
+        (0...).first { tint in !compareEntries.contains { $0.tint == tint } }!
     }
 
     // MARK: Font caches

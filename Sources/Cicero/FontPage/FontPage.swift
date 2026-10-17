@@ -48,7 +48,8 @@ struct FontPage: View {
                             if !content.ligatures.isEmpty {
                                 LigaturesSection(face: face, columns: ligatureColumns, groups: content.ligatures)
                             }
-                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs)
+                            GlyphsSection(family: family, columns: glyphColumns, followsLigatures: !content.ligatures.isEmpty,
+                                          sections: content.glyphs)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
@@ -117,6 +118,9 @@ private struct Header: View {
         .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 16)
+        // The family's menu, as in the browser; the sample below has it too.
+        .contentShape(.rect)
+        .contextMenu { FamilyMenu(families: [family], model: model) }
     }
 
     private var summary: String {
@@ -203,10 +207,15 @@ private struct TypeTester: View {
                 .hidden()
                 .overlay {
                     SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
-                                 alignment: alignment.paragraph, overhang: overhang)
+                                 alignment: alignment.paragraph, overhang: overhang) {
+                        FamilyMenu(families: [family], model: model)
+                    }
                 }
                 .frame(minHeight: 280)
                 .padding(.vertical, 20)
+                // Around the text too, which has it in its own menu (see `SampleEditor`).
+                .contentShape(.rect)
+                .contextMenu { FamilyMenu(families: [family], model: model) }
         }
         .padding(.horizontal, 24)
     }

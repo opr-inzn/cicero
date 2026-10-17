@@ -14,7 +14,9 @@ At the top of the sidebar are five items that are always there:
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Problems | Things worth fixing, with a count. See [Problems](problems.md) |
 
-Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Coverage**.
+Below them are sections: **Folders**, **Sets**, **License Status**, **Foundries**, **Classifications** and **Coverage**.
+
+The item you’ve selected is in the accent color. To hide the whole sidebar, choose **View → Hide Sidebar** (⌃⌘S), and **View → Show Sidebar** to bring it back.
 
 ### Open or close a section
 
@@ -22,7 +24,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 
 ### Hide items you don’t use
 
-1. Click **Edit** next to **Fonts** at the top of the sidebar, or choose **View → Edit Sidebar**. Every item and section gets a checkbox. Sections stay open or closed as they were: click a section’s title to open or close it, for example to close **Foundries** and get to **Coverage** faster.
+1. Click **Edit** next to **Library** at the top of the sidebar, or right-click the sidebar and choose **Edit Sidebar**. Every item and section gets a checkbox. Sections stay open or closed as they were: click a section’s title to open or close it, for example to close **Foundries** and get to **Coverage** faster.
 2. Uncheck what you don’t want. Unchecked items are dimmed.
 3. Click **Done**. The unchecked items disappear.
 
@@ -49,8 +51,11 @@ Selected items have to be in one section, or in one group under **Coverage**. �
 Drag families from the browser onto:
 
 - **a set**, to add them to it
-- **a tag**, to give them that tag
+- **a license status**, to give them that status
 - **a foundry**, to say they’re from that foundry
+- **a classification**, to put them in it
+
+The item they’re over lights up in the accent color.
 
 ## Folders
 
@@ -91,7 +96,7 @@ The first time Cicero looks in a cloud service’s folder, macOS asks whether it
 
 ### Folders on a server or an external disk
 
-Add a folder on a network disk or a USB drive like any other. While the disk isn’t connected, its folder has a question mark in the sidebar, its fonts are out of your library, and the folder says “Isn’t connected”. Its fonts are back as soon as you connect the disk, and they keep their tags and their places in sets; Problems doesn’t list them as missing meanwhile.
+Add a folder on a network disk or a USB drive like any other. While the disk isn’t connected, its folder has a question mark in the sidebar, its fonts are out of your library, and the folder says “Isn’t connected”. Its fonts are back as soon as you connect the disk, and they keep their license statuses and their places in sets; Problems doesn’t list them as missing meanwhile.
 
 Cicero sees fonts you add to a server folder from your Mac at once. Fonts someone else adds show up the next time Cicero looks, when you come back to it after a minute or more, or when you choose **Fonts → Rescan Library** (⌘R).
 
@@ -171,7 +176,7 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Name | contains, doesn’t contain, begins with, is | Text |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
-| Tag | has, doesn’t have | One of your tags |
+| License Status | is, is not | One of your license statuses |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
@@ -184,22 +189,35 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 
 A smart set with a language or coverage rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
 
-## Tags
+## License status
 
-Tags are labels you give families, like “Licensed”, “Client approved” or “Try later”, each with a color if you like. A family can have any number of them, and its tags show as colored dots next to its name in the list, grid and specimens. A new library starts with Red, Yellow and Green tags, ready to use.
+Keep track of what you may do with each family: give it a license status, which shows as a colored dot next to its name in the list, grid and specimens. A family has one status at a time. Cicero comes with these:
 
-### Tag fonts
+| Status | Color |
+| --- | --- |
+| Licensed | Green |
+| Licensed + Non-Commercial | Sand |
+| Unlicensed | Red |
+| Partially Licensed | Yellow |
+| Public Domain | Purple |
+| Open Source | Blue |
+| Trial | Orange |
 
-- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked tag to take it off. **New Tag** makes a tag and gives it to them.
-- Drag families onto a tag in the sidebar.
-- In the [Info panel](browsing.md#see-a-fonts-details), click **Add Tag** or **Edit Tags** next to **Tags**.
+A family without one has **No Status**. Libraries from before Cicero had license statuses get these too, once; their tags are statuses now, and the Red, Yellow and Green tags a library started with go if you never used them.
 
-### Make, change and delete tags
+### Give fonts a license status
 
-- Click **+** next to **Tags** in the sidebar to make a tag. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other tag has. Leave the name empty to name the tag after its color, like **Orange**.
-- Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
+- Right-click families and choose **License Status**, then a status. A checkmark shows the one they have; **No Status** takes it off. **New License Status** makes a status and gives it to them.
+- On a font page, right-click the text, the header or a style for the same menu.
+- Drag families onto a status in the sidebar.
+- In the [Info panel](browsing.md#see-a-fonts-details), click **Change** next to **License Status**.
 
-Select a tag in the sidebar to see the families that have it. To find families with several tags, or without one, make a [smart set](#smart-sets) with **Tag** rules.
+### Make, change and delete license statuses
+
+- Click **+** next to **License Status** in the sidebar to make a status. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other status has.
+- Right-click a status and choose **Rename License Status**, a color under **Color** (or **None**), or **Delete License Status**. Deleting a status takes it off every family, and smart set rules that use it are removed.
+
+Select a status in the sidebar to see the families that have it. To find families without one, or with any of several, make a [smart set](#smart-sets) with **License Status** rules.
 
 ## Foundries
 

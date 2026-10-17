@@ -490,6 +490,27 @@ final class SegmentTarget: NSObject {
 }
 
 extension View {
+    /// A bar over the top of the scroll view in this view, on the window's background, which what scrolls under it
+    /// fades into just below it, as under the main window's title, rather than meeting at an edge. The system's soft
+    /// edge fades less far than a tall bar reaches, so rows showed behind its lower half.
+    func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
+        let fade: CGFloat = 18
+        return scrollEdgeEffectHidden(true, for: .top)
+            .contentMargins(.top, fade, for: .scrollContent)
+            .safeAreaBar(edge: .top, spacing: 0) {
+                bar()
+                    .background(.background)
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(.background)
+                            .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
+                            .frame(height: fade)
+                            .offset(y: fade)
+                            .allowsHitTesting(false)
+                    }
+            }
+    }
+
     /// For a section footer in a grouped form: moves it closer to its card than the default gap.
     func formFooter() -> some View {
         padding(.top, -4)

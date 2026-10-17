@@ -59,25 +59,7 @@ struct FamilyMenu: View {
 
         Divider()
 
-        // The symbols of the sidebar's sections.
-        Menu {
-            ForEach(model.data.sets) { set in
-                Toggle(set.name, isOn: Binding(
-                    get: { families.allSatisfy { model.isMember($0, of: set.id) } },
-                    set: { model.setMembership($0, for: families, in: set.id) }
-                ))
-            }
-            if !model.data.sets.isEmpty { Divider() }
-            Button("New Set from Selection", systemImage: "plus") {
-                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
-            }
-        } label: {
-            Label("Add to Set", systemImage: SidebarSection.sets.icon)
-        }
-        Menu { TagMenuItems(families: families, model: model) } label: { Label("Tags", systemImage: SidebarSection.tags.icon) }
-        Menu { ClassificationMenuItems(families: families, model: model) } label: {
-            Label("Classification", systemImage: SidebarSection.classifications.icon)
-        }
+        OrganizingMenus(families: families, model: model)
 
         Divider()
 
@@ -113,7 +95,36 @@ struct FamilyMenu: View {
     }
 }
 
-/// The right-click menu for one style of a family.
+/// Add to Set, License Status and Classification, for families' menus and a style's, where they're the family's.
+struct OrganizingMenus: View {
+    let families: [Family]
+    let model: AppModel
+
+    var body: some View {
+        // The symbols of the sidebar's sections.
+        Menu {
+            ForEach(model.data.sets) { set in
+                Toggle(set.name, isOn: Binding(
+                    get: { families.allSatisfy { model.isMember($0, of: set.id) } },
+                    set: { model.setMembership($0, for: families, in: set.id) }
+                ))
+            }
+            if !model.data.sets.isEmpty { Divider() }
+            Button("New Set from Selection", systemImage: "plus") {
+                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
+            }
+        } label: {
+            Label("Add to Set", systemImage: SidebarSection.sets.icon)
+        }
+        Menu { TagMenuItems(families: families, model: model) } label: { Label("License Status", systemImage: SidebarSection.tags.icon) }
+        Menu { ClassificationMenuItems(families: families, model: model) } label: {
+            Label("Classification", systemImage: SidebarSection.classifications.icon)
+        }
+    }
+}
+
+/// The right-click menu for one style of a family: the style's own actions, then its family's sets, license status
+/// and classification, which are the family's, not the style's.
 struct StyleMenu: View {
     let family: Family
     let face: LibraryFace
@@ -138,6 +149,10 @@ struct StyleMenu: View {
         Button("Copy PostScript Name", systemImage: "doc.on.clipboard") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(face.face.postScriptName, forType: .string)
+        }
+        Divider()
+        Section(family.name) {
+            OrganizingMenus(families: [family], model: model)
         }
         Divider()
         Button("Move Style to Trash", systemImage: "trash") {
