@@ -60,8 +60,8 @@ struct SmartSetEditor: View {
 
     private var matchSummary: String {
         let test = model.matcher(for: draft)
-        let showSystem = model.data.showSystemFonts
-        let count = model.library.families.count { (showSystem || $0.state != .system) && test($0) }
+        let data = model.data
+        let count = model.library.families.count { data.lists($0) && test($0) }
         return count == 1 ? "1 family matches" : "\(count.formatted()) families match"
     }
 }
@@ -99,8 +99,8 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
-    /// The user's folders, then Testing when its fonts are shown, Adobe Fonts when there are some, and Added Fonts
-    /// when there are some.
+    /// The user's folders, then Testing when its fonts are shown, Adobe Fonts when there are some and they're shown,
+    /// and Added Fonts when there are some.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
