@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.5.2
+
+- Cicero has a new icon: C, 1 and 6 from AM Gaonkar Display Medium, cut into the faces of its cube.
+
 ## 1.5.1
 
 - **Show fonts from Creative Cloud**, in Settings → General, keeps Adobe Fonts out of your lists, like **Show system fonts** for the fonts that come with macOS. With it off, they’re left out of every list, smart sets and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours.
