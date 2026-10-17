@@ -276,6 +276,7 @@ private struct SampleDrag: Equatable {
 /// Name, a menu of styles and a remove button, as a row caption or a legend chip.
 private struct SampleCaption: View {
     @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
     let sample: CompareSample
     let showsTint: Bool
 
@@ -307,7 +308,11 @@ private struct SampleCaption: View {
             .labelsHidden()
             if sample.family.faces.count > 1 {
                 Divider()
-                Button("Compare Another Style", systemImage: "plus") { model.compareAnotherStyle(of: sample.id) }
+                Button("Compare Another Style", systemImage: "plus") {
+                    let automatic = sample.family.face(nearestWeight: preview.weight).id
+                    let shown = model.compareEntries.filter { $0.familyID == sample.family.id }.map { $0.style ?? automatic }
+                    model.compareAnotherStyle(of: sample.id, besides: Set(shown))
+                }
             }
         } label: {
             // One text, as a menu's label puts an image of its own first.
