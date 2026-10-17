@@ -2,6 +2,13 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.5.1
+
+- **Show fonts from Creative Cloud**, in Settings → General, keeps Adobe Fonts out of your lists, like **Show system fonts** for the fonts that come with macOS. With it off, they’re left out of every list, smart sets and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours.
+- **Type Designer Mode** comes after **Maintenance** in Settings → General.
+- In Compare, the plus next to **Compare Another Style** is the color of the text, also when you hold the pointer over it. Before, it was gray.
+- The About panel links to Cicero’s website.
+
 ## 1.5
 
 - Tags are now license statuses, to keep track of what you may do with each family. Cicero comes with **Licensed**, **Licensed + Non-Commercial**, **Unlicensed**, **Partially Licensed**, **Public Domain**, **Open Source** and **Trial**, each with its color, and you can make your own. A family has one status at a time, shown as a colored dot next to its name; give it one from its right-click menu, the Info panel, or by dropping it on a status under **License** in the sidebar. Smart sets have a **License Status** rule.
