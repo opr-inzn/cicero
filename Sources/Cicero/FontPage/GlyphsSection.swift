@@ -1,16 +1,17 @@
 import CiceroCore
 import SwiftUI
 
-/// Every character a style has, grouped by Unicode block, then the ligatures it makes, by feature, under headers like
-/// the blocks'; with a filter by character, Unicode name or U+ code that takes in the ligatures too. Several views in a
-/// row, so each block's header pins in the page's lazy stack and its cells are rows of it.
+/// Every character a style has, and the glyphs its features draw in place of characters', like tabular figures, by
+/// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
+/// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
+/// Several views in a row, so each group's header pins in the page's lazy stack and its cells are rows of it.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
     /// Cells per row, from the page's width.
     let columns: Int
-    /// The style's characters, but those listed as ligatures.
+    /// The style's characters, but those listed as ligatures, and its feature glyphs.
     let sections: [GlyphSection]
     /// All of them.
     let characterCount: Int
@@ -18,7 +19,13 @@ struct GlyphsSection: View {
     /// The character a ligature's glyph is too, like U+FB01 for ﬁ.
     let ligatureCharacters: [CGGlyph: UInt32]
     @State private var query = ""
-    @State private var popover: UInt32?
+    @State private var popover: Cell?
+
+    /// A cell of the grid: a character, or a glyph a feature draws for one.
+    private enum Cell: Hashable {
+        case character(UInt32)
+        case feature(FeatureGlyph)
+    }
 
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
@@ -47,7 +54,7 @@ struct GlyphsSection: View {
                 .frame(maxWidth: 280)
         }
         .padding(.horizontal, Self.inset)
-        // Well clear of the styles above, and close to the blocks it heads.
+        // Well clear of the styles above, and close to the groups it heads.
         .padding(.top, 56)
         .padding(.bottom, 4)
         if shown.isEmpty && shownLigatures.isEmpty {
@@ -55,34 +62,42 @@ struct GlyphsSection: View {
                                    description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else {
-            ForEach(shown) { section in
-                Section {
-                    // Rows of the page's stack, not a LazyVGrid per block in it. The stack guesses the height of blocks
-                    // it hasn't placed from those it has, and blocks run from one row to hundreds, so every correction
-                    // shifted the page and changed which blocks were placed: it re-laid itself out at full CPU. Rows
-                    // of fixed cells are all one height, so the guesses are right.
-                    let rows = (section.scalars.count + columns - 1) / columns
-                    ForEach(0..<rows, id: \.self) { row in
-                        glyphRow(section.scalars[row * columns ..< min((row + 1) * columns, section.scalars.count)], face: face)
-                            .padding(.horizontal, Self.inset)
-                            .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
-                    }
-                } header: {
-                    HStack(spacing: 6) {
-                        Text(section.title).font(.headline)
-                        Text("— \(section.scalars.count.formatted())").font(.callout).foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, Self.inset)
-                    .padding(.vertical, 4)
-                    .background(Color.canvas)
-                }
+            ForEach(shown.filter { $0.group <= .ligatures }) { section in
+                self.section(section, face: face)
             }
-            // Glyphs with no character of their own, after those with one.
+            // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes.
             if !shownLigatures.isEmpty {
                 LigaturesSection(face: face, columns: columns, groups: shownLigatures, characters: ligatureCharacters)
             }
+            ForEach(shown.filter { $0.group > .ligatures }) { section in
+                self.section(section, face: face)
+            }
             Color.clear.frame(height: 6)
+        }
+    }
+
+    private func section(_ section: GlyphSection, face: FontFace) -> some View {
+        let cells = section.scalars.map(Cell.character) + section.glyphs.map(Cell.feature)
+        return Section {
+            // Rows of the page's stack, not a LazyVGrid per group in it. The stack guesses the height of groups it
+            // hasn't placed from those it has, and groups run from one row to hundreds, so every correction shifted
+            // the page and changed which groups were placed: it re-laid itself out at full CPU. Rows of fixed cells
+            // are all one height, so the guesses are right.
+            let rows = (cells.count + columns - 1) / columns
+            ForEach(0..<rows, id: \.self) { row in
+                glyphRow(cells[row * columns ..< min((row + 1) * columns, cells.count)], face: face)
+                    .padding(.horizontal, Self.inset)
+                    .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Text(section.title).font(.headline)
+                Text("— \(cells.count.formatted())").font(.callout).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, Self.inset)
+            .padding(.vertical, 4)
+            .background(Color.canvas)
         }
     }
 
@@ -98,38 +113,57 @@ struct GlyphsSection: View {
     /// One popover per row, pointing at the clicked cell, rather than one per cell: each is worked out
     /// again whenever the page updates. The cells share out the row's width, so they reach the page's edge
     /// whatever it is, without the page drawing them again as it changes; a short last row keeps their width.
-    private func glyphRow(_ scalars: ArraySlice<UInt32>, face: FontFace) -> some View {
-        let column = popover.flatMap { scalars.firstIndex(of: $0) }.map { $0 - scalars.startIndex }
+    private func glyphRow(_ cells: ArraySlice<Cell>, face: FontFace) -> some View {
+        let column = popover.flatMap { cells.firstIndex(of: $0) }.map { $0 - cells.startIndex }
         // The clicked cell's bottom middle, within two points: the cells are as wide as the row allows.
         let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
         return HStack(spacing: Self.spacing) {
-            ForEach(scalars, id: \.self) { scalar in
-                glyph(scalar, face: face)
+            ForEach(cells, id: \.self) { cell in
+                glyph(cell, face: face)
             }
-            ForEach(scalars.count..<columns, id: \.self) { _ in
+            ForEach(cells.count..<columns, id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell)
             }
         }
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let popover {
-                VStack(spacing: 10) {
-                    character(popover, face: face, size: 96)
-                        .frame(minWidth: 160, minHeight: 130)
-                    Text(GlyphSection.name(of: popover)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
-                    Text(String(format: "U+%04X", popover)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                }
-                .padding(16)
-                .frame(maxWidth: 260)
+                details(popover, face: face)
             }
         }
     }
 
-    private func glyph(_ scalar: UInt32, face: FontFace) -> some View {
-        character(scalar, face: face, size: Self.glyphSize)
-            .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
-            .background(.quaternary.opacity(popover == scalar ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-            .contentShape(.rect)
-            .onTapGesture { popover = scalar }
+    /// A character's name and code; for a feature's glyph, the character's and the feature's.
+    private func details(_ cell: Cell, face: FontFace) -> some View {
+        VStack(spacing: 10) {
+            switch cell {
+            case .character(let scalar):
+                character(scalar, face: face, size: 96)
+                    .frame(minWidth: 160, minHeight: 130)
+                Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
+                Text(String(format: "U+%04X", scalar)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+            case .feature(let glyph):
+                GlyphImage(face: face, glyph: glyph.glyph, size: 96, weight: preview.weight)
+                    .frame(width: 160, height: 130)
+                Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
+                Text(String(format: "U+%04X", glyph.character)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                Text("\(glyph.featureName) (\(glyph.feature))").font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: 260)
+    }
+
+    private func glyph(_ cell: Cell, face: FontFace) -> some View {
+        Group {
+            switch cell {
+            case .character(let scalar): character(scalar, face: face, size: Self.glyphSize)
+            case .feature(let glyph): GlyphImage(face: face, glyph: glyph.glyph, size: Self.glyphSize, weight: preview.weight)
+            }
+        }
+        .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
+        .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
+        .contentShape(.rect)
+        .onTapGesture { popover = cell }
     }
 
     /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
@@ -167,12 +201,17 @@ struct GlyphsSection: View {
         let codeValue = UInt32(code, radix: 16)
         let scalars = Set(trimmed.unicodeScalars.map(\.value))
         let lower = trimmed.lowercased()
+        func matches(_ scalar: UInt32) -> Bool {
+            scalars.contains(scalar) || scalar == codeValue
+                || (trimmed.count > 1 && (GlyphSection.name(of: scalar)?.lowercased().contains(lower) ?? false))
+        }
         return sections.compactMap { section in
-            let matches = section.scalars.filter { scalar in
-                scalars.contains(scalar) || scalar == codeValue
-                    || (trimmed.count > 1 && (GlyphSection.name(of: scalar)?.lowercased().contains(lower) ?? false))
+            // A feature's glyph by its character, or the feature's name or tag.
+            let characters = section.scalars.filter(matches)
+            let glyphs = section.glyphs.filter { glyph in
+                matches(glyph.character) || (trimmed.count > 1 && (glyph.featureName.lowercased().contains(lower) || glyph.feature == lower))
             }
-            return matches.isEmpty ? nil : GlyphSection(title: section.title, scalars: matches)
+            return characters.isEmpty && glyphs.isEmpty ? nil : GlyphSection(group: section.group, scalars: characters, glyphs: glyphs)
         }
     }
 

@@ -1,12 +1,13 @@
 import CiceroCore
 import CoreText
 
-/// What a font page lists under its styles for one face: its characters by block and the ligatures it makes. A character
+/// What a font page lists under its styles for one face: its characters and the glyphs its features draw, by group,
+/// and the ligatures it makes. A character
 /// whose glyph a ligature feature makes, like ﬁ, which fonts usually give U+FB01 (Alphabetic Presentation Forms) too, is
 /// listed once, as a ligature, which says the character.
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
-    /// The characters by block, but those listed as ligatures.
+    /// The characters and feature glyphs by group, but characters listed as ligatures.
     let glyphs: [GlyphSection]
     /// Every character the face has, those listed as ligatures included.
     let characterCount: Int
@@ -32,7 +33,7 @@ nonisolated struct PageContent: Sendable {
         self.ligatures = ligatures
         self.glyphs = listed.isEmpty ? glyphs : glyphs.compactMap { section in
             let left = section.scalars.filter { !listed.contains($0) }
-            return left.isEmpty ? nil : GlyphSection(title: section.title, scalars: left)
+            return left.isEmpty && section.glyphs.isEmpty ? nil : GlyphSection(group: section.group, scalars: left, glyphs: section.glyphs)
         }
         ligatureCharacters = characters
     }
@@ -108,7 +109,9 @@ final class PageContents {
     @concurrent
     private static func read(_ face: FontFace, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
+        async let features = FeatureGlyph.read(face)
         let scalars = await coverage.coverage(computing: face).scalars
-        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars), font: FontLoader.shared.font(face, size: 12))
+        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars, features: await features),
+                           font: FontLoader.shared.font(face, size: 12))
     }
 }

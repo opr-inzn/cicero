@@ -49,20 +49,21 @@ public struct LigatureGroup: Identifiable, Sendable {
     public static func read(_ face: FontFace) -> [LigatureGroup] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
-        let found = GSUBLigatures.read(table, features: Set(features.map(\.tag)))
+        // Only ligatures: a feature's lookups can substitute single glyphs too.
+        let found = GSUBSubstitutions.read(table, features: Set(features.map(\.tag))).mapValues { $0.filter { $0.components.count >= 2 } }.filter { !$0.value.isEmpty }
         guard !found.isEmpty else { return [] }
         return resolve(found, characters: characterGlyphs(of: font, needed: Set(found.values.flatMap { $0.flatMap(\.components) })))
     }
 
     /// Turns glyph ligatures into character ligatures, in feature order. A component that's itself a ligature
     /// ("f_f" in "f_f_i") stands for its characters.
-    static func resolve(_ found: [String: [GSUBLigatures.Entry]], characters: [CGGlyph: UInt32]) -> [LigatureGroup] {
+    static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32]) -> [LigatureGroup] {
         var made: [CGGlyph: [UInt32]] = [:]
         var pending = features.flatMap { feature in (found[feature.tag] ?? []).map { (feature.tag, $0) } }
-        var resolved: [(String, GSUBLigatures.Entry, [UInt32])] = []
+        var resolved: [(String, GSUBSubstitutions.Entry, [UInt32])] = []
         // Each pass resolves the ligatures whose components are known by now, so ligatures of ligatures follow.
         while true {
-            var next: [(String, GSUBLigatures.Entry)] = []
+            var next: [(String, GSUBSubstitutions.Entry)] = []
             for (tag, entry) in pending {
                 var text: [UInt32] = []
                 for component in entry.components {
@@ -96,7 +97,7 @@ public struct LigatureGroup: Identifiable, Sendable {
     }
 
     /// The character each needed glyph is drawn for: the lowest one when several share a glyph.
-    private static func characterGlyphs(of font: CTFont, needed: Set<CGGlyph>) -> [CGGlyph: UInt32] {
+    static func characterGlyphs(of font: CTFont, needed: Set<CGGlyph>) -> [CGGlyph: UInt32] {
         var result: [CGGlyph: UInt32] = [:]
         var units: [UniChar] = [0, 0]
         var glyphs: [CGGlyph] = [0, 0]
@@ -124,10 +125,10 @@ public struct LigatureGroup: Identifiable, Sendable {
     }
 }
 
-/// Reads ligature substitutions (lookup type 4) from a GSUB table, by feature. Lookups an extension (type 7)
-/// wraps are read through it, and contextual lookups (types 5 and 6) are followed to the lookups they apply.
+/// Reads single and ligature substitutions (lookup types 1 and 4) from a GSUB table, by feature: a single substitution
+/// is an entry of one component. Lookups an extension (type 7) wraps are read through it, and contextual lookups (types 5 and 6) are followed to the lookups they apply.
 /// Every offset and count is checked against the table, so a damaged one gives fewer ligatures, never a crash.
-enum GSUBLigatures {
+enum GSUBSubstitutions {
     struct Entry: Hashable {
         var glyph: CGGlyph
         var components: [CGGlyph]
@@ -174,6 +175,8 @@ enum GSUBLigatures {
 
         private func subtable(_ start: Int, type: Int, visited: inout Set<Int>) -> [Entry] {
             switch type {
+            case 1:
+                return singleSubstitution(start)
             case 4:
                 return ligatureSubstitution(start)
             case 5, 6:
@@ -181,6 +184,25 @@ enum GSUBLigatures {
             case 7:
                 guard reader.u16(start) == 1, let type = reader.u16(start + 2), type != 7, let offset = reader.u32(start + 4) else { return [] }
                 return subtable(start + offset, type: type, visited: &visited)
+            default:
+                return []
+            }
+        }
+
+        /// SingleSubstFormat1, a delta added to each glyph in the coverage, and SingleSubstFormat2, a substitute for each.
+        private func singleSubstitution(_ start: Int) -> [Entry] {
+            guard let format = reader.u16(start), let coverage = reader.u16(start + 2) else { return [] }
+            let inputs = reader.coverage(start + coverage)
+            switch format {
+            case 1:
+                guard let delta = reader.u16(start + 4) else { return [] }
+                return inputs.map { Entry(glyph: CGGlyph((Int($0) + delta) & 0xFFFF), components: [$0]) }
+            case 2:
+                guard let count = reader.u16(start + 4) else { return [] }
+                return inputs.enumerated().compactMap { index, input in
+                    guard index < count, let glyph = reader.u16(start + 6 + index * 2) else { return nil }
+                    return Entry(glyph: CGGlyph(glyph), components: [input])
+                }
             default:
                 return []
             }
@@ -306,5 +328,72 @@ enum GSUBLigatures {
                 return []
             }
         }
+    }
+}
+
+/// A glyph an OpenType feature puts in place of a character's, like a tabular figure or a hyphen for capitals, which
+/// has no character of its own.
+public struct FeatureGlyph: Hashable, Sendable {
+    public let glyph: CGGlyph
+    /// The character whose glyph it replaces.
+    public let character: UInt32
+    /// The feature's tag, "tnum".
+    public let feature: String
+
+    public init(glyph: CGGlyph, character: UInt32, feature: String) {
+        self.glyph = glyph
+        self.character = character
+        self.feature = feature
+    }
+
+    /// The features read for the font page's glyphs, in the order it lists their glyphs, with their names and the
+    /// groups they go in.
+    public static let features: [(tag: String, name: String, group: GlyphGroup)] = [
+        ("tnum", "Tabular Figures", .tabularFigures),
+        ("sups", "Superscript", .superscriptAndSubscript), ("subs", "Subscript", .superscriptAndSubscript),
+        ("sinf", "Scientific Inferiors", .superscriptAndSubscript),
+        ("frac", "Fractions", .fractionsAndOrdinals), ("numr", "Numerators", .fractionsAndOrdinals),
+        ("dnom", "Denominators", .fractionsAndOrdinals), ("ordn", "Ordinals", .fractionsAndOrdinals),
+        ("case", "Case-Sensitive Forms", .caseSensitiveForms),
+    ]
+
+    public var featureName: String { Self.features.first { $0.tag == feature }?.name ?? feature }
+    public var group: GlyphGroup { Self.features.first { $0.tag == feature }?.group ?? .global }
+
+    /// Keeps a font with features over thousands of glyphs to a sensible number.
+    public static let limit = 3000
+
+    /// The face's glyphs that only those features draw, each once, by feature, then character; a glyph a character
+    /// has too, like a superscript two the font maps U+00B2 to, is left to the character, and accents' case-sensitive
+    /// forms are left out. Reads the font's GSUB table;
+    /// call off the main thread.
+    public static func read(_ face: FontFace) -> [FeatureGlyph] {
+        let font = FontLoader.shared.font(face, size: 12)
+        guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
+        let found = GSUBSubstitutions.read(table, features: Set(features.map(\.tag))).mapValues { $0.filter { $0.components.count == 1 } }
+        let glyphs = Set(found.values.flatMap { $0.flatMap { [$0.glyph] + $0.components } })
+        guard !glyphs.isEmpty else { return [] }
+        return resolve(found, characters: LigatureGroup.characterGlyphs(of: font, needed: glyphs))
+    }
+
+    static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32]) -> [FeatureGlyph] {
+        var seen = Set<CGGlyph>()
+        var result: [FeatureGlyph] = []
+        for feature in features {
+            let entries = (found[feature.tag] ?? []).compactMap { entry -> FeatureGlyph? in
+                guard let input = entry.components.first, let character = characters[input], characters[entry.glyph] == nil,
+                      entry.glyph != input
+                else { return nil }
+                // Accents for capitals are the accented capitals' business, not worth a cell each.
+                if feature.tag == "case", let group = GlyphGroup.of(character), group == .diacriticalMarks || group == .combiningMarks {
+                    return nil
+                }
+                return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
+            }
+            for glyph in entries.sorted(by: { $0.character < $1.character }) where result.count < limit && seen.insert(glyph.glyph).inserted {
+                result.append(glyph)
+            }
+        }
+        return result
     }
 }
