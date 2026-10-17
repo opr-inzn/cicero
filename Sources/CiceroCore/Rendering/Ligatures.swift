@@ -351,7 +351,6 @@ public struct FeatureGlyph: Hashable, Sendable {
     public static let features: [(tag: String, name: String, group: GlyphGroup)] = [
         ("tnum", "Tabular Figures", .tabularFigures),
         ("sups", "Superscript", .superscripts), ("subs", "Subscript", .subscripts), ("sinf", "Scientific Inferiors", .subscripts),
-        ("frac", "Fractions", .fractions), ("numr", "Numerators", .fractions), ("dnom", "Denominators", .fractions),
         ("ordn", "Ordinals", .ordinals),
         ("case", "Case-Sensitive Forms", .caseSensitiveForms),
     ]
@@ -389,7 +388,13 @@ public struct FeatureGlyph: Hashable, Sendable {
                 }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
             }
-            for glyph in entries.sorted(by: { $0.character < $1.character }) where result.count < limit && seen.insert(glyph.glyph).inserted {
+            // Case-sensitive forms in the order of the punctuation they're for.
+            let sorted = entries.sorted {
+                feature.group == .caseSensitiveForms
+                    ? GlyphGroup.order(of: $0.character, in: .punctuationAndSymbols).lexicographicallyPrecedes(GlyphGroup.order(of: $1.character, in: .punctuationAndSymbols))
+                    : $0.character < $1.character
+            }
+            for glyph in sorted where result.count < limit && seen.insert(glyph.glyph).inserted {
                 result.append(glyph)
             }
         }
