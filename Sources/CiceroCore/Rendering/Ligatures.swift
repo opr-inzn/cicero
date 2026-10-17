@@ -351,7 +351,7 @@ public struct FeatureGlyph: Hashable, Sendable {
     public static let features: [(tag: String, name: String, group: GlyphGroup)] = [
         ("tnum", "Tabular Figures", .tabularFigures),
         ("sups", "Superscript", .superscripts), ("subs", "Subscript", .subscripts), ("sinf", "Scientific Inferiors", .subscripts),
-        ("ordn", "Ordinals", .ordinals),
+        ("numr", "Numerators", .numerators), ("dnom", "Denominators", .denominators), ("ordn", "Ordinals", .ordinals),
         ("case", "Case-Sensitive Forms", .caseSensitiveForms),
     ]
 

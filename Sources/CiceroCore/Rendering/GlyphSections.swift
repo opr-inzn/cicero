@@ -4,7 +4,7 @@ import Foundation
 /// then signs, symbols and accents, and last the letters, marks and signs of scripts other than Latin.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
-    case dingbatNumerals, currency, mathematicalOperators, superscripts, subscripts, fractions, ordinals, punctuationAndSymbols
+    case dingbatNumerals, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals, punctuationAndSymbols
     case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
 
     public var title: String {
@@ -22,6 +22,8 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .superscripts: "Superscript"
         case .subscripts: "Subscript"
         case .fractions: "Fractions"
+        case .numerators: "Numerators"
+        case .denominators: "Denominators"
         case .ordinals: "Ordinals"
         case .punctuationAndSymbols: "Punctuation and Symbols"
         case .diacriticalMarks: "Diacritical Marks"
