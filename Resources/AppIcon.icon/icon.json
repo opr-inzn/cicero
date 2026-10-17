@@ -67,17 +67,17 @@
           ]
         },
         {
+          "name": "Top Wall",
+          "image-name": "top-wall.svg",
+          "glass": false
+        },
+        {
           "name": "Top Floor",
           "image-name": "top-floor.svg",
           "glass": false,
           "fill": {
             "solid": "srgb:0.23922,0.03529,0.01569,1.00000"
           }
-        },
-        {
-          "name": "Top Wall",
-          "image-name": "top-wall.svg",
-          "glass": false
         }
       ],
       "shadow": {
@@ -143,17 +143,17 @@
           ]
         },
         {
+          "name": "Left Wall",
+          "image-name": "left-wall.svg",
+          "glass": false
+        },
+        {
           "name": "Left Floor",
           "image-name": "left-floor.svg",
           "glass": false,
           "fill": {
             "solid": "srgb:0.01961,0.03922,0.22745,1.00000"
           }
-        },
-        {
-          "name": "Left Wall",
-          "image-name": "left-wall.svg",
-          "glass": false
         }
       ],
       "shadow": {
@@ -219,17 +219,17 @@
           ]
         },
         {
+          "name": "Right Wall",
+          "image-name": "right-wall.svg",
+          "glass": false
+        },
+        {
           "name": "Right Floor",
           "image-name": "right-floor.svg",
           "glass": false,
           "fill": {
             "solid": "srgb:0.02353,0.18824,0.04314,1.00000"
           }
-        },
-        {
-          "name": "Right Wall",
-          "image-name": "right-wall.svg",
-          "glass": false
         },
         {
           "name": "Shadow",
