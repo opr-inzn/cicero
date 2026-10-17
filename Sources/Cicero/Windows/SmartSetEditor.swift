@@ -148,7 +148,7 @@ private struct RuleRow: View {
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
-            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet")
+            options(model.data.tags.map { ($0, $0) }, empty: "No license statuses yet")
         case .set:
             options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No sets yet")
         case .folder:
@@ -300,7 +300,7 @@ private extension SmartRule.Field {
         case .name: "Name"
         case .foundry: "Foundry"
         case .classification: "Classification"
-        case .tag: "Tag"
+        case .tag: "License Status"
         case .set: "Set"
         case .folder: "Folder"
         case .status: "Status"
@@ -315,11 +315,10 @@ private extension SmartRule.Field {
 }
 
 private extension SmartRule.Comparison {
-    /// The wording depends on the field: a tag is "had", a set "is in", a language "is supported", coverage "includes".
+    /// The wording depends on the field: a set "is in", a language "is supported", coverage "includes". A license status
+    /// "is", as a family has one.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
-        case (.tag, .is): "has"
-        case (.tag, .isNot): "doesn’t have"
         case (.set, .is), (.folder, .is): "is in"
         case (.set, .isNot), (.folder, .isNot): "isn’t in"
         case (.language, .is): "is supported"

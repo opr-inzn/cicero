@@ -24,9 +24,13 @@ public final class UserDataStore: Sendable {
         legacyURL = locations.support.appendingPathComponent("library.json", isDirectory: false)
     }
 
+    /// A library from before there were license statuses gets them (see `UserData.addLicenseStatuses`).
     public func load() -> UserData {
         if let data = try? Data(contentsOf: fileURL) {
-            if let decoded = try? JSONDecoder().decode(UserData.self, from: data) { return decoded }
+            if var decoded = try? JSONDecoder().decode(UserData.self, from: data) {
+                decoded.addLicenseStatuses()
+                return decoded
+            }
             // Keep a damaged file for the user instead of silently writing over it.
             try? FileManager.default.moveItem(at: fileURL, to: fileURL.deletingPathExtension().appendingPathExtension("unreadable.json"))
             return UserData()

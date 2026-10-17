@@ -13,7 +13,8 @@ struct FamilyRowSection: Identifiable {
 /// Families as rows with a selection of their own, for the Character Toolbox: click, ⌘- and ⇧-click and
 /// the arrow keys select, double-click or Return opens, right-click for the family menu. A lazy stack, not
 /// a Table or List: those make every row whenever an accessibility client walks the window, which keeps
-/// the app busy for minutes with a thousand families.
+/// the app busy for minutes with a thousand families. Section titles scroll with the rows rather than pin, so rows
+/// only meet the bar above them, where they fade out (see `safeAreaBar`) instead of ending at a title's edge.
 struct FamilyRowList<Row: View>: View {
     @Environment(AppModel.self) private var model
     let sections: [FamilyRowSection]
@@ -27,7 +28,7 @@ struct FamilyRowList<Row: View>: View {
         let ids = sections.flatMap { $0.families.map(\.id) }
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(sections) { section in
                         Section {
                             if section.families.isEmpty, let empty = section.emptyText {
@@ -43,7 +44,6 @@ struct FamilyRowList<Row: View>: View {
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 12)
                                     .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-                                    .background(.background)
                             }
                         }
                     }

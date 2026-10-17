@@ -14,14 +14,17 @@ struct SidebarView: View {
     /// What the list shows selected while the browser hasn't taken it yet (see `select`).
     @State private var pendingSelection: Set<SidebarItem>?
     @State private var pace = SelectionPace()
+    @State private var highlight = SidebarHighlight()
 
     var body: some View {
+        let shown = pendingSelection ?? model.selectedItems
         // The rows are a view of their own: a list's selection updates whatever makes the list, and this
-        // way that's just this, not every section and row.
-        List(selection: Binding(get: { pendingSelection ?? model.selectedItems }, set: select)) {
-            SidebarContent()
+        // way that's just this, not every section and row. Each row's title reads the selection it draws.
+        List(selection: Binding(get: { shown }, set: select)) {
+            SidebarContent(highlight: highlight)
         }
         .listStyle(.sidebar)
+        .onChange(of: shown, initial: true) { highlight.selected = shown }
         .contextMenu {
             Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
                    systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
@@ -66,6 +69,8 @@ private final class SelectionPace {
 /// The sidebar's sections and rows.
 private struct SidebarContent: View {
     @Environment(AppModel.self) private var model
+    /// Passed in rather than through the environment, which a row's background doesn't get.
+    let highlight: SidebarHighlight
     /// The character set group whose title is being dragged, and the one whose title it's over.
     @State private var draggedGroup: String?
     @State private var groupDropTarget: String?
@@ -186,7 +191,7 @@ private struct SidebarContent: View {
 
     private var header: some View {
         HStack {
-            Text("Fonts")
+            Text("Library")
             Spacer()
             Button(model.isEditingSidebar ? "Done" : "Edit") { model.isEditingSidebar.toggle() }
             .buttonStyle(.plain)
@@ -195,7 +200,7 @@ private struct SidebarContent: View {
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
         }
         .padding(.trailing, 10)
-        .background(GapDropFeedback())
+        .background(OutlineViewSetup())
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -238,7 +243,7 @@ private struct SidebarContent: View {
             .fixedSize()
             .help("New set or smart set")
         case .tags:
-            plus("New tag") { model.newTag() }
+            plus("New license status") { model.newTag() }
         case .characterSets:
             plus("New coverage set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
         case .classifications:
@@ -277,16 +282,27 @@ private struct SidebarContent: View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title) }
-            Label { Text(row.title).lineLimit(1) } icon: { SidebarIcon(row: row) }
+            SidebarLabel(row: row, highlight: highlight)
         }
         .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
+        .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
         .contextMenu { menu(for: row) }
         // Only rows that take family names are drop targets: being one makes a row much slower to appear,
-        // which shows when a section opens or a long one scrolls.
+        // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
-            content.dropDestination(for: String.self) { names, _ in _ = model.handleDrop(names, on: row.item) }
+            content
+                .dropDestination(for: String.self) { names, _ in
+                    highlight.dropTarget = nil
+                    _ = model.handleDrop(names, on: row.item)
+                }
+                .onDropSessionUpdated { session in
+                    switch session.phase {
+                    case .entering, .active: highlight.dropTarget = row.item
+                    default: if highlight.dropTarget == row.item { highlight.dropTarget = nil }
+                    }
+                }
         } else {
             content
         }
@@ -328,7 +344,9 @@ private struct SidebarContent: View {
                 Button("Delete Smart Set", systemImage: "trash") { model.deleteSmartSet(id) }
             }
         case .tag(let name):
-            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
+            Button("Rename License Status", systemImage: "pencil") {
+                model.prompt("Rename License Status", text: name, confirm: "Rename") { model.renameTag(name, to: $0) }
+            }
             Picker(selection: Binding(get: { model.data.tagColors[name] }, set: { model.setColor($0, forTag: name) })) {
                 Text("None").tag(TagColor?.none)
                 Divider()
@@ -340,7 +358,7 @@ private struct SidebarContent: View {
             } label: {
                 Label("Color", systemImage: "paintpalette")
             }
-            Button("Delete Tag", systemImage: "trash") { model.deleteTag(name) }
+            Button("Delete License Status", systemImage: "trash") { model.deleteTag(name) }
         case .foundry(let name):
             Button("Rename Foundry", systemImage: "pencil") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
         case .classification(let name):
@@ -371,15 +389,53 @@ private struct SidebarContent: View {
     }
 }
 
-/// A row's symbol, or a tag's colour as a dot.
+/// What the sidebar shows selected, and the row families are being dragged over. The list draws neither (see
+/// `OutlineViewSetup`): each row draws its own, from this.
+@Observable
+final class SidebarHighlight {
+    var selected: Set<SidebarItem> = []
+    var dropTarget: SidebarItem?
+}
+
+/// A row's title and symbol: in the accent colour while it's selected, white on it while families are over it.
+private struct SidebarLabel: View {
+    let row: SidebarRow
+    let highlight: SidebarHighlight
+
+    var body: some View {
+        let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
+            : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
+        // On the symbol too: a sidebar styles symbols itself. A status's dot keeps its own colour.
+        Label { Text(row.title).lineLimit(1).foregroundStyle(style) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
+    }
+}
+
+/// Behind a selected row, a light fill; behind the row families are over, the accent colour, as the list draws a
+/// selected row while it has focus.
+private struct SidebarRowBackground: View {
+    let item: SidebarItem
+    let highlight: SidebarHighlight
+
+    var body: some View {
+        let isTarget = highlight.dropTarget == item
+        let isSelected = highlight.selected.contains(item)
+        if isTarget || isSelected {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isTarget ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary))
+                .padding(.horizontal, 10)
+        }
+    }
+}
+
+/// A row's symbol, or a status's colour as a dot. The dot is a picture rather than a symbol in the colour, which the
+/// list darkened on the accent colour behind a row families are dragged over (and behind a selected row, when the
+/// list drew those).
 struct SidebarIcon: View {
     let row: SidebarRow
 
     var body: some View {
         if let color = row.color {
-            Image(systemName: "circle.fill")
-                .foregroundStyle(color.color)
-                .imageScale(.small)
+            Image(nsImage: color.menuImage)
                 .accessibilityLabel(color.title)
         } else {
             Image(systemName: row.icon)
@@ -402,11 +458,12 @@ private extension UTType {
 }
 
 /// Makes the list open a gap where dragged rows will land, the rows around it sliding apart as in Finder's
-/// sidebar, instead of drawing an insertion line. SwiftUI has no setting for it: a List on macOS 26 is an
-/// NSOutlineView, whose `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves
-/// the style alone once it's set. This sits behind a header inside the list, so the outline view is among
-/// its superviews; it takes no clicks and draws nothing.
-private struct GapDropFeedback: NSViewRepresentable {
+/// sidebar, instead of drawing an insertion line, and leaves drawing the selection to the rows (see
+/// `SidebarHighlight`). SwiftUI has no setting for either: a List on macOS 26 is an NSOutlineView, whose
+/// `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves the styles alone once
+/// they're set. This sits behind a header inside the list, so the outline view is among its superviews; it takes
+/// no clicks and draws nothing.
+private struct OutlineViewSetup: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { Marker() }
     func updateNSView(_ nsView: NSView, context: Context) {}
 
@@ -417,7 +474,9 @@ private struct GapDropFeedback: NSViewRepresentable {
             super.viewDidMoveToWindow()
             var view = superview
             while let current = view, !(current is NSOutlineView) { view = current.superview }
-            (view as? NSOutlineView)?.draggingDestinationFeedbackStyle = .gap
+            guard let outline = view as? NSOutlineView else { return }
+            outline.draggingDestinationFeedbackStyle = .gap
+            outline.selectionHighlightStyle = .none
         }
     }
 }
