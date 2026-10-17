@@ -12,7 +12,10 @@ struct GlyphsSection: View {
     let columns: Int
     /// The style's characters.
     let sections: [GlyphSection]
+    /// The ligatures without a character of their own.
     let ligatures: [LigatureGroup]
+    /// Characters a ligature feature makes too, which the popover says.
+    let madeByLigatures: [UInt32: (tag: String, characters: [UInt32])]
     @State private var query = ""
     @State private var popover: UInt32?
 
@@ -113,6 +116,14 @@ struct GlyphsSection: View {
                         .frame(minWidth: 160, minHeight: 130)
                     Text(GlyphSection.name(of: popover)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                     Text(String(format: "U+%04X", popover)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                    if let made = madeByLigatures[popover] {
+                        let name = LigatureGroup.features.first { $0.tag == made.tag }?.name ?? made.tag
+                        let parts = made.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }
+                        Text("Made from \(parts.joined(separator: " + ")) by \(name) (\(made.tag))")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(16)
                 .frame(maxWidth: 260)
