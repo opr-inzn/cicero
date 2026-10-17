@@ -35,7 +35,7 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                // Lazy for the glyphs, which can run to thousands of cells; their block headers stay pinned. Only
+                // Lazy for the glyphs, which can run to thousands of cells; their group headers stay pinned. Only
                 // rows about one height go in it: it guesses the height of rows it hasn't placed from those it has,
                 // and with the styles in it too (fifty of them are 2,000 pt) the guesses swung so far that, scrolled
                 // to the end, the page laid itself out again and again at full CPU.
