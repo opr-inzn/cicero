@@ -289,13 +289,13 @@ private struct SidebarContent: View {
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
         .contextMenu { menu(for: row) }
-        // Only rows that take family names are drop targets: being one makes a row much slower to appear,
+        // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear,
         // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
             content
-                .dropDestination(for: String.self) { names, _ in
+                .dropDestination(for: FontDrag.self) { drags, _ in
                     highlight.dropTarget = nil
-                    _ = model.handleDrop(names, on: row.item)
+                    _ = model.handleDrop(drags, on: row.item)
                 }
                 .onDropSessionUpdated { session in
                     switch session.phase {

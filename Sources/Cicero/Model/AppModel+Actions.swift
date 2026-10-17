@@ -180,7 +180,7 @@ extension AppModel {
     }
 
     private func forget(family name: String) {
-        for index in data.sets.indices { data.sets[index].families.removeAll { $0 == name } }
+        for index in data.sets.indices { data.sets[index].remove(families: [name]) }
         data.familyTags[name] = nil
         data.foundryOverrides[name] = nil
         selectedIDs.remove(name)
@@ -361,10 +361,10 @@ extension AppModel {
 
     // MARK: Sets
 
-    func addSet(named name: String, with families: [Family] = []) {
+    func addSet(named name: String, with families: [Family] = [], styles: [String: [String]] = [:]) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        data.sets.append(FontSet(name: trimmed, families: families.map(\.id)))
+        data.sets.append(FontSet(name: trimmed, families: families.map(\.id), styles: styles))
         data.sidebar.hidden.remove(SidebarSection.sets.key)
     }
 
@@ -383,16 +383,41 @@ extension AppModel {
         deselect { $0 == .set(id) }
     }
 
+    /// Whether the set has the whole family.
     func isMember(_ family: Family, of setID: UUID) -> Bool {
         data.sets.first { $0.id == setID }?.families.contains(family.id) ?? false
     }
 
+    /// Puts the families in the set whole, in place of the styles of them it had, or takes them out with their styles.
     func setMembership(_ member: Bool, for families: [Family], in setID: UUID) {
         guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
-        let names = Set(families.map(\.id))
-        var list = data.sets[index].families.filter { !names.contains($0) }
-        if member { list += families.map(\.id) }
-        data.sets[index].families = list
+        if member {
+            data.sets[index].add(families: families.map(\.id))
+        } else {
+            data.sets[index].remove(families: Set(families.map(\.id)))
+        }
+    }
+
+    /// Whether the set has the style, on its own or with its whole family.
+    func isMember(_ face: LibraryFace, of family: Family, in setID: UUID) -> Bool {
+        data.sets.first { $0.id == setID }?.contains(style: face.face.postScriptName, of: family.id) ?? false
+    }
+
+    /// Puts one style of a family in a set, or takes it out; a family the set has whole keeps its other styles.
+    func setMembership(_ member: Bool, for face: LibraryFace, of family: Family, in setID: UUID) {
+        guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
+        if member {
+            data.sets[index].add(style: face.face.postScriptName, of: family.id)
+        } else {
+            data.sets[index].remove(style: face.face.postScriptName, of: family.id, all: family.faces.map(\.face.postScriptName))
+        }
+    }
+
+    /// The styles a sidebar row has: a set's own, which can be only some of a family's, else every style of its families.
+    func faces(in item: SidebarItem) -> [LibraryFace] {
+        let families = families(in: item)
+        guard case .set(let id) = item, let set = data.sets.first(where: { $0.id == id }) else { return families.flatMap(\.faces) }
+        return families.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }
     }
 
     /// The families a sidebar row shows, without the search.
@@ -403,21 +428,21 @@ extension AppModel {
 
     /// Activate Set on a set's or smart set's menu: every font in it, asking how when the install method is Ask.
     func activateFonts(in item: SidebarItem, named name: String) {
-        let families = families(in: item)
-        guard !families.isEmpty else { return showToast("There are no fonts in “\(name)”") }
-        activate(families.flatMap(\.faces), title: "“\(name)”")
+        let faces = faces(in: item)
+        guard !faces.isEmpty else { return showToast("There are no fonts in “\(name)”") }
+        activate(faces, title: "“\(name)”")
     }
 
     func activateFontsTemporarily(in item: SidebarItem) {
-        let families = families(in: item)
-        guard !families.isEmpty else { return showToast("Nothing to activate") }
-        activateTemporarily(families)
+        let faces = faces(in: item)
+        guard !faces.isEmpty else { return showToast("Nothing to activate") }
+        activateTemporarily(faces)
     }
 
     func deactivateFonts(in item: SidebarItem) {
-        let families = families(in: item)
-        guard !families.isEmpty else { return showToast("Nothing to deactivate") }
-        deactivate(families)
+        let faces = faces(in: item)
+        guard !faces.isEmpty else { return showToast("Nothing to deactivate") }
+        deactivate(faces)
     }
 
     // MARK: Smart sets
@@ -487,12 +512,22 @@ extension AppModel {
         }
     }
 
-    /// Family names dropped onto a sidebar row.
-    func handleDrop(_ names: [String], on item: SidebarItem) -> Bool {
-        let families = names.compactMap(family)
+    /// Families, or single styles of them, dropped onto a sidebar row. A set takes a style on its own; a license status,
+    /// foundry or classification is the whole family's.
+    func handleDrop(_ drags: [FontDrag], on item: SidebarItem) -> Bool {
+        var seen = Set<String>()
+        let families = drags.compactMap { family($0.family) }.filter { seen.insert($0.id).inserted }
         guard !families.isEmpty else { return false }
         switch item {
-        case .set(let id): setMembership(true, for: families, in: id)
+        case .set(let id):
+            for drag in drags {
+                guard let family = family(drag.family) else { continue }
+                if let style = drag.style, let face = family.faces.first(where: { $0.face.postScriptName == style }) {
+                    setMembership(true, for: face, of: family, in: id)
+                } else {
+                    setMembership(true, for: [family], in: id)
+                }
+            }
         case .tag(let name): setLicenseStatus(name, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         case .classification(let name): setClassification(name, for: families)
@@ -806,7 +841,7 @@ extension AppModel {
                 model.updateProblems()
             }
         case .removeFromSet(let id, let family):
-            if let index = data.sets.firstIndex(where: { $0.id == id }) { data.sets[index].families.removeAll { $0 == family } }
+            if let index = data.sets.firstIndex(where: { $0.id == id }) { data.sets[index].remove(families: [family]) }
             updateProblems()
         case .installCopy(let path):
             guard let face = library.families.lazy.flatMap(\.faces).first(where: { $0.face.path == path }) else { return }

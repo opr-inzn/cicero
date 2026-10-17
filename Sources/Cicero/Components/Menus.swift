@@ -123,8 +123,8 @@ struct OrganizingMenus: View {
     }
 }
 
-/// The right-click menu for one style of a family: the style's own actions, then its family's sets, license status
-/// and classification, which are the family's, not the style's.
+/// The right-click menu for one style of a family: the style's own actions and sets, then its family's sets, license
+/// status and classification, which are the family's, not the style's.
 struct StyleMenu: View {
     let family: Family
     let face: LibraryFace
@@ -149,6 +149,20 @@ struct StyleMenu: View {
         Button("Copy PostScript Name", systemImage: "doc.on.clipboard") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(face.face.postScriptName, forType: .string)
+        }
+        Menu {
+            ForEach(model.data.sets) { set in
+                Toggle(set.name, isOn: Binding(
+                    get: { model.isMember(face, of: family, in: set.id) },
+                    set: { model.setMembership($0, for: face, of: family, in: set.id) }
+                ))
+            }
+            if !model.data.sets.isEmpty { Divider() }
+            Button("New Set with Style", systemImage: "plus") {
+                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, styles: [family.id: [face.face.postScriptName]]) }
+            }
+        } label: {
+            Label("Add Style to Set", systemImage: SidebarSection.sets.icon)
         }
         Divider()
         Section(family.name) {
