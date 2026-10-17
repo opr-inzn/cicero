@@ -343,10 +343,10 @@ public final class LibraryScanner: Sendable {
                 found[path] = nil
                 continue
             }
-            // A file that was there keeps what fontd said of it; a new one is off, unless macOS turns on whatever
-            // is in its Fonts folders, or Cicero registered it before (both as `confirmFontsFolders` and
-            // `confirmRegistered` ask).
-            file.isActive = previous?.isActive ?? false
+            // A file that was there keeps what fontd said of it. A new one in a Fonts folder is on, as macOS turns on
+            // whatever is put there, if a few seconds later (the scan after it says, see `AppModel.fontsChanged`);
+            // any other is off unless Cicero registered it before (as `confirmRegistered` asks).
+            file.isActive = previous?.isActive ?? file.inFontsFolder
             if !file.isActive, file.inFontsFolder || input.records.inPlace.contains(path) || input.records.temporary[path] != nil {
                 file.isActive = (file.inFontsFolder && !last.listed) || registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
             }

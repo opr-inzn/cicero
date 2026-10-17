@@ -190,6 +190,8 @@ final class AppModel {
     @ObservationIgnored private var pendingChanges: Set<String>? = []
     /// The running scan's number and the files it looks at, nil for all of them.
     @ObservationIgnored private var runningScan: (id: Int, changes: Set<String>?)?
+    /// A scan of everything a while after a file came or went in a Fonts folder, to see what macOS made of it.
+    @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
@@ -350,6 +352,18 @@ final class AppModel {
         }
         if let changed, let pending = pendingChanges { pendingChanges = pending.union(changed) } else { pendingChanges = nil }
         scheduleRescan(after: pendingChanges == nil ? 0.3 : 0.05)
+        // A font put in a Fonts folder shows as on at once, though macOS takes a few seconds to turn it on and
+        // says so with a notification that scans everything; this scan comes in case it says nothing, as
+        // when it doesn't take the font.
+        let fontsFolders = [locations.userFonts.path + "/", locations.allUsersFonts.path + "/"]
+        if let changed, changed.contains(where: { path in fontsFolders.contains { path.hasPrefix($0) } }) {
+            fontsFolderCheck?.cancel()
+            fontsFolderCheck = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                self?.fontsChanged()
+            }
+        }
     }
 
     /// The scan looks only at the files changed meanwhile, if it can.
