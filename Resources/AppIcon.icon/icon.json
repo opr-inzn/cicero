@@ -77,10 +77,7 @@
         {
           "name": "Top Wall",
           "image-name": "top-wall.svg",
-          "glass": false,
-          "fill": {
-            "solid": "srgb:0.64706,0.14902,0.09412,1.00000"
-          }
+          "glass": false
         }
       ],
       "shadow": {
@@ -156,10 +153,7 @@
         {
           "name": "Left Wall",
           "image-name": "left-wall.svg",
-          "glass": false,
-          "fill": {
-            "solid": "srgb:0.07843,0.15294,0.62745,1.00000"
-          }
+          "glass": false
         }
       ],
       "shadow": {
@@ -235,10 +229,7 @@
         {
           "name": "Right Wall",
           "image-name": "right-wall.svg",
-          "glass": false,
-          "fill": {
-            "solid": "srgb:0.13333,0.52549,0.17255,1.00000"
-          }
+          "glass": false
         },
         {
           "name": "Shadow",
