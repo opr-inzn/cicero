@@ -600,7 +600,7 @@ public enum ProblemDetector {
         }
         // A family out of reach for now, on a disk that isn't connected, say, comes back with it.
         for set in context.data.sets {
-            for family in set.families where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
+            for family in set.memberFamilies where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
                 problems.append(Problem(
                     id: "missing.set.\(set.id.uuidString).\(family)", kind: .missing, title: family,
                     summary: "In the set “\(set.name)”, but not in the library.",

@@ -39,15 +39,17 @@ extension AppModel {
         }
     }
 
-    /// Exports the families a sidebar row shows, named after the row.
+    /// Exports the fonts a sidebar row has, named after the row: of a set, only the styles it has.
     func exportFonts(in item: SidebarItem, named name: String) {
-        exportFonts(families(in: item), named: name)
+        let faces = Set(faces(in: item).map(\.id))
+        exportFonts(families(in: item), named: name) { faces.contains($1.id) }
     }
 
     /// Asks where to put the files (and whether as a folder or a ZIP archive), copies them off the
-    /// main thread and reveals the result. Called `name`, else after the one family or "N Families".
-    func exportFonts(_ families: [Family], named name: String?) {
-        let plan = FontExportPlan(families: families)
+    /// main thread and reveals the result. Called `name`, else after the one family or "N Families". `including` picks
+    /// the styles of a family to export; all of them unless it says otherwise.
+    func exportFonts(_ families: [Family], named name: String?, including: (Family, LibraryFace) -> Bool = { _, _ in true }) {
+        let plan = FontExportPlan(families: families, including: including)
         guard !plan.isEmpty else {
             return showToast(families.isEmpty ? "No fonts to export" : "Fonts that come with macOS or an app can’t be exported")
         }

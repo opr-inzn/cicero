@@ -87,6 +87,16 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
+			<string>Cicero Font Style</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.maximilianinzinger.cicero.font-style</string>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
 			<string>Cicero Library Backup</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.maximilianinzinger.cicero.backup</string>
