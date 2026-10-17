@@ -199,7 +199,8 @@ extension AppModel {
         case .problems: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
         case .set(let id):
-            let members = Set(data.sets.first { $0.id == id }?.families ?? [])
+            // Families it has only some styles of too.
+            let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])
             return { members.contains($0.id) }
         case .smartSet(let id):
             guard let smartSet = data.smartSets.first(where: { $0.id == id }) else { return { _ in false } }
@@ -256,7 +257,7 @@ extension AppModel {
             let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
             return compare { tagged.contains($0.id) }
         case .set:
-            let members = Set(data.sets.first { $0.id.uuidString == value }?.families ?? [])
+            let members = Set(data.sets.first { $0.id.uuidString == value }?.memberFamilies ?? [])
             return compare { members.contains($0.id) }
         case .folder:
             let id = UUID(uuidString: value)

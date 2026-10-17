@@ -130,9 +130,10 @@ final class AppSetWatcher {
         for set in model.data.sets where !set.apps.isEmpty {
             let apps = Set(set.apps.map(\.bundleID)).intersection(running)
             guard !apps.isEmpty else { continue }
-            for name in set.families {
+            for name in set.memberFamilies {
                 guard let family = model.library.family(name) else { continue }
-                for face in family.faces where !ActivationEngine.isProtected(face.face.path) {
+                // Only the styles it has of a family it has some of.
+                for face in family.faces where set.contains(style: face.face.postScriptName, of: name) && !ActivationEngine.isProtected(face.face.path) {
                     wantedNames.insert(face.face.postScriptName)
                     guard !dismissed.contains(face.face.postScriptName) else { continue }
                     wanted[face.face.path, default: []].formUnion(apps)
