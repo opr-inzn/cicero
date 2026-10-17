@@ -68,23 +68,25 @@ private struct TextTab: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            controls
-            Divider()
+        Group {
             if query.text.isEmpty {
                 ContentUnavailableView("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
                                        description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
-                    .frame(maxHeight: .infinity)
             } else if matches.isEmpty && !isSearching {
                 ContentUnavailableView("No Fonts Have Every Character", systemImage: "character.textbox",
                                        description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
-                    .frame(maxHeight: .infinity)
             } else {
                 table
             }
         }
-        // Keeps the controls at the top while the empty states fill the space below.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // The fonts scroll under the controls and column titles.
+        .fadingTopBar {
+            VStack(spacing: 0) {
+                controls
+                if !query.text.isEmpty && !(matches.isEmpty && !isSearching) { columnTitles }
+            }
+        }
         .task(id: query) { await search(query) }
     }
 
@@ -117,18 +119,7 @@ private struct TextTab: View {
         let preview = self.preview
         let sample = query.text
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
-        return VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text("Name").frame(width: 220, alignment: .leading)
-                Text("Sample").frame(maxWidth: .infinity, alignment: .leading)
-                Text("Missing").frame(width: 160, alignment: .leading)
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .frame(height: 28)
-            Divider()
-            FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
+        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
                         Text(family.name).lineLimit(1)
@@ -146,7 +137,18 @@ private struct TextTab: View {
                         .frame(width: 160, alignment: .leading)
                 }
             }
+    }
+
+    private var columnTitles: some View {
+        HStack(spacing: 12) {
+            Text("Name").frame(width: 220, alignment: .leading)
+            Text("Sample").frame(maxWidth: .infinity, alignment: .leading)
+            Text("Missing").frame(width: 160, alignment: .leading)
         }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .frame(height: 28)
     }
 
     private static func characters(_ scalars: [UInt32]) -> String {
@@ -235,7 +237,20 @@ private struct LanguagesTab: View {
     }
 
     private var list: some View {
-        VStack(spacing: 0) {
+        List(languages, selection: Binding(get: { languageID.isEmpty ? nil : languageID }, set: { languageID = $0 ?? "" })) { language in
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(language.name)
+                    Text(Self.subtitle(language)).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(language.speakers, format: .number.notation(.compactName))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        // The languages scroll under the search field.
+        .fadingTopBar {
             HStack(spacing: 8) {
                 TextField("Search", text: $search, prompt: Text("Language, autonym or script"))
                     .textFieldStyle(.roundedBorder)
@@ -248,18 +263,6 @@ private struct LanguagesTab: View {
                 .help("Sort by speakers or by name")
             }
             .padding(10)
-            List(languages, selection: Binding(get: { languageID.isEmpty ? nil : languageID }, set: { languageID = $0 ?? "" })) { language in
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(language.name)
-                        Text(Self.subtitle(language)).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(language.speakers, format: .number.notation(.compactName))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            }
         }
     }
 
@@ -276,7 +279,23 @@ private struct LanguagesTab: View {
     private var detail: some View {
         if let language = model.languages.language(languageID) {
             let query = Query(id: language.id, showSystem: model.data.showSystemFonts, fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
-            VStack(alignment: .leading, spacing: 10) {
+            FamilyRowList(sections: [
+                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
+                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
+            ], selection: $selection, open: open) { family in
+                HStack(spacing: 12) {
+                    HStack(spacing: 6) {
+                        Text(family.name).lineLimit(1)
+                        StatusTag(family: family)
+                    }
+                    .frame(width: 220, alignment: .leading)
+                    FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 22)
+                }
+            }
+            // The fonts scroll under the language.
+            .fadingTopBar {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(language.name).font(.title2.bold())
@@ -291,23 +310,10 @@ private struct LanguagesTab: View {
                         .lineLimit(4)
                         .padding(.top, 4)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
-                FamilyRowList(sections: [
-                    FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
-                    FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
-                ], selection: $selection, open: open) { family in
-                    HStack(spacing: 12) {
-                        HStack(spacing: 6) {
-                            Text(family.name).lineLimit(1)
-                            StatusTag(family: family)
-                        }
-                        .frame(width: 220, alignment: .leading)
-                        FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 22)
-                    }
-                }
+                .padding(.bottom, 10)
             }
             .task(id: query) { await load(query) }
         } else {

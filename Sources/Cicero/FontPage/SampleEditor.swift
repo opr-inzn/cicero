@@ -5,14 +5,15 @@ import SwiftUI
 /// whatever reaches past the font's ascent and descent (descenders lower than the font says, swashes), and
 /// past each line when the lines are closer than the font is tall. Its lines draw every glyph wherever it
 /// reaches. It fills the room the page gives it, an invisible copy of the text's, and keeps `overhang` above
-/// and below the lines for glyphs reaching past them.
-struct SampleEditor: NSViewRepresentable {
+/// and below the lines for glyphs reaching past them. A right-click shows Cut, Copy and Paste, then `menu`.
+struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
     let font: CTFont
     let kerning: Double
     let lineHeight: Double
     let alignment: NSTextAlignment
     let overhang: CGFloat
+    @ViewBuilder let menu: () -> MenuContent
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -39,9 +40,17 @@ struct SampleEditor: NSViewRepresentable {
         update(view, context: context)
     }
 
+    /// Made at each right-click, so its checkmarks are up to date.
+    private func setMenu(of view: NSTextView) {
+        (view as? SampleTextView)?.makeMenu = { [menu] in
+            NSHostingMenu(rootView: SampleMenu(view: view, content: menu()))
+        }
+    }
+
     /// Sets the font, spacing and alignment when they change, not on every keystroke, which would upset typing
     /// with an input method.
     private func update(_ view: NSTextView, context: Context) {
+        setMenu(of: view)
         view.textContainerInset = NSSize(width: 0, height: overhang)
         let style = Style(font: font, kerning: kerning, lineHeight: lineHeight, alignment: alignment)
         guard style != context.coordinator.style || view.textStorage?.length != context.coordinator.styledLength else { return }
@@ -97,10 +106,38 @@ struct SampleEditor: NSViewRepresentable {
     }
 }
 
-/// Esc goes back from the font page, as everywhere else on it, rather than offering completions.
+/// Esc goes back from the font page, as everywhere else on it, rather than offering completions. A right-click
+/// shows the page's menu, not the text view's.
 private final class SampleTextView: NSTextView {
+    var makeMenu: (() -> NSMenu)?
+    /// The menu last shown, kept until the next: its items act once it has closed.
+    private var shownMenu: NSMenu?
+
     override func cancelOperation(_ sender: Any?) {
         nextResponder?.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: sender)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let makeMenu else { return super.menu(for: event) }
+        shownMenu = makeMenu()
+        return shownMenu
+    }
+}
+
+/// The sample's right-click menu: editing the text, then what the page gives it.
+private struct SampleMenu<Content: View>: View {
+    weak var view: NSTextView?
+    let content: Content
+
+    var body: some View {
+        let hasSelection = (view?.selectedRange().length ?? 0) > 0
+        Button("Cut", systemImage: "scissors") { view?.cut(nil) }
+            .disabled(!hasSelection)
+        Button("Copy", systemImage: "doc.on.doc") { view?.copy(nil) }
+            .disabled(!hasSelection)
+        Button("Paste", systemImage: "doc.on.clipboard") { view?.paste(nil) }
+        Divider()
+        content
     }
 }
 

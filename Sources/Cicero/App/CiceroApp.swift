@@ -95,11 +95,8 @@ struct CiceroCommands: Commands {
             Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
             Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
         }
-        CommandGroup(after: .sidebar) {
-            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
-                   systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
-            Divider()
-        }
+        // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
+        SidebarCommands()
         CommandMenu("Fonts") {
             let selection = model.selectedFamilies
             Button("Activate", systemImage: "checkmark.circle") { model.activate(selection) }
