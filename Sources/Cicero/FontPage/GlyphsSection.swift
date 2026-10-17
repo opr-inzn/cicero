@@ -13,14 +13,14 @@ struct GlyphsSection: View {
     /// The style's characters.
     let sections: [GlyphSection]
     let ligatures: [LigatureGroup]
-    /// Ligature cells per row: they're wider.
-    let ligatureColumns: Int
     @State private var query = ""
     @State private var popover: UInt32?
 
-    private nonisolated static let cell: CGFloat = 52
-    private nonisolated static let spacing: CGFloat = 4
-    private nonisolated static let inset: CGFloat = 24
+    nonisolated static let cell: CGFloat = 52
+    nonisolated static let spacing: CGFloat = 4
+    nonisolated static let inset: CGFloat = 24
+    /// The size a cell's character, or ligature, is set at.
+    static let glyphSize: CGFloat = 26
 
     /// How many cells fit across a page this wide.
     nonisolated static func columns(fitting width: CGFloat) -> Int {
@@ -76,7 +76,7 @@ struct GlyphsSection: View {
             }
             // Glyphs with no character of their own, after those with one.
             if !shownLigatures.isEmpty {
-                LigaturesSection(face: face, columns: ligatureColumns, groups: shownLigatures)
+                LigaturesSection(face: face, columns: columns, groups: shownLigatures)
             }
             Color.clear.frame(height: 6)
         }
@@ -109,7 +109,7 @@ struct GlyphsSection: View {
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let popover {
                 VStack(spacing: 10) {
-                    FontText(text: String(Character(Unicode.Scalar(popover)!)), face: face, size: 96, weight: preview.weight)
+                    character(popover, face: face, size: 96)
                         .frame(minWidth: 160, minHeight: 130)
                     Text(GlyphSection.name(of: popover)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                     Text(String(format: "U+%04X", popover)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
@@ -121,11 +121,39 @@ struct GlyphsSection: View {
     }
 
     private func glyph(_ scalar: UInt32, face: FontFace) -> some View {
-        FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: face, size: 26, weight: preview.weight, features: model.features(for: family))
+        character(scalar, face: face, size: Self.glyphSize)
             .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
             .background(.quaternary.opacity(popover == scalar ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
             .contentShape(.rect)
             .onTapGesture { popover = scalar }
+    }
+
+    /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
+    /// its outline instead: set on its own it has nothing to sit on and showed nothing.
+    @ViewBuilder
+    private func character(_ scalar: UInt32, face: FontFace, size: CGFloat) -> some View {
+        if Self.isCombining(scalar), let glyph = Self.glyph(of: scalar, in: FontLoader.shared.font(face, size: size, weight: preview.weight)) {
+            GlyphImage(face: face, glyph: glyph, size: size, weight: preview.weight)
+        } else {
+            FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: face, size: size, weight: preview.weight,
+                     features: model.features(for: family))
+        }
+    }
+
+    private static func isCombining(_ scalar: UInt32) -> Bool {
+        switch Unicode.Scalar(scalar)?.properties.generalCategory {
+        case .nonspacingMark, .enclosingMark: true
+        default: false
+        }
+    }
+
+    /// The glyph the font maps a character to, if it has one.
+    private static func glyph(of scalar: UInt32, in font: CTFont) -> CGGlyph? {
+        guard let character = Unicode.Scalar(scalar) else { return nil }
+        var units = Array(String(Character(character)).utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: units.count)
+        guard CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count), glyphs[0] != 0 else { return nil }
+        return glyphs[0]
     }
 
     private func filtered(_ sections: [GlyphSection]) -> [GlyphSection] {
