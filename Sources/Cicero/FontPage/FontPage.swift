@@ -1,8 +1,8 @@
 import CiceroCore
 import SwiftUI
 
-/// One family's page, pushed over the browser: a type tester, every style, the ligatures, then the glyphs, one
-/// under the other.
+/// One family's page, pushed over the browser: a type tester, every style, then the glyphs, the ligatures among them,
+/// one under the other.
 struct FontPage: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -41,15 +41,12 @@ struct FontPage: View {
                 // and with the styles in it too (fifty of them are 2,000 pt) the guesses swung so far that, scrolled
                 // to the end, the page laid itself out again and again at full CPU.
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-                    // Ligatures and glyphs together, once the page's width is known: one arriving after the other, or
+                    // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
                     // their cells after their titles, moved what was already there.
                     if let content {
                         if let ligatureColumns, let glyphColumns {
-                            if !content.ligatures.isEmpty {
-                                LigaturesSection(face: face, columns: ligatureColumns, groups: content.ligatures)
-                            }
-                            GlyphsSection(family: family, columns: glyphColumns, followsLigatures: !content.ligatures.isEmpty,
-                                          sections: content.glyphs)
+                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs,
+                                          ligatures: content.ligatures, ligatureColumns: ligatureColumns)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
