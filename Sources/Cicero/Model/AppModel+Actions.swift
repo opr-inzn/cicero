@@ -423,7 +423,7 @@ extension AppModel {
     /// The families a sidebar row shows, without the search.
     func families(in item: SidebarItem) -> [Family] {
         let test = filter(for: item)
-        return library.families.filter { (data.showSystemFonts || $0.state != .system) && test($0) }
+        return library.families.filter { data.lists($0) && test($0) }
     }
 
     /// Activate Set on a set's or smart set's menu: every font in it, asking how when the install method is Ask.
