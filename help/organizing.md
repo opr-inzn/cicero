@@ -71,6 +71,7 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a folder in the sidebar:
 
+- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Problems. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Folder**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a folder’s fonts on](activating.md#keep-a-folders-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.

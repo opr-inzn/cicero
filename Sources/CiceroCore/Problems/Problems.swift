@@ -197,7 +197,8 @@ public enum ProblemDetector {
             self.data = data
             self.locations = locations
             self.fileForName = fileForName
-            folders = data.scannedFolders()
+            // With the names the user gave them, which problems describe files by.
+            folders = data.scannedFolders().map(data.named)
             copies = SpareCopies(library)
         }
 

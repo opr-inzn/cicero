@@ -5,6 +5,9 @@ import Foundation
 public struct UserData: Codable, Equatable, Sendable {
     public var version = 2
     public var folders: [WatchedFolder] = []
+    /// Folder ID → the name the user gave it in the sidebar, in place of its own (`WatchedFolder.displayName`); the
+    /// folder on disk keeps its name. Cicero's own items (Testing, Adobe Fonts, Added Fonts, Deactivated) take one too.
+    public var folderNames: [String: String] = [:]
     /// Font files added one at a time (Add Fonts…, dropped on the window, or opened from the Finder), listed
     /// where they are, like the fonts in a folder.
     public var fontFiles: [String] = []
@@ -84,6 +87,7 @@ public struct UserData: Codable, Equatable, Sendable {
         }
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
+        folderNames = try value(.folderNames, d.folderNames)
         fontFiles = try value(.fontFiles, d.fontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)
@@ -135,6 +139,16 @@ public struct UserData: Codable, Equatable, Sendable {
         folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : [])
     }
 
+    /// A folder with the name the user gave it, if any, as its `displayName`.
+    public func named(_ folder: WatchedFolder) -> WatchedFolder {
+        var folder = folder
+        folder.customName = folderNames[folder.id.uuidString]
+        return folder
+    }
+
+    /// The user's folders, with the names given them.
+    public var namedFolders: [WatchedFolder] { folders.map(named) }
+
     /// The license statuses a family has, in the order they were made: one, unless it was tagged several ways before
     /// there were statuses.
     public func tags(of family: String) -> [String] {
@@ -161,6 +175,8 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     public var appName: String?
     /// Active: Cicero keeps every font in the folder on, where it is, including ones added to it later.
     public var isActive: Bool
+    /// The name the user gave it (`UserData.folderNames`), set on copies made to show; not saved with the folder.
+    public var customName: String?
 
     /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
     public static let deactivatedID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
@@ -192,9 +208,10 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// "Deactivated", "Testing" (Adobe's folders, where type designers test fonts), "Adobe Fonts" and "Added Fonts"
-    /// for Cicero's own items, "<Parent> Fonts" for other folders called Fonts, else the name.
+    /// The name the user gave it; else "Deactivated", "Testing" (Adobe's folders, where type designers test fonts),
+    /// "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts, else the name.
     public var displayName: String {
+        if let customName { return customName }
         if id == Self.deactivatedID { return "Deactivated" }
         if id == Self.adobeAppsID { return "Testing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
