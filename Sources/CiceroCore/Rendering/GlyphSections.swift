@@ -1,10 +1,10 @@
 import Foundation
 
-/// What a face's glyphs are grouped by on its font page, in its order: the letters, plain then accented, the figures,
+/// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
 /// then signs, symbols and accents, and last the letters, marks and signs of scripts other than Latin.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
-    case dingbatNumerals, currencyAndMath, superscriptAndSubscript, fractionsAndOrdinals, punctuationAndSymbols
+    case dingbatNumerals, currencyAndMath, superscripts, subscripts, fractions, ordinals, punctuationAndSymbols
     case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
 
     public var title: String {
@@ -18,8 +18,10 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .tabularFigures: "Tabular Figures"
         case .dingbatNumerals: "Dingbat Numerals"
         case .currencyAndMath: "Currency and Mathematical Operators"
-        case .superscriptAndSubscript: "Superscript and Subscript"
-        case .fractionsAndOrdinals: "Fractions and Ordinals"
+        case .superscripts: "Superscript"
+        case .subscripts: "Subscript"
+        case .fractions: "Fractions"
+        case .ordinals: "Ordinals"
         case .punctuationAndSymbols: "Punctuation and Symbols"
         case .diacriticalMarks: "Diacritical Marks"
         case .combiningMarks: "Combining Marks"
@@ -42,21 +44,23 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         }
         let name = properties.name ?? ""
         let block = GlyphSection.block(of: value) ?? ""
-        if name.contains("SUPERSCRIPT") || name.contains("SUBSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL")
-            || name.hasPrefix("MODIFIER LETTER CAPITAL") {
-            return .superscriptAndSubscript
+        if name.contains("SUBSCRIPT") { return .subscripts }
+        if name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL") || name.hasPrefix("MODIFIER LETTER CAPITAL") {
+            return .superscripts
         }
-        if name.contains("FRACTION") || name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .fractionsAndOrdinals }
+        if name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .ordinals }
+        if name.contains("FRACTION") { return .fractions }
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
         if name.contains("ARROW") { return .arrows }
         if block.hasPrefix("Enclosed Alphanumeric") || (block == "Dingbats" && properties.numericType != nil) { return .dingbatNumerals }
         // Latin letters in other blocks too, like ə in IPA Extensions.
         let latin = block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
+        // A to Z on their own; Æ, Ł, Þ and the like with the accented letters.
         case .uppercaseLetter, .titlecaseLetter:
-            return latin ? (isAccented(scalar) ? .uppercaseAccents : .uppercase) : .global
+            return latin ? (0x41...0x5A ~= value ? .uppercase : .uppercaseAccents) : .global
         case .lowercaseLetter:
-            return latin ? (isAccented(scalar) ? .lowercaseAccents : .lowercase) : .global
+            return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .global
         case .decimalNumber:
             return block == "Basic Latin" ? .proportionalFigures : .global
         case .currencySymbol, .mathSymbol:
@@ -74,12 +78,6 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         default:
             return .punctuationAndSymbols
         }
-    }
-
-    /// A letter with an accent, or a stroke, bar or the like through it: Á, Ł, Ø.
-    static func isAccented(_ scalar: Unicode.Scalar) -> Bool {
-        (scalar.properties.name ?? "").contains(" WITH ")
-            || String(Character(scalar)).decomposedStringWithCanonicalMapping.unicodeScalars.count > 1
     }
 
     /// The letter an accented one is made from, for listing Á, Â and Ä together: its decomposition's first character,
@@ -130,12 +128,16 @@ public struct GlyphSection: Identifiable, Sendable {
         for group in [GlyphGroup.uppercaseAccents, .lowercaseAccents] {
             buckets[group] = buckets[group]?.map { (GlyphGroup.base(of: $0), $0) }.sorted { $0 < $1 }.map(\.1)
         }
-        // By value rather than where Unicode put them (¹²³ in Latin-1, the rest in their own block): superscripts, then
-        // subscripts; ordinals and the fraction slash, then the fractions.
-        for group in [GlyphGroup.superscriptAndSubscript, .fractionsAndOrdinals] {
+        // By value rather than where Unicode put them (¹²³ in Latin-1, the rest in their own block), the fraction slash
+        // first; letters, which have none, after.
+        for group in [GlyphGroup.superscripts, .subscripts, .fractions] {
             buckets[group] = buckets[group]?.sorted { left, right in
-                let a = Self.numericOrder(left), b = Self.numericOrder(right)
-                return a.kind != b.kind ? a.kind < b.kind : a.value != b.value ? a.value < b.value : left < right
+                let a = Self.value(of: left), b = Self.value(of: right)
+                return a != b ? a < b : left < right
+            }
+            if group == .fractions, var list = buckets[group], let slash = list.firstIndex(of: 0x2044) {
+                list.insert(list.remove(at: slash), at: 0)
+                buckets[group] = list
             }
         }
         let glyphs = Dictionary(grouping: features, by: \.group)
@@ -145,12 +147,9 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// Where a superscript, subscript, fraction or ordinal goes among the others: its kind, then its value.
-    private static func numericOrder(_ value: UInt32) -> (kind: Int, value: Double) {
-        guard let scalar = Unicode.Scalar(value) else { return (9, 0) }
-        let name = scalar.properties.name ?? ""
-        let kind = name.contains("SUBSCRIPT") ? 1 : name.contains("FRACTION") && !name.contains("SLASH") ? 1 : 0
-        return (kind, scalar.properties.numericValue ?? .infinity)
+    /// A character's numeric value, for sorting; letters, which have none, after.
+    private static func value(of scalar: UInt32) -> Double {
+        Unicode.Scalar(scalar)?.properties.numericValue ?? .infinity
     }
 
     /// The Unicode name, e.g. "LATIN SMALL LETTER A WITH ACUTE".
