@@ -117,13 +117,15 @@ private struct Tile: View {
     }
 }
 
-/// A family's card in the grid and specimens: light grey, or tinted and outlined while it's selected.
+/// A family's card in the grid and specimens: light grey, or tinted and outlined while it's selected. Opaque, on the
+/// window's background, so a card dragged to the sidebar looks as it does here rather than all but see-through.
 struct FamilyCard: ViewModifier {
     let isSelected: Bool
 
     func body(content: Content) -> some View {
         content
             .background(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.4)), in: .rect(cornerRadius: 14))
+            .background(Color.canvas, in: .rect(cornerRadius: 14))
             .overlay {
                 if isSelected { RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, lineWidth: 2) }
             }
