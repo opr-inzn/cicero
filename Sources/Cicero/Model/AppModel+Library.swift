@@ -184,7 +184,7 @@ extension AppModel {
         let query = appliedSearch.trimmingCharacters(in: .whitespaces).lowercased()
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
         return library.families.filter { family in
-            if !data.showSystemFonts && family.state == .system { return false }
+            guard data.lists(family) else { return false }
             return tests.contains { $0(family) } && library.matches(family, search: query)
         }
     }

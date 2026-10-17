@@ -123,7 +123,7 @@ Some fonts belong to macOS or another app. Their switch is dimmed, and holding t
 
 ## Adobe Fonts
 
-The fonts you turn on in Adobe Fonts, in Creative Cloud, are on in every app. Cicero always lists them, with a purple **Adobe Fonts** tag, and together as **Adobe Fonts** under **Folders**.
+The fonts you turn on in Adobe Fonts, in Creative Cloud, are on in every app. Cicero lists them, with a purple **Adobe Fonts** tag, and together as **Adobe Fonts** under **Folders**. To keep them out of your lists, turn off **Show fonts from Creative Cloud** in **Settings → General**.
 
 Adobe apps can also turn on Adobe Fonts by themselves, for instance for a document that uses them. Those are on in Adobe apps only: their switch sits halfway, and their styles say **Active in Adobe apps**, like the fonts in Adobe’s folders.
 
@@ -142,7 +142,7 @@ Type designers export fonts there to test them: an Adobe app picks up a new vers
 
 These folders have nothing to do with Adobe Fonts, the fonts you turn on in Creative Cloud (see [Adobe Fonts](#adobe-fonts)).
 
-Cicero lists the fonts in all of them together as **Testing** under **Folders**, while there are any. They show as active in those apps, with a red tag, **Testing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show test fonts installed for Adobe apps** under **Type Designer Mode** in **Settings → General**. Adobe Fonts stay listed either way.
+Cicero lists the fonts in all of them together as **Testing** under **Folders**, while there are any. They show as active in those apps, with a red tag, **Testing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show test fonts installed for Adobe apps** under **Type Designer Mode** in **Settings → General**. Adobe Fonts have a switch of their own, **Show fonts from Creative Cloud**.
 
 ### The three-position switch
 

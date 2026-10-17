@@ -41,18 +41,12 @@ struct GeneralSettings: View {
                         : "Application sets activate fonts only while Cicero is open.")
                 }
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
+                Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Guess classifications from names")
                     Text(guessingExplanation)
                 }
                 .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
-            }
-            // The folders type designers export fonts to, to test them in Adobe apps.
-            Section("Type Designer Mode") {
-                Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    Text("Show test fonts installed for Adobe apps")
-                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
-                }
             }
             Section("Maintenance") {
                 LabeledContent("Library") {
@@ -68,6 +62,13 @@ struct GeneralSettings: View {
                         .foregroundStyle(.red)
                 }
                 .formRowCentered()
+            }
+            // The folders type designers export fonts to, to test them in Adobe apps.
+            Section("Type Designer Mode") {
+                Toggle(isOn: $model.data.showAdobeAppFolders) {
+                    Text("Show test fonts installed for Adobe apps")
+                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                }
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)

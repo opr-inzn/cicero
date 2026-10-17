@@ -58,13 +58,15 @@ private struct TextTab: View {
         var maxMissing: Int
         var activatedOnly: Bool
         var showSystem: Bool
+        var showCreativeCloud: Bool
         var fingerprint: Int
         var coverageRevision: Int
     }
 
     private var query: Query {
         Query(text: text.trimmingCharacters(in: .whitespacesAndNewlines), maxMissing: maxMissing, activatedOnly: activatedOnly,
-              showSystem: model.data.showSystemFonts, fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
+              showSystem: model.data.showSystemFonts, showCreativeCloud: model.data.showCreativeCloudFonts, fingerprint: model.library.fingerprint,
+              coverageRevision: model.coverageRevision)
     }
 
     var body: some View {
@@ -170,8 +172,9 @@ private struct TextTab: View {
         // Wait for a pause in typing before walking a big library.
         try? await Task.sleep(for: .milliseconds(200))
         guard !Task.isCancelled else { return }
+        let data = model.data
         let families = model.library.families.filter { family in
-            (query.showSystem || family.state != .system) && (!query.activatedOnly || family.hasActive)
+            data.lists(family) && (!query.activatedOnly || family.hasActive)
         }
         let index = model.coverage
         let text = query.text
@@ -206,6 +209,7 @@ private struct LanguagesTab: View {
     private struct Query: Equatable {
         var id: String
         var showSystem: Bool
+        var showCreativeCloud: Bool
         var fingerprint: Int
         var coverageRevision: Int
     }
@@ -278,7 +282,8 @@ private struct LanguagesTab: View {
     @ViewBuilder
     private var detail: some View {
         if let language = model.languages.language(languageID) {
-            let query = Query(id: language.id, showSystem: model.data.showSystemFonts, fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
+            let query = Query(id: language.id, showSystem: model.data.showSystemFonts, showCreativeCloud: model.data.showCreativeCloudFonts,
+                              fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
             FamilyRowList(sections: [
                 FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
                 FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
@@ -336,7 +341,8 @@ private struct LanguagesTab: View {
     }
 
     private func load(_ query: Query) async {
-        let families = model.library.families.filter { query.showSystem || $0.state != .system }
+        let data = model.data
+        let families = model.library.families.filter { data.lists($0) }
         let index = model.coverage
         let id = query.id
         let result = await Task.detached(priority: .userInitiated) {

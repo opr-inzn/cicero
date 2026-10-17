@@ -38,8 +38,12 @@ public struct UserData: Codable, Equatable, Sendable {
     public var installMethod: InstallMethod = .ask
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
-    /// as one Testing item. Not Adobe Fonts from Creative Cloud, which are always listed, as Adobe Fonts.
+    /// as one Testing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
     public var showAdobeAppFolders = true
+    /// List the Adobe Fonts Creative Cloud turned on, as Adobe Fonts: those on in every app and those Adobe apps turned
+    /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
+    /// the key `showAdobeAppFolders` was saved as before.
+    public var showCreativeCloudFonts = true
     public var records = ActivationRecords()
 
     public init() {}
@@ -111,6 +115,7 @@ public struct UserData: Codable, Equatable, Sendable {
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
             ?? decoder.container(keyedBy: FormerKeys.self).decodeIfPresent(Bool.self, forKey: .showAdobeFonts)
             ?? d.showAdobeAppFolders
+        showCreativeCloudFonts = try value(.showCreativeCloudFonts, d.showCreativeCloudFonts)
         records = try value(.records, d.records)
         // Rules for Slab Serif, a classification there used to be, pick Serif, which it's part of now; unless
         // Slab Serif is one of the user's.
@@ -133,6 +138,11 @@ public struct UserData: Codable, Equatable, Sendable {
     }
 
     private enum FormerKeys: String, CodingKey { case showAdobeFonts }
+
+    /// Whether the library lists a family: those that come with macOS, and those from Creative Cloud, only when shown.
+    public func lists(_ family: Family) -> Bool {
+        (showSystemFonts || family.state != .system) && (showCreativeCloudFonts || !family.isAdobeFonts)
+    }
 
     /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
     public func scannedFolders() -> [WatchedFolder] {

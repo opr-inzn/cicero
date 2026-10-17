@@ -175,10 +175,12 @@ extension AppModel {
             let name = paths.count == 1 ? URL(fileURLWithPath: paths.first!).lastPathComponent : nil
             return showToast(name.map { "Couldn’t read “\($0)”" } ?? "Couldn’t read these fonts")
         }
-        // With system fonts hidden, a font that comes with macOS is nowhere to show.
-        let families = found.filter { data.showSystemFonts || $0.state != .system }
+        // With system fonts hidden, a font that comes with macOS is nowhere to show; so is one from Creative Cloud.
+        let families = found.filter(data.lists)
         guard !families.isEmpty else {
-            return showToast("That font comes with macOS, and system fonts are hidden (Settings → General)")
+            return showToast(found[0].state == .system
+                ? "That font comes with macOS, and system fonts are hidden (Settings → General)"
+                : "That font is from Adobe Fonts, which are hidden (Settings → General)")
         }
         if let set = opened.set, let name = data.sets.first(where: { $0.id == set })?.name {
             setMembership(true, for: families, in: set)

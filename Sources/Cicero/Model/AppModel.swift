@@ -40,7 +40,8 @@ final class AppModel {
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
-    /// Cicero's own folder items that have fonts now (Testing, Adobe Fonts, Added Fonts, Deactivated): the sidebar lists them.
+    /// Cicero's own folder items that have fonts now (Testing, Adobe Fonts while shown, Added Fonts, Deactivated): the sidebar
+    /// lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
     var downloads: [UUID: DownloadProgress] = [:]
@@ -60,7 +61,8 @@ final class AppModel {
             if data.sidebar == oldValue.sidebar || data.differs(besidesSidebar: oldValue) { dataRevision &+= 1 }
             if data.foundryOverrides != oldValue.foundryOverrides || data.foundryRenames != oldValue.foundryRenames
                 || data.classifications != oldValue.classifications || data.classificationOverrides != oldValue.classificationOverrides
-                || data.classificationRenames != oldValue.classificationRenames || data.showSystemFonts != oldValue.showSystemFonts {
+                || data.classificationRenames != oldValue.classificationRenames || data.showSystemFonts != oldValue.showSystemFonts
+                || data.showCreativeCloudFonts != oldValue.showCreativeCloudFonts {
                 refreshGroups()
             }
             if !data.showSystemFonts { deselect { $0 == .system } }
@@ -551,10 +553,10 @@ final class AppModel {
         let classificationName = classificationNamer()
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
-            if family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
+            if data.showCreativeCloudFonts, family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
             if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
-            guard data.showSystemFonts || family.state != .system else { continue }
+            guard data.lists(family) else { continue }
             if let name = foundryName(family) { names.insert(name) }
             classifications.insert(classificationName(family))
         }
