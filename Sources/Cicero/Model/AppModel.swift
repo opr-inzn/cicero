@@ -145,6 +145,13 @@ final class AppModel {
     var isClearingCaches = false
     /// The document whose fonts the Fonts in Document sheet shows.
     var documentFonts: DocumentFontsReport?
+    /// Another font manager's library, read for the Import sheet. What reading one left in temporary folders goes
+    /// when the sheet closes or shows another.
+    var importing: ImportPrompt? {
+        didSet { if let oldValue, oldValue.id != importing?.id { oldValue.library.discard() } }
+    }
+    /// An import is under way, which a library read meanwhile mustn't take the place of.
+    var isImporting = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
 

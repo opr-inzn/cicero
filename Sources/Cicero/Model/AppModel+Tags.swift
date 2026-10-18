@@ -1,14 +1,13 @@
 import CiceroCore
 
 extension AppModel {
-    /// Asks for a name and a colour, starting with the first colour no status has, and makes a license status (saved as
-    /// a tag, as statuses were called before), given to `families`.
+    /// Asks for a name and a colour, starting with the first colour no tag has, and makes a tag, given to `families`.
     func newTag(for families: [Family] = []) {
         newTagRequest = NewTagRequest(families: families, color: TagColor.next(after: data.tagColors.values))
     }
 
-    /// Makes a license status in the colour (nil: none) and gives it to the families in place of theirs. A name that's
-    /// taken gives them that status, in the colour it has.
+    /// Makes a tag in the colour (nil: none) and gives it to the families, which keep the ones they have. A name that's
+    /// taken gives them that tag, in the colour it has.
     func addTag(named name: String, color: TagColor?, to families: [Family] = []) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -18,7 +17,7 @@ extension AppModel {
             data.tagColors[trimmed] = color
             data.sidebar.hidden.remove(SidebarSection.tags.key)
         }
-        Self.setLicenseStatus(trimmed, for: families, in: &data)
+        Self.setTag(trimmed, true, for: families, in: &data)
         self.data = data
     }
 
@@ -46,7 +45,7 @@ extension AppModel {
         }
     }
 
-    /// Takes the status off every family, and out of smart set rules.
+    /// Takes the tag off every family, and out of smart set rules.
     func deleteTag(_ name: String) {
         var data = data
         data.tags.removeAll { $0 == name }
@@ -71,18 +70,28 @@ extension AppModel {
         data.familyTags[family.id]?.contains(tag) ?? false
     }
 
-    /// Gives the families this license status, in place of the one (or, from before, the tags) they have; nil for none.
-    func setLicenseStatus(_ status: String?, for families: [Family]) {
-        Self.setLicenseStatus(status, for: families, in: &data)
+    /// Gives the families the tag, or takes it off them; each keeps its other tags.
+    func setTag(_ tag: String, _ isOn: Bool, for families: [Family]) {
+        Self.setTag(tag, isOn, for: families, in: &data)
     }
 
-    private static func setLicenseStatus(_ status: String?, for families: [Family], in data: inout UserData) {
+    private static func setTag(_ tag: String, _ isOn: Bool, for families: [Family], in data: inout UserData) {
         for family in families {
-            data.familyTags[family.id] = status.map { [$0] }
+            var tags = data.familyTags[family.id] ?? []
+            if isOn, !tags.contains(tag) { tags.append(tag) }
+            if !isOn { tags.removeAll { $0 == tag } }
+            data.familyTags[family.id] = tags.isEmpty ? nil : tags
         }
     }
 
-    /// The colours of the family's statuses, in the order the statuses were made; one without a colour has no dot.
+    /// Takes every tag off the families.
+    func removeTags(from families: [Family]) {
+        var data = data
+        for family in families { data.familyTags[family.id] = nil }
+        self.data = data
+    }
+
+    /// The colours of the family's tags, in the order the tags were made; one without a colour has no dot.
     func tagColors(of family: Family) -> [TagColor] {
         tagDots[family.id] ?? []
     }

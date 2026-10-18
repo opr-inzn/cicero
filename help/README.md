@@ -7,7 +7,7 @@ New to Cicero? Start with [Getting started](getting-started.md). To open this gu
 ## Contents
 
 1. **[Getting started](getting-started.md)**\
-   [Install Cicero](getting-started.md#install-cicero) · [Move it to Applications](getting-started.md#move-cicero-to-applications) · [Find your way around](getting-started.md#find-your-way-around) · [Add your fonts](getting-started.md#add-your-fonts) · [Keep Cicero up to date](getting-started.md#keep-cicero-up-to-date)
+   [Install Cicero](getting-started.md#install-cicero) · [Move it to Applications](getting-started.md#move-cicero-to-applications) · [Find your way around](getting-started.md#find-your-way-around) · [Add your fonts](getting-started.md#add-your-fonts) · [Coming from FontExplorer X or Font Book](getting-started.md#coming-from-fontexplorer-x-or-font-book) · [Keep Cicero up to date](getting-started.md#keep-cicero-up-to-date)
 2. **[Browsing and previewing](browsing.md)**\
    [List, grid and specimens](browsing.md#choose-a-view) · [Search](browsing.md#search) · [Select fonts](browsing.md#select-fonts) · [Quick Look](browsing.md#take-a-quick-look) · [Font pages](browsing.md#open-a-font-page) · [Ligatures](browsing.md#see-a-fonts-ligatures) · [The Info panel](browsing.md#see-a-fonts-details) · [Features](browsing.md#try-opentype-features) · [Preview Options](browsing.md#change-the-preview-text-and-size) · [Compare](browsing.md#compare-fonts)
 3. **[Activating fonts](activating.md)**\

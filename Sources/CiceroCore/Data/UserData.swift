@@ -15,19 +15,19 @@ public struct UserData: Codable, Equatable, Sendable {
     public var missingFontFiles: [String: Date] = [:]
     public var sets: [FontSet] = []
     public var smartSets: [SmartSet] = []
-    /// License statuses, in the order they were made. Saved as tags, which they were called before 1.5: a family has one
-    /// status at a time now, but one tagged several ways before keeps them all until it's given one.
+    /// Tags, in the order they were made; the license tags to begin with (see `licenseTags`). From 1.5 to 1.6 they were
+    /// license statuses, one to a family; a family can have any number again.
     public var tags: [String] = []
-    /// Family name → its license statuses (see `tags`).
+    /// Family name → its tags (see `tags`).
     public var familyTags: [String: [String]] = [:]
-    /// License status → its colour. A status without one has none.
+    /// Tag → its colour. A tag without one has none.
     public var tagColors: [String: TagColor] = [:]
     /// Family name → the stars the user gave it, 1…5. A family without any has no rating.
     public var familyRatings: [String: Int] = [:]
     /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
-    /// False only for libraries saved before there were license statuses, which get them once as they load (see
-    /// `addLicenseStatuses`).
+    /// False only for libraries saved before there were license tags (license statuses, as they were in 1.5), which get
+    /// them once as they load (see `addLicenseTags`).
     public var licenseStatusesAdded = true
     /// Family name → foundry, overriding the files' manufacturer.
     public var foundryOverrides: [String: String] = [:]
@@ -56,24 +56,25 @@ public struct UserData: Codable, Equatable, Sendable {
 
     public init() {}
 
-    /// What a new library starts with: the license statuses, in their colours.
+    /// What a new library starts with: the license tags, in their colours, on no family.
     public static var newLibrary: UserData {
         var data = UserData()
         data.licenseStatusesAdded = false
-        data.addLicenseStatuses()
+        data.addLicenseTags()
         return data
     }
 
-    /// The license statuses a library starts with, in their order and colours.
-    public static let licenseStatuses: [(name: String, color: TagColor)] = [
+    /// The tags a library starts with, for keeping track of what may be done with each family, in their order and
+    /// colours. Tags like any other: the user can rename or delete them.
+    public static let licenseTags: [(name: String, color: TagColor)] = [
         ("Licensed", .green), ("Licensed + Non-Commercial", .sand), ("Unlicensed", .red), ("Partially Licensed", .yellow),
         ("Public Domain", .purple), ("Open Source", .blue), ("Trial", .orange),
     ]
 
-    /// Puts the license statuses it doesn't have yet first, in their colours, once. Red, Yellow and Green, the tags a
+    /// Puts the license tags it doesn't have yet first, in their colours, once. Red, Yellow and Green, the tags a
     /// library started with before, go when they're as they came: in their colours, on no family and in no smart set.
-    /// Tags of the user's own stay, as statuses, after these.
-    public mutating func addLicenseStatuses() {
+    /// Tags of the user's own stay, after these.
+    public mutating func addLicenseTags() {
         guard !licenseStatusesAdded else { return }
         licenseStatusesAdded = true
         let used = Set(familyTags.values.joined())
@@ -85,9 +86,9 @@ public struct UserData: Codable, Equatable, Sendable {
             tagColors[name] = nil
             sidebar.forget("tag.\(name)")
         }
-        let missing = Self.licenseStatuses.filter { !tags.contains($0.name) }
+        let missing = Self.licenseTags.filter { !tags.contains($0.name) }
         tags.insert(contentsOf: missing.map(\.name), at: 0)
-        for status in missing { tagColors[status.name] = status.color }
+        for tag in missing { tagColors[tag.name] = tag.color }
     }
 
     /// Missing keys take their defaults, so files from older versions keep loading.
@@ -110,7 +111,7 @@ public struct UserData: Codable, Equatable, Sendable {
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         familyRatings = try value(.familyRatings, d.familyRatings).filter { (1...5).contains($0.value) }
         activations = try value(.activations, d.activations)
-        // Missing in files from before there were license statuses, which are yet to get them.
+        // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
         foundryRenames = try value(.foundryRenames, d.foundryRenames)
@@ -204,8 +205,7 @@ public struct UserData: Codable, Equatable, Sendable {
         }
     }
 
-    /// The license statuses a family has, in the order they were made: one, unless it was tagged several ways before
-    /// there were statuses.
+    /// The tags a family has, in the order they were made.
     public func tags(of family: String) -> [String] {
         guard let names = familyTags[family], !names.isEmpty else { return [] }
         return tags.filter(names.contains)
@@ -223,11 +223,11 @@ public struct ActivationHistory: Codable, Equatable, Sendable {
     }
 }
 
-/// The colours a license status can have: the Finder's, and sand, for Licensed + Non-Commercial.
+/// The colours a tag can have: the Finder's, and sand, for Licensed + Non-Commercial.
 public enum TagColor: String, Codable, CaseIterable, Sendable {
     case red, orange, yellow, green, blue, purple, gray, sand
 
-    /// The first colour no status has yet, in this order, so new ones tell apart; red again once all are taken.
+    /// The first colour no tag has yet, in this order, so new ones tell apart; red again once all are taken.
     public static func next(after taken: some Sequence<TagColor>) -> TagColor {
         let used = Set(taken)
         return allCases.first { !used.contains($0) } ?? .red

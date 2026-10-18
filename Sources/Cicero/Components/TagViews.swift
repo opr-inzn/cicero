@@ -37,21 +37,9 @@ extension TagColor {
         image.isTemplate = false
         return image
     }
-
-    /// No Tag's dot in menus: grey, like a tag without a colour.
-    static var noStatusImage: NSImage {
-        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
-            NSColor.tertiaryLabelColor.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
-            return true
-        }
-        image.isTemplate = false
-        return image
-    }
 }
 
-/// A family's license status as a small dot in its colour; side by side for one with several from before a family had
-/// one at a time.
+/// A family's tags as small dots in their colours, side by side.
 struct TagDots: View {
     let colors: [TagColor]
 
@@ -70,8 +58,8 @@ struct TagDots: View {
     }
 }
 
-/// The Tag submenu of a family's menu and the Info panel: the tags, the families' checked, No Tag, and New Tag….
-/// Choosing one gives the families that tag in place of the one they have.
+/// The Tags submenu of a family's menu and the Info panel: the tags, checked when every family has it, Remove All
+/// Tags, and New Tag…. Choosing a tag gives it to the families, or takes it off them; they keep their other tags.
 struct TagMenuItems: View {
     let families: [Family]
     let model: AppModel
@@ -80,7 +68,7 @@ struct TagMenuItems: View {
         ForEach(model.data.tags, id: \.self) { tag in
             Toggle(isOn: Binding(
                 get: { families.allSatisfy { model.hasTag(tag, $0) } },
-                set: { model.setLicenseStatus($0 ? tag : nil, for: families) }
+                set: { model.setTag(tag, $0, for: families) }
             )) {
                 if let color = model.data.tagColors[tag] {
                     Label { Text(tag) } icon: { Image(nsImage: color.menuImage) }
@@ -90,14 +78,9 @@ struct TagMenuItems: View {
                 }
             }
         }
-        Toggle(isOn: Binding(
-            get: { families.allSatisfy { model.data.tags(of: $0.id).isEmpty } },
-            set: { if $0 { model.setLicenseStatus(nil, for: families) } }
-        )) {
-            Label { Text("No Tag") } icon: { Image(nsImage: TagColor.noStatusImage) }
-                .labelStyle(.titleAndIcon)
-        }
         Divider()
+        Button("Remove All Tags", systemImage: "tag.slash") { model.removeTags(from: families) }
+            .disabled(families.allSatisfy { model.data.tags(of: $0.id).isEmpty })
         Button("New Tag", systemImage: "plus") { model.newTag(for: families) }
     }
 }
