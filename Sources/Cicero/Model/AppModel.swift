@@ -129,7 +129,6 @@ final class AppModel {
     // MARK: Prompts
 
     var activationPrompt: ActivationPrompt?
-    var deactivationPrompt: DeactivationPrompt?
     /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
     var copySwitchPrompt: CopySwitchRequest?
     /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
@@ -703,12 +702,6 @@ struct DuplicatePrompt: Identifiable {
     var duplicates: [AddedDuplicate]
     /// What adding them does once they're in.
     var then: (AppModel, Set<String>) -> Void
-}
-
-struct DeactivationPrompt: Identifiable {
-    let id = UUID()
-    var faces: [LibraryFace]
-    var unmanagedCount: Int
 }
 
 /// New Tag…: the families that get the tag, and the colour the sheet starts with.

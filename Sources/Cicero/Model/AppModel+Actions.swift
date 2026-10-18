@@ -54,12 +54,7 @@ extension AppModel {
         guard !targets.isEmpty else {
             return showToast(faces.contains { $0.state.isActive } ? "These fonts are managed by macOS or another app" : "Nothing to deactivate")
         }
-        let unmanaged = engine.unmanaged(targets, records: data.records)
-        if unmanaged.isEmpty {
-            performDeactivation(targets)
-        } else {
-            deactivationPrompt = DeactivationPrompt(faces: targets, unmanagedCount: Set(unmanaged.map(\.face.path)).count)
-        }
+        performDeactivation(targets)
     }
 
     func performDeactivation(_ faces: [LibraryFace]) {

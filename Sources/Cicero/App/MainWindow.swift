@@ -58,18 +58,6 @@ struct MainWindow: View {
         .backupSheet(isPresented: $backup.isBackingUp)
         .restoreSheet(contents: $backup.restoring)
         .alert(
-            "Deactivate fonts?",
-            isPresented: Binding(get: { model.deactivationPrompt != nil }, set: { if !$0 { model.deactivationPrompt = nil } }),
-            presenting: model.deactivationPrompt
-        ) { prompt in
-            Button("Deactivate") { model.performDeactivation(prompt.faces) }
-            Button("Cancel", role: .cancel) {}
-        } message: { prompt in
-            Text(prompt.unmanagedCount == 1
-                ? "1 file wasn’t installed by Cicero, so it may be your only copy. Cicero will move it to its Deactivated folder, which stays in your library."
-                : "\(prompt.unmanagedCount) files weren’t installed by Cicero, so they may be your only copies. Cicero will move them to its Deactivated folder, which stays in your library.")
-        }
-        .alert(
             "Turn Off Other Styles Too?",
             isPresented: Binding(get: { model.copySwitchPrompt != nil }, set: { if !$0 { model.copySwitchPrompt = nil } }),
             presenting: model.copySwitchPrompt
