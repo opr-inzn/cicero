@@ -11,6 +11,8 @@ public struct UserData: Codable, Equatable, Sendable {
     /// Font files added one at a time (Add Fonts…, dropped on the window, or opened from the Finder), listed
     /// where they are, like the fonts in a folder.
     public var fontFiles: [String] = []
+    /// Added files the last scans found gone, and since when (see `noteGoneFiles`).
+    public var missingFontFiles: [String: Date] = [:]
     public var sets: [FontSet] = []
     public var smartSets: [SmartSet] = []
     /// License statuses, in the order they were made. Saved as tags, which they were called before 1.5: a family has one
@@ -93,6 +95,7 @@ public struct UserData: Codable, Equatable, Sendable {
         folders = try value(.folders, d.folders)
         folderNames = try value(.folderNames, d.folderNames)
         fontFiles = try value(.fontFiles, d.fontFiles)
+        missingFontFiles = try value(.missingFontFiles, d.missingFontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)
         tags = try value(.tags, d.tags)
@@ -128,6 +131,23 @@ public struct UserData: Codable, Equatable, Sendable {
                 }
             }
         }
+    }
+
+    /// How long an added file can be gone before it leaves the list of added files.
+    public static let missingFileGrace: TimeInterval = 30 * 24 * 60 * 60
+
+    /// Takes the added files a scan found gone (deleted, or their folder moved): they're out of the library at once, but
+    /// stay listed for `missingFileGrace`, so one that's back by then, as after its folder is renamed back or a cloud
+    /// service is signed in to again, is in the library again. Files found again are no longer missing.
+    public mutating func noteGoneFiles(_ gone: Set<String>, at now: Date = Date()) {
+        var missing = missingFontFiles.filter { gone.contains($0.key) }
+        for path in gone where missing[path] == nil && fontFiles.contains(path) { missing[path] = now }
+        let expired = Set(missing.filter { now.timeIntervalSince($0.value) > Self.missingFileGrace }.keys)
+        if !expired.isEmpty {
+            fontFiles.removeAll(where: expired.contains)
+            missing = missing.filter { !expired.contains($0.key) }
+        }
+        if missing != missingFontFiles { missingFontFiles = missing }
     }
 
     /// Whether anything but the sidebar's choices (order, hidden and collapsed items) differs.

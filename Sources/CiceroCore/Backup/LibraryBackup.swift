@@ -462,6 +462,7 @@ public struct LibraryBackup: Sendable {
         var data = contents.userData
         data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName, isActive: $0.isActive) }
         data.fontFiles = data.fontFiles.map(map)
+        data.missingFontFiles = [:]
         let roots = fontLocations(watching: data.folders)
         func isFont(_ path: String) -> Bool { Self.isFontLocation(path, in: roots) }
         func isFont(_ path: String, in folder: URL) -> Bool { path.hasPrefix(folder.path + "/") && isFont(path) }

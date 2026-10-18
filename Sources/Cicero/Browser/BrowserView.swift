@@ -163,24 +163,22 @@ private struct FolderOutOfReach: View {
                 Button("Open Privacy & Security") { model.openFilesAndFoldersSettings() }
                 Button("Try Again") { model.rescan() }
             }
+        case .disconnected(let volume):
+            ContentUnavailableView {
+                Label("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark")
+            } description: {
+                Text("The fonts in “\(name)” are back as soon as you connect it. Their sets and tags stay as they are.")
+            } actions: {
+                Button("Try Again") { model.rescan() }
+            }
         case .notFound:
-            if let volume = folder.flatMap({ Reachability.disconnectedVolume(of: $0.path) }) {
-                ContentUnavailableView {
-                    Label("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark")
-                } description: {
-                    Text("The fonts in “\(name)” are back as soon as you connect it. Their sets and tags stay as they are.")
-                } actions: {
-                    Button("Try Again") { model.rescan() }
-                }
-            } else {
-                ContentUnavailableView {
-                    Label("Can’t Find “\(name)”", systemImage: "questionmark.folder")
-                } description: {
-                    Text("Nothing is at \(((folder?.path ?? "") as NSString).abbreviatingWithTildeInPath) now. If it’s on a disk or a server, connect it. If it moved, remove it from the library and add it again.")
-                } actions: {
-                    Button("Try Again") { model.rescan() }
-                    Button("Remove Folder from Library") { model.removeFolder(folderID) }
-                }
+            ContentUnavailableView {
+                Label("Can’t Find “\(name)”", systemImage: "questionmark.folder")
+            } description: {
+                Text("Nothing is at \(((folder?.path ?? "") as NSString).abbreviatingWithTildeInPath) now. If it’s on a disk or a server, connect it. If it moved, remove it from the library and add it again.")
+            } actions: {
+                Button("Try Again") { model.rescan() }
+                Button("Remove Folder from Library") { model.removeFolder(folderID) }
             }
         case nil:
             let count = model.onlineOnlyCount(inFolder: folderID)

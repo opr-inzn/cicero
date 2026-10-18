@@ -367,7 +367,10 @@ public final class LibraryScanner: Sendable {
             if ActiveSource.isAdobeFonts(path) { file.folderIDs.append(WatchedFolder.adobeFontsID) }
             found[path] = file
         }
-        return Find(input: input, found: found, reach: last.reach, listed: last.listed)
+        // An added file the last scan of everything found gone that's back isn't gone any more.
+        var reach = last.reach
+        reach.goneFiles = reach.goneFiles.filter { found[$0] == nil }
+        return Find(input: input, found: found, reach: reach, listed: last.listed)
     }
 
     /// Whether `enumerate` lists a file under a folder: none of the folders between them, nor the file, is

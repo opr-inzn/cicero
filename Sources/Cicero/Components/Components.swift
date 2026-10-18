@@ -7,7 +7,9 @@ extension Color {
     static let canvas = Color(nsColor: .textBackgroundColor)
 }
 
-/// Text set in a font face, straight from its file (so it works for fonts that aren't active).
+/// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
+/// a cloud service keeps online only, is read off the main thread first, with room kept for the text: a server that's slow
+/// to answer, or stopped answering, never holds up the window.
 struct FontText: View {
     let text: String
     let face: FontFace
@@ -18,15 +20,28 @@ struct FontText: View {
     var lineLimit: Int? = 1
     /// For text that runs over several lines; nil for the font's own line spacing.
     var lineHeight: AttributedString.LineHeight?
+    @State private var readPath: String?
 
     var body: some View {
-        let font = FontLoader.shared.font(face, size: size, weight: weight, features: features)
-        Text(text.isEmpty ? " " : text)
-            .font(Font(font))
-            .kerning(kerning)
-            .lineLimit(lineLimit)
-            .lineHeight(lineHeight)
-            .textRenderer(UnclippedText(font: font))
+        if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
+            let font = FontLoader.shared.font(face, size: size, weight: weight, features: features)
+            Text(text.isEmpty ? " " : text)
+                .font(Font(font))
+                .kerning(kerning)
+                .lineLimit(lineLimit)
+                .lineHeight(lineHeight)
+                .textRenderer(UnclippedText(font: font))
+        } else {
+            Text(text.isEmpty ? " " : text)
+                .font(.system(size: size))
+                .lineLimit(lineLimit)
+                .lineHeight(lineHeight)
+                .hidden()
+                .task(id: face.path) {
+                    await FontLoader.shared.read(face.path)
+                    readPath = face.path
+                }
+        }
     }
 }
 

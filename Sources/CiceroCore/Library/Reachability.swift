@@ -2,20 +2,27 @@ import Foundation
 
 /// Why a watched folder's fonts are out of reach for now.
 public enum FolderAvailability: Hashable, Sendable {
-    /// It isn't there: its disk or server isn't connected, or it was moved, renamed or deleted.
+    /// It isn't there: it was moved, renamed or deleted, or it's on a disk or server Cicero can't tell isn't connected.
     case notFound
+    /// It's on this disk or server under /Volumes (its name), which isn't connected. Found out by the scan, as asking a
+    /// server that stopped answering takes a while.
+    case disconnected(String)
     /// macOS doesn't let Cicero read it, as for a cloud folder Cicero wasn't allowed into.
     case noAccess
 
     /// nil when the folder can be read.
     public static func of(_ path: String) -> FolderAvailability? {
         var info = stat()
-        guard stat(path, &info) == 0 else { return errno == EACCES || errno == EPERM ? .noAccess : .notFound }
+        guard stat(path, &info) == 0 else { return errno == EACCES || errno == EPERM ? .noAccess : notFound(path) }
         guard info.st_mode & S_IFMT == S_IFDIR else { return .notFound }
         // A cloud folder Cicero may not read can still be looked at; its contents can't.
-        guard let directory = opendir(path) else { return errno == EACCES || errno == EPERM ? .noAccess : .notFound }
+        guard let directory = opendir(path) else { return errno == EACCES || errno == EPERM ? .noAccess : notFound(path) }
         closedir(directory)
         return nil
+    }
+
+    private static func notFound(_ path: String) -> FolderAvailability {
+        Reachability.disconnectedVolume(of: path).map(FolderAvailability.disconnected) ?? .notFound
     }
 }
 
@@ -43,6 +50,25 @@ public enum Reachability {
         var info = stat()
         guard lstat(path, &info) != 0 else { return false }
         return (errno == ENOENT || errno == ENOTDIR) && disconnectedVolume(of: path) == nil
+    }
+
+    /// Whether a path is on one of the Mac's own disks rather than on a server, going by the list of mounted disks macOS
+    /// keeps, which asks none of them: a server that stopped answering holds up whatever asks it anything.
+    public static func isOnLocalDisk(_ path: String) -> Bool {
+        let count = getfsstat(nil, 0, MNT_NOWAIT)
+        guard count > 0 else { return true }
+        var mounts: [statfs] = Array(repeating: .init(), count: Int(count))
+        let listed = getfsstat(&mounts, Int32(MemoryLayout<statfs>.stride * mounts.count), MNT_NOWAIT)
+        guard listed > 0 else { return true }
+        var closest = (length: 0, isLocal: true)
+        for var mount in mounts.prefix(Int(listed)) {
+            let point = withUnsafeBytes(of: &mount.f_mntonname) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+            let prefix = point.hasSuffix("/") ? point : point + "/"
+            if path.hasPrefix(prefix), prefix.count > closest.length {
+                closest = (prefix.count, mount.f_flags & UInt32(MNT_LOCAL) != 0)
+            }
+        }
+        return closest.isLocal
     }
 
     /// Whether a cloud service has taken the file's contents off the Mac. Reading it would download it.

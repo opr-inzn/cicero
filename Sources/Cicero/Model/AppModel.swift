@@ -405,9 +405,9 @@ final class AppModel {
         hasScanned = true
         // Also when nothing changed, in case Apple Intelligence was turned on meanwhile.
         defer { guessClassifications() }
-        // Added files that are gone leave the library: nothing would show them, and looking for them every time
-        // touches their folder, which may be one macOS asks about, like Downloads.
-        if !new.goneFiles.isEmpty { data.fontFiles.removeAll(where: new.goneFiles.contains) }
+        // Added files that are gone leave the list of them after a while (see `UserData.noteGoneFiles`): nothing would
+        // show them, and looking for them every time touches their folder, which may be one macOS asks about, like Downloads.
+        if !new.goneFiles.isEmpty || !data.missingFontFiles.isEmpty { data.noteGoneFiles(new.goneFiles) }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
         let offline = library.offlinePaths
