@@ -4,6 +4,10 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- Give a family one to five stars from its right-click menu (on its font page too) or the Info panel, and see them in the list’s **Rating** column (right-click the column headers to show it).
+- Smart sets have new rules: **Designer**, **Rating**, **OpenType Feature** (like Small Capitals, Old-Style Figures or Stylistic Sets), **Embedding** (Installable, Editable, Preview & Print or Restricted), **Times Activated** and **Last Activated**. From now on, Cicero counts each time a family comes on, whether you, an application set or another app turns it on.
+- The Info panel shows what a font’s license lets a document do with it, as **Embedding**.
+- After the update, Cicero reads your font files again once, for the OpenType features and embedding the new rules use.
 - On a font page, clicking a glyph shows its HTML entities (like `&eacute;` and `&#xE9;`) and how to type it with your keyboard layout (like ⌥E, then E), next to its Unicode code, with **Copy Character** to put it on the clipboard. Right-click a glyph for **Copy Character**, **Copy Unicode** and **Copy HTML Entity**, or a ligature for **Copy Characters** and **Copy Unicode**.
 
 ## 1.5.3

@@ -177,19 +177,27 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | --- | --- | --- |
 | Name | contains, doesn’t contain, begins with, is | Text |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
+| Designer | contains, doesn’t contain, is | Text, matched against the designer any of the family’s styles credits |
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | is, is not | One of your tags |
+| Rating | is, is not, is more than, is less than | No Rating, or one to five stars (see [Ratings](#ratings)) |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
 | Kind | is, is not | Variable, Monospaced or Has Italics |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
 | Number of Styles | is, is more than, is less than | A number |
+| OpenType Feature | is supported, isn’t supported | Small Capitals, Old-Style Figures, Tabular Figures, Fractions, Stylistic Sets, Swashes and others, in any of the family’s styles |
+| Embedding | is, is not | Installable, Editable, Preview & Print or Restricted: what the font’s license lets a document do with it, as its files say. A family’s is its most restrictive style’s |
 | Language | is supported, isn’t supported | A language, chosen from a searchable list that starts with yours |
 | Coverage | includes, doesn’t include | Any built-in set or one of your coverage sets |
 | Date Added | is in the last, isn’t in the last | A number of days |
+| Times Activated | is, is more than, is less than | A number of times |
+| Last Activated | is in the last, isn’t in the last | A number of days |
 
 A smart set with a language or coverage rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
+
+**Times Activated** and **Last Activated** count from the version of Cicero that added them. Each time a family comes on, Cicero counts it: whether you turned it on, an application set or a document did, or another app or the Finder did, like a font you put in your Fonts folder, while Cicero is open or by the time it next opens. Fonts that come with macOS aren’t counted. A family that hasn’t come on since then has been activated 0 times, and wasn’t activated in the last however many days. To find the fonts you haven’t used for a year, make a smart set with **Last Activated** **isn’t in the last** 365 days.
 
 ## Tags
 
@@ -220,6 +228,16 @@ A family without one has **No Tag**. Libraries from before Cicero 1.5 get these 
 - Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
 
 Select a tag in the sidebar to see the families that have it. To find families without one, or with any of several, make a [smart set](#smart-sets) with **Tag** rules.
+
+## Ratings
+
+Give a family one to five stars, to pick out your favorites or the ones you’d rather not use again.
+
+- Right-click families and choose **Rating**, then the stars. A checkmark shows the rating they have; **No Rating** takes it away.
+- On a font page, right-click the text, the header or a style for the same menu.
+- In the [Info panel](browsing.md#see-a-fonts-details), click a star under **Rating**. Click the one it has again to take the rating away.
+
+To see ratings in the list, right-click the column headers and choose **Rating**; click its header to sort by it. To keep your favorites together, make a [smart set](#smart-sets) with a **Rating** rule, like **Rating** **is more than** ★★★.
 
 ## Foundries
 
