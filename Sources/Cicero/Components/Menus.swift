@@ -124,8 +124,8 @@ struct OrganizingMenus: View {
     }
 }
 
-/// The right-click menu for one style of a family: the style's own actions and sets, then its family's sets, license
-/// status, rating and classification, which are the family's, not the style's.
+/// The right-click menu for one style of a family: the style's own actions and sets, then its family's sets, tag,
+/// rating and classification, which are the family's, not the style's.
 struct StyleMenu: View {
     let family: Family
     let face: LibraryFace
