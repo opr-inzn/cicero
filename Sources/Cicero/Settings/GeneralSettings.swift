@@ -31,6 +31,18 @@ struct GeneralSettings: View {
                     Text("Activate fonts by")
                     Text(activationExplanation)
                 }
+                Toggle(isOn: $model.data.installsIntoCiceroFolder) {
+                    Text("Keep installed fonts in a Cicero folder")
+                    Text("Fonts Cicero installs go into ~/Library/Fonts/Cicero, in a folder for each family, rather than right into ~/Library/Fonts.")
+                }
+                let misplaced = model.misplacedInstalledFonts()
+                if !misplaced.paths.isEmpty {
+                    LabeledContent {
+                        Button("Move Them") { model.moveInstalledFonts() }
+                    } label: {
+                        Text(misplacedNote(misplaced))
+                    }
+                }
                 LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
                 } label: {
@@ -101,6 +113,15 @@ struct GeneralSettings: View {
         case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
         case .unavailable: "Guessing needs Apple Intelligence, which this Mac doesn’t have."
         }
+    }
+
+    /// "Cicero installed Inter and Roboto before, right in ~/Library/Fonts."
+    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> String {
+        let count = misplaced.paths.count
+        let names = FontNames.describe(families: Array(Set(misplaced.families.values))) ?? (count == 1 ? "a font" : "\(count) fonts")
+        return model.data.installsIntoCiceroFolder
+            ? "Cicero installed \(names) before, right in ~/Library/Fonts."
+            : "Cicero installed \(names) in ~/Library/Fonts/Cicero."
     }
 
     private var duplicateExplanation: String {

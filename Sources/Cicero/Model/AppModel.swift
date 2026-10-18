@@ -12,7 +12,8 @@ final class AppModel {
     @ObservationIgnored let locations = Locations.standard
     @ObservationIgnored let scanner: LibraryScanner
     @ObservationIgnored let store: UserDataStore
-    @ObservationIgnored let engine: ActivationEngine
+    /// The engine as made at launch; `engine` puts copies where the user chose.
+    @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
@@ -20,6 +21,13 @@ final class AppModel {
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
+
+    /// Turns fonts on and off, installing copies right into ~/Library/Fonts or into Cicero's folder there, as the user chose.
+    var engine: ActivationEngine {
+        var engine = launchEngine
+        engine.installsIntoCiceroFolder = data.installsIntoCiceroFolder
+        return engine
+    }
 
     // MARK: Library
 
@@ -214,7 +222,7 @@ final class AppModel {
         let locations = Locations.standard
         scanner = LibraryScanner(locations: locations)
         store = UserDataStore(locations: locations)
-        engine = ActivationEngine(locations: locations)
+        launchEngine = ActivationEngine(locations: locations)
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)

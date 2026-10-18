@@ -55,6 +55,11 @@ public struct Locations: Sendable {
 
     /// Fonts Cicero moved out of ~/Library/Fonts because it had no other copy.
     public var deactivated: URL { support.appendingPathComponent("Deactivated", isDirectory: true) }
+
+    /// ~/Library/Fonts/Cicero, where the fonts Cicero installs go, a folder for each family, when the user keeps them
+    /// together (see `ActivationEngine.installsIntoCiceroFolder`). macOS turns on fonts in folders inside a Fonts folder
+    /// too, and the scanner reads them as in it.
+    public var ciceroFolder: URL { userFonts.appendingPathComponent("Cicero", isDirectory: true) }
 }
 
 /// An immutable snapshot of every font Cicero knows about, built off the main thread by

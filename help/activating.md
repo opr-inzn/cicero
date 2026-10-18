@@ -49,8 +49,18 @@ Choose which one in **Settings → General**, next to **Activate fonts by**:
 A few things happen either way:
 
 - Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders).
-- When a copy has the same name as a file already in your Fonts folder, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
+- When a copy has the same name as a file already where it goes, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
 - A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
+
+### Keep installed fonts in a Cicero folder
+
+Turn on **Keep installed fonts in a Cicero folder** in **Settings → General**, under **Activate fonts by**, and the fonts Cicero installs go into `~/Library/Fonts/Cicero`, in a folder for each family, like `~/Library/Fonts/Cicero/Inter`, rather than right into your Fonts folder among everything else there. macOS uses them from there like any font in your Fonts folder.
+
+- A file with fonts of more than one family, as a font collection can be, goes into the folder of the family you turned on, or of its first font when you open it from the Finder.
+- A family whose name has a “/” or “:” gets a “-” in its folder’s name: `AC-DC` for AC/DC.
+- When you turn off or remove the last font in a family’s folder, the folder goes, and so does the Cicero folder once nothing is left in it. A folder with anything else in it stays.
+- Fonts you or other apps put in your Fonts folder stay where they are.
+- Fonts Cicero installed before stay where they are too, until you click **Move Them**, which shows next to the setting while there are any. Cicero moves each into its family’s folder, turning it off for the moment that takes and on again there. When you turn the setting off, **Move Them** moves the fonts in the Cicero folder back out into your Fonts folder.
 
 ## Use another copy of a font
 

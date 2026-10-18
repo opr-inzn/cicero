@@ -213,20 +213,24 @@ public struct TrashPlan: Sendable, Identifiable {
 /// only when the file it was copied from is still there with the same contents, in the library; every
 /// other file in ~/Library/Fonts moves to Cicero's Deactivated folder.
 public struct ActivationEngine: Sendable {
-    private let locations: Locations
+    let locations: Locations
     let registrar: any FontRegistrar
     /// Moves a file to the Trash. Tests replace it so they don't fill the user's Trash.
     public var trash: @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
     /// Moves files `trash` wasn't allowed to move, after macOS asks for an administrator's password, and returns
     /// the paths that went. Tests replace it so no password is asked for.
     public var trashAsAdministrator: @Sendable ([URL]) async -> Set<String> = { await AdministratorTrash.move($0) }
+    /// Copies go into Cicero's folder in ~/Library/Fonts, a folder for each family (see `Locations.ciceroFolder`),
+    /// rather than right into ~/Library/Fonts.
+    public var installsIntoCiceroFolder = false
 
     public init(locations: Locations, registrar: any FontRegistrar = CoreTextRegistrar()) {
         self.locations = locations
         self.registrar = registrar
     }
 
-    /// Copies into ~/Library/Fonts or registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`,
+    /// Copies into ~/Library/Fonts (into the family's folder in Cicero's, see `installsIntoCiceroFolder`) or registers
+    /// in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`,
     /// files in `movable` (ones the user added one at a time) are moved there instead (see `removeOriginals`), and
     /// the rest copied. Faces from app-only folders are always registered in place, after going back into the
     /// folder if Cicero moved them out; faces in a Fonts folder that macOS has off are turned on
@@ -241,7 +245,8 @@ public struct ActivationEngine: Sendable {
         defer { Signposts.activation.endInterval("Activate", signpost) }
         var records = records
         var failed: [String] = []
-        var toCopy: [String] = []
+        // Files to copy, and the family each is copied for (see `placeCopy`).
+        var toCopy: [(path: String, family: String)] = []
         // Files to register where they are; `record` for those Cicero must remember to unregister.
         var toRegister: [(path: String, record: Bool)] = []
         let targets = Self.uniqueByPath(faces).filter(\.canActivate)
@@ -264,14 +269,14 @@ public struct ActivationEngine: Sendable {
             } else if face.app != nil || method == .inPlace {
                 toRegister.append((path, true))
             } else {
-                toCopy.append(path)
+                toCopy.append((path, face.face.familyName))
             }
         }
         var copies: [PlacedCopy] = []
         Signposts.activation.withIntervalSignpost("Copy", "\(toCopy.count) files") {
-            for path in toCopy {
+            for (path, family) in toCopy {
                 do {
-                    copies.append(try placeCopy(of: path))
+                    copies.append(try placeCopy(of: path, family: family))
                 } catch {
                     failed.append(path)
                 }
@@ -307,7 +312,7 @@ public struct ActivationEngine: Sendable {
         var copies: [PlacedCopy] = []
         for path in Set(paths).sorted() {
             do {
-                copies.append(try placeCopy(of: path))
+                copies.append(try placeCopy(of: path, family: nil))
             } catch {
                 failed.append(path)
             }
@@ -329,7 +334,10 @@ public struct ActivationEngine: Sendable {
         for copy in copies {
             if stuck.contains(copy.destination) {
                 failed.append(copy.source)
-                if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
+                if copy.isNew {
+                    try? FileManager.default.removeItem(atPath: copy.destination)
+                    removeEmptyFolders(around: copy.destination)
+                }
             } else {
                 records.installedCopies[copy.destination] = copy.source
                 kept.append(copy)
@@ -507,6 +515,7 @@ public struct ActivationEngine: Sendable {
                 do {
                     moved[face.face.path] = try moveOutOfFontsFolder(face.face.path, listed: listed[face.face.path] ?? [], records: records)
                     records.installedCopies[face.face.path] = nil
+                    removeEmptyFolders(around: face.face.path)
                     succeeded += 1
                 } catch {
                     failed.append(face.face.path)
@@ -669,6 +678,7 @@ public struct ActivationEngine: Sendable {
             records.inPlace.remove(path)
             records.temporary[path] = nil
             records.appFolderOrigins[path] = nil
+            removeEmptyFolders(around: path)
             succeeded += 1
         }
         var forbidden: [String] = []
@@ -720,9 +730,12 @@ public struct ActivationEngine: Sendable {
         let path = face.face.path
         let name = FontNames.describe([face])
         let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy \(name ?? "the font") into your Fonts folder")
-        guard let copy = try? placeCopy(of: path) else { return failure }
+        guard let copy = try? placeCopy(of: path, family: face.face.familyName) else { return failure }
         guard await registerAndConfirm([copy.destination], scope: .persistent).isEmpty else {
-            if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
+            if copy.isNew {
+                try? FileManager.default.removeItem(atPath: copy.destination)
+                removeEmptyFolders(around: copy.destination)
+            }
             return failure
         }
         records.installedCopies[copy.destination] = path
@@ -784,7 +797,7 @@ public struct ActivationEngine: Sendable {
 
     // MARK: Files
 
-    private static func url(_ path: String) -> URL {
+    static func url(_ path: String) -> URL {
         URL(fileURLWithPath: path, isDirectory: false)
     }
 
@@ -829,27 +842,30 @@ public struct ActivationEngine: Sendable {
         var isNew: Bool
     }
 
-    /// Puts a copy of a file into ~/Library/Fonts. It's copied into Cicero's staging folder first (a clone,
-    /// on the same disk) and then moved in, so macOS never sees a half-written file. A file of the same
-    /// name with the same contents is already installed; another file of that name gets "Name 2.otf".
-    private func placeCopy(of path: String) throws -> PlacedCopy {
+    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in Cicero's (see `installFolder`). It's
+    /// copied into Cicero's staging folder first (a clone, on the same disk) and then moved in, so macOS never sees a
+    /// half-written file. A file of the same name with the same contents is already installed; another file of that
+    /// name gets "Name 2.otf".
+    private func placeCopy(of path: String, family: String?) throws -> PlacedCopy {
         let fm = FileManager.default
         let source = Self.url(path)
-        try fm.createDirectory(at: locations.userFonts, withIntermediateDirectories: true)
+        let folder = installFolder(for: path, family: family)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = source.lastPathComponent
-        let first = locations.userFonts.appendingPathComponent(name, isDirectory: false)
+        let first = folder.appendingPathComponent(name, isDirectory: false)
         if fm.fileExists(atPath: first.path), Self.size(of: first) == Self.size(of: source), fm.contentsEqual(atPath: first.path, andPath: path) {
             return PlacedCopy(destination: first.path, source: path, isNew: false)
         }
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
         let staged = staging.appendingPathComponent(UUID().uuidString + "-" + name, isDirectory: false)
-        let destination = Self.uniqueURL(for: name, in: locations.userFonts)
+        let destination = Self.uniqueURL(for: name, in: folder)
         do {
             try fm.copyItem(at: source, to: staged)
             try fm.moveItem(at: staged, to: destination)
         } catch {
             try? fm.removeItem(at: staged)
+            removeEmptyFolders(around: destination.path)
             throw error
         }
         return PlacedCopy(destination: destination.path, source: path, isNew: true)
@@ -914,7 +930,7 @@ public struct ActivationEngine: Sendable {
     }
 
     /// "Name.otf", then "Name 2.otf", "Name 3.otf"…
-    private static func uniqueURL(for name: String, in folder: URL) -> URL {
+    static func uniqueURL(for name: String, in folder: URL) -> URL {
         let fm = FileManager.default
         let base = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
@@ -934,7 +950,7 @@ public struct ActivationEngine: Sendable {
     /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 families activated", naming the
     /// fonts `done` (see `FontNames`), else "Activated 3 files"; or what couldn't be done, by name (`undone`) when
     /// nothing could.
-    private static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int,
+    static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int,
                                 done: @autoclosure () -> String? = nil, undone: @autoclosure () -> String? = nil) -> String {
         if failed == 0 {
             if let done = done() { return "\(done) \(past.lowercased())" }

@@ -42,6 +42,9 @@ public struct UserData: Codable, Equatable, Sendable {
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
+    /// The fonts Cicero installs go into its folder in ~/Library/Fonts, a folder for each family, rather than right into
+    /// ~/Library/Fonts (see `ActivationEngine.installsIntoCiceroFolder`).
+    public var installsIntoCiceroFolder = false
     /// What to do with an added font file whose fonts the library has already, from another file.
     public var duplicateHandling: DuplicateHandling = .ask
     public var showSystemFonts = true
@@ -122,6 +125,7 @@ public struct UserData: Codable, Equatable, Sendable {
         sidebar = try value(.sidebar, d.sidebar)
         // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
+        installsIntoCiceroFolder = try value(.installsIntoCiceroFolder, d.installsIntoCiceroFolder)
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)

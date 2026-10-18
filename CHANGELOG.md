@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- **Keep installed fonts in a Cicero folder**, in Settings → General, puts the fonts Cicero copies or moves into your Fonts folder into `~/Library/Fonts/Cicero`, in a folder for each family, rather than right into your Fonts folder among everything else. Fonts Cicero installed before stay where they are until you click **Move Them** next to the setting, which also moves them back out when you turn it off. A family's folder goes when its last font is turned off or removed.
+
 ## 1.6
 
 - Coming from FontExplorer X? Choose **File → Import from FontExplorer X** to bring over its Font Library, sets (named after the folders they were in, like “Clients / Acme”), application sets with their apps, smart sets, labels as tags in their colors, ratings and how often each family was turned on, and to turn on again the fonts that were on. Cicero finds FontExplorer X’s library on your Mac by itself, or opens a backup of it (`.fexconfig` or `.fexbackup`, from **File → Local Backup**), also when you drop one on the window; a `.fexbackup`’s fonts go back where the Font Library was. A sheet shows what it found, to pick what comes over, and what stays behind, like smart sets with rules Cicero doesn’t have. FontExplorer X’s database is read from a copy, so it can stay open, and nothing of it changes.

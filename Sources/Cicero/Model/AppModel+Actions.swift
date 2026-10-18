@@ -148,6 +148,35 @@ extension AppModel {
         }
     }
 
+    // MARK: Cicero's folder
+
+    /// The fonts Cicero installed that aren't where it puts them now, in its folder in ~/Library/Fonts or right in
+    /// ~/Library/Fonts (see `UserData.installsIntoCiceroFolder`), with the family each file is in, for its folder there.
+    func misplacedInstalledFonts() -> (paths: [String], families: [String: String]) {
+        let paths = engine.misplacedCopies(in: data.records)
+        guard !paths.isEmpty else { return ([], [:]) }
+        let wanted = Set(paths)
+        var families: [String: String] = [:]
+        for family in library.families {
+            for face in family.faces {
+                for path in [face.face.path] + face.otherCopies where wanted.contains(path) && families[path] == nil {
+                    families[path] = family.id
+                }
+            }
+        }
+        return (paths, families)
+    }
+
+    /// Moves the fonts Cicero installed to where it puts them now (see `misplacedInstalledFonts`).
+    func moveInstalledFonts() {
+        let (paths, families) = misplacedInstalledFonts()
+        guard !paths.isEmpty else { return }
+        enqueue { model in
+            let result = await model.engine.moveInstalledCopies(paths, families: families, records: model.data.records)
+            model.finish(result)
+        }
+    }
+
     // MARK: Trash
 
     func requestTrash(_ families: [Family]) {
