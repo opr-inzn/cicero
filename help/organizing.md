@@ -14,7 +14,7 @@ At the top of the sidebar are five items that are always there:
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Problems | Things worth fixing, with a count. See [Problems](problems.md) |
 
-Below them are sections: **Folders**, **Sets**, **License**, **Foundries**, **Classifications** and **Coverage**.
+Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Coverage**.
 
 The item you’ve selected is in the accent color. To hide the whole sidebar, choose **View → Hide Sidebar** (⌃⌘S), and **View → Show Sidebar** to bring it back.
 
@@ -211,12 +211,12 @@ A family without one has **No Status**. Libraries from before Cicero had license
 
 - Right-click families and choose **License Status**, then a status. A checkmark shows the one they have; **No Status** takes it off. **New License Status** makes a status and gives it to them.
 - On a font page, right-click the text, the header or a style for the same menu.
-- Drag families onto a status under **License** in the sidebar.
+- Drag families onto a status under **Tags** in the sidebar.
 - In the [Info panel](browsing.md#see-a-fonts-details), click **Change** next to **License Status**.
 
 ### Make, change and delete license statuses
 
-- Click **+** next to **License** in the sidebar to make a status. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other status has.
+- Click **+** next to **Tags** in the sidebar to make a status. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other status has.
 - Right-click a status and choose **Rename License Status**, a color under **Color** (or **None**), or **Delete License Status**. Deleting a status takes it off every family, and smart set rules that use it are removed.
 
 Select a status in the sidebar to see the families that have it. To find families without one, or with any of several, make a [smart set](#smart-sets) with **License Status** rules.

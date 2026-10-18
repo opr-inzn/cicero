@@ -42,12 +42,12 @@ capsule on every side, that slides to the next one chosen.
     Menus start with Activate Set, Activate Temporarily and Deactivate Set
     (Activate Smart Set, Deactivate Smart Set), for every family the row shows; then Rename Set, Delete Set;
     Edit Smart Set, Delete Smart Set.
-  - **License** (a family's license status; saved as tags, `SidebarSection.tags`; + new status: the New License Status sheet, a name and a
+  - **Tags** (license statuses, a family's one at a time; saved as tags, `SidebarSection.tags`; + new status: the New License Status sheet, a name and a
     row of colour dots, None, the Finder's seven and sand, starting on the first colour no status has; an empty name
     is the colour's; a name that's taken says so and can't be created). A new library starts with Licensed (green),
     Licensed + Non-Commercial (sand), Unlicensed (red), Partially Licensed (yellow), Public Domain (purple), Open
     Source (blue) and Trial (orange). One row per status in the order they were made, a dot in its colour (a picture,
-    not a tinted symbol, which the list darkened on the accent colour; or checkmark.seal when it has none). Menu:
+    not a tinted symbol, which the list darkened on the accent colour; or tag when it has none). Menu:
     Rename License Status (a name that's taken says so), Color (None, Red, Orange, Yellow, Green, Blue, Purple, Gray,
     Sand; each with its dot, as are statuses in a family's License Status menu: `.titleAndIcon`, since menus built
     with the macOS 27 SDK hide images otherwise), Delete License Status (off every family, and out of smart set rules).
