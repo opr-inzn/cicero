@@ -191,20 +191,19 @@ extension AppModel {
         }
     }
 
-    /// "Skipped Helvetica, already in your library", or nothing when no family was left out.
+    /// "Skipped Helvetica, already in your library", "Skipped 3 typefaces already in your library", or nothing when no
+    /// family was left out.
     private static func skipNote(_ skipped: [AddedDuplicate]) -> String {
-        switch skipped.count {
-        case 0: ""
-        case 1: "Skipped \(skipped[0].family), already in your library"
-        default: "Skipped \(skipped.count) families already in your library"
-        }
+        guard let names = FontNames.describe(typefaces: skipped.map(\.family)) else { return "" }
+        return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
     }
 
     /// "Using the added copy of Helvetica", once the library's copies of it went off.
     private static func replacementMessage(_ replacement: DuplicateReplacement) -> String {
         let families = replacement.families
         guard !families.isEmpty else { return "" }
-        let using = families.count == 1 ? "Using the added copy of \(families[0])" : "Using the added copies of \(families.count) families"
+        let using = (families.count == 1 ? "Using the added copy of " : "Using the added copies of ")
+            + (FontNames.describe(typefaces: families) ?? "")
         return using + (replacement.leavesOtherCopiesOn ? ". Another copy Cicero can’t turn off is still on, so apps may use that one" : "")
     }
 
@@ -260,7 +259,7 @@ extension AppModel {
         }
         if let set = opened.set, let name = data.sets.first(where: { $0.id == set })?.name {
             setMembership(true, for: families, in: set)
-            showToast(families.count == 1 ? "Added \(families[0].name) to “\(name)”" : "Added \(families.count) families to “\(name)”")
+            showToast("Added \(FontNames.describe(typefaces: families.map(\.name)) ?? "") to “\(name)”")
         }
         let ids = Set(families.map(\.id))
         // Added files in Added Fonts, unless they joined the set shown; others where the browser shows them, else

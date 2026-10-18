@@ -94,7 +94,7 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
     private var guessingExplanation: String {
-        let what = "When nothing else classifies a font, Apple Intelligence guesses from its name, on this Mac. Nothing is sent."
+        let what = "When nothing else classifies a typeface, Apple Intelligence guesses from its name, on this Mac. Nothing is sent."
         return switch ClassificationGuesser.availability {
         case .available: what
         case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to use this."

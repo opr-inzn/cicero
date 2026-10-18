@@ -6,7 +6,7 @@
 
 Apps only offer fonts that macOS has turned on, or *activated*. Cicero lists every font in your library, on or off, and turns them on and off for you.
 
-A font counts as activated once macOS says it is. So when the message at the bottom says “Activated”, the font is in every app’s font menu. Most apps show it right away; if one doesn’t, see [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font).
+A font counts as activated once macOS says it is. So when the message at the bottom says a font is activated, like “Inter activated”, it’s in every app’s font menu. Most apps show it right away; if one doesn’t, see [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font).
 
 A switch moves the moment you click it and stays there while Cicero works. If something goes wrong, it moves back and a message says what happened. While a switch is moving, clicking it again does nothing.
 
