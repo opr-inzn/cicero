@@ -32,7 +32,7 @@ public final class UserDataStore: Sendable {
                 return decoded
             }
             // Keep a damaged file for the user instead of silently writing over it.
-            try? FileManager.default.moveItem(at: fileURL, to: fileURL.deletingPathExtension().appendingPathExtension("unreadable.json"))
+            setAside()
             return UserData()
         }
         if let legacy = try? Data(contentsOf: legacyURL),
@@ -42,6 +42,19 @@ public final class UserDataStore: Sendable {
             return imported
         }
         return .newLibrary
+    }
+
+    /// Moves a file this version can't read out of the way, to user-data.unreadable.json, or, when one was kept
+    /// before, user-data.unreadable 2.json and so on: never over another.
+    private func setAside() {
+        let fm = FileManager.default
+        for number in 1...1000 {
+            let name = number == 1 ? "user-data.unreadable.json" : "user-data.unreadable \(number).json"
+            let destination = fileURL.deletingLastPathComponent().appendingPathComponent(name, isDirectory: false)
+            guard !fm.fileExists(atPath: destination.path) else { continue }
+            try? fm.moveItem(at: fileURL, to: destination)
+            return
+        }
     }
 
     /// Schedules a save of this value (the latest one wins).

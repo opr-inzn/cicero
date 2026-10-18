@@ -130,6 +130,32 @@ public final class FontLoader: Sendable {
         state.withLock { $0.descriptors[path] != nil }
     }
 
+    /// Whether making a font from the file would read it now from a server, or download it, as a cloud service keeps it
+    /// online only: either can take a while, or never finish, on a server that stopped answering. Files on the Mac's
+    /// own disks are read at once (see `read`).
+    public func wouldWait(for path: String) -> Bool {
+        !hasDescriptors(for: path) && (!Reachability.isOnLocalDisk(path) || Reachability.isOnlineOnly(path))
+    }
+
+    /// Reads the file's faces off the caller's thread, and the whole file into memory, unless they were read already.
+    public func read(_ path: String) async {
+        guard !hasDescriptors(for: path) else { return }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                Self.readAhead(path)
+                _ = fileDescriptors(at: path)
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Reads these files' faces off the caller's thread, side by side (see `read(_:)`).
+    public func read(_ paths: [String]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for path in paths { group.addTask { await self.read(path) } }
+        }
+    }
+
     /// Drops what's cached for files that changed or went away.
     public func invalidate(paths: Set<String>) {
         state.withLock { state in

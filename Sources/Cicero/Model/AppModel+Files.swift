@@ -29,7 +29,7 @@ extension AppModel {
         panel.prompt = installsAddedFiles ? "Install" : "Add"
         panel.message = switch data.installMethod {
         case .copy: "Choose font files. They’re copied into your Fonts folder and turned on. The originals stay where they are."
-        case .move: "Choose font files. They’re moved into your Fonts folder and turned on. A folder they leave empty goes to the Trash."
+        case .move: "Choose font files. They’re moved into your Fonts folder and turned on."
         case .ask, .inPlace: "Choose font files. They’re listed in your library where they are, without being activated."
         }
         guard panel.runModal() == .OK else { return }

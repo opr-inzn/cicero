@@ -25,22 +25,32 @@ public struct CoreTextRegistrar: FontRegistrar {
     /// returns. Files turned off in macOS stay off when registered again, so those are turned back on.
     public func register(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> {
         guard !urls.isEmpty else { return [] }
-        let result = await Self.perform(urls, ignoring: .alreadyRegistered) { handler in
+        let result = await Self.perform(urls, ignoring: .alreadyRegistered, undone: { !Self.isActive($0) }) { handler in
             CTFontManagerRegisterFontURLs(urls as CFArray, scope, true, handler)
         }
-        let disabled = urls.filter { result.ignored.contains($0.path(percentEncoded: false)) && !isActive($0) }
+        if result.timedOut, !result.failed.isEmpty {
+            // fontd may still turn on the files it hadn't by then; taken back, they stay off, as the caller is told.
+            // Without waiting, as fontd may not be answering.
+            let late = urls.filter { result.failed.contains($0.path(percentEncoded: false)) }
+            DispatchQueue.global(qos: .utility).async {
+                CTFontManagerUnregisterFontURLs(late as CFArray, scope) { _, _ in true }
+            }
+        }
+        let ignored = Self.given(result.ignored, among: urls)
+        let disabled = urls.filter { ignored.contains($0.path(percentEncoded: false)) && !isActive($0) }
         if !disabled.isEmpty {
             let descriptors = disabled.flatMap { CTFontManagerCreateFontDescriptorsFromURL($0 as CFURL) as? [CTFontDescriptor] ?? [] }
             CTFontManagerEnableFontDescriptors(descriptors as CFArray, true)
         }
-        return result.failed
+        return Self.given(result.failed, among: urls)
     }
 
     public func unregister(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> {
         guard !urls.isEmpty else { return [] }
-        return await Self.perform(urls, ignoring: .notRegistered) { handler in
+        let failed = await Self.perform(urls, ignoring: .notRegistered, undone: { Self.isActive($0) }) { handler in
             CTFontManagerUnregisterFontURLs(urls as CFArray, scope, handler)
         }.failed
+        return Self.given(failed, among: urls)
     }
 
     public func unregisterNow(_ urls: [URL], scope: CTFontManagerScope) {
@@ -57,16 +67,34 @@ public struct CoreTextRegistrar: FontRegistrar {
         CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []
     }
 
+    /// CoreText knows a file registered through a symlink (a folder linked into the home folder, say) by its path with
+    /// the symlink resolved only, so that's asked about too.
     public func isActive(_ url: URL) -> Bool {
-        CTFontManagerGetScopeForURL(url as CFURL) != .none
+        Self.isActive(url)
+    }
+
+    private static func isActive(_ url: URL) -> Bool {
+        if CTFontManagerGetScopeForURL(url as CFURL) != .none { return true }
+        return LibraryScanner.linkedPaths(url.path(percentEncoded: false)).contains { path in
+            CTFontManagerGetScopeForURL(URL(fileURLWithPath: path, isDirectory: false) as CFURL) != .none
+        }
+    }
+
+    /// The files CoreText's errors name, by their paths as given: it names a file by its path with every symlink resolved.
+    private static func given(_ named: Set<String>, among urls: [URL]) -> Set<String> {
+        guard !named.isEmpty else { return named }
+        return Set(urls.map { $0.path(percentEncoded: false) }.filter { path in
+            named.contains(path) || !LibraryScanner.linkedPaths(path).isDisjoint(with: named)
+        })
     }
 
     /// Runs a CoreText registration call and waits for its last callback. fontd can hang, and an
-    /// operation that never finishes would hold up every one after it, so after a while every file counts
-    /// as failed (fontd takes a few milliseconds a file).
+    /// operation that never finishes would hold up every one after it, so after a while (fontd takes a few
+    /// milliseconds a file) the files that are still `undone` count as failed.
     private static func perform(
-        _ urls: [URL], ignoring ignored: CTFontManagerError, _ start: (@escaping (CFArray, Bool) -> Bool) -> Void
-    ) async -> (failed: Set<String>, ignored: Set<String>) {
+        _ urls: [URL], ignoring ignored: CTFontManagerError, undone: @escaping @Sendable (URL) -> Bool,
+        _ start: (@escaping (CFArray, Bool) -> Bool) -> Void
+    ) async -> FailureCollector.Result {
         await withCheckedContinuation { continuation in
             let collector = FailureCollector(ignoring: ignored, continuation: continuation)
             start { errors, done in
@@ -76,7 +104,12 @@ public struct CoreTextRegistrar: FontRegistrar {
             }
             let timeout = 15 + 0.05 * Double(urls.count)
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
-                collector.finish(failing: Set(urls.map { $0.path(percentEncoded: false) }))
+                guard collector.isWaiting else { return }
+                // Asking about each file takes fontd too, which may not answer either: then, a while later, every
+                // file counts as failed.
+                let all = Set(urls.map { $0.path(percentEncoded: false) })
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) { collector.finish(failing: all, timedOut: true) }
+                collector.finish(failing: Set(urls.filter(undone).map { $0.path(percentEncoded: false) }), timedOut: true)
             }
         }
     }
@@ -84,15 +117,22 @@ public struct CoreTextRegistrar: FontRegistrar {
     /// Gathers the files named by CoreText's errors (the handler can run more than once) and resumes
     /// the caller once, when CoreText is done or the wait times out.
     private final class FailureCollector: @unchecked Sendable {
+        typealias Result = (failed: Set<String>, ignored: Set<String>, timedOut: Bool)
+
         private let lock = NSLock()
         private let ignoredCode: CTFontManagerError
-        private var continuation: CheckedContinuation<(failed: Set<String>, ignored: Set<String>), Never>?
+        private var continuation: CheckedContinuation<Result, Never>?
         private var failed = Set<String>()
         private var ignored = Set<String>()
 
-        init(ignoring: CTFontManagerError, continuation: CheckedContinuation<(failed: Set<String>, ignored: Set<String>), Never>) {
+        init(ignoring: CTFontManagerError, continuation: CheckedContinuation<Result, Never>) {
             ignoredCode = ignoring
             self.continuation = continuation
+        }
+
+        /// Whether the caller hasn't been resumed yet.
+        var isWaiting: Bool {
+            lock.withLock { continuation != nil }
         }
 
         func add(_ errors: [CFError]) {
@@ -109,14 +149,14 @@ public struct CoreTextRegistrar: FontRegistrar {
             }
         }
 
-        func finish(failing extra: Set<String> = []) {
-            let resume = lock.withLock { () -> (CheckedContinuation<(failed: Set<String>, ignored: Set<String>), Never>, Set<String>, Set<String>)? in
+        func finish(failing extra: Set<String> = [], timedOut: Bool = false) {
+            let resume = lock.withLock { () -> (CheckedContinuation<Result, Never>, Result)? in
                 guard let continuation else { return nil }
                 self.continuation = nil
-                return (continuation, failed.union(extra), ignored)
+                return (continuation, (failed.union(extra), ignored, timedOut))
             }
-            guard let (continuation, failed, ignored) = resume else { return }
-            continuation.resume(returning: (failed, ignored))
+            guard let (continuation, result) = resume else { return }
+            continuation.resume(returning: result)
         }
     }
 }
@@ -249,8 +289,8 @@ public struct ActivationEngine: Sendable {
         }
         let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
         succeeded += installed.count
-        var message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
-        if method == .move { message += Self.trashedNote(removeOriginals(of: installed.filter { movable.contains($0.source) })) }
+        let message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
+        if method == .move { removeOriginals(of: installed.filter { movable.contains($0.source) }) }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
@@ -272,8 +312,8 @@ public struct ActivationEngine: Sendable {
         }
         let stuck = await registerAndConfirm(copies.map(\.destination), scope: .persistent)
         let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
-        var message = Self.message("Installed", "install", succeeded: installed.count, failed: failed.count)
-        if moving { message += Self.trashedNote(removeOriginals(of: installed)) }
+        if moving { removeOriginals(of: installed) }
+        let message = Self.message("Installed", "install", succeeded: installed.count, failed: failed.count)
         return ActivationResult(records: records, succeeded: installed.count, failed: failed, message: message)
     }
 
@@ -293,54 +333,12 @@ public struct ActivationEngine: Sendable {
         return kept
     }
 
-    /// Finishes moving files whose copies are on: deletes each original whose copy has the same contents, then puts
-    /// the folders they were in in the Trash when they're left empty, like a download's folder once its fonts are
-    /// installed (see `isDisposableFolder`). An original that can't go, on a disk that's read only say, stays, as
-    /// a copy's would. Returns the folders that went to the Trash.
-    private func removeOriginals(of copies: [PlacedCopy]) -> [String] {
-        let fm = FileManager.default
-        var folders = Set<String>()
+    /// Finishes moving files whose copies are on: deletes each original whose copy has the same contents. The folders
+    /// they were in stay, whatever is left in them. An original that can't go, on a disk that's read only say, stays, as
+    /// a copy's would.
+    private func removeOriginals(of copies: [PlacedCopy]) {
         for copy in copies where !Self.isProtected(copy.source) && Self.isIdenticalCopy(copy.destination, of: copy.source) {
-            guard (try? fm.removeItem(atPath: copy.source)) != nil else { continue }
-            folders.insert((copy.source as NSString).deletingLastPathComponent)
-        }
-        return folders.sorted().filter { folder in
-            guard Self.isDisposableFolder(folder, home: locations.home.path) else { return false }
-            return (try? trash(URL(fileURLWithPath: folder, isDirectory: true))) != nil
-        }
-    }
-
-    /// Whether a folder files were moved out of can go to the Trash: nothing is left in it but hidden files, like
-    /// .DS_Store, and it's a folder inside one of the user's, in the home folder (a download's folder in Downloads,
-    /// never Downloads or the home folder itself, nor anything in ~/Library) or on a disk in /Volumes (not one
-    /// at its top). Never a package, a link or a folder Cicero never touches.
-    static func isDisposableFolder(_ path: String, home: String) -> Bool {
-        let components = (path as NSString).pathComponents
-        let homeComponents = (home as NSString).pathComponents
-        let below: ArraySlice<String>
-        if components.starts(with: homeComponents) {
-            below = components.dropFirst(homeComponents.count)
-            guard below.first != "Library" else { return false }
-        } else if components.count > 3, components[0] == "/", components[1] == "Volumes" {
-            below = components.dropFirst(3)
-        } else {
-            return false
-        }
-        guard below.count >= 2, !isProtected(path + "/") else { return false }
-        let url = URL(fileURLWithPath: path, isDirectory: true)
-        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey]),
-              values.isDirectory == true, values.isSymbolicLink != true, values.isPackage != true,
-              let contents = try? FileManager.default.contentsOfDirectory(atPath: path)
-        else { return false }
-        return contents.allSatisfy { $0.hasPrefix(".") }
-    }
-
-    /// ". Put “Name” in the Trash" for the folders moving files emptied, or nothing.
-    private static func trashedNote(_ folders: [String]) -> String {
-        switch folders.count {
-        case 0: ""
-        case 1: ". Put “\((folders[0] as NSString).lastPathComponent)” in the Trash"
-        default: ". Put \(folders.count) empty folders in the Trash"
+            try? FileManager.default.removeItem(atPath: copy.source)
         }
     }
 

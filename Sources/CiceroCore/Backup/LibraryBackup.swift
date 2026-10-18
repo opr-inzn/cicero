@@ -462,6 +462,7 @@ public struct LibraryBackup: Sendable {
         var data = contents.userData
         data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName, isActive: $0.isActive) }
         data.fontFiles = data.fontFiles.map(map)
+        data.missingFontFiles = [:]
         let roots = fontLocations(watching: data.folders)
         func isFont(_ path: String) -> Bool { Self.isFontLocation(path, in: roots) }
         func isFont(_ path: String, in folder: URL) -> Bool { path.hasPrefix(folder.path + "/") && isFont(path) }
@@ -516,24 +517,30 @@ enum Archive {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         process.arguments = arguments
-        let errors = Pipe()
-        process.standardError = errors
+        let pipe = Pipe()
+        process.standardError = pipe
         process.standardOutput = FileHandle.nullDevice
-        let status: Int32 = try await withTaskCancellationHandler {
+        let errors = pipe.fileHandleForReading
+        let (status, message): (Int32, Data) = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        try process.run()
+                    } catch {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    // Read before waiting: ditto with more to say than a pipe holds, about many files it couldn't
+                    // read say, waits until it's read.
+                    let message = errors.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    continuation.resume(returning: (process.terminationStatus, message))
                 }
             }
         } onCancel: {
             if process.isRunning { process.terminate() }
         }
         try Task.checkCancellation()
-        guard status == 0 else {
-            throw LibraryBackup.Failure.archive(String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
-        }
+        guard status == 0 else { throw LibraryBackup.Failure.archive(String(decoding: message, as: UTF8.self)) }
     }
 }

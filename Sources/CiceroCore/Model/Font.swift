@@ -266,12 +266,9 @@ public enum TemporaryScope: String, Codable, Sendable, CaseIterable {
         self.init(rawValue: value == "untilLogout" ? Self.untilQuit.rawValue : value)
     }
 
+    /// A scope a later version adds ends when Cicero quits here, rather than a file that doesn't load.
     public init(from decoder: Decoder) throws {
-        let value = try decoder.singleValueContainer().decode(String.self)
-        guard let scope = Self(saved: value) else {
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown scope “\(value)”"))
-        }
-        self = scope
+        self = Self(saved: try decoder.singleValueContainer().decode(String.self)) ?? .untilQuit
     }
 }
 

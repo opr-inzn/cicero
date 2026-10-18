@@ -79,9 +79,16 @@ public struct Library: Sendable {
     /// Families whose files are all out of reach for now (online only, in a watched folder that isn't there, or
     /// on a disk that isn't connected): not in `families`, but not gone either.
     public let offlineFamilies: Set<String>
+    /// Font files the library had that are out of reach for now, in a watched folder that isn't there or on a disk that
+    /// isn't connected; not those online only. Back, they're the files they were, not new ones.
+    public let offlinePaths: Set<String>
+    /// Font files added one at a time that are gone for good (see `Reachability.isGone`), for the user's list of them
+    /// to drop. Looked for off the main thread, as a file on a server that stopped answering can take a while.
+    public let goneFiles: Set<String>
 
     public init(families: [Family], unreadableFiles: [String], activePaths: Set<String>, fingerprint: Int, changedPaths: Set<String> = [],
-                unavailableFolders: [UUID: FolderAvailability] = [:], onlineOnlyFiles: [UUID: [String]] = [:], offlineFamilies: Set<String> = []) {
+                unavailableFolders: [UUID: FolderAvailability] = [:], onlineOnlyFiles: [UUID: [String]] = [:], offlineFamilies: Set<String> = [],
+                offlinePaths: Set<String> = [], goneFiles: Set<String> = []) {
         self.families = families
         self.unreadableFiles = unreadableFiles
         self.activePaths = activePaths
@@ -90,6 +97,8 @@ public struct Library: Sendable {
         self.unavailableFolders = unavailableFolders
         self.onlineOnlyFiles = onlineOnlyFiles
         self.offlineFamilies = offlineFamilies
+        self.offlinePaths = offlinePaths
+        self.goneFiles = goneFiles
         var index: [String: Int] = [:]
         for (position, family) in families.enumerated() { index[family.id] = position }
         self.index = index
@@ -242,7 +251,7 @@ public final class LibraryScanner: Sendable {
             async let active = Self.activeFontURLs(registrar)
             var (found, reach) = enumerateFolders(input)
             let activeURLs = await active
-            addActive(activeURLs, to: &found)
+            addActive(activeURLs, to: &found, linked: linkedFolders(input))
             for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
             confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
             confirmRegistered(&found, records: input.records)
@@ -263,10 +272,15 @@ public final class LibraryScanner: Sendable {
         if !stale.isEmpty {
             progress(.identifying(done: 0, total: stale.count))
             let parsing = signposter.beginInterval("Parse", "\(stale.count) files")
-            parsed = try await Self.parse(stale, progress: progress)
+            parsed = await Self.parse(stale, progress: progress)
             signposter.endInterval("Parse", parsing)
         }
-        try Task.checkCancellation()
+        if Task.isCancelled {
+            // What was read is kept, so the scan that replaced this one reads only the rest: one of everything, after an
+            // update that reads every file again, would otherwise never finish while fonts kept changing.
+            keep(parsed)
+            throw CancellationError()
+        }
 
         let files = updateCache(found: found, parsed: parsed, keeping: reach)
         if rereadAll { state.withLock { $0.rereadAll = false } }
@@ -353,7 +367,10 @@ public final class LibraryScanner: Sendable {
             if ActiveSource.isAdobeFonts(path) { file.folderIDs.append(WatchedFolder.adobeFontsID) }
             found[path] = file
         }
-        return Find(input: input, found: found, reach: last.reach, listed: last.listed)
+        // An added file the last scan of everything found gone that's back isn't gone any more.
+        var reach = last.reach
+        reach.goneFiles = reach.goneFiles.filter { found[$0] == nil }
+        return Find(input: input, found: found, reach: reach, listed: last.listed)
     }
 
     /// Whether `enumerate` lists a file under a folder: none of the folders between them, nor the file, is
@@ -443,6 +460,8 @@ public final class LibraryScanner: Sendable {
         var onlineOnly: [UUID: [String]] = [:]
         var onlineOnlyPaths: Set<String> = []
         var disconnectedFiles: Set<String> = []
+        /// Files added one at a time that are gone for good, which no scan needs to look for again.
+        var goneFiles: Set<String> = []
 
         /// Whether the faces read from a file the scan didn't find are worth keeping: it's only out of reach.
         func keeps(_ path: String) -> Bool {
@@ -501,7 +520,11 @@ public final class LibraryScanner: Sendable {
         }
         for path in input.files where Self.isFontFile(path) {
             guard let stamp = Self.stamp(ofPath: path) else {
-                if Reachability.disconnectedVolume(of: path) != nil { reach.disconnectedFiles.insert(path) }
+                if Reachability.disconnectedVolume(of: path) != nil {
+                    reach.disconnectedFiles.insert(path)
+                } else if Reachability.isGone(path) {
+                    reach.goneFiles.insert(path)
+                }
                 continue
             }
             if Reachability.isOnlineOnly(path) {
@@ -521,15 +544,30 @@ public final class LibraryScanner: Sendable {
         return (found, reach)
     }
 
-    private func addActive(_ urls: [URL], to found: inout [String: FoundFile]) {
+    private func addActive(_ urls: [URL], to found: inout [String: FoundFile], linked: [(real: String, chosen: String)]) {
         for url in urls {
-            let path = url.path(percentEncoded: false)
+            var path = url.path(percentEncoded: false)
+            // A file in a folder reached through a symlink goes by the path the folder was found at.
+            if found[path] == nil, let folder = linked.first(where: { path.hasPrefix($0.real) }) {
+                let chosen = folder.chosen + path.dropFirst(folder.real.count)
+                if found[chosen] != nil { path = chosen }
+            }
             if found[path] != nil {
                 found[path]!.isActive = true
             } else if Self.isFontFile(path), let stamp = Self.stamp(ofPath: path) {
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }
+    }
+
+    /// The folders scanned that are reached through a symlink, each as CoreText may name it and as it was chosen (with a
+    /// "/" at the end), longest first: fontd names the files it has active by their paths with every symlink resolved.
+    private func linkedFolders(_ input: ScanInput) -> [(real: String, chosen: String)] {
+        let folders = Set([locations.userFonts.path, locations.allUsersFonts.path] + input.folders.map(\.path)
+            + input.files.map { ($0 as NSString).deletingLastPathComponent })
+        return folders.flatMap { folder in
+            Self.linkedPaths(folder).map { ($0 + "/", folder + "/") }
+        }.sorted { $0.real.count > $1.real.count }
     }
 
     /// Files in the Fonts folders are active unless macOS says otherwise, as for one turned off in macOS or
@@ -562,11 +600,13 @@ public final class LibraryScanner: Sendable {
     private static func enumerate(_ folder: URL, includingHidden: Bool = false, onlineOnly: ((String) -> Void)? = nil,
                                   _ body: (String, FaceStamp) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
-        guard let enumerator = FileManager.default.enumerator(
-            at: folder, includingPropertiesForKeys: Array(keys), options: includingHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return }
         let chosen = folder.path + "/"
         let resolved = realPath(folder.path) + "/"
+        // Walked where it really is: the enumerator doesn't follow a folder that's a symlink itself.
+        guard let enumerator = FileManager.default.enumerator(
+            at: URL(fileURLWithPath: resolved, isDirectory: true), includingPropertiesForKeys: Array(keys),
+            options: includingHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return }
         for case let url as URL in enumerator {
             guard FontFileReader.fontExtensions.contains(url.pathExtension.lowercased()),
                   let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
@@ -583,10 +623,17 @@ public final class LibraryScanner: Sendable {
     }
 
     /// The path with every symlink resolved, as the enumerator reports files (e.g. /private/var for /var).
-    private static func realPath(_ path: String) -> String {
+    static func realPath(_ path: String) -> String {
         guard let resolved = realpath(path, nil) else { return path }
         defer { free(resolved) }
         return String(cString: resolved)
+    }
+
+    /// The paths besides this one that CoreText may name a file by when a symlink leads to it: fontd resolves every
+    /// symlink as Foundation does, which leaves /private off /private/var and /private/tmp, unlike `realPath`. None
+    /// when no symlink does.
+    static func linkedPaths(_ path: String) -> Set<String> {
+        Set([realPath(path), (path as NSString).resolvingSymlinksInPath]).subtracting([path])
     }
 
     private static func stamp(ofPath path: String) -> FaceStamp? {
@@ -598,11 +645,12 @@ public final class LibraryScanner: Sendable {
 
     // MARK: Reading
 
-    private static func parse(_ files: [String: FoundFile], progress: @escaping @Sendable (ScanProgress) -> Void) async throws -> [String: CachedFile] {
+    /// Stops starting files when the task is cancelled, and returns those it read.
+    private static func parse(_ files: [String: FoundFile], progress: @escaping @Sendable (ScanProgress) -> Void) async -> [String: CachedFile] {
         let total = files.count
         var results: [String: CachedFile] = [:]
         results.reserveCapacity(total)
-        try await withThrowingTaskGroup(of: (String, CachedFile).self) { group in
+        await withTaskGroup(of: (String, CachedFile).self) { group in
             var pending = files.map { ($0.key, $0.value.stamp) }[...]
             func addNext() {
                 guard let (path, stamp) = pending.popFirst() else { return }
@@ -614,13 +662,12 @@ public final class LibraryScanner: Sendable {
                 }
             }
             for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
-            while let (path, file) = try await group.next() {
+            while let (path, file) = await group.next() {
                 results[path] = file
                 if results.count % 200 == 0 || results.count == total {
                     progress(.identifying(done: results.count, total: total))
                 }
-                try Task.checkCancellation()
-                addNext()
+                if !Task.isCancelled { addNext() }
             }
         }
         return results
@@ -637,6 +684,15 @@ public final class LibraryScanner: Sendable {
                 }
             }
             return state.files
+        }
+    }
+
+    /// Adds what a scan that was cancelled read, for the next one.
+    private func keep(_ parsed: [String: CachedFile]) {
+        guard !parsed.isEmpty else { return }
+        state.withLock { state in
+            state.files.merge(parsed) { _, new in new }
+            state.dirty = true
         }
     }
 
@@ -758,7 +814,9 @@ public final class LibraryScanner: Sendable {
         unreadable.sort()
 
         var offline = Set<String>()
+        var offlinePaths = Set<String>()
         for (path, file) in files where found[path] == nil && reach.keeps(path) {
+            if !reach.onlineOnlyPaths.contains(path) { offlinePaths.insert(path) }
             for face in file.faces where byFamily[face.familyName] == nil && !face.familyName.hasPrefix(".") && !face.familyName.isEmpty {
                 offline.insert(face.familyName)
             }
@@ -789,7 +847,8 @@ public final class LibraryScanner: Sendable {
             return Set(changed)
         }
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
-                       unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline)
+                       unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
+                       goneFiles: reach.goneFiles)
     }
 
     /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate — then by path.

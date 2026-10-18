@@ -46,8 +46,9 @@ enum LibraryCache {
         writer.write(Array(library.activePaths))
         writer.write(UInt32(library.unavailableFolders.count))
         for (id, availability) in library.unavailableFolders {
+            // A disk that isn't connected is saved as not found, as 1.5.2 reads it, with its name at the end.
             let tag: UInt8 = switch availability {
-            case .notFound: 0
+            case .notFound, .disconnected: 0
             case .noAccess: 1
             }
             writer.write(id)
@@ -59,6 +60,16 @@ enum LibraryCache {
             writer.write(paths)
         }
         writer.write(Array(library.offlineFamilies))
+        // Last, so 1.5.2, which stops reading before them, still reads the rest.
+        writer.write(Array(library.offlinePaths))
+        let disconnected = library.unavailableFolders.compactMap { id, availability in
+            if case .disconnected(let volume) = availability { (id, volume) } else { nil }
+        }
+        writer.write(UInt32(disconnected.count))
+        for (id, volume) in disconnected {
+            writer.write(id)
+            writer.write(volume)
+        }
         return writer.data
     }
 
@@ -117,8 +128,16 @@ enum LibraryCache {
                     onlineOnly[id] = try reader.strings()
                 }
                 let offline = Set(try reader.strings())
+                // Missing from a library 1.5.2 saved.
+                let offlinePaths = reader.isAtEnd ? [] : Set(try reader.strings())
+                if !reader.isAtEnd {
+                    for _ in 0..<Int(try reader.u32()) {
+                        let id = try reader.uuid()
+                        unavailable[id] = .disconnected(try reader.string())
+                    }
+                }
                 return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: fingerprint,
-                               unavailableFolders: unavailable, onlineOnlyFiles: onlineOnly, offlineFamilies: offline)
+                               unavailableFolders: unavailable, onlineOnlyFiles: onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths)
             } catch {
                 return nil
             }

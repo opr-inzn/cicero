@@ -27,7 +27,7 @@ Right-click a set or smart set in the sidebar and choose **Activate Set** or **A
 
 ### Keep a folder’s fonts on
 
-Choose **Active** for one of your folders, next to it in **Settings → Folders** or under **Fonts in This Folder** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off. Choose **Inactive** again, or remove the folder, and Cicero turns off the fonts it turned on.
+Choose **Active** for one of your folders, next to it in **Settings → Folders** or under **Fonts in This Folder** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off, also when the folder is on a disk you unplug and connect again. Choose **Inactive** again, or remove the folder, and Cicero turns off the fonts it turned on.
 
 ## Copy or use in place
 
@@ -43,7 +43,7 @@ Choose which one in **Settings → General**, next to **Activate fonts by**:
 
 - **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Check **Remember this choice** to stop being asked; you can change it again in Settings.
 - **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
-- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. When that leaves the folder they were in empty, like a font download’s folder in Downloads, the folder goes to the Trash. A folder with anything else left in it, like a license, stays. Fonts in your [folders](organizing.md#folders) are copied, so your folders stay as they are, and so is a file **Find on This Mac** finds for a document.
+- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. Fonts in your [folders](organizing.md#folders) are copied, so your folders stay as they are, and so is a file **Find on This Mac** finds for a document.
 - **Leave the files where they are**
 
 A few things happen either way:

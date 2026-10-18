@@ -21,7 +21,7 @@ struct ActivationSheet: View {
                        detail: "Copies the files into your Fonts folder. The originals stay where they are.") { choose(.copy) }
                 if offersMove {
                     option("Move Into Fonts Folder", icon: "folder",
-                           detail: "Moves the files you added into your Fonts folder. A folder they leave empty goes to the Trash.") { choose(.move) }
+                           detail: "Moves the files you added into your Fonts folder. The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",
                        detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }

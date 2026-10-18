@@ -22,6 +22,8 @@ DMG="${1:-build/Cicero-$VERSION.dmg}"
 BUILT=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" build/Cicero.app/Contents/Info.plist 2>/dev/null || true)
 [[ "$BUILT" == "$BUILD" ]] ||
     { echo "build/Cicero.app is build ${BUILT:-(missing)}, Info.plist says $BUILD — run ./scripts/release.sh again." >&2; exit 1; }
+# A feed naming a build that isn't above the published one would never offer it.
+./scripts/check-version.sh
 
 NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / { exit } found' CHANGELOG.md)
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }

@@ -82,8 +82,9 @@ private struct FolderRow: View {
         let onlineOnly = model.onlineOnlyCount(inFolder: folder.id)
         switch model.availability(ofFolder: folder.id) {
         case .notFound:
-            let volume = Reachability.disconnectedVolume(of: folder.path)
-            warning(volume.map { "“\($0)” isn’t connected" } ?? "Can’t be found")
+            warning("Can’t be found")
+        case .disconnected(let volume):
+            warning("“\(volume)” isn’t connected")
         case .noAccess:
             HStack(spacing: 6) {
                 warning("Cicero isn’t allowed to read it")

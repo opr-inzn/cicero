@@ -35,6 +35,8 @@ if [[ $# -ge 1 ]]; then
     plutil -replace CFBundleVersion -string "$BUILD" Resources/Info.plist
 fi
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)
+# Before building and notarizing, which take a while: a build installed copies would never be offered isn't worth it.
+./scripts/check-version.sh
 echo "Releasing Cicero $VERSION, signed by $IDENTITY"
 
 notarize() {
