@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## 1.5.2
 
 - Cicero has a new icon: C, 1 and 6 from AM Gaonkar Display Medium, cut into the faces of its cube.
+- A font you put in a folder Cicero watches, or in the Fonts folder in your Library, shows almost at once, rather than after two or three seconds, also when your Mac is busy. One put in a Fonts folder shows as active straight away, as macOS turns it on a moment later.
 
 ## 1.5.1
 
