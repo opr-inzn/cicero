@@ -17,7 +17,7 @@ One row per family, under column headers:
 | Column | Shows |
 | --- | --- |
 | Status | The family’s on/off switch |
-| Name | The family name, the color of its [license status](organizing.md#license-status), and a status tag when it isn’t simply on or off (see [Status tags](#status-tags)) |
+| Name | The family name, the color of its [tag](organizing.md#tags), and a status tag when it isn’t simply on or off (see [Status tags](#status-tags)) |
 | Preview | A sample in the font |
 | Styles | How many styles the family has |
 | Classification | Serif, Sans Serif, Script and so on, from what the font says, the shapes of its letters, or its name (see [Classifications](organizing.md#classifications)) |
@@ -76,9 +76,9 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
 | Extend the selection | Hold ⇧ with an arrow key |
 
-Right-click a family for its menu: activate or deactivate it, add it to a set, give it a license status or a classification, reveal its files, copy its name, export it, compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
+Right-click a family for its menu: activate or deactivate it, add it to a set, give it a tag or a classification, reveal its files, copy its name, export it, compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
-You can drag families onto a set, a license status, a foundry or a classification in the sidebar, or into the Compare window.
+You can drag families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window.
 
 ## Take a quick look
 
@@ -96,8 +96,8 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 From top to bottom, a font page has:
 
 - **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why. A family from [Adobe Fonts](activating.md#adobe-fonts) has **Manage in Creative Cloud** instead.
-- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it a license status, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**.
-- **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash. Under the family’s name, it has the family’s **Add to Set**, **License Status** and **Classification** too.
+- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it a tag, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**.
+- **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash. Under the family’s name, it has the family’s **Add to Set**, **Tag** and **Classification** too.
 - **Glyphs:** every character in the font, grouped by kind in the order a type designer would list them: **Uppercase** and **Lowercase** from A to Z, then **Uppercase Accents** and **Lowercase Accents** (with the other Latin letters, like Æ, Þ and ß), **Ligatures**, **Proportional Figures** and **Tabular Figures**, **Dingbat Numerals**, **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Punctuation and Symbols**, **Diacritical Marks**, **Combining Marks**, **Case Sensitive Forms**, **Arrows**, and **Global** for the letters and figures of other scripts. The glyphs the style’s features draw in place of characters are in their groups too, like its tabular figures (tnum), superscripts (sups) and case-sensitive forms (case); click one to see which feature draws it. The ligatures the style makes are in the Ligatures group, in a section per feature, like **Standard Ligatures** (see [See a font’s ligatures](#see-a-fonts-ligatures)). To find characters, type into the filter field: a character, part of its Unicode name, or a code like U+00E9. Ligatures made of what you type show too: “f” finds ff, fi and ffl. Click a character to see it large, with its name and code.
 
 ## See a font’s ligatures
@@ -113,7 +113,7 @@ Click **Info** in the toolbar, or choose **Fonts → Show Info** (⌘I). The Inf
 The panel describes the style being previewed, the one closest to the weight in Preview Options. Its **Info** tab shows:
 
 - **Status**, and the font’s names: family, style, full name and PostScript name
-- **License Status**: the family’s license status, or **No Status**. **Change** gives it another or takes it off.
+- **Tag**: the family’s tag, or **No Tag**. **Change** gives it another or takes it off.
 - version, designer, manufacturer, and the vendor ID: the four letters a foundry registers, like ADBE for Adobe
 - weight, and the weight range of a variable font
 - number of glyphs, format and copyright

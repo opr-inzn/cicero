@@ -23,7 +23,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "Folders"
         case .sets: "Sets"
-        // License statuses, one per family, still `tags` in what's saved; the section was called License in 1.5.
+        // One per family, license statuses to begin with; called License in 1.5 to 1.5.2.
         case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
