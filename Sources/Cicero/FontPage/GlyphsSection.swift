@@ -195,6 +195,9 @@ struct GlyphsSection: View {
         .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
         .contentShape(.rect)
         .onTapGesture { popover = cell }
+        // VoiceOver opens the popover as a click does.
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { popover = cell }
         .contextMenu { copyMenu(cell) }
     }
 

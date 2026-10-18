@@ -80,6 +80,7 @@ struct LigaturesSection: View {
         .accessibilityElement()
         .accessibilityLabel("Ligature of \(ligature.text)")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction { popover = (group.tag, ligature.characters) }
     }
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
