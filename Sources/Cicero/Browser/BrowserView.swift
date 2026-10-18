@@ -239,7 +239,7 @@ private struct EmptyBrowser: View {
                                    description: Text("Turn a font on and it shows up here."))
         case .set:
             ContentUnavailableView("Empty Set", systemImage: "square.stack",
-                                   description: Text("Drag fonts onto the set in the sidebar, or right-click a font and choose Add to Set."))
+                                   description: Text("Drag typefaces onto the set in the sidebar, or right-click one and choose Add to Set."))
         case .smartSet(let id):
             ContentUnavailableView {
                 Label("No Matching Fonts", systemImage: "gearshape")

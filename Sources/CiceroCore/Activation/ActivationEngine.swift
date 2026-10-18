@@ -289,7 +289,9 @@ public struct ActivationEngine: Sendable {
         }
         let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
         succeeded += installed.count
-        let message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
+        let done = Set(targets.map(\.face.path)).subtracting(failed)
+        let message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count,
+                                   done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed)))
         if method == .move { removeOriginals(of: installed.filter { movable.contains($0.source) }) }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
@@ -313,7 +315,10 @@ public struct ActivationEngine: Sendable {
         let stuck = await registerAndConfirm(copies.map(\.destination), scope: .persistent)
         let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
         if moving { removeOriginals(of: installed) }
-        let message = Self.message("Installed", "install", succeeded: installed.count, failed: failed.count)
+        // Read from the copies: moving, the originals are gone.
+        let message = Self.message("Installed", "install", succeeded: installed.count, failed: failed.count,
+                                   done: FontNames.describe(FontNames.fonts(inFiles: installed.map(\.destination))),
+                                   undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
         return ActivationResult(records: records, succeeded: installed.count, failed: failed, message: message)
     }
 
@@ -349,6 +354,7 @@ public struct ActivationEngine: Sendable {
         var records = records
         var failed: [String] = []
         var succeeded = 0
+        var done = Set<String>()
         var toRegister: [String] = []
         let session = Self.currentSession()
         // Never one of Creative Cloud's: one only Adobe apps load would be on in every app.
@@ -356,6 +362,7 @@ public struct ActivationEngine: Sendable {
             let path = face.face.path
             if records.temporary[path] != nil {
                 records.temporary[path] = TemporaryRecord(scope: .untilQuit, session: session)
+                done.insert(path)
                 succeeded += 1
             } else if !face.state.isActive {
                 toRegister.append(path)
@@ -367,14 +374,18 @@ public struct ActivationEngine: Sendable {
                 failed.append(path)
             } else {
                 records.temporary[path] = TemporaryRecord(scope: .untilQuit, session: session)
+                done.insert(path)
                 succeeded += 1
             }
         }
         let message: String
-        if failed.isEmpty {
+        if failed.isEmpty, let name = Self.names(of: faces, in: done) {
+            message = "\(name) activated until Cicero quits"
+        } else if failed.isEmpty {
             message = succeeded <= 1 ? "Activated until Cicero quits" : "Activated \(succeeded) files until Cicero quits"
         } else {
-            message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count)
+            message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count,
+                                   undone: Self.names(of: faces, in: Set(failed)))
         }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
@@ -544,9 +555,11 @@ public struct ActivationEngine: Sendable {
                 failed.append(path)
             }
         }
+        let done = Set(installed.map(\.face.path) + persistent + session + leaving).subtracting(failed)
         let message = failed.isEmpty && succeeded == 0 && !locked.isEmpty
             ? "These fonts are managed by macOS or another app"
-            : Self.message("Deactivated", "deactivate", succeeded: succeeded, failed: failed.count + locked.count)
+            : Self.message("Deactivated", "deactivate", succeeded: succeeded, failed: failed.count + locked.count,
+                           done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed + locked)))
         return ActivationResult(records: records, succeeded: succeeded, failed: failed + locked, message: message)
     }
 
@@ -711,7 +724,8 @@ public struct ActivationEngine: Sendable {
     public func installCopy(of face: LibraryFace, records: ActivationRecords) async -> ActivationResult {
         var records = records
         let path = face.face.path
-        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy the font into your Fonts folder")
+        let name = FontNames.describe([face])
+        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy \(name ?? "the font") into your Fonts folder")
         guard let copy = try? placeCopy(of: path) else { return failure }
         guard await registerAndConfirm([copy.destination], scope: .persistent).isEmpty else {
             if copy.isNew { try? FileManager.default.removeItem(atPath: copy.destination) }
@@ -722,7 +736,7 @@ public struct ActivationEngine: Sendable {
             _ = await registrar.unregister([Self.url(path)], scope: .persistent)
             records.inPlace.remove(path)
         }
-        return ActivationResult(records: records, succeeded: 1, failed: [], message: "Installed a copy")
+        return ActivationResult(records: records, succeeded: 1, failed: [], message: name.map { "\($0) installed" } ?? "Installed a copy")
     }
 
     /// At launch: unregisters "until Cicero quits" activations left behind by a crash, and forgets
@@ -923,9 +937,24 @@ public struct ActivationEngine: Sendable {
         try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
     }
 
-    private static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int) -> String {
-        if failed == 0 { return succeeded <= 1 ? past : "\(past) \(succeeded) files" }
-        if succeeded == 0 { return failed == 1 ? "Couldn’t \(verb) the font" : "Couldn’t \(verb) \(failed) files" }
+    /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 typefaces activated", naming the
+    /// fonts `done` (see `FontNames`), else "Activated 3 files"; or what couldn't be done, by name (`undone`) when
+    /// nothing could.
+    private static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int,
+                                done: @autoclosure () -> String? = nil, undone: @autoclosure () -> String? = nil) -> String {
+        if failed == 0 {
+            if let done = done() { return "\(done) \(past.lowercased())" }
+            return succeeded <= 1 ? past : "\(past) \(succeeded) files"
+        }
+        if succeeded == 0 {
+            if let undone = undone() { return "Couldn’t \(verb) \(undone)" }
+            return failed == 1 ? "Couldn’t \(verb) the font" : "Couldn’t \(verb) \(failed) files"
+        }
         return "Couldn’t \(verb) \(failed) of \(succeeded + failed) files"
+    }
+
+    /// The fonts among `faces` whose files are among `paths`, named for a toast (see `FontNames`).
+    private static func names(of faces: [LibraryFace], in paths: Set<String>) -> String? {
+        FontNames.describe(faces.filter { paths.contains($0.face.path) })
     }
 }

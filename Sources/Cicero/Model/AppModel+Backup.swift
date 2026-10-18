@@ -182,7 +182,7 @@ extension AppModel {
         }
     }
 
-    /// "Restored 4 sets and 3,790 fonts; 22 were already there"
+    /// "Restored 4 sets and 3,790 font files; 22 were already there"
     private static func restoreSummary(settings: Bool, data: UserData, fonts: FontRestoreResult?) -> String {
         var parts: [String] = []
         if settings {
@@ -191,7 +191,7 @@ extension AppModel {
         }
         if let fonts {
             let count = fonts.restored + fonts.fallback
-            parts.append(count == 1 ? "1 font" : "\(count.formatted()) fonts")
+            parts.append(count == 1 ? "1 font file" : "\(count.formatted()) font files")
         }
         var notes: [String] = []
         if let fonts, fonts.skipped > 0 {

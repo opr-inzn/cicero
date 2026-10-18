@@ -27,7 +27,7 @@ New to Cicero? Start with [Getting started](getting-started.md). To open this gu
 
 ## Words this guide uses
 
-- **Family**: all the styles of one typeface, like Inter Regular, Inter Bold and Inter Italic. Cicero lists families, and you can open one to see its styles.
+- **Family**: a typeface, all its styles together, like Inter Regular, Inter Bold and Inter Italic. Cicero lists families, and you can open one to see its styles.
 - **Style**: one font in a family, usually one file or one face in a font collection.
 - **Active**: on. macOS offers the font to every app. **Inactive** means the font is in your library but apps don’t see it.
 - **Library**: every font Cicero knows about: the ones macOS has on, the ones in your Fonts folder, and the ones in the folders and files you add.

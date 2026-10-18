@@ -95,7 +95,7 @@ struct RestoreSheet: View {
     }
 
     private var fontsDetail: String {
-        "\(contents.fontCount.formatted()) files. Puts each font back where it was, unless a file is already there."
+        "\(contents.fontCount.formatted()) files. Puts each file back where it was, unless one is already there."
     }
 
     private func restore() {

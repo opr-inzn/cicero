@@ -96,7 +96,7 @@ struct BackupSheet: View {
                     Task { @MainActor in progress = step }
                 }
                 NSWorkspace.shared.activateFileViewerSelecting([destination])
-                model.showToast(include ? "Backed up your library and \(fonts.count.formatted()) fonts" : "Backed up your library")
+                model.showToast(include ? "Backed up your library and \(fonts.count.formatted()) font files" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {
                 dismiss()

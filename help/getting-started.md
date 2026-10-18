@@ -46,7 +46,7 @@ Double-click a family to open its **font page**, with a large text to type into,
 
 The toolbar has, from left to right, the view switcher (List, Grid, Specimens), **Preview Options**, **Info** and the search field.
 
-Short messages at the bottom of the window confirm what Cicero did, like “Activated” or “Moved to the Trash”.
+Short messages at the bottom of the window confirm what Cicero did, like “Inter activated” or “Moved to the Trash”.
 
 ## Add your fonts
 
@@ -69,7 +69,7 @@ If a file has fonts your library has already, from another file, like a newer ve
 
 ## Turn a font on
 
-Click the switch next to a family. It’s on in every app as soon as the switch settles and the message says “Activated”. To learn how Cicero turns fonts on, and the choices you have, see [Activating fonts](activating.md).
+Click the switch next to a family. It’s on in every app as soon as the switch settles and the message says so, like “Inter activated”. To learn how Cicero turns fonts on, and the choices you have, see [Activating fonts](activating.md).
 
 ## Choose light or dark
 

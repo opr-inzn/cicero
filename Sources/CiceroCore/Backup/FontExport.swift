@@ -24,7 +24,7 @@ public struct FontExportPlan: Sendable {
     /// Families with files to copy, in the order given.
     public var items: [Item]
     /// Families with at least one file in the export, including ones whose only file is in another family's folder.
-    public var familyCount: Int
+    public var exportedFamilies: [String]
     /// Files left out because they come with macOS or an app.
     public var protectedCount: Int
 
@@ -33,7 +33,7 @@ public struct FontExportPlan: Sendable {
     public init(families: [Family], including: (Family, LibraryFace) -> Bool = { _, _ in true }) {
         var seen = Set<String>()
         var items: [Item] = []
-        var familyCount = 0
+        var exportedFamilies: [String] = []
         var protectedCount = 0
         for family in families {
             var paths: [String] = []
@@ -47,24 +47,26 @@ public struct FontExportPlan: Sendable {
                 exported = true
                 if seen.insert(path).inserted { paths.append(path) }
             }
-            if exported { familyCount += 1 }
+            if exported { exportedFamilies.append(family.name) }
             if !paths.isEmpty { items.append(Item(family: family.name, paths: paths)) }
         }
         self.items = items
-        self.familyCount = familyCount
+        self.exportedFamilies = exportedFamilies
         self.protectedCount = protectedCount
     }
 
+    public var familyCount: Int { exportedFamilies.count }
     public var isEmpty: Bool { items.isEmpty }
     public var fileCount: Int { items.reduce(0) { $0 + $1.paths.count } }
 
-    /// "Exported 12 families" with a note about files left out, for a toast.
+    /// "Exported Inter", "Exported Inter and Roboto" or "Exported 12 typefaces", with a note about files left out, for a
+    /// toast.
     public var completionMessage: String {
-        var message = familyCount == 1 ? "Exported 1 family" : "Exported \(familyCount) families"
+        var message = "Exported " + (FontNames.describe(typefaces: exportedFamilies) ?? "the fonts")
         if protectedCount > 0 {
             message += protectedCount == 1
-                ? ". Left out 1 font that comes with macOS or an app"
-                : ". Left out \(protectedCount) fonts that come with macOS or an app"
+                ? ". Left out 1 font file that comes with macOS or an app"
+                : ". Left out \(protectedCount) font files that come with macOS or an app"
         }
         return message
     }
