@@ -38,7 +38,7 @@ extension TagColor {
         return image
     }
 
-    /// No Status's dot in menus: grey, like a status without a colour.
+    /// No Tag's dot in menus: grey, like a tag without a colour.
     static var noStatusImage: NSImage {
         let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
             NSColor.tertiaryLabelColor.setFill()
@@ -70,8 +70,8 @@ struct TagDots: View {
     }
 }
 
-/// The License Status submenu of a family's menu and the Info panel: the statuses, the families' checked, No Status,
-/// and New License Status…. Choosing one gives the families that status in place of the one they have.
+/// The Tag submenu of a family's menu and the Info panel: the tags, the families' checked, No Tag, and New Tag….
+/// Choosing one gives the families that tag in place of the one they have.
 struct TagMenuItems: View {
     let families: [Family]
     let model: AppModel
@@ -94,10 +94,10 @@ struct TagMenuItems: View {
             get: { families.allSatisfy { model.data.tags(of: $0.id).isEmpty } },
             set: { if $0 { model.setLicenseStatus(nil, for: families) } }
         )) {
-            Label { Text("No Status") } icon: { Image(nsImage: TagColor.noStatusImage) }
+            Label { Text("No Tag") } icon: { Image(nsImage: TagColor.noStatusImage) }
                 .labelStyle(.titleAndIcon)
         }
         Divider()
-        Button("New License Status", systemImage: "plus") { model.newTag(for: families) }
+        Button("New Tag", systemImage: "plus") { model.newTag(for: families) }
     }
 }

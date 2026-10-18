@@ -95,7 +95,7 @@ struct FamilyMenu: View {
     }
 }
 
-/// Add to Set, License Status, Rating and Classification, for families' menus and a style's, where they're the family's.
+/// Add to Set, Tag, Rating and Classification, for families' menus and a style's, where they're the family's.
 struct OrganizingMenus: View {
     let families: [Family]
     let model: AppModel
@@ -116,7 +116,7 @@ struct OrganizingMenus: View {
         } label: {
             Label("Add to Set", systemImage: SidebarSection.sets.icon)
         }
-        Menu { TagMenuItems(families: families, model: model) } label: { Label("License Status", systemImage: SidebarSection.tags.icon) }
+        Menu { TagMenuItems(families: families, model: model) } label: { Label("Tag", systemImage: SidebarSection.tags.icon) }
         Menu { RatingMenuItems(families: families, model: model) } label: { Label("Rating", systemImage: "star") }
         Menu { ClassificationMenuItems(families: families, model: model) } label: {
             Label("Classification", systemImage: SidebarSection.classifications.icon)

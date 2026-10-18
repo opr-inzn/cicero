@@ -168,7 +168,7 @@ private struct FolderOutOfReach: View {
                 ContentUnavailableView {
                     Label("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark")
                 } description: {
-                    Text("The fonts in “\(name)” are back as soon as you connect it. Their sets and license statuses stay as they are.")
+                    Text("The fonts in “\(name)” are back as soon as you connect it. Their sets and tags stay as they are.")
                 } actions: {
                     Button("Try Again") { model.rescan() }
                 }

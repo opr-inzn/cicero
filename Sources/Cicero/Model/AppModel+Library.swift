@@ -23,8 +23,8 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "Folders"
         case .sets: "Sets"
-        // A family's license status; tags before 1.5, still `tags` in what's saved.
-        case .tags: "License"
+        // One per family, license statuses to begin with; called License in 1.5 to 1.5.2.
+        case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
         // As in Settings: which fonts have every character of a set.
@@ -36,7 +36,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "folder"
         case .sets: "square.stack"
-        case .tags: "checkmark.seal"
+        case .tags: "tag"
         case .foundries: "building.2"
         case .classifications: "textformat"
         case .characterSets: "character.textbox"

@@ -17,7 +17,7 @@ With no family selected, **File → Export Fonts** exports every family in the b
 
 ### Export a set, folder or other sidebar item
 
-Right-click a set, smart set, license status, folder, foundry, classification or set under Coverage in the sidebar and choose **Export Fonts**. The export is named after it.
+Right-click a set, smart set, tag, folder, foundry, classification or set under Coverage in the sidebar and choose **Export Fonts**. The export is named after it.
 
 For **All Fonts**, **Active**, **Inactive** or **System Fonts**, select the item, make sure no family is selected, and choose **File → Export Fonts**
 
@@ -44,7 +44,7 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 ### What a backup holds
 
 - your sets (with the apps of application sets), smart sets and coverage sets
-- your license statuses, their colors, and which families have them
+- your tags, their colors, and which families have them
 - your folders, and what you chose under **Fonts in This Folder**
 - the font files you added one at a time, as **Added Fonts**
 - foundry names you changed, and the families you moved to another foundry
@@ -60,7 +60,7 @@ A backup doesn’t hold settings that belong to one Mac: the appearance, **Open 
 1. Choose **File → Restore Library**, or click **Restore** next to **Library**, under **Maintenance** in **Settings → General**.
 2. Choose a `.cicerobackup` file.
 3. Cicero asks “Restore the Backup from” and the date it was made. Choose what to restore:
-   - **Sets, folders and settings** says what’s in the backup, like “4 sets, 2 smart sets, 7 license statuses, 3 folders and 1 coverage set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
+   - **Sets, folders and settings** says what’s in the backup, like “4 sets, 2 smart sets, 7 tags, 3 folders and 1 coverage set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
    - **Font files**, when the backup has them, puts each font back where it was, unless a file is already there.
 4. Click **Restore**.
 

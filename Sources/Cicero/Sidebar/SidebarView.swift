@@ -243,7 +243,7 @@ private struct SidebarContent: View {
             .fixedSize()
             .help("New set or smart set")
         case .tags:
-            plus("New license status") { model.newTag() }
+            plus("New tag") { model.newTag() }
         case .characterSets:
             plus("New coverage set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
         case .classifications:
@@ -355,9 +355,7 @@ private struct SidebarContent: View {
                 Button("Delete Smart Set", systemImage: "trash") { model.deleteSmartSet(id) }
             }
         case .tag(let name):
-            Button("Rename License Status", systemImage: "pencil") {
-                model.prompt("Rename License Status", text: name, confirm: "Rename") { model.renameTag(name, to: $0) }
-            }
+            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
             Picker(selection: Binding(get: { model.data.tagColors[name] }, set: { model.setColor($0, forTag: name) })) {
                 Text("None").tag(TagColor?.none)
                 Divider()
@@ -369,7 +367,7 @@ private struct SidebarContent: View {
             } label: {
                 Label("Color", systemImage: "paintpalette")
             }
-            Button("Delete License Status", systemImage: "trash") { model.deleteTag(name) }
+            Button("Delete Tag", systemImage: "trash") { model.deleteTag(name) }
         case .foundry(let name):
             Button("Rename Foundry", systemImage: "pencil") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
         case .classification(let name):
