@@ -5,6 +5,16 @@ Each version’s notes here become its release notes on the [releases page](http
 ## 1.5.3
 
 - License statuses are tags again: they’re under **Tags** in the sidebar, with the tag symbol, rather than **License**, and a family’s menu, the Info panel and smart set rules say **Tag**. Cicero still comes with Licensed, Unlicensed and the others, and a family still has one at a time.
+- Fonts in a folder that a symlink leads to, like a fonts folder on another disk linked into your home folder, turn on and show as active. Before, Cicero could say it couldn’t activate them, or list them twice. A folder you add that is a symlink itself shows its fonts too.
+- When the disk or server with an **Active** folder is connected again, its fonts are as you left them: those you turned off stay off. Before, they all came back on.
+- A font you added whose file goes away for a while, as when you rename its folder and back or sign out of a cloud service, is back in your library when the file is, within 30 days. Before, Cicero forgot it at once.
+- Moving fonts into your Fonts folder leaves the folder they were in, even when it’s left empty. Before, an empty folder went to the Trash.
+- A smart set rule a later version of Cicero saved, which this one doesn’t know, is left out, rather than your sets, folders and tags all starting over. A library file Cicero can’t read is never written over, also when one was kept aside before.
+- A scan of every font, as after an update that reads them all again, finishes while fonts keep changing, rather than starting over each time; fonts changed meanwhile are looked at once it’s done.
+- A font you put in a watched folder no longer shows and then disappears again when two scans overlap.
+- A server that’s slow, or has stopped answering, no longer holds up Cicero: fonts on it are read in the background, and finding out whether a folder’s disk is connected no longer waits for it.
+- If macOS takes very long to turn fonts on, those it turned on count as activated, and the rest are kept off, rather than all of them counting as failed.
+- A backup, restore or clearing of font caches no longer stalls when the tool doing it reports many problems.
 
 ## 1.5.2
 
