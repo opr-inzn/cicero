@@ -191,10 +191,10 @@ extension AppModel {
         }
     }
 
-    /// "Skipped Helvetica, already in your library", "Skipped 3 typefaces already in your library", or nothing when no
+    /// "Skipped Helvetica, already in your library", "Skipped 3 families already in your library", or nothing when no
     /// family was left out.
     private static func skipNote(_ skipped: [AddedDuplicate]) -> String {
-        guard let names = FontNames.describe(typefaces: skipped.map(\.family)) else { return "" }
+        guard let names = FontNames.describe(families: skipped.map(\.family)) else { return "" }
         return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
     }
 
@@ -203,7 +203,7 @@ extension AppModel {
         let families = replacement.families
         guard !families.isEmpty else { return "" }
         let using = (families.count == 1 ? "Using the added copy of " : "Using the added copies of ")
-            + (FontNames.describe(typefaces: families) ?? "")
+            + (FontNames.describe(families: families) ?? "")
         return using + (replacement.leavesOtherCopiesOn ? ". Another copy Cicero can’t turn off is still on, so apps may use that one" : "")
     }
 
@@ -259,7 +259,7 @@ extension AppModel {
         }
         if let set = opened.set, let name = data.sets.first(where: { $0.id == set })?.name {
             setMembership(true, for: families, in: set)
-            showToast("Added \(FontNames.describe(typefaces: families.map(\.name)) ?? "") to “\(name)”")
+            showToast("Added \(FontNames.describe(families: families.map(\.name)) ?? "") to “\(name)”")
         }
         let ids = Set(families.map(\.id))
         // Added files in Added Fonts, unless they joined the set shown; others where the browser shows them, else

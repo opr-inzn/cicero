@@ -931,7 +931,7 @@ public struct ActivationEngine: Sendable {
         try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
     }
 
-    /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 typefaces activated", naming the
+    /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 families activated", naming the
     /// fonts `done` (see `FontNames`), else "Activated 3 files"; or what couldn't be done, by name (`undone`) when
     /// nothing could.
     private static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int,
