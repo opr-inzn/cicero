@@ -5,6 +5,7 @@ import SwiftUI
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(BackupPrompts.self) private var backup
+    @Environment(\.openWindow) private var openWindow
     @State private var promptText = ""
 
     var body: some View {
@@ -41,6 +42,8 @@ struct MainWindow: View {
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
         .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
+        // For a family chosen in Spotlight while the window is closed.
+        .onAppear { model.openMainWindow = { [openWindow] in openWindow(id: WindowID.main) } }
         // While the Fonts in Document sheet is up, it asks how to activate itself: a window shows one sheet.
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.activationPrompt : nil }, set: { model.activationPrompt = $0 })) {
             ActivationSheet(prompt: $0)

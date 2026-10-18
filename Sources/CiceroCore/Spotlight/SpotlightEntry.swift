@@ -28,22 +28,28 @@ public struct SpotlightEntry: Hashable, Sendable {
         self.sample = sample
     }
 
-    /// The family as the browser shows it: `classification` nil when it's unclassified, `foundry` as the user named
-    /// it, `tags` in the user's order, `sets` and `smartSets` the names of those it's in.
-    public init(family: Family, classification: String?, foundry: String?, tags: [String], rating: Int?, sets: [String], smartSets: [String]) {
+    /// The family as the browser shows it (see `SpotlightFacts`).
+    public init(family: Family, facts: SpotlightFacts) {
         let faces = family.faces.map(\.face)
-        let stars = rating.map { String(repeating: "★", count: min(max($0, 0), 5)) }
+        let stars = facts.rating.map { String(repeating: "★", count: min(max($0, 0), 5)) }
         func unique(_ words: [String?]) -> [String] {
             var seen = Set<String>()
             return words.compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && seen.insert($0).inserted }
         }
         self.init(
             family: family.id,
-            description: unique([classification, foundry] + tags + [stars]).joined(separator: " · "),
-            keywords: unique([classification, foundry, family.manufacturer] + faces.map(\.designer) + faces.map(\.vendorID) + tags
-                + sets + smartSets + faces.map(\.styleName) + faces.map(\.fullName) + faces.map(\.postScriptName)),
+            description: unique([facts.classification, facts.foundry] + facts.tags + [stars]).joined(separator: " · "),
+            keywords: unique([facts.classification, facts.foundry, family.manufacturer] + faces.map(\.designer) + faces.map(\.vendorID)
+                + facts.tags + facts.sets + facts.smartSets + faces.map(\.styleName) + faces.map(\.fullName) + faces.map(\.postScriptName)),
             sample: family.regular.face
         )
+    }
+
+    /// The entries of these families, made off the caller's thread: their keywords are every style's names, tens of
+    /// thousands of words in a large library.
+    @concurrent
+    public static func entries(_ families: [(Family, SpotlightFacts)]) async -> [SpotlightEntry] {
+        families.map { SpotlightEntry(family: $0, facts: $1) }
     }
 
     /// Its item's identifier in Spotlight, which comes back when the item is opened.
@@ -64,6 +70,30 @@ public struct SpotlightEntry: Hashable, Sendable {
         var text = [family, description, sample.id.description, sample.postScriptName, sampleStamp].joined(separator: "\u{1E}")
         text += "\u{1E}" + keywords.joined(separator: "\u{1F}")
         return SHA256.hash(data: Data(text.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// What the app knows of a family that Spotlight shows, and the files don't say.
+public struct SpotlightFacts: Sendable {
+    /// Its classification's name, as the user named it; nil when it's unclassified.
+    public var classification: String?
+    /// Its foundry, as the user named it.
+    public var foundry: String?
+    /// Its tags, in the user's order.
+    public var tags: [String]
+    public var rating: Int?
+    /// The names of the sets and smart sets it's in.
+    public var sets: [String]
+    public var smartSets: [String]
+
+    public init(classification: String? = nil, foundry: String? = nil, tags: [String] = [], rating: Int? = nil,
+                sets: [String] = [], smartSets: [String] = []) {
+        self.classification = classification
+        self.foundry = foundry
+        self.tags = tags
+        self.rating = rating
+        self.sets = sets
+        self.smartSets = smartSets
     }
 }
 

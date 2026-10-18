@@ -189,6 +189,8 @@ final class AppModel {
     @ObservationIgnored var spotlightTask: Task<Void, Never>?
     /// A family opened from Spotlight before the library had it, shown once the first scan is done.
     @ObservationIgnored var awaitedSpotlightFamily: String?
+    /// Opens the main window, or brings it forward; set once it has appeared.
+    @ObservationIgnored var openMainWindow: (() -> Void)?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// Activation, deactivation and trashing run one at a time, so their record changes never overwrite each other.

@@ -116,9 +116,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `AddedDuplicates` (CiceroCore) which families the library has from other files; the setting, or the
   `DuplicatesSheet`, says per family whether to skip, add or take over, and taking over is a `switchCopies`
   operation with the added faces as the new copies (`AddedDuplicates.replacement`).
-- `AppModel+Spotlight` makes the Spotlight entries of the families the library lists, under the user's names for
-  foundries and classifications, and has the indexer update them two seconds after the library or the data they
-  show changes (`UserData.showsDifferentlyInSpotlight`), after the first scan and when coverage or guesses arrive.
+- `AppModel+Spotlight` gathers what Spotlight shows of each family the library lists (`SpotlightFacts`: foundry and
+  classification under the user's names, tags, rating, sets, smart sets), has the entries made from them off the main
+  actor, and the indexer update them two seconds after the library or the data they show changes
+  (`UserData.showsDifferentlyInSpotlight`), after the first scan and when coverage or guesses arrive.
   A family chosen in Spotlight comes in as a `CSSearchableItemActionType` user activity, to `AppDelegate`, since
   SwiftUI's `onContinueUserActivity` doesn't get it on the Mac, and opens its page (`show(familyFromSpotlight:)`).
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the

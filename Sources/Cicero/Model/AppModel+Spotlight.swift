@@ -14,7 +14,7 @@ extension AppModel {
             try? await Task.sleep(for: delay)
             await previous?.value
             guard !Task.isCancelled, let self else { return }
-            let entries = self.spotlightEntries()
+            let entries = await SpotlightEntry.entries(self.spotlightFacts())
             try? await self.spotlight.update(entries)
         }
     }
@@ -28,9 +28,10 @@ extension AppModel {
         }
     }
 
-    /// Every listed family as the browser shows it: classification and foundry under the user's names, its tags,
-    /// rating, and the sets and smart sets it's in.
-    func spotlightEntries() -> [SpotlightEntry] {
+    /// Every listed family with what Spotlight shows of it as the browser does: classification and foundry under the
+    /// user's names, its tags, rating, and the sets and smart sets it's in. The entries are made from them off the main
+    /// actor.
+    func spotlightFacts() -> [(Family, SpotlightFacts)] {
         let families = library.families.filter(data.lists)
         let foundryName = foundryNamer()
         let classificationName = classificationNamer()
@@ -46,11 +47,11 @@ extension AppModel {
         }
         return families.map { family in
             let classification = classificationName(family)
-            return SpotlightEntry(
-                family: family, classification: classification == unclassified ? nil : classification, foundry: foundryName(family),
+            return (family, SpotlightFacts(
+                classification: classification == unclassified ? nil : classification, foundry: foundryName(family),
                 tags: data.tags(of: family.id), rating: data.familyRatings[family.id], sets: sets[family.id] ?? [],
                 smartSets: smartSets[family.id] ?? []
-            )
+            ))
         }
     }
 
@@ -68,5 +69,6 @@ extension AppModel {
         }
         selectedIDs = [name]
         openFamilyID = name
+        openMainWindow?()
     }
 }
