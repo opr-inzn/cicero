@@ -2,7 +2,7 @@
 
 ![Cicero’s window: All Fonts as a grid of tiles, each family previewed in itself, with the sidebar on the left](docs/screenshot.png)
 
-**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · Requires macOS 26 on Apple silicon.
+**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · [Roadmap](docs/ROADMAP.md) · Requires macOS 26 on Apple silicon.
 
 A font manager for macOS. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
@@ -36,6 +36,10 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **Updates.** Cicero checks GitHub for new versions and offers to install them. Check now with Cicero → Check for Updates, or turn off *Check for updates automatically* in Settings → General.
 - **Moves itself to Applications.** Opened from the disk image or your Downloads folder, Cicero offers to move itself to the Applications folder, where application sets, opening at login and updates work.
 - **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with Release Notes and Report an Issue next to it in the Help menu.
+
+## Roadmap
+
+Coming next: **similar fonts**, the families in your library that look most like the one you pick, and **Cicero in Spotlight**, so a family’s name, or a tag, rating or set of yours, finds it in Spotlight. Then smaller things, like a note on each family and the font list as a spreadsheet. How each could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 

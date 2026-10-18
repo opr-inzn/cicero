@@ -1,8 +1,8 @@
 # Roadmap
 
 Features that could come next, roughly in the order they'd come, with how each could work, what's still open and
-about how big it is (S: a few hours, M: about a day, L: several days or more). Nothing here is promised; the order
-changes as Cicero does. What's done but not released yet is under "Unreleased" in the [changelog](../CHANGELOG.md).
+about how big it is (S: a few hours, M: about a day). Nothing here is promised; the order changes as Cicero does.
+What's done is in the [changelog](../CHANGELOG.md).
 
 ## Next
 
@@ -67,44 +67,12 @@ Not this way: writing Finder tags onto the font files for Cicero's tags. That ch
 - What 1,200 thumbnails cost to make, and whether results look good enough without them.
 - Whether to index styles too, by PostScript name.
 
-## Later
-
-### Specimen sheets (L)
-
-Print the selected families, or save them as a PDF: one family per page with its styles and a paragraph, a catalog of
-many families with a line each, or a page of a style's characters, with the name and date in the header. Drawn with
-CoreText through `NSPrintOperation`, so print and PDF are one; glyphs set by their ink bounds, never clipped. Open:
-which layouts, and whether the user can edit them.
-
-### Web preview (L)
-
-Load a web page in Cicero and set it in fonts from the library: the whole page, or the block of text clicked, with
-size, line height and colors, and a set made of the fonts tried. A `WKWebView` with the fonts brought in through
-`@font-face` from a custom URL scheme (`WKURLSchemeHandler`). Open: many sites' Content Security Policy blocks fonts from
-anywhere but their own servers; find out how many before building it.
-
-### Turning on a document's fonts as it opens (L, research first)
-
-Plug-ins for InDesign and Illustrator that ask Cicero to turn on a document's missing fonts as it opens, and turn them
-off when it closes. Find Fonts in Document and application sets do this by hand today. Open: whether Adobe's UXP
-plug-ins can see a document opening and its missing fonts, or whether it takes the C++ SDKs, rebuilt for every Adobe
-release. Catching any app's request for a missing font isn't possible with public macOS APIs.
-
 ## Small improvements
 
 - **Notes** (S): a note per family in the Info panel, searched with the rest, and a **Note contains** smart set rule.
-- **Waterfall** (S): a style at several sizes at once, 12 to 72 pt, on the font page.
-- **Kerning pairs** (M): a table of a style's kerning pairs, from GPOS or the kern table, searchable by pair.
-- **Preview colors** (S): text and background colors of the user's own, and a see-through window to lay a preview over
-  a design.
-- **Slideshow** (S): the selected or listed families one after another, full window, on a timer.
-- **More documents** (M): Find Fonts in Document also for EPS, SVG, Pages, Keynote, RTF, Word, PowerPoint,
-  OpenDocument, Sketch and Scribus files, and the list saved as text or CSV.
 - **Font list as CSV** (S): the listed families' names, styles, foundry, designer, version, format, tags, rating and
   paths, for a spreadsheet.
-- **Share** (S): send exported fonts with AirDrop or Mail from the share sheet.
 - **Ask before turning on many fonts** (S): a question before turning on more than, say, 100 families at once.
-- **A shortcut from anywhere** (S): a keyboard shortcut that brings Cicero forward from any app.
 - **Localized names** (S): family names in the Mac's language, when the font has them.
 - **A folder of Cicero's own** (M): an option to keep every font Cicero installs in one folder of its own, a subfolder per
   family, rather than loose in ~/Library/Fonts.
