@@ -132,6 +132,8 @@ final class AppModel {
     var deactivationPrompt: DeactivationPrompt?
     /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
     var copySwitchPrompt: CopySwitchRequest?
+    /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
+    var duplicatePrompt: DuplicatePrompt?
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
     var newTagRequest: NewTagRequest?
@@ -669,6 +671,15 @@ struct CopySwitchRequest: Identifiable {
     /// What the activation sheet calls it: "Helvetica from Acme".
     var title: String
     var plan: CopySwitchPlan
+}
+
+/// Font files being added, some of them with fonts the library has already (see `AppModel.addCheckingDuplicates`).
+struct DuplicatePrompt: Identifiable {
+    let id = UUID()
+    var paths: [String]
+    var duplicates: [AddedDuplicate]
+    /// What adding them does once they're in.
+    var then: (AppModel, Set<String>) -> Void
 }
 
 struct DeactivationPrompt: Identifiable {

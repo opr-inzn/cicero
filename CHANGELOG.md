@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- When a font file you add has fonts your library has already, from another file, like a newer version of a font you installed, Cicero asks what to do with each family: **Skip It**, **Add as Another Copy**, or **Use the Added One**, which turns the library’s copy off the way deactivating does, so no font is lost, and the added one on. The sheet shows both versions, where your copy is and whether it’s on, and whether the added one is newer, older, the same version or the same file; each family starts at using the added one when it’s newer. To stop being asked, choose **Add it as another copy**, **Skip it**, **Use the added one** or **Keep the newer version** next to **When an added font is already in your library** in Settings → General.
+
 ## 1.5.2
 
 - Cicero has a new icon: C, 1 and 6 from AM Gaonkar Display Medium, cut into the faces of its cube.
