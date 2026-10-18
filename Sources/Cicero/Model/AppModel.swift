@@ -20,6 +20,7 @@ final class AppModel {
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
+    @ObservationIgnored let spotlight: SpotlightIndexer
 
     // MARK: Library
 
@@ -71,6 +72,7 @@ final class AppModel {
                 refreshTagDots()
             }
             if data.showAdobeAppFolders != oldValue.showAdobeAppFolders { rescan() }
+            if data.showsDifferentlyInSpotlight(than: oldValue) { updateSpotlight() }
         }
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
@@ -90,6 +92,15 @@ final class AppModel {
         }
     }
     static let guessesClassificationsKey = "classification.guessesFromNames"
+    /// Settings → General → Show fonts in Spotlight (see `AppModel+Spotlight`). Saved in user defaults.
+    var indexesSpotlight: Bool {
+        didSet {
+            guard indexesSpotlight != oldValue else { return }
+            UserDefaults.standard.set(indexesSpotlight, forKey: Self.indexesSpotlightKey)
+            indexesSpotlight ? updateSpotlight(after: .zero) : removeFromSpotlight()
+        }
+    }
+    static let indexesSpotlightKey = "spotlight.isOn"
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
     private(set) var tagDots: [String: [TagColor]] = [:]
@@ -174,6 +185,10 @@ final class AppModel {
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var coverageTask: Task<Void, Never>?
     @ObservationIgnored private var problemsTask: Task<Void, Never>?
+    /// The latest Spotlight update, which waits for the one before it.
+    @ObservationIgnored var spotlightTask: Task<Void, Never>?
+    /// A family opened from Spotlight before the library had it, shown once the first scan is done.
+    @ObservationIgnored var awaitedSpotlightFamily: String?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// Activation, deactivation and trashing run one at a time, so their record changes never overwrite each other.
@@ -221,6 +236,8 @@ final class AppModel {
         pageContents = PageContents(coverage: coverage)
         guesser = ClassificationGuesser(caches: locations.caches)
         guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
+        spotlight = SpotlightIndexer(caches: locations.caches)
+        indexesSpotlight = UserDefaults.standard.object(forKey: Self.indexesSpotlightKey) as? Bool ?? true
         data = store.load()
         if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
@@ -432,6 +449,11 @@ final class AppModel {
         FontLoader.shared.prefetch((visibleFamilies + new.families).map(\.regular.face))
         updateCoverage()
         updateProblems()
+        updateSpotlight()
+        if first, let name = awaitedSpotlightFamily {
+            awaitedSpotlightFamily = nil
+            show(familyFromSpotlight: name)
+        }
     }
 
     /// Fonts in Active folders that weren't in the library before this scan, like files just put in one. Those that were
@@ -465,6 +487,8 @@ final class AppModel {
             self.coverageProgress = nil
             self.coverageRevision &+= 1
             self.characterSetLookup.reset()
+            // Smart sets with language or character set rules have their members now.
+            self.updateSpotlight()
         }
     }
 
@@ -608,6 +632,7 @@ final class AppModel {
         classificationGuesses = guesser.guesses
         guessRevision &+= 1
         refreshGroups()
+        updateSpotlight()
     }
 
     private func refreshGroups() {

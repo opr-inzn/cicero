@@ -41,7 +41,7 @@ type, so a comparison, not the answer.
 - Fonts without Latin letters, and scripts and symbol fonts, which the measurements don't fit: leave them out at
   first.
 
-### Cicero in Spotlight (M)
+### Cicero in Spotlight (M, in progress)
 
 **What.** Cicero's own information becomes searchable in Spotlight: type a family's name, or "Licensed serif", and
 families from Cicero's library show among the results; choosing one opens its font page in Cicero.
@@ -53,8 +53,9 @@ Cicero knows is the user's own: tags, ratings, classifications, sets and smart s
 **How.** Core Spotlight (`CSSearchableIndex`), one item per family:
 - title: the family name
 - description: "Serif · Carter & Cone · Licensed · ★★★★"
-- keywords: its tags, sets, classification, foundry, designers and style names
-- thumbnail: a sample set in the font, made in the background and cached
+- keywords: its tags, sets, smart sets, classification, foundry, designers, and every style's name, full name and
+  PostScript name
+- thumbnail: "Ag" set in its regular style, made only when its item changes
 
 Items change when the library or the user's data does (gathered for a moment, not on every change) and go when their
 family does. Choosing a result reaches Cicero as a `CSSearchableItemActionType` user activity, which selects the family
@@ -63,9 +64,25 @@ items.
 
 Not this way: writing Finder tags onto the font files for Cicero's tags. That changes the user's files.
 
-**Open.**
-- What 1,200 thumbnails cost to make, and whether results look good enough without them.
-- Whether to index styles too, by PostScript name.
+**Settled**, measured on a library of 1,180 families and 7,637 styles (`spotlight` branch):
+- **Thumbnails are cheap to make.** About 1.5 ms a family on one core (making the font from the file the prefetch has
+  read, drawing, encoding a PNG): under two seconds for the library, 2.4 KB each at 128 pixels, 2.8 MB in all. HEIC
+  was a third smaller but took 80 seconds. Core Spotlight takes about 5 seconds to index the families with
+  thumbnails, 2 to 2.5 without them; the first index, thumbnails included, took 7 seconds in the background, and later
+  launches index only what changed (nothing, when nothing did).
+- **No items for styles.** A style's PostScript or full name is among its family's keywords, so "HelveticaNeue-BoldItalic"
+  finds Helvetica Neue. Styles as items of their own would be 6.5 times as many (10 seconds to index), and they crowd
+  the families out: Core Spotlight's own search stops at 40 results, and a family's name gave 40 of its styles and
+  not the family.
+
+**Still open.**
+- How Spotlight on macOS 26 shows an app's thumbnails, if at all (nothing documents it), and what they should look
+  like in Dark Mode: `thumbnailData` has no dark variant, `darkThumbnailURL` needs files.
+- A report from the macOS 27 betas says Spotlight there shows App Intents entities (`IndexedEntity`) but not plain
+  Core Spotlight items. If so, each item needs an App Entity, which needs Xcode's `appintentsmetadataprocessor` in
+  `build-app.sh`.
+- Opening a result: SwiftUI's `onContinueUserActivity` reportedly doesn't get Spotlight's activity on the Mac, so the
+  app delegate takes it; to try from Spotlight itself.
 
 ## Small improvements
 

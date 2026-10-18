@@ -1,5 +1,6 @@
 import AppKit
 import CiceroCore
+import CoreSpotlight
 import SwiftUI
 
 @main
@@ -170,14 +171,16 @@ struct CiceroCommands: Commands {
 }
 
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
-/// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
+/// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together. Takes the
+/// families chosen in Spotlight, which SwiftUI's `onContinueUserActivity` doesn't get on the Mac.
 /// Also counts the launch for the usage statistics.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Set when the main window appears; files that come before wait for it.
+    /// Set when the main window appears; files and families that come before wait for it.
     var model: AppModel? {
         didSet { flush() }
     }
     private var waiting: [URL] = []
+    private var waitingFamily: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UsageStatistics.sendLaunch()
@@ -188,9 +191,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flush()
     }
 
+    func application(_ application: NSApplication, willContinueUserActivityWithType userActivityType: String) -> Bool {
+        userActivityType == CSSearchableItemActionType
+    }
+
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity,
+                     restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        guard userActivity.activityType == CSSearchableItemActionType,
+              let identifier = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+              let family = SpotlightEntry.family(fromIdentifier: identifier) else { return false }
+        waitingFamily = family
+        flush()
+        return true
+    }
+
     private func flush() {
-        guard let model, !waiting.isEmpty else { return }
-        model.open(waiting)
-        waiting = []
+        guard let model else { return }
+        if !waiting.isEmpty {
+            model.open(waiting)
+            waiting = []
+        }
+        if let family = waitingFamily {
+            waitingFamily = nil
+            model.show(familyFromSpotlight: family)
+        }
     }
 }

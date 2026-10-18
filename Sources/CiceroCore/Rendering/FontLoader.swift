@@ -64,6 +64,12 @@ public final class FontLoader: Sendable {
         return font
     }
 
+    /// A font made from the face's file for something drawn once, like a Spotlight thumbnail, so it doesn't push the
+    /// fonts on screen out of the cache. Reads the file now unless it was read already.
+    func uncachedFont(_ face: FontFace, size: CGFloat) -> CTFont {
+        CTFontCreateWithFontDescriptor(descriptor(for: face), size, nil)
+    }
+
     /// Loads descriptors for these faces at low priority, in order, ahead of what earlier calls asked for.
     public func prefetch(_ faces: [FontFace]) {
         let lanes: Int = state.withLock { state in

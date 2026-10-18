@@ -48,6 +48,10 @@ struct GeneralSettings: View {
                 }
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
+                Toggle(isOn: $model.indexesSpotlight) {
+                    Text("Show fonts in Spotlight")
+                    Text("Find a family in Spotlight by its name, a style’s name, its foundry, designer, classification, tags or sets, and open it in Cicero. The index stays on this Mac.")
+                }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Guess classifications from names")
                     Text(guessingExplanation)

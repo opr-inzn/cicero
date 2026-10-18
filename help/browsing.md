@@ -64,6 +64,12 @@ Small capsules next to a family’s name tell you more about its state:
 
 Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name or manufacturer contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
 
+## Find fonts in Spotlight
+
+Cicero puts the families it lists in Spotlight. Press ⌘Space and type a family’s name, a style’s name (like Helvetica Neue Bold Italic or its PostScript name, HelveticaNeue-BoldItalic), a foundry, a designer, or what you’ve given it in Cicero: a tag, a set, a smart set or a classification, like “licensed serif”. Under each family Spotlight shows its classification, foundry, tags and stars. Choose one to open its font page in Cicero.
+
+Cicero keeps Spotlight up to date a moment after anything changes. To keep your fonts out of Spotlight, open **Settings → General** and turn off **Show fonts in Spotlight**, which takes them out again. Spotlight’s index is on your Mac; nothing is sent anywhere.
+
 ## Select fonts
 
 | To | Do this |
