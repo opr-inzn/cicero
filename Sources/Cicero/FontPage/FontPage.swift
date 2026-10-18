@@ -185,40 +185,49 @@ private struct TypeTester: View {
                     .help("Align left, center or right")
             }
             .padding(.top, 12)
-            let ctFont = FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family))
-            let font = Font(ctFont)
-            let kerning = preview.kerning(at: size)
-            let lineHeight = preview.lineHeight(at: size)
-            let lineHeightPoints = size * preview.lineSpacing / 100
-            let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
-            // An invisible copy of the text sets the editor's height, so it grows with the page instead of
-            // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
-            Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
-                .font(font)
-                .kerning(kerning)
-                .lineHeight(lineHeight)
-                .multilineTextAlignment(alignment.text)
-                .frame(maxWidth: .infinity, alignment: alignment.frame)
-                .padding(.horizontal, 5)
-                .padding(.vertical, overhang)
-                .hidden()
-                .overlay {
-                    SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
-                                 alignment: alignment.paragraph, overhang: overhang) {
-                        FamilyMenu(families: [family], model: model)
-                    }
-                }
-                .frame(minHeight: 280)
-                .padding(.vertical, 20)
-                // Around the text too, which has it in its own menu (see `SampleEditor`).
-                .contentShape(.rect)
-                .contextMenu { FamilyMenu(families: [family], model: model) }
+            // A style on a server is read off the main thread first, in the room the editor takes at least.
+            ReadingFonts(paths: [face.face.path]) {
+                editor(face: face, weight: weight)
+            }
+            .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
     }
 }
 
 private extension TypeTester {
+    @ViewBuilder
+    func editor(face: LibraryFace, weight: Double) -> some View {
+        let ctFont = FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family))
+        let font = Font(ctFont)
+        let kerning = preview.kerning(at: size)
+        let lineHeight = preview.lineHeight(at: size)
+        let lineHeightPoints = size * preview.lineSpacing / 100
+        let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
+        // An invisible copy of the text sets the editor's height, so it grows with the page instead of
+        // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
+        Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
+            .font(font)
+            .kerning(kerning)
+            .lineHeight(lineHeight)
+            .multilineTextAlignment(alignment.text)
+            .frame(maxWidth: .infinity, alignment: alignment.frame)
+            .padding(.horizontal, 5)
+            .padding(.vertical, overhang)
+            .hidden()
+            .overlay {
+                SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+                             alignment: alignment.paragraph, overhang: overhang) {
+                    FamilyMenu(families: [family], model: model)
+                }
+            }
+            .frame(minHeight: 280)
+            .padding(.vertical, 20)
+            // Around the text too, which has it in its own menu (see `SampleEditor`).
+            .contentShape(.rect)
+            .contextMenu { FamilyMenu(families: [family], model: model) }
+    }
+
     /// Room above and below the lines for glyphs that reach past them, which the editor would cut off at its
     /// edges: as much of the text's height as the line spacing leaves out, at either end, as the editor may
     /// put it either side, and a quarter of the size more, as it sets its lines a few points lower than the

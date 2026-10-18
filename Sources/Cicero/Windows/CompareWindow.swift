@@ -18,13 +18,20 @@ struct CompareWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
+    /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
+    @State private var read: Set<String> = []
 
     var body: some View {
-        let samples = model.compareEntries.compactMap { entry in
-            model.family(entry.familyID).map { CompareSample(entry, family: $0, model: model, preview: preview) }
+        let entries = model.compareEntries.compactMap { entry in
+            model.family(entry.familyID).map { family in
+                (entry: entry, family: family, path: CompareSample.face(for: entry, in: family, preview: preview).face.path)
+            }
         }
+        // A family whose file is on a server joins the others once it's been read in the background.
+        let waiting = entries.map(\.path).filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
+        let samples = entries.filter { !waiting.contains($0.path) }.map { CompareSample($0.entry, family: $0.family, model: model, preview: preview) }
         Group {
-            if samples.isEmpty {
+            if entries.isEmpty {
                 ContentUnavailableView("Nothing to Compare", systemImage: "square.on.square",
                                        description: Text("Select two or more families and choose Fonts → Compare, or drop families here."))
             } else {
@@ -43,7 +50,12 @@ struct CompareWindow: View {
         .frame(minWidth: 600, minHeight: 400)
         .background(Color.canvas)
         .dropDestination(for: String.self) { names, _ in _ = model.addToCompare(names) }
-        .navigationSubtitle(subtitle(samples))
+        .task(id: waiting) {
+            guard !waiting.isEmpty else { return }
+            await FontLoader.shared.read(waiting)
+            read.formUnion(waiting)
+        }
+        .navigationSubtitle(subtitle(entries.map(\.family)))
         .toolbar {
             ToolbarCapsule {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
@@ -55,9 +67,10 @@ struct CompareWindow: View {
 }
 
 private extension CompareWindow {
-    /// "2 families", and how many styles when a family is there in more than one: "2 families · 3 styles".
-    func subtitle(_ samples: [CompareSample]) -> String {
-        let families = Set(samples.map(\.family.id)).count
+    /// "2 families", and how many styles when a family is there in more than one: "2 families · 3 styles". One family
+    /// for each sample.
+    func subtitle(_ samples: [Family]) -> String {
+        let families = Set(samples.map(\.id)).count
         let text = families == 1 ? "1 family" : "\(families) families"
         return samples.count > families ? "\(text) · \(samples.count) styles" : text
     }
@@ -78,13 +91,23 @@ private struct CompareSample: Identifiable {
     init(_ entry: CompareEntry, family: Family, model: AppModel, preview: PreviewSettings) {
         self.family = family
         id = entry.id
-        let chosen = entry.style.flatMap { style in family.faces.first { $0.id == style } }
+        let chosen = Self.chosenStyle(of: entry, in: family)
         style = chosen?.id
-        face = chosen ?? family.face(nearestWeight: preview.weight)
+        face = Self.face(for: entry, in: family, preview: preview)
         let weight = chosen.map(\.face.styleWeight) ?? preview.weight
         let font = FontLoader.shared.font(face.face, size: preview.size, weight: weight, features: model.features(for: family))
         line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: preview.kerning(at: preview.size))
         tint = Self.tints[entry.tint % Self.tints.count]
+    }
+
+    /// The style chosen for the family, if one was.
+    static func chosenStyle(of entry: CompareEntry, in family: Family) -> LibraryFace? {
+        entry.style.flatMap { style in family.faces.first { $0.id == style } }
+    }
+
+    /// The style its sample is set in: the one chosen, else the one nearest the preview weight.
+    static func face(for entry: CompareEntry, in family: Family, preview: PreviewSettings) -> LibraryFace {
+        chosenStyle(of: entry, in: family) ?? family.face(nearestWeight: preview.weight)
     }
 }
 

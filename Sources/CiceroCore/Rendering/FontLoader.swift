@@ -149,6 +149,13 @@ public final class FontLoader: Sendable {
         }
     }
 
+    /// Reads these files' faces off the caller's thread, side by side (see `read(_:)`).
+    public func read(_ paths: [String]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for path in paths { group.addTask { await self.read(path) } }
+        }
+    }
+
     /// Drops what's cached for files that changed or went away.
     public func invalidate(paths: Set<String>) {
         state.withLock { state in

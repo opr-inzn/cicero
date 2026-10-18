@@ -45,6 +45,29 @@ struct FontText: View {
     }
 }
 
+/// Its content once the font files it draws from have been read, so making their fonts never reads a file on the main
+/// thread: at once when they're on the Mac's own disks or were read before, as almost all are; for files on a server,
+/// or online only, once they've been read in the background, with empty room in its place meanwhile (see
+/// `FontLoader.wouldWait`).
+struct ReadingFonts<Content: View>: View {
+    let paths: [String]
+    @ViewBuilder let content: () -> Content
+    @State private var read: Set<String> = []
+
+    var body: some View {
+        let waiting = paths.filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
+        if waiting.isEmpty {
+            content()
+        } else {
+            Color.clear
+                .task(id: waiting) {
+                    await FontLoader.shared.read(waiting)
+                    read.formUnion(waiting)
+                }
+        }
+    }
+}
+
 /// Draws text as usual, but with room above and below its lines for glyphs reaching past the font's ascent
 /// and descent, like a descender lower than the font says or a swash, which SwiftUI otherwise cuts off: as far
 /// as any of the font's glyphs reach, and at least half the size, for the fonts that stand in for missing
