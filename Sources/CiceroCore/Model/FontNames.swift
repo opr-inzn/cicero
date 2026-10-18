@@ -1,25 +1,25 @@
 import CoreText
 import Foundation
 
-/// What toasts call the fonts something happened to. A font is one style of a typeface, like Inter Bold; a typeface
-/// is a family, all its styles together, like Inter.
+/// What toasts call the fonts something happened to: by name where they can, as a style (Inter Bold) or a family
+/// (Inter), so it doesn't matter whether a whole family was picked or some of its styles.
 public enum FontNames {
-    /// One font by its name ("Inter Bold"), the fonts of one typeface by the typeface's ("Inter"), those of two by
-    /// both ("Inter and Roboto"), more by how many typefaces ("12 typefaces"). nil for none.
+    /// One style by its name ("Inter Bold"), the styles of one family by the family's ("Inter"), those of two by
+    /// both ("Inter and Roboto"), more by how many families ("12 families"). nil for none.
     public static func describe(_ fonts: [(family: String, style: String)]) -> String? {
         var seen = Set<[String]>()
         let fonts = fonts.filter { !$0.family.isEmpty && seen.insert([$0.family, $0.style]).inserted }
         if fonts.count == 1 { return [fonts[0].family, fonts[0].style].filter { !$0.isEmpty }.joined(separator: " ") }
-        return describe(typefaces: fonts.map(\.family))
+        return describe(families: fonts.map(\.family))
     }
 
     public static func describe(_ faces: [LibraryFace]) -> String? {
         describe(faces.map { ($0.face.familyName, $0.face.styleName) })
     }
 
-    /// One typeface by its name ("Inter"), two by both, in alphabetical order ("Inter and Roboto"), more by how many
-    /// ("12 typefaces"). nil for none.
-    public static func describe(typefaces names: [String]) -> String? {
+    /// One family by its name ("Inter"), two by both, in alphabetical order ("Inter and Roboto"), more by how many
+    /// ("12 families"). nil for none.
+    public static func describe(families names: [String]) -> String? {
         var seen = Set<String>()
         let names = names.filter { !$0.isEmpty && seen.insert($0).inserted }
         switch names.count {
@@ -28,7 +28,7 @@ public enum FontNames {
         case 2:
             let sorted = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             return "\(sorted[0]) and \(sorted[1])"
-        default: return "\(names.count.formatted()) typefaces"
+        default: return "\(names.count.formatted()) families"
         }
     }
 

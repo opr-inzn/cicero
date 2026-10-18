@@ -449,12 +449,6 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: 0, failed: failed, message: "")
     }
 
-    /// Faces in ~/Library/Fonts whose file Cicero didn't install: deactivating them moves the file into
-    /// Cicero's Deactivated folder, other copies or not, so the app asks first.
-    public func unmanaged(_ faces: [LibraryFace], records: ActivationRecords) -> [LibraryFace] {
-        faces.filter { $0.state.source == .fontsFolder && records.installedCopies[$0.face.path] == nil }
-    }
-
     /// Faces an app loads from its own folder also leave that folder for Cicero's Deactivated folder,
     /// so they're off in the app too. Files in ~/Library/Fonts are unregistered before they move, so
     /// apps drop them at once rather than when macOS notices they're gone, seconds later.
@@ -937,7 +931,7 @@ public struct ActivationEngine: Sendable {
         try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
     }
 
-    /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 typefaces activated", naming the
+    /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 families activated", naming the
     /// fonts `done` (see `FontNames`), else "Activated 3 files"; or what couldn't be done, by name (`undone`) when
     /// nothing could.
     private static func message(_ past: String, _ verb: String, succeeded: Int, failed: Int,

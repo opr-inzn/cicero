@@ -59,10 +59,10 @@ public struct FontExportPlan: Sendable {
     public var isEmpty: Bool { items.isEmpty }
     public var fileCount: Int { items.reduce(0) { $0 + $1.paths.count } }
 
-    /// "Exported Inter", "Exported Inter and Roboto" or "Exported 12 typefaces", with a note about files left out, for a
+    /// "Exported Inter", "Exported Inter and Roboto" or "Exported 12 families", with a note about files left out, for a
     /// toast.
     public var completionMessage: String {
-        var message = "Exported " + (FontNames.describe(typefaces: exportedFamilies) ?? "the fonts")
+        var message = "Exported " + (FontNames.describe(families: exportedFamilies) ?? "the fonts")
         if protectedCount > 0 {
             message += protectedCount == 1
                 ? ". Left out 1 font file that comes with macOS or an app"
