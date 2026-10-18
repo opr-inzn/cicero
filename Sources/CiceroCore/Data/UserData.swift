@@ -40,6 +40,8 @@ public struct UserData: Codable, Equatable, Sendable {
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
+    /// What to do with an added font file whose fonts the library has already, from another file.
+    public var duplicateHandling: DuplicateHandling = .ask
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
     /// as one Testing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
@@ -116,6 +118,8 @@ public struct UserData: Codable, Equatable, Sendable {
         sidebar = try value(.sidebar, d.sidebar)
         // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
+        // The same for a choice a later version adds.
+        duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)

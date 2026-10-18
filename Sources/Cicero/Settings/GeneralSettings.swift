@@ -31,6 +31,12 @@ struct GeneralSettings: View {
                     Text("Activate fonts by")
                     Text(activationExplanation)
                 }
+                LabeledContent {
+                    PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
+                } label: {
+                    Text("When an added font is already in your library")
+                    Text(duplicateExplanation)
+                }
                 Toggle(isOn: Binding(
                     get: { loginItem == .enabled || loginItem == .requiresApproval },
                     set: { loginItem = LoginItem.set($0, model: model) }
@@ -97,12 +103,34 @@ struct GeneralSettings: View {
         }
     }
 
+    private var duplicateExplanation: String {
+        switch model.data.duplicateHandling {
+        case .ask: "When a font file you add has fonts your library has from another file, Cicero asks what to do with each family."
+        case .addCopy: "The added file is listed or installed next to the library’s copy, which stays in use."
+        case .skip: "The added file is left out, and the library’s copy stays in use."
+        case .useAdded: "The added file takes over: where the library’s copy is on, it goes off as deactivating does, and the added one goes on."
+        case .keepNewer: "The added file takes over when its version is newer than the library’s copy, and is left out otherwise."
+        }
+    }
+
     private var activationExplanation: String {
         switch model.data.installMethod {
         case .ask: "Cicero asks each time whether to copy font files into your user Fonts folder or activate them from their current location."
         case .copy: "Copying duplicates font files into your user Fonts folder."
         case .move: "Moving puts font files into your user Fonts folder, and a folder they leave empty goes to the Trash."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves."
+        }
+    }
+}
+
+private extension DuplicateHandling {
+    var title: String {
+        switch self {
+        case .ask: "Ask each time"
+        case .addCopy: "Add it as another copy"
+        case .skip: "Skip it"
+        case .useAdded: "Use the added one"
+        case .keepNewer: "Keep the newer version"
         }
     }
 }

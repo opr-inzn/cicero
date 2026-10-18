@@ -46,6 +46,7 @@ struct MainWindow: View {
             ActivationSheet(prompt: $0)
         }
         .sheet(item: $model.documentFonts) { DocumentFontsSheet(report: $0) }
+        .sheet(item: $model.duplicatePrompt) { DuplicatesSheet(prompt: $0) }
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }

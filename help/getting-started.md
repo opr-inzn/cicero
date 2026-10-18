@@ -65,6 +65,8 @@ You can add single font files too, without adding the folder they’re in:
 
 They’re listed where they are, under **Added Fonts**, without being activated. If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** in Settings → General, they’re copied or moved into your Fonts folder instead and turned on, and they’re in **All Fonts** like any font you’ve installed. See [Added Fonts](organizing.md#added-fonts).
 
+If a file has fonts your library has already, from another file, like a newer version of one you installed, Cicero asks whether to skip it, add it as another copy or use it in place of the one you have. See [Fonts already in your library](organizing.md#fonts-already-in-your-library).
+
 ## Turn a font on
 
 Click the switch next to a family. It’s on in every app as soon as the switch settles and the message says “Activated”. To learn how Cicero turns fonts on, and the choices you have, see [Activating fonts](activating.md).

@@ -244,6 +244,26 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   other copy, or in the Fonts folders, the Deactivated folder or a watched folder) is just shown; any other goes
   into the user data's `fontFiles` and is listed where it is, like a watched folder's fonts, under Added Fonts
   (`WatchedFolder.addedFilesID`), which un-hides. Nothing is installed.
+- Duplicates (`AddedDuplicates`, `UserData.duplicateHandling`, Settings → General → "When an added font is already in your
+  library"): before font files the library doesn't list are added, their faces are read off the main thread, and a
+  face whose PostScript name a library style has from another file makes its family a duplicate (grouped by the
+  library's family; versions compared with `FontVersion`: Newer, Older, Same Version, or Same File when the files are
+  the library's byte for byte). Ask (the default) shows a sheet with a row per family: name, a Newer/Older/Same
+  Version/Same File tag, "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000", and a picker:
+  Skip It / Add as Another Copy / Use the Added One, starting at Use the Added One when the added one is newer, else
+  Skip It; Choose for All; Cancel adds nothing of the batch, Add adds everything else as usual. The setting can
+  instead always Add it as another copy (as before), Skip it, Use the added one, or Keep the newer version (use it
+  when newer, else skip). Skipped: a file only of skipped families stays out, the browser shows the library's
+  copies, and the toast says "Skipped Helvetica, already in your library" / "Skipped 3 families already in your
+  library". Use the added one (`AddedDuplicates.replacement`): for each style whose library copy is on, the copies
+  Cicero can turn off (from a Fonts folder, in place, until quit, by another app; not macOS's, an app's, Adobe Fonts'
+  or an application set's) go off through `switchCopies`, as deactivating does (a copy Cicero installed to the Trash
+  when its original is in the library, any other Fonts-folder file to the Deactivated folder), then the added face
+  goes on: installed (copied, or moved with Move) when fonts are activated by copying or moving, which installs the
+  whole file once it takes over any style; else in place, or copied when Ask and the old copy was in a Fonts folder.
+  Old copies under Added Fonts whose every face is taken over stop being listed. Toast: "Using the added copy of
+  Helvetica" / "Using the added copies of 3 families", plus ". Another copy Cicero can’t turn off is still on, so
+  apps may use that one" when one stays. Not for folders, nor files Find on This Mac turns up.
 - After the scan that reads them, the browser shows their families selected: added files in Added Fonts (a short
   list, so they're in view: the browser doesn't scroll to a selection), others in the sidebar item shown when it has
   them all, else in All Fonts (the search cleared). One family opened from the Finder opens on its font page.
@@ -322,7 +342,7 @@ may be needed afterwards): checkboxes macOS (my account) [`atsutil databases -re
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "Open at login" (for application sets); "Show system fonts" (+ explanation); "Guess classifications from names" (+ explanation following Apple Intelligence's availability; disabled on Macs without it); Font Caches (Rebuild, a red Clear); Backup (Back Up, Restore, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends); Usage Statistics ("Share usage statistics", on by default, + what it sends).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance); Activation ("Activate fonts by" + explanation incl. app-only folders); "When an added font is already in your library" (Ask each time / Add it as another copy / Skip it / Use the added one / Keep the newer version, + explanation); "Open at login" (for application sets); "Show system fonts" (+ explanation); "Guess classifications from names" (+ explanation following Apple Intelligence's availability; disabled on Macs without it); Font Caches (Rebuild, a red Clear); Backup (Back Up, Restore, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends); Usage Statistics ("Share usage statistics", on by default, + what it sends).
 - Folders: list (+/−), each with a menu to mark it as loaded by an app.
 - Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Coverage: the character sets, as above.

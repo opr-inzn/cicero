@@ -121,6 +121,18 @@ If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next
 
 Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). Cicero then shows them in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder, whichever way you activate fonts.
 
+### Fonts already in your library
+
+A font file you add may have fonts your library has already, from another file: a newer version of a font you installed, say, or the same file from another folder. Cicero tells them by their PostScript names, and asks what to do with each family:
+
+- **Skip It** leaves the file out. The library’s copy stays in use, and Cicero shows it.
+- **Add as Another Copy** lists or installs the file next to the library’s copy, as for any other file. You can switch between them later with [Use Copy From](activating.md#use-another-copy-of-a-font).
+- **Use the Added One** adds the file and uses it in place of the library’s copy. Where that copy is on, it goes off the way deactivating turns a font off, so no font is lost: a copy Cicero installed goes to the Trash when its original is still in your library, any other file in your Fonts folder goes to Cicero’s Deactivated folder, and a font used where it is just turns off. Then the added one goes on, the way you activate fonts; when Cicero asks each time, it’s installed in place of a copy in your Fonts folder, else used where it is. A copy under Added Fonts that the added file replaces stops being listed. Fonts that come with macOS or an app, and Adobe Fonts, stay on; apps may then get those.
+
+The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Use the Added One** when the added one is newer, else at **Skip It**; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
+
+To stop being asked, choose next to **When an added font is already in your library** in Settings → General: **Add it as another copy**, **Skip it**, **Use the added one**, or **Keep the newer version**, which uses the added one when its version is newer and skips it otherwise. Folders you add, and files **Find on This Mac** turns up for a document, are added as they are.
+
 When a file you added changes, as when you build a new version of a font you’re making, Cicero reads it again.
 
 ### Remove them again

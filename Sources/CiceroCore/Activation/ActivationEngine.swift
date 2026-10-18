@@ -384,12 +384,13 @@ public struct ActivationEngine: Sendable {
     /// Moves styles to other copies of them (see `CopyChooser.plan`): the old copies go off first, so the
     /// new ones don't land beside them as "Name 2.otf", then the new ones go on. A style whose new copy
     /// doesn't go on gets its old copies back rather than none; any that can't come back are among `failed`.
+    /// With `.move`, new copies in `movable` are moved into the Fonts folder (see `activate`).
     @concurrent
-    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords) async -> ActivationResult {
+    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords, movable: Set<String> = []) async -> ActivationResult {
         let origins = records.installedCopies
         var moved: [String: String] = [:]
         let off = await deactivate(switches.flatMap(\.others), records: records, moved: &moved)
-        let on = await activate(switches.compactMap(\.target), method: method, records: off.records)
+        let on = await activate(switches.compactMap(\.target), method: method, records: off.records, movable: movable)
         var result = ActivationResult(records: on.records, succeeded: on.succeeded, failed: off.failed + on.failed, message: "Switched")
         let stuck = Set(on.failed)
         let restoring = switches.filter { $0.target.map { stuck.contains($0.face.path) } ?? false }

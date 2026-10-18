@@ -96,7 +96,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from
   Add Fonts. It gathers URLs for a moment, adds folders and unlisted files to the user data, and shows
-  their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends).
+  their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends). Unlisted files
+  first go through `addCheckingDuplicates`, which reads their faces off the main thread and asks
+  `AddedDuplicates` (CiceroCore) which families the library has from other files; the setting, or the
+  `DuplicatesSheet`, says per family whether to skip, add or take over, and taking over is a `switchCopies`
+  operation with the added faces as the new copies (`AddedDuplicates.replacement`).
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌫, ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Move to Trash, Open) can
   take them. In any window but the main one (its `mainWindow`, set by a `WindowReader` in `MainWindow`), it
