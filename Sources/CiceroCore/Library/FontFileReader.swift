@@ -78,8 +78,33 @@ enum FontFileReader {
             weightAxis: axis,
             width: widthClass(os2),
             axes: axes,
-            year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head))
+            year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head)),
+            embedding: embedding(os2),
+            features: OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?))
         )
+    }
+
+    /// The OS/2 fsType's usage permissions; nil without an OS/2 table.
+    static func embedding(_ table: Data?) -> Embedding? {
+        guard let table, table.count >= 10 else { return nil }
+        return Embedding(fsType: UInt16(table[table.startIndex + 8]) << 8 | UInt16(table[table.startIndex + 9]))
+    }
+
+    /// The tags of a GSUB (or GPOS) table's feature list, each once; empty without one. The feature list's offset is
+    /// 6 bytes in; it starts with the number of features, then a tag and an offset for each.
+    static func featureTags(_ table: Data?) -> Set<String> {
+        guard let table, table.count >= 10 else { return [] }
+        func u16(_ offset: Int) -> Int { Int(table[table.startIndex + offset]) << 8 | Int(table[table.startIndex + offset + 1]) }
+        let list = u16(6)
+        guard list > 0, list + 2 <= table.count else { return [] }
+        var tags = Set<String>()
+        for record in 0..<u16(list) {
+            let start = list + 2 + record * 6
+            guard start + 4 <= table.count else { break }
+            let bytes = table[(table.startIndex + start)..<(table.startIndex + start + 4)]
+            tags.insert(String(decoding: bytes, as: UTF8.self))
+        }
+        return tags
     }
 
     /// The font's variation axes, none without an fvar table. A variable font's named instances are faces of one font

@@ -44,6 +44,123 @@ public struct VariationAxis: Hashable, Codable, Sendable {
     }
 }
 
+/// What the font's license lets a document do with it, as the OS/2 table's embedding bits say: from the least
+/// restrictive to the most, the order `rank` follows.
+public enum Embedding: String, CaseIterable, Codable, Sendable {
+    /// May be embedded and installed for good on the reader's system.
+    case installable
+    /// May be embedded, and the document edited.
+    case editable
+    /// May be embedded to view and print the document, not to edit it.
+    case previewAndPrint
+    /// Mustn't be embedded at all.
+    case restricted
+
+    public var title: String {
+        switch self {
+        case .installable: "Installable"
+        case .editable: "Editable"
+        case .previewAndPrint: "Preview & Print"
+        case .restricted: "Restricted"
+        }
+    }
+
+    public var rank: Int { Self.allCases.firstIndex(of: self)! }
+
+    /// The usage permissions in an OS/2 fsType. A font may set more than one, which files from before version 3 of the
+    /// table did; the least restrictive applies.
+    public init(fsType: UInt16) {
+        self = fsType & 0x0008 != 0 ? .editable
+            : fsType & 0x0004 != 0 ? .previewAndPrint
+            : fsType & 0x0002 != 0 ? .restricted
+            : .installable
+    }
+}
+
+/// OpenType features a smart set can ask for, each one or more GSUB feature tags. Saved by their place in this list,
+/// so new ones go at its end.
+public enum OpenTypeFeature: String, CaseIterable, Sendable {
+    case smallCaps = "smcp", capitalsToSmallCaps = "c2sc", petiteCaps = "pcap"
+    case oldStyleFigures = "onum", liningFigures = "lnum", tabularFigures = "tnum", proportionalFigures = "pnum"
+    case fractions = "frac", superscript = "sups", `subscript` = "subs", ordinals = "ordn", slashedZero = "zero"
+    case caseSensitiveForms = "case", standardLigatures = "liga", discretionaryLigatures = "dlig"
+    case contextualAlternates = "calt", stylisticAlternates = "salt"
+    /// Any of ss01–ss20.
+    case stylisticSets = "ss"
+    /// Any of cv01–cv99.
+    case characterVariants = "cv"
+    /// swsh, or cswh.
+    case swashes = "swsh"
+    case titling = "titl", historicalForms = "hist", localizedForms = "locl"
+
+    public var title: String {
+        switch self {
+        case .smallCaps: "Small Capitals"
+        case .capitalsToSmallCaps: "Capitals to Small Capitals"
+        case .petiteCaps: "Petite Capitals"
+        case .oldStyleFigures: "Old-Style Figures"
+        case .liningFigures: "Lining Figures"
+        case .tabularFigures: "Tabular Figures"
+        case .proportionalFigures: "Proportional Figures"
+        case .fractions: "Fractions"
+        case .superscript: "Superscript"
+        case .subscript: "Subscript"
+        case .ordinals: "Ordinals"
+        case .slashedZero: "Slashed Zero"
+        case .caseSensitiveForms: "Case-Sensitive Forms"
+        case .standardLigatures: "Standard Ligatures"
+        case .discretionaryLigatures: "Discretionary Ligatures"
+        case .contextualAlternates: "Contextual Alternates"
+        case .stylisticAlternates: "Stylistic Alternates"
+        case .stylisticSets: "Stylistic Sets"
+        case .characterVariants: "Character Variants"
+        case .swashes: "Swashes"
+        case .titling: "Titling Alternates"
+        case .historicalForms: "Historical Forms"
+        case .localizedForms: "Localized Forms"
+        }
+    }
+
+    /// The feature a GSUB tag turns on, if it's one of these.
+    public init?(tag: String) {
+        guard tag.count == 4 else { return nil }
+        if tag == "cswh" {
+            self = .swashes
+        } else if let number = Int(tag.dropFirst(2)), tag.hasPrefix("ss") || tag.hasPrefix("cv") {
+            guard (1...(tag.hasPrefix("ss") ? 20 : 99)).contains(number) else { return nil }
+            self = tag.hasPrefix("ss") ? .stylisticSets : .characterVariants
+        } else if let feature = Self(rawValue: tag) {
+            self = feature
+        } else {
+            return nil
+        }
+    }
+}
+
+/// The OpenType features a face has, of those in `OpenTypeFeature`, as bits by their place in it.
+public struct OpenTypeFeatures: OptionSet, Hashable, Codable, Sendable {
+    public let rawValue: UInt64
+
+    public init(rawValue: UInt64) {
+        self.rawValue = rawValue
+    }
+
+    public init(_ feature: OpenTypeFeature) {
+        rawValue = 1 << UInt64(OpenTypeFeature.allCases.firstIndex(of: feature)!)
+    }
+
+    /// The features among GSUB feature tags.
+    public init(tags: some Sequence<String>) {
+        self = tags.reduce(into: []) { features, tag in
+            if let feature = OpenTypeFeature(tag: tag) { features.insert(Self(feature)) }
+        }
+    }
+
+    public func contains(_ feature: OpenTypeFeature) -> Bool {
+        contains(Self(feature))
+    }
+}
+
 /// What a font file says about one of its faces. Read once and cached by file stamp.
 public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public let id: FaceID
@@ -76,12 +193,17 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var axes: [VariationAxis]
     /// When the face came out, as near as its file says (see `FontFileReader.year`).
     public var year: Int?
+    /// What its license lets a document do with it; nil without an OS/2 table.
+    public var embedding: Embedding?
+    /// The OpenType features its GSUB table has, of those smart sets ask for.
+    public var features: OpenTypeFeatures
 
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
-        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], year: Int? = nil
+        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], year: Int? = nil,
+        embedding: Embedding? = nil, features: OpenTypeFeatures = []
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -102,6 +224,8 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.width = width
         self.axes = axes
         self.year = year
+        self.embedding = embedding
+        self.features = features
     }
 
     /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
@@ -375,6 +499,10 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
     /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
+    /// What its license lets a document do with every one of its styles: the most restrictive of their embedding.
+    public var embedding: Embedding? { faces.lazy.compactMap(\.face.embedding).max { $0.rank < $1.rank } }
+    /// The OpenType features any of its styles has.
+    public var features: OpenTypeFeatures { faces.reduce([]) { $0.union($1.face.features) } }
 
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         precondition(!faces.isEmpty, "A family has at least one face")

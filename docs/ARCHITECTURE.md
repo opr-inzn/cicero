@@ -47,7 +47,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
   (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
-  their components back to characters through the cmap.
+  their components back to characters through the cmap. `CharacterCodes` writes a character's U+ code and HTML
+  entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
+  UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
   Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library; `FontFileSearch`
   asks Spotlight for font files by PostScript name.
@@ -94,7 +96,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from
   Add Fonts. It gathers URLs for a moment, adds folders and unlisted files to the user data, and shows
-  their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends).
+  their families once the scan it starts is done (`showOpenedFiles`, called as each scan ends). Unlisted files
+  first go through `addCheckingDuplicates`, which reads their faces off the main thread and asks
+  `AddedDuplicates` (CiceroCore) which families the library has from other files; the setting, or the
+  `DuplicatesSheet`, says per family whether to skip, add or take over, and taking over is a `switchCopies`
+  operation with the added faces as the new copies (`AddedDuplicates.replacement`).
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌫, ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Move to Trash, Open) can
   take them. In any window but the main one (its `mainWindow`, set by a `WindowReader` in `MainWindow`), it

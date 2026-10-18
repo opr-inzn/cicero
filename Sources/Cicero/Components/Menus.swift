@@ -95,7 +95,7 @@ struct FamilyMenu: View {
     }
 }
 
-/// Add to Set, Tag and Classification, for families' menus and a style's, where they're the family's.
+/// Add to Set, Tag, Rating and Classification, for families' menus and a style's, where they're the family's.
 struct OrganizingMenus: View {
     let families: [Family]
     let model: AppModel
@@ -117,14 +117,15 @@ struct OrganizingMenus: View {
             Label("Add to Set", systemImage: SidebarSection.sets.icon)
         }
         Menu { TagMenuItems(families: families, model: model) } label: { Label("Tag", systemImage: SidebarSection.tags.icon) }
+        Menu { RatingMenuItems(families: families, model: model) } label: { Label("Rating", systemImage: "star") }
         Menu { ClassificationMenuItems(families: families, model: model) } label: {
             Label("Classification", systemImage: SidebarSection.classifications.icon)
         }
     }
 }
 
-/// The right-click menu for one style of a family: the style's own actions and sets, then its family's sets, license
-/// status and classification, which are the family's, not the style's.
+/// The right-click menu for one style of a family: the style's own actions and sets, then its family's sets, tag,
+/// rating and classification, which are the family's, not the style's.
 struct StyleMenu: View {
     let family: Family
     let face: LibraryFace
@@ -208,6 +209,33 @@ struct CopySourcesMenu: View {
         }
         return details.isEmpty ? source.name : "\(source.name) — " + details.joined(separator: ", ")
     }
+}
+
+/// One to five stars for families, or none, checked when they all have it.
+struct RatingMenuItems: View {
+    let families: [Family]
+    let model: AppModel
+
+    var body: some View {
+        ForEach(1...5, id: \.self) { stars in
+            Toggle(Rating.stars(stars), isOn: Binding(
+                get: { families.allSatisfy { model.rating(of: $0) == stars } },
+                set: { model.setRating($0 ? stars : nil, for: families) }
+            ))
+            .accessibilityLabel(Rating.description(stars))
+        }
+        Toggle("No Rating", isOn: Binding(
+            get: { families.allSatisfy { model.rating(of: $0) == nil } },
+            set: { if $0 { model.setRating(nil, for: families) } }
+        ))
+    }
+}
+
+/// How ratings read: stars in menus and lists, words for VoiceOver.
+enum Rating {
+    static func stars(_ count: Int) -> String { String(repeating: "★", count: count) }
+
+    static func description(_ count: Int) -> String { count == 1 ? "1 star" : "\(count) stars" }
 }
 
 /// Which classification families are in: Automatic, the one their fonts suggest, or one the user puts them in, the

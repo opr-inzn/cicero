@@ -16,6 +16,8 @@ nonisolated struct FontRow: Identifiable, Sendable {
     let added: Date
     /// 0 when the files don't say.
     let year: Int
+    /// 0 for none.
+    let rating: Int
     let tags: [TagColor]
 
     var id: String { family.id }
@@ -58,6 +60,7 @@ nonisolated struct FontRow: Identifiable, Sendable {
         self.coverage = coverage
         added = family.dateAdded ?? .distantPast
         year = family.year ?? 0
+        rating = model.rating(of: family) ?? 0
         tags = model.tagColors(of: family)
     }
 
@@ -84,7 +87,7 @@ nonisolated enum CoverageCell: Sendable {
 
 /// A column of the font list.
 nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
-    case status, name, preview, styles, classification, foundry, year, added, format
+    case status, name, preview, styles, classification, foundry, year, rating, added, format
     /// The largest set of a series the family has.
     case series(String)
     /// Whether the family has every character of one set, else how many it lacks.
@@ -104,6 +107,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .classification: "classification"
         case .foundry: "foundry"
         case .year: "year"
+        case .rating: "rating"
         case .added: "added"
         case .format: "format"
         case .series(CharacterSetCatalog.latinSeriesID): "latin"
@@ -114,7 +118,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
     }
 
     init?(id: String) {
-        if let column = [Self.status, .name, .preview, .styles, .classification, .foundry, .year, .latin, .adobe, .added, .format].first(where: { $0.id == id }) {
+        if let column = [Self.status, .name, .preview, .styles, .classification, .foundry, .year, .rating, .latin, .adobe, .added, .format].first(where: { $0.id == id }) {
             self = column
         } else if id.hasPrefix("series.") {
             self = .series(String(id.dropFirst(7)))
@@ -134,6 +138,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .classification: "Classification"
         case .foundry: "Foundry"
         case .year: "Year"
+        case .rating: "Rating"
         case .added: "Date Added"
         case .format: "Format"
         case .series(let id): model.characterSetSeries(id)?.name ?? ""
@@ -151,6 +156,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .classification: 110
         case .foundry: 150
         case .year: 56
+        case .rating: 76
         case .series: 96
         case .characterSet: 110
         case .added: 100
@@ -164,6 +170,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .name: 140
         case .preview: 160
         case .styles, .year: 44
+        case .rating: 60
         case .classification, .foundry, .added, .format: 80
         case .series, .characterSet: 60
         }
@@ -180,11 +187,11 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         if case .characterSet = self { true } else { false }
     }
 
-    /// Shown unless hidden, where the year, the other series and single sets are hidden unless added.
+    /// Shown unless hidden, where the year, the rating, the other series and single sets are hidden unless added.
     var isStandard: Bool {
         switch self {
         case .series(let id): id == CharacterSetCatalog.latinSeriesID || id == CharacterSetCatalog.adobeSeriesID
-        case .year, .characterSet: false
+        case .year, .rating, .characterSet: false
         default: true
         }
     }
@@ -198,6 +205,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         case .classification: KeyPathComparator(\.classification)
         case .foundry: KeyPathComparator(\.foundry, comparator: .localizedStandard)
         case .year: KeyPathComparator(\.year)
+        case .rating: KeyPathComparator(\.rating)
         case .series, .characterSet: KeyPathComparator(\FontRow.[rank: self])
         case .added: KeyPathComparator(\.added)
         case .format: KeyPathComparator(\.format)
@@ -273,11 +281,12 @@ struct FontList: View {
         return [comparator]
     }
 
-    /// Every column there is, in order: the year, the series, then single sets (the user's last), between Foundry and Date Added.
+    /// Every column there is, in order: the year, the rating, the series, then single sets (the user's last), between Foundry
+    /// and Date Added.
     private var allColumns: [FontListColumn] {
         let series = model.characterSetCatalog.series.map { FontListColumn.series($0.id) }
         let sets = singleSetGroups.flatMap(\.sets).map(\.id) + model.data.customCharacterSets.map(\.setID)
-        return [.status, .name, .preview, .styles, .classification, .foundry, .year] + series + sets.map(FontListColumn.characterSet) + [.added, .format]
+        return [.status, .name, .preview, .styles, .classification, .foundry, .year, .rating] + series + sets.map(FontListColumn.characterSet) + [.added, .format]
     }
 
     /// Built-in sets by group, less the ones in a series: its column says already.
@@ -561,6 +570,10 @@ private struct FontListRow: View {
         case .year:
             if row.year > 0 {
                 Text(String(row.year)).monospacedDigit().foregroundStyle(.secondary)
+            }
+        case .rating:
+            if row.rating > 0 {
+                Text(Rating.stars(row.rating)).foregroundStyle(.secondary).lineLimit(1).accessibilityLabel(Rating.description(row.rating))
             }
         case .series:
             if case .largest(let name, _) = row.coverage[column] {

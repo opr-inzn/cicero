@@ -20,6 +20,10 @@ public struct UserData: Codable, Equatable, Sendable {
     public var familyTags: [String: [String]] = [:]
     /// License status → its colour. A status without one has none.
     public var tagColors: [String: TagColor] = [:]
+    /// Family name → the stars the user gave it, 1…5. A family without any has no rating.
+    public var familyRatings: [String: Int] = [:]
+    /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
+    public var activations: [String: ActivationHistory] = [:]
     /// False only for libraries saved before there were license statuses, which get them once as they load (see
     /// `addLicenseStatuses`).
     public var licenseStatusesAdded = true
@@ -36,6 +40,8 @@ public struct UserData: Codable, Equatable, Sendable {
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
+    /// What to do with an added font file whose fonts the library has already, from another file.
+    public var duplicateHandling: DuplicateHandling = .ask
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
     /// as one Testing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
@@ -99,6 +105,8 @@ public struct UserData: Codable, Equatable, Sendable {
         familyTags = try value(.familyTags, d.familyTags)
         // A colour a later version adds is no colour here, rather than a file that doesn't load.
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
+        familyRatings = try value(.familyRatings, d.familyRatings).filter { (1...5).contains($0.value) }
+        activations = try value(.activations, d.activations)
         // Missing in files from before there were license statuses, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
@@ -110,6 +118,8 @@ public struct UserData: Codable, Equatable, Sendable {
         sidebar = try value(.sidebar, d.sidebar)
         // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
+        // The same for a choice a later version adds.
+        duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
@@ -159,11 +169,37 @@ public struct UserData: Codable, Equatable, Sendable {
     /// The user's folders, with the names given them.
     public var namedFolders: [WatchedFolder] { folders.map(named) }
 
+    /// Counts the families that came on between two libraries, the one before a scan and the one after: those with no
+    /// style on before (or not there before, as when they're installed) and some after, wherever they were turned on, by
+    /// Cicero, an application set or another app. Not those that come with macOS, nor ones on a disk that wasn't there
+    /// before; and none at all without a library before to compare with, as at the first launch.
+    public mutating func recordActivations(from old: Library, to new: Library, at date: Date = Date()) {
+        guard !old.families.isEmpty else { return }
+        for family in new.families where family.hasActive && family.state != .system && !old.offlineFamilies.contains(family.id) {
+            if old.family(family.id)?.hasActive == true { continue }
+            var history = activations[family.id] ?? ActivationHistory()
+            history.count += 1
+            history.last = date
+            activations[family.id] = history
+        }
+    }
+
     /// The license statuses a family has, in the order they were made: one, unless it was tagged several ways before
     /// there were statuses.
     public func tags(of family: String) -> [String] {
         guard let names = familyTags[family], !names.isEmpty else { return [] }
         return tags.filter(names.contains)
+    }
+}
+
+/// How often a family was turned on, and when last.
+public struct ActivationHistory: Codable, Equatable, Sendable {
+    public var count = 0
+    public var last: Date?
+
+    public init(count: Int = 0, last: Date? = nil) {
+        self.count = count
+        self.last = last
     }
 }
 
@@ -384,14 +420,17 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
 
 
     public enum Field: String, Codable, CaseIterable, Sendable {
-        case name, foundry, classification, tag, set, folder, status, kind, format, styles, language, characterSet, added
+        case name, foundry, designer, classification, tag, rating, set, folder, status, kind, format, styles, feature, embedding, language
+        case characterSet, added, timesActivated, lastActivated
 
         public var comparisons: [Comparison] {
             switch self {
             case .name: [.contains, .doesNotContain, .beginsWith, .is]
             case .foundry: [.is, .isNot, .contains]
-            case .styles: [.is, .greaterThan, .lessThan]
-            case .added: [.inLast, .notInLast]
+            case .designer: [.contains, .doesNotContain, .is]
+            case .rating: [.is, .isNot, .greaterThan, .lessThan]
+            case .styles, .timesActivated: [.is, .greaterThan, .lessThan]
+            case .added, .lastActivated: [.inLast, .notInLast]
             default: [.is, .isNot]
             }
         }

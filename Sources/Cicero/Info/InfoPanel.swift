@@ -140,6 +140,7 @@ private struct InfoRows: View {
         VStack(alignment: .leading, spacing: 14) {
             row("Status", face.state.label)
             TagsRow(family: family)
+            RatingRow(family: family)
             ClassificationRow(family: family)
             if let info = info?.value {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
@@ -240,6 +241,43 @@ private struct TagsRow: View {
                             Text(tag).font(.callout)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/// The family's rating: five stars to click, the one it has again to take it away.
+private struct RatingRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+
+    var body: some View {
+        let rating = model.rating(of: family) ?? 0
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Rating").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 2) {
+                ForEach(1...5, id: \.self) { stars in
+                    Button {
+                        model.setRating(stars == rating ? nil : stars, for: [family])
+                    } label: {
+                        Image(systemName: stars <= rating ? "star.fill" : "star")
+                            .foregroundStyle(stars <= rating ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(stars == rating ? "Remove Rating" : Rating.description(stars))
+                }
+            }
+            .font(.callout)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Rating")
+            .accessibilityValue(rating == 0 ? "No rating" : Rating.description(rating))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: model.setRating(min(rating + 1, 5), for: [family])
+                case .decrement: model.setRating(rating > 1 ? rating - 1 : nil, for: [family])
+                @unknown default: break
                 }
             }
         }

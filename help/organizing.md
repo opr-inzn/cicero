@@ -121,6 +121,18 @@ If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next
 
 Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). Cicero then shows them in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder, whichever way you activate fonts.
 
+### Fonts already in your library
+
+A font file you add may have fonts your library has already, from another file: a newer version of a font you installed, say, or the same file from another folder. Cicero tells them by their PostScript names, and asks what to do with each family:
+
+- **Skip It** leaves the file out. The library’s copy stays in use, and Cicero shows it.
+- **Add as Another Copy** lists or installs the file next to the library’s copy, as for any other file. You can switch between them later with [Use Copy From](activating.md#use-another-copy-of-a-font).
+- **Use the Added One** adds the file and uses it in place of the library’s copy. Where that copy is on, it goes off the way deactivating turns a font off, so no font is lost: a copy Cicero installed goes to the Trash when its original is still in your library, any other file in your Fonts folder goes to Cicero’s Deactivated folder, and a font used where it is just turns off. Then the added one goes on, the way you activate fonts; when Cicero asks each time, it’s installed in place of a copy in your Fonts folder, else used where it is. A copy under Added Fonts that the added file replaces stops being listed. Fonts that come with macOS or an app, and Adobe Fonts, stay on; apps may then get those.
+
+The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Use the Added One** when the added one is newer, else at **Skip It**; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
+
+To stop being asked, choose next to **When an added font is already in your library** in Settings → General: **Add it as another copy**, **Skip it**, **Use the added one**, or **Keep the newer version**, which uses the added one when its version is newer and skips it otherwise. Folders you add, and files **Find on This Mac** turns up for a document, are added as they are.
+
 When a file you added changes, as when you build a new version of a font you’re making, Cicero reads it again.
 
 ### Remove them again
@@ -177,19 +189,27 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | --- | --- | --- |
 | Name | contains, doesn’t contain, begins with, is | Text |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
+| Designer | contains, doesn’t contain, is | Text, matched against the designer any of the family’s styles credits |
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | is, is not | One of your tags |
+| Rating | is, is not, is more than, is less than | No Rating, or one to five stars (see [Ratings](#ratings)) |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
 | Kind | is, is not | Variable, Monospaced or Has Italics |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
 | Number of Styles | is, is more than, is less than | A number |
+| OpenType Feature | is supported, isn’t supported | Small Capitals, Old-Style Figures, Tabular Figures, Fractions, Stylistic Sets, Swashes and others, in any of the family’s styles |
+| Embedding | is, is not | Installable, Editable, Preview & Print or Restricted: what the font’s license lets a document do with it, as its files say. A family’s is its most restrictive style’s |
 | Language | is supported, isn’t supported | A language, chosen from a searchable list that starts with yours |
 | Coverage | includes, doesn’t include | Any built-in set or one of your coverage sets |
 | Date Added | is in the last, isn’t in the last | A number of days |
+| Times Activated | is, is more than, is less than | A number of times |
+| Last Activated | is in the last, isn’t in the last | A number of days |
 
 A smart set with a language or coverage rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
+
+**Times Activated** and **Last Activated** count from the version of Cicero that added them. Each time a family comes on, Cicero counts it: whether you turned it on, an application set or a document did, or another app or the Finder did, like a font you put in your Fonts folder, while Cicero is open or by the time it next opens. Fonts that come with macOS aren’t counted. A family that hasn’t come on since then has been activated 0 times, and wasn’t activated in the last however many days. To find the fonts you haven’t used for a year, make a smart set with **Last Activated** **isn’t in the last** 365 days.
 
 ## Tags
 
@@ -220,6 +240,16 @@ A family without one has **No Tag**. Libraries from before Cicero 1.5 get these 
 - Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
 
 Select a tag in the sidebar to see the families that have it. To find families without one, or with any of several, make a [smart set](#smart-sets) with **Tag** rules.
+
+## Ratings
+
+Give a family one to five stars, to pick out your favorites or the ones you’d rather not use again.
+
+- Right-click families and choose **Rating**, then the stars. A checkmark shows the rating they have; **No Rating** takes it away.
+- On a font page, right-click the text, the header or a style for the same menu.
+- In the [Info panel](browsing.md#see-a-fonts-details), click a star under **Rating**. Click the one it has again to take the rating away.
+
+To see ratings in the list, right-click the column headers and choose **Rating**; click its header to sort by it. To keep your favorites together, make a [smart set](#smart-sets) with a **Rating** rule, like **Rating** **is more than** ★★★.
 
 ## Foundries
 

@@ -45,6 +45,7 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 
 - your sets (with the apps of application sets), smart sets and coverage sets
 - your tags, their colors, and which families have them
+- your ratings, and how many times each family was activated and when last
 - your folders, and what you chose under **Fonts in This Folder**
 - the font files you added one at a time, as **Added Fonts**
 - foundry names you changed, and the families you moved to another foundry
