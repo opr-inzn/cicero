@@ -47,7 +47,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
   (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
-  their components back to characters through the cmap.
+  their components back to characters through the cmap. `CharacterCodes` writes a character's U+ code and HTML
+  entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
+  UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
   Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library; `FontFileSearch`
   asks Spotlight for font files by PostScript name.

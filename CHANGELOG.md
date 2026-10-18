@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- On a font page, clicking a glyph shows its HTML entities (like `&eacute;` and `&#xE9;`) and how to type it with your keyboard layout (like ⌥E, then E), next to its Unicode code, with **Copy Character** to put it on the clipboard. Right-click a glyph for **Copy Character**, **Copy Unicode** and **Copy HTML Entity**, or a ligature for **Copy Characters** and **Copy Unicode**.
+
 ## 1.5.3
 
 - License statuses are tags again: they’re under **Tags** in the sidebar, with the tag symbol, rather than **License**, and a family’s menu, the Info panel and smart set rules say **Tag**. Cicero still comes with Licensed, Unlicensed and the others, and a family still has one at a time.

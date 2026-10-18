@@ -1,3 +1,4 @@
+import AppKit
 import CiceroCore
 import SwiftUI
 
@@ -131,7 +132,8 @@ struct GlyphsSection: View {
         }
     }
 
-    /// A character's name and code; for a feature's glyph, the character's and the feature's.
+    /// A character's name, codes and keystroke, and a button that copies it; for a feature's glyph, the character's,
+    /// and the feature's name.
     private func details(_ cell: Cell, face: FontFace) -> some View {
         VStack(spacing: 10) {
             switch cell {
@@ -139,17 +141,47 @@ struct GlyphsSection: View {
                 character(scalar, face: face, size: 96)
                     .frame(minWidth: 160, minHeight: 130)
                 Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
-                Text(String(format: "U+%04X", scalar)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                CharacterCodesGrid(scalar: scalar)
+                Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(scalar)) }
+                    .help("Copies “\(Self.text(scalar))”")
             case .feature(let glyph):
                 GlyphImage(face: face, glyph: glyph.glyph, size: 96, weight: preview.weight)
                     .frame(width: 160, height: 130)
                 Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
-                Text(String(format: "U+%04X", glyph.character)).font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                 Text("\(glyph.featureName) (\(glyph.feature))").font(.callout).foregroundStyle(.secondary)
+                CharacterCodesGrid(scalar: glyph.character)
+                // The glyph has no code of its own: what's copied is the character, which the font draws like this
+                // where the feature is on.
+                Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(glyph.character)) }
+                    .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureName) on")
             }
         }
         .padding(16)
         .frame(maxWidth: 260)
+    }
+
+    /// Copy Character, Copy Unicode and Copy HTML Entity, for a cell's right-click menu: a feature's glyph copies the
+    /// character it's drawn for.
+    @ViewBuilder
+    private func copyMenu(_ cell: Cell) -> some View {
+        let scalar = switch cell {
+        case .character(let scalar): scalar
+        case .feature(let glyph): glyph.character
+        }
+        Button("Copy Character", systemImage: "doc.on.clipboard") { Self.copy(Self.text(scalar)) }
+        Button("Copy Unicode", systemImage: "doc.on.clipboard") { Self.copy(CharacterCodes.unicode(scalar)) }
+        Button("Copy HTML Entity", systemImage: "doc.on.clipboard") { Self.copy(CharacterCodes.htmlEntity(scalar)) }
+    }
+
+    /// Puts text on the clipboard, as plain text.
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// A character as text; nothing for a code that isn't one.
+    static func text(_ scalar: UInt32) -> String {
+        Unicode.Scalar(scalar).map { String(Character($0)) } ?? ""
     }
 
     private func glyph(_ cell: Cell, face: FontFace) -> some View {
@@ -163,6 +195,7 @@ struct GlyphsSection: View {
         .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
         .contentShape(.rect)
         .onTapGesture { popover = cell }
+        .contextMenu { copyMenu(cell) }
     }
 
     /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
@@ -230,5 +263,38 @@ struct GlyphsSection: View {
             }
             return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches)
         }
+    }
+}
+
+/// A character's Unicode code, its HTML references (the named one, when HTML has a name for it, and the numeric one)
+/// and how to type it on the keyboard layout in use, when it can be typed; each selectable.
+private struct CharacterCodesGrid: View {
+    let scalar: UInt32
+
+    var body: some View {
+        let layout = KeyboardLayout.current()
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
+            GridRow {
+                Text("Unicode").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                Text(CharacterCodes.unicode(scalar)).monospaced().textSelection(.enabled)
+            }
+            GridRow {
+                Text("HTML").foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    if let named = CharacterCodes.namedEntity(scalar) {
+                        Text(named).monospaced().textSelection(.enabled)
+                    }
+                    Text(CharacterCodes.numericReference(scalar)).monospaced().textSelection(.enabled)
+                }
+            }
+            if let layout, let keystroke = layout.keystroke(for: scalar) {
+                GridRow {
+                    Text("Keystroke").foregroundStyle(.secondary)
+                    Text(keystroke.description).textSelection(.enabled)
+                        .help("With the \(layout.name) keyboard layout")
+                }
+            }
+        }
+        .font(.callout)
     }
 }

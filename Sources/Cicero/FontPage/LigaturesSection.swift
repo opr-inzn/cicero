@@ -3,8 +3,9 @@ import CoreText
 import SwiftUI
 
 /// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph in a cell
-/// like a character's, in the same columns, the characters it stands for in its tooltip and popover. Like the glyphs'
-/// groups, rows of fixed cells in the page's stack, under a header per feature like a group's.
+/// like a character's, in the same columns, the characters it stands for in its tooltip and popover, which copies them,
+/// as its right-click menu does. Like the glyphs' groups, rows of fixed cells in the page's stack, under a header per
+/// feature like a group's.
 struct LigaturesSection: View {
     @Environment(PreviewSettings.self) private var preview
     let face: FontFace
@@ -72,6 +73,10 @@ struct LigaturesSection: View {
             .contentShape(.rect)
             .help(ligature.text)
             .onTapGesture { popover = (group.tag, ligature.characters) }
+            .contextMenu {
+                Button("Copy Characters", systemImage: "doc.on.clipboard") { GlyphsSection.copy(ligature.text) }
+                Button("Copy Unicode", systemImage: "doc.on.clipboard") { GlyphsSection.copy(CharacterCodes.unicode(ligature.characters)) }
+            }
         .accessibilityElement()
         .accessibilityLabel("Ligature of \(ligature.text)")
         .accessibilityAddTraits(.isButton)
@@ -83,18 +88,22 @@ struct LigaturesSection: View {
                 .frame(width: 220, height: 130)
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
                 .font(.title3)
-            Text(ligature.characters.map { String(format: "U+%04X", $0) }.joined(separator: " "))
+            Text(CharacterCodes.unicode(ligature.characters))
                 .font(.callout.monospaced())
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Text("\(group.name) (\(group.tag))").font(.callout).foregroundStyle(.secondary)
             if let character = characters[ligature.glyph] {
-                Text("Also \(String(format: "U+%04X", character))\(GlyphSection.name(of: character).map { ", \($0.capitalized)" } ?? "")")
+                Text("Also \(CharacterCodes.unicode(character))\(GlyphSection.name(of: character).map { ", \($0.capitalized)" } ?? "")")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .textSelection(.enabled)
             }
+            // A ligature has no code of its own: what's copied is its characters, which the font draws as this glyph
+            // where its feature is on.
+            Button("Copy Characters", systemImage: "doc.on.doc") { GlyphsSection.copy(ligature.text) }
+                .help("Copies “\(ligature.text)”, which this font draws as this ligature with \(group.name) on")
         }
         .padding(16)
         .frame(maxWidth: 300)
