@@ -81,11 +81,11 @@ struct RestoreSheet: View {
         .toggleStyle(.checkbox)
     }
 
-    /// "4 sets, 2 smart sets, 7 license statuses, 3 folders, 12 added fonts and 1 character set." and what restoring them does.
+    /// "4 sets, 2 smart sets, 7 tags, 3 folders, 12 added fonts and 1 character set." and what restoring them does.
     private var settingsDetail: String {
         let data = contents.userData
         let counts = [
-            (data.sets.count, "set", "sets"), (data.smartSets.count, "smart set", "smart sets"), (data.tags.count, "license status", "license statuses"),
+            (data.sets.count, "set", "sets"), (data.smartSets.count, "smart set", "smart sets"), (data.tags.count, "tag", "tags"),
             (data.folders.count, "folder", "folders"), (data.fontFiles.count, "added font", "added fonts"),
             (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]

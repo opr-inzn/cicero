@@ -1,7 +1,7 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for New License Status…: a name and a colour, one of the Finder's, sand or none. Left empty, the name is
+/// The sheet for New Tag…: a name and a colour, one of the Finder's, sand or none. Left empty, the name is
 /// the colour's, as the Finder names its colour tags.
 struct NewTagSheet: View {
     let request: NewTagRequest
@@ -24,14 +24,14 @@ struct NewTagSheet: View {
     var body: some View {
         let taken = model.data.tags.contains(tagName)
         VStack(alignment: .leading, spacing: 14) {
-            Text("New License Status").font(.title2.bold())
+            Text("New Tag").font(.title2.bold())
             TextField("Name", text: $name, prompt: Text(color?.title ?? "Name"))
             HStack(spacing: 6) {
                 swatch(nil)
                 ForEach(TagColor.allCases, id: \.self) { swatch($0) }
             }
             if taken {
-                Text("There’s already a license status called “\(tagName)”.")
+                Text("There’s already a tag called “\(tagName)”.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

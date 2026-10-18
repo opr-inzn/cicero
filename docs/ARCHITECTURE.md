@@ -26,7 +26,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
   only for that file.
 - **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
-  license statuses (saved as tags) and their colours, foundry names, character sets, sidebar choices, install method, activation records).
+  tags (license statuses to begin with) and their colours, foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
