@@ -263,11 +263,11 @@ public struct LibraryBackup: Sendable {
         try replacement.commit(trash: trash)
     }
 
-    /// Saves the current setup as `Backups/Before Restore <date>.json` and returns the file.
-    public func saveSnapshot(_ data: UserData, date: Date = Date()) throws -> URL {
+    /// Saves the current setup as `Backups/<name> <date>.json` ("Before Restore", "Before Import") and returns the file.
+    public func saveSnapshot(_ data: UserData, named name: String = "Before Restore", date: Date = Date()) throws -> URL {
         let fm = FileManager.default
         try fm.createDirectory(at: snapshotsFolder, withIntermediateDirectories: true)
-        let url = snapshotsFolder.appendingPathComponent("Before Restore \(Self.stamp(date, "yyyy-MM-dd HH.mm.ss")).json", isDirectory: false)
+        let url = snapshotsFolder.appendingPathComponent("\(name) \(Self.stamp(date, "yyyy-MM-dd HH.mm.ss")).json", isDirectory: false)
         try UserDataStore.encoded(data).write(to: url, options: .atomic)
         return url
     }

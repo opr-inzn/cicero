@@ -23,7 +23,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .folders: "Folders"
         case .sets: "Sets"
-        // One per family, license statuses to begin with; called License in 1.5 to 1.5.2.
+        // The license tags to begin with; called License in 1.5 to 1.5.2, when a family had one.
         case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
@@ -61,7 +61,7 @@ struct SidebarRow: Identifiable, Hashable {
     var icon: String
     var item: SidebarItem
     var badge = 0
-    /// A license status's colour, drawn as a dot instead of the icon; nil for one without and every other row.
+    /// A tag's colour, drawn as a dot instead of the icon; nil for one without and every other row.
     var color: TagColor?
 
     var id: String { key }

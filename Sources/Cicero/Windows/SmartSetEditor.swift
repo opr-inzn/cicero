@@ -337,7 +337,7 @@ private extension SmartRule.Field {
 
 private extension SmartRule.Comparison {
     /// The wording depends on the field: a set "is in", a language or an OpenType feature "is supported", coverage
-    /// "includes". A tag "is", as a family has one.
+    /// "includes". A tag "is" any of the family's.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"

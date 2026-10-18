@@ -501,7 +501,7 @@ extension AppModel {
 
     // MARK: Drag and drop
 
-    /// Sidebar rows that family names can be dropped onto: sets, license statuses, foundries and classifications.
+    /// Sidebar rows that family names can be dropped onto: sets, tags, foundries and classifications.
     func takesFamilies(_ item: SidebarItem) -> Bool {
         switch item {
         case .set, .tag, .foundry, .classification: true
@@ -509,8 +509,8 @@ extension AppModel {
         }
     }
 
-    /// Families, or single styles of them, dropped onto a sidebar row. A set takes a style on its own; a license status,
-    /// foundry or classification is the whole family's.
+    /// Families, or single styles of them, dropped onto a sidebar row. A set takes a style on its own; a tag, foundry or
+    /// classification is the whole family's, and a tag is given along with the ones the family has.
     func handleDrop(_ drags: [FontDrag], on item: SidebarItem) -> Bool {
         var seen = Set<String>()
         let families = drags.compactMap { family($0.family) }.filter { seen.insert($0.id).inserted }
@@ -525,7 +525,7 @@ extension AppModel {
                     setMembership(true, for: [family], in: id)
                 }
             }
-        case .tag(let name): setLicenseStatus(name, for: families)
+        case .tag(let name): setTag(name, true, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         case .classification(let name): setClassification(name, for: families)
         default: return false

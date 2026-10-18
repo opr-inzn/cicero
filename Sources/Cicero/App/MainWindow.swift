@@ -46,6 +46,8 @@ struct MainWindow: View {
             ActivationSheet(prompt: $0)
         }
         .sheet(item: $model.documentFonts) { DocumentFontsSheet(report: $0) }
+        // A sheet of its own for each library, rather than the last one's with its choices.
+        .sheet(item: $model.importing) { ImportSheet(prompt: $0).id($0.id) }
         .sheet(item: $model.duplicatePrompt) { DuplicatesSheet(prompt: $0) }
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }

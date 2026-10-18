@@ -364,23 +364,12 @@ extension DocumentFonts {
     /// The library's face for each font: the one with its PostScript name, else the one whose family and style
     /// names are the document's (ignoring case and spaces), else none.
     public static func match(_ fonts: [DocumentFont], in library: Library) -> [DocumentFontMatch] {
-        func key(_ text: String) -> String { text.lowercased().filter { !$0.isWhitespace && $0 != "-" && $0 != "_" } }
-        var byPostScriptName: [String: (String, LibraryFace)] = [:]
-        var byName: [String: (String, LibraryFace)] = [:]
-        for family in library.families {
-            for face in family.faces {
-                byPostScriptName[face.face.postScriptName.lowercased()] = byPostScriptName[face.face.postScriptName.lowercased()] ?? (family.id, face)
-                let name = key(family.id) + "|" + key(face.face.styleName)
-                byName[name] = byName[name] ?? (family.id, face)
-            }
-        }
+        let matcher = FontMatcher(library)
         return fonts.map { font in
-            var found = font.postScriptName.flatMap { byPostScriptName[$0.lowercased()] }
-            if found == nil, let family = font.family {
-                found = byName[key(family) + "|" + key(font.style ?? "Regular")]
-            }
-            let installed = found?.1.state.isActive ?? font.postScriptName.map(isInstalled) ?? false
-            return DocumentFontMatch(font: font, family: found?.0, face: found?.1, isInstalled: installed)
+            let named = ImportedFont(postScriptName: font.postScriptName, family: font.family, style: font.style)
+            let found = matcher.faces(named, defaultStyle: "Regular").first
+            let installed = found?.face.state.isActive ?? font.postScriptName.map(isInstalled) ?? false
+            return DocumentFontMatch(font: font, family: found?.family.id, face: found?.face, isInstalled: installed)
         }
     }
 

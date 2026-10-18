@@ -67,6 +67,37 @@ They’re listed where they are, under **Added Fonts**, without being activated.
 
 If a file has fonts your library has already, from another file, like a newer version of one you installed, Cicero asks whether to skip it, add it as another copy or use it in place of the one you have. See [Fonts already in your library](organizing.md#fonts-already-in-your-library).
 
+## Coming from FontExplorer X or Font Book
+
+Cicero can bring over what you set up in FontExplorer X Pro or Font Book, so you don’t have to start again.
+
+### FontExplorer X
+
+1. Choose **File → Import from FontExplorer X**. Cicero finds FontExplorer X’s library on this Mac by itself; if it isn’t here, pick its database (FontExplorer X.fexdb) or a backup made with **File → Local Backup** in FontExplorer X (a `.fexconfig` or `.fexbackup`). You can also drop one on Cicero’s window. **Choose Another** picks a different one.
+2. Cicero shows what it found, each with a checkbox. Uncheck what you don’t want.
+3. Click **Import**.
+
+What comes over:
+
+- **Your fonts.** FontExplorer X’s Font Library is added as a folder, called **FontExplorer X** in the sidebar, and the fonts it used from other folders are listed where they are, under **Added Fonts**. Nothing is moved or turned on. From a `.fexbackup` with fonts, they’re put back where the Font Library was, in your home folder, without writing over anything.
+- **Sets,** with the folders they were in in their names, like “Clients / Acme”. FontExplorer X puts files in sets, so a set gets every style in its files: a whole family when it has them all, otherwise just those styles.
+- **Application sets,** with their apps. An app that isn’t on this Mac is found by its name, also with another year, like Adobe InDesign 2026 for Adobe InDesign 2024. Cicero has no fonts to turn off while an app is open, so the **Autodeactivate** part stays behind.
+- **Smart sets,** when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), designer, whether it’s activated, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
+- **Labels,** as tags in their colors, named after them: Red, Orange, Yellow, Green, Blue, Purple and Gray. A family gets a tag for each label its styles have.
+- **Ratings.** A family gets the stars of its best-rated style, unless you gave it a rating already.
+- **Activations:** how often each family was turned on and when last, for the **Times Activated** and **Last Activated** rules.
+- **The fonts that were on,** turned on again where they are. Quit FontExplorer X first, so it doesn’t turn them off when it quits.
+
+Comments and license details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
+
+### Font Book
+
+Choose **File → Import from Font Book**. Each collection you made becomes a set with its families and styles, leaving out the fonts you took out of it in Font Book. The ones Font Book comes with, like Fun and Web, start unchecked, and smart collections stay behind. To import collections from another Mac, click **Choose Another** and pick their `.collection` files, from Library/FontCollections in that Mac’s home folder.
+
+### Importing again
+
+An import only adds: a set with the name of one you have gets the fonts it doesn’t have yet, and a smart set with the name of one you have stays as it is, so importing twice changes nothing. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`, as it does before restoring a backup.
+
 ## Turn a font on
 
 Click the switch next to a family. It’s on in every app as soon as the switch settles and the message says so, like “Inter activated”. To learn how Cicero turns fonts on, and the choices you have, see [Activating fonts](activating.md).

@@ -213,7 +213,7 @@ A smart set with a language or coverage rule can grow for a while after launch, 
 
 ## Tags
 
-Keep track of what you may do with each family: give it a tag, which shows as a colored dot next to its name in the list, grid and specimens. A family has one tag at a time. Cicero comes with these license statuses:
+Mark families with tags, which show as colored dots next to their names in the list, grid and specimens. A family can have as many tags as you like. Cicero comes with tags for keeping track of what you may do with each family, given to no family to begin with:
 
 | Tag | Color |
 | --- | --- |
@@ -225,21 +225,21 @@ Keep track of what you may do with each family: give it a tag, which shows as a 
 | Open Source | Blue |
 | Trial | Orange |
 
-A family without one has **No Tag**. Libraries from before Cicero 1.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them.
+They’re tags like any other: rename them, delete them, or make your own. Libraries from before Cicero 1.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. From 1.5 to 1.6 a family had one tag at a time; the tags families had then, they keep.
 
 ### Tag fonts
 
-- Right-click families and choose **Tag**, then a tag. A checkmark shows the one they have; **No Tag** takes it off. **New Tag** makes a tag and gives it to them.
+- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked one to take it off. **Remove All Tags** takes every tag off them, and **New Tag** makes a tag and gives it to them. The families keep the tags they have.
 - On a font page, right-click the text, the header or a style for the same menu.
 - Drag families onto a tag under **Tags** in the sidebar.
-- In the [Info panel](browsing.md#see-a-fonts-details), click **Change** next to **Tag**.
+- In the [Info panel](browsing.md#see-a-fonts-details), click **Change** next to **Tags**.
 
 ### Make, change and delete tags
 
 - Click **+** next to **Tags** in the sidebar to make a tag. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other tag has.
 - Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart set rules that use it are removed.
 
-Select a tag in the sidebar to see the families that have it. To find families without one, or with any of several, make a [smart set](#smart-sets) with **Tag** rules.
+Select a tag in the sidebar to see the families that have it. To find families with several tags, any of several, or without one, make a [smart set](#smart-sets) with **Tag** rules: **Tag** **is** a tag picks the families that have it, among their others.
 
 ## Ratings
 

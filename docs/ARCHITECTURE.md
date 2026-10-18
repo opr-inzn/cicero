@@ -26,7 +26,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
   only for that file.
 - **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
-  tags (license statuses to begin with) and their colours, foundry names, character sets, sidebar choices, install method, activation records).
+  tags (license tags to begin with) and their colours, foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
@@ -51,8 +51,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
   UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
-  Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library; `FontFileSearch`
-  asks Spotlight for font files by PostScript name.
+  Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
+  (`Library/`: by file, PostScript name, or family and style names); `FontFileSearch` asks Spotlight for font files
+  by PostScript name.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
   taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
@@ -68,6 +69,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   records about those. Exports and backups are built in a private folder on the destination's disk
   and moved into place once complete (`ItemReplacement`), and never replace an item holding fonts
   Cicero uses. Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
+- **Import** (`Import/`): `FontExplorerImport` reads FontExplorer X Pro's SQLite database (a copy, opened read-only
+  and immutable through `SQLiteFile`, the system's SQLite) or its backups, and `FontBookImport` Font Book's
+  `.collection` archives (their font descriptors read as attributes, without AppKit), into an `ImportedLibrary`:
+  fonts named by file, PostScript name or family and style, sets, smart sets with their rules already in Cicero's
+  terms, labels as tags, ratings, activation history. `LibraryImport` adds the other app's fonts to the user data,
+  then, once a scan has read them, matches the rest to the library and adds it, only ever adding.
 
 ## The app
 

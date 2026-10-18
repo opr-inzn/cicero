@@ -62,7 +62,9 @@ extension AppModel {
         var folders: [URL] = []
         var files: [String] = []
         var documents: [URL] = []
-        for url in urls where url.isFileURL {
+        // Another font manager's library or collections open the Import sheet.
+        let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
+        for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
             let url = url.standardizedFileURL
             var isDirectory: ObjCBool = false
             guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
@@ -78,7 +80,7 @@ extension AppModel {
         // One document at a time: the sheet shows one.
         if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
-            guard documents.isEmpty else { return }
+            guard documents.isEmpty, imports.isEmpty else { return }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
         if !folders.isEmpty {
