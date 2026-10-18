@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## 1.5.3
 
-- The license statuses in the sidebar are under **Tags** again, with the tag symbol, rather than **License**. Cicero still comes with Licensed, Unlicensed and the others, and a family still has one at a time.
+- License statuses are tags again: they’re under **Tags** in the sidebar, with the tag symbol, rather than **License**, and a family’s menu, the Info panel and smart set rules say **Tag**. Cicero still comes with Licensed, Unlicensed and the others, and a family still has one at a time.
 
 ## 1.5.2
 
