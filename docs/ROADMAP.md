@@ -41,23 +41,6 @@ type, so a comparison, not the answer.
 - Fonts without Latin letters, and scripts and symbol fonts, which the measurements don't fit: leave them out at
   first.
 
-### Pairing (M, on top of Similar)
-
-**What.** A **Pairs With** section on the font page: a few families that go with this one, each shown as a heading in
-one and a paragraph in the other, with why ("Same designer", "Similar x-height").
-
-**How.** Rules of thumb on the Similar measurements:
-- a serif with a sans serif, or the other way round
-- similar x-height and proportions, so they sit well on a line together
-- weights that overlap
-- a strong preference for the same superfamily: a shared name ("Freight Text" and "Freight Sans"), the same designer or
-  the same foundry
-
-The superfamily rule is cheap and reliable; the others give reasonable suggestions, some of which will look naive.
-
-**Open.** It's a matter of taste. Families the user keeps in the same set could count as pairs they like, so the
-suggestions learn from the library itself.
-
 ### Cicero in Spotlight (M)
 
 **What.** Cicero's own information becomes searchable in Spotlight: type a family's name, or "Licensed serif", and
