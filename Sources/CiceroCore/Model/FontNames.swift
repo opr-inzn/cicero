@@ -14,7 +14,7 @@ public enum FontNames {
     }
 
     public static func describe(_ faces: [LibraryFace]) -> String? {
-        describe(faces.map { ($0.face.familyName, $0.face.styleName) })
+        describe(faces.map { ($0.face.displayFamilyName, $0.face.styleName) })
     }
 
     /// One family by its name ("Inter"), two by both, in alphabetical order ("Inter and Roboto"), more by how many

@@ -22,7 +22,7 @@ enum LibraryCache {
         writer.write(Int64(library.fingerprint))
         writer.write(UInt32(library.families.count))
         for family in library.families {
-            writer.write(family.name)
+            writer.write(family.id)
             writer.write(family.manufacturer)
             writer.write(UInt32(family.folderIDs.count))
             for id in family.folderIDs { writer.write(id) }

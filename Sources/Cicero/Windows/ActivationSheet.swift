@@ -30,7 +30,7 @@ struct ActivationSheet: View {
             HStack {
                 if prompt.switching == nil && prompt.faces.contains(where: \.canActivateTemporarily) {
                     Button("Activate Temporarily") {
-                        model.activateTemporarily(prompt.faces)
+                        model.activateTemporarily(prompt.faces, confirmed: true)
                         dismiss()
                     }
                     .help(prompt.faces.count == 1 ? "Turns the font on until Cicero quits." : "Turns the fonts on until Cicero quits.")
@@ -75,5 +75,39 @@ struct ActivationSheet: View {
             model.performActivation(prompt.faces, method: method)
         }
         dismiss()
+    }
+}
+
+extension View {
+    /// Asks whether to turn on as many families as `AppModel.manyActivationPrompt` holds, when `isActive`: the main window
+    /// asks unless a sheet of its own is up, which asks from there.
+    func confirmsManyActivations(when isActive: Bool = true) -> some View {
+        modifier(ManyActivationConfirmation(isActive: isActive))
+    }
+}
+
+private struct ManyActivationConfirmation: ViewModifier {
+    let isActive: Bool
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        // On a view of its own, so the window's other alerts don't get the switch.
+        content.background {
+            Color.clear
+                .alert(
+                    model.manyActivationPrompt.map { "Activate \($0.families.formatted()) families?" } ?? "",
+                    isPresented: Binding(get: { isActive && model.manyActivationPrompt != nil }, set: { if !$0 { model.manyActivationPrompt = nil } }),
+                    presenting: model.manyActivationPrompt
+                ) { prompt in
+                    Button(prompt.temporarily ? "Activate Temporarily" : "Activate") { model.confirm(prompt) }
+                    Button("Cancel", role: .cancel) {}
+                } message: { _ in
+                    Text("Apps list every font that’s on in their font menus, and so many at once can make them slower to open.")
+                }
+                .dialogSuppressionToggle("Don’t ask again", isSuppressed: Binding(
+                    get: { !model.data.asksBeforeActivatingMany },
+                    set: { model.data.asksBeforeActivatingMany = !$0 }
+                ))
+        }
     }
 }

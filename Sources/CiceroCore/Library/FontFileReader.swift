@@ -80,7 +80,10 @@ enum FontFileReader {
             axes: axes,
             year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head)),
             embedding: embedding(os2),
-            features: OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?))
+            features: OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?)),
+            localizedFamilyNames: LocalizedNames.familyNames(
+                CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), CTFontTableOptions(rawValue: 0)) as Data?, besides: familyName
+            )
         )
     }
 

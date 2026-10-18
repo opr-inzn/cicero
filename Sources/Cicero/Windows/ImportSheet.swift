@@ -2,8 +2,8 @@ import CiceroCore
 import SwiftUI
 
 /// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts, its
-/// sets, application sets and smart sets, labels (as tags), ratings, activation history and the fonts that were on;
-/// or Font Book's collections. Then progress while it's brought in, and what came over.
+/// sets, application sets and smart sets, labels (as tags), ratings, comments (as notes), activation history and the fonts
+/// that were on; or Font Book's collections. Then progress while it's brought in, and what came over.
 struct ImportSheet: View {
     let prompt: ImportPrompt
     @Environment(AppModel.self) private var model
@@ -95,7 +95,7 @@ struct ImportSheet: View {
                 }
             }
         }
-        if !library.tags.isEmpty || !library.ratings.isEmpty || !library.history.isEmpty || !library.active.isEmpty {
+        if !library.tags.isEmpty || !library.ratings.isEmpty || !library.comments.isEmpty || !library.history.isEmpty || !library.active.isEmpty {
             section("Tags, Ratings and Activations") {
                 if !library.tags.isEmpty {
                     checkbox("Labels as tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the label.",
@@ -104,6 +104,10 @@ struct ImportSheet: View {
                 if !library.ratings.isEmpty {
                     checkbox("Ratings", detail: "\(count(library.ratings.count, "rated style")). A family gets its best style’s stars, unless it has a rating already.",
                              isOn: $choices.ratings)
+                }
+                if !library.comments.isEmpty {
+                    checkbox("Comments as notes", detail: "\(count(library.comments.count, "comment")), each in its family’s note, unless the family has a note already.",
+                             isOn: $choices.comments)
                 }
                 if !library.history.isEmpty {
                     checkbox("Activation history", detail: "How often each family was turned on, and when last, for the Times Activated and Last Activated rules.",
@@ -241,7 +245,7 @@ struct ImportSheet: View {
         let fonts = (library.fontFolder != nil ? 1 : 0) + (library.otherFiles.isEmpty ? 0 : 1)
         let plain = library.sets.count { !$0.isApplicationSet }
         let applicationSets = library.sets.count - plain
-        let others = [library.tags.isEmpty, library.ratings.isEmpty, library.history.isEmpty, library.active.isEmpty].filter { !$0 }.count
+        let others = [library.tags.isEmpty, library.ratings.isEmpty, library.comments.isEmpty, library.history.isEmpty, library.active.isEmpty].filter { !$0 }.count
         let rows = [fonts, plain, applicationSets, library.smartSets.count, others]
         let sections = rows.filter { $0 > 0 }.count
         return 150 + CGFloat(sections) * 46 + CGFloat(rows.reduce(0, +)) * 44 + (library.notes.isEmpty ? 0 : 50)
@@ -251,6 +255,7 @@ struct ImportSheet: View {
         (choices.fontFolder && library.fontFolder != nil) || (choices.otherFiles && !library.otherFiles.isEmpty)
             || !choices.sets.isEmpty || !choices.smartSets.isEmpty
             || (choices.tags && !library.tags.isEmpty) || (choices.ratings && !library.ratings.isEmpty)
+            || (choices.comments && !library.comments.isEmpty)
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
     }
 
@@ -320,6 +325,9 @@ struct ImportSheet: View {
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
         if summary.activated > 0 { lines.append("\(count(summary.activated, "style")) turned on, as they were in \(appName).") }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
+        if summary.notedFamilies > 0 {
+            lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.formatted()) families with notes from their comments.")
+        }
         if summary.notFound > 0 {
             lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(prompt.source == .fontBook ? "collections" : "sets, tags and ratings") \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
         }

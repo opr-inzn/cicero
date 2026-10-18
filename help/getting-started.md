@@ -85,10 +85,11 @@ What comes over:
 - **Smart sets,** when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), designer, whether it’s activated, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
 - **Labels,** as tags in their colors, named after them: Red, Orange, Yellow, Green, Blue, Purple and Gray. A family gets a tag for each label its styles have.
 - **Ratings.** A family gets the stars of its best-rated style, unless you gave it a rating already.
+- **Comments,** as notes. A family’s note gets the comments on its files and styles, each once, unless you wrote a note already.
 - **Activations:** how often each family was turned on and when last, for the **Times Activated** and **Last Activated** rules.
 - **The fonts that were on,** turned on again where they are. Quit FontExplorer X first, so it doesn’t turn them off when it quits.
 
-Comments and license details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
+License details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
 
 ### Font Book
 

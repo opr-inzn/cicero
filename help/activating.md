@@ -21,6 +21,8 @@ Any of these work:
 
 To turn on a single style, open the font page and use the style’s switch in **Styles**, or right-click the style and choose **Activate Style**.
 
+Every app lists the fonts that are on in its font menu, so hundreds at once can make apps slower to open. When you turn on more than 100 families at once, Cicero asks first. Check **Don’t ask again** there, or turn off **Ask before activating more than 100 families at once** in **Settings → General**, to go ahead without asking. Application sets and imports never ask.
+
 ### Turn on a whole set
 
 Right-click a set or smart set in the sidebar and choose **Activate Set** or **Activate Smart Set** to turn on every font in it. **Activate Temporarily** there turns them on until Cicero quits, and **Deactivate Set** or **Deactivate Smart Set** turns them off again. Like any activation, they follow your choice in [Copy or use in place](#copy-or-use-in-place), and ask first with **Ask each time**.

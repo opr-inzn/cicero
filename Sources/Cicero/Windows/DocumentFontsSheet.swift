@@ -60,6 +60,7 @@ struct DocumentFontsSheet: View {
         .frame(width: 680, height: 540)
         // The main window can't show a sheet over this one, so activating asks how from here.
         .sheet(item: $model.activationPrompt) { ActivationSheet(prompt: $0) }
+        .confirmsManyActivations()
     }
 
     // MARK: Rows

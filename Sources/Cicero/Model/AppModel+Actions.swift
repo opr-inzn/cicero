@@ -9,10 +9,14 @@ extension AppModel {
     }
 
     /// Asks how to activate when the install method is Ask, unless every face comes from a folder
-    /// an app loads by itself (those are always used where they are).
-    func activate(_ faces: [LibraryFace], title: String) {
+    /// an app loads by itself (those are always used where they are). Asks first whether to turn on so many when that's
+    /// more than `UserData.manyFamilies` families, unless `confirmed`.
+    func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
+        if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
+            return manyActivationPrompt = prompt
+        }
         let needsChoice = targets.contains { $0.app == nil }
         if data.installMethod == .ask && needsChoice {
             activationPrompt = ActivationPrompt(title: title, faces: targets)
@@ -34,14 +38,34 @@ extension AppModel {
         activateTemporarily(families.flatMap(\.faces))
     }
 
-    /// Until Cicero quits.
-    func activateTemporarily(_ faces: [LibraryFace]) {
+    /// Until Cicero quits. Asks first when that's many families, unless `confirmed`, like `activate`.
+    func activateTemporarily(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canActivateTemporarily)
         guard !targets.isEmpty else { return showToast("Already on") }
+        if !confirmed, let prompt = manyActivationPrompt(for: targets, title: "", temporarily: true) {
+            return manyActivationPrompt = prompt
+        }
         let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, records: model.data.records)
             model.finish(result, operation: operation)
+        }
+    }
+
+    /// A question for turning on more than `UserData.manyFamilies` families at once, while the user wants one.
+    private func manyActivationPrompt(for faces: [LibraryFace], title: String, temporarily: Bool) -> ManyActivationPrompt? {
+        guard data.asksBeforeActivatingMany else { return nil }
+        let families = Set(faces.map(\.face.familyName)).count
+        guard families > UserData.manyFamilies else { return nil }
+        return ManyActivationPrompt(title: title, faces: faces, families: families, temporarily: temporarily)
+    }
+
+    /// Goes on with an activation the user agreed to.
+    func confirm(_ prompt: ManyActivationPrompt) {
+        if prompt.temporarily {
+            activateTemporarily(prompt.faces, confirmed: true)
+        } else {
+            activate(prompt.faces, title: prompt.title, confirmed: true)
         }
     }
 
@@ -178,6 +202,7 @@ extension AppModel {
         for index in data.sets.indices { data.sets[index].remove(families: [name]) }
         data.familyTags[name] = nil
         data.familyRatings[name] = nil
+        data.familyNotes[name] = nil
         data.activations[name] = nil
         data.foundryOverrides[name] = nil
         selectedIDs.remove(name)

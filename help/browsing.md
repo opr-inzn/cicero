@@ -6,6 +6,10 @@
 
 Click an item in the sidebar, like **All Fonts**, a folder or a set, and the browser shows its families. To see the fonts of several items at once, ⌘-click or ⇧-click them; see [Select several items](organizing.md#select-several-items).
 
+### Names in your language
+
+A font can name its family in other languages too, as many Japanese, Chinese and Korean fonts do. When it has a name in your Mac’s language, the first in **System Settings → General → Language & Region**, Cicero shows the family by that name and sorts it by it: Hiragino Sans is ヒラギノ角ゴシック on a Mac in Japanese. With English first, families show by their own names. The **Family** row in the [Info panel](#see-a-fonts-details) has the family’s own name, and searching finds either.
+
 ## Choose a view
 
 Use the switcher at the left of the toolbar. Every view shows each family in its own fonts and has an on/off switch for it.
@@ -62,7 +66,7 @@ Small capsules next to a family’s name tell you more about its state:
 
 ## Search
 
-Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name or manufacturer contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
+Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, manufacturer or [note](organizing.md#notes) contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
 
 ## Select fonts
 
@@ -116,6 +120,7 @@ The panel describes the style being previewed, the one closest to the weight in 
 - **Status**, and the font’s names: family, style, full name and PostScript name
 - **Tags**: the family’s tags, or **No Tags**. **Change** gives it more or takes them off.
 - **Rating**: five stars to click to give the family a [rating](organizing.md#ratings). Click the one it has again to take the rating away.
+- **Note**: your [note](organizing.md#notes) on the family. Click it to write one.
 - version, designer, manufacturer, and the vendor ID: the four letters a foundry registers, like ADBE for Adobe
 - weight, and the weight range of a variable font
 - number of glyphs, format, embedding and copyright. **Embedding** is what the font’s license lets a document do with it, as the font says: **Installable**, **Editable** (the document can be edited with the font in it), **Preview & Print** (viewed and printed, not edited) or **Restricted** (not embedded at all)

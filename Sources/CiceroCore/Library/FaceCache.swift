@@ -34,7 +34,7 @@ extension Classification {
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
     /// Part of the library cache's version too, as it writes faces the same way.
-    static let version: UInt32 = 8
+    static let version: UInt32 = 9
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -158,6 +158,11 @@ struct ByteWriter {
         write(UInt32(face.year ?? 0))
         write(UInt8(face.embedding.map { $0.rank + 1 } ?? 0))
         write(Int64(bitPattern: face.features.rawValue))
+        write(UInt32(face.localizedFamilyNames.count))
+        for (language, name) in face.localizedFamilyNames.sorted(by: { $0.key < $1.key }) {
+            write(language)
+            write(name)
+        }
     }
 }
 
@@ -250,6 +255,11 @@ struct ByteReader {
         let embedding = Int(try u8())
         guard embedding <= Embedding.allCases.count else { throw Truncated() }
         let features = OpenTypeFeatures(rawValue: UInt64(bitPattern: try i64()))
+        var localizedFamilyNames: [String: String] = [:]
+        for _ in 0..<Int(try u32()) {
+            let language = try string()
+            localizedFamilyNames[language] = try string()
+        }
         var axis: WeightAxis?
         if let minimum, let maximum, let defaultValue {
             axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
@@ -259,7 +269,8 @@ struct ByteReader {
             styleName: styleName, fullName: fullName, weight: weight, isItalic: flags & 1 != 0,
             isMonospaced: flags & 2 != 0, familyClass: familyClass, panose: panose, letterShape: letterShape, manufacturer: manufacturer,
             version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes,
-            year: year == 0 ? nil : year, embedding: embedding == 0 ? nil : Embedding.allCases[embedding - 1], features: features
+            year: year == 0 ? nil : year, embedding: embedding == 0 ? nil : Embedding.allCases[embedding - 1], features: features,
+            localizedFamilyNames: localizedFamilyNames
         )
     }
 }

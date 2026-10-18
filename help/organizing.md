@@ -187,12 +187,13 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 
 | Field | Comparisons | Value |
 | --- | --- | --- |
-| Name | contains, doesn’t contain, begins with, is | Text |
+| Name | contains, doesn’t contain, begins with, is | Text, matched against the family’s name and the one it shows in your Mac’s language |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
 | Designer | contains, doesn’t contain, is | Text, matched against the designer any of the family’s styles credits |
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | is, is not | One of your tags |
 | Rating | is, is not, is more than, is less than | No Rating, or one to five stars (see [Ratings](#ratings)) |
+| Note | contains, doesn’t contain | Text in the family’s [note](#notes); left empty, every family with a note, or (doesn’t contain) without one |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
@@ -250,6 +251,12 @@ Give a family one to five stars, to pick out your favorites or the ones you’d 
 - In the [Info panel](browsing.md#see-a-fonts-details), click a star under **Rating**. Click the one it has again to take the rating away.
 
 To see ratings in the list, right-click the column headers and choose **Rating**; click its header to sort by it. To keep your favorites together, make a [smart set](#smart-sets) with a **Rating** rule, like **Rating** **is more than** ★★★.
+
+## Notes
+
+Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type; Cicero saves it as you go. Delete the text to take the note away.
+
+Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
 
 ## Foundries
 

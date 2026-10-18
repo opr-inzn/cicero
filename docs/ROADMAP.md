@@ -69,11 +69,6 @@ Not this way: writing Finder tags onto the font files for Cicero's tags. That ch
 
 ## Small improvements
 
-- **Notes** (S): a note per family in the Info panel, searched with the rest, and a **Note contains** smart set rule.
-- **Font list as CSV** (S): the listed families' names, styles, foundry, designer, version, format, tags, rating and
-  paths, for a spreadsheet.
-- **Ask before turning on many fonts** (S): a question before turning on more than, say, 100 families at once.
-- **Localized names** (S): family names in the Mac's language, when the font has them.
 - **A folder of Cicero's own** (M): an option to keep every font Cicero installs in one folder of its own, a subfolder per
   family, rather than loose in ~/Library/Fonts.
 
