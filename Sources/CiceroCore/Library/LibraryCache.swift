@@ -59,6 +59,8 @@ enum LibraryCache {
             writer.write(paths)
         }
         writer.write(Array(library.offlineFamilies))
+        // Last, so 1.5.2, which stops reading before it, still reads the rest.
+        writer.write(Array(library.offlinePaths))
         return writer.data
     }
 
@@ -117,8 +119,10 @@ enum LibraryCache {
                     onlineOnly[id] = try reader.strings()
                 }
                 let offline = Set(try reader.strings())
+                // Missing from a library 1.5.2 saved.
+                let offlinePaths = reader.isAtEnd ? [] : Set(try reader.strings())
                 return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: fingerprint,
-                               unavailableFolders: unavailable, onlineOnlyFiles: onlineOnly, offlineFamilies: offline)
+                               unavailableFolders: unavailable, onlineOnlyFiles: onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths)
             } catch {
                 return nil
             }

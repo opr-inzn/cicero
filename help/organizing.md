@@ -111,7 +111,7 @@ When a font is in more than one of your folders, like a copy from each client, r
 
 Font files you add one at a time are listed where they are, without being activated, like the fonts in a folder. They show up together as **Added Fonts** under **Folders**, while there are any.
 
-If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next to **Activate fonts by** in Settings → General, font files you add are installed instead: Cicero copies or moves them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed, not under Added Fonts. Copied, the originals stay where they are. Moved, they’re gone from there, and a folder they leave empty goes to the Trash; see [Copy or use in place](activating.md#copy-or-use-in-place). Fonts already under Added Fonts that you open again, or turn on by copying or moving, leave Added Fonts the same way.
+If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next to **Activate fonts by** in Settings → General, font files you add are installed instead: Cicero copies or moves them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed, not under Added Fonts. Copied, the originals stay where they are. Moved, they’re gone from there, though the folder they were in stays; see [Copy or use in place](activating.md#copy-or-use-in-place). Fonts already under Added Fonts that you open again, or turn on by copying or moving, leave Added Fonts the same way.
 
 ### Add font files
 

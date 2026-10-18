@@ -190,6 +190,9 @@ final class AppModel {
     @ObservationIgnored private var pendingChanges: Set<String>? = []
     /// The running scan's number and the files it looks at, nil for all of them.
     @ObservationIgnored private var runningScan: (id: Int, changes: Set<String>?)?
+    /// Files a watched folder said changed while a scan of everything was running, looked at again once it's done
+    /// (see `rescan`).
+    @ObservationIgnored private var changedDuringScan: Set<String> = []
     /// A scan of everything a while after a file came or went in a Fonts folder, to see what macOS made of it.
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
@@ -228,7 +231,8 @@ final class AppModel {
         // like folders on network disks.
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, Date().timeIntervalSince(self.lastScan) > 60 else { return }
+                // Not while a scan of everything is running, which would start over (a long one never finishing).
+                guard let self, Date().timeIntervalSince(self.lastScan) > 60, self.runningScan.map({ $0.changes != nil }) ?? true else { return }
                 self.rescan()
             }
         }
@@ -279,8 +283,16 @@ final class AppModel {
     /// Returns the scan's number. With `changes`, only those files are looked at again (see `LibraryScanner.scan`).
     @discardableResult
     func rescan(changes: Set<String>? = nil) -> Int {
+        // Files that change while a scan of everything runs are looked at once it's done, rather than starting it over:
+        // a long one would never finish while a folder kept changing, and it may not have got to them yet.
+        if let changes, let running = runningScan, running.changes == nil {
+            pendingChanges = []
+            changedDuringScan.formUnion(changes)
+            return running.id
+        }
         // A scan this one replaces is cancelled, so this one looks at whatever that one would have.
-        var changes = changes
+        var changes = changes.map { $0.union(changedDuringScan) }
+        changedDuringScan = []
         if let running = runningScan { changes = running.changes.flatMap { looked in changes?.union(looked) } }
         pendingChanges = []
         scanTask?.cancel()
@@ -288,9 +300,6 @@ final class AppModel {
         scanCount += 1
         let id = scanCount
         runningScan = (id, changes)
-        // Added files that are gone leave the library: nothing would show them, and looking for them every time
-        // touches their folder, which may be one macOS asks about, like Downloads.
-        if data.fontFiles.contains(where: Reachability.isGone) { data.fontFiles.removeAll(where: Reachability.isGone) }
         let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
         // The Fonts folders too, so a font dropped into one shows without waiting for macOS to register it.
         let fontsFolders = [locations.userFonts.path, locations.allUsersFonts.path]
@@ -315,6 +324,8 @@ final class AppModel {
         scanTask = Task { [weak self] in
             do {
                 let library = try await scanner.scan(input, changes: changes, progress: report)
+                // A scan that was replaced can finish anyway, even after the one that replaced it: what it found is out of date.
+                guard !Task.isCancelled else { return }
                 self?.finishScan(id)
                 self?.apply(library, scan: id)
             } catch is CancellationError {
@@ -327,7 +338,9 @@ final class AppModel {
     }
 
     private func finishScan(_ id: Int) {
-        if runningScan?.id == id { runningScan = nil }
+        guard runningScan?.id == id else { return }
+        runningScan = nil
+        if !changedDuringScan.isEmpty { scheduleRescan(after: 0) }
     }
 
     private func endScan(_ id: Int) {
@@ -392,10 +405,14 @@ final class AppModel {
         hasScanned = true
         // Also when nothing changed, in case Apple Intelligence was turned on meanwhile.
         defer { guessClassifications() }
+        // Added files that are gone leave the library: nothing would show them, and looking for them every time
+        // touches their folder, which may be one macOS asks about, like Downloads.
+        if !new.goneFiles.isEmpty { data.fontFiles.removeAll(where: new.goneFiles.contains) }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
+        let offline = library.offlinePaths
         library = new
-        activateAddedFonts(knowing: known)
+        activateAddedFonts(knowing: known, offline: offline)
         endScan(id)
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
@@ -408,12 +425,17 @@ final class AppModel {
         updateProblems()
     }
 
-    /// Fonts in Active folders that weren't in the library before this scan, like files just put in one. With nothing
-    /// to compare against (no saved library at launch), none: a font turned off by hand would come back on.
-    private func activateAddedFonts(knowing known: Set<String>) {
+    /// Fonts in Active folders that weren't in the library before this scan, like files just put in one. Those that were
+    /// only out of reach, on a disk that was ejected say, are back as they were: on if Cicero had them on, off if they were
+    /// turned off. With nothing to compare against (no saved library at launch), none: a font turned off by hand would
+    /// come back on.
+    private func activateAddedFonts(knowing known: Set<String>, offline: Set<String>) {
         let active = data.folders.filter(\.isActive)
-        guard !active.isEmpty, !known.isEmpty else { return }
-        keepOn(faces(in: active).filter { !known.contains($0.face.path) })
+        guard !active.isEmpty, !known.isEmpty || !offline.isEmpty else { return }
+        keepOn(faces(in: active).filter { face in
+            let path = face.face.path
+            return !known.contains(path) && (!offline.contains(path) || data.records.inPlace.contains(path))
+        })
     }
 
     private func updateCoverage() {

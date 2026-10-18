@@ -366,6 +366,25 @@ public struct SmartSet: Codable, Hashable, Identifiable, Sendable {
         self.matchAll = matchAll
         self.rules = rules
     }
+
+    /// A rule on a field, or with a comparison, a later version adds is left out here, rather than a file that doesn't load.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        matchAll = try c.decode(Bool.self, forKey: .matchAll)
+        rules = try c.decode([Readable<SmartRule>].self, forKey: .rules).compactMap(\.value)
+    }
+}
+
+/// An element of a list as this version can read it; nil for one it can't, as one a later version saved, so the rest
+/// of the list loads.
+private struct Readable<Value: Decodable>: Decodable {
+    var value: Value?
+
+    init(from decoder: Decoder) throws {
+        value = try? Value(from: decoder)
+    }
 }
 
 public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
@@ -500,7 +519,7 @@ public enum InstallMethod: String, Codable, CaseIterable, Sendable {
     case ask
     /// Copy into ~/Library/Fonts.
     case copy
-    /// Move files added one at a time into ~/Library/Fonts, putting the folders they leave empty in the Trash;
+    /// Move files added one at a time into ~/Library/Fonts, leaving the folders they were in;
     /// copy the rest, so the user's folders stay as they are.
     case move
     /// Register the files where they are.

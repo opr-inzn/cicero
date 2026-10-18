@@ -101,7 +101,7 @@ struct GeneralSettings: View {
         switch model.data.installMethod {
         case .ask: "Cicero asks each time whether to copy font files into your user Fonts folder or activate them from their current location."
         case .copy: "Copying duplicates font files into your user Fonts folder."
-        case .move: "Moving puts font files into your user Fonts folder, and a folder they leave empty goes to the Trash."
+        case .move: "Moving puts font files into your user Fonts folder; the folders they were in stay."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves."
         }
     }
