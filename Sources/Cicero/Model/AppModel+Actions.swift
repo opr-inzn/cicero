@@ -182,6 +182,8 @@ extension AppModel {
     private func forget(family name: String) {
         for index in data.sets.indices { data.sets[index].remove(families: [name]) }
         data.familyTags[name] = nil
+        data.familyRatings[name] = nil
+        data.activations[name] = nil
         data.foundryOverrides[name] = nil
         selectedIDs.remove(name)
         if openFamilyID == name { openFamilyID = nil }

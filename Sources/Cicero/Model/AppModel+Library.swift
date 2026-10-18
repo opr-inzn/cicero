@@ -250,12 +250,30 @@ extension AppModel {
                 return { (self.foundryName(of: $0) ?? "").lowercased().contains(lower) }
             }
             return compare { self.foundryName(of: $0) == value }
+        case .designer:
+            // Any style's: a family's styles may credit different designers, or some of them none.
+            let lower = value.lowercased()
+            func designers(_ family: Family) -> [String] { family.faces.compactMap { $0.face.designer?.lowercased() } }
+            switch rule.comparison {
+            case .contains: return { family in lower.isEmpty || designers(family).contains { $0.contains(lower) } }
+            case .doesNotContain: return { family in lower.isEmpty || !designers(family).contains { $0.contains(lower) } }
+            default: return { family in designers(family).contains(lower) }
+            }
         case .classification:
             let classificationName = classificationNamer()
             return compare { classificationName($0) == value }
         case .tag:
             let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
             return compare { tagged.contains($0.id) }
+        case .rating:
+            // No rating is 0 stars.
+            let ratings = data.familyRatings
+            let stars = Int(value) ?? 0
+            switch rule.comparison {
+            case .greaterThan: return { ratings[$0.id, default: 0] > stars }
+            case .lessThan: return { ratings[$0.id, default: 0] < stars }
+            default: return compare { ratings[$0.id, default: 0] == stars }
+            }
         case .set:
             let members = Set(data.sets.first { $0.id.uuidString == value }?.memberFamilies ?? [])
             return compare { members.contains($0.id) }
@@ -288,6 +306,11 @@ extension AppModel {
             case .lessThan: return { $0.faces.count < number }
             default: return { $0.faces.count == number }
             }
+        case .feature:
+            guard let feature = OpenTypeFeature(rawValue: value) else { return { _ in false } }
+            return compare { $0.features.contains(feature) }
+        case .embedding:
+            return compare { $0.embedding?.rawValue == value }
         case .language:
             return { family in
                 guard let supported = self.supports(family, language: value) else { return false }
@@ -305,6 +328,23 @@ extension AppModel {
             return { family in
                 guard let added = family.dateAdded else { return false }
                 return (added > cutoff) == recent
+            }
+        case .timesActivated:
+            let activations = data.activations
+            let number = Int(value) ?? 0
+            switch rule.comparison {
+            case .greaterThan: return { activations[$0.id]?.count ?? 0 > number }
+            case .lessThan: return { activations[$0.id]?.count ?? 0 < number }
+            default: return { activations[$0.id]?.count ?? 0 == number }
+            }
+        case .lastActivated:
+            // A family never turned on since Cicero began counting wasn't turned on in the last days either.
+            let activations = data.activations
+            let cutoff = Date().addingTimeInterval(-Double(Int(value) ?? 0) * 86_400)
+            let recent = rule.comparison != .notInLast
+            return { family in
+                guard let last = activations[family.id]?.last else { return !recent }
+                return (last > cutoff) == recent
             }
         }
     }

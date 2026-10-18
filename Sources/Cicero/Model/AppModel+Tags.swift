@@ -86,4 +86,19 @@ extension AppModel {
     func tagColors(of family: Family) -> [TagColor] {
         tagDots[family.id] ?? []
     }
+
+    // MARK: Ratings
+
+    /// The stars the user gave the family, 1…5; nil for none.
+    func rating(of family: Family) -> Int? {
+        data.familyRatings[family.id]
+    }
+
+    /// Gives the families this many stars, 1…5; nil takes their rating away.
+    func setRating(_ stars: Int?, for families: [Family]) {
+        let stars = stars.flatMap { (1...5).contains($0) ? $0 : nil }
+        var data = data
+        for family in families { data.familyRatings[family.id] = stars }
+        self.data = data
+    }
 }

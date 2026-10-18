@@ -394,6 +394,7 @@ final class AppModel {
         defer { guessClassifications() }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
+        data.recordActivations(from: library, to: new)
         library = new
         activateAddedFonts(knowing: known)
         endScan(id)

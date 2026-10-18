@@ -120,15 +120,20 @@ private struct RuleRow: View {
         switch field {
         case .name: ""
         case .foundry: model.foundryNames.first ?? ""
+        case .designer: ""
         case .classification: model.classificationNames[0]
         case .tag: model.data.tags.first ?? ""
+        case .rating: "5"
         case .set: model.data.sets.first?.id.uuidString ?? ""
         case .folder: folderOptions.first?.id ?? ""
         case .status: SmartRuleValue.statuses[0]
         case .kind: SmartRuleValue.kinds[0]
         case .format: FontFormat.openTypePostScript.rawValue
         case .styles: "2"
-        case .added: "30"
+        case .feature: OpenTypeFeature.smallCaps.rawValue
+        case .embedding: Embedding.installable.rawValue
+        case .added, .lastActivated: "30"
+        case .timesActivated: "0"
         case .language: model.languages.preferredLanguageID
         case .characterSet: model.characterSetCatalog.builtIn.first?.id ?? ""
         }
@@ -145,10 +150,14 @@ private struct RuleRow: View {
             } else {
                 options(model.foundryNames.map { ($0, $0) }, empty: "No foundries yet")
             }
+        case .designer:
+            text
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
             options(model.data.tags.map { ($0, $0) }, empty: "No license statuses yet")
+        case .rating:
+            options([("0", "No Rating")] + (1...5).map { (String($0), Rating.stars($0)) })
         case .set:
             options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No sets yet")
         case .folder:
@@ -161,8 +170,14 @@ private struct RuleRow: View {
             options(FontFormat.allCases.map { ($0.rawValue, $0.rawValue) })
         case .styles:
             number(unit: "styles", in: 0...999)
-        case .added:
+        case .feature:
+            options(OpenTypeFeature.allCases.map { ($0.rawValue, $0.title) })
+        case .embedding:
+            options(Embedding.allCases.map { ($0.rawValue, $0.title) })
+        case .added, .lastActivated:
             number(unit: "days", in: 1...3650)
+        case .timesActivated:
+            number(unit: "times", in: 0...99_999)
         case .language:
             LanguagePicker(selection: $rule.value, catalog: model.languages)
         case .characterSet:
@@ -299,30 +314,36 @@ private extension SmartRule.Field {
         switch self {
         case .name: "Name"
         case .foundry: "Foundry"
+        case .designer: "Designer"
         case .classification: "Classification"
         case .tag: "License Status"
+        case .rating: "Rating"
         case .set: "Set"
         case .folder: "Folder"
         case .status: "Status"
         case .kind: "Kind"
         case .format: "Format"
         case .styles: "Number of Styles"
+        case .feature: "OpenType Feature"
+        case .embedding: "Embedding"
         case .language: "Language"
         case .characterSet: "Coverage"
         case .added: "Date Added"
+        case .timesActivated: "Times Activated"
+        case .lastActivated: "Last Activated"
         }
     }
 }
 
 private extension SmartRule.Comparison {
-    /// The wording depends on the field: a set "is in", a language "is supported", coverage "includes". A license status
-    /// "is", as a family has one.
+    /// The wording depends on the field: a set "is in", a language or an OpenType feature "is supported", coverage
+    /// "includes". A license status "is", as a family has one.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"
         case (.set, .isNot), (.folder, .isNot): "isn’t in"
-        case (.language, .is): "is supported"
-        case (.language, .isNot): "isn’t supported"
+        case (.language, .is), (.feature, .is): "is supported"
+        case (.language, .isNot), (.feature, .isNot): "isn’t supported"
         case (.characterSet, .is): "includes"
         case (.characterSet, .isNot): "doesn’t include"
         case (_, .contains): "contains"

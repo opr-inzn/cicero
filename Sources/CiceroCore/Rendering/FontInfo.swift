@@ -10,7 +10,7 @@ public struct FontInfo: Sendable {
     }
 
     /// Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Vendor ID, Weight, Variable
-    /// weight, Glyphs, Format, Copyright. Reads the font; call off the main thread.
+    /// weight, Glyphs, Format, Embedding, Copyright. Reads the font; call off the main thread.
     public static func read(_ face: FontFace) -> FontInfo {
         let font = FontLoader.shared.font(face, size: 12)
         func name(_ key: CFString) -> String? {
@@ -30,6 +30,7 @@ public struct FontInfo: Sendable {
             ("Variable weight", face.weightAxis.map { "\(Int($0.minimum))–\(Int($0.maximum))" }),
             ("Glyphs", CTFontGetGlyphCount(font).formatted()),
             ("Format", FontFormat.of(path: face.path).rawValue),
+            ("Embedding", face.embedding?.title),
             ("Copyright", name(kCTFontCopyrightNameKey)),
         ]
         return FontInfo(rows: rows.compactMap { label, value in
