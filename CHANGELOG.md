@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.5.3
+
+- The license statuses in the sidebar are under **Tags** again, with the tag symbol, rather than **License**. Cicero still comes with Licensed, Unlicensed and the others, and a family still has one at a time.
+
 ## 1.5.2
 
 - Cicero has a new icon: C, 1 and 6 from AM Gaonkar Display Medium, cut into the faces of its cube.
