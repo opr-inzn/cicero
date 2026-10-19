@@ -43,7 +43,7 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF”, “TTF” or “Variable”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
 
 The grid is the view Cicero starts with.
 
@@ -63,6 +63,8 @@ Small capsules next to a family’s name tell you more about its state:
 | Adobe Fonts | From Adobe Fonts, managed in Creative Cloud: on in every app, or in Adobe apps only when its switch sits halfway. See [Adobe Fonts](activating.md#adobe-fonts) |
 | Temporary | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
 | App Set | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
+
+A teal **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
 
 ## Search
 

@@ -61,6 +61,7 @@ private struct Specimen: View {
                 Text(family.name).font(.headline).lineLimit(1)
                 TagDots(colors: model.tagColors(of: family))
                 StatusTag(family: family)
+                VariableTag(family: family)
                 Text([foundry, family.stylesLabel].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -552,6 +552,7 @@ private struct FontListRow: View {
                 Text(row.name).lineLimit(1)
                 TagDots(colors: row.tags)
                 StatusTag(family: family)
+                VariableTag(family: family)
             }
         case .preview:
             FontText(

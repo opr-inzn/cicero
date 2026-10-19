@@ -5,6 +5,10 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
+    /// The Variable tag's: the system teal is too light for small text on its own tint in light mode.
+    static let variable = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemTeal : NSColor(srgbRed: 0, green: 0.49, blue: 0.58, alpha: 1)
+    })
 }
 
 /// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
@@ -184,15 +188,43 @@ struct ActivationSwitch: View {
 struct Tag: View {
     let text: String
     let tint: Color
+    /// A symbol before the text.
+    var systemImage: String?
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
-            .background(tint.opacity(0.14), in: .capsule)
-            .foregroundStyle(tint.opacity(0.9))
-            .fixedSize()
+        HStack(spacing: 2.5) {
+            if let systemImage { Image(systemName: systemImage) }
+            Text(text)
+        }
+        .font(.system(size: 9, weight: .semibold))
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1.5)
+        .background(tint.opacity(0.14), in: .capsule)
+        .foregroundStyle(tint.opacity(0.9))
+        .fixedSize()
+    }
+}
+
+/// Marks a variable family wherever it's listed, apart from the kinds of file, with the symbol of its axes and, on
+/// hover, their names.
+struct VariableTag: View {
+    let family: Family
+
+    var body: some View {
+        if family.isVariable {
+            Tag(text: "Variable", tint: .variable, systemImage: "slider.horizontal.3")
+                .help(help)
+                .accessibilityLabel(help)
+        }
+    }
+
+    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in the order the fonts give them.
+    private var help: String {
+        var names: [String] = []
+        for face in family.faces {
+            for axis in face.face.axes where !names.contains(axis.name) { names.append(axis.name) }
+        }
+        return names.isEmpty ? "Variable" : "Variable: " + names.joined(separator: ", ")
     }
 }
 

@@ -513,8 +513,13 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let hasItalics: Bool
     /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
     public let rangeLabel: String
-    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable", "OTF · Variable".
+    /// The kinds of file the faces come in, variable ones apart, for the exported font list: "OTF", "Variable",
+    /// "OTF · Variable".
     public let formatLabel: String
+    /// The kinds of file the faces come in, variable ones too, for tile captions: "OTF", "TTF", "OTF · TTF".
+    public var fileKinds: String {
+        Set(faces.map { ($0.face.path as NSString).pathExtension.uppercased() }).sorted().joined(separator: " · ")
+    }
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
     /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
