@@ -32,8 +32,10 @@ right on the held-out families, and how often when it's sure, which `AppModel.le
 
 It learns designs: a family's uprights at one width and optical size (the normal one, and condensed and expanded, small
 and large ones of a variable font with those axes) or its italics, each a design of its own, that the others of the
-family, and its siblings named for another size or width (DM Serif Display and Text), share a batch with, so that
-slant, width and optical size count. `--stretch` adds designs drawn narrower and wider than they are, which made width
+family, and its siblings named for another size, width or kind (DM Serif Display and Text, Roboto Mono and Roboto),
+share a batch with, so that slant, width and optical size count. Next to the letters it gets their advances
+(letters-advances.f32), which the squares, each letter centred by its ink, don't show: how wide a face sets its
+letters, and that a monospaced one sets them all as wide. `--stretch` adds designs drawn narrower and wider than they are, which made width
 count a little more and italics less in round two; it's off.
 
 Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the

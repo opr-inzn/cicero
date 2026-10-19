@@ -47,6 +47,8 @@ ORNAMENTAL = {"Blackletter", "Stencil", "Inline", "Shaded", "Distressed", "Pixel
               "Art Nouveau", "Tuscan", "Medieval"}
 # The lowercase's width among the measures, and SimilarFonts' step of it; the capitals' and the o's width.
 WIDTH, WIDTH_STEP = 6, 0.08
+# The monospaced measure, 1 for a monospaced style.
+MONOSPACED = 17
 WIDTHS = [6, 7, 8]
 
 
@@ -61,17 +63,18 @@ class Embedder(nn.Module):
             *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
             nn.AdaptiveAvgPool2d(4), nn.Flatten(), nn.Linear(128 * 16, 128), nn.ReLU(inplace=True),
         )
+        # What it sees in each letter, and how wide each letter's advance is.
         self.together = nn.Sequential(
-            nn.Linear(LETTERS * 128, 512), nn.BatchNorm1d(512), nn.ReLU(inplace=True), nn.Linear(512, DIMENSIONS),
+            nn.Linear(LETTERS * 129, 512), nn.BatchNorm1d(512), nn.ReLU(inplace=True), nn.Linear(512, DIMENSIONS),
         )
         self.tags = nn.Linear(DIMENSIONS, tags)
         self.measures = nn.Linear(DIMENSIONS, MEASURES)
 
-    def forward(self, letters):
-        """(n, 16, 64, 64), 0 to 1 → (n, 128) of length 1."""
+    def forward(self, letters, advances):
+        """(n, 16, 64, 64), 0 to 1, and (n, 16), in squares → (n, 128) of length 1."""
         count = letters.shape[0]
         each = self.letter(letters.reshape(count * LETTERS, 1, SIZE, SIZE)).reshape(count, LETTERS * 128)
-        return F.normalize(self.together(each), dim=1)
+        return F.normalize(self.together(torch.cat([each, advances], 1)), dim=1)
 
 
 def classifier():
@@ -88,9 +91,9 @@ class Exported(nn.Module):
         self.model = model
         self.classify = classify
 
-    def forward(self, letters):
+    def forward(self, letters, advances):
         each = self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS * 128)
-        embedding = F.normalize(self.model.together(each), dim=1)
+        embedding = F.normalize(self.model.together(torch.cat([each, advances], 1)), dim=1)
         if self.classify is None:
             return embedding
         return embedding, F.softmax(self.classify(embedding), dim=1)
@@ -137,10 +140,10 @@ def label(family):
     return None
 
 
-# Words that name a family's optical size or width, as its siblings' names differ: DM Serif Display and Text,
-# Playfair and Playfair Display, Roboto and Roboto Condensed.
+# Words that name a family's optical size, width or kind, as its siblings' names differ: DM Serif Display and Text,
+# Playfair and Playfair Display, Roboto, Roboto Condensed and Roboto Mono, IBM Plex Sans, Serif and Mono.
 SIBLING_WORDS = {"display", "text", "headline", "caption", "fine", "deck", "poster", "banner", "micro", "subhead", "condensed",
-                 "narrow", "compressed", "expanded", "extended", "wide", "semi", "extra", "ultra", "sc"}
+                 "narrow", "compressed", "expanded", "extended", "wide", "semi", "extra", "ultra", "sc", "mono", "code", "sans", "serif"}
 
 
 def sibling_root(name):
@@ -149,11 +152,25 @@ def sibling_root(name):
     return " ".join(words) or name.lower()
 
 
+class Letters:
+    """What render-letters.swift drew: each entry's squares, 0 to 255, and its letters' advances, in squares."""
+
+    def __init__(self, work):
+        self.pixels = np.fromfile(work / "letters.u8", dtype=np.uint8).reshape(-1, LETTERS, SIZE, SIZE)
+        self.advances = np.fromfile(work / "letters-advances.f32", dtype=np.float32).reshape(-1, LETTERS)
+
+    def __len__(self):
+        return len(self.pixels)
+
+    def tensors(self, rows, device):
+        return torch.tensor(self.pixels[rows], device=device).float() / 255, torch.tensor(self.advances[rows], device=device)
+
+
 def load(work):
-    """The designs, the letters drawn and the names of the tags."""
+    """The designs, the letters drawn (see `Letters`) and the names of the tags."""
     families = json.loads((work / "families.json").read_text())
     drawn = json.loads((work / "letters.json").read_text())
-    pixels = np.fromfile(work / "letters.u8", dtype=np.uint8).reshape(-1, LETTERS, SIZE, SIZE)
+    letters = Letters(work)
     tag_names = sorted({tag for family in families for tag in family["tags"]
                         if tag.startswith(KINDS) or tag.startswith("/Expressive/")})
     designs = []
@@ -174,12 +191,12 @@ def load(work):
                 "views": [entry["row"] for entry in own if abs(entry["weight"] - regular["weight"]) <= 100],
                 "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"]), "label": label(family),
             })
-    return designs, pixels, tag_names
+    return designs, letters, tag_names
 
 
-def merge_alike(designs, pixels, device):
+def merge_alike(designs, letters, device):
     """Groups of designs whose regulars are drawn alike, as for a family that borrows another's Latin."""
-    regulars = torch.tensor(pixels[[design["regular"] for design in designs]], device=device).float().reshape(len(designs), -1) / 255
+    regulars = torch.tensor(letters.pixels[[design["regular"] for design in designs]], device=device).float().reshape(len(designs), -1) / 255
     squares = (regulars * regulars).sum(1)
     distances = (squares[:, None] + squares[None, :] - 2 * regulars @ regulars.T).clamp(min=0).sqrt() / math.sqrt(regulars.shape[1])
     parent = list(range(len(designs)))
@@ -204,9 +221,9 @@ def held_out(name):
     return zlib.crc32(name.split()[0].lower().encode()) % 10 == 0
 
 
-def augment(batch):
-    """Each style a little bigger or smaller about its baseline and moved a pixel or two, and a letter or two
-    missing now and then."""
+def augment(batch, advances):
+    """Each style a little bigger or smaller about its baseline, its advances with it, and moved a pixel or two, and
+    a letter or two missing now and then."""
     count = batch.shape[0]
     device = batch.device
     scale = torch.empty(count, device=device).uniform_(0.9, 1.1)
@@ -222,7 +239,7 @@ def augment(batch):
     grid = F.affine_grid(theta, list(batch.shape), align_corners=False)
     moved = F.grid_sample(batch, grid, align_corners=False, padding_mode="zeros")
     keep = (torch.rand(count, LETTERS, 1, 1, device=device) > 0.08).float()
-    return moved * keep
+    return moved * keep, advances * scale[:, None] * keep[:, :, 0, 0]
 
 
 def stretch(batch, factors):
@@ -244,23 +261,22 @@ def contrastive(embeddings, temperature):
 
 
 @torch.no_grad()
-def embed(model, pixels, rows, device, batch=256):
+def embed(model, letters, rows, device, batch=256):
     model.eval()
     found = []
     for start in range(0, len(rows), batch):
-        letters = torch.tensor(pixels[rows[start:start + batch]], device=device).float() / 255
-        found.append(model(letters))
+        found.append(model(*letters.tensors(rows[start:start + batch], device)))
     return torch.cat(found)
 
 
-def model_distance(model, pixels, device):
+def model_distance(model, letters, device):
     """The distance between the embeddings of rows, each embedded once."""
     known = {}
 
     def distance(first, second):
         missing = sorted(set(first + second) - known.keys())
         if missing:
-            known.update(zip(missing, embed(model, pixels, missing, device)))
+            known.update(zip(missing, embed(model, letters, missing, device)))
         return torch.cdist(torch.stack([known[row] for row in first]), torch.stack([known[row] for row in second]))
     return distance
 
@@ -273,7 +289,8 @@ def evaluate(distance, designs, tag_names, measurements=None):
     by kind (Didone, geometric…) and its category;
     uprights, italics: how many of the ten nearest designs of the normal width are upright, for an upright one, and
     italic, for an italic one;
-    width: how far apart the ten nearest upright designs, of any width, are in width, in SimilarFonts' steps."""
+    width: how far apart the ten nearest upright designs, of any width, are in width, in SimilarFonts' steps;
+    monospaced: how many of the ten nearest upright designs of the normal width are monospaced, for a monospaced one."""
     kinds = np.array([1.0 if name.startswith(KINDS) else 0.0 for name in tag_names] + [0.0] * len(CATEGORIES))
     targets = np.array([design["target"] for design in designs]) * kinds
     targets /= np.maximum(np.linalg.norm(targets, axis=1, keepdims=True), 1e-9)
@@ -319,6 +336,10 @@ def evaluate(distance, designs, tag_names, measurements=None):
         steps = [np.nanmean([abs(width(other) - width(query)) for other in near]) / WIDTH_STEP
                  for query, near in zip(queries, nearest(queries, uprights)) if not np.isnan(width(query))]
         scores["width"] = float(np.nanmean(steps))
+        monospaced = lambda index: measurements[designs[index]["regular"], MONOSPACED] == 1
+        queries = [index for index in upright if designs[index]["held_out"] and monospaced(index)]
+        if queries:
+            scores["monospaced"] = float(np.mean([sum(map(monospaced, near)) / 10 for near in nearest(queries, upright)]))
     return scores
 
 
@@ -327,8 +348,8 @@ def train(arguments):
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     torch.manual_seed(arguments.seed)
     random.seed(arguments.seed)
-    designs, pixels, tag_names = load(work)
-    groups = merge_alike(designs, pixels, device)
+    designs, drawn, tag_names = load(work)
+    groups = merge_alike(designs, drawn, device)
     merged = [group for group in groups if len(group) > 1]
     print(f"{len(designs)} designs of {len({design['family'] for design in designs})} families drawn, {len(groups)} once alike "
           "ones are one; alike: " + "; ".join(", ".join(designs[index]["name"] for index in group) for group in merged[:40]))
@@ -349,38 +370,35 @@ def train(arguments):
             by_root.setdefault(designs[index]["root"], set()).add(position)
     roots = sorted(by_root)
 
-    everything = torch.tensor(pixels, device=device)
+    everything = torch.tensor(drawn.pixels, device=device)
+    spans = torch.tensor(drawn.advances, device=device)
     targets = torch.tensor([design["target"] for design in designs], device=device)
     tagged = torch.tensor([design["tagged"] for design in designs], device=device)
     # Tags of a kind count for more than the expressive ones (calm, playful…), the category most.
     tag_weights = torch.tensor([1.0 if name.startswith(KINDS) else 0.3 for name in tag_names] + [1.0] * len(CATEGORIES), device=device)
-    measurements = read_measurements(arguments.measurements, len(pixels)) if arguments.measurements else None
+    measurements = read_measurements(arguments.measurements, len(drawn)) if arguments.measurements else None
     measures = torch.tensor(standard_scores(measurements), device=device) if measurements is not None else None
     measure_weights = torch.ones(MEASURES, device=device)
     measure_weights[WIDTHS] = arguments.widths
 
     model = Embedder(len(tag_names) + len(CATEGORIES)).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=arguments.rate, weight_decay=arguments.decay)
-    # Batches of whole families come out a little bigger, so never more of them than this.
-    steps_per_epoch = math.ceil(len(classes) / arguments.batch) + 1
+    steps_per_epoch = len(classes) // arguments.batch
     total = arguments.epochs * steps_per_epoch
     schedule = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=arguments.rate, total_steps=total, pct_start=0.05)
     out = work / arguments.name
     for epoch in range(arguments.epochs):
         model.train()
-        batches, batch, taken = [], [], set()
+        # Families in a random order, each with its siblings, cut into batches of exactly as many designs: a batch of
+        # another size would have the GPU work out and keep another graph, and its memory grows with every one.
+        order, taken = [], set()
         for root in random.sample(roots, len(roots)):
             for position in sorted(by_root[root] - taken):
                 taken.add(position)
-                batch.append(classes[position])
-            if len(batch) >= arguments.batch:
-                batches.append(batch)
-                batch = []
-        batches.append(batch)
+                order.append(classes[position])
+        batches = [order[start:start + arguments.batch] for start in range(0, len(order) - arguments.batch + 1, arguments.batch)]
         losses = []
         for chosen in batches:
-            if len(chosen) < 8:
-                continue
             first_rows, second_rows, owners = [], [], []
             for group in chosen:
                 # Two views: of one design of the group, or of two, which are drawn alike anyway.
@@ -396,13 +414,14 @@ def train(arguments):
             second_rows += [second_rows[index] for index in stretched]
             owners += [owners[index] for index in stretched]
             rows = torch.tensor(first_rows + second_rows, device=device)
-            letters = everything[rows].float() / 255
+            letters, advances = everything[rows].float() / 255, spans[rows].clone()
             if stretched:
                 total = len(first_rows)
                 for offset in (count, total + count):
                     letters[offset:offset + len(stretched)] = stretch(letters[offset:offset + len(stretched)], factors)
-            letters = augment(letters)
-            embeddings = model(letters)
+                    advances[offset:offset + len(stretched)] *= factors[:, None]
+            letters, advances = augment(letters, advances)
+            embeddings = model(letters, advances)
             loss = contrastive(embeddings, arguments.temperature)
             owners = torch.tensor(owners + owners, device=device)
             known = tagged[owners]
@@ -427,9 +446,9 @@ def train(arguments):
             schedule.step()
             losses.append(loss.item())
         if epoch % arguments.every == arguments.every - 1 or epoch == arguments.epochs - 1:
-            scores = evaluate(model_distance(model, pixels, device), designs, tag_names, measurements)
+            scores = evaluate(model_distance(model, drawn, device), designs, tag_names, measurements)
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
-    torch.save({"model": model.state_dict(), "tags": tag_names, "epoch": arguments.epochs, "scores": scores}, out)
+            torch.save({"model": model.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores}, out)
     print(f"saved {out}")
 
 
@@ -439,8 +458,8 @@ def classify(arguments):
     work = Path(arguments.work).expanduser()
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     torch.manual_seed(arguments.seed)
-    designs, pixels, tag_names = load(work)
-    for group in merge_alike(designs, pixels, device):
+    designs, drawn, tag_names = load(work)
+    for group in merge_alike(designs, drawn, device):
         if any(designs[index]["held_out"] for index in group):
             for index in group:
                 designs[index]["held_out"] = True
@@ -451,9 +470,9 @@ def classify(arguments):
     labelled = [design for design in designs if design["label"] is not None]
     learn = [(row, design["label"]) for design in labelled if not design["held_out"] for row in design["all"]]
     check = [(design["regular"], design["label"]) for design in labelled if design["held_out"]]
-    inputs = embed(model, pixels, [row for row, _ in learn], device)
+    inputs = embed(model, drawn, [row for row, _ in learn], device)
     targets = torch.tensor([label for _, label in learn], device=device)
-    held = embed(model, pixels, [row for row, _ in check], device)
+    held = embed(model, drawn, [row for row, _ in check], device)
     answers = torch.tensor([label for _, label in check], device=device)
     # Every family counts as much (--balance 0): counting the rare ornamental ones for more had the model say
     # ornamental of heavy and rounded sans serifs.
@@ -500,26 +519,26 @@ def export(arguments):
         head.load_state_dict(saved["classifier"])
         head.eval()
     exported = Exported(model, head).eval()
-    example = torch.rand(1, LETTERS, SIZE, SIZE)
+    example = (torch.rand(1, LETTERS, SIZE, SIZE), torch.rand(1, LETTERS))
     traced = torch.jit.trace(exported, example)
     converted = ct.convert(
         traced,
-        inputs=[ct.TensorType(name="letters", shape=example.shape)],
+        inputs=[ct.TensorType(name="letters", shape=example[0].shape), ct.TensorType(name="advances", shape=example[1].shape)],
         outputs=[ct.TensorType(name="embedding", dtype=np.float32)]
         + ([ct.TensorType(name="classification", dtype=np.float32)] if head is not None else []),
         minimum_deployment_target=ct.target.macOS15,
         compute_precision=ct.precision.FLOAT16,
     )
-    converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, as 128 numbers of length 1, alike fonts close, and how "
-                                   "likely it is to be " + ", ".join(CLASSES) + ". Learned from Google Fonts families under the OFL, Apache and "
-                                   "UFL licenses.")
+    converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, and their advances, in squares, as 128 numbers of "
+                                   "length 1, alike fonts close, and how likely it is to be " + ", ".join(CLASSES) + ". Learned from "
+                                   "Google Fonts families under the OFL, Apache and UFL licenses.")
     converted.version = f"epoch {saved['epoch']}"
     converted.save(arguments.output)
-    pixels = np.fromfile(work / "letters.u8", dtype=np.uint8).reshape(-1, LETTERS, SIZE, SIZE)
-    letters = pixels[:1].astype(np.float32) / 255
-    expected = exported(torch.tensor(letters))
+    drawn = Letters(work)
+    letters, advances = drawn.pixels[:1].astype(np.float32) / 255, drawn.advances[:1]
+    expected = exported(torch.tensor(letters), torch.tensor(advances))
     expected = (expected[0] if head is not None else expected).detach().numpy()
-    found = converted.predict({"letters": letters})["embedding"]
+    found = converted.predict({"letters": letters, "advances": advances})["embedding"]
     print(f"saved {arguments.output}; Core ML and PyTorch differ by {np.abs(found - expected).max():.4f} at most")
 
 

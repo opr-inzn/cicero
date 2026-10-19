@@ -7,7 +7,8 @@
 //
 // The manifest is a list of {"file": path, "variations": {"wght": 400, …}}, as prepare.py writes it; a variable
 // font's other axes are at their defaults. Writes letters.u8, each entry's squares one after the other (an empty
-// square block for an entry that couldn't be drawn), and letters.json, whether each was drawn.
+// square block for an entry that couldn't be drawn), letters-advances.f32, the letters' advances, 16 floats an
+// entry, and letters.json, whether each was drawn.
 
 import CoreText
 import Foundation
@@ -27,17 +28,21 @@ struct RenderLetters {
         }
         let entries = try JSONDecoder().decode([Entry].self, from: Data(contentsOf: URL(fileURLWithPath: arguments[1])))
         let block = LetterImages.size * LetterImages.size * LetterImages.letters.count
+        let count = LetterImages.letters.count
         var pixels = [UInt8](repeating: 0, count: block * entries.count)
+        var advances = [Float](repeating: 0, count: count * entries.count)
         var drawn = [Bool](repeating: false, count: entries.count)
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: entries.count) { position in
             guard let font = font(entries[position]), let letters = LetterImages.draw(font) else { return }
             lock.withLock {
-                pixels.replaceSubrange(position * block..<(position + 1) * block, with: letters)
+                pixels.replaceSubrange(position * block..<(position + 1) * block, with: letters.pixels)
+                advances.replaceSubrange(position * count..<(position + 1) * count, with: letters.advances)
                 drawn[position] = true
             }
         }
         try Data(pixels).write(to: URL(fileURLWithPath: arguments[2] + ".u8"))
+        try advances.withUnsafeBytes { Data($0) }.write(to: URL(fileURLWithPath: arguments[2] + "-advances.f32"))
         try JSONEncoder().encode(drawn).write(to: URL(fileURLWithPath: arguments[2] + ".json"))
         print("drew \(drawn.count(where: { $0 })) of \(entries.count)")
     }

@@ -2,7 +2,8 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-/// A face's letters drawn small, white on black, each in a square of its own, for `LetterEmbedding` to look at.
+/// A face's letters drawn small, white on black, each in a square of its own, and how wide each one's advance is, for
+/// `LetterEmbedding` to look at.
 /// Every face has the same letters in the same squares, its baseline at the same height and its x-height as tall
 /// (its capitals no taller than `largestCapHeight`), so that what differs is how they're drawn. Drawn from their
 /// outlines, without hinting. Needs nothing but CoreText, so that scripts/embedding/render-letters.swift draws the
@@ -20,14 +21,22 @@ enum LetterImages {
     /// Fewer letters than this drawn, and the face hasn't enough of the Latin alphabet to say what it looks like.
     static let fewest = 8
 
-    /// One square after the other, each `size` rows of `size` pixels from the top left, 255 where it's all ink;
-    /// a letter the face hasn't is an empty square. nil for a face with fewer than `fewest` of the letters drawn
-    /// as outlines.
-    static func draw(_ font: CTFont) -> [UInt8]? {
+    struct Drawn: Equatable {
+        /// One square after the other, each `size` rows of `size` pixels from the top left, 255 where it's all ink;
+        /// a letter the face hasn't is an empty square.
+        var pixels: [UInt8]
+        /// Each letter's advance at the size it's drawn, in squares, so 0.5 for one half as wide as its square, and
+        /// 0 for a letter the face hasn't: what the squares, each letter centred by its ink, don't show, as how a
+        /// monospaced face's i and m are as wide.
+        var advances: [Float]
+    }
+
+    /// nil for a face with fewer than `fewest` of the letters drawn as outlines.
+    static func draw(_ font: CTFont) -> Drawn? {
         let font = inThousandths(font)
-        let paths = letters.map { character -> CGPath? in
-            guard let glyph = glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
-                  !path.boundingBoxOfPath.isEmpty else { return nil }
+        let glyphs = letters.map { glyph(font, $0) }
+        let paths = glyphs.map { glyph -> CGPath? in
+            guard let glyph, let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty else { return nil }
             return path
         }
         guard paths.count(where: { $0 != nil }) >= fewest else { return nil }
@@ -44,6 +53,7 @@ enum LetterImages {
 
         let area = size * size
         var pixels = [UInt8](repeating: 0, count: area * letters.count)
+        var advances = [Float](repeating: 0, count: letters.count)
         guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size,
                                       space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue),
               let data = context.data
@@ -51,7 +61,10 @@ enum LetterImages {
         context.setAllowsAntialiasing(true)
         context.setShouldAntialias(true)
         for (position, path) in paths.enumerated() {
-            guard let path else { continue }
+            guard let path, var glyph = glyphs[position] else { continue }
+            var advance = CGSize.zero
+            CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
+            advances[position] = Float(advance.width * scale / CGFloat(size))
             context.setFillColor(gray: 0, alpha: 1)
             context.fill(CGRect(x: 0, y: 0, width: size, height: size))
             // Centred across by its ink, on the baseline.
@@ -64,7 +77,7 @@ enum LetterImages {
             context.flush()
             pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
         }
-        return pixels
+        return Drawn(pixels: pixels, advances: advances)
     }
 
     /// The font at 1,000 units to the em, at its own optical size: the one its variation sets, else its axis's default.
