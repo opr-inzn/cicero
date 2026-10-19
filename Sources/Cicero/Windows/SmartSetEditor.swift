@@ -124,6 +124,7 @@ private struct RuleRow: View {
         case .classification: model.classificationNames[0]
         case .tag: model.data.tags.first ?? ""
         case .rating: "5"
+        case .note: ""
         case .set: model.data.sets.first?.id.uuidString ?? ""
         case .folder: folderOptions.first?.id ?? ""
         case .status: SmartRuleValue.statuses[0]
@@ -152,6 +153,9 @@ private struct RuleRow: View {
             }
         case .designer:
             text
+        case .note:
+            TextField("Text", text: $rule.value, prompt: Text("Text, or empty for any note"))
+                .frame(minWidth: 180, maxWidth: 260)
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
@@ -318,6 +322,7 @@ private extension SmartRule.Field {
         case .classification: "Classification"
         case .tag: "Tag"
         case .rating: "Rating"
+        case .note: "Note"
         case .set: "Set"
         case .folder: "Folder"
         case .status: "Status"

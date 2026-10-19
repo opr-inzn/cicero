@@ -219,7 +219,7 @@ private struct Reader {
         var count: Int
         var lastActivated: Date?
         var label: Int
-        var hasComment: Bool
+        var comment: String?
         var hasLicense: Bool
     }
 
@@ -261,7 +261,7 @@ private struct Reader {
                 isCloud: row.int("isSkyFont") != 0 || row.int("isTypekit") != 0 || row.int("isMLSFont") != 0,
                 isActive: row.int("activate") == 1, count: max(row.int("count"), 0),
                 lastActivated: last > 0 ? Date(timeIntervalSinceReferenceDate: last) : nil,
-                label: row.int("labelColorID"), hasComment: row.text("comment") != nil,
+                label: row.int("labelColorID"), comment: row.text("comment"),
                 hasLicense: ["licenseName", "licenseLocation", "licenseComment"].contains { row.text($0) != nil }
             )
             order.append(id)
@@ -271,7 +271,6 @@ private struct Reader {
         var faces: [Int: [ImportedFont]] = [:]
         var labelled: [Int: [ImportedFont]] = [:]
         var library = ImportedLibrary(source: .fontExplorer)
-        var comments = containers.values.count(where: \.hasComment)
         for row in fontRows {
             guard let container = containers[row.int("containerID")] else { continue }
             let font = ImportedFont(path: container.path, postScriptName: row.text("psName"), family: row.text("familyName"), style: row.text("style"))
@@ -280,7 +279,7 @@ private struct Reader {
             if FontExplorerImport.labels[label] != nil { labelled[label, default: []].append(font) }
             let stars = row.int("rating")
             if (1...5).contains(stars) { library.ratings.append(ImportedRating(font: font, stars: stars)) }
-            if row.text("comment") != nil { comments += 1 }
+            if let comment = row.text("comment") { library.comments.append(ImportedComment(fonts: [font], text: comment)) }
         }
         func fonts(_ id: Int) -> [ImportedFont] {
             guard let container = containers[id] else { return [] }
@@ -291,6 +290,7 @@ private struct Reader {
             if FontExplorerImport.labels[container.label] != nil {
                 labelled[container.label, default: []] += fonts(id).filter { !(labelled[container.label] ?? []).contains($0) }
             }
+            if let comment = container.comment { library.comments.append(ImportedComment(fonts: fonts(id), text: comment)) }
             if container.count > 0 || container.lastActivated != nil {
                 library.history.append(ImportedHistory(fonts: fonts(id), count: container.count, last: container.lastActivated))
             }
@@ -403,7 +403,6 @@ private struct Reader {
         }
 
         if missing > 0 { library.notes.append(missing == 1 ? "1 font file that isn’t on this Mac" : "\(missing.formatted()) font files that aren’t on this Mac") }
-        if comments > 0 { library.notes.append(comments == 1 ? "1 comment" : "\(comments.formatted()) comments") }
         let licensed = containers.values.count(where: \.hasLicense)
         if licensed > 0 { library.notes.append("license details of \(licensed == 1 ? "1 font" : "\(licensed.formatted()) fonts")") }
         if deactivating > 0 {

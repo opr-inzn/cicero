@@ -197,13 +197,16 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var embedding: Embedding?
     /// The OpenType features its GSUB table has, of those smart sets ask for.
     public var features: OpenTypeFeatures
+    /// Language → the family's name in it, for the languages besides English the font names its family in, where that
+    /// differs from `familyName` (see `LocalizedNames`).
+    public var localizedFamilyNames: [String: String]
 
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
         weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], year: Int? = nil,
-        embedding: Embedding? = nil, features: OpenTypeFeatures = []
+        embedding: Embedding? = nil, features: OpenTypeFeatures = [], localizedFamilyNames: [String: String] = [:]
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -226,6 +229,12 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.year = year
         self.embedding = embedding
         self.features = features
+        self.localizedFamilyNames = localizedFamilyNames
+    }
+
+    /// The family's name in the Mac's language, when the font has one; else its own.
+    public var displayFamilyName: String {
+        LocalizedNames.name(in: localizedFamilyNames) ?? familyName
     }
 
     /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
@@ -455,8 +464,11 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
 /// A font family with everything lists, sorting and filters need worked out once, when the library
 /// is built, so views never recompute it.
 public struct Family: Identifiable, Hashable, Sendable {
-    /// The family name.
+    /// The family name, as the fonts give it; the user's data knows the family by it.
     public let id: String
+    /// The name to show: the family's in the Mac's language, when its fonts have one (ヒラギノ角ゴシック for Hiragino Sans
+    /// on a Mac in Japanese), else `id`.
+    public let name: String
     /// Sorted by weight, then upright before italic, then style name.
     public let faces: [LibraryFace]
     public let state: FamilyState
@@ -492,7 +504,6 @@ public struct Family: Identifiable, Hashable, Sendable {
     /// Set when every active face is temporarily active with this scope.
     public let temporaryScope: TemporaryScope?
 
-    public var name: String { id }
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
     /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
@@ -504,6 +515,10 @@ public struct Family: Identifiable, Hashable, Sendable {
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         precondition(!faces.isEmpty, "A family has at least one face")
         id = name
+        let regular = Self.nearest(400, in: faces)
+        // The regular style's, else any style's: a family's styles name it alike.
+        self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
+            ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
         self.faces = faces
         self.state = state
         self.folderIDs = folderIDs
@@ -522,7 +537,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         format = formats.count == 1 ? formats.first! : .mixed
         classification = Classification.of(name: name, faces: faces)
         mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
-        regular = Self.nearest(400, in: faces)
+        self.regular = regular
         activeCount = faces.count { $0.state.isActive }
         hasActive = activeCount > 0
         hasActivatable = faces.contains(where: \.canActivate)

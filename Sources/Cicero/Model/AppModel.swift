@@ -129,6 +129,8 @@ final class AppModel {
     // MARK: Prompts
 
     var activationPrompt: ActivationPrompt?
+    /// Turning on many families at once, waiting for the user to agree (see `UserData.asksBeforeActivatingMany`).
+    var manyActivationPrompt: ManyActivationPrompt?
     /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
     var copySwitchPrompt: CopySwitchRequest?
     /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
@@ -682,6 +684,17 @@ struct DownloadProgress: Equatable {
 enum InfoTab: String, CaseIterable {
     case info = "Info"
     case features = "Features"
+}
+
+/// Turning on more families at once than `UserData.manyFamilies`.
+struct ManyActivationPrompt: Identifiable {
+    let id = UUID()
+    /// What `AppModel.activate` was asked to call them.
+    var title: String
+    var faces: [LibraryFace]
+    var families: Int
+    /// Until Cicero quits.
+    var temporarily: Bool
 }
 
 struct ActivationPrompt: Identifiable {

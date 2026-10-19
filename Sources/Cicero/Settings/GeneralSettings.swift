@@ -31,6 +31,10 @@ struct GeneralSettings: View {
                     Text("Activate fonts by")
                     Text(activationExplanation)
                 }
+                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
+                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
+                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
+                }
                 LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
                 } label: {

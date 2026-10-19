@@ -275,7 +275,7 @@ struct FamilyItem: ViewModifier {
                 model.click(family, in: order.families, anchor: &anchor)
             })
             .contextMenu { FamilyMenu(families: model.targets(for: family), model: model) }
-            .draggable(family.name)
+            .draggable(family.id)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.openFamilyID = family.id }

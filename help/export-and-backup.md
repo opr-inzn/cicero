@@ -31,6 +31,15 @@ If the place you pick already has something with that name and you choose to rep
 
 Before you send fonts to someone, check that their licenses allow it.
 
+## Export a font list
+
+A font list is a CSV file with a row for each family, for a spreadsheet like Numbers or Excel: its name, number of styles and their names, foundry, designer, version, year, format, classification, status, tags, rating, note and files.
+
+- Choose **File → Export Font List** for the selected families, or with none selected for every family in the browser.
+- Right-click a set, smart set, tag, folder, foundry, classification or set under Coverage in the sidebar and choose **Export Font List**. The list is named after it.
+
+Pick a place and a name, and click **Export**. Cicero shows the file in the Finder.
+
 ## Back up your library
 
 A backup is one `.cicerobackup` file with everything you set up in Cicero, and your font files if you like. Use it to keep your setup safe, or to move it to another Mac.
@@ -45,12 +54,12 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 
 - your sets (with the apps of application sets), smart sets and coverage sets
 - your tags, their colors, and which families have them
-- your ratings, and how many times each family was activated and when last
+- your ratings and notes, and how many times each family was activated and when last
 - your folders, and what you chose under **Fonts in This Folder**
 - the font files you added one at a time, as **Added Fonts**
 - foundry names you changed, and the families you moved to another foundry
 - the sidebar: what’s hidden, the order, and which sections are open
-- the settings for how Cicero activates fonts, **Show system fonts**, **Show fonts from Creative Cloud** and **Show test fonts installed for Adobe apps**
+- the settings for how Cicero activates fonts and whether it asks before activating many, **Show system fonts**, **Show fonts from Creative Cloud** and **Show test fonts installed for Adobe apps**
 - which fonts Cicero turned on, and how
 - with **Include font files**: every font file in your library, other copies included, except the ones that come with macOS or an app, and Adobe Fonts
 

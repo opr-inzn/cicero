@@ -183,9 +183,12 @@ extension AppModel {
     private func computeVisibleFamilies() -> [Family] {
         let query = appliedSearch.trimmingCharacters(in: .whitespaces).lowercased()
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
+        // The user's notes are searched too.
+        let notes = query.isEmpty ? [:] : data.familyNotes.mapValues { $0.lowercased() }
         return library.families.filter { family in
             guard data.lists(family) else { return false }
-            return tests.contains { $0(family) } && library.matches(family, search: query)
+            return tests.contains { $0(family) }
+                && (library.matches(family, search: query) || notes[family.id]?.contains(query) == true)
         }
     }
 
@@ -237,12 +240,16 @@ extension AppModel {
         }
         switch rule.field {
         case .name:
+            // The fonts' own name, or the one in the Mac's language a family shows.
             let lower = value.lowercased()
+            func names(_ family: Family) -> [String] {
+                family.name == family.id ? [family.id.lowercased()] : [family.id.lowercased(), family.name.lowercased()]
+            }
             switch rule.comparison {
-            case .contains: return { lower.isEmpty || $0.name.lowercased().contains(lower) }
-            case .doesNotContain: return { lower.isEmpty || !$0.name.lowercased().contains(lower) }
-            case .beginsWith: return { $0.name.lowercased().hasPrefix(lower) }
-            default: return { $0.name.lowercased() == lower }
+            case .contains: return { family in lower.isEmpty || names(family).contains { $0.contains(lower) } }
+            case .doesNotContain: return { family in lower.isEmpty || !names(family).contains { $0.contains(lower) } }
+            case .beginsWith: return { family in names(family).contains { $0.hasPrefix(lower) } }
+            default: return { family in names(family).contains(lower) }
             }
         case .foundry:
             if rule.comparison == .contains {
@@ -265,6 +272,15 @@ extension AppModel {
         case .tag:
             let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
             return compare { tagged.contains($0.id) }
+        case .note:
+            // Without text: whether the family has a note at all.
+            let lower = value.lowercased()
+            let notes = data.familyNotes.mapValues { $0.lowercased() }
+            let contains = rule.comparison != .doesNotContain
+            return { family in
+                guard let note = notes[family.id] else { return !contains }
+                return (lower.isEmpty || note.contains(lower)) == contains
+            }
         case .rating:
             // No rating is 0 stars.
             let ratings = data.familyRatings

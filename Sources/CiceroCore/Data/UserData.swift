@@ -24,6 +24,8 @@ public struct UserData: Codable, Equatable, Sendable {
     public var tagColors: [String: TagColor] = [:]
     /// Family name → the stars the user gave it, 1…5. A family without any has no rating.
     public var familyRatings: [String: Int] = [:]
+    /// Family name → the user's note on it. A family without one has none, never an empty one.
+    public var familyNotes: [String: String] = [:]
     /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
     /// False only for libraries saved before there were license tags (license statuses, as they were in 1.5), which get
@@ -44,6 +46,10 @@ public struct UserData: Codable, Equatable, Sendable {
     public var installMethod: InstallMethod = .ask
     /// What to do with an added font file whose fonts the library has already, from another file.
     public var duplicateHandling: DuplicateHandling = .ask
+    /// Ask before turning on more than `manyFamilies` families at once.
+    public var asksBeforeActivatingMany = true
+    /// How many families at once turning on can be without asking first (see `asksBeforeActivatingMany`).
+    public static let manyFamilies = 100
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
     /// as one Testing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
@@ -110,6 +116,7 @@ public struct UserData: Codable, Equatable, Sendable {
         // A colour a later version adds is no colour here, rather than a file that doesn't load.
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         familyRatings = try value(.familyRatings, d.familyRatings).filter { (1...5).contains($0.value) }
+        familyNotes = try value(.familyNotes, d.familyNotes).filter { !$0.value.isEmpty }
         activations = try value(.activations, d.activations)
         // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
@@ -124,6 +131,7 @@ public struct UserData: Codable, Equatable, Sendable {
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
+        asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
@@ -459,14 +467,15 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
 
 
     public enum Field: String, Codable, CaseIterable, Sendable {
-        case name, foundry, designer, classification, tag, rating, set, folder, status, kind, format, styles, feature, embedding, language
-        case characterSet, added, timesActivated, lastActivated
+        case name, foundry, designer, classification, tag, rating, note, set, folder, status, kind, format, styles, feature, embedding
+        case language, characterSet, added, timesActivated, lastActivated
 
         public var comparisons: [Comparison] {
             switch self {
             case .name: [.contains, .doesNotContain, .beginsWith, .is]
             case .foundry: [.is, .isNot, .contains]
             case .designer: [.contains, .doesNotContain, .is]
+            case .note: [.contains, .doesNotContain]
             case .rating: [.is, .isNot, .greaterThan, .lessThan]
             case .styles, .timesActivated: [.is, .greaterThan, .lessThan]
             case .added, .lastActivated: [.inLast, .notInLast]

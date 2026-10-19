@@ -138,6 +138,8 @@ private struct InfoRows: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // First: what the user wrote about the family.
+            NoteRow(family: family)
             row("Status", face.state.label)
             TagsRow(family: family)
             RatingRow(family: family)
@@ -281,6 +283,53 @@ private struct RatingRow: View {
                 }
             }
         }
+    }
+}
+
+/// The family's note, to write in place. Saved a moment after the typing stops, and at once when the field loses focus or
+/// the panel goes to another family, so a list searched or a smart set by notes doesn't change with every key.
+private struct NoteRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+    @State private var text = ""
+    /// The family `text` is the note of.
+    @State private var editing: String?
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Note").font(.caption).foregroundStyle(.secondary)
+            TextField("Note", text: $text, prompt: Text("Add a Note"), axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.callout)
+                .lineLimit(1...12)
+                .focused($isFocused)
+                .labelsHidden()
+        }
+        .onAppear(perform: load)
+        .onChange(of: family.id) {
+            save()
+            load()
+        }
+        // A note changed elsewhere, as by restoring a backup, unless it's being written here.
+        .onChange(of: model.note(of: family)) { if !isFocused { load() } }
+        .onChange(of: isFocused) { if !isFocused { save() } }
+        .onDisappear(perform: save)
+        .task(id: text) {
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { save() }
+        }
+    }
+
+    private func load() {
+        editing = family.id
+        text = model.note(of: family) ?? ""
+    }
+
+    /// Saves the text as the note of the family it was written for, which may be the one before.
+    private func save() {
+        guard let editing, let family = model.family(editing) else { return }
+        model.setNote(text, for: family)
     }
 }
 

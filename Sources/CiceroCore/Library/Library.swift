@@ -103,7 +103,8 @@ public struct Library: Sendable {
         for (position, family) in families.enumerated() { index[family.id] = position }
         self.index = index
         searchText = families.concurrentMap { family in
-            var words = [family.name, family.manufacturer ?? ""]
+            var words = [family.id, family.manufacturer ?? ""]
+            if family.name != family.id { words.append(family.name) }
             var seen = Set<String>()
             for face in family.faces.map(\.face) {
                 words.append(face.postScriptName)
@@ -124,8 +125,8 @@ public struct Library: Sendable {
 
     public func position(of id: String) -> Int? { index[id] }
 
-    /// Whether a family matches a search: its name, foundry, or a style's PostScript name, designer or vendor
-    /// ID contains the (lowercased) query.
+    /// Whether a family matches a search: its name (also the one in the Mac's language it shows), foundry, or a style's
+    /// PostScript name, designer or vendor ID contains the (lowercased) query.
     public func matches(_ family: Family, search lowercasedQuery: String) -> Bool {
         guard !lowercasedQuery.isEmpty, let position = index[family.id] else { return true }
         return searchText[position].contains(lowercasedQuery)
@@ -170,7 +171,8 @@ public final class LibraryScanner: Sendable {
         var files: [String: CachedFile] = [:]
         var loaded = false
         var dirty = false
-        /// Finder-order positions from the last full sort, so scans with no new family skip `localizedStandardCompare`.
+        /// Finder-order positions from the last full sort, so scans with no new family skip `localizedStandardCompare`
+        /// (see `sorted`).
         var ranks: [String: Int] = [:]
         /// The last library built and a hash of what it was built from, so an unchanged rescan returns it as is.
         var last: (inputs: Int, library: Library)?
@@ -791,9 +793,8 @@ public final class LibraryScanner: Sendable {
         for members in byFamily.values {
             for (face, _, stamp) in members { stamps[face.id] = stamp }
         }
-        let names = sortedNames(Array(byFamily.keys))
         let grouped = byFamily
-        var families = names.concurrentMap { name in
+        var families = Array(byFamily.keys).concurrentMap { name in
             let members = grouped[name]!
             let faces = members.map(\.0).sorted { a, b in
                 // Narrowest first, then lightest: by each named instance's place on the axes, as a variable
@@ -810,7 +811,7 @@ public final class LibraryScanner: Sendable {
                 manufacturer: faces.lazy.compactMap { Foundry.normalized($0.face.manufacturer) }.first
             )
         }
-        families = Self.unifyingManufacturerCase(families)
+        families = Self.unifyingManufacturerCase(sorted(families))
         unreadable.sort()
 
         var offline = Set<String>()
@@ -921,25 +922,29 @@ public final class LibraryScanner: Sendable {
             let key = String(manufacturer.lowercased().filter { $0.isLetter || $0.isNumber })
             if let spelling = spellings[key] {
                 guard spelling != manufacturer else { return family }
-                return Family(name: family.name, faces: family.faces, state: family.state, folderIDs: family.folderIDs, manufacturer: spelling)
+                return Family(name: family.id, faces: family.faces, state: family.state, folderIDs: family.folderIDs, manufacturer: spelling)
             }
             spellings[key] = manufacturer
             return family
         }
     }
 
-    /// Finder order. A full `localizedStandardCompare` sort costs tens of milliseconds, so its result
-    /// is remembered as ranks and reused while no new family name appears.
-    private func sortedNames(_ names: [String]) -> [String] {
-        state.withLock { state in
-            if names.allSatisfy({ state.ranks[$0] != nil }) {
-                return names.sorted { state.ranks[$0]! < state.ranks[$1]! }
+    /// Finder order of the names they show. A full `localizedStandardCompare` sort costs tens of milliseconds, so its
+    /// result is remembered as ranks and reused while no new name appears.
+    private func sorted(_ families: [Family]) -> [Family] {
+        // A family shown in the Mac's language by that name, and its own after it, so two that show alike stay apart.
+        let keys = families.map { $0.name == $0.id ? $0.id : $0.name + "\u{0}" + $0.id }
+        let order: [String] = state.withLock { state in
+            if keys.allSatisfy({ state.ranks[$0] != nil }) {
+                return keys.sorted { state.ranks[$0]! < state.ranks[$1]! }
             }
             // Sorted from a fixed starting order, so the result never depends on dictionary order.
-            let sorted = names.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            let sorted = keys.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             state.ranks = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($1, $0) })
             return sorted
         }
+        let byKey = Dictionary(uniqueKeysWithValues: zip(keys, families))
+        return order.map { byKey[$0]! }
     }
 }
 
