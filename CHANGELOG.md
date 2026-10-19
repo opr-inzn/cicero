@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- In the sidebar, a section title’s **+** stays where it is when the pointer comes over the title and its chevron shows; it moved aside to make room.
+
 ## 1.7
 
 - The Info panel has an **Axes** tab for a variable family: a slider for each of its axes, like Weight, Width, Optical Size or the designer’s own, with its tag, to move the family’s previews along them, in the browser and on its font page, text and glyphs alike, or type a value. Axes the font hides, like Roboto Flex’s parametric ones, come last, under **Hidden Axes**, which opens and closes. On a font page, **Axes**, after the alignment buttons, opens the tab, and once an axis has moved, the Style menu says **Custom**.
