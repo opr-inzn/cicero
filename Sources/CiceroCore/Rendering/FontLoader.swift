@@ -45,7 +45,9 @@ public final class FontLoader: Sendable {
     public init() {}
 
     /// `weight` sets the weight axis of variable faces (clamped to its range); ignored otherwise. `variations` sets
-    /// any of their axes, by tag, the weight axis over `weight`; the slider that sets one keeps it in range.
+    /// any of their axes, by tag, the weight axis over `weight`; the slider that sets one keeps it in range. A variable
+    /// face is otherwise drawn exactly where it sits on its axes, optical size included: CoreText would match that to
+    /// the point size, and drops a setting of the default to do so.
     public func font(_ face: FontFace, size: CGFloat, weight: Double? = nil, variations: [String: Double] = [:],
                      features: [FeatureSetting] = []) -> CTFont {
         let weight = face.weightAxis.flatMap { axis in weight.map { min(max($0, axis.minimum), axis.maximum) } }
@@ -59,6 +61,9 @@ public final class FontLoader: Sendable {
         if let font = fonts[key] { return font }
 
         var descriptor = descriptor(for: face)
+        if face.weightAxis != nil || !face.axes.isEmpty {
+            descriptor = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontOpticalSizeAttribute: "none"] as CFDictionary)
+        }
         if let weight {
             descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: Self.weightAxisID), weight)
         }
@@ -97,8 +102,8 @@ public final class FontLoader: Sendable {
         return axes
     }
 
-    /// Where a font is drawn on each of its axes, by tag: the named instance's place, the values it was made with,
-    /// and the optical size CoreText picks for its point size. Axes left out are at their defaults.
+    /// Where a font is drawn on each of its axes, by tag: the named instance's place and the values it was made with.
+    /// Axes left out are at their defaults.
     public static func variation(of font: CTFont) -> [String: Double] {
         (CTFontCopyVariation(font) as? [NSNumber: NSNumber] ?? [:]).reduce(into: [:]) {
             $0[AxisTag.string($1.key.uint32Value)] = $1.value.doubleValue

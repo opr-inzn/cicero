@@ -6,8 +6,6 @@ import SwiftUI
 struct AxisControls: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
-    /// The font page's text size, for the optical size its text is drawn at.
-    @AppStorage("typeTester.size") private var testerSize = 72.0
     let family: Family
 
     var body: some View {
@@ -27,9 +25,7 @@ struct AxisControls: View {
 
     private func form(_ axes: [AxisRange], style: LibraryFace, weight: Double) -> some View {
         let moved = model.variations(for: family, face: style.id)
-        // Where the previews draw it: the optical size follows the size of the page's text, or of the browser's.
-        let size = model.openFamilyID == family.id ? testerSize : preview.size
-        let drawn = FontLoader.variation(of: FontLoader.shared.font(style.face, size: size, weight: weight, variations: moved))
+        let drawn = FontLoader.variation(of: FontLoader.shared.font(style.face, size: preview.size, weight: weight, variations: moved))
         let shown = axes.filter { !$0.isHidden }
         let hidden = axes.filter(\.isHidden)
         return Form {

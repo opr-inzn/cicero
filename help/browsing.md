@@ -144,13 +144,13 @@ The features you choose apply to that family wherever Cicero previews it, in the
 
 ## Try variable axes
 
-A variable font is drawn from its design axes, like **Weight**, **Width**, **Optical Size** or **Slant**, or the designer’s own, like Roboto Flex’s **Grade**. Cicero shows it at its default on each, the origin its styles are drawn from, at the weight in Preview Options. To move it along them:
+A variable font is drawn from its design axes, like **Weight**, **Width**, **Optical Size** or **Slant**, or the designer’s own, like Roboto Flex’s **Grade**. Cicero shows it at its default on each, the origin its styles are drawn from, Optical Size included, at the weight in Preview Options. To move it along them:
 
 1. Select a variable family and open the Info panel, or click **Axes** on its font page.
 2. Click **Axes**.
 3. Drag a slider, or type a value next to it.
 
-Each axis shows its name and its four-letter tag, like `wdth`. The arrow that appears next to a moved axis puts it back, and **Reset All** puts them all back. **Optical Size** follows the size the text is drawn at until you move it. Axes the font asks apps not to show, like Roboto Flex’s parametric ones, are listed last, under **Hidden Axes**.
+Each axis shows its name and its four-letter tag, like `wdth`. The arrow that appears next to a moved axis puts it back, and **Reset All** puts them all back. **Optical Size** stays at the font’s own, like every other axis, rather than following the size of the text, until you move it. Axes the font asks apps not to show, like Roboto Flex’s parametric ones, are listed last, under **Hidden Axes**.
 
 Like features, the axes apply to that family wherever Cicero previews it, in the list, grid, specimens, Quick Look and its font page, text and glyphs alike, until Cicero quits. Choosing a style on the font page puts them back.
 
