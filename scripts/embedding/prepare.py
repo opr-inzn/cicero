@@ -5,10 +5,15 @@
 
 Takes a family only when its license file says OFL, Apache or UFL, and only families for Latin (no primary script
 of another, unless --other-scripts: many draw Latin letters of their own, and train.py takes those that borrow
-another family's as that family), without symbol fonts and Playwrite's Guides, which draw lines with the letters. Of each it draws the upright styles from Light to Bold, a variable font at 300, 400, 500, 600 and 700
-as far as its weight axis goes, and one italic, the nearest to 400; a family with none of those in its range, the
-nearest to 400 of what it has. Writes manifest.json, the styles to draw (see render-letters.swift), and
-families.json: each family's name, category, Google's tags and its entries in the manifest.
+another family's as that family), without symbol fonts and Playwrite's Guides, which draw lines with the letters.
+
+Of each it draws the upright and the italic styles from Light to Bold, a variable font at 300, 400, 500, 600 and 700
+as far as its weight axis goes and at the normal width, whatever its default; a family with none of those weights,
+the nearest to 400 it has. A variable font with a width axis is drawn narrower and wider too, at 300, 400 and 500:
+extra condensed and condensed (62.5 and 75, or as narrow as it goes past 87.5) and expanded and extra expanded (125
+and 150, or as wide as it goes past 112.5). Writes manifest.json, the styles to draw (see render-letters.swift), and
+families.json: each family's name, category, Google's tags and its entries in the manifest, with their weight,
+width and whether they're italic.
 """
 
 import argparse
@@ -23,6 +28,7 @@ LICENSES = {
     "ufl": ("UFL.txt", "UBUNTU FONT LICENCE"),
 }
 WEIGHTS = [300, 400, 500, 600, 700]
+NARROW, WIDE = [62.5, 75], [125, 150]
 
 
 def parse_metadata(text):
@@ -67,27 +73,43 @@ def licensed(directory, kind):
     return any(path.exists() and says.lower() in path.read_text(errors="ignore").lower() for path in candidates)
 
 
+def axis_range(axes, tag):
+    axis = next((axis for axis in axes if first(axis, "tag") == tag), None)
+    return (first(axis, "min_value"), first(axis, "max_value")) if axis else None
+
+
+def widths(axes):
+    """The widths besides the normal one to draw a variable font at."""
+    found = axis_range(axes, "wdth")
+    if not found:
+        return []
+    low, high = found
+    narrow = [width for width in NARROW if width >= low] or ([low] if low <= 87.5 else [])
+    wide = [width for width in WIDE if width <= high] or ([high] if high >= 112.5 else [])
+    return narrow + wide
+
+
 def instances(fonts, axes, italic):
-    """(file, variations, weight) for the styles to draw."""
+    """(file, variations, weight, width) for the styles to draw."""
     fonts = [font for font in fonts if (first(font, "style") == "italic") == italic]
     if not fonts:
         return []
-    weight_axis = next((axis for axis in axes if first(axis, "tag") == "wght"), None)
     variable = [font for font in fonts if "[" in first(font, "filename", "")]
     if variable:
         file = first(variable[0], "filename")
-        if weight_axis is None:
-            return [(file, {}, first(variable[0], "weight", 400))]
-        low, high = first(weight_axis, "min_value"), first(weight_axis, "max_value")
+        weight_range, width_range = axis_range(axes, "wght"), axis_range(axes, "wdth")
+        normal = {"wdth": min(max(100, width_range[0]), width_range[1])} if width_range else {}
+        if weight_range is None:
+            return [(file, normal, first(variable[0], "weight", 400), 100)]
+        low, high = weight_range
         weights = [weight for weight in WEIGHTS if low <= weight <= high] or [min(max(400, low), high)]
-        if italic:
-            weights = [min(weights, key=lambda weight: abs(weight - 400))]
-        return [(file, {"wght": weight}, weight) for weight in weights]
-    statics = [(first(font, "filename"), {}, first(font, "weight", 400)) for font in fonts]
-    chosen = [entry for entry in statics if 300 <= entry[2] <= 700]
-    if italic or not chosen:
-        chosen = [min(chosen or statics, key=lambda entry: abs(entry[2] - 400))]
-    return chosen
+        found = [(file, {"wght": weight, **normal}, weight, 100) for weight in weights]
+        if not italic:
+            for width in widths(axes):
+                found += [(file, {"wght": weight, "wdth": width}, weight, width) for weight in weights if weight <= 500]
+        return found
+    statics = [(first(font, "filename"), {}, first(font, "weight", 400), 100) for font in fonts]
+    return [entry for entry in statics if 300 <= entry[2] <= 700] or [min(statics, key=lambda entry: abs(entry[2] - 400))]
 
 
 def tags(root):
@@ -136,11 +158,11 @@ def main():
             fonts, axes = meta.get("fonts", []), meta.get("axes", [])
             entries = []
             for italic in (False, True):
-                for file, variations, weight in instances(fonts, axes, italic):
+                for file, variations, weight, width in instances(fonts, axes, italic):
                     path = directory / file
                     if not path.exists():
                         continue
-                    entries.append({"row": len(manifest), "weight": weight, "italic": italic})
+                    entries.append({"row": len(manifest), "weight": weight, "width": width, "italic": italic})
                     manifest.append({"file": str(path), "variations": variations})
             if not entries:
                 continue

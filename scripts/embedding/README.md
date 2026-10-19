@@ -25,7 +25,13 @@ swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/Cicer
 "$T/venv/bin/python" -I scripts/embedding/train.py export "$T/work" Resources/LetterEmbedding.mlpackage
 ```
 
-Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the tenth of the
-families it doesn't learn from: how often a style's nearest other style is its own family's, and how much the ten
-nearest families share its Google tags and category. A new model changes every family's embedding: raise
-`MeasurementIndex.version` with it.
+It learns designs: a family's uprights at one width (the normal one, and condensed and expanded ones of a variable
+font with a width axis) or its italics, each a design of its own, that the others of the family share a batch with,
+so that slant and width count. `--stretch` adds designs drawn narrower and wider than they are, which made width
+count a little more and italics less in round two; it's off.
+
+Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the
+tenth of the families it doesn't learn from: how often a style's nearest other style is its own design's; how much
+the ten nearest upright designs share an upright one's Google tags and category; how many of the ten nearest are
+upright, for an upright design, and italic, for an italic one; and how far apart in width the ten nearest are, in
+`SimilarFonts`' steps. A new model changes every family's embedding: raise `MeasurementIndex.version` with it.

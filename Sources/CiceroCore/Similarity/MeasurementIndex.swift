@@ -13,7 +13,7 @@ public final class MeasurementIndex: Sendable {
     private let saveQueue = DispatchQueue(label: "Cicero.MeasurementIndex.save", qos: .utility)
 
     /// Raised whenever measuring or the embedding's model changes, so measurements from before are made again.
-    static let version = 2
+    static let version = 3
 
     private struct Entry: Sendable {
         var stamp: CoverageStamp
