@@ -308,8 +308,14 @@ private struct StyleRows: View {
         let axes = family.styleAxes.map { (tag: $0.tag, name: $0.name, width: Self.width(fitting: [$0.name], in: headerFont)) }
         // As wide as the longest name, up to a point: some run to Serif Compressed Thin Italic.
         let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: 240)
+        // The switch and the longest status its styles say, or come to with their switches, so turning one on or off
+        // doesn't move the columns; the rest of the page's width goes to the samples.
+        let statuses = family.faces.flatMap { style in
+            [style.state.label, "Active", "Inactive"] + (style.app.map { [FaceState.appOnly($0).label] } ?? [])
+        }
+        let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         VStack(spacing: 0) {
-            row(styleWidth: styleWidth) {
+            row(styleWidth: styleWidth, statusWidth: statusWidth) {
                 Text("Styles")
             } style: {
                 Text("Style")
@@ -325,7 +331,7 @@ private struct StyleRows: View {
             .padding(.vertical, 6)
             ForEach(family.faces) { style in
                 Divider()
-                row(styleWidth: styleWidth) {
+                row(styleWidth: styleWidth, statusWidth: statusWidth) {
                     FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
@@ -369,7 +375,7 @@ private struct StyleRows: View {
         return min(max(minimum, widest.rounded(.up)), maximum)
     }
 
-    private func row(styleWidth: CGFloat, @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
+    private func row(styleWidth: CGFloat, statusWidth: CGFloat, @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
                      @ViewBuilder weight: () -> some View, @ViewBuilder axes: () -> some View,
                      @ViewBuilder status: () -> some View) -> some View {
         HStack(spacing: 12) {
@@ -377,7 +383,7 @@ private struct StyleRows: View {
             style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
             weight().frame(width: 56, alignment: .leading)
             axes().lineLimit(1)
-            status().frame(width: 210, alignment: .leading)
+            status().frame(width: statusWidth, alignment: .leading)
         }
     }
 }
