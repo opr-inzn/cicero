@@ -117,10 +117,10 @@ Click **Info** in the toolbar, or choose **Fonts → Show Info** (⌘I). The Inf
 
 The panel describes the style being previewed, the one closest to the weight in Preview Options. Its **Info** tab shows:
 
+- **Note**: your [note](organizing.md#notes) on the family, at the top. Click it to write one.
 - **Status**, and the font’s names: family, style, full name and PostScript name
 - **Tags**: the family’s tags, or **No Tags**. **Change** gives it more or takes them off.
 - **Rating**: five stars to click to give the family a [rating](organizing.md#ratings). Click the one it has again to take the rating away.
-- **Note**: your [note](organizing.md#notes) on the family. Click it to write one.
 - version, designer, manufacturer, and the vendor ID: the four letters a foundry registers, like ADBE for Adobe
 - weight, and the weight range of a variable font
 - number of glyphs, format, embedding and copyright. **Embedding** is what the font’s license lets a document do with it, as the font says: **Installable**, **Editable** (the document can be edited with the font in it), **Preview & Print** (viewed and printed, not edited) or **Restricted** (not embedded at all)

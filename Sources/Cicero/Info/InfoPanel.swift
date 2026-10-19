@@ -138,10 +138,11 @@ private struct InfoRows: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // First: what the user wrote about the family.
+            NoteRow(family: family)
             row("Status", face.state.label)
             TagsRow(family: family)
             RatingRow(family: family)
-            NoteRow(family: family)
             ClassificationRow(family: family)
             if let info = info?.value {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
