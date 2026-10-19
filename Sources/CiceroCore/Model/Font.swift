@@ -737,6 +737,8 @@ extension Classification {
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
+            // A stencil or an outline of a sans serif is still ornamental.
+            (.ornamental, ["stencil", "inline", "outline", "fraktur", "blackletter"]),
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
             (.serif, ["serif", "slab", "garamond", "antiqua"]),
             (.script, ["script", "brush", "hand"]),

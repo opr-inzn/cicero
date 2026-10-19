@@ -12,6 +12,7 @@ public struct ImportChoices: Equatable, Sendable {
     public var smartSets: Set<String> = []
     public var tags = true
     public var ratings = true
+    public var classifications = true
     public var history = true
     /// Turn on, in place, the fonts that were on in the other app.
     public var activate = false
@@ -35,6 +36,9 @@ public struct ImportSummary: Equatable, Sendable {
     public var smartSets = 0
     public var tags = 0
     public var ratedFamilies = 0
+    /// Families put in a classification, and the user's own classifications made for them.
+    public var classifiedFamilies = 0
+    public var classifications = 0
     /// Styles to turn on, as they were on in the other app.
     public var activated = 0
     /// Fonts the sets, tags or ratings name that aren't in the library.
@@ -118,7 +122,7 @@ public enum LibraryImport {
         return copied
     }
 
-    /// Brings in the sets, smart sets, tags, ratings and activation history, matched against the library, which has
+    /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the library, which has
     /// the other app's fonts by now; and gives the styles to turn on, when chosen. Apps of application sets are looked
     /// for where they were, then by name in `appFolders`.
     public static func apply(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, library: Library,
@@ -245,6 +249,35 @@ public enum LibraryImport {
             for (family, value) in stars where data.familyRatings[family] == nil {
                 data.familyRatings[family] = value
                 summary.ratedFamilies += 1
+            }
+        }
+
+        // A family goes in the classification most of its styles have, as the user's choice, unless the user chose one
+        // already or its fonts say as much; the user's own ones from the other app come along.
+        if choices.classifications {
+            var votes: [String: [String: Int]] = [:]
+            var families: [String: Family] = [:]
+            var custom = Set<String>()
+            for classification in imported.classifications {
+                let name = classification.builtIn.map { data.classificationRenames[$0.rawValue] ?? $0.rawValue } ?? classification.name
+                if classification.builtIn == nil { custom.insert(name) }
+                for (family, _) in faces([classification.font]) {
+                    votes[family.id, default: [:]][name, default: 0] += 1
+                    families[family.id] = family
+                }
+            }
+            for (id, counts) in votes.sorted(by: { $0.key < $1.key }) where data.classificationOverrides[id] == nil {
+                guard let family = families[id],
+                      let name = counts.max(by: { $0.value < $1.value || $0.value == $1.value && $0.key > $1.key })?.key else { continue }
+                let suggested = data.classificationRenames[family.classification.rawValue] ?? family.classification.rawValue
+                guard name != suggested || custom.contains(name) else { continue }
+                if custom.contains(name), !data.classifications.contains(name),
+                   !Classification.allCases.contains(where: { (data.classificationRenames[$0.rawValue] ?? $0.rawValue) == name }) {
+                    data.classifications.append(name)
+                    summary.classifications += 1
+                }
+                data.classificationOverrides[id] = name
+                summary.classifiedFamilies += 1
             }
         }
 

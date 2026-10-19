@@ -8,7 +8,8 @@ import Foundation
 /// The database (SQLite, the same in 7.x and its backups): `containers` has a row per font file, `fonts` a row per face,
 /// `sourceItems` the sidebar (sets, folders, smart sets and application sets, nested by `parentSerialID`),
 /// `setContainers` which files each set has, `smartGroupRules` each smart set's rules and `applicationSetPaths` the
-/// apps of each application set. Dates are seconds since 2001.
+/// apps of each application set; `fonts.fontClassificationIds` numbers each face's classifications, which
+/// `fontClassifications` names, the user's own among them (`isCustom`). Dates are seconds since 2001.
 public enum FontExplorerImport {
     public enum Failure: Error, Equatable {
         /// Not FontExplorer X's database, or a backup without one.
@@ -100,6 +101,29 @@ public enum FontExplorerImport {
     }
 
     // MARK: Labels
+
+    /// FontExplorer X's own classifications (its FontClassifications.json, which its database copies), by number, as
+    /// Cicero's: each branch of its tree goes where Cicero puts that kind, its blackletter, a branch of scripts there,
+    /// among the ornamental ones. Themes (Christmas, Techno…), usages (Book, Poster…), and Condensed and the like say
+    /// nothing about it.
+    static let classifications: [Int: Classification] = {
+        var found: [Int: Classification] = [42: .monospaced, 48: .symbol, 17: .ornamental]
+        for id in [1, 47, 3, 4, 5, 6, 7, 8] { found[id] = .serif }
+        for id in [9, 45, 11, 12, 13, 14] { found[id] = .sansSerif }
+        for id in [15, 46, 18, 19, 20, 69, 23, 24] { found[id] = .script }
+        for id in [25, 40] + Array(27...37) { found[id] = .ornamental }
+        return found
+    }()
+
+    /// The classification of a style FontExplorer X gave these (its numbers, however they're written): the user's own
+    /// first, which only the user gives, then monospaced and symbol, which say more than a kind, then the first kind.
+    static func classification(_ ids: String, of font: ImportedFont, custom: [Int: String]) -> ImportedClassification? {
+        let numbers = ids.matches(of: /\d+/).compactMap { Int($0.output) }
+        if let name = numbers.lazy.compactMap({ custom[$0] }).first { return ImportedClassification(font: font, custom: name) }
+        let found = numbers.compactMap { classifications[$0] }
+        guard let first = found.first(where: { $0 == .monospaced }) ?? found.first(where: { $0 == .symbol }) ?? found.first else { return nil }
+        return ImportedClassification(font: font, builtIn: first)
+    }
 
     /// FontExplorer X's labels by number, as tags: they have colours but no names, so they're named after them, as
     /// Cicero names a tag made with a colour and no name.
@@ -231,7 +255,13 @@ private struct Reader {
         let containerRows = try select(["containerID", "path", "isSystemFont", "isInSystemFolder", "isSkyFont", "isTypekit", "isMLSFont",
                                         "activate", "count", "lastActivated", "labelColorID", "comment", "licenseName", "licenseLocation",
                                         "licenseComment"], from: "containers")
-        let fontRows = try select(["containerID", "psName", "familyName", "style", "rating", "labelColorID", "comment"], from: "fonts")
+        let fontRows = try select(["containerID", "psName", "familyName", "style", "rating", "labelColorID", "comment", "fontClassificationIds"],
+                                  from: "fonts")
+        let classificationRows = try select(["fontClassificationID", "isCustom", "title"], from: "fontClassifications")
+        let custom = Dictionary(classificationRows.compactMap { row -> (Int, String)? in
+            guard row.int("isCustom") != 0, let title = row.text("title")?.trimmingCharacters(in: .whitespaces), !title.isEmpty else { return nil }
+            return (row.int("fontClassificationID"), title)
+        }, uniquingKeysWith: { first, _ in first })
         let items = try select(["serialID", "type", "title", "parentSerialID", "specialFlag"], from: "sourceItems", orderedBy: "rowid")
         let memberRows = try select(["serialID", "containerID"], from: "setContainers")
         let ruleRows = try select(["serialID", "baseCriteria", "subCriteria", "value"], from: "smartGroupRules", orderedBy: "rowid")
@@ -280,6 +310,9 @@ private struct Reader {
             if FontExplorerImport.labels[label] != nil { labelled[label, default: []].append(font) }
             let stars = row.int("rating")
             if (1...5).contains(stars) { library.ratings.append(ImportedRating(font: font, stars: stars)) }
+            if let ids = row.text("fontClassificationIds"), let classification = FontExplorerImport.classification(ids, of: font, custom: custom) {
+                library.classifications.append(classification)
+            }
             if row.text("comment") != nil { comments += 1 }
         }
         func fonts(_ id: Int) -> [ImportedFont] {

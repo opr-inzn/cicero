@@ -44,6 +44,8 @@ public struct ImportedLibrary: Sendable {
     public var tags: [ImportedTag] = []
     /// Stars the other app gave single styles, 1…5.
     public var ratings: [ImportedRating] = []
+    /// The classifications FontExplorer X gave single styles.
+    public var classifications: [ImportedClassification] = []
     /// How often the other app turned font files on, and when last.
     public var history: [ImportedHistory] = []
     /// Fonts that were on in the other app.
@@ -131,6 +133,27 @@ public struct ImportedTag: Hashable, Sendable {
         self.name = name
         self.color = color
         self.fonts = fonts
+    }
+}
+
+/// The classification the other app gave a style: one of Cicero's, or one the user made there.
+public struct ImportedClassification: Hashable, Sendable {
+    public var font: ImportedFont
+    /// One of Cicero's, or nil for the user's own.
+    public var builtIn: Classification?
+    /// The user's own classification's name.
+    public var name: String
+
+    public init(font: ImportedFont, builtIn: Classification) {
+        self.font = font
+        self.builtIn = builtIn
+        name = builtIn.rawValue
+    }
+
+    public init(font: ImportedFont, custom name: String) {
+        self.font = font
+        builtIn = nil
+        self.name = name
     }
 }
 

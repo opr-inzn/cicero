@@ -4,8 +4,9 @@ import FoundationModels
 
 /// Classifications for the families nothing in their files classifies (see `Classification.of`), guessed from
 /// their names by the language model Apple Intelligence keeps on the Mac, while Settings → General → Guess
-/// classifications from names is on. The model runs on the Mac, so nothing is sent anywhere. Each family is asked
-/// about once, one at a time in the background; the answers, "can't tell" among them, are kept in the caches.
+/// classifications is on; they come before the model of letters' guesses (see `AppModel.letterGuesses`), as the
+/// language model answers only when a name says. The model runs on the Mac, so nothing is sent anywhere. Each family
+/// is asked about once, one at a time in the background; the answers, "can't tell" among them, are kept in the caches.
 final class ClassificationGuesser {
     /// Family name → the model's guess; `.unclassified` where it couldn't tell.
     private(set) var guesses: [String: Classification]

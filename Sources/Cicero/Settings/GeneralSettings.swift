@@ -49,10 +49,9 @@ struct GeneralSettings: View {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 Toggle(isOn: $model.guessesClassifications) {
-                    Text("Guess classifications from names")
+                    Text("Guess classifications")
                     Text(guessingExplanation)
                 }
-                .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
             }
             Section("Maintenance") {
                 LabeledContent("Library") {
@@ -94,12 +93,12 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
     private var guessingExplanation: String {
-        let what = "When nothing else classifies a font, Apple Intelligence guesses from its name, on this Mac. Nothing is sent."
+        let what = "When a font’s files don’t say, Cicero guesses from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
         return switch ClassificationGuesser.availability {
         case .available: what
-        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to use this."
+        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to guess from names too."
         case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
-        case .unavailable: "Guessing needs Apple Intelligence, which this Mac doesn’t have."
+        case .unavailable: "When a font’s files don’t say, Cicero guesses from the shapes of its letters, on this Mac. Nothing is sent."
         }
     }
 

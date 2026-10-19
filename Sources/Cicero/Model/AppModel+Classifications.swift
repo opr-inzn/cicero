@@ -1,8 +1,17 @@
 import CiceroCore
 import Foundation
 
-/// Classifications: the one a family's fonts suggest (or for one they don't, the guess from its name), unless the
-/// user put it in another, the user's own among them. Built-in ones keep their place under the names the user gave them.
+/// Where a guessed classification comes from.
+enum ClassificationGuessSource {
+    /// Apple Intelligence, from the family's name.
+    case name
+    /// The model of letters, from their shapes.
+    case letters
+}
+
+/// Classifications: the one a family's fonts suggest (or for one they don't, a guess from its name or its letters),
+/// unless the user put it in another, the user's own among them. Built-in ones keep their place under the names the
+/// user gave them.
 extension AppModel {
     /// Every classification, for menus: the built-in ones under their names, then the user's.
     var classificationNames: [String] {
@@ -22,25 +31,34 @@ extension AppModel {
     func classificationNamer() -> (Family) -> String {
         let overrides = data.classificationOverrides
         let renames = data.classificationRenames
-        let guesses = classificationGuesses
+        let guess = classificationGuess()
         return { family in
             if let override = overrides[family.id] { return override }
-            let guessable = family.classification == .unclassified && !family.mixesSerifAndSans
-            let classification = guessable ? guesses[family.id] ?? .unclassified : family.classification
+            let classification = guess(family)?.classification ?? family.classification
             return renames[classification.rawValue] ?? classification.rawValue
         }
     }
 
-    /// The classification Automatic puts a family in: the one its fonts suggest, or the guess from its name.
+    /// The classification Automatic puts a family in: the one its fonts suggest, or the guess.
     func suggestedClassification(of family: Family) -> Classification {
-        guessedClassification(of: family) ?? family.classification
+        guessedClassification(of: family)?.classification ?? family.classification
     }
 
-    /// What Apple Intelligence guessed from the name of a family its fonts don't classify; nil without a guess.
-    func guessedClassification(of family: Family) -> Classification? {
-        guard family.classification == .unclassified, !family.mixesSerifAndSans,
-              let guess = classificationGuesses[family.id], guess != .unclassified else { return nil }
-        return guess
+    /// The guess for a family its fonts don't classify, and where it comes from; nil without one.
+    func guessedClassification(of family: Family) -> (classification: Classification, source: ClassificationGuessSource)? {
+        classificationGuess()(family)
+    }
+
+    /// `guessedClassification(of:)` for many families: Apple Intelligence's guess from the name, which it makes only
+    /// when the name says, else what the model sees in the letters; nothing while guessing is off, and nothing for a
+    /// family whose letters say serif for some styles and sans serif for others.
+    func classificationGuess() -> (Family) -> (classification: Classification, source: ClassificationGuessSource)? {
+        let names = classificationGuesses, letters = letterGuesses, guessing = guessesClassifications
+        return { family in
+            guard guessing, family.classification == .unclassified, !family.mixesSerifAndSans else { return nil }
+            if let guess = names[family.id], guess != .unclassified { return (guess, .name) }
+            return letters[family.id].map { ($0, .letters) }
+        }
     }
 
     func isUserClassification(_ name: String) -> Bool {

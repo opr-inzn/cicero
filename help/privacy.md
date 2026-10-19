@@ -13,7 +13,7 @@ The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Ci
 
 ## Apple Intelligence
 
-To guess the classification of fonts nothing else classifies, Cicero gives the language model Apple Intelligence keeps on your Mac each family’s name, foundry, designer and style names. The model runs on your Mac, so nothing is sent. To stop it, turn off **Guess classifications from names** in **Settings → General**; Cicero then forgets its guesses. Without Apple Intelligence, Cicero doesn’t guess.
+To guess the classification of fonts nothing else classifies, Cicero gives the language model Apple Intelligence keeps on your Mac each family’s name, foundry, designer and style names. The model runs on your Mac, so nothing is sent. Cicero also guesses from the shapes of the letters, with a model of its own that comes with it, on your Mac too. To stop both, turn off **Guess classifications** in **Settings → General**; Cicero then forgets its guesses. Without Apple Intelligence, Cicero guesses from the letters only.
 
 The **Help** menu opens pages in your web browser, like this guide on GitHub and the privacy policy on Cicero’s website, and so do the links in **Settings → Coverage** and in **About Cicero**. Cicero itself doesn’t load them.
 

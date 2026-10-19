@@ -263,10 +263,14 @@ Cicero reads each family’s foundry from the manufacturer name in its files, an
 Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol and Unclassified, and shows the ones your library has. Slab serifs count as Serif. To decide, it goes through these in turn and stops at the first that says something:
 
 1. The classification the font gives itself.
-2. Words in the name, like “Mono”, “Slab”, “Sans”, “Grotesk”, “Script” or “Symbol”.
+2. Words in the name, like “Mono”, “Stencil”, “Slab”, “Sans”, “Grotesk”, “Script” or “Symbol”.
 3. The shapes of the letters. An I and an l with feet on both sides are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing.
 4. The font’s PANOSE numbers, another way fonts can say what they are.
-5. With Apple Intelligence on, a guess from the family’s name, made on your Mac. The Info panel says “Guessed from the name by Apple Intelligence” under such a classification. To stop the guessing, turn off **Guess classifications from names** in **Settings → General**.
+5. With **Guess classifications** on in **Settings → General**, a guess, made on your Mac:
+   - With Apple Intelligence on, from the family’s name, when the name says. The Info panel says “Guessed from the name by Apple Intelligence” under such a classification.
+   - Otherwise from the shapes of its letters, when Cicero is sure enough: it tells serif, sans serif, script and ornamental letters apart, italics, display and variable fonts too, the way it learned to from thousands of freely licensed fonts. The Info panel says “Guessed from the shapes of its letters”.
+
+   Cicero asks whether to guess the first time it opens. Turn **Guess classifications** off, and the guesses go: those families are Unclassified again.
 
 A family none of them tells stays Unclassified, rather than ending up in the wrong classification.
 

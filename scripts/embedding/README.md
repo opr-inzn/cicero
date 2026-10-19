@@ -22,8 +22,13 @@ swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/Cicer
 # writes them to measurements.tsv (CICERO_EMBEDDING_WORK="$T/work" swift test --filter EmbeddingEvaluation).
 
 "$T/venv/bin/python" -I scripts/embedding/train.py train "$T/work" --measurements "$T/work/measurements.tsv"
+"$T/venv/bin/python" -I scripts/embedding/train.py classify "$T/work"
 "$T/venv/bin/python" -I scripts/embedding/train.py export "$T/work" Resources/LetterEmbedding.mlpackage
 ```
+
+`classify` fits a small classifier on the embedding as it is, for Cicero's guesses of classifications: serif, sans
+serif, script or ornamental, from Google's category, stroke and tags (see `label` in train.py). It says how often it's
+right on the held-out families, and how often when it's sure, which `AppModel.letterGuessLikelihood` goes by.
 
 It learns designs: a family's uprights at one width (the normal one, and condensed and expanded ones of a variable
 font with a width axis) or its italics, each a design of its own, that the others of the family share a batch with,

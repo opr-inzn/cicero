@@ -99,8 +99,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   them leaves `dataRevision`, and the browser's list, as they are.
 - `ClassificationGuesser` (`Model/`) asks Apple Intelligence's on-device model to guess, from their names,
   the classification of families nothing in their files classifies, one at a time after scans, and keeps the
-  answers in the caches. `classificationNamer` applies them below the user's choices; `guessRevision`, in
-  `VisibleKey`, refills lists as they come.
+  answers in the caches. `letterGuesses` holds what `LetterEmbedding`'s model sees in their letters, as
+  `MeasurementIndex` caches it. `classificationGuess` applies the name's guess, else the letters', below the user's
+  choices and only while guessing is on; `guessRevision`, in `VisibleKey`, refills lists as they come.
 - `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
   light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
   the font page's editor (`SampleEditor`, an NSTextView with the same line height) follows too, so its text

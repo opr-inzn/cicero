@@ -2,8 +2,9 @@
 """Learns letter embeddings from the Google Fonts families drawn by render-letters.swift, and exports the model to
 Core ML for Cicero (Sources/CiceroCore/Similarity/LetterEmbedding.swift).
 
-    python3 -I scripts/embedding/train.py train  ~/Downloads/cicero-training/work [--measurements …/measurements.tsv]
-    python3 -I scripts/embedding/train.py export ~/Downloads/cicero-training/work Resources/LetterEmbedding.mlpackage
+    python3 -I scripts/embedding/train.py train    ~/Downloads/cicero-training/work [--measurements …/measurements.tsv]
+    python3 -I scripts/embedding/train.py classify ~/Downloads/cicero-training/work
+    python3 -I scripts/embedding/train.py export   ~/Downloads/cicero-training/work Resources/LetterEmbedding.mlpackage
 
 A small network looks at each of a style's 16 letters (see LetterImages.swift) the same way, then at all of them
 together, and gives 128 numbers of length 1: the embedding. It learns designs: a family's uprights at one width, or
@@ -14,6 +15,10 @@ so that designs of a kind come out close, and, given them, each style's letter m
 one line per manifest entry: its row, then the values, tab-separated), so that it sees weight, widths and x-height
 as they do. Designs whose letters are drawn alike are one design to it. A tenth of the families, by the first word
 of their names, are held out to see how it does on designs it hasn't seen.
+
+Then `classify` learns which of Cicero's classifications a design's embedding says it is, the embedding as it is:
+serif, sans serif, script or ornamental, from Google's metadata (see `label`). Monospaced ones are left out, as
+Cicero tells them by their advances. The exported model answers both.
 """
 
 import argparse
@@ -35,6 +40,11 @@ BASELINE = SIZE - 18
 CATEGORIES = ["SANS_SERIF", "SERIF", "DISPLAY", "HANDWRITING", "MONOSPACE"]
 MEASURES = 18
 KINDS = ("/Sans/", "/Serif/", "/Slab/", "/Script/", "/Theme/", "/Monospace/")
+# Cicero's classifications the model tells, in the order of its answer (Classification's raw values).
+CLASSES = ["Serif", "Sans Serif", "Script", "Ornamental"]
+# Google's themes of decorative lettering, which Cicero calls ornamental.
+ORNAMENTAL = {"Blackletter", "Stencil", "Inline", "Shaded", "Distressed", "Pixel", "Blobby", "Wacky", "Art Deco",
+              "Art Nouveau", "Tuscan", "Medieval"}
 # The lowercase's width among the measures, and SimilarFonts' step of it; the capitals' and the o's width.
 WIDTH, WIDTH_STEP = 6, 0.08
 WIDTHS = [6, 7, 8]
@@ -64,16 +74,26 @@ class Embedder(nn.Module):
         return F.normalize(self.together(each), dim=1)
 
 
-class Exported(nn.Module):
-    """One style at a time, as Cicero asks, with no shape taken from the input."""
+def classifier():
+    """From an embedding to how likely each of CLASSES is."""
+    return nn.Sequential(nn.Linear(DIMENSIONS, 64), nn.ReLU(), nn.Linear(64, len(CLASSES)))
 
-    def __init__(self, model):
+
+class Exported(nn.Module):
+    """One style at a time, as Cicero asks, with no shape taken from the input: its embedding, and how likely each
+    classification is when there's a classifier."""
+
+    def __init__(self, model, classify=None):
         super().__init__()
         self.model = model
+        self.classify = classify
 
     def forward(self, letters):
         each = self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS * 128)
-        return F.normalize(self.model.together(each), dim=1)
+        embedding = F.normalize(self.model.together(each), dim=1)
+        if self.classify is None:
+            return embedding
+        return embedding, F.softmax(self.classify(embedding), dim=1)
 
 
 def read_measurements(path, rows):
@@ -89,6 +109,32 @@ def read_measurements(path, rows):
 def standard_scores(values):
     mean, spread = np.nanmean(values, 0), np.nanstd(values, 0)
     return (values - mean) / np.maximum(spread, 1e-6)
+
+
+def label(family):
+    """The family's classification as Cicero names it (an index into CLASSES), from Google's metadata: handwriting and
+    script or brush tags are script; display families with a decorative theme ornamental (themes alone aren't
+    enough: Google tags Bodoni Moda blackletter); then the stroke Google gives it, else its category or tags, serif
+    (slab serif among them) or sans serif. None for a monospaced family, and for one nothing says enough about."""
+    tags, kinds = family["tags"], set(family.get("classifications", [])) | {family["category"]}
+    strongest = lambda prefixes: max([score for tag, score in tags.items() if tag.startswith(prefixes)], default=0)
+    if "MONOSPACE" in kinds or strongest("/Monospace/") >= 0.5:
+        return None
+    if "HANDWRITING" in kinds or strongest("/Script/") >= 0.5 or tags.get("/Theme/Brush", 0) >= 0.5:
+        return CLASSES.index("Script")
+    if "DISPLAY" in kinds and any(tags.get(f"/Theme/{theme}", 0) >= 0.5 for theme in ORNAMENTAL):
+        return CLASSES.index("Ornamental")
+    stroke = family.get("stroke")
+    if stroke in ("SERIF", "SLAB_SERIF"):
+        return CLASSES.index("Serif")
+    if stroke == "SANS_SERIF":
+        return CLASSES.index("Sans Serif")
+    serif, sans = strongest(("/Serif/", "/Slab/")), strongest("/Sans/")
+    if family["category"] == "SERIF" or serif >= 0.5 and serif > sans:
+        return CLASSES.index("Serif")
+    if family["category"] == "SANS_SERIF" or sans >= 0.5:
+        return CLASSES.index("Sans Serif")
+    return None
 
 
 def load(work):
@@ -112,7 +158,7 @@ def load(work):
                 "name": name, "family": family["name"], "italic": italic, "width": width, "category": family["category"],
                 "regular": regular["row"], "all": [entry["row"] for entry in own],
                 "views": [entry["row"] for entry in own if abs(entry["weight"] - regular["weight"]) <= 100],
-                "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"]),
+                "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"]), "label": label(family),
             })
     return designs, pixels, tag_names
 
@@ -372,6 +418,59 @@ def train(arguments):
     print(f"saved {out}")
 
 
+def classify(arguments):
+    """Fits the classifier on the embeddings of every style of the designs learned from, and says how it does on the
+    regulars of those held out: how often it's right, and how often when it's sure enough to say."""
+    work = Path(arguments.work).expanduser()
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    torch.manual_seed(arguments.seed)
+    designs, pixels, tag_names = load(work)
+    for group in merge_alike(designs, pixels, device):
+        if any(designs[index]["held_out"] for index in group):
+            for index in group:
+                designs[index]["held_out"] = True
+    checkpoint = arguments.checkpoint or work / "model.pt"
+    saved = torch.load(checkpoint, map_location="cpu")
+    model = Embedder(len(saved["tags"]) + len(CATEGORIES)).to(device)
+    model.load_state_dict(saved["model"])
+    labelled = [design for design in designs if design["label"] is not None]
+    learn = [(row, design["label"]) for design in labelled if not design["held_out"] for row in design["all"]]
+    check = [(design["regular"], design["label"]) for design in labelled if design["held_out"]]
+    inputs = embed(model, pixels, [row for row, _ in learn], device)
+    targets = torch.tensor([label for _, label in learn], device=device)
+    held = embed(model, pixels, [row for row, _ in check], device)
+    answers = torch.tensor([label for _, label in check], device=device)
+    # Every family counts as much (--balance 0): counting the rare ornamental ones for more had the model say
+    # ornamental of heavy and rounded sans serifs.
+    counts = torch.bincount(targets, minlength=len(CLASSES)).float()
+    weights = (counts.sum() / counts / len(CLASSES)) ** arguments.balance
+    head = classifier().to(device)
+    optimizer = torch.optim.AdamW(head.parameters(), lr=3e-3, weight_decay=1e-3)
+    for step in range(arguments.steps):
+        head.train()
+        order = torch.randperm(len(inputs), device=device)[:512]
+        loss = F.cross_entropy(head(inputs[order]), targets[order], weight=weights, label_smoothing=arguments.smoothing)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    head.eval()
+    with torch.no_grad():
+        chances = F.softmax(head(held), dim=1)
+    sure, guess = chances.max(1)
+    print(f"{len(learn)} styles of {sum(not design['held_out'] for design in labelled)} designs learned from; "
+          f"{len(check)} held out, right {float((guess == answers).float().mean()):.3f}")
+    for name, index in zip(CLASSES, range(len(CLASSES))):
+        mine = answers == index
+        print(f"  {name}: {int(mine.sum())}, right {float((guess[mine] == index).float().mean()):.3f}; "
+              f"said of {int((guess == index).sum())}, right {float((answers[guess == index] == index).float().mean()):.3f}")
+    for threshold in (0.5, 0.6, 0.7, 0.8, 0.9):
+        said = sure >= threshold
+        print(f"  sure at least {threshold}: says {float(said.float().mean()):.3f}, right {float((guess[said] == answers[said]).float().mean()):.3f}")
+    saved["classifier"] = {key: value.cpu() for key, value in head.state_dict().items()}
+    torch.save(saved, checkpoint)
+    print(f"saved the classifier in {checkpoint}")
+
+
 def export(arguments):
     import coremltools as ct
 
@@ -380,23 +479,31 @@ def export(arguments):
     model = Embedder(len(saved["tags"]) + len(CATEGORIES))
     model.load_state_dict(saved["model"])
     model.eval()
-    exported = Exported(model).eval()
+    head = None
+    if "classifier" in saved:
+        head = classifier()
+        head.load_state_dict(saved["classifier"])
+        head.eval()
+    exported = Exported(model, head).eval()
     example = torch.rand(1, LETTERS, SIZE, SIZE)
     traced = torch.jit.trace(exported, example)
     converted = ct.convert(
         traced,
         inputs=[ct.TensorType(name="letters", shape=example.shape)],
-        outputs=[ct.TensorType(name="embedding", dtype=np.float32)],
+        outputs=[ct.TensorType(name="embedding", dtype=np.float32)]
+        + ([ct.TensorType(name="classification", dtype=np.float32)] if head is not None else []),
         minimum_deployment_target=ct.target.macOS15,
         compute_precision=ct.precision.FLOAT16,
     )
-    converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, as 128 numbers of length 1; alike fonts are close. "
-                                   "Learned from Google Fonts families under the OFL, Apache and UFL licenses.")
+    converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, as 128 numbers of length 1, alike fonts close, and how "
+                                   "likely it is to be " + ", ".join(CLASSES) + ". Learned from Google Fonts families under the OFL, Apache and "
+                                   "UFL licenses.")
     converted.version = f"epoch {saved['epoch']}"
     converted.save(arguments.output)
     pixels = np.fromfile(work / "letters.u8", dtype=np.uint8).reshape(-1, LETTERS, SIZE, SIZE)
     letters = pixels[:1].astype(np.float32) / 255
-    expected = exported(torch.tensor(letters)).detach().numpy()
+    expected = exported(torch.tensor(letters))
+    expected = (expected[0] if head is not None else expected).detach().numpy()
     found = converted.predict({"letters": letters})["embedding"]
     print(f"saved {arguments.output}; Core ML and PyTorch differ by {np.abs(found - expected).max():.4f} at most")
 
@@ -419,12 +526,19 @@ def main():
     training.add_argument("--name", default="model.pt", help="of the model saved in the work folder")
     training.add_argument("--every", type=int, default=10)
     training.add_argument("--seed", type=int, default=1)
+    classifying = commands.add_parser("classify")
+    classifying.add_argument("work")
+    classifying.add_argument("--checkpoint", help="instead of the work folder's model.pt; the classifier is saved in it")
+    classifying.add_argument("--steps", type=int, default=3000)
+    classifying.add_argument("--balance", type=float, default=0.0, help="0 counts every family as much, 1 every classification")
+    classifying.add_argument("--smoothing", type=float, default=0.1, help="so that how likely it says an answer is means something")
+    classifying.add_argument("--seed", type=int, default=1)
     exporting = commands.add_parser("export")
     exporting.add_argument("work")
     exporting.add_argument("output")
     exporting.add_argument("--checkpoint", help="instead of the work folder's model.pt")
     arguments = parser.parse_args()
-    {"train": train, "export": export}[arguments.command](arguments)
+    {"train": train, "classify": classify, "export": export}[arguments.command](arguments)
 
 
 if __name__ == "__main__":
