@@ -343,7 +343,7 @@ struct ValueField: View {
     }
 
     private func formatted(_ value: Double) -> String {
-        String(format: step < 1 ? "%.1f" : "%.0f", value)
+        String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
     }
 }
 

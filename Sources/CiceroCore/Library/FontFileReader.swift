@@ -54,7 +54,7 @@ enum FontFileReader {
                 axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
             }
             if entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true { continue }
-            let tag = String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .isoLatin1) ?? ""
+            let tag = AxisTag.string(identifier)
             let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
             axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
         }

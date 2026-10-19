@@ -44,6 +44,26 @@ public struct VariationAxis: Hashable, Codable, Sendable {
     }
 }
 
+/// How far one of a variable font's axes goes, for a slider: Weight from 100 to 900, 400 by default.
+public struct AxisRange: Hashable, Sendable, Identifiable {
+    /// As `VariationAxis.tag`.
+    public var tag: String
+    public var name: String
+    public var minimum: Double
+    public var maximum: Double
+    public var defaultValue: Double
+
+    public var id: String { tag }
+
+    public init(tag: String, name: String, minimum: Double, maximum: Double, defaultValue: Double) {
+        self.tag = tag
+        self.name = name
+        self.minimum = minimum
+        self.maximum = maximum
+        self.defaultValue = defaultValue
+    }
+}
+
 /// What the font's license lets a document do with it, as the OS/2 table's embedding bits say: from the least
 /// restrictive to the most, the order `rank` follows.
 public enum Embedding: String, CaseIterable, Codable, Sendable {
