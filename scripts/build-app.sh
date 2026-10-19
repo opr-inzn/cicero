@@ -37,6 +37,9 @@ ditto "$BIN_DIR/Sparkle.framework" "$SPARKLE"
 rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Versions/B/XPCServices"
 cp .build/artifacts/sparkle/Sparkle/LICENSE "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 
+# The model of letters' embeddings for similar fonts (see scripts/embedding).
+xcrun coremlcompiler compile Resources/LetterEmbedding.mlpackage "$APP/Contents/Resources" >/dev/null
+
 # Compile the Icon Composer icon into Assets.car plus an AppIcon.icns fallback.
 # actool runs through a helper process, so it needs absolute paths.
 PARTIAL="$(mktemp -d)/partial.plist"

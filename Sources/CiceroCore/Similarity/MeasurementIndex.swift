@@ -2,21 +2,25 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// Measures every family's letters (its regular face's, see `LetterMeasurements`) in the background, caches them on
-/// disk by file stamp, as `CoverageIndex` does coverage, and answers lookups from any thread.
+/// Measures every family's letters (its regular face's, see `LetterMeasurements`) and takes their embedding (see
+/// `LetterEmbedding`) in the background, caches both on disk by file stamp, as `CoverageIndex` does coverage, and
+/// answers lookups from any thread.
 public final class MeasurementIndex: Sendable {
     private let file: URL
+    private let embedder: LetterEmbedding?
     private let state = Mutex(State())
     /// Writes the cache one save at a time, after `update` has returned.
     private let saveQueue = DispatchQueue(label: "Cicero.MeasurementIndex.save", qos: .utility)
 
-    /// Raised whenever measuring changes, so measurements from before are made again.
-    static let version = 1
+    /// Raised whenever measuring or the embedding's model changes, so measurements from before are made again.
+    static let version = 2
 
     private struct Entry: Sendable {
         var stamp: CoverageStamp
         /// nil for a face that hasn't the letters to measure.
         var measurements: LetterMeasurements?
+        /// nil for a face that hasn't the letters, and without a model.
+        var embedding: [Float]?
     }
 
     private struct State: Sendable {
@@ -25,8 +29,10 @@ public final class MeasurementIndex: Sendable {
         var dirty = false
     }
 
-    public init(caches: URL) {
+    /// Without an embedder, faces are measured only.
+    public init(caches: URL, embedder: LetterEmbedding? = nil) {
         file = caches.appendingPathComponent("letters.plist", isDirectory: false)
+        self.embedder = embedder
     }
 
     /// Measures what's missing at low priority; cheap when nothing changed. `progress` reports (done, total) only
@@ -43,16 +49,20 @@ public final class MeasurementIndex: Sendable {
             let total = work.count
             progress(0, total)
             var done = 0
-            await withTaskGroup(of: (FaceID, CoverageStamp, LetterMeasurements?).self) { group in
+            let embedder = embedder
+            await withTaskGroup(of: (FaceID, CoverageStamp, LetterMeasurements?, [Float]?).self) { group in
                 var pending = work.makeIterator()
                 func addNext() {
                     guard !Task.isCancelled, let (face, stamp) = pending.next() else { return }
-                    group.addTask(priority: .utility) { (face.id, stamp, Self.measure(face)) }
+                    group.addTask(priority: .utility) {
+                        let font = Self.font(face)
+                        return (face.id, stamp, font.flatMap(LetterMeasurements.measure), font.flatMap { embedder?.embedding(of: $0) })
+                    }
                 }
                 for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
-                for await (id, stamp, measurements) in group {
+                for await (id, stamp, measurements, embedding) in group {
                     state.withLock {
-                        $0.entries[id] = Entry(stamp: stamp, measurements: measurements)
+                        $0.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: embedding)
                         $0.dirty = true
                     }
                     done += 1
@@ -69,6 +79,11 @@ public final class MeasurementIndex: Sendable {
     /// nil until measured, and for a face that hasn't the letters to measure.
     public func measurements(of face: FaceID) -> LetterMeasurements? {
         state.withLock { $0.entries[face]?.measurements }
+    }
+
+    /// nil until taken, for a face that hasn't the letters, and without a model.
+    public func embedding(of face: FaceID) -> [Float]? {
+        state.withLock { $0.entries[face]?.embedding }
     }
 
     /// Whether every one of these faces has been measured, letters or not.
@@ -89,16 +104,20 @@ public final class MeasurementIndex: Sendable {
         saveQueue.sync {}
     }
 
+    static func measure(_ face: FontFace) -> LetterMeasurements? {
+        font(face).flatMap(LetterMeasurements.measure)
+    }
+
     /// The face as its file has it, a variable one at the regular weight, as previews show it; an installed font of
     /// the same name when the file can't be read, and nothing when neither exists.
-    static func measure(_ face: FontFace) -> LetterMeasurements? {
+    static func font(_ face: FontFace) -> CTFont? {
         var descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         guard CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 0, nil)) as String == face.postScriptName else { return nil }
         if let axis = face.weightAxis {
             descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: Self.weightAxisID), min(max(400, axis.minimum), axis.maximum))
         }
-        return LetterMeasurements.measure(CTFontCreateWithFontDescriptor(descriptor, 0, nil))
+        return CTFontCreateWithFontDescriptor(descriptor, 0, nil)
     }
 
     /// The 'wght' axis.
@@ -116,11 +135,12 @@ public final class MeasurementIndex: Sendable {
             else { return }
             let count = LetterMeasurements.Measure.allCases.count
             for entry in cache.entries {
-                let values = entry.values.array(of: Float.self)
-                guard values.isEmpty || values.count == count else { continue }
+                let values = entry.values.array(of: Float.self), embedding = entry.embedding.array(of: Float.self)
+                guard values.isEmpty || values.count == count, embedding.isEmpty || embedding.count == LetterEmbedding.dimensions else { continue }
                 state.entries[FaceID(path: entry.path, index: entry.index)] = Entry(
                     stamp: CoverageStamp(modified: entry.modified, size: entry.size),
-                    measurements: values.isEmpty ? nil : LetterMeasurements(values: values)
+                    measurements: values.isEmpty ? nil : LetterMeasurements(values: values),
+                    embedding: embedding.isEmpty ? nil : embedding
                 )
             }
         }
@@ -142,7 +162,7 @@ public final class MeasurementIndex: Sendable {
         defer { Signposts.library.endInterval("Save letters", signpost) }
         let cache = CacheFile(version: Self.version, entries: entries.map { id, entry in
             CacheEntry(path: id.path, index: id.index, modified: entry.stamp.modified, size: entry.stamp.size,
-                       values: Data(array: entry.measurements?.values ?? []))
+                       values: Data(array: entry.measurements?.values ?? []), embedding: Data(array: entry.embedding ?? []))
         })
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
@@ -163,5 +183,7 @@ public final class MeasurementIndex: Sendable {
         var size: Int64
         /// Empty for a face that hasn't the letters to measure.
         var values: Data
+        /// Empty without one.
+        var embedding: Data
     }
 }

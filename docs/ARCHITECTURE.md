@@ -42,10 +42,13 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
 - **Similarity** (`Similarity/`): `LetterMeasurements` measures a face's letters from their outlines (x-height,
   weight, contrast and stress, widths, spacing, slant, serifs, aperture, squareness, the a's and g's stories,
-  monospacing), with `LetterShapes`' outline runs; `MeasurementIndex` measures every family's regular style in the
-  background after coverage and caches the results on disk, as `CoverageIndex` does; `SimilarFonts` ranks the
-  families nearest one, measure by measure in fixed steps, weighted. The app keeps one `SimilarFonts` for the
-  listed families and makes it again when the library, the measurements or the user's data change.
+  monospacing), with `LetterShapes`' outline runs; `LetterImages` draws 16 of its letters small, on one baseline and
+  x-height, and `LetterEmbedding` turns them into 128 numbers with a small Core ML model learned from Google Fonts
+  (Resources/LetterEmbedding.mlpackage, made by scripts/embedding), close together for faces that look alike;
+  `MeasurementIndex` measures and embeds every family's regular style in the background after coverage and caches
+  the results on disk, as `CoverageIndex` does; `SimilarFonts` ranks the families nearest one, measure by measure in
+  fixed steps, weighted, and by the embedding's distance. The app keeps one `SimilarFonts` for the listed families
+  and makes it again when the library, the measurements or the user's data change.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
   preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
   prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead

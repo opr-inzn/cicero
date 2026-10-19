@@ -232,7 +232,8 @@ final class AppModel {
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
-        measurements = MeasurementIndex(caches: locations.caches)
+        measurements = MeasurementIndex(caches: locations.caches,
+                                        embedder: LetterEmbedding(contentsOf: Bundle.main.url(forResource: "LetterEmbedding", withExtension: "mlmodelc")))
         pageContents = PageContents(coverage: coverage)
         guesser = ClassificationGuesser(caches: locations.caches)
         guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true

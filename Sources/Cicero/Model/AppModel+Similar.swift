@@ -13,8 +13,9 @@ extension AppModel {
     /// How many families Show Similar Fonts lists after the one they look like.
     static let similarListed = 30
 
-    /// The listed families side by side by their letters, with their classifications as the sidebar has them. Made
-    /// again when the library, its measurements or the user's data change, which takes a millisecond or two.
+    /// The listed families side by side by their letters and the letters' embedding, with their classifications as the
+    /// sidebar has them. Made again when the library, its measurements or the user's data change, which takes a
+    /// millisecond or two.
     var similarFonts: SimilarFonts {
         let key = SimilarKey(fingerprint: library.fingerprint, measurementRevision: measurementRevision, dataRevision: dataRevision,
                              guessRevision: guessRevision)
@@ -23,6 +24,7 @@ extension AppModel {
         let classification = classificationNamer()
         let unclassified = data.classificationRenames[Classification.unclassified.rawValue] ?? Classification.unclassified.rawValue
         let table = SimilarFonts(families: library.families.filter(data.lists), measurements: { measurements.measurements(of: $0.regular.face.id) },
+                                 embeddings: { measurements.embedding(of: $0.regular.face.id) },
                                  classification: { family in
                                      let name = classification(family)
                                      return name == unclassified ? nil : name
