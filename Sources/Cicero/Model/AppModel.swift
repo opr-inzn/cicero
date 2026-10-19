@@ -465,6 +465,8 @@ final class AppModel {
 
     private func updateCoverage() {
         coverageTask?.cancel()
+        // Measuring starts again after coverage, with the new families; what it measured so far is kept.
+        measurementTask?.cancel()
         let families = library.families
         let coverage = coverage
         let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
