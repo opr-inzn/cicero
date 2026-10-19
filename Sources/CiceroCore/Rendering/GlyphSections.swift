@@ -59,6 +59,9 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         // Figures in circles, like ① and ❶, and the blocks' other numbered ones, like ⑴ and ⒈. The letters there, like Ⓐ
         // or the Ⓟ some fonts have for ℗, go with the symbols.
         if (block.hasPrefix("Enclosed Alphanumeric") || block == "Dingbats") && properties.numericType != nil { return .circledFigures }
+        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and ℝ: with ℮,
+        // not with other scripts' letters.
+        if block == "Letterlike Symbols" && properties.isAlphabetic { return .punctuationAndSymbols }
         // Latin letters in other blocks too, like ə in IPA Extensions.
         let latin = block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
@@ -90,9 +93,10 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     }
 
     /// The order a type designer would list these groups' characters in, rather than where Unicode put them. For
-    /// punctuation and symbols: the stops, then slashes and bars, brackets, dashes, quotes, then the signs.
+    /// punctuation and symbols: the stops, then slashes and bars, brackets, dashes, quotes, then the signs, with those
+    /// for units, like Ω for ohms, after ℮.
     private static let orders: [GlyphGroup: [UInt32: Int]] = [
-        .punctuationAndSymbols: ".,:;\u{2026}!\u{A1}?\u{BF}\u{203D}\u{B7}\u{2022}*#/\\|\u{A6}()[]{}\u{2329}\u{232A}\u{27E8}\u{27E9}-\u{AD}\u{2010}\u{2011}\u{2012}\u{2013}\u{2014}\u{2015}_'\"\u{2018}\u{2019}\u{201A}\u{201B}\u{201C}\u{201D}\u{201E}\u{201F}\u{2039}\u{203A}\u{AB}\u{BB}\u{2032}\u{2033}@&\u{B6}\u{A7}\u{A9}\u{AE}\u{2117}\u{2122}\u{B0}\u{2020}\u{2021}%\u{2030}\u{2031}\u{212E}^`",
+        .punctuationAndSymbols: ".,:;\u{2026}!\u{A1}?\u{BF}\u{203D}\u{B7}\u{2022}*#/\\|\u{A6}()[]{}\u{2329}\u{232A}\u{27E8}\u{27E9}-\u{AD}\u{2010}\u{2011}\u{2012}\u{2013}\u{2014}\u{2015}_'\"\u{2018}\u{2019}\u{201A}\u{201B}\u{201C}\u{201D}\u{201E}\u{201F}\u{2039}\u{203A}\u{AB}\u{BB}\u{2032}\u{2033}@&\u{B6}\u{A7}\u{A9}\u{AE}\u{2117}\u{2122}\u{B0}\u{2020}\u{2021}%\u{2030}\u{2031}\u{212E}\u{2126}\u{2127}\u{212A}\u{212B}^`",
         .mathematicalOperators: "+\u{2212}\u{B1}\u{D7}\u{F7}=\u{2260}\u{2248}~\u{223C}<>\u{2264}\u{2265}\u{AC}\u{2215}\u{2219}\u{221E}\u{221A}\u{2202}\u{2206}\u{220F}\u{2211}\u{222B}\u{2205}\u{2227}\u{2228}\u{2229}\u{222A}\u{2208}\u{2209}\u{2200}\u{2203}\u{25CA}",
         .currency: "$\u{20AC}\u{A3}\u{A5}\u{A2}\u{20B9}\u{20BD}\u{20A9}\u{20BA}\u{20B4}\u{20AA}\u{20AB}\u{20A6}\u{20B1}\u{20BF}\u{E3F}\u{20A1}\u{20B5}\u{20B8}\u{20AE}\u{A4}",
     ].mapValues { list in
