@@ -166,7 +166,7 @@ class Letters:
         return torch.tensor(self.pixels[rows], device=device).float() / 255, torch.tensor(self.advances[rows], device=device)
 
 
-def load(work):
+def load(work, fold=0):
     """The designs, the letters drawn (see `Letters`) and the names of the tags."""
     families = json.loads((work / "families.json").read_text())
     drawn = json.loads((work / "letters.json").read_text())
@@ -189,7 +189,7 @@ def load(work):
                 "size": size, "category": family["category"],
                 "regular": regular["row"], "all": [entry["row"] for entry in own],
                 "views": [entry["row"] for entry in own if abs(entry["weight"] - regular["weight"]) <= 100],
-                "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"]), "label": label(family),
+                "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"], fold), "label": label(family),
             })
     return designs, letters, tag_names
 
@@ -217,8 +217,10 @@ def merge_alike(designs, letters, device):
     return list(groups.values())
 
 
-def held_out(name):
-    return zlib.crc32(name.split()[0].lower().encode()) % 10 == 0
+def held_out(name, fold=0):
+    """Whether the family is in the tenth held out, `fold` of ten, by the first word of its name, so that its
+    siblings are too."""
+    return zlib.crc32(name.split()[0].lower().encode()) % 10 == fold
 
 
 def augment(batch, advances):
@@ -314,12 +316,19 @@ def evaluate(distance, designs, tag_names, measurements=None):
     upright = [index for index, design in enumerate(designs) if not design["italic"] and design["width"] == 100]
     queries = [index for index in upright if designs[index]["held_out"]]
     tags, category, counted = 0.0, 0.0, 0
+    by_kind = {}
     for query, near in zip(queries, nearest(queries, upright)):
         category += sum(designs[other]["category"] == designs[query]["category"] for other in near) / 10
         if targets[query].any():
-            tags += float((targets[near] @ targets[query]).mean())
+            agreement = float((targets[near] @ targets[query]).mean())
+            tags += agreement
             counted += 1
+            by_kind.setdefault(designs[query]["category"], []).append(agreement)
     scores["tags"], scores["category"] = tags / max(counted, 1), category / len(queries)
+    # Tags by the query's category, as a library of text faces cares most about serifs and sans serifs.
+    for name, kind in (("serif", "SERIF"), ("sans", "SANS_SERIF"), ("display", "DISPLAY"), ("script", "HANDWRITING")):
+        if by_kind.get(kind):
+            scores[f"tags {name}"] = float(np.mean(by_kind[kind]))
 
     normal = [index for index, design in enumerate(designs) if design["width"] == 100]
     queries = [index for index in normal if designs[index]["held_out"]]
@@ -348,7 +357,7 @@ def train(arguments):
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     torch.manual_seed(arguments.seed)
     random.seed(arguments.seed)
-    designs, drawn, tag_names = load(work)
+    designs, drawn, tag_names = load(work, arguments.fold)
     groups = merge_alike(designs, drawn, device)
     merged = [group for group in groups if len(group) > 1]
     print(f"{len(designs)} designs of {len({design['family'] for design in designs})} families drawn, {len(groups)} once alike "
@@ -359,6 +368,9 @@ def train(arguments):
             for index in group:
                 designs[index]["held_out"] = True
     classes = [group for group in groups if not designs[group[0]]["held_out"]]
+    # Only part of the families, with their siblings, to see what more of them would do (--share).
+    if arguments.share < 1:
+        classes = [group for group in classes if zlib.crc32(designs[group[0]]["root"].encode()) % 1000 < arguments.share * 1000]
     families = sorted({designs[index]["family"] for group in classes for index in group})
     print(f"training on {len(classes)} designs ({sum(map(len, classes))} before merging) of {len(families)} families, "
           f"{sum(not designs[group[0]]['italic'] and designs[group[0]]['width'] == 100 and not designs[group[0]]['size'] for group in classes)} "
@@ -448,7 +460,7 @@ def train(arguments):
         if epoch % arguments.every == arguments.every - 1 or epoch == arguments.epochs - 1:
             scores = evaluate(model_distance(model, drawn, device), designs, tag_names, measurements)
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
-            torch.save({"model": model.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores}, out)
+            torch.save({"model": model.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores, "fold": arguments.fold}, out)
     print(f"saved {out}")
 
 
@@ -458,13 +470,14 @@ def classify(arguments):
     work = Path(arguments.work).expanduser()
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     torch.manual_seed(arguments.seed)
-    designs, drawn, tag_names = load(work)
+    checkpoint = arguments.checkpoint or work / "model.pt"
+    saved = torch.load(checkpoint, map_location="cpu")
+    # Held out as the model was.
+    designs, drawn, tag_names = load(work, saved.get("fold", 0))
     for group in merge_alike(designs, drawn, device):
         if any(designs[index]["held_out"] for index in group):
             for index in group:
                 designs[index]["held_out"] = True
-    checkpoint = arguments.checkpoint or work / "model.pt"
-    saved = torch.load(checkpoint, map_location="cpu")
     model = Embedder(len(saved["tags"]) + len(CATEGORIES)).to(device)
     model.load_state_dict(saved["model"])
     labelled = [design for design in designs if design["label"] is not None]
@@ -560,6 +573,8 @@ def main():
     training.add_argument("--name", default="model.pt", help="of the model saved in the work folder")
     training.add_argument("--every", type=int, default=10)
     training.add_argument("--seed", type=int, default=1)
+    training.add_argument("--fold", type=int, default=0, help="which tenth of the families to hold out, 0 to 9")
+    training.add_argument("--share", type=float, default=1.0, help="the share of the other families to learn from")
     classifying = commands.add_parser("classify")
     classifying.add_argument("work")
     classifying.add_argument("--checkpoint", help="instead of the work folder's model.pt; the classifier is saved in it")
