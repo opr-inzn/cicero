@@ -278,6 +278,12 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         return [50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200][min(max(width, 1), 9) - 1]
     }
 
+    /// Where the face sits on an axis: on width, `styleWidth`; on another, a variable font's named instance's place;
+    /// nil on an axis it doesn't have.
+    public func styleValue(on tag: String) -> Double? {
+        tag == "wdth" ? styleWidth : axes.first { $0.tag == tag }?.value
+    }
+
     public var path: String { id.path }
     public var url: URL { URL(fileURLWithPath: id.path, isDirectory: false) }
 
@@ -536,6 +542,22 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let temporaryScope: TemporaryScope?
 
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
+    /// The axes besides weight its styles sit apart on, by tag and the font's name for them, in the order they're
+    /// listed by (see `LibraryScanner.stylePrecedes`): the designer's own, like a Serif axis, then width, a static
+    /// family's too, then the other registered ones, like optical size. Not italic or slant, which style names say.
+    public var styleAxes: [(tag: String, name: String)] {
+        var names = ["wdth": "Width"]
+        var tags: [String] = []
+        for axis in faces.lazy.flatMap(\.face.axes) where !tags.contains(axis.tag) {
+            tags.append(axis.tag)
+            names[axis.tag] = axis.name
+        }
+        let designers = tags.filter { $0.first?.isUppercase == true }
+        let registered = tags.filter { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }
+        return (designers + ["wdth"] + registered)
+            .filter { tag in Set(faces.map { $0.face.styleValue(on: tag) }).count > 1 }
+            .map { (tag: $0, name: names[$0] ?? $0) }
+    }
     /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
     /// What its license lets a document do with every one of its styles: the most restrictive of their embedding.

@@ -1,3 +1,4 @@
+import AppKit
 import CiceroCore
 import SwiftUI
 
@@ -294,6 +295,8 @@ private extension TypeTester {
 
 /// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
 /// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above.
+/// After Weight, a column for each other axis the styles sit apart on, like Width or one of the designer's own, in
+/// the order the styles are listed by (see `Family.styleAxes`).
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -301,13 +304,19 @@ private struct StyleRows: View {
 
     var body: some View {
         let model = self.model
+        let headerFont = NSFont.systemFont(ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold)
+        let axes = family.styleAxes.map { (tag: $0.tag, name: $0.name, width: Self.width(fitting: [$0.name], in: headerFont)) }
+        // As wide as the longest name, up to a point: some run to Serif Compressed Thin Italic.
+        let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: 240)
         VStack(spacing: 0) {
-            row {
+            row(styleWidth: styleWidth) {
                 Text("Styles")
             } style: {
                 Text("Style")
             } weight: {
                 Text("Weight")
+            } axes: {
+                ForEach(axes, id: \.tag) { Text($0.name).frame(width: $0.width, alignment: .leading) }
             } status: {
                 Text("Status")
             }
@@ -316,12 +325,19 @@ private struct StyleRows: View {
             .padding(.vertical, 6)
             ForEach(family.faces) { style in
                 Divider()
-                row {
+                row(styleWidth: styleWidth) {
                     FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
                     Text("\(Int(style.face.styleWeight.rounded()))").monospacedDigit().foregroundStyle(.secondary)
+                } axes: {
+                    ForEach(axes, id: \.tag) { axis in
+                        Text(style.face.styleValue(on: axis.tag)?.formatted(.number.grouping(.never).precision(.fractionLength(0...1))) ?? "")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: axis.width, alignment: .leading)
+                    }
                 } status: {
                     HStack(spacing: 8) {
                         MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {
@@ -347,12 +363,20 @@ private struct StyleRows: View {
         .padding(.top, 12)
     }
 
-    private func row(@ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
-                     @ViewBuilder weight: () -> some View, @ViewBuilder status: () -> some View) -> some View {
+    /// As wide as the widest of `texts` set in `font`, within `minimum` and `maximum`.
+    private static func width(fitting texts: [String], in font: NSFont, minimum: CGFloat = 56, maximum: CGFloat = .infinity) -> CGFloat {
+        let widest = texts.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return min(max(minimum, widest.rounded(.up)), maximum)
+    }
+
+    private func row(styleWidth: CGFloat, @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
+                     @ViewBuilder weight: () -> some View, @ViewBuilder axes: () -> some View,
+                     @ViewBuilder status: () -> some View) -> some View {
         HStack(spacing: 12) {
             preview().frame(maxWidth: .infinity, alignment: .leading)
-            style().lineLimit(1).frame(width: 140, alignment: .leading)
+            style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
             weight().frame(width: 56, alignment: .leading)
+            axes().lineLimit(1)
             status().frame(width: 210, alignment: .leading)
         }
     }
