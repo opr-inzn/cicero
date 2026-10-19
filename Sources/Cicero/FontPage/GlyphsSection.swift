@@ -152,7 +152,7 @@ struct GlyphsSection: View {
         }
     }
 
-    /// A character's name, codes and keystroke, and a button that copies it; for a feature's glyph, the character's,
+    /// A character's name and codes, and a button that copies it; for a feature's glyph, the character's,
     /// and the feature's name.
     private func details(_ cell: Cell, style: Style) -> some View {
         VStack(spacing: 10) {
@@ -339,13 +339,12 @@ struct GlyphsSection: View {
     }
 }
 
-/// A character's Unicode code, its HTML references (the named one, when HTML has a name for it, and the numeric one)
-/// and how to type it on the keyboard layout in use, when it can be typed; each selectable.
+/// A character's Unicode code and its HTML references (the named one, when HTML has a name for it, and the numeric
+/// one), each selectable.
 private struct CharacterCodesGrid: View {
     let scalar: UInt32
 
     var body: some View {
-        let layout = KeyboardLayout.current()
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
             GridRow {
                 Text("Unicode").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
@@ -358,13 +357,6 @@ private struct CharacterCodesGrid: View {
                         Text(named).monospaced().textSelection(.enabled)
                     }
                     Text(CharacterCodes.numericReference(scalar)).monospaced().textSelection(.enabled)
-                }
-            }
-            if let layout, let keystroke = layout.keystroke(for: scalar) {
-                GridRow {
-                    Text("Keystroke").foregroundStyle(.secondary)
-                    Text(keystroke.description).textSelection(.enabled)
-                        .help("With the \(layout.name) keyboard layout")
                 }
             }
         }
