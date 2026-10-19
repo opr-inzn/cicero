@@ -24,7 +24,7 @@ struct GeneralSettings: View {
                 .pickerStyle(.segmented)
                 .formRowCentered()
             }
-            Section("Fonts") {
+            Section("Installing") {
                 LabeledContent {
                     PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
                                 selection: $model.data.installMethod)
@@ -50,15 +50,17 @@ struct GeneralSettings: View {
                         Text(misplacedNote(misplaced))
                     }
                 }
-                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
-                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
-                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
-                }
                 LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
                 } label: {
                     Text("When an added font is already in your library")
                     Text(duplicateExplanation)
+                }
+            }
+            Section("Activating") {
+                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
+                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
+                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
                 }
                 Toggle(isOn: Binding(
                     get: { loginItem == .enabled || loginItem == .requiresApproval },
@@ -78,6 +80,8 @@ struct GeneralSettings: View {
                     Text("When a document open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero activates them until the app quits. macOS asks once whether Cicero may ask each app.")
                 }
                 .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
+            }
+            Section("Browsing") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 Toggle(isOn: $model.guessesClassifications) {
