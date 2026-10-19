@@ -114,9 +114,10 @@ struct LigaturesSection: View {
     }
 }
 
-/// One glyph of a face, by its ID, drawn from its outline: a ligature has no character of its own to set.
-/// Centred on the font's ascender and descender, so glyphs side by side share a baseline, and scaled down
-/// when it's wider than the room.
+/// One glyph of a face, by its ID: a ligature or an alternate has no character of its own to set. Drawn as text is,
+/// not filled from its outline, which came out a quarter lighter than the characters set next to it, as macOS
+/// thickens text a little when it draws it. Centred on the font's ascender and descender, so glyphs side by side
+/// share a baseline, and scaled down when it's wider than the room.
 struct GlyphImage: View {
     let face: FontFace
     let glyph: CGGlyph
@@ -128,16 +129,23 @@ struct GlyphImage: View {
         Canvas { context, area in
             let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
             var glyph = glyph
-            guard let outline = CTFontCreatePathForGlyph(font, glyph, nil) else { return }
             var bounds = CGRect.zero
             CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyph, &bounds, 1)
+            guard !bounds.isEmpty else { return }
             // The font's ascent and descent, or as far as the glyph reaches past them: all of it fits the cell.
             let ascent = max(CTFontGetAscent(font), bounds.maxY), descent = max(CTFontGetDescent(font), -bounds.minY)
             let scale = min(1, (area.width - 6) / max(bounds.width, 1), area.height / max(ascent + descent, 1))
             let x = (area.width - bounds.width * scale) / 2 - bounds.minX * scale
             let baseline = (area.height + (ascent - descent) * scale) / 2
-            let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: x, ty: baseline)
-            context.fill(Path(outline).applying(transform), with: .foreground)
+            let color = Color.primary.resolve(in: context.environment).cgColor
+            context.withCGContext { cg in
+                cg.setFillColor(color)
+                // From the canvas's top-left origin to the glyph's baseline, with y going up.
+                cg.translateBy(x: x, y: baseline)
+                cg.scaleBy(x: scale, y: -scale)
+                var origin = CGPoint.zero
+                CTFontDrawGlyphs(font, &glyph, &origin, 1, cg)
+            }
         }
         .accessibilityHidden(true)
     }
