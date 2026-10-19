@@ -133,6 +133,8 @@ struct CiceroCommands: Commands {
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
             .disabled(selection.count < 2)
+            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: selection[0]) }
+                .disabled(selection.count != 1 || !model.canShowSimilar(selection[0]))
             Button("Character Toolbox", systemImage: "character.textbox") { openWindow(id: WindowID.toolbox) }
                 .keyboardShortcut("t", modifiers: [.command, .option])
             Divider()

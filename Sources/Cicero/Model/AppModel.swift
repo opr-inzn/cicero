@@ -16,6 +16,7 @@ final class AppModel {
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
+    @ObservationIgnored let measurements: MeasurementIndex
     @ObservationIgnored let pageContents: PageContents
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let quickLook = QuickLook()
@@ -37,6 +38,10 @@ final class AppModel {
     private(set) var guessRevision = 0
     /// nil when coverage is up to date.
     private(set) var coverageProgress: CoverageProgress?
+    /// Bumped whenever letter measurements arrive (see `MeasurementIndex`); similar fonts depend on it.
+    private(set) var measurementRevision = 0
+    /// nil when every family's letters are measured.
+    private(set) var measurementProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
@@ -99,6 +104,8 @@ final class AppModel {
     /// The sidebar item the browser's title and empty states follow. Setting it selects just that item.
     var selection: SidebarItem? = .all {
         didSet {
+            // Showing a sidebar item again ends Show Similar Fonts.
+            if selection != nil, similarFamilyID != nil { similarFamilyID = nil }
             let items: Set<SidebarItem> = selection.map { [$0] } ?? []
             if selectedItems != items { selectedItems = items }
             guard oldValue != selection else { return }
@@ -112,6 +119,9 @@ final class AppModel {
     var selectedIDs: Set<String> = []
     /// The family whose page is pushed over the browser.
     var openFamilyID: String?
+    /// The family whose similar fonts the browser shows instead of a sidebar item's, the closest first (see
+    /// `showSimilar`); nil for a sidebar item's.
+    var similarFamilyID: String?
     /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
     /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
@@ -173,6 +183,7 @@ final class AppModel {
     @ObservationIgnored private var scanTask: Task<Void, Never>?
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var coverageTask: Task<Void, Never>?
+    @ObservationIgnored private var measurementTask: Task<Void, Never>?
     @ObservationIgnored private var problemsTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -207,6 +218,9 @@ final class AppModel {
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
+    @ObservationIgnored var similarCache: (key: SimilarKey, table: SimilarFonts)?
+    /// What the sidebar had selected before Show Similar Fonts, to go back to.
+    @ObservationIgnored var similarReturn: Set<SidebarItem>?
     /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
 
@@ -218,6 +232,7 @@ final class AppModel {
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
+        measurements = MeasurementIndex(caches: locations.caches)
         pageContents = PageContents(coverage: coverage)
         guesser = ClassificationGuesser(caches: locations.caches)
         guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
@@ -401,6 +416,7 @@ final class AppModel {
     func rebuildFontList() {
         scanner.clearCache()
         coverage.clearCache()
+        measurements.clearCache()
         rescan()
     }
 
@@ -465,6 +481,27 @@ final class AppModel {
             self.coverageProgress = nil
             self.coverageRevision &+= 1
             self.characterSetLookup.reset()
+            self.updateMeasurements()
+        }
+    }
+
+    /// Every family's letters, for similar fonts; after coverage, which lists wait for.
+    private func updateMeasurements() {
+        measurementTask?.cancel()
+        let families = library.families
+        let measurements = measurements
+        let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
+            guard let self else { return }
+            Task { @MainActor in
+                self.measurementProgress = CoverageProgress(done: done, total: total)
+                if done == total || done % 200 == 0 { self.measurementRevision &+= 1 }
+            }
+        }
+        measurementTask = Task { [weak self] in
+            await measurements.update(families, progress: report)
+            guard !Task.isCancelled, let self else { return }
+            self.measurementProgress = nil
+            self.measurementRevision &+= 1
         }
     }
 

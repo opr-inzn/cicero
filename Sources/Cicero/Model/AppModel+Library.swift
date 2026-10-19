@@ -75,6 +75,9 @@ struct VisibleKey: Equatable {
     var dataRevision: Int
     var coverageRevision: Int
     var guessRevision: Int
+    var similar: String?
+    /// 0 unless the browser shows similar fonts, so measurements arriving don't make other lists again.
+    var measurementRevision: Int
 }
 
 /// What the cached rows of the font list were made from.
@@ -156,7 +159,8 @@ extension AppModel {
     private var visibleKey: VisibleKey {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
-            dataRevision: dataRevision, coverageRevision: coverageRevision, guessRevision: guessRevision
+            dataRevision: dataRevision, coverageRevision: coverageRevision, guessRevision: guessRevision,
+            similar: similarFamilyID, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
     }
 
@@ -174,7 +178,9 @@ extension AppModel {
             default: nil
             }
         }
-        let rows = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }.sorted(using: order)
+        // No order keeps the families' own, as for similar fonts, the closest first.
+        let unsorted = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }
+        let rows = order.isEmpty ? unsorted : unsorted.sorted(using: order)
         let families = rows.map(\.family)
         fontRowsCache = (key, rows, families)
         return (rows, families)
@@ -182,6 +188,10 @@ extension AppModel {
 
     private func computeVisibleFamilies() -> [Family] {
         let query = appliedSearch.trimmingCharacters(in: .whitespaces).lowercased()
+        if let id = similarFamilyID {
+            guard let family = library.family(id), data.lists(family) else { return [] }
+            return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter { library.matches($0, search: query) }
+        }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
         return library.families.filter { family in
             guard data.lists(family) else { return false }
