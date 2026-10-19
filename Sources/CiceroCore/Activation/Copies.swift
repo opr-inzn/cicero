@@ -283,7 +283,7 @@ extension FontFace {
             id: FaceID(path: path, index: id.index), postScriptName: postScriptName, familyName: familyName, styleName: styleName,
             fullName: fullName, weight: weight, isItalic: isItalic, isMonospaced: isMonospaced, familyClass: familyClass,
             panose: panose, letterShape: letterShape, manufacturer: manufacturer, version: version, designer: designer, vendorID: vendorID, weightAxis: weightAxis,
-            width: width, axes: axes, year: year, embedding: embedding, features: features,
+            width: width, axes: axes, isAtOrigin: isAtOrigin, year: year, embedding: embedding, features: features,
             localizedFamilyNames: localizedFamilyNames
         )
     }

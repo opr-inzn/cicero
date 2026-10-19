@@ -75,8 +75,9 @@ private struct Tile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            HStack(spacing: 4) {
                 StatusTag(family: family)
+                VariableTag(family: family)
                 Spacer()
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
@@ -84,7 +85,7 @@ private struct Tile: View {
             FontText(
                 text: preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText,
                 face: family.face(nearestWeight: preview.weight).face,
-                size: preview.size, weight: preview.weight,
+                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
                 features: model.features(for: family), kerning: preview.kerning(at: preview.size)
             )
             .minimumScaleFactor(0.4)
@@ -104,7 +105,8 @@ private struct Tile: View {
                         .lineLimit(1)
                         .help(family.rangeLabel)
                     Spacer(minLength: 0)
-                    Text(family.formatLabel)
+                    // The kinds of file: the tag above says it's variable.
+                    Text(family.fileKinds)
                         .foregroundStyle(.tertiary)
                         .fixedSize()
                 }

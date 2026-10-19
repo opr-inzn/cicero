@@ -43,7 +43,7 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF”, “TTF” or “Variable”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
 
 The grid is the view Cicero starts with.
 
@@ -63,6 +63,8 @@ Small capsules next to a family’s name tell you more about its state:
 | Adobe Fonts | From Adobe Fonts, managed in Creative Cloud: on in every app, or in Adobe apps only when its switch sits halfway. See [Adobe Fonts](activating.md#adobe-fonts) |
 | Temporary | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
 | App Set | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
+
+A teal **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
 
 ## Search
 
@@ -101,7 +103,7 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 From top to bottom, a font page has:
 
 - **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why. A family from [Adobe Fonts](activating.md#adobe-fonts) has **Manage in Creative Cloud** instead.
-- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it tags or a rating, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**.
+- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options; a variable font is otherwise at its default, the origin its styles are drawn from), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it tags or a rating, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**. For a variable style, **Axes** opens the Info panel at its [Axes](#try-variable-axes) tab. Once you’ve moved an axis there, the Style menu says **Custom**: **Reset** next to it, or choosing a style, goes back.
 - **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash. Under the family’s name, it has the family’s **Add to Set**, **Tags**, **Rating** and **Classification** too.
 - **Glyphs:** every character in the font, grouped by kind in the order a type designer would list them: **Uppercase** and **Lowercase** from A to Z, then **Uppercase Accents** and **Lowercase Accents** (with the other Latin letters, like Æ, Þ and ß), **Ligatures**, **Proportional Figures** and **Tabular Figures**, **Dingbat Numerals**, **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Punctuation and Symbols**, **Diacritical Marks**, **Combining Marks**, **Case Sensitive Forms**, **Arrows**, and **Global** for the letters and figures of other scripts. The glyphs the style’s features draw in place of characters are in their groups too, like its tabular figures (tnum), superscripts (sups) and case-sensitive forms (case); click one to see which feature draws it. The ligatures the style makes are in the Ligatures group, in a section per feature, like **Standard Ligatures** (see [See a font’s ligatures](#see-a-fonts-ligatures)). To find characters, type into the filter field: a character, part of its Unicode name, or a code like U+00E9. Ligatures made of what you type show too: “f” finds ff, fi and ffl. Click a character to see it large, with its name, its Unicode code, its HTML entities (the named one when HTML has one, like `&eacute;`, and the numeric one, like `&#xE9;`, which works for any character) and, when your keyboard layout types it, its keystroke, like ⌥E, then E for é on a U.S. keyboard (a dead key, then the letter). **Copy Character** there puts it on the clipboard; right-click a character for **Copy Character**, **Copy Unicode** and **Copy HTML Entity**. A glyph a feature draws copies the character it stands for, which looks like the glyph where the feature is on.
 
@@ -141,6 +143,18 @@ Many fonts have optional features, like small caps, old-style figures or stylist
 Some features let you choose one option of several; turning one on turns the others off, and turning the chosen one off goes back to the font’s default.
 
 The features you choose apply to that family wherever Cicero previews it, in the list, grid, specimens and font page, until Cicero quits. They don’t change the font file.
+
+## Try variable axes
+
+A variable font is drawn from its design axes, like **Weight**, **Width**, **Optical Size** or **Slant**, or the designer’s own, like Roboto Flex’s **Grade**. Cicero shows it at its default on each, the origin its styles are drawn from, Optical Size included, at the weight in Preview Options. To move it along them:
+
+1. Select a variable family and open the Info panel, or click **Axes** on its font page.
+2. Click **Axes**.
+3. Drag a slider, or type a value next to it.
+
+Each axis shows its name and its four-letter tag, like `wdth`. **Reset All** puts them all back. **Optical Size** stays at the font’s own, like every other axis, rather than following the size of the text, until you move it. Axes the font asks apps not to show, like Roboto Flex’s parametric ones, are listed last, under **Hidden Axes**: click it to show or hide them. Cicero remembers whether they’re shown.
+
+Like features, the axes apply to that family wherever Cicero previews it, in the list, grid, specimens, Quick Look and its font page, text and glyphs alike, until Cicero quits. Choosing a style on the font page puts them back.
 
 ## Change the preview text and size
 

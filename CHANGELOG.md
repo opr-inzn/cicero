@@ -2,6 +2,13 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- The Info panel has an **Axes** tab for a variable family: a slider for each of its axes, like Weight, Width, Optical Size or the designer’s own, with its tag, to move the family’s previews along them, in the browser and on its font page, text and glyphs alike, or type a value. Axes the font hides, like Roboto Flex’s parametric ones, come last, under **Hidden Axes**, which opens and closes. On a font page, **Axes** opens the tab, and once an axis has moved, the Style menu says **Custom**, with **Reset** next to it.
+- Variable families stand out in the list, grid and specimens: a teal **Variable** tag next to the name (at the top of a tile), which lists the family’s axes when you hold the pointer over it. A tile’s caption names the kind of file, like TTF, as it does for other fonts.
+- A variable family shows at its font’s default, the origin its other styles are drawn from, on every axis but weight, which follows the preview weight: SF Pro at its normal width, rather than Compressed, everywhere it’s previewed.
+- Variable fonts are drawn at their own optical size, the font’s default or the named style’s, rather than one matched to the size of the text, so previews show the letters as they were drawn at the origin. Move Optical Size in the Axes tab to try another. After the update, Cicero reads your variable fonts again once.
+
 ## 1.6
 
 - Coming from FontExplorer X? Choose **File → Import from FontExplorer X** to bring over its Font Library, sets (named after the folders they were in, like “Clients / Acme”), application sets with their apps, smart sets, labels as tags in their colors, ratings and how often each family was turned on, and to turn on again the fonts that were on. Cicero finds FontExplorer X’s library on your Mac by itself, or opens a backup of it (`.fexconfig` or `.fexbackup`, from **File → Local Backup**), also when you drop one on the window; a `.fexbackup`’s fonts go back where the Font Library was. A sheet shows what it found, to pick what comes over, and what stays behind, like smart sets with rules Cicero doesn’t have. FontExplorer X’s database is read from a copy, so it can stay open, and nothing of it changes.

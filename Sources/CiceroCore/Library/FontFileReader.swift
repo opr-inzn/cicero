@@ -40,21 +40,24 @@ enum FontFileReader {
         let lowercasedStyle = styleName.lowercased()
         var axis: WeightAxis?
         var axes: [VariationAxis] = []
+        var isAtOrigin = true
         // A named instance's own coordinates; axes it leaves out are at their defaults. (The font's variation
         // would also hold the optical size CoreText picks for its point size.)
         let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
             .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
-        for entry in variationAxes(of: font, known: &knownAxes) {
+        let entries = variationAxes(of: font, known: &knownAxes)
+        for entry in entries {
             guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double
             else { continue }
+            if identifier != weightAxisTag, abs((instance[identifier] ?? defaultValue) - defaultValue) > 0.01 { isAtOrigin = false }
             if identifier == weightAxisTag,
                let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
                let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double {
                 axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
             }
             if entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true { continue }
-            let tag = String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .isoLatin1) ?? ""
+            let tag = AxisTag.string(identifier)
             let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
             axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
         }
@@ -78,6 +81,7 @@ enum FontFileReader {
             weightAxis: axis,
             width: widthClass(os2),
             axes: axes,
+            isAtOrigin: isAtOrigin && !entries.isEmpty,
             year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head)),
             embedding: embedding(os2),
             features: OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?)),

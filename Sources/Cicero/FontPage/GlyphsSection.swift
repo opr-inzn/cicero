@@ -68,7 +68,8 @@ struct GlyphsSection: View {
             }
             // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes.
             if !shownLigatures.isEmpty {
-                LigaturesSection(face: face, columns: columns, groups: shownLigatures, characters: ligatureCharacters)
+                LigaturesSection(face: face, variations: model.variations(for: family), columns: columns, groups: shownLigatures,
+                                 characters: ligatureCharacters)
             }
             ForEach(shown.filter { $0.group > .ligatures }) { section in
                 self.section(section, face: face)
@@ -145,7 +146,7 @@ struct GlyphsSection: View {
                 Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(scalar)) }
                     .help("Copies “\(Self.text(scalar))”")
             case .feature(let glyph):
-                GlyphImage(face: face, glyph: glyph.glyph, size: 96, weight: preview.weight)
+                GlyphImage(face: face, glyph: glyph.glyph, size: 96, weight: preview.weight, variations: model.variations(for: family))
                     .frame(width: 160, height: 130)
                 Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 Text("\(glyph.featureName) (\(glyph.feature))").font(.callout).foregroundStyle(.secondary)
@@ -188,7 +189,8 @@ struct GlyphsSection: View {
         Group {
             switch cell {
             case .character(let scalar): character(scalar, face: face, size: Self.glyphSize)
-            case .feature(let glyph): GlyphImage(face: face, glyph: glyph.glyph, size: Self.glyphSize, weight: preview.weight)
+            case .feature(let glyph):
+                GlyphImage(face: face, glyph: glyph.glyph, size: Self.glyphSize, weight: preview.weight, variations: model.variations(for: family))
             }
         }
         .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
@@ -206,10 +208,10 @@ struct GlyphsSection: View {
     @ViewBuilder
     private func character(_ scalar: UInt32, face: FontFace, size: CGFloat) -> some View {
         if Self.isCombining(scalar), let glyph = Self.glyph(of: scalar, in: FontLoader.shared.font(face, size: size, weight: preview.weight)) {
-            GlyphImage(face: face, glyph: glyph, size: size, weight: preview.weight)
+            GlyphImage(face: face, glyph: glyph, size: size, weight: preview.weight, variations: model.variations(for: family))
         } else {
             FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: face, size: size, weight: preview.weight,
-                     features: model.features(for: family))
+                     variations: model.variations(for: family), features: model.features(for: family))
         }
     }
 

@@ -157,23 +157,31 @@ private struct TypeTester: View {
     @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
-    /// nil follows the preview weight.
-    @State private var styleID: FaceID?
 
     var body: some View {
-        let chosen = family.faces.first { $0.id == styleID }
-        let face = chosen ?? family.face(nearestWeight: preview.weight)
-        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
+        let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 if family.faces.count > 1 {
-                    Picker("Style", selection: $styleID) {
-                        Text("Automatic").tag(FaceID?.none)
+                    Picker("Style", selection: choice(isAdjusted: !variations.isEmpty)) {
+                        Text("Automatic").tag(StyleChoice.automatic)
                         Divider()
-                        ForEach(family.faces) { Text($0.face.styleName).tag(Optional($0.id)) }
+                        ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
+                        if !variations.isEmpty {
+                            Divider()
+                            Text("Custom").tag(StyleChoice.custom)
+                        }
                     }
                     .fixedSize()
                     .help("Which style to show; Automatic follows the preview weight")
+                }
+                if !variations.isEmpty {
+                    Button("Reset") { model.familyAxes[family.id] = nil }
+                        .help("Back to the style’s own values")
+                }
+                if !face.face.axes.isEmpty {
+                    AxesButton()
                 }
                 Spacer()
                 HStack(spacing: 8) {
@@ -187,18 +195,54 @@ private struct TypeTester: View {
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
-                editor(face: face, weight: weight)
+                editor(FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
+                                              features: model.features(for: family)))
             }
             .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
     }
+
+    /// The Style menu's choice: Custom once an axis has been moved, until a style is chosen again.
+    private func choice(isAdjusted: Bool) -> Binding<StyleChoice> {
+        Binding {
+            isAdjusted ? .custom : model.pageStyleID.map(StyleChoice.style) ?? .automatic
+        } set: { choice in
+            switch choice {
+            case .automatic: model.pageStyleID = nil
+            case .style(let id): model.pageStyleID = id
+            case .custom: return
+            }
+            model.familyAxes[family.id] = nil
+        }
+    }
+}
+
+private enum StyleChoice: Hashable {
+    case automatic
+    case style(FaceID)
+    case custom
+}
+
+/// Shows the Info panel at its Axes tab, or hides it when it's showing them.
+private struct AxesButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button {
+            let isShowing = model.isInfoPresented && model.infoTab == .axes
+            model.infoTab = .axes
+            model.isInfoPresented = !isShowing
+        } label: {
+            Label("Axes", systemImage: "slider.horizontal.3")
+        }
+        .help("Move the style’s axes, in the Info panel")
+    }
 }
 
 private extension TypeTester {
     @ViewBuilder
-    func editor(face: LibraryFace, weight: Double) -> some View {
-        let ctFont = FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family))
+    func editor(_ ctFont: CTFont) -> some View {
         let font = Font(ctFont)
         let kerning = preview.kerning(at: size)
         let lineHeight = preview.lineHeight(at: size)

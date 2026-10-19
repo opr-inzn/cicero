@@ -5,6 +5,10 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
+    /// The Variable tag's: the system teal is too light for small text on its own tint in light mode.
+    static let variable = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemTeal : NSColor(srgbRed: 0, green: 0.49, blue: 0.58, alpha: 1)
+    })
 }
 
 /// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
@@ -15,6 +19,8 @@ struct FontText: View {
     let face: FontFace
     let size: Double
     var weight: Double = 400
+    /// Axes moved in the Info panel, by tag.
+    var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     var kerning: Double = 0
     var lineLimit: Int? = 1
@@ -24,7 +30,7 @@ struct FontText: View {
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let font = FontLoader.shared.font(face, size: size, weight: weight, features: features)
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
             Text(text.isEmpty ? " " : text)
                 .font(Font(font))
                 .kerning(kerning)
@@ -182,15 +188,42 @@ struct ActivationSwitch: View {
 struct Tag: View {
     let text: String
     let tint: Color
+    /// A symbol before the text.
+    var systemImage: String?
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
-            .background(tint.opacity(0.14), in: .capsule)
-            .foregroundStyle(tint.opacity(0.9))
-            .fixedSize()
+        HStack(spacing: 2.5) {
+            if let systemImage { Image(systemName: systemImage).accessibilityHidden(true) }
+            Text(text)
+        }
+        .font(.system(size: 9, weight: .semibold))
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1.5)
+        .background(tint.opacity(0.14), in: .capsule)
+        .foregroundStyle(tint.opacity(0.9))
+        .fixedSize()
+    }
+}
+
+/// Marks a variable family wherever it's listed, apart from the kinds of file, with the symbol of its axes and, on
+/// hover, their names.
+struct VariableTag: View {
+    let family: Family
+
+    var body: some View {
+        if family.isVariable {
+            Tag(text: "Variable", tint: .variable, systemImage: "slider.horizontal.3")
+                .help(help)
+        }
+    }
+
+    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in the order the fonts give them.
+    private var help: String {
+        var names: [String] = []
+        for face in family.faces {
+            for axis in face.face.axes where !names.contains(axis.name) { names.append(axis.name) }
+        }
+        return names.isEmpty ? "Variable" : "Variable: " + names.joined(separator: ", ")
     }
 }
 
@@ -343,7 +376,14 @@ struct ValueField: View {
     }
 
     private func formatted(_ value: Double) -> String {
-        String(format: step < 1 ? "%.1f" : "%.0f", value)
+        String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
+    }
+}
+
+/// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
+struct StillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.contentShape(.rect)
     }
 }
 

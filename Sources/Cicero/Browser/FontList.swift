@@ -552,11 +552,13 @@ private struct FontListRow: View {
                 Text(row.name).lineLimit(1)
                 TagDots(colors: row.tags)
                 StatusTag(family: family)
+                VariableTag(family: family)
             }
         case .preview:
             FontText(
                 text: preview.text(for: family), face: family.face(nearestWeight: preview.weight).face,
-                size: 17, weight: preview.weight, features: model.features(for: family), kerning: preview.kerning(at: 17)
+                size: 17, weight: preview.weight, variations: model.variations(for: family), features: model.features(for: family),
+                kerning: preview.kerning(at: 17)
             )
             // Every row the same height, however tall the font's glyphs, which may run over its edges rather
             // than be cut off.

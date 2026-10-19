@@ -44,6 +44,29 @@ public struct VariationAxis: Hashable, Codable, Sendable {
     }
 }
 
+/// How far one of a variable font's axes goes, for a slider: Weight from 100 to 900, 400 by default.
+public struct AxisRange: Hashable, Sendable, Identifiable {
+    /// As `VariationAxis.tag`.
+    public var tag: String
+    public var name: String
+    public var minimum: Double
+    public var maximum: Double
+    public var defaultValue: Double
+    /// Set for an axis the font asks apps not to show, like Roboto Flex's parametric ones; it still changes the letters.
+    public var isHidden: Bool
+
+    public var id: String { tag }
+
+    public init(tag: String, name: String, minimum: Double, maximum: Double, defaultValue: Double, isHidden: Bool = false) {
+        self.tag = tag
+        self.name = name
+        self.minimum = minimum
+        self.maximum = maximum
+        self.defaultValue = defaultValue
+        self.isHidden = isHidden
+    }
+}
+
 /// What the font's license lets a document do with it, as the OS/2 table's embedding bits say: from the least
 /// restrictive to the most, the order `rank` follows.
 public enum Embedding: String, CaseIterable, Codable, Sendable {
@@ -191,6 +214,10 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var width: Int
     /// A variable font's axes, without the ones it hides, with this instance's position on each; empty for a static font.
     public var axes: [VariationAxis]
+    /// Set for a variable font's named instance at the font's default, its origin, on every axis but weight, hidden
+    /// ones too: upright, at its normal width and default optical size. One of these stands for the family, at the
+    /// weight a preview asks for.
+    public var isAtOrigin: Bool
     /// When the face came out, as near as its file says (see `FontFileReader.year`).
     public var year: Int?
     /// What its license lets a document do with it; nil without an OS/2 table.
@@ -205,7 +232,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
-        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], year: Int? = nil,
+        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], isAtOrigin: Bool = false, year: Int? = nil,
         embedding: Embedding? = nil, features: OpenTypeFeatures = [], localizedFamilyNames: [String: String] = [:]
     ) {
         self.id = id
@@ -226,6 +253,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.weightAxis = weightAxis
         self.width = width
         self.axes = axes
+        self.isAtOrigin = isAtOrigin
         self.year = year
         self.embedding = embedding
         self.features = features
@@ -485,8 +513,13 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let hasItalics: Bool
     /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
     public let rangeLabel: String
-    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable", "OTF · Variable".
+    /// The kinds of file the faces come in, variable ones apart, for the exported font list: "OTF", "Variable",
+    /// "OTF · Variable".
     public let formatLabel: String
+    /// The kinds of file the faces come in, variable ones too, for tile captions: "OTF", "TTF", "OTF · TTF".
+    public var fileKinds: String {
+        Set(faces.map { ($0.face.path as NSString).pathExtension.uppercased() }).sorted().joined(separator: " · ")
+    }
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
     /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
@@ -552,21 +585,30 @@ public struct Family: Identifiable, Hashable, Sendable {
         return app == nil ? (positions.contains(.on) ? .on : .off) : SwitchPosition(positions)
     }
 
-    /// The face to preview at a weight: a variable face when there is one, else the closest upright weight.
+    /// The face to preview at a weight: a variable face when there is one, which draws any weight, else the closest
+    /// upright weight.
     public func face(nearestWeight weight: Double) -> LibraryFace {
-        weight == 400 ? regular : Self.nearest(weight, in: faces)
+        weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
     }
 
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
         let hasUpright = faces.contains { !$0.face.isItalic }
         var best: LibraryFace?
+        var variable: LibraryFace?
         for candidate in faces where !hasUpright || !candidate.face.isItalic {
-            if candidate.face.weightAxis != nil { return candidate }
-            if best == nil || abs(Double(candidate.face.weight) - weight) < abs(Double(best!.face.weight) - weight) {
+            if candidate.face.weightAxis != nil {
+                // The instance at the font's origin, the regular weight of those there, rather than the first
+                // one, which in SF Pro is Compressed.
+                guard let found = variable else { variable = candidate; continue }
+                if candidate.face.isAtOrigin && (!found.face.isAtOrigin
+                    || abs(candidate.face.styleWeight - 400) < abs(found.face.styleWeight - 400)) {
+                    variable = candidate
+                }
+            } else if best == nil || abs(Double(candidate.face.weight) - weight) < abs(Double(best!.face.weight) - weight) {
                 best = candidate
             }
         }
-        return best ?? faces[0]
+        return variable ?? best ?? faces[0]
     }
 
     /// Counts the weights and widths. A variable font's styles are its named instances, placed by their axis
