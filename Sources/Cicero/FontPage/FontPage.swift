@@ -249,28 +249,14 @@ private struct AxesButton: View {
 private extension TypeTester {
     @ViewBuilder
     func editor(_ ctFont: CTFont) -> some View {
-        let font = Font(ctFont)
         let kerning = preview.kerning(at: size)
-        let lineHeight = preview.lineHeight(at: size)
         let lineHeightPoints = size * preview.lineSpacing / 100
         let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
-        // An invisible copy of the text sets the editor's height, so it grows with the page instead of
-        // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
-        Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
-            .font(font)
-            .kerning(kerning)
-            .lineHeight(lineHeight)
-            .multilineTextAlignment(alignment.text)
-            .frame(maxWidth: .infinity, alignment: alignment.frame)
-            .padding(.horizontal, 5)
-            .padding(.vertical, overhang)
-            .hidden()
-            .overlay {
-                SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
-                             alignment: alignment.paragraph, overhang: overhang) {
-                    FamilyMenu(families: [family], model: model)
-                }
-            }
+        // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
+        SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+                     alignment: alignment.paragraph, overhang: overhang) {
+            FamilyMenu(families: [family], model: model)
+        }
             .frame(minHeight: 280)
             .padding(.vertical, 20)
             // Around the text too, which has it in its own menu (see `SampleEditor`).

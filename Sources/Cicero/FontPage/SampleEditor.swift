@@ -4,8 +4,8 @@ import SwiftUI
 /// The font page's editable sample: a text view of its own rather than SwiftUI's TextEditor, which cuts off
 /// whatever reaches past the font's ascent and descent (descenders lower than the font says, swashes), and
 /// past each line when the lines are closer than the font is tall. Its lines draw every glyph wherever it
-/// reaches. It fills the room the page gives it, an invisible copy of the text's, and keeps `overhang` above
-/// and below the lines for glyphs reaching past them. A right-click shows Cut, Copy and Paste, then `menu`.
+/// reaches. It's as tall as its lines at the width the page gives it, with `overhang` above and below them for
+/// glyphs reaching past them. A right-click shows Cut, Copy and Paste, then `menu`.
 struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
     let font: CTFont
@@ -38,6 +38,22 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         context.coordinator.text = $text
         if view.string != text { view.string = text }
         update(view, context: context)
+    }
+
+    /// As tall as its lines, laid out at the width it's offered, and the room above and below them. An invisible
+    /// SwiftUI copy of the text used to set the height, but it broke some lines elsewhere, so at some sizes the last
+    /// line was cut off.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width.isFinite, let manager = view.textLayoutManager, let container = view.textContainer
+        else { return nil }
+        if container.size.width != width { container.size = NSSize(width: width, height: .greatestFiniteMagnitude) }
+        // The extra line after a final line break, and the one empty text has, count too.
+        var bottom: CGFloat = 0
+        manager.enumerateTextLayoutFragments(from: manager.documentRange.location, options: [.ensuresLayout, .ensuresExtraLineFragment]) {
+            bottom = max(bottom, $0.layoutFragmentFrame.maxY)
+            return true
+        }
+        return CGSize(width: width, height: bottom.rounded(.up) + 2 * overhang)
     }
 
     /// Made at each right-click, so its checkmarks are up to date.
