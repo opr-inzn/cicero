@@ -11,6 +11,7 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **Font pages** (double-click, ↩ or ⌘↓). A large text you can type into, aligned left, center or right, a table of styles you can switch on one by one when a family has more than one, and a searchable glyph map grouped by kind, as a type designer would list it (uppercase, accents, figures, punctuation and so on), with the glyphs features like tabular figures draw and the ligatures each style makes. Click a glyph for its name, Unicode code, HTML entity and the keys that type it on your keyboard, and copy it from there or its right-click menu. Right-click the text or a style to give the family a tag or a rating, add it to a set or change its classification.
 - **Info and Features.** The info panel shows a font’s details (its designer, vendor ID and embedding permission among them), its tag and rating, the languages it supports, its coverage and the Unicode blocks it covers; the Features tab turns OpenType features on for that family wherever it’s previewed.
 - **Search** by family name, foundry, PostScript name, designer or vendor ID.
+- **Similar fonts.** Right-click a family and choose Show Similar Fonts to see the 30 in your library that look most like it, the closest first, measured from the shapes of their letters on your Mac: x-height, weight, contrast and stress, width and spacing, slant, serifs, aperture, and the a’s and g’s stories. A font page shows the six closest.
 - **Preview Options.** Preview text, size, weight, letter and line spacing, and alignment, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.
 - **Customizable sidebar.** Click **Edit** next to Library and every item and group gets a checkbox; uncheck what you don’t want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*. Drag items into the order you like within their section, as in the Finder, and ⌘- or ⇧-click several items in a section to drag them together or see all their fonts at once. A click anywhere on a section’s title opens or closes it, and View → Hide Sidebar (⌃⌘S) puts it away.
@@ -40,7 +41,7 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 
 ## Roadmap
 
-Coming next: **similar fonts**, the families in your library that look most like the one you pick, and **Cicero in Spotlight**, so a family’s name, or a tag, rating or set of yours, finds it in Spotlight. Then smaller things, like a note on each family and the font list as a spreadsheet. How each could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **Cicero in Spotlight**, so a family’s name, or a tag, rating or set of yours, finds it in Spotlight. Then smaller things, like a note on each family and the font list as a spreadsheet. How each could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 

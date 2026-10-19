@@ -64,6 +64,16 @@ Small capsules next to a family’s name tell you more about its state:
 
 Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name or manufacturer contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
 
+## Find similar fonts
+
+Right-click a family and choose **Show Similar Fonts**, or select it and choose **Fonts → Show Similar Fonts**. The browser shows the family and the 30 families in your library that look most like it, the closest first, in the view you’re using. A bar above them says whose they are. To go back to what you were looking at, click **Done** in the bar, or choose an item in the sidebar. Search works within them, and in the list they stay closest first until you click a column’s title to sort by it.
+
+A font page shows the six closest under **Similar**, below its styles, each set in itself: click one to open its page, or **Show All** to see the 30 in the browser.
+
+Cicero compares the letters of each family’s regular style: how tall its lowercase is against its capitals, how far its ascenders and descenders reach, how heavy its stems are, how much its strokes change from thick to thin and at what angle, how wide its letters are and how much room it leaves around them, how far it leans, whether it has serifs and how long and thick they are, how open its c and e are, how square its o is, whether its a and g have one story or two, and whether it’s monospaced. Families of different classifications count as further apart. It measures the letters on your Mac, once Cicero has checked your fonts’ characters: a few seconds for a thousand families the first time, then only new and changed files.
+
+A family without the Latin letters Cicero measures, like most fonts for other scripts and symbol fonts, has no similar fonts: **Show Similar Fonts** is dimmed, and its page has no **Similar**. Fonts you’ve hidden from your lists, like the ones that come with macOS while **Show system fonts** is off, aren’t among the similar ones.
+
 ## Select fonts
 
 | To | Do this |
@@ -77,7 +87,7 @@ Type in the search field in the toolbar. Cicero shows the families in the curren
 | Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
 | Extend the selection | Hold ⇧ with an arrow key |
 
-Right-click a family for its menu: activate or deactivate it, add it to a set, give it a tag or a classification, reveal its files, copy its name, export it, compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
+Right-click a family for its menu: activate or deactivate it, add it to a set, give it a tag or a classification, reveal its files, copy its name, export it, [show similar fonts](#find-similar-fonts), compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
 You can drag families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window.
 
@@ -99,6 +109,7 @@ From top to bottom, a font page has:
 - **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why. A family from [Adobe Fonts](activating.md#adobe-fonts) has **Manage in Creative Cloud** instead.
 - **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it tags or a rating, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**.
 - **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash. Under the family’s name, it has the family’s **Add to Set**, **Tags**, **Rating** and **Classification** too.
+- **Similar:** the six families that look most like this one, each set in itself, with its foundry. Click one to open its page, or **Show All** for more in the browser (see [Find similar fonts](#find-similar-fonts)).
 - **Glyphs:** every character in the font, grouped by kind in the order a type designer would list them: **Uppercase** and **Lowercase** from A to Z, then **Uppercase Accents** and **Lowercase Accents** (with the other Latin letters, like Æ, Þ and ß), **Ligatures**, **Proportional Figures** and **Tabular Figures**, **Dingbat Numerals**, **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Punctuation and Symbols**, **Diacritical Marks**, **Combining Marks**, **Case Sensitive Forms**, **Arrows**, and **Global** for the letters and figures of other scripts. The glyphs the style’s features draw in place of characters are in their groups too, like its tabular figures (tnum), superscripts (sups) and case-sensitive forms (case); click one to see which feature draws it. The ligatures the style makes are in the Ligatures group, in a section per feature, like **Standard Ligatures** (see [See a font’s ligatures](#see-a-fonts-ligatures)). To find characters, type into the filter field: a character, part of its Unicode name, or a code like U+00E9. Ligatures made of what you type show too: “f” finds ff, fi and ffl. Click a character to see it large, with its name, its Unicode code, its HTML entities (the named one when HTML has one, like `&eacute;`, and the numeric one, like `&#xE9;`, which works for any character) and, when your keyboard layout types it, its keystroke, like ⌥E, then E for é on a U.S. keyboard (a dead key, then the letter). **Copy Character** there puts it on the clipboard; right-click a character for **Copy Character**, **Copy Unicode** and **Copy HTML Entity**. A glyph a feature draws copies the character it stands for, which looks like the glyph where the feature is on.
 
 ## See a font’s ligatures

@@ -40,6 +40,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
+- **Similarity** (`Similarity/`): `LetterMeasurements` measures a face's letters from their outlines (x-height,
+  weight, contrast and stress, widths, spacing, slant, serifs, aperture, squareness, the a's and g's stories,
+  monospacing), with `LetterShapes`' outline runs; `MeasurementIndex` measures every family's regular style in the
+  background after coverage and caches the results on disk, as `CoverageIndex` does; `SimilarFonts` ranks the
+  families nearest one, measure by measure in fixed steps, weighted. The app keeps one `SimilarFonts` for the
+  listed families and makes it again when the library, the measurements or the user's data change.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
   preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
   prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead
