@@ -381,7 +381,7 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// Its feature's tag and those it takes along with it, and their names, in the same order.
     public var featureTags: [String] { [feature] + alongWith }
     public var featureNames: [String] { [featureName] + alongWith.map { FeatureAlternates.name(of: $0, in: [:]) } }
-    public var group: GlyphGroup { Self.features.first { $0.tag == feature }?.group ?? .global }
+    public var group: GlyphGroup { Self.features.first { $0.tag == feature }?.group ?? .graphical }
 
     /// Keeps a font with features over thousands of glyphs to a sensible number.
     public static let limit = 3000
