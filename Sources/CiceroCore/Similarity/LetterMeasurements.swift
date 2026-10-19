@@ -65,7 +65,7 @@ public struct LetterMeasurements: Equatable, Sendable {
     /// symbols and bitmap emoji.
     public static func measure(_ font: CTFont) -> LetterMeasurements? {
         // In thousandths of an em.
-        let font = CTFontCreateCopyWithAttributes(font, 1000, nil, nil)
+        let font = LetterImages.inThousandths(font)
         var letters: [Character: Letter] = [:]
         func letter(_ character: Character) -> Letter? {
             if let known = letters[character] { return known }

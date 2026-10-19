@@ -11,9 +11,11 @@ Of each it draws the upright and the italic styles from Light to Bold, a variabl
 as far as its weight axis goes and at the normal width, whatever its default; a family with none of those weights,
 the nearest to 400 it has. A variable font with a width axis is drawn narrower and wider too, at 300, 400 and 500:
 extra condensed and condensed (62.5 and 75, or as narrow as it goes past 87.5) and expanded and extra expanded (125
-and 150, or as wide as it goes past 112.5). Writes manifest.json, the styles to draw (see render-letters.swift), and
-families.json: each family's name, category, Google's tags and its entries in the manifest, with their weight,
-width and whether they're italic.
+and 150, or as wide as it goes past 112.5). One with an optical size axis is drawn at its own (its default) and,
+also at 300, 400 and 500, at a small and a large one, 8 and 96 as far as the axis goes, when those are at least
+twice apart. Writes manifest.json, the styles to draw (see render-letters.swift), and families.json: each family's
+name, category, Google's tags and its entries in the manifest, with their weight, width, optical size (nil for its
+own) and whether they're italic.
 """
 
 import argparse
@@ -29,6 +31,7 @@ LICENSES = {
 }
 WEIGHTS = [300, 400, 500, 600, 700]
 NARROW, WIDE = [62.5, 75], [125, 150]
+SMALL, LARGE = 8, 96
 
 
 def parse_metadata(text):
@@ -89,8 +92,17 @@ def widths(axes):
     return narrow + wide
 
 
+def optical_sizes(axes):
+    """The optical sizes besides its own to draw a variable font at."""
+    found = axis_range(axes, "opsz")
+    if not found:
+        return []
+    small, large = max(SMALL, found[0]), min(LARGE, found[1])
+    return [small, large] if large >= small * 2 else []
+
+
 def instances(fonts, axes, italic):
-    """(file, variations, weight, width) for the styles to draw."""
+    """(file, variations, weight, width, optical size) for the styles to draw."""
     fonts = [font for font in fonts if (first(font, "style") == "italic") == italic]
     if not fonts:
         return []
@@ -100,15 +112,17 @@ def instances(fonts, axes, italic):
         weight_range, width_range = axis_range(axes, "wght"), axis_range(axes, "wdth")
         normal = {"wdth": min(max(100, width_range[0]), width_range[1])} if width_range else {}
         if weight_range is None:
-            return [(file, normal, first(variable[0], "weight", 400), 100)]
+            return [(file, normal, first(variable[0], "weight", 400), 100, None)]
         low, high = weight_range
         weights = [weight for weight in WEIGHTS if low <= weight <= high] or [min(max(400, low), high)]
-        found = [(file, {"wght": weight, **normal}, weight, 100) for weight in weights]
+        found = [(file, {"wght": weight, **normal}, weight, 100, None) for weight in weights]
         if not italic:
             for width in widths(axes):
-                found += [(file, {"wght": weight, "wdth": width}, weight, width) for weight in weights if weight <= 500]
+                found += [(file, {"wght": weight, "wdth": width}, weight, width, None) for weight in weights if weight <= 500]
+            for size in optical_sizes(axes):
+                found += [(file, {"wght": weight, "opsz": size, **normal}, weight, 100, size) for weight in weights if weight <= 500]
         return found
-    statics = [(first(font, "filename"), {}, first(font, "weight", 400), 100) for font in fonts]
+    statics = [(first(font, "filename"), {}, first(font, "weight", 400), 100, None) for font in fonts]
     return [entry for entry in statics if 300 <= entry[2] <= 700] or [min(statics, key=lambda entry: abs(entry[2] - 400))]
 
 
@@ -158,11 +172,11 @@ def main():
             fonts, axes = meta.get("fonts", []), meta.get("axes", [])
             entries = []
             for italic in (False, True):
-                for file, variations, weight, width in instances(fonts, axes, italic):
+                for file, variations, weight, width, size in instances(fonts, axes, italic):
                     path = directory / file
                     if not path.exists():
                         continue
-                    entries.append({"row": len(manifest), "weight": weight, "width": width, "italic": italic})
+                    entries.append({"row": len(manifest), "weight": weight, "width": width, "opsz": size, "italic": italic})
                     manifest.append({"file": str(path), "variations": variations})
             if not entries:
                 continue

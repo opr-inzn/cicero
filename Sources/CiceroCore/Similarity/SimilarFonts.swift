@@ -3,8 +3,8 @@ import Foundation
 /// The families of a library side by side by their letter measurements (see `LetterMeasurements`) and their
 /// letters' embedding (see `LetterEmbedding`), to find those that look most like one. Each measure counts in steps
 /// of about as much as it takes to see a difference, so none counts for more by being a bigger number, and then by
-/// how much it shows: weight and serifs more than spacing. The embedding counts like one more measure, in steps of
-/// `embeddingStep`. Families of different classifications are farther apart. Made once for a library, then asked as
+/// how much it shows: weight and serifs more than spacing, and the widths more still, as the embedding hardly tells
+/// them. The embedding counts like one more measure, in steps of `embeddingStep`. Families of different classifications are farther apart. Made once for a library, then asked as
 /// often as needed.
 public struct SimilarFonts: Sendable {
     private let ids: [String]
@@ -24,8 +24,8 @@ public struct SimilarFonts: Sendable {
 
     /// How much each measure counts.
     public static let weights: [LetterMeasurements.Measure: Float] = [
-        .xHeight: 1.5, .ascender: 0.5, .descender: 0.5, .weight: 2.5, .contrast: 2, .stress: 1, .width: 1.5, .capitalWidth: 0.75,
-        .roundWidth: 0.75, .spacing: 0.5, .slant: 1.5, .serifLength: 2.5, .serifThickness: 1, .aperture: 1,
+        .xHeight: 1.5, .ascender: 0.5, .descender: 0.5, .weight: 2.5, .contrast: 2, .stress: 1, .width: 3, .capitalWidth: 1.5,
+        .roundWidth: 1.5, .spacing: 0.5, .slant: 1.5, .serifLength: 2.5, .serifThickness: 1, .aperture: 1,
         .squareness: 0.75, .doubleStoryA: 1, .doubleStoryG: 0.75, .monospaced: 2,
     ]
 

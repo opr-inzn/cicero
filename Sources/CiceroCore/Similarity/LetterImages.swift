@@ -24,8 +24,7 @@ enum LetterImages {
     /// a letter the face hasn't is an empty square. nil for a face with fewer than `fewest` of the letters drawn
     /// as outlines.
     static func draw(_ font: CTFont) -> [UInt8]? {
-        // In thousandths of an em.
-        let font = CTFontCreateCopyWithAttributes(font, 1000, nil, nil)
+        let font = inThousandths(font)
         let paths = letters.map { character -> CGPath? in
             guard let glyph = glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
                   !path.boundingBoxOfPath.isEmpty else { return nil }
@@ -66,6 +65,14 @@ enum LetterImages {
             pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
         }
         return pixels
+    }
+
+    /// The font at 1,000 units to the em, at its own optical size: the one its variation sets, else its axis's default.
+    /// CoreText would size a font with an optical size axis to the point size, so at 1,000 every one would be its
+    /// largest, display cut.
+    static func inThousandths(_ font: CTFont) -> CTFont {
+        let ownSize = CTFontDescriptorCreateWithAttributes([kCTFontOpticalSizeAttribute: "none"] as CFDictionary)
+        return CTFontCreateCopyWithAttributes(font, 1000, nil, ownSize)
     }
 
     private static func glyph(_ font: CTFont, _ character: Character) -> CGGlyph? {

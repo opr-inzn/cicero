@@ -7,8 +7,8 @@ Core ML for Cicero (Sources/CiceroCore/Similarity/LetterEmbedding.swift).
     python3 -I scripts/embedding/train.py export   ~/Downloads/cicero-training/work Resources/LetterEmbedding.mlpackage
 
 A small network looks at each of a style's 16 letters (see LetterImages.swift) the same way, then at all of them
-together, and gives 128 numbers of length 1: the embedding. It learns designs: a family's uprights at one width, or
-its italics. Two styles of a design a weight or so apart should come out close and other designs far (a contrastive
+together, and gives 128 numbers of length 1: the embedding. It learns designs: a family's uprights at one width or
+optical size, or its italics. Two styles of a design a weight or so apart should come out close and other designs far (a contrastive
 loss), a family's italics and other widths too, which share a batch with its uprights, so that slant and width
 count. And the embedding should tell Google's tags (Didone, geometric sans, stencil, formal script…) and category,
 so that designs of a kind come out close, and, given them, each style's letter measurements (LetterMeasurements.swift,
@@ -137,6 +137,18 @@ def label(family):
     return None
 
 
+# Words that name a family's optical size or width, as its siblings' names differ: DM Serif Display and Text,
+# Playfair and Playfair Display, Roboto and Roboto Condensed.
+SIBLING_WORDS = {"display", "text", "headline", "caption", "fine", "deck", "poster", "banner", "micro", "subhead", "condensed",
+                 "narrow", "compressed", "expanded", "extended", "wide", "semi", "extra", "ultra", "sc"}
+
+
+def sibling_root(name):
+    """The family's name without the words that name an optical size or width, which its siblings share."""
+    words = [word for word in name.lower().split() if word not in SIBLING_WORDS]
+    return " ".join(words) or name.lower()
+
+
 def load(work):
     """The designs, the letters drawn and the names of the tags."""
     families = json.loads((work / "families.json").read_text())
@@ -149,13 +161,15 @@ def load(work):
         target = [family["tags"].get(tag, 0.0) for tag in tag_names]
         target += [1.0 if family["category"] == category else 0.0 for category in CATEGORIES]
         entries = [entry for entry in family["entries"] if drawn[entry["row"]]]
-        kinds = sorted({(entry["italic"], entry.get("width", 100)) for entry in entries})
-        for italic, width in kinds:
-            own = [entry for entry in entries if entry["italic"] == italic and entry.get("width", 100) == width]
+        kind = lambda entry: (entry["italic"], entry.get("width", 100), entry.get("opsz") or 0)
+        for italic, width, size in sorted({kind(entry) for entry in entries}):
+            own = [entry for entry in entries if kind(entry) == (italic, width, size)]
             regular = min(own, key=lambda entry: abs(entry["weight"] - 400))
-            name = family["name"] + (" Italic" if italic else "") + (f" {width:g}" if width != 100 else "")
+            name = (family["name"] + (" Italic" if italic else "") + (f" {width:g}" if width != 100 else "")
+                    + (f" at {size:g} pt" if size else ""))
             designs.append({
-                "name": name, "family": family["name"], "italic": italic, "width": width, "category": family["category"],
+                "name": name, "family": family["name"], "root": sibling_root(family["name"]), "italic": italic, "width": width,
+                "size": size, "category": family["category"],
                 "regular": regular["row"], "all": [entry["row"] for entry in own],
                 "views": [entry["row"] for entry in own if abs(entry["weight"] - regular["weight"]) <= 100],
                 "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"]), "label": label(family),
@@ -326,13 +340,14 @@ def train(arguments):
     classes = [group for group in groups if not designs[group[0]]["held_out"]]
     families = sorted({designs[index]["family"] for group in classes for index in group})
     print(f"training on {len(classes)} designs ({sum(map(len, classes))} before merging) of {len(families)} families, "
-          f"{sum(not designs[group[0]]['italic'] and designs[group[0]]['width'] == 100 for group in classes)} of them "
-          f"upright and of the normal width; holding out {sum(design['held_out'] for design in designs)} designs")
-    # Each family's designs, so that they go into a batch together.
-    by_family = {}
+          f"{sum(not designs[group[0]]['italic'] and designs[group[0]]['width'] == 100 and not designs[group[0]]['size'] for group in classes)} "
+          f"of them upright and of the normal width and size; holding out {sum(design['held_out'] for design in designs)} designs")
+    # Each family's designs, and its siblings' (see `sibling_root`), so that they go into a batch together.
+    by_root = {}
     for position, group in enumerate(classes):
         for index in group:
-            by_family.setdefault(designs[index]["family"], set()).add(position)
+            by_root.setdefault(designs[index]["root"], set()).add(position)
+    roots = sorted(by_root)
 
     everything = torch.tensor(pixels, device=device)
     targets = torch.tensor([design["target"] for design in designs], device=device)
@@ -354,8 +369,8 @@ def train(arguments):
     for epoch in range(arguments.epochs):
         model.train()
         batches, batch, taken = [], [], set()
-        for family in random.sample(families, len(families)):
-            for position in sorted(by_family[family] - taken):
+        for root in random.sample(roots, len(roots)):
+            for position in sorted(by_root[root] - taken):
                 taken.add(position)
                 batch.append(classes[position])
             if len(batch) >= arguments.batch:

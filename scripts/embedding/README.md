@@ -30,9 +30,10 @@ swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/Cicer
 serif, script or ornamental, from Google's category, stroke and tags (see `label` in train.py). It says how often it's
 right on the held-out families, and how often when it's sure, which `AppModel.letterGuessLikelihood` goes by.
 
-It learns designs: a family's uprights at one width (the normal one, and condensed and expanded ones of a variable
-font with a width axis) or its italics, each a design of its own, that the others of the family share a batch with,
-so that slant and width count. `--stretch` adds designs drawn narrower and wider than they are, which made width
+It learns designs: a family's uprights at one width and optical size (the normal one, and condensed and expanded, small
+and large ones of a variable font with those axes) or its italics, each a design of its own, that the others of the
+family, and its siblings named for another size or width (DM Serif Display and Text), share a batch with, so that
+slant, width and optical size count. `--stretch` adds designs drawn narrower and wider than they are, which made width
 count a little more and italics less in round two; it's off.
 
 Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the
