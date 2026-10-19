@@ -5,7 +5,8 @@ import SwiftUI
 /// Every character a style has, and the glyphs its features draw in place of characters', like tabular figures, by
 /// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
 /// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
-/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with a grey dot.
+/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with a grey dot;
+/// figures go in rows by kind instead, lining, old-style, other alternates, then signs (see `GlyphSection.runs`).
 /// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
@@ -27,13 +28,7 @@ struct GlyphsSection: View {
     @State private var query = ""
     @State private var popover: Cell?
 
-    /// A cell of the grid: a character, a glyph a feature draws for one in a group of its own, like a tabular figure,
-    /// or an alternate after it.
-    private enum Cell: Hashable {
-        case character(UInt32)
-        case feature(FeatureGlyph)
-        case alternate(FeatureAlternate)
-    }
+    private typealias Cell = GlyphCell
 
     /// The style the page's text is set in, chosen in its Style menu or the one for the preview weight, at its
     /// weight and with its axes as moved: the glyphs are its.
@@ -97,23 +92,26 @@ struct GlyphsSection: View {
 
     private func section(_ section: GlyphSection, style: Style) -> some View {
         let filter = Filter(query)
-        let cells = section.scalars.flatMap { [Cell.character($0)] + shownAlternates(of: $0, filter).map(Cell.alternate) }
-            + section.glyphs.map(Cell.feature)
+        // Figures in runs, lining, old-style and so on, each starting a row (see `GlyphSection.runs`).
+        let runs = section.runs { shownAlternates(of: $0, filter) }
+        let rows = runs.flatMap { run in
+            stride(from: 0, to: run.count, by: columns).map { run[$0 ..< min($0 + columns, run.count)] }
+        }
+        let total = runs.reduce(0) { $0 + $1.count }
         return Section {
             // Rows of the page's stack, not a LazyVGrid per group in it. The stack guesses the height of groups it
             // hasn't placed from those it has, and groups run from one row to hundreds, so every correction shifted
             // the page and changed which groups were placed: it re-laid itself out at full CPU. Rows of fixed cells
             // are all one height, so the guesses are right.
-            let rows = (cells.count + columns - 1) / columns
-            ForEach(0..<rows, id: \.self) { row in
-                glyphRow(cells[row * columns ..< min((row + 1) * columns, cells.count)], style: style)
+            ForEach(rows.indices, id: \.self) { row in
+                glyphRow(rows[row], style: style)
                     .padding(.horizontal, Self.inset)
-                    .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
+                    .padding(.bottom, row == rows.count - 1 ? 18 : Self.spacing)
             }
         } header: {
             HStack(spacing: 6) {
                 Text(section.title).font(.headline)
-                Text("— \(cells.count.formatted())").font(.callout).foregroundStyle(.secondary)
+                Text("— \(total.formatted())").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
@@ -170,12 +168,14 @@ struct GlyphsSection: View {
                 GlyphImage(face: style.face, glyph: glyph.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
                 Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
-                Text("\(glyph.featureName) (\(glyph.feature))").font(.callout).foregroundStyle(.secondary)
+                // "Tabular Figures (tnum)", and "Old-Style Figures (onum)" under it for a tabular old-style figure.
+                Text(zip(glyph.featureNames, glyph.featureTags).map { "\($0) (\($1))" }.joined(separator: "\n"))
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: glyph.character)
                 // The glyph has no code of its own: what's copied is the character, which the font draws like this
                 // where the feature is on.
                 Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(glyph.character)) }
-                    .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureName) on")
+                    .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureNames.formatted(.list(type: .and))) on")
             case .alternate(let alternate):
                 let names = alternate.featureNames.formatted(.list(type: .or))
                 GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
@@ -313,7 +313,9 @@ struct GlyphsSection: View {
             // A character with an alternate the filter finds, which follows it; a feature's glyph by its character, or
             // the feature's name or tag.
             let characters = section.scalars.filter { filter.matches($0) || !shownAlternates(of: $0, filter).isEmpty }
-            let glyphs = section.glyphs.filter { filter.matches($0.character) || filter.matches(feature: $0.featureName, tag: $0.feature) }
+            let glyphs = section.glyphs.filter { glyph in
+                filter.matches(glyph.character) || zip(glyph.featureNames, glyph.featureTags).contains { filter.matches(feature: $0, tag: $1) }
+            }
             return characters.isEmpty && glyphs.isEmpty ? nil : GlyphSection(group: section.group, scalars: characters, glyphs: glyphs)
         }
     }

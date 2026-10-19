@@ -358,11 +358,14 @@ public struct FeatureGlyph: Hashable, Sendable {
     public let character: UInt32
     /// The feature's tag, "tnum".
     public let feature: String
+    /// The features it takes on top of that one, like Old-Style Figures for a tabular old-style figure.
+    public let alongWith: [String]
 
-    public init(glyph: CGGlyph, character: UInt32, feature: String) {
+    public init(glyph: CGGlyph, character: UInt32, feature: String, alongWith: [String] = []) {
         self.glyph = glyph
         self.character = character
         self.feature = feature
+        self.alongWith = alongWith
     }
 
     /// The features read for the font page's glyphs, in the order it lists their glyphs, with their names and the
@@ -375,6 +378,9 @@ public struct FeatureGlyph: Hashable, Sendable {
     ]
 
     public var featureName: String { Self.features.first { $0.tag == feature }?.name ?? feature }
+    /// Its feature's tag and those it takes along with it, and their names, in the same order.
+    public var featureTags: [String] { [feature] + alongWith }
+    public var featureNames: [String] { [featureName] + alongWith.map { FeatureAlternates.name(of: $0, in: [:]) } }
     public var group: GlyphGroup { Self.features.first { $0.tag == feature }?.group ?? .global }
 
     /// Keeps a font with features over thousands of glyphs to a sensible number.
@@ -387,11 +393,15 @@ public struct FeatureGlyph: Hashable, Sendable {
     public static func read(_ face: FontFace) -> [FeatureGlyph] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
-        let found = GSUBSubstitutions.read(table, features: Set(features.map(\.tag))).mapValues { $0.filter { $0.components.count == 1 } }
+        let tags = Set(features.map(\.tag)).union(figureStyles)
+        let found = GSUBSubstitutions.read(table, features: tags).mapValues { $0.filter { $0.components.count == 1 } }
         let glyphs = Set(found.values.flatMap { $0.flatMap { [$0.glyph] + $0.components } })
         guard !glyphs.isEmpty else { return [] }
         return resolve(found, characters: LigatureGroup.characterGlyphs(of: font, needed: glyphs))
     }
+
+    /// The features that draw figures in another style, which tabular figures can take on too.
+    static let figureStyles = ["onum", "lnum", "zero"]
 
     static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32]) -> [FeatureGlyph] {
         var seen = Set<CGGlyph>()
@@ -413,10 +423,39 @@ public struct FeatureGlyph: Hashable, Sendable {
                     ? GlyphGroup.order(of: $0.character, in: .punctuationAndSymbols).lexicographicallyPrecedes(GlyphGroup.order(of: $1.character, in: .punctuationAndSymbols))
                     : $0.character < $1.character
             }
-            for glyph in sorted where result.count < limit && seen.insert(glyph.glyph).inserted {
+            let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
+            for glyph in sorted + combined where result.count < limit && seen.insert(glyph.glyph).inserted {
                 result.append(glyph)
             }
         }
         return result
+    }
+
+    /// Tabular figures in another style, like old-style ones, by style, then character: glyphs of their own (a
+    /// zero.osf.tf, New York's zero.onum.tnum) that neither feature draws for a character alone. Tabular Figures draws
+    /// them for the style's figures, or the style's feature for the tabular ones; fonts tend to do both.
+    static func tabularFigures(in found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32]) -> [FeatureGlyph] {
+        let tabular = found["tnum"] ?? []
+        /// What `entries` draw for characters' own glyphs, glyph → character.
+        func drawn(by entries: [GSUBSubstitutions.Entry]) -> [CGGlyph: UInt32] {
+            entries.reduce(into: [:]) { drawn, entry in
+                if let input = entry.components.first, let character = characters[input], characters[entry.glyph] == nil {
+                    drawn[entry.glyph] = character
+                }
+            }
+        }
+        let tabularFor = drawn(by: tabular)
+        return figureStyles.flatMap { style -> [FeatureGlyph] in
+            let styled = found[style] ?? []
+            let styledFor = drawn(by: styled)
+            let entries = tabular.map { ($0, styledFor) } + styled.map { ($0, tabularFor) }
+            return entries.compactMap { entry, from -> FeatureGlyph? in
+                guard let input = entry.components.first, let character = from[input], characters[entry.glyph] == nil,
+                      entry.glyph != input
+                else { return nil }
+                return FeatureGlyph(glyph: entry.glyph, character: character, feature: "tnum", alongWith: [style])
+            }
+            .sorted { $0.character < $1.character }
+        }
     }
 }

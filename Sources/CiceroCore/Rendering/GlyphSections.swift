@@ -123,6 +123,14 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     }
 }
 
+/// A cell of the font page's glyph grid: a character, a glyph a feature draws for one in a group of its own, like a
+/// tabular figure, or an alternate after it.
+public enum GlyphCell: Hashable, Sendable {
+    case character(UInt32)
+    case feature(FeatureGlyph)
+    case alternate(FeatureAlternate)
+}
+
 /// A face's glyphs in one group for the glyph grid: its characters, then the glyphs features draw in place of theirs.
 public struct GlyphSection: Identifiable, Sendable {
     public let group: GlyphGroup
@@ -180,6 +188,44 @@ public struct GlyphSection: Identifiable, Sendable {
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
             return scalars.isEmpty && featured.isEmpty ? nil : GlyphSection(group: group, scalars: scalars, glyphs: featured)
         }
+    }
+
+    /// The section's cells in runs, each starting a row of its own, with `alternates` giving a character's: in most
+    /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
+    /// ones, then old-style ones, whichever the font's own are, then their other alternates, like a slashed zero, then
+    /// the signs a feature draws to go with them, like a tabular dollar, in the order of their own groups.
+    public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
+        guard group == .proportionalFigures || group == .tabularFigures else {
+            return [scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) } + glyphs.map(GlyphCell.feature)]
+        }
+        let found = scalars.map { ($0, alternates($0)) }
+        // The font's own figures are old-style when a feature offers lining ones for them, and none old-style ones.
+        let tags = found.flatMap { $0.1.flatMap(\.features) } + glyphs.flatMap(\.alongWith)
+        let ownAreOldStyle = tags.contains("lnum") && !tags.contains("onum")
+        enum Run: Int, CaseIterable { case lining, oldStyle, alternates, signs }
+        func run(of features: [String]) -> Run {
+            if features.contains("onum") { return .oldStyle }
+            if features.contains("lnum") { return .lining }
+            if features.isEmpty { return ownAreOldStyle ? .oldStyle : .lining }
+            return .alternates
+        }
+        var runs: [Run: [GlyphCell]] = [:]
+        for (scalar, list) in found {
+            runs[run(of: []), default: []].append(.character(scalar))
+            for alternate in list { runs[run(of: alternate.features), default: []].append(.alternate(alternate)) }
+        }
+        for glyph in glyphs {
+            let isFigure = GlyphGroup.of(glyph.character) == .proportionalFigures
+            runs[isFigure ? run(of: glyph.alongWith) : .signs, default: []].append(.feature(glyph))
+        }
+        runs[.signs] = runs[.signs]?.sorted { left, right in
+            func place(_ cell: GlyphCell) -> [Int] {
+                guard case .feature(let glyph) = cell, let group = GlyphGroup.of(glyph.character) else { return [Int.max] }
+                return [group.rawValue] + GlyphGroup.order(of: glyph.character, in: group)
+            }
+            return place(left).lexicographicallyPrecedes(place(right))
+        }
+        return Run.allCases.compactMap { runs[$0] }
     }
 
     /// A character's numeric value, for sorting; letters, which have none, after.
