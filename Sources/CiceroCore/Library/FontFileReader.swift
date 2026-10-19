@@ -14,11 +14,32 @@ enum FontFileReader {
     static func read(atPath path: String) -> (faces: [FontFace], descriptors: [CTFontDescriptor]) {
         let descriptors = FontFiles.descriptors(at: path)
         var axes: [Data: [[String: Any]]] = [:]
-        var faces: [FontFace] = []
+        var faces: [ReadFace] = []
         for (index, descriptor) in descriptors.enumerated() {
             if let face = face(from: descriptor, id: FaceID(path: path, index: index), axes: &axes) { faces.append(face) }
         }
-        return (faces, descriptors)
+        return (withoutAddedDefaults(faces), descriptors)
+    }
+
+    /// A face as read, with what tells whether CoreText made it up.
+    struct ReadFace {
+        var face: FontFace
+        /// Its font's fvar table; nil for a static face.
+        var fvar: Data?
+        /// Whether it's the default CoreText adds to a variable font that names no instance there (see `leavesDefaultUnnamed`).
+        var isAddedDefault: Bool
+    }
+
+    /// CoreText lists a variable font's named instances, and adds the font's default as one more face when none of
+    /// them is there, under the file's own style name: a second Regular, at another weight than the named
+    /// one. It isn't one of the font's styles, so it's left out when a named instance is at the origin on every axis
+    /// but weight, as that one stands for the family in previews. Otherwise the default stays for them: where a
+    /// font's instances, uprights too, say a slant of -32768, which CoreText takes as the axis's end, -12, its
+    /// default is the only upright.
+    static func withoutAddedDefaults(_ faces: [ReadFace]) -> [FontFace] {
+        faces.filter { read in
+            !read.isAddedDefault || !faces.contains { !$0.isAddedDefault && $0.fvar == read.fvar && $0.face.isAtOrigin }
+        }.map(\.face)
     }
 
     /// Finder's Date Added, else the creation date.
@@ -29,7 +50,7 @@ enum FontFileReader {
     }
 
     /// - Parameter axes: the variation axes read so far from the file's faces, by their fvar table.
-    private static func face(from descriptor: CTFontDescriptor, id: FaceID, axes knownAxes: inout [Data: [[String: Any]]]) -> FontFace? {
+    private static func face(from descriptor: CTFontDescriptor, id: FaceID, axes knownAxes: inout [Data: [[String: Any]]]) -> ReadFace? {
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         let postScriptName = CTFontCopyPostScriptName(font) as String
         guard !postScriptName.isEmpty else { return nil }
@@ -45,7 +66,8 @@ enum FontFileReader {
         // would also hold the optical size CoreText picks for its point size.)
         let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
             .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
-        let entries = variationAxes(of: font, known: &knownAxes)
+        let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), CTFontTableOptions(rawValue: 0)) as Data?
+        let entries = variationAxes(of: font, fvar: fvar, known: &knownAxes)
         for entry in entries {
             guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double
@@ -65,7 +87,7 @@ enum FontFileReader {
         let head = CTFontCopyTable(font, CTFontTableTag(kCTFontTableHead), CTFontTableOptions(rawValue: 0)) as Data?
         let familyClass = Int((symbolic.rawValue >> 28) & 0xF)
         let isMonospaced = symbolic.contains(.monoSpaceTrait)
-        return FontFace(
+        let face = FontFace(
             id: id, postScriptName: postScriptName, familyName: familyName, styleName: styleName, fullName: fullName,
             weight: weightClass(of: font, os2: os2),
             isItalic: symbolic.contains(.italicTrait) || lowercasedStyle.contains("italic") || lowercasedStyle.contains("oblique"),
@@ -89,6 +111,7 @@ enum FontFileReader {
                 CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), CTFontTableOptions(rawValue: 0)) as Data?, besides: familyName
             )
         )
+        return ReadFace(face: face, fvar: fvar, isAddedDefault: instance.isEmpty && fvar.map(leavesDefaultUnnamed) == true)
     }
 
     /// The OS/2 fsType's usage permissions; nil without an OS/2 table.
@@ -118,12 +141,32 @@ enum FontFileReader {
     /// and share its axes, and CoreText looks up every axis's localized name, under a lock all reading threads
     /// wait on, for each of them: a file of fifty instances read its axes fifty times, and axes were a quarter of
     /// reading a library.
-    private static func variationAxes(of font: CTFont, known: inout [Data: [[String: Any]]]) -> [[String: Any]] {
-        guard let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), CTFontTableOptions(rawValue: 0)) as Data? else { return [] }
+    private static func variationAxes(of font: CTFont, fvar: Data?, known: inout [Data: [[String: Any]]]) -> [[String: Any]] {
+        guard let fvar else { return [] }
         if let axes = known[fvar] { return axes }
         let axes = CTFontCopyVariationAxes(font) as? [[String: Any]] ?? []
         known[fvar] = axes
         return axes
+    }
+
+    /// Whether an fvar table names instances but none at the default of every axis, which is when CoreText adds the
+    /// default as a face of its own. Coordinates are compared as written, as CoreText does: an italic whose
+    /// instances say slant 0 on an axis that only goes to -16 draws its Normal like the default, but it isn't there.
+    /// The header gives where the axes start, their count and size, then the instances' count and size; an axis
+    /// has its default 8 bytes in, and an instance its coordinates 4 bytes in, all 16.16 fixed.
+    static func leavesDefaultUnnamed(_ fvar: Data) -> Bool {
+        guard fvar.count >= 16 else { return false }
+        func u16(_ offset: Int) -> Int { Int(fvar[fvar.startIndex + offset]) << 8 | Int(fvar[fvar.startIndex + offset + 1]) }
+        func fixed(_ offset: Int) -> Int { u16(offset) << 16 | u16(offset + 2) }
+        let axesStart = u16(4), axisCount = u16(8), axisSize = u16(10), instanceCount = u16(12), instanceSize = u16(14)
+        let instancesStart = axesStart + axisCount * axisSize
+        guard axisCount > 0, instanceCount > 0, axisSize >= 20, instanceSize >= 4 + axisCount * 4,
+              instancesStart + instanceCount * instanceSize <= fvar.count
+        else { return false }
+        let defaults = (0..<axisCount).map { fixed(axesStart + $0 * axisSize + 8) }
+        return !(0..<instanceCount).contains { instance in
+            (0..<axisCount).map { fixed(instancesStart + instance * instanceSize + 4 + $0 * 4) } == defaults
+        }
     }
 
     /// When a face came out, as near as its file says: the earliest year in its copyright notice ("© 2014–2021"

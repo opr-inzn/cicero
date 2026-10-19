@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - In the sidebar, a section title’s **+** stays where it is when the pointer comes over the title and its chevron shows; it moved aside to make room.
 - A family’s styles are listed lightest first, those of one weight along the designer’s own axes, then narrowest first, each followed by its italic: a family with Sans and Serif styles in three widths lists its Thin ones as Sans Compressed, Sans Condensed, Sans, then Serif Compressed and so on. Families with several widths used to list each width’s weights in turn.
 - On a font page, **Styles** has a column after Weight for each other axis the styles sit apart on, like Width or one of the designer’s own, and room for names as long as Serif Compressed Medium Italic.
+- A variable family no longer lists a style its font doesn’t name. When none of the named ones sits at the font’s default, macOS adds the default as one more, which showed as a second Regular, next to the font’s own at a slightly different weight. It stays where no named style is at the default on every axis but weight, as the family’s previews show it there. After the update, Cicero reads your variable fonts again once.
 
 ## 1.7
 
