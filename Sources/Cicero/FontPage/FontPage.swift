@@ -47,7 +47,8 @@ struct FontPage: View {
                     if let content {
                         if let glyphColumns {
                             GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, characterCount: content.characterCount,
-                                          ligatures: content.ligatures, ligatureCharacters: content.ligatureCharacters)
+                                          ligatures: content.ligatures, ligatureCharacters: content.ligatureCharacters,
+                                          alternates: content.alternates)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)

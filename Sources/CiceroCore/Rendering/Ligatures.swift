@@ -125,8 +125,9 @@ public struct LigatureGroup: Identifiable, Sendable {
     }
 }
 
-/// Reads single and ligature substitutions (lookup types 1 and 4) from a GSUB table, by feature: a single substitution
-/// is an entry of one component. Lookups an extension (type 7) wraps are read through it, and contextual lookups (types 5 and 6) are followed to the lookups they apply.
+/// Reads single, alternate and ligature substitutions (lookup types 1, 3 and 4) from a GSUB table, by feature: a single
+/// substitution, or each choice of an alternate one, is an entry of one component. Lookups an extension (type 7) wraps
+/// are read through it, and contextual lookups (types 5 and 6) are followed to the lookups they apply.
 /// Every offset and count is checked against the table, so a damaged one gives fewer ligatures, never a crash.
 enum GSUBSubstitutions {
     struct Entry: Hashable {
@@ -135,6 +136,11 @@ enum GSUBSubstitutions {
     }
 
     static func read(_ table: Data, features tags: Set<String>) -> [String: [Entry]] {
+        read(table) { tags.contains($0) }
+    }
+
+    /// The features the table lists that `includes` says to read.
+    static func read(_ table: Data, including includes: (String) -> Bool) -> [String: [Entry]] {
         let reader = Reader(bytes: [UInt8](table))
         // Header: version (4 bytes), then the offsets of the script, feature and lookup lists.
         guard let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [:] }
@@ -143,7 +149,7 @@ enum GSUBSubstitutions {
         var done: [String: Set<Int>] = [:]
         for record in 0..<(reader.u16(featureList) ?? 0) {
             let at = featureList + 2 + record * 6
-            guard let tag = reader.tag(at), tags.contains(tag), let offset = reader.u16(at + 4) else { continue }
+            guard let tag = reader.tag(at), includes(tag), let offset = reader.u16(at + 4) else { continue }
             let feature = featureList + offset
             for index in 0..<(reader.u16(feature + 2) ?? 0) {
                 guard let lookup = reader.u16(feature + 4 + index * 2), done[tag, default: []].insert(lookup).inserted else { continue }
@@ -177,6 +183,8 @@ enum GSUBSubstitutions {
             switch type {
             case 1:
                 return singleSubstitution(start)
+            case 3:
+                return alternateSubstitution(start)
             case 4:
                 return ligatureSubstitution(start)
             case 5, 6:
@@ -205,6 +213,17 @@ enum GSUBSubstitutions {
                 }
             default:
                 return []
+            }
+        }
+
+        /// AlternateSubstFormat1: per glyph in the coverage, a set of glyphs to choose from in its place.
+        private func alternateSubstitution(_ start: Int) -> [Entry] {
+            guard reader.u16(start) == 1, let coverage = reader.u16(start + 2), let setCount = reader.u16(start + 4) else { return [] }
+            return reader.coverage(start + coverage).enumerated().flatMap { index, input -> [Entry] in
+                guard index < setCount, let offset = reader.u16(start + 6 + index * 2), let count = reader.u16(start + offset) else { return [] }
+                return (0..<count).compactMap { choice in
+                    reader.u16(start + offset + 2 + choice * 2).map { Entry(glyph: CGGlyph($0), components: [input]) }
+                }
             }
         }
 

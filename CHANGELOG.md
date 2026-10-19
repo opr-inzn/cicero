@@ -11,7 +11,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Turn on **Activate the fonts documents use in Adobe apps** in Settings → General, and when you open a document in InDesign, Illustrator or Photoshop, Cicero turns on the fonts from your library it uses that are off, and turns them off again when the app quits, like an application set. The first time, macOS asks whether Cicero may control the app.
 - **File → Find Fonts in Document** reads Photoshop files (`.psd` and `.psb`) too: the fonts their text layers use.
 - Settings → General sorts its switches into **Installation**, **Activation** and **Library**; **Show test fonts installed for Adobe apps** is under Library, next to the other fonts you can show or hide.
-- The OpenType features you turn on in the Info panel change the text on the family’s font page, and nothing else: the list, grid and specimens, Quick Look, Compare and the page’s list of styles, now headed **Styles**, show each style as it is. Under **Glyphs**, the glyphs they draw follow the characters they’re for, each with a green dot.
+- The OpenType features you turn on in the Info panel change the text on the family’s font page, and nothing else: the list, grid and specimens, Quick Look, Compare and the page’s list of styles, now headed **Styles**, show each style as it is.
+- A font page’s **Glyphs** lists the alternates the font’s features offer, like a stylistic set’s single-storey a, small capitals, old-style figures or character variants, each after the character it’s for with a green dot. Click one to see which feature offers it, by the name the font gives it; type a feature’s name or tag, like `ss01`, into the filter to see its alternates.
 
 ## 1.6
 
