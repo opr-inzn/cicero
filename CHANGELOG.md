@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## 1.7.2
+
+- In Settings → General, the **Glyphs** tag next to **Show test fonts installed for Adobe apps** is in Glyphs’ own colors, dark green on lime, rather than lime on dark green.
+
 ## 1.7.1
 
 - A font page’s text no longer cuts off its last line at some sizes: the page makes room for the lines as they’re set, rather than as a copy of the text broke them.
