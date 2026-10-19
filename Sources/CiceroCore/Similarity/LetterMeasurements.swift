@@ -22,8 +22,8 @@ public struct LetterMeasurements: Equatable, Sendable {
         /// against its stems. 1 for strokes all as thick.
         case contrast
         /// How far the o's thinnest parts are turned from its top and bottom, as a pen held at an angle leaves
-        /// them, in units of 30°, and less the less contrast there is: 0 for Bodoni's upright stress and for
-        /// strokes about as thick all round.
+        /// them, in units of 30°, and less the less its thickness changes going round: 0 for Bodoni's upright
+        /// stress and for strokes about as thick all round, about 0.5 for Garamond's.
         case stress
         /// The lowercase's average advance against the x-height.
         case width
@@ -108,7 +108,7 @@ public struct LetterMeasurements: Equatable, Sendable {
         let contrast = mean(contrasts).map { min($0, 1.5) }
         set(.contrast, contrast)
         // Strokes about as thick all round have no stress to speak of, whichever way they're thinnest.
-        if let o, let contrast, let tilt = o.thinnestTilt() { set(.stress, max(0, 0.8 - contrast) / 0.8 * min(max(tilt, -40), 40) / 30) }
+        if let o, let axis = o.stressAxis() { set(.stress, min(max(axis.tilt, -40), 40) / 30 * min(axis.modulation / 0.5, 1)) }
 
         let lowercase = "abcdefghijklmnopqrstuvwxyz".compactMap { letter($0)?.advance }
         let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".compactMap { letter($0)?.advance }
@@ -262,26 +262,33 @@ private struct Letter {
         return Foot(length: (widest - width) / 2, thickness: thickness)
     }
 
-    /// Which way the stroke of a round letter is thinnest, as the angle in degrees from upright that it's
-    /// thinnest at, both sides together: the thickness of the ring along lines out from the middle, every 3°.
-    /// Positive when the thin parts are turned to the left at the top, as a broad pen held at an angle leaves them.
-    func thinnestTilt() -> CGFloat? {
+    /// Which way the stroke of a round letter is thick and thin: the thickness of the ring along lines out from the
+    /// middle, every 6°, as one wave that peaks twice going round. `tilt` is how far in degrees its thin parts are
+    /// turned from the top and bottom, positive when turned to the left at the top, as a broad pen held at an angle
+    /// leaves them; `modulation` how much the thickness changes, against the average: 0 for strokes as thick all
+    /// round, about 1 for hairlines against thick sides.
+    func stressAxis() -> (tilt: CGFloat, modulation: CGFloat)? {
         let center = CGPoint(x: box.midX, y: box.midY)
         guard !rows(at: center.y).contains(where: { $0.contains(center.x) }) else { return nil }
         let reach = (box.width + box.height) * 2
-        func thickness(_ degrees: CGFloat) -> CGFloat? {
-            let angle = degrees * .pi / 180
+        var sum: CGFloat = 0, cosines: CGFloat = 0, sines: CGFloat = 0
+        let directions = 60
+        for step in 0..<directions {
+            let angle = CGFloat(step) / CGFloat(directions) * 2 * .pi
             let end = CGPoint(x: center.x + cos(angle) * reach, y: center.y + sin(angle) * reach)
             let crossings = edges.compactMap { Self.crossing(center, end, $0.0, $0.1) }.sorted()
-            return crossings.count >= 2 ? (crossings[1] - crossings[0]) * reach : nil
+            guard crossings.count >= 2 else { return nil }
+            let thickness = (crossings[1] - crossings[0]) * reach
+            sum += thickness
+            cosines += thickness * cos(2 * angle)
+            sines += thickness * sin(2 * angle)
         }
-        var thinnest: (degrees: CGFloat, thickness: CGFloat)?
-        for step in 0..<60 {
-            let degrees = CGFloat(step) * 3
-            guard let one = thickness(degrees), let other = thickness(degrees + 180) else { return nil }
-            if thinnest == nil || one + other < thinnest!.thickness { thinnest = (degrees, one + other) }
-        }
-        return thinnest.map { $0.degrees - 90 }
+        let mean = sum / CGFloat(directions)
+        guard mean > 0 else { return nil }
+        // Thickest where the wave peaks; thinnest a quarter turn on, so the tilt from upright is the thickest
+        // direction's from level.
+        let thickest = atan2(sines, cosines) / 2 * 180 / .pi
+        return (thickest, hypot(cosines, sines) / CGFloat(directions / 2) / mean)
     }
 
     /// The most runs of ink crossed going up at these places across the letter: 3 for a double-story a, 2 for a

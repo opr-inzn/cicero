@@ -1,16 +1,16 @@
 import Foundation
 
 /// The families of a library side by side by their letter measurements (see `LetterMeasurements`), to find those
-/// that look most like one. Each measure counts in the library's own spread of it, so none counts for more by being
-/// a bigger number, and then by how much it shows: weight and serifs more than spacing. Families of different
-/// classifications are farther apart. Made once for a library, then asked as often as needed.
+/// that look most like one. Each measure counts in steps of about as much as it takes to see a difference, so none
+/// counts for more by being a bigger number, and then by how much it shows: weight and serifs more than spacing.
+/// Families of different classifications are farther apart. Made once for a library, then asked as often as needed.
 public struct SimilarFonts: Sendable {
     private let ids: [String]
     private let positions: [String: Int]
     /// The measurements of the families in `ids`, one after the other.
     private let values: [Float]
     private let classifications: [String?]
-    /// How far apart one step of each measure is: about the spread of the middle two thirds of the library.
+    /// `steps`, in the order of the measures.
     private let scales: [Float]
     private let weights: [Float]
 
@@ -21,6 +21,15 @@ public struct SimilarFonts: Sendable {
         .xHeight: 1.5, .ascender: 0.5, .descender: 0.5, .weight: 2.5, .contrast: 2, .stress: 1, .width: 1.5, .capitalWidth: 0.75,
         .roundWidth: 0.75, .spacing: 0.5, .slant: 1.5, .serifLength: 2.5, .serifThickness: 1, .aperture: 1,
         .squareness: 0.75, .doubleStoryA: 1, .doubleStoryG: 0.75, .monospaced: 2,
+    ]
+
+    /// One step of each measure: about as much as it takes to see a difference. Not the library's spread of it,
+    /// which for contrast is mostly the gap between sans serif and serif faces, and for slant next to nothing, as
+    /// most faces don't lean.
+    public static let steps: [LetterMeasurements.Measure: Float] = [
+        .xHeight: 0.04, .ascender: 0.03, .descender: 0.04, .weight: 0.025, .contrast: 0.1, .stress: 0.15, .width: 0.08,
+        .capitalWidth: 0.07, .roundWidth: 0.07, .spacing: 0.05, .slant: 0.07, .serifLength: 0.03, .serifThickness: 0.03,
+        .aperture: 0.04, .squareness: 0.02, .doubleStoryA: 0.5, .doubleStoryG: 0.5, .monospaced: 0.5,
     ]
 
     /// Added to the distance between families whose classifications differ, when both have one.
@@ -42,14 +51,7 @@ public struct SimilarFonts: Sendable {
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         self.values = values
         self.classifications = classifications
-        let count = ids.count
-        scales = LetterMeasurements.Measure.allCases.map { measure in
-            if measure == .doubleStoryA || measure == .doubleStoryG || measure == .monospaced { return 0.5 }
-            let column = (0..<count).map { values[$0 * Self.measures + measure.rawValue] }.filter { !$0.isNaN }.sorted()
-            guard column.count >= 3 else { return 1 }
-            let spread = (column[column.count * 5 / 6] - column[column.count / 6]) / 2
-            return spread > 0.0001 ? spread : 1
-        }
+        scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
     }
 
