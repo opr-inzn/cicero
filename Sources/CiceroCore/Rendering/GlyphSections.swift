@@ -6,7 +6,7 @@ import Foundation
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
     case circledFigures, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
-    case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
+    case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, graphical
 
     public var title: String {
         switch self {
@@ -31,7 +31,7 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .combiningMarks: "Combining Marks"
         case .caseSensitiveForms: "Case Sensitive Forms"
         case .arrows: "Arrows"
-        case .global: "Global"
+        case .graphical: "Graphical"
         }
     }
 
@@ -67,11 +67,11 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         switch category {
         // A to Z on their own; Æ, Ł, Þ and the like with the accented letters.
         case .uppercaseLetter, .titlecaseLetter:
-            return latin ? (0x41...0x5A ~= value ? .uppercase : .uppercaseAccents) : .global
+            return latin ? (0x41...0x5A ~= value ? .uppercase : .uppercaseAccents) : .graphical
         case .lowercaseLetter:
-            return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .global
+            return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .graphical
         case .decimalNumber:
-            return block == "Basic Latin" ? .proportionalFigures : .global
+            return block == "Basic Latin" ? .proportionalFigures : .graphical
         case .currencySymbol:
             return .currency
         case .mathSymbol:
@@ -79,14 +79,14 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
             return value == 0x7C ? .punctuationAndSymbols : .mathematicalOperators
         case .nonspacingMark, .spacingMark, .enclosingMark:
             // The accents letters take, like U+0301; other scripts' own marks go with their letters.
-            return block.hasPrefix("Combining") ? .combiningMarks : .global
+            return block.hasPrefix("Combining") ? .combiningMarks : .graphical
         case .modifierSymbol:
             // Accents set on their own, like ´ and ˘; ^ and ` are typed as punctuation.
             return value < 0x80 ? .punctuationAndSymbols : .diacriticalMarks
         case .privateUse, .unassigned:
-            return .global
+            return .graphical
         case .otherLetter, .modifierLetter:
-            return block == "Spacing Modifier Letters" ? .diacriticalMarks : .global
+            return block == "Spacing Modifier Letters" ? .diacriticalMarks : .graphical
         default:
             return .punctuationAndSymbols
         }
