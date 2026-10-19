@@ -1,10 +1,11 @@
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
-/// then signs, symbols and accents, and last the letters, marks and signs of scripts other than Latin.
+/// then punctuation, which any text has, before currency and the other signs, then accents, and last the letters,
+/// marks and signs of scripts other than Latin.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
-    case dingbatNumerals, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals, punctuationAndSymbols
+    case dingbatNumerals, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
     case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
 
     public var title: String {
@@ -17,6 +18,7 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
         case .dingbatNumerals: "Dingbat Numerals"
+        case .punctuationAndSymbols: "Punctuation and Symbols"
         case .currency: "Currency"
         case .mathematicalOperators: "Mathematical Operators"
         case .superscripts: "Superscript"
@@ -25,7 +27,6 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .numerators: "Numerators"
         case .denominators: "Denominators"
         case .ordinals: "Ordinals"
-        case .punctuationAndSymbols: "Punctuation and Symbols"
         case .diacriticalMarks: "Diacritical Marks"
         case .combiningMarks: "Combining Marks"
         case .caseSensitiveForms: "Case Sensitive Forms"
@@ -193,7 +194,7 @@ public struct GlyphSection: Identifiable, Sendable {
     /// The section's cells in runs, each starting a row of its own, with `alternates` giving a character's: in most
     /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
     /// ones, then old-style ones, whichever the font's own are, then their other alternates, like a slashed zero, then
-    /// the signs a feature draws to go with them, like a tabular dollar, in the order of their own groups.
+    /// the signs a feature draws to go with them, in the order of their own groups: a tabular percent, then a dollar.
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
         guard group == .proportionalFigures || group == .tabularFigures else {
             return [scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) } + glyphs.map(GlyphCell.feature)]
