@@ -5,7 +5,7 @@ import SwiftUI
 /// Every character a style has, and the glyphs its features draw in place of characters', like tabular figures, by
 /// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
 /// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
-/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with a dot.
+/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with the feature's tag.
 /// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
@@ -218,10 +218,15 @@ struct GlyphsSection: View {
         }
         .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
         .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-        // An alternate, after the character's own glyph.
+        // An alternate, after the character's own glyph: the tag of the feature that offers it, like "ss01".
         .overlay(alignment: .topTrailing) {
-            if case .alternate = cell {
-                Circle().fill(.green).frame(width: 6, height: 6).padding(5)
+            if case .alternate(let alternate) = cell, let tag = alternate.features.first {
+                Text(tag)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                    .padding(.trailing, 5)
+                    .accessibilityHidden(true)
             }
         }
         .contentShape(.rect)
