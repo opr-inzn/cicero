@@ -10,6 +10,11 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font page’s **Glyphs** lists figures by kind, each on rows of its own: lining figures, then old-style ones, then their other alternates, like a slashed zero. **Tabular Figures** has its figures before the signs that go with them, like a tabular dollar, and now lists tabular old-style figures too, which a font draws with Tabular and Old-Style Figures on together.
 - Clicking a glyph no longer shows a keystroke for it: it was only right for the keyboard layout your Mac was set to, so the Unicode code and HTML entities are what’s left.
 - A sidebar section’s chevron turns at once when the section opens or closes.
+- A font page’s **Glyphs** lists **Punctuation and Symbols** right after the figures, before **Currency**, and the signs that go with tabular figures in that order too: a tabular percent before a tabular dollar.
+- **Dingbat Numerals** are called **Circled Figures**, and only figures are in them, like ① and ❶, or ⑴ and ⒈ in fonts that have them. Letters in circles, like the Ⓟ some fonts have for ℗, are with **Punctuation and Symbols** rather than in a group of their own.
+- The ohm sign Ω is in **Punctuation and Symbols**, after ℮ with the kelvin and angstrom signs, rather than with other scripts’ letters; so are letter-like symbols such as ℓ, ℝ and ℵ.
+- **Glyphs** has a **Greek** group, before the last one: capitals, then small letters, each followed by its accented forms, then Greek’s own accents and punctuation. Greek letters in a Latin font, like the Δ and Ω many have, were with other scripts.
+- The last group of glyphs is called **Graphical** rather than **Global**: the logos, icons and other glyphs a font keeps in private use, and the letters of scripts other than Latin and Greek.
 - A variable family no longer lists a style its font doesn’t name. When none of the named ones sits at the font’s default, macOS adds the default as one more, which showed as a second Regular, next to the font’s own at a slightly different weight. It stays where no named style is at the default on every axis but weight, as the family’s previews show it there. After the update, Cicero reads your variable fonts again once.
 
 ## 1.7
