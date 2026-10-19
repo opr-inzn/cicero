@@ -13,8 +13,11 @@ nonisolated struct PageContent: Sendable {
     let characterCount: Int
     /// The character a ligature's glyph is too, by glyph.
     let ligatureCharacters: [CGGlyph: UInt32]
+    /// The glyphs features offer in place of characters', by character.
+    let alternates: [UInt32: [FeatureAlternate]]
 
-    init(ligatures: [LigatureGroup], glyphs: [GlyphSection], font: CTFont) {
+    init(ligatures: [LigatureGroup], glyphs: [GlyphSection], alternates: [UInt32: [FeatureAlternate]], font: CTFont) {
+        self.alternates = alternates
         characterCount = glyphs.reduce(0) { $0 + $1.scalars.count }
         let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
@@ -110,8 +113,16 @@ final class PageContents {
     private static func read(_ face: FontFace, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
         async let features = FeatureGlyph.read(face)
+        async let alternates = FeatureAlternates.read(face)
         let scalars = await coverage.coverage(computing: face).scalars
-        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars, features: await features),
-                           font: FontLoader.shared.font(face, size: 12))
+        let featureGlyphs = await features
+        // Those in groups of their own, like tabular figures, aren't listed again after their characters.
+        let grouped = Set(featureGlyphs.map(\.glyph))
+        let listed = await alternates.compactMapValues { list in
+            let left = list.filter { !grouped.contains($0.glyph) }
+            return left.isEmpty ? nil : left
+        }
+        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars, features: featureGlyphs),
+                           alternates: listed, font: FontLoader.shared.font(face, size: 12))
     }
 }

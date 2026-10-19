@@ -23,9 +23,14 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        let face = family.face(nearestWeight: preview.weight).face
-        // Usually ready before the page opens: the browser starts on a family when it's selected.
-        let content = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        // The style the text is set in, whose glyphs the page lists.
+        let face = model.previewStyle(of: family, weight: preview.weight).face.face
+        // Usually ready before the page opens: the browser starts on a family when it's selected. While another style's
+        // are read, the last one's stay, in that style, rather than a spinner in their place.
+        let ready = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
+            family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
+        }
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Header(family: family)
@@ -44,10 +49,12 @@ struct FontPage: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
                     // their cells after their titles, moved what was already there.
-                    if let content {
+                    if let shown {
                         if let glyphColumns {
-                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, characterCount: content.characterCount,
-                                          ligatures: content.ligatures, ligatureCharacters: content.ligatureCharacters)
+                            let content = shown.content
+                            GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
+                                          characterCount: content.characterCount, ligatures: content.ligatures,
+                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
@@ -176,21 +183,19 @@ private struct TypeTester: View {
                     .fixedSize()
                     .help("Which style to show; Automatic follows the preview weight")
                 }
-                if !variations.isEmpty {
-                    Button("Reset") { model.familyAxes[family.id] = nil }
-                        .help("Back to the style’s own values")
+                Spacer()
+                // Where the row is short of room, the slider narrows; squeezed, the label would wrap and the row grow.
+                HStack(spacing: 8) {
+                    Text("Size").foregroundStyle(.secondary).fixedSize()
+                    ValueSlider(value: $size, range: 12...240).frame(minWidth: 80, maxWidth: 160)
+                    ValueField("Size", value: $size, range: 12...240, unit: " pt")
                 }
+                .layoutPriority(1)
+                IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
+                    .help("Align left, center or right")
                 if !face.face.axes.isEmpty {
                     AxesButton()
                 }
-                Spacer()
-                HStack(spacing: 8) {
-                    Text("Size").foregroundStyle(.secondary)
-                    ValueSlider(value: $size, range: 12...240).frame(width: 160)
-                    ValueField("Size", value: $size, range: 12...240, unit: " pt")
-                }
-                IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
-                    .help("Align left, center or right")
             }
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
@@ -288,7 +293,7 @@ private extension TypeTester {
 }
 
 /// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
-/// rather than with the page.
+/// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above.
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -296,10 +301,9 @@ private struct StyleRows: View {
 
     var body: some View {
         let model = self.model
-        let features = model.features(for: family)
         VStack(spacing: 0) {
             row {
-                Text("Preview")
+                Text("Styles")
             } style: {
                 Text("Style")
             } weight: {
@@ -313,7 +317,7 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight, features: features)
+                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
@@ -331,8 +335,7 @@ private struct StyleRows: View {
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
                 // Onto a set in the sidebar, which takes just this style.
                 .draggable(FontDrag(family: family.id, style: style.face.postScriptName)) {
-                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20,
-                             weight: style.face.styleWeight, features: features)
+                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20, weight: style.face.styleWeight)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.background, in: .rect(cornerRadius: 8))

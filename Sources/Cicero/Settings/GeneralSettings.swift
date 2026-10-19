@@ -24,7 +24,7 @@ struct GeneralSettings: View {
                 .pickerStyle(.segmented)
                 .formRowCentered()
             }
-            Section("Fonts") {
+            Section("Installation") {
                 LabeledContent {
                     PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
                                 selection: $model.data.installMethod)
@@ -50,15 +50,17 @@ struct GeneralSettings: View {
                         Text(misplacedNote(misplaced))
                     }
                 }
-                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
-                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
-                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
-                }
                 LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
                 } label: {
                     Text("When an added font is already in your library")
                     Text(duplicateExplanation)
+                }
+            }
+            Section("Activation") {
+                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
+                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
+                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
                 }
                 Toggle(isOn: Binding(
                     get: { loginItem == .enabled || loginItem == .requiresApproval },
@@ -70,7 +72,7 @@ struct GeneralSettings: View {
                         : "Application sets activate fonts only while Cicero is open.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Text("Activate the fonts documents use in Adobe apps")
                         Tag(text: "BETA", tint: .orange)
                             .help("New, and still being tried out with each app")
@@ -78,8 +80,21 @@ struct GeneralSettings: View {
                     Text("When a document open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero activates them until the app quits. macOS asks once whether Cicero may ask each app.")
                 }
                 .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
+            }
+            Section("Library") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
+                // The folders type designers export fonts to, to test them in Adobe apps.
+                Toggle(isOn: $model.data.showAdobeAppFolders) {
+                    HStack(spacing: 4) {
+                        Text("Show test fonts installed for Adobe apps")
+                        // Glyphs' own lime on dark green.
+                        Tag(text: "Glyphs", tint: Color(red: 154 / 255, green: 1, blue: 0),
+                            fill: Color(red: 30 / 255, green: 50 / 255, blue: 25 / 255))
+                            .help("Where Glyphs exports fonts to test them in Adobe apps")
+                    }
+                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Guess classifications from names")
                     Text(guessingExplanation)
@@ -100,13 +115,6 @@ struct GeneralSettings: View {
                         .foregroundStyle(.red)
                 }
                 .formRowCentered()
-            }
-            // The folders type designers export fonts to, to test them in Adobe apps.
-            Section("Type Designer Mode") {
-                Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    Text("Show test fonts installed for Adobe apps")
-                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
-                }
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)

@@ -79,7 +79,7 @@ Right-click a folder in the sidebar:
 
 ### Testing
 
-The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Testing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Testing** isn’t one of your folders: you turn it on or off with **Show test fonts installed for Adobe apps** under **Type Designer Mode** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Testing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
+The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Testing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Testing** isn’t one of your folders: you turn it on or off with **Show test fonts installed for Adobe apps** under **Library** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Testing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
 
 ### Adobe Fonts
 

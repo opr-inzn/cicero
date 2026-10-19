@@ -4,12 +4,17 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- The Info panel has an **Axes** tab for a variable family: a slider for each of its axes, like Weight, Width, Optical Size or the designer’s own, with its tag, to move the family’s previews along them, in the browser and on its font page, text and glyphs alike, or type a value. Axes the font hides, like Roboto Flex’s parametric ones, come last, under **Hidden Axes**, which opens and closes. On a font page, **Axes** opens the tab, and once an axis has moved, the Style menu says **Custom**, with **Reset** next to it.
+- The Info panel has an **Axes** tab for a variable family: a slider for each of its axes, like Weight, Width, Optical Size or the designer’s own, with its tag, to move the family’s previews along them, in the browser and on its font page, text and glyphs alike, or type a value. Axes the font hides, like Roboto Flex’s parametric ones, come last, under **Hidden Axes**, which opens and closes. On a font page, **Axes**, after the alignment buttons, opens the tab, and once an axis has moved, the Style menu says **Custom**.
 - Variable families stand out in the list, grid and specimens: a teal **Variable** tag next to the name (at the top of a tile), which lists the family’s axes when you hold the pointer over it. A tile’s caption names the kind of file, like TTF, as it does for other fonts.
 - A variable family shows at its font’s default, the origin its other styles are drawn from, on every axis but weight, which follows the preview weight: SF Pro at its normal width, rather than Compressed, everywhere it’s previewed.
 - Variable fonts are drawn at their own optical size, the font’s default or the named style’s, rather than one matched to the size of the text, so previews show the letters as they were drawn at the origin. Move Optical Size in the Axes tab to try another. After the update, Cicero reads your variable fonts again once.
 - Turn on **Activate the fonts documents use in Adobe apps** in Settings → General, and when you open a document in InDesign, Illustrator or Photoshop, Cicero turns on the fonts from your library it uses that are off, and turns them off again when the app quits, like an application set. The first time, macOS asks whether Cicero may control the app.
 - **File → Find Fonts in Document** reads Photoshop files (`.psd` and `.psb`) too: the fonts their text layers use.
+- Settings → General sorts its switches into **Installation**, **Activation** and **Library**; **Show test fonts installed for Adobe apps** is under Library, next to the other fonts you can show or hide.
+- The OpenType features you turn on in the Info panel change the text on the family’s font page, and nothing else: the list, grid and specimens, Quick Look, Compare and the page’s list of styles, now headed **Styles**, show each style as it is.
+- A font page’s **Glyphs** lists the alternates the font’s features offer, like a stylistic set’s single-storey a, small capitals, old-style figures or character variants, each after the character it’s for, with a grey dot. Click one to see which feature offers it, by the name the font gives it; type a feature’s name or tag, like `ss01`, into the filter to see its alternates.
+- A font page’s glyphs and ligatures are those of the style its text is set in: choose another in the **Style** menu, or move its axes, and they follow.
+- On a font page, ligatures and glyphs like tabular figures are as dark as the characters beside them; they were drawn a little lighter.
 
 ## 1.6
 
