@@ -75,14 +75,22 @@ Not this way: writing Finder tags onto the font files for Cicero's tags. That ch
   the families out: Core Spotlight's own search stops at 40 results, and a family's name gave 40 of its styles and
   not the family.
 
+**Seen in Spotlight** (macOS 26.6, Dark Mode, with a test copy):
+- A family's item can come first ("Helvetica Neue"), with its description under the name. Searching a PostScript name
+  ("HelveticaNeue-BoldItalic") or a tag with a classification ("licensed sans") finds it.
+- The thumbnail takes the place of the icon, with Cicero's icon small in its corner. Spotlight shows `thumbnailData`
+  but not `thumbnailURL` or `darkThumbnailURL`, so one picture serves both appearances: black letters on a clear
+  ground all but disappeared in Dark Mode, so the letters are on a white card, as Spotlight shows font files.
+- Spotlight lists the font files of every style anyway ("HelveticaNeueLTStd-Roman.otf"), one more reason not to add
+  items for styles.
+- Choosing an item opens its font page, also with the main window closed. An app run from a temporary folder
+  (`/private/tmp`) gets its items shown but can't open them, and has a blank icon.
+
 **Still open.**
-- How Spotlight on macOS 26 shows an app's thumbnails, if at all (nothing documents it), and what they should look
-  like in Dark Mode: `thumbnailData` has no dark variant, `darkThumbnailURL` needs files.
 - A report from the macOS 27 betas says Spotlight there shows App Intents entities (`IndexedEntity`) but not plain
   Core Spotlight items. If so, each item needs an App Entity, which needs Xcode's `appintentsmetadataprocessor` in
-  `build-app.sh`.
-- Opening a result: SwiftUI's `onContinueUserActivity` reportedly doesn't get Spotlight's activity on the Mac, so the
-  app delegate takes it; to try from Spotlight itself.
+  `build-app.sh`. Not testable on macOS 26.
+- Return opens Spotlight's top hit, which for a family's name is often its font file, not Cicero's item.
 
 ## Small improvements
 

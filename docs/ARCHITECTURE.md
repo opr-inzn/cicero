@@ -61,7 +61,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   digests in the caches; a number it leaves in the index as client state tells it when macOS rebuilt the index or the
   caches were cleared, and it fills the index again. `SearchableIndex` is Core Spotlight's index named Cicero, whose
   items never expire, or one in memory for tests. `SpotlightThumbnail` draws "Ag" (or a font's first two characters)
-  in the regular style as a 128-pixel PNG.
+  in the regular style, black on a white card, as a 128-pixel PNG: Spotlight shows it in place of the app's icon, and
+  takes no dark variant from data.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
   taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
@@ -121,7 +122,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   actor, and the indexer update them two seconds after the library or the data they show changes
   (`UserData.showsDifferentlyInSpotlight`), after the first scan and when coverage or guesses arrive.
   A family chosen in Spotlight comes in as a `CSSearchableItemActionType` user activity, to `AppDelegate`, since
-  SwiftUI's `onContinueUserActivity` doesn't get it on the Mac, and opens its page (`show(familyFromSpotlight:)`).
+  SwiftUI's `onContinueUserActivity` doesn't get it on the Mac, and opens its page (`show(familyFromSpotlight:)`),
+  opening the main window if it's closed; before the window ever appeared, the delegate has Cicero reopen itself, as a
+  click on its Dock icon does.
 - `TextEditingKeys` (`App/`) is a local key-down monitor: while an editable text view or field editor has the
   focus, it hands ⌫, ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Move to Trash, Open) can
   take them. In any window but the main one (its `mainWindow`, set by a `WindowReader` in `MainWindow`), it

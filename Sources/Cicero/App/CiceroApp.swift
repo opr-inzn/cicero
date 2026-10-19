@@ -206,7 +206,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func flush() {
-        guard let model else { return }
+        guard let model else {
+            // No main window yet in this launch, as when it was closed when Cicero last quit: reopening, as a click on
+            // the Dock icon does, makes it, and it takes the family once it appears.
+            if waitingFamily != nil { Self.reopen() }
+            return
+        }
         if !waiting.isEmpty {
             model.open(waiting)
             waiting = []
@@ -215,5 +220,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             waitingFamily = nil
             model.show(familyFromSpotlight: family)
         }
+    }
+
+    /// Sends Cicero the event a click on its Dock icon sends, which SwiftUI answers by opening the main window.
+    private static func reopen() {
+        let event = NSAppleEventDescriptor(
+            eventClass: AEEventClass(kCoreEventClass), eventID: AEEventID(kAEReopenApplication),
+            targetDescriptor: NSAppleEventDescriptor(processIdentifier: ProcessInfo.processInfo.processIdentifier),
+            returnID: AEReturnID(kAutoGenerateReturnID), transactionID: AETransactionID(kAnyTransactionID)
+        )
+        _ = try? event.sendEvent(options: [.noReply], timeout: 1)
     }
 }

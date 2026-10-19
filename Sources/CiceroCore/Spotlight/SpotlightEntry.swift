@@ -65,9 +65,11 @@ public struct SpotlightEntry: Hashable, Sendable {
     private static let prefix = "family:"
 
     /// Changes when anything Spotlight shows of the family does, the sample's file included, which a type designer
-    /// exports again and again under the same names. The same in every launch, unlike `hashValue`.
+    /// exports again and again under the same names, and the look of thumbnails. The same in every launch, unlike
+    /// `hashValue`.
     func digest(sampleStamp: String) -> String {
-        var text = [family, description, sample.id.description, sample.postScriptName, sampleStamp].joined(separator: "\u{1E}")
+        var text = [family, description, sample.id.description, sample.postScriptName, sampleStamp, "\(SpotlightThumbnail.version)"]
+            .joined(separator: "\u{1E}")
         text += "\u{1E}" + keywords.joined(separator: "\u{1F}")
         return SHA256.hash(data: Data(text.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
     }
