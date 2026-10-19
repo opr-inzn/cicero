@@ -133,9 +133,11 @@ private struct SidebarContent: View {
             } label: {
                 // Only the chevron toggles a group in a selectable list; make the title do it too. A tap
                 // rather than a button, so the title doesn't dim while it's pressed. An icon and full-strength
-                // text like the rows around it, as a playlist folder has in Music's sidebar.
+                // text like the rows around it, as a playlist folder has in Music's sidebar. Coloured here, as the
+                // rows are (see `SidebarLabel`), or the list grays it while another window is in front.
                 Label(group.title, systemImage: "character.book.closed")
                     .lineLimit(1)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
                     .onTapGesture {
