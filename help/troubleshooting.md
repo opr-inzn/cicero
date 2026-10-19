@@ -55,7 +55,7 @@ See [Turn fonts off](activating.md#turn-fonts-off).
 
 ### Does Cicero change my font files?
 
-No. Cicero never edits a font file. It copies files into your Fonts folder when you install a copy, moves files into its Deactivated folder when you turn them off, and moves files to the Trash only when you ask, or when a copy it installed is no longer needed.
+No. Cicero never edits a font file. It copies files into your Fonts folder, or its Font Library, when you install a copy, moves files into its Deactivated folder when you turn them off, and moves files to the Trash only when you ask, or when a copy it installed is no longer needed.
 
 ### What happens to my fonts when I quit Cicero?
 

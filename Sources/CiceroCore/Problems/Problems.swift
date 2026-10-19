@@ -513,11 +513,13 @@ public enum ProblemDetector {
 
     /// The same font more than once among the inactive files in one place in the user's folders. Copies in
     /// different places, like each client's folder, are for Use Copy From to choose between (see
-    /// `CopyChooser.places`), not spares.
+    /// `CopyChooser.places`), not spares, and the Font Library's files never are: the library keeps its fonts while
+    /// they're off, copies of fonts in the user's folders among them.
     private static func duplicates(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         let records = context.data.records
         let origins = Set(records.installedCopies.values)
+        let fontLibrary = context.data.fontLibraryPath.isEmpty ? nil : context.data.fontLibraryPath + "/"
         for family in context.library.families {
             // The family's copies Use Copy From would list, each in its place.
             var copies: [(style: FaceID, folder: String)] = []
@@ -540,7 +542,9 @@ public enum ProblemDetector {
             var keep = Set<String>()
             var styles = 0
             for face in family.faces {
-                let inactive = ([face.face.path] + face.otherCopies).filter { !context.library.activePaths.contains($0) && context.isInWatchedFolder($0) }
+                let inactive = ([face.face.path] + face.otherCopies).filter { path in
+                    !context.library.activePaths.contains(path) && context.isInWatchedFolder(path) && !(fontLibrary.map(path.hasPrefix) ?? false)
+                }
                 let spares = Dictionary(grouping: inactive) { place[$0] ?? ($0 as NSString).deletingLastPathComponent }.values.filter { $0.count >= 2 }
                 guard !spares.isEmpty else { continue }
                 styles += 1
@@ -628,10 +632,12 @@ public enum ProblemDetector {
 
     // MARK: External
 
-    /// Fonts used in place from disks that can go away, and from ones that are gone for now.
+    /// Fonts used in place from disks that can go away, and from ones that are gone for now. Not the Font Library's: the
+    /// user chose where it is.
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
-        for path in context.data.records.inPlace.sorted() {
+        let fontLibrary = context.data.fontLibraryPath.isEmpty ? nil : context.data.fontLibraryPath + "/"
+        for path in context.data.records.inPlace.sorted() where !(fontLibrary.map(path.hasPrefix) ?? false) {
             if !FileManager.default.fileExists(atPath: path), let place = context.unreachable(path) {
                 problems.append(Problem(
                     id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,

@@ -20,9 +20,12 @@ public struct Locations: Sendable {
     /// Where Creative Cloud keeps the Adobe Fonts that Adobe apps turned on for themselves, as for a document
     /// that uses them: a hidden folder whose fonts only Adobe apps load, under hidden names.
     public var adobeFontsInAdobeApps: URL?
+    /// ~/Cicero/Font Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
+    /// By default in the home folder `userFonts` is in, so a test run with another home keeps its own.
+    public var defaultFontLibrary: URL
 
     public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
-                adobeFontsInAdobeApps: URL? = nil) {
+                adobeFontsInAdobeApps: URL? = nil, defaultFontLibrary: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
@@ -30,6 +33,8 @@ public struct Locations: Sendable {
         self.systemFonts = systemFonts
         self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
+        self.defaultFontLibrary = defaultFontLibrary
+            ?? userFonts.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Cicero/Font Library", isDirectory: true)
     }
 
     public static var standard: Locations {
@@ -498,9 +503,11 @@ public final class LibraryScanner: Sendable {
         }
         let deactivated = WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path)
         for folder in input.folders + [deactivated] {
-            // Adobe's folders and Cicero's own are listed only when they're there.
+            // Adobe's folders and Cicero's own are listed only when they're there; the Font Library counts as away when
+            // it's on a disk that isn't connected, or one Cicero may not read, like the user's folders.
             if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.deactivatedID,
                let availability = FolderAvailability.of(folder.path) {
+                if folder.id == WatchedFolder.fontLibraryID && availability == .notFound { continue }
                 reach.folders[folder.id] = availability
                 reach.folderPaths.append(folder.path + "/")
                 continue

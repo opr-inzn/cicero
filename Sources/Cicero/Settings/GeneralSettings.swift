@@ -26,10 +26,29 @@ struct GeneralSettings: View {
             }
             Section("Fonts") {
                 LabeledContent {
-                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title, $0) }, selection: $model.data.installMethod)
+                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
+                                selection: $model.data.installMethod)
                 } label: {
                     Text("Activate fonts by")
                     Text(activationExplanation)
+                }
+                Toggle(isOn: $model.data.installsIntoFontLibrary) {
+                    Text("Keep installed fonts in Cicero’s Font Library")
+                    Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library.")
+                }
+                LabeledContent {
+                    Button("Change") { model.changeFontLibrary() }
+                } label: {
+                    Text("Font Library")
+                    Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
+                }
+                let misplaced = model.misplacedInstalledFonts()
+                if !misplaced.paths.isEmpty {
+                    LabeledContent {
+                        Button("Move Them") { model.moveInstalledFonts() }
+                    } label: {
+                        Text(misplacedNote(misplaced))
+                    }
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
                     Text("Ask before activating more than \(UserData.manyFamilies) families at once")
@@ -107,6 +126,13 @@ struct GeneralSettings: View {
         }
     }
 
+    /// "Cicero installed Inter and Roboto before, in ~/Library/Fonts."
+    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> String {
+        let count = misplaced.paths.count
+        let names = FontNames.describe(families: Array(Set(misplaced.families.values))) ?? (count == 1 ? "a font" : "\(count) fonts")
+        return "Cicero installed \(names) before, in ~/Library/Fonts."
+    }
+
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
         case .ask: "When a font file you add has fonts your library has from another file, Cicero asks what to do with each family."
@@ -118,10 +144,11 @@ struct GeneralSettings: View {
     }
 
     private var activationExplanation: String {
-        switch model.data.installMethod {
-        case .ask: "Cicero asks each time whether to copy font files into your user Fonts folder or activate them from their current location."
-        case .copy: "Copying duplicates font files into your user Fonts folder."
-        case .move: "Moving puts font files into your user Fonts folder; the folders they were in stay."
+        let place = model.data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your user Fonts folder"
+        return switch model.data.installMethod {
+        case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
+        case .copy: "Copying duplicates font files into \(place)."
+        case .move: "Moving puts font files into \(place); the folders they were in stay."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves."
         }
     }
@@ -140,11 +167,11 @@ private extension DuplicateHandling {
 }
 
 private extension InstallMethod {
-    var title: String {
+    func title(intoFontLibrary: Bool) -> String {
         switch self {
         case .ask: "Ask each time"
-        case .copy: "Copy into ~/Library/Fonts"
-        case .move: "Move into ~/Library/Fonts"
+        case .copy: intoFontLibrary ? "Copy into the Font Library" : "Copy into ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move into the Font Library" : "Move into ~/Library/Fonts"
         case .inPlace: "Leave the files where they are"
         }
     }

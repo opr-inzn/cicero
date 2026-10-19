@@ -67,11 +67,6 @@ Not this way: writing Finder tags onto the font files for Cicero's tags. That ch
 - What 1,200 thumbnails cost to make, and whether results look good enough without them.
 - Whether to index styles too, by PostScript name.
 
-## Small improvements
-
-- **A folder of Cicero's own** (M): an option to keep every font Cicero installs in one folder of its own, a subfolder per
-  family, rather than loose in ~/Library/Fonts.
-
 ## Not planned
 
 Buying fonts inside Cicero, font subscription and rental services, and team servers with accounts: Cicero has no

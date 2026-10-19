@@ -51,8 +51,21 @@ Choose which one in **Settings → General**, next to **Activate fonts by**:
 A few things happen either way:
 
 - Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders).
-- When a copy has the same name as a file already in your Fonts folder, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
+- When a copy has the same name as a file already where it goes, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
 - A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
+
+## The Font Library
+
+Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, the Font Library, and have macOS use them from there. Turn on **Keep installed fonts in Cicero’s Font Library** in **Settings → General**, under **Activate fonts by**. The library is `~/Cicero/Font Library` at first, with a folder for each family, like `~/Cicero/Font Library/Inter`.
+
+- **Turning a font on**, by copying or moving it, or opening a file from the Finder with either chosen, puts its file into its family’s folder in the library and turns it on there. A file with fonts of more than one family, as a font collection can be, goes into the folder of the family you turned on, or of its first font when you open it from the Finder. When the library has the same file already, Cicero uses that one rather than copying it again. A font in the [Deactivated folder](#the-deactivated-folder) moves into the library.
+- **Turning a font off** only turns it off: the file stays in the library, listed and off, ready to turn on again. It never goes to the Trash or the Deactivated folder. **Move to Trash** removes it from the library, and its family’s folder goes once nothing is left in it.
+- **The sidebar** lists the library as **Font Library**, under **Folders**, while it has fonts, whether or not the setting is on. You can rename it, and pick it in a smart set’s **Folder** rule.
+- **A font from one of your folders** has two files once it’s in the library: the one in your folder and the library’s copy. That’s not a duplicate: Problems leaves it alone, and **Use Copy From** counts the copy as being where its original is.
+- **Fonts Cicero installed before** stay in your Fonts folder until you click **Move Them**, next to the setting, which shows while there are any. Cicero moves each into its family’s folder in the library, turning it off for the moment that takes and on again there. Fonts you put in your Fonts folder yourself stay where they are.
+- **Turning the setting off** moves nothing: the library stays, its fonts stay on or off as they are, and fonts you install from then on go into your Fonts folder again.
+
+To keep the library somewhere else, click **Change** next to **Font Library** and choose an empty folder, or make a new one with **New Folder**. Cicero moves the library there, fonts and all, turning the ones that are on off for a moment and on again there, and the old folder goes. A few places can’t work, and Cicero says why: your Fonts folder or the one for all users (macOS would turn on everything in it), Cicero’s own folders, a folder in one of your watched folders, a folder in iCloud Drive or another cloud service’s folder (it can take files off your Mac to make room, and fonts used from there stop working), and a folder with anything in it. On an external disk, the library’s fonts are off while the disk isn’t connected. In your Documents, Desktop or Downloads folder, macOS asks the first time whether Cicero may use the folder; see [Privacy](privacy.md#when-macos-asks-for-permission).
 
 ## Use another copy of a font
 
@@ -100,6 +113,7 @@ Turning a font off never deletes your only copy of it. What happens to the file 
 | The font was | When you turn it off |
 | --- | --- |
 | Used where it is, or on temporarily | macOS stops using it. The file stays where it is. |
+| In Cicero’s [Font Library](#the-font-library) | macOS stops using it. The file stays in the library. |
 | A copy Cicero installed in your Fonts folder, and the original is still there, unchanged, in your library | The copy goes to the Trash. The original stays where it is. |
 | Any other file in your Fonts folder, like a font you installed by opening it | The file moves to Cicero’s [Deactivated folder](#the-deactivated-folder), so the font stays in your library. |
 | In a folder an app loads by itself, like Adobe’s | The file moves to the Deactivated folder, so the app stops loading it too. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders). |

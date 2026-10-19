@@ -71,7 +71,7 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a folder in the sidebar:
 
-- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Problems. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
+- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Problems. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Folder**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a folder’s fonts on](activating.md#keep-a-folders-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.
@@ -84,6 +84,10 @@ The fonts that Adobe apps load from their own folders, where type designers put 
 ### Adobe Fonts
 
 The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show test fonts installed for Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Settings → General**: they’re then left out of every list, smart sets and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
+
+### Font Library
+
+Cicero’s own folder for the fonts it installs, when you keep them there. It shows while it has fonts. See [The Font Library](activating.md#the-font-library).
 
 ### Deactivated
 
@@ -127,7 +131,7 @@ A font file you add may have fonts your library has already, from another file: 
 
 - **Skip It** leaves the file out. The library’s copy stays in use, and Cicero shows it.
 - **Add as Another Copy** lists or installs the file next to the library’s copy, as for any other file. You can switch between them later with [Use Copy From](activating.md#use-another-copy-of-a-font).
-- **Use the Added One** adds the file and uses it in place of the library’s copy. Where that copy is on, it goes off the way deactivating turns a font off, so no font is lost: a copy Cicero installed goes to the Trash when its original is still in your library, any other file in your Fonts folder goes to Cicero’s Deactivated folder, and a font used where it is just turns off. Then the added one goes on, the way you activate fonts; when Cicero asks each time, it’s installed in place of a copy in your Fonts folder, else used where it is. A copy under Added Fonts that the added file replaces stops being listed. Fonts that come with macOS or an app, and Adobe Fonts, stay on; apps may then get those.
+- **Use the Added One** adds the file and uses it in place of the library’s copy. Where that copy is on, it goes off the way deactivating turns a font off, so no font is lost: a copy Cicero installed goes to the Trash when its original is still in your library, any other file in your Fonts folder goes to Cicero’s Deactivated folder, and a font used where it is, or in Cicero’s [Font Library](activating.md#the-font-library), just turns off. Then the added one goes on, the way you activate fonts; when Cicero asks each time, it’s installed in place of a copy in your Fonts folder, else used where it is. A copy under Added Fonts that the added file replaces stops being listed. Fonts that come with macOS or an app, and Adobe Fonts, stay on; apps may then get those.
 
 The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Use the Added One** when the added one is newer, else at **Skip It**; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
 

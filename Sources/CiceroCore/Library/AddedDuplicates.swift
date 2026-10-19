@@ -151,8 +151,10 @@ public enum AddedDuplicates {
     /// its original is in the library, any other in a Fonts folder to the Deactivated folder, one used where it is just
     /// goes off) and the added face goes on. `installing`, as when fonts are activated by copying or moving, an added
     /// file that takes over some style goes on whole; else only its styles that take over go on. Files under Added
-    /// Fonts (`fontFiles`) that the added ones take over stop being listed.
-    public static func replacement(of duplicates: [AddedDuplicate], installing: Bool, library: Library, fontFiles: [String]) -> DuplicateReplacement {
+    /// Fonts (`fontFiles`) that the added ones take over stop being listed. A copy in the Font Library (`fontLibrary`)
+    /// counts as installed, like one in ~/Library/Fonts, and just goes off.
+    public static func replacement(of duplicates: [AddedDuplicate], installing: Bool, library: Library, fontFiles: [String],
+                                   fontLibrary: String = "") -> DuplicateReplacement {
         guard !duplicates.isEmpty else {
             return DuplicateReplacement(switches: [], families: [], forgotten: [], leavesOtherCopiesOn: false, replacesInstalledCopy: false)
         }
@@ -185,7 +187,9 @@ public enum AddedDuplicates {
         }
         var families: [String] = []
         for style in styles where !style.off.isEmpty && !families.contains(style.family) { families.append(style.family) }
-        let replacesInstalledCopy = styles.contains { $0.off.contains { $0.state.source == .fontsFolder } }
+        let replacesInstalledCopy = styles.contains { style in
+            style.off.contains { $0.state.source == .fontsFolder || !fontLibrary.isEmpty && $0.face.path.hasPrefix(fontLibrary + "/") }
+        }
         // A file under Added Fonts goes only when every face in it is taken over, not a collection with others too.
         var names: [String: Set<String>] = [:]
         for face in library.families.flatMap(\.faces) {

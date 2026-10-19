@@ -100,11 +100,12 @@ private struct RuleRow: View {
     }
 
     /// The user's folders, then Testing when its fonts are shown, Adobe Fonts when there are some and they're shown,
-    /// and Added Fonts when there are some.
+    /// Added Fonts when there are some, and the Font Library when it has fonts.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
             + (model.data.fontFiles.isEmpty ? [] : [WatchedFolder.addedFilesID])
+            + (model.ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID) ? [WatchedFolder.fontLibraryID] : [])
         return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
     }
 

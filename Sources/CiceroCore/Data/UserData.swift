@@ -44,6 +44,12 @@ public struct UserData: Codable, Equatable, Sendable {
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
+    /// The fonts Cicero installs go into its Font Library (`fontLibraryPath`), a folder for each family, and are used from
+    /// there, rather than copied into ~/Library/Fonts (see `ActivationEngine.installsIntoFontLibrary`).
+    public var installsIntoFontLibrary = false
+    /// Where Cicero's Font Library is: `Locations.defaultFontLibrary` unless the user moved it. Empty in files from before
+    /// there was one, until the app fills in the default.
+    public var fontLibraryPath = ""
     /// What to do with an added font file whose fonts the library has already, from another file.
     public var duplicateHandling: DuplicateHandling = .ask
     /// Ask before turning on more than `manyFamilies` families at once.
@@ -129,6 +135,8 @@ public struct UserData: Codable, Equatable, Sendable {
         sidebar = try value(.sidebar, d.sidebar)
         // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
+        installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
+        fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
@@ -183,9 +191,15 @@ public struct UserData: Codable, Equatable, Sendable {
         (showSystemFonts || family.state != .system) && (showCreativeCloudFonts || !family.isAdobeFonts)
     }
 
-    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
+    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown, and the Font Library.
     public func scannedFolders() -> [WatchedFolder] {
-        folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : [])
+        folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : []) + [fontLibrary].compactMap(\.self)
+    }
+
+    /// Cicero's Font Library as a folder the scan reads, whether or not fonts are installed into it now: the fonts in it
+    /// stay in the library. nil until it has a place.
+    public var fontLibrary: WatchedFolder? {
+        fontLibraryPath.isEmpty ? nil : WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
     }
 
     /// A folder with the name the user gave it, if any, as its `displayName`.
@@ -254,6 +268,8 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
     public static let deactivatedID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
+    /// Cicero's Font Library (see `UserData.fontLibraryPath`).
+    public static let fontLibraryID = UUID(uuidString: "00000000-0000-0000-0000-000000F0711B")!
     /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
     /// them as one item.
     public static let adobeAppsID = UUID(uuidString: "00000000-0000-0000-0000-00000000AD0B")!
@@ -282,11 +298,13 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Deactivated", "Testing" (Adobe's folders, where type designers test fonts),
-    /// "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts, else the name.
+    /// The name the user gave it; else "Deactivated", "Font Library", "Testing" (Adobe's folders, where type designers
+    /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
+    /// else the name.
     public var displayName: String {
         if let customName { return customName }
         if id == Self.deactivatedID { return "Deactivated" }
+        if id == Self.fontLibraryID { return "Font Library" }
         if id == Self.adobeAppsID { return "Testing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
         if id == Self.addedFilesID { return "Added Fonts" }
@@ -596,7 +614,8 @@ public enum InstallMethod: String, Codable, CaseIterable, Sendable {
 
 /// What Cicero did to turn fonts on, so it can turn them off again correctly.
 public struct ActivationRecords: Codable, Equatable, Sendable {
-    /// Installed copy in ~/Library/Fonts → the file it was copied from.
+    /// Installed copy → the file it was copied from: in ~/Library/Fonts, or in Cicero's Font Library, where it's
+    /// registered where it is (in `inPlace`) while it's on.
     public var installedCopies: [String: String] = [:]
     /// Files registered where they are (persistent).
     public var inPlace: Set<String> = []
