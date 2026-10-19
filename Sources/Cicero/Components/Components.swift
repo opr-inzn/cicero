@@ -193,7 +193,7 @@ struct Tag: View {
 
     var body: some View {
         HStack(spacing: 2.5) {
-            if let systemImage { Image(systemName: systemImage) }
+            if let systemImage { Image(systemName: systemImage).accessibilityHidden(true) }
             Text(text)
         }
         .font(.system(size: 9, weight: .semibold))
@@ -214,7 +214,6 @@ struct VariableTag: View {
         if family.isVariable {
             Tag(text: "Variable", tint: .variable, systemImage: "slider.horizontal.3")
                 .help(help)
-                .accessibilityLabel(help)
         }
     }
 

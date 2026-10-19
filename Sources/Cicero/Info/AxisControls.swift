@@ -89,7 +89,7 @@ struct AxisControls: View {
         .help(isOpen ? "Hide the axes the font hides" : "Show the axes the font hides")
     }
 
-    /// The axis's name and tag, the value and a button to put it back once it's moved, and a slider the panel's width.
+    /// The axis's name and tag, the value and a button to put it back once it's moved, then a slider the panel's width.
     private func row(_ axis: AxisRange, style: FaceID, moved: [String: Double], drawn: [String: Double]) -> some View {
         let value = Binding { moved[axis.tag] ?? drawn[axis.tag] ?? axis.defaultValue } set: { set(axis.tag, to: $0, on: style, moved: moved) }
         let range = axis.minimum...axis.maximum
@@ -99,17 +99,17 @@ struct AxisControls: View {
                 Text(axis.name).lineLimit(1)
                 Text(axis.tag).foregroundStyle(.secondary)
                 Spacer(minLength: 4)
-                // There but invisible until the axis is moved, so the value beside it stays put.
+                ValueField(axis.name, value: value, range: range, step: axis.step)
+                // At the end of the row, as on Google Fonts, and on every axis, dimmed until it's moved, so the values
+                // line up.
                 Button {
                     set(axis.tag, to: nil, on: style, moved: moved)
                 } label: {
                     Label("Reset \(axis.name)", systemImage: "arrow.counterclockwise").labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-                .opacity(isMoved ? 1 : 0)
                 .disabled(!isMoved)
                 .help("Back to the style’s own place on it")
-                ValueField(axis.name, value: value, range: range, step: axis.step)
             }
             ValueSlider(value: value, range: range, step: axis.step)
                 .accessibilityLabel(axis.name)
