@@ -33,7 +33,7 @@ enum LetterShapes {
         return nil
     }
 
-    private static func glyph(_ font: CTFont, _ character: Character) -> CGGlyph? {
+    static func glyph(_ font: CTFont, _ character: Character) -> CGGlyph? {
         var characters = Array(String(character).utf16)
         var glyph: CGGlyph = 0
         return CTFontGetGlyphsForCharacters(font, &characters, &glyph, 1) && glyph != 0 ? glyph : nil
@@ -42,7 +42,7 @@ enum LetterShapes {
     /// Whether a drawn i, m and W are exactly as wide (I, M and W, without lowercase), as in a monospaced style
     /// the font doesn't flag as one. Fonts in three widths have i and m alike, and unfinished ones letters that
     /// aren't drawn yet, all as wide.
-    private static func isMonospaced(_ font: CTFont) -> Bool {
+    static func isMonospaced(_ font: CTFont) -> Bool {
         func drawn(_ characters: [Character]) -> [CGGlyph]? {
             let glyphs = characters.compactMap { character -> CGGlyph? in
                 guard let glyph = glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
@@ -131,7 +131,7 @@ enum LetterShapes {
     }
 
     /// A flattened glyph outline as straight edges, to find the ink along a horizontal line.
-    private struct Outline {
+    struct Outline {
         private struct Edge {
             var from: CGPoint
             var to: CGPoint

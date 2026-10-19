@@ -544,12 +544,19 @@ public struct Family: Identifiable, Hashable, Sendable {
         weight == 400 ? regular : Self.nearest(weight, in: faces)
     }
 
+    /// The upright style of the nearest weight, and of those the one nearest the normal width (Futura's Medium
+    /// rather than its Condensed Medium).
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
         let hasUpright = faces.contains { !$0.face.isItalic }
         var best: LibraryFace?
         for candidate in faces where !hasUpright || !candidate.face.isItalic {
             if candidate.face.weightAxis != nil { return candidate }
-            if best == nil || abs(Double(candidate.face.weight) - weight) < abs(Double(best!.face.weight) - weight) {
+            guard let current = best else {
+                best = candidate
+                continue
+            }
+            let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
+            if distance < bestDistance || distance == bestDistance && abs(candidate.face.width - 5) < abs(current.face.width - 5) {
                 best = candidate
             }
         }
