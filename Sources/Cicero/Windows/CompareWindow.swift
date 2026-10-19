@@ -95,8 +95,7 @@ private struct CompareSample: Identifiable {
         style = chosen?.id
         face = Self.face(for: entry, in: family, preview: preview)
         let weight = chosen.map(\.face.styleWeight) ?? preview.weight
-        let font = FontLoader.shared.font(face.face, size: preview.size, weight: weight, variations: model.variations(for: family, face: face.id),
-                                          features: model.features(for: family))
+        let font = FontLoader.shared.font(face.face, size: preview.size, weight: weight, variations: model.variations(for: family, face: face.id))
         line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: preview.kerning(at: preview.size))
         tint = Self.tints[entry.tint % Self.tints.count]
     }

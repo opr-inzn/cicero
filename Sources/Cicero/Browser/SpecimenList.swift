@@ -73,7 +73,7 @@ private struct Specimen: View {
             FontText(
                 text: preview.text(for: family), face: family.face(nearestWeight: preview.weight).face,
                 size: preview.size, weight: preview.weight, variations: model.variations(for: family),
-                features: model.features(for: family), kerning: preview.kerning(at: preview.size)
+                kerning: preview.kerning(at: preview.size)
             )
             .frame(maxWidth: .infinity, alignment: preview.alignment.frame)
             if family.faces.count > 1 {
