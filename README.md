@@ -43,6 +43,12 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **Moves itself to Applications.** Opened from the disk image or your Downloads folder, Cicero offers to move itself to the Applications folder, where application sets, opening at login and updates work.
 - **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with Release Notes and Report an Issue next to it in the Help menu.
 
+## Help wanted: fonts beyond Latin
+
+Cicero has mostly been tried with Latin fonts, and a lot of it still assumes them. Family names in your Mac’s language, the Cyrillic and Greek coverage sets and the 780 languages of the Character Toolbox reach further. But the samples the previews start with are Latin, the glyph map puts the letters of every other script into one group, and the classifications Cicero reads from the shapes of letters only measure Latin ones.
+
+If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or any other script, your help would be very welcome. Try Cicero with your fonts and [open an issue](https://github.com/opr-inzn/cicero/issues/new) for anything that looks wrong or is missing: a preview that shows the wrong script, text that runs the wrong way, glyphs grouped in a way that makes no sense for your script, or a coverage set you’d need. Sample fonts, sample texts and pull requests are welcome too.
+
 ## Roadmap
 
 Coming next: **similar fonts**, the families in your library that look most like the one you pick, and **Cicero in Spotlight**, so a family’s name, or a tag, rating or set of yours, finds it in Spotlight. How each could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
