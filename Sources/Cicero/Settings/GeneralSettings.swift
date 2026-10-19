@@ -25,13 +25,6 @@ struct GeneralSettings: View {
                 .formRowCentered()
             }
             Section("Installation") {
-                LabeledContent {
-                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
-                                selection: $model.data.installMethod)
-                } label: {
-                    Text("Activate fonts by")
-                    Text(activationExplanation)
-                }
                 Toggle(isOn: $model.data.installsIntoFontLibrary) {
                     Text("Keep installed fonts in Cicero’s Font Library")
                     Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library.")
@@ -49,6 +42,13 @@ struct GeneralSettings: View {
                     } label: {
                         Text(misplacedNote(misplaced))
                     }
+                }
+                LabeledContent {
+                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
+                                selection: $model.data.installMethod)
+                } label: {
+                    Text("Activate fonts by")
+                    Text(activationExplanation)
                 }
                 LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
