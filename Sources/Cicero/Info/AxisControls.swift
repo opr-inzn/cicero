@@ -6,6 +6,8 @@ import SwiftUI
 struct AxisControls: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    /// Closed to begin with, as the font asks apps not to show them; open or closed for every family after.
+    @AppStorage("axes.showsHidden") private var showsHidden = false
     let family: Family
 
     var body: some View {
@@ -44,18 +46,47 @@ struct AxisControls: View {
                 }
             }
             if !hidden.isEmpty {
+                // Open when they're all the font has.
+                let isOpen = showsHidden || shown.isEmpty
                 Section {
-                    ForEach(hidden) { row($0, style: style.id, moved: moved, drawn: drawn) }
+                    if isOpen {
+                        ForEach(hidden) { row($0, style: style.id, moved: moved, drawn: drawn) }
+                    }
                 } header: {
-                    Text("Hidden Axes")
+                    hiddenHeader(count: hidden.count, moved: hidden.count { moved[$0.tag] != nil }, isOpen: isOpen)
+                        .disabled(shown.isEmpty)
                 } footer: {
-                    Text("The font asks apps not to show these, but they change its letters too.")
-                        .foregroundStyle(.secondary)
+                    if isOpen {
+                        Text("The font asks apps not to show these, but they change its letters too.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
+    }
+
+    /// Hidden Axes and how many, which opens and closes them without sliding, and how many of them are moved, which
+    /// a closed section would otherwise keep out of sight.
+    private func hiddenHeader(count: Int, moved: Int, isOpen: Bool) -> some View {
+        Button {
+            showsHidden.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isOpen ? 90 : 0))
+                Text("Hidden Axes")
+                Text(moved > 0 ? "\(count) · \(moved) moved" : "\(count)").foregroundStyle(.secondary)
+                Spacer()
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
+        .help(isOpen ? "Hide the axes the font hides" : "Show the axes the font hides")
     }
 
     /// The axis's name and tag, the value and a button to put it back once it's moved, and a slider the panel's width.
