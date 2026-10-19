@@ -30,7 +30,7 @@ Cicero looks for fonts in these places:
 
 Looking changes nothing: no font is turned on, off, copied or moved until you ask.
 
-The first time it opens, Cicero asks whether to classify your fonts automatically: the ones whose files don’t say what they are. Choose **Classify**, and it sorts them by the shapes of their letters and, with Apple Intelligence, by their names, on your Mac. Choose **Don’t Classify**, and they stay Unclassified until you put them somewhere. You can change your mind with **Classify fonts automatically** in **Settings → General** (see [Classifications](organizing.md#classifications)).
+The first time it opens, Cicero asks whether to classify your fonts automatically: the ones whose files don’t say what they are. Choose **Classify**, and it sorts them by the shapes of their letters and, with Apple Intelligence, by their names, on your Mac. Choose **Not Now**, and they stay Unclassified until you put them somewhere. You can change your mind with **Classify fonts automatically** in **Settings → General** (see [Classifications](organizing.md#classifications)).
 
 When a scan takes a moment, a small capsule at the bottom right says what Cicero is doing, like “Identifying fonts 200 of 4,000”. Cicero reads each font file once and remembers what it found, so later scans are quick.
 
