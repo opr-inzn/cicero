@@ -1,11 +1,12 @@
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
-/// then signs, symbols and accents, and last the letters, marks and signs of scripts other than Latin.
+/// then signs, symbols and accents, then Greek, which a type designer lists after Latin, and last the letters, marks
+/// and signs of other scripts.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
     case dingbatNumerals, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals, punctuationAndSymbols
-    case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
+    case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, greek, global
 
     public var title: String {
         switch self {
@@ -30,6 +31,7 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .combiningMarks: "Combining Marks"
         case .caseSensitiveForms: "Case Sensitive Forms"
         case .arrows: "Arrows"
+        case .greek: "Greek"
         case .global: "Global"
         }
     }
@@ -56,6 +58,9 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
         if name.contains("ARROW") { return .arrows }
         if block.hasPrefix("Enclosed Alphanumeric") || (block == "Dingbats" && properties.numericType != nil) { return .dingbatNumerals }
+        // Greek's letters with its own accents and punctuation, like the tonos ΄ and the ano teleia ·; not the Coptic
+        // letters Unicode keeps in its block, like ϣ, which go with the rest of Coptic.
+        if block == "Greek and Coptic" || block == "Greek Extended" { return name.hasPrefix("COPTIC ") ? .global : .greek }
         // Latin letters in other blocks too, like ə in IPA Extensions.
         let latin = block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
@@ -108,6 +113,22 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         default: 6
         }
         return [kind, Int(value)]
+    }
+
+    /// Where a character goes in the Greek group: capitals, then small letters, each in the alphabet's order with the
+    /// accented ones after the letter they're made from (Α Ά Ἀ …, then α ά ἀ …), and the letters outside the 24, like
+    /// the archaic ϝ or the symbol form ϑ, after those; then the accents and signs, like ΄, then the punctuation, like ;.
+    static func greekOrder(of value: UInt32) -> [Int] {
+        let kind: Int = switch Unicode.Scalar(value)?.properties.generalCategory {
+        case .uppercaseLetter, .titlecaseLetter: 0
+        case .lowercaseLetter: 1
+        case .otherPunctuation: 3
+        default: 2
+        }
+        guard kind < 2 else { return [kind, Int(value)] }
+        let base = base(of: value)
+        let inAlphabet = 0x391...0x3A9 ~= base || 0x3B1...0x3C9 ~= base
+        return [kind, inAlphabet ? 0 : 1, Int(base), base == value ? 0 : 1, Int(value)]
     }
 
     /// The letter an accented one is made from, for listing Á, Â and Ä together: its decomposition's first character,
@@ -166,6 +187,7 @@ public struct GlyphSection: Identifiable, Sendable {
         for group in [GlyphGroup.uppercaseAccents, .lowercaseAccents] {
             buckets[group] = buckets[group]?.map { (GlyphGroup.base(of: $0), $0) }.sorted { $0 < $1 }.map(\.1)
         }
+        buckets[.greek] = buckets[.greek]?.sorted { GlyphGroup.greekOrder(of: $0).lexicographicallyPrecedes(GlyphGroup.greekOrder(of: $1)) }
         // By value rather than where Unicode put them (¹²³ in Latin-1, the rest in their own block), the fraction slash
         // first; letters, which have none, after.
         for group in [GlyphGroup.superscripts, .subscripts, .fractions] {
