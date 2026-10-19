@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Restart Now after clearing font caches asks loginwindow to restart the Mac, and Cicero asks InDesign and
-         Illustrator which fonts their documents use, with Apple events the hardened runtime blocks without this. -->
+    <!-- Restart Now after clearing font caches asks loginwindow to restart the Mac, and Cicero asks InDesign,
+         Illustrator and Photoshop which fonts their documents use, with Apple events the hardened runtime blocks without this. -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
 </dict>

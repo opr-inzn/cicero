@@ -191,19 +191,20 @@ To see which fonts a document needs, and turn on the ones you have:
    - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. With **Copy into ~/Library/Fonts** chosen, the button says **Install** and copies it into your Fonts folder, on. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders; see [Privacy](privacy.md#when-macos-asks-for-permission).
 3. **Activate All** turns on every font of the document that’s in your library. **Make Set** makes a set named after the document with its fonts that are in your library, or adds them to a set of that name.
 
-Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`) and Illustrator files (`.ai`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.
+Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrator files (`.ai`) and Photoshop files (`.psd`, `.psb`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.
 
 - **PDFs** list the fonts their pages use. An **Embedded** tag marks the ones the PDF carries itself, so it shows as it should even where the font is missing.
 - **IDML files** list every style of each family they use; Cicero shows the styles the document’s text and styles apply, which can now and then include one it doesn’t use.
 - **InDesign and Illustrator files** keep a list of their fonts, which Cicero reads.
+- **Photoshop files** keep the fonts of each text layer with its text. Text in smart objects, which are documents of their own placed in the file, isn’t read.
 
-### Fonts documents open in InDesign and Illustrator use
+### Fonts documents open in Adobe apps use
 
-You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in InDesign and Illustrator** in **Settings → General**, and when a document you open in InDesign or Illustrator uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same blue **App Set** tag.
+You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same blue **App Set** tag.
 
-- Cicero asks the app in front, every few seconds, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, or Illustrator; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
-- The app’s Missing Fonts dialog may still come up while Cicero turns the fonts on. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts.
-- Illustrator says which files its documents are, and Cicero reads their fonts from the file as last saved, so a document you haven’t saved yet isn’t covered.
+- Cicero asks the app in front, every few seconds, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, Illustrator or Photoshop; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
+- The app’s Missing Fonts dialog may still come up while Cicero turns the fonts on. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts. Photoshop shows none: its text layers look as they did when saved, and use the fonts once you edit them.
+- Illustrator and Photoshop say which files their documents are, and Cicero reads their fonts from the file as last saved, so a document you haven’t saved yet isn’t covered, nor text in a Photoshop smart object.
 - If you turn one of those fonts off while the app is open, Cicero leaves it off until the app quits.
 
 ## Turn fonts on with an app

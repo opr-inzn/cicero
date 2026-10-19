@@ -58,7 +58,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
   UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
-  Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
+  Illustrator file (XMP) or Photoshop file (text layers) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
   (`Library/`: by file, PostScript name, or family and style names); `FontFileSearch` asks Spotlight for font files
   by PostScript name.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the

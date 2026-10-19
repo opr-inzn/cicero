@@ -1,15 +1,17 @@
 import AppKit
 import CiceroCore
 
-/// Turns on the fonts that documents open in InDesign and Illustrator use, while the app is open. Neither app asks
-/// macOS for a font a document uses, so while one of them is in front Cicero asks it, over Apple Events, every few
-/// seconds: InDesign for its documents' fonts, Illustrator for its documents' files, whose fonts `DocumentFonts`
-/// reads. The ones the library has and are off go to `AppSetWatcher`, which keeps them on until the app quits. Both
-/// apps answer while their Missing Fonts dialog is open, and take up the fonts once it's closed.
+/// Turns on the fonts that documents open in InDesign, Illustrator and Photoshop use, while the app is open. None of
+/// them asks macOS for a font a document uses, so while one of them is in front Cicero asks it, over Apple Events,
+/// every few seconds: InDesign for its documents' fonts, Illustrator and Photoshop for their documents' files, whose
+/// fonts `DocumentFonts` reads. The ones the library has and are off go to `AppSetWatcher`, which keeps them on until
+/// the app quits. InDesign and Illustrator answer while their Missing Fonts dialog is open, and take up the fonts once
+/// it's closed; Photoshop shows none, and takes them up within seconds.
 final class DocumentFontWatcher {
     nonisolated private enum App: String, CaseIterable {
         case inDesign = "com.adobe.InDesign"
         case illustrator = "com.adobe.illustrator"
+        case photoshop = "com.adobe.Photoshop"
     }
 
     private weak var model: AppModel?
@@ -19,7 +21,7 @@ final class DocumentFontWatcher {
     private var refused: Set<App> = []
     /// What each app's documents used when it was asked last, so the same answer isn't matched again.
     private var lastFonts: [App: [DocumentFont]] = [:]
-    /// Illustrator files read before → when they were last saved then, and their fonts.
+    /// Illustrator and Photoshop files read before → when they were last saved then, and their fonts.
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
     private static let interval: Duration = .seconds(2)
 
@@ -122,7 +124,7 @@ final class DocumentFontWatcher {
             let (n, f, s) = (strings(names), strings(families), strings(styles))
             guard n.count == f.count, n.count == s.count else { return .fonts([]) }
             return .fonts(n.indices.map { DocumentFont(postScriptName: n[$0], family: f[$0], style: s[$0]) })
-        case .illustrator:
+        case .illustrator, .photoshop:
             // Unsaved documents have no file, and files are read as last saved.
             let script = """
                 tell application id "\(app.rawValue)"
