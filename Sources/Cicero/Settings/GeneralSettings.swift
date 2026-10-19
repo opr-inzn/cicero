@@ -88,9 +88,9 @@ struct GeneralSettings: View {
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     HStack(spacing: 4) {
                         Text("Show test fonts installed for Adobe apps")
-                        // Glyphs' own lime on dark green.
-                        Tag(text: "Glyphs", tint: Color(red: 154 / 255, green: 1, blue: 0),
-                            fill: Color(red: 30 / 255, green: 50 / 255, blue: 25 / 255))
+                        // Glyphs' own dark green on lime.
+                        Tag(text: "Glyphs", tint: Color(red: 30 / 255, green: 50 / 255, blue: 25 / 255),
+                            fill: Color(red: 154 / 255, green: 1, blue: 0))
                             .help("Where Glyphs exports fonts to test them in Adobe apps")
                     }
                     Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
