@@ -199,13 +199,12 @@ Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`) and Illustr
 
 ### Fonts documents open in InDesign and Illustrator use
 
-You don’t have to look up a document before you open it. When a document you open in InDesign or Illustrator uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same blue **App Set** tag.
+You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in InDesign and Illustrator** in **Settings → General**, and when a document you open in InDesign or Illustrator uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same blue **App Set** tag.
 
 - Cicero asks the app in front, every few seconds, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, or Illustrator; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
 - The app’s Missing Fonts dialog may still come up while Cicero turns the fonts on. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts.
 - Illustrator says which files its documents are, and Cicero reads their fonts from the file as last saved, so a document you haven’t saved yet isn’t covered.
 - If you turn one of those fonts off while the app is open, Cicero leaves it off until the app quits.
-- To stop this, turn off **Activate the fonts documents use in InDesign and Illustrator** in **Settings → General**.
 
 ## Turn fonts on with an app
 

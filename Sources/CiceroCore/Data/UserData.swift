@@ -64,8 +64,9 @@ public struct UserData: Codable, Equatable, Sendable {
     /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
     /// the key `showAdobeAppFolders` was saved as before.
     public var showCreativeCloudFonts = true
-    /// Turn on the fonts the documents open in InDesign and Illustrator use, while the app is open.
-    public var activatesDocumentFonts = true
+    /// Turn on the fonts the documents open in InDesign and Illustrator use, while the app is open. Off until the user
+    /// turns it on, as macOS then asks whether Cicero may control each app.
+    public var activatesDocumentFonts = false
     public var records = ActivationRecords()
 
     public init() {}
