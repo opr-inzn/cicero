@@ -72,7 +72,7 @@ struct GeneralSettings: View {
                         : "Application sets activate fonts only while Cicero is open.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Text("Activate the fonts documents use in Adobe apps")
                         Tag(text: "BETA", tint: .orange)
                             .help("New, and still being tried out with each app")
@@ -86,7 +86,7 @@ struct GeneralSettings: View {
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Text("Show test fonts installed for Adobe apps")
                         // Glyphs' own lime on dark green.
                         Tag(text: "Glyphs", tint: Color(red: 154 / 255, green: 1, blue: 0),
