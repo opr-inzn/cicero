@@ -396,10 +396,10 @@ private struct SidebarContent: View {
     }
 }
 
-/// A section's title, with its checkbox while editing and its + after it, and a chevron while the pointer is over the
-/// row. The list has a chevron that shows the same way, but it narrows the header as it comes and goes, which moved
-/// the +; this one keeps its place when it's hidden. The whole row opens and closes the section. Its own view, so
-/// the pointer coming and going doesn't redo the sidebar's rows.
+/// A section's title, with its checkbox while editing and its + at the end, and a chevron before the + while the pointer
+/// is over the row. The list has a chevron that shows the same way, but after the +, narrowing the header as it comes
+/// and goes, which moved the +; keeping its place empty left a gap. The whole row opens and closes the section. Its
+/// own view, so the pointer coming and going doesn't redo the sidebar's rows.
 private struct SectionHeader<Leading: View, Trailing: View>: View {
     let title: String
     @Binding var isExpanded: Bool
@@ -415,14 +415,14 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
                 .opacity(isDimmed ? 0.45 : 1)
                 .accessibilityAction(named: isExpanded ? "Collapse" : "Expand", toggle)
             Spacer()
-            trailing
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .frame(width: 14)
-                .padding(.leading, 4)
+                .padding(.trailing, 4)
                 .opacity(isHovered ? 1 : 0)
                 .accessibilityHidden(true)
+            trailing
         }
         .padding(.trailing, 10)
         .contentShape(.rect)
