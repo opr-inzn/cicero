@@ -8,6 +8,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Variable families stand out in the list, grid and specimens: a teal **Variable** tag next to the name (at the top of a tile), which lists the family’s axes when you hold the pointer over it. A tile’s caption names the kind of file, like TTF, as it does for other fonts.
 - A variable family shows at its font’s default, the origin its other styles are drawn from, on every axis but weight, which follows the preview weight: SF Pro at its normal width, rather than Compressed, everywhere it’s previewed.
 - Variable fonts are drawn at their own optical size, the font’s default or the named style’s, rather than one matched to the size of the text, so previews show the letters as they were drawn at the origin. Move Optical Size in the Axes tab to try another. After the update, Cicero reads your variable fonts again once.
+- Turn on **Activate the fonts documents use in Adobe apps** in Settings → General, and when you open a document in InDesign, Illustrator or Photoshop, Cicero turns on the fonts from your library it uses that are off, and turns them off again when the app quits, like an application set. The first time, macOS asks whether Cicero may control the app.
+- **File → Find Fonts in Document** reads Photoshop files (`.psd` and `.psb`) too: the fonts their text layers use.
 
 ## 1.6
 

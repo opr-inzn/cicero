@@ -19,6 +19,7 @@ final class AppModel {
     @ObservationIgnored let coverage: CoverageIndex
     @ObservationIgnored let pageContents: PageContents
     @ObservationIgnored let appSets = AppSetWatcher()
+    @ObservationIgnored let openDocumentFonts = DocumentFontWatcher()
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
 

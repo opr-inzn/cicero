@@ -40,7 +40,7 @@ extension AppModel {
     /// Folders are added as folders; font files the library doesn't have yet are listed where they are, or
     /// installed with fonts activated by copying or moving (see `addFontFiles`). Once a scan has read them, the browser
     /// goes to the first of their families, selected (see `showOpenedFiles`).
-    /// Dropped into a set, they join it. A document (PDF, IDML, InDesign, Illustrator) shows the fonts it uses.
+    /// Dropped into a set, they join it. A document (PDF, IDML, InDesign, Illustrator, Photoshop) shows the fonts it uses.
     /// Several arriving one by one, as from the Finder, are added together.
     func open(_ urls: [URL], into set: UUID? = nil) {
         openQueue.urls += urls

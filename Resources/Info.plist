@@ -48,7 +48,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Cicero asks macOS to restart your Mac when you choose Restart Now after clearing font caches.</string>
+	<string>Cicero asks InDesign, Illustrator and Photoshop which fonts their open documents use, to activate the ones that are off, and asks macOS to restart your Mac when you choose Restart Now after clearing font caches.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Cicero reads the fonts in your library that are kept here, like ones you added or a folder it watches, and looks here for the fonts a document uses when you choose Find on This Mac. Nothing leaves your Mac.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
