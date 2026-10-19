@@ -120,7 +120,11 @@ final class AppModel {
     var selectedItems: Set<SidebarItem> = [.all]
     var selectedIDs: Set<String> = []
     /// The family whose page is pushed over the browser.
-    var openFamilyID: String?
+    var openFamilyID: String? {
+        didSet { if openFamilyID != oldValue { pageStyleID = nil } }
+    }
+    /// The style chosen in the open font page's Style menu; nil follows the preview weight.
+    var pageStyleID: FaceID?
     /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
     /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
@@ -134,6 +138,9 @@ final class AppModel {
     var infoTab: InfoTab = .info
     /// OpenType features chosen in the Info panel, per family, applied wherever it's previewed.
     var familyFeatures: [String: [FeatureSetting]] = [:]
+    /// Where the Info panel's sliders put a variable family's axes, per family, applied wherever the style they were
+    /// moved on is previewed.
+    var familyAxes: [String: AdjustedAxes] = [:]
 
     // MARK: Prompts
 
@@ -696,6 +703,13 @@ struct DownloadProgress: Equatable {
 enum InfoTab: String, CaseIterable {
     case info = "Info"
     case features = "Features"
+    case axes = "Axes"
+}
+
+/// The axes moved on a variable style's sliders, by tag, for that style only.
+struct AdjustedAxes: Equatable {
+    let face: FaceID
+    var values: [String: Double]
 }
 
 /// Turning on more families at once than `UserData.manyFamilies`.

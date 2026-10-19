@@ -84,7 +84,7 @@ private struct Tile: View {
             FontText(
                 text: preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText,
                 face: family.face(nearestWeight: preview.weight).face,
-                size: preview.size, weight: preview.weight,
+                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
                 features: model.features(for: family), kerning: preview.kerning(at: preview.size)
             )
             .minimumScaleFactor(0.4)

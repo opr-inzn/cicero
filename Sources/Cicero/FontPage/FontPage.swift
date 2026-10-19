@@ -157,16 +157,10 @@ private struct TypeTester: View {
     @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
-    /// nil follows the preview weight.
-    @State private var styleID: FaceID?
-    /// The axes moved on a variable style's sliders since it was chosen.
-    @State private var adjusted: AdjustedAxes?
 
     var body: some View {
-        let chosen = family.faces.first { $0.id == styleID }
-        let face = chosen ?? family.face(nearestWeight: preview.weight)
-        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
-        let variations = adjusted.flatMap { $0.face == face.id ? $0.values : nil } ?? [:]
+        let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 if family.faces.count > 1 {
@@ -182,10 +176,12 @@ private struct TypeTester: View {
                     .fixedSize()
                     .help("Which style to show; Automatic follows the preview weight")
                 }
-                // Here rather than after the sliders, where it could start a line of its own and push the sample down.
                 if !variations.isEmpty {
-                    Button("Reset") { adjusted = nil }
+                    Button("Reset") { model.familyAxes[family.id] = nil }
                         .help("Back to the style’s own values")
+                }
+                if !face.face.axes.isEmpty {
+                    AxesButton()
                 }
                 Spacer()
                 HStack(spacing: 8) {
@@ -199,20 +195,8 @@ private struct TypeTester: View {
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
-                let ctFont = FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
-                                                    features: model.features(for: family))
-                let axes = FontLoader.shared.axes(of: face.face)
-                VStack(spacing: 0) {
-                    if !axes.isEmpty {
-                        AxisSliders(axes: axes, values: FontLoader.variation(of: ctFont)) { tag, value in
-                            var values = variations
-                            values[tag] = value
-                            adjusted = AdjustedAxes(face: face.id, values: values)
-                        }
-                        .padding(.top, 10)
-                    }
-                    editor(ctFont)
-                }
+                editor(FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
+                                              features: model.features(for: family)))
             }
             .frame(minHeight: 320)
         }
@@ -222,14 +206,14 @@ private struct TypeTester: View {
     /// The Style menu's choice: Custom once an axis has been moved, until a style is chosen again.
     private func choice(isAdjusted: Bool) -> Binding<StyleChoice> {
         Binding {
-            isAdjusted ? .custom : styleID.map(StyleChoice.style) ?? .automatic
+            isAdjusted ? .custom : model.pageStyleID.map(StyleChoice.style) ?? .automatic
         } set: { choice in
             switch choice {
-            case .automatic: styleID = nil
-            case .style(let id): styleID = id
+            case .automatic: model.pageStyleID = nil
+            case .style(let id): model.pageStyleID = id
             case .custom: return
             }
-            adjusted = nil
+            model.familyAxes[family.id] = nil
         }
     }
 }
@@ -240,10 +224,20 @@ private enum StyleChoice: Hashable {
     case custom
 }
 
-/// Where a variable style's sliders put the axes they moved, for that style only.
-private struct AdjustedAxes {
-    let face: FaceID
-    let values: [String: Double]
+/// Shows the Info panel at its Axes tab, or hides it when it's showing them.
+private struct AxesButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button {
+            let isShowing = model.isInfoPresented && model.infoTab == .axes
+            model.infoTab = .axes
+            model.isInfoPresented = !isShowing
+        } label: {
+            Label("Axes", systemImage: "slider.horizontal.3")
+        }
+        .help("Move the style’s axes, in the Info panel")
+    }
 }
 
 private extension TypeTester {
@@ -290,46 +284,6 @@ private extension TypeTester {
     /// Centered, unless the left alignment was chosen when there were only those two.
     static var savedAlignment: SampleAlignment {
         UserDefaults.standard.object(forKey: "typeTester.centered") as? Bool == false ? .leading : .center
-    }
-}
-
-/// A slider for each axis of a variable style, at the place the sample is drawn: the style's own until one is moved,
-/// and the optical size, which follows the sample's size until it's moved itself.
-private struct AxisSliders: View {
-    let axes: [AxisRange]
-    let values: [String: Double]
-    let set: (String, Double) -> Void
-
-    var body: some View {
-        // Every name as wide as the longest, up to a point, so the sliders line up when they run over several lines.
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        let nameWidth = min(axes.map { ceil(($0.name as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0, 140)
-        FlowLayout(spacing: 28, lineSpacing: 6) {
-            ForEach(axes) { axis in
-                let value = Binding { values[axis.tag] ?? axis.defaultValue } set: { set(axis.tag, $0) }
-                let range = axis.minimum...axis.maximum
-                HStack(spacing: 8) {
-                    Text(axis.name)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .frame(width: nameWidth, alignment: .leading)
-                    ValueSlider(value: value, range: range, step: axis.step)
-                        .frame(width: 160)
-                        .accessibilityLabel(axis.name)
-                    ValueField(axis.name, value: value, range: range, step: axis.step)
-                }
-                .help("\(axis.name) (\(axis.tag)), from \(axis.minimum.formatted()) to \(axis.maximum.formatted()), \(axis.defaultValue.formatted()) by default")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private extension AxisRange {
-    /// Whole units, or tenths or hundredths on an axis that spans 20 or less, like a slant from −12 to 0.
-    var step: Double {
-        let span = maximum - minimum
-        return span > 20 ? 1 : span > 2 ? 0.1 : 0.01
     }
 }
 

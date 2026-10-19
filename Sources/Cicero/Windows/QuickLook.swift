@@ -305,17 +305,18 @@ private struct FamilyQuickLook: View {
     /// Lined up and spaced as Preview Options say.
     private func sample(features: [FeatureSetting]) -> some View {
         let face = family.regular.face
+        let variations = model.variations(for: family)
         let alignment = preview.alignment
         return Group {
             if preview.sampleText.isEmpty {
                 VStack(alignment: alignment.horizontal, spacing: 14) {
-                    QuickLookText(text: PreviewSettings.tileSample, face: face, size: 96, features: features, kerning: preview.kerning(at: 96))
+                    QuickLookText(text: PreviewSettings.tileSample, face: face, size: 96, variations: variations, features: features, kerning: preview.kerning(at: 96))
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: Self.alphabet, face: face, size: 24, features: features, kerning: preview.kerning(at: 24),
+                    QuickLookText(text: Self.alphabet, face: face, size: 24, variations: variations, features: features, kerning: preview.kerning(at: 24),
                                   lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
                 }
             } else {
-                QuickLookText(text: preview.sampleText, face: face, size: 56, features: features, kerning: preview.kerning(at: 56),
+                QuickLookText(text: preview.sampleText, face: face, size: 56, variations: variations, features: features, kerning: preview.kerning(at: 56),
                               lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
             }
         }
@@ -377,6 +378,7 @@ private struct QuickLookText: View {
     let face: FontFace
     let size: Double
     var weight: Double = 400
+    var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     var kerning: Double = 0
     var lineLimit: Int? = 1
@@ -385,7 +387,8 @@ private struct QuickLookText: View {
 
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
-            FontText(text: text, face: face, size: size, weight: weight, features: features, kerning: kerning, lineLimit: lineLimit, lineHeight: lineHeight)
+            FontText(text: text, face: face, size: size, weight: weight, variations: variations, features: features, kerning: kerning,
+                     lineLimit: lineLimit, lineHeight: lineHeight)
         } else {
             Text(text)
                 .font(.system(size: size))
@@ -393,10 +396,10 @@ private struct QuickLookText: View {
                 .lineHeight(lineHeight)
                 .hidden()
                 .task(id: face.id) {
-                    let (face, size, weight, features) = (face, size, weight, features)
+                    let (face, size, weight, variations, features) = (face, size, weight, variations, features)
                     // Makes the font too, so drawing it is a cache hit.
                     await Task.detached(priority: .userInitiated) {
-                        _ = FontLoader.shared.font(face, size: size, weight: weight, features: features)
+                        _ = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
                     }.value
                     readPath = face.path
                 }

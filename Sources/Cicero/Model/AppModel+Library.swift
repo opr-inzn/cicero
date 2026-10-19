@@ -141,6 +141,22 @@ extension AppModel {
 
     func features(for family: Family) -> [FeatureSetting] { familyFeatures[family.id] ?? [] }
 
+    /// Where the Info panel put the family's axes, by tag, for the style that stands for it unless another is given;
+    /// none for a style they weren't moved on.
+    func variations(for family: Family, face: FaceID? = nil) -> [String: Double] {
+        guard let adjusted = familyAxes[family.id], adjusted.face == face ?? family.regular.id else { return [:] }
+        return adjusted.values
+    }
+
+    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one for
+    /// the preview weight, at that weight.
+    func previewStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
+        if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
+            return (chosen, chosen.face.styleWeight)
+        }
+        return (family.face(nearestWeight: weight), weight)
+    }
+
     // MARK: The list
 
     /// The families the browser shows for the sidebar selection and search. Cached; recomputed only

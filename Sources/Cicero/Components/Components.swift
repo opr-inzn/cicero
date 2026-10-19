@@ -15,6 +15,8 @@ struct FontText: View {
     let face: FontFace
     let size: Double
     var weight: Double = 400
+    /// Axes moved in the Info panel, by tag.
+    var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     var kerning: Double = 0
     var lineLimit: Int? = 1
@@ -24,7 +26,7 @@ struct FontText: View {
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let font = FontLoader.shared.font(face, size: size, weight: weight, features: features)
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
             Text(text.isEmpty ? " " : text)
                 .font(Font(font))
                 .kerning(kerning)

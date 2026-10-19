@@ -73,16 +73,15 @@ public final class FontLoader: Sendable {
         return font
     }
 
-    /// A variable face's axes and how far each goes, without those the font hides; none for a static face. Read once
-    /// per face, as CoreText looks up the axes' names each time it's asked.
+    /// A variable face's axes and how far each goes, those the font hides too; none for a static face. Read once per
+    /// face, as CoreText looks up the axes' names each time it's asked.
     public func axes(of face: FontFace) -> [AxisRange] {
         guard !face.axes.isEmpty else { return [] }
         let key = state.withLock { "\(face.id)|\($0.generations[face.path] ?? 0)" }
         if let axes = state.withLock({ $0.axes[key] }) { return axes }
         let entries = CTFontCopyVariationAxes(font(face, size: 12)) as? [[String: Any]] ?? []
         let axes = entries.compactMap { entry -> AxisRange? in
-            guard entry[kCTFontVariationAxisHiddenKey as String] as? Bool != true,
-                  let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
+            guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
                   let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double,
                   let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double,
@@ -91,7 +90,8 @@ public final class FontLoader: Sendable {
             let tag = AxisTag.string(identifier)
             let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
             return AxisRange(tag: tag, name: name.isEmpty || name == tag ? AxisTag.registeredNames[tag] ?? tag : name,
-                             minimum: minimum, maximum: maximum, defaultValue: defaultValue)
+                             minimum: minimum, maximum: maximum, defaultValue: defaultValue,
+                             isHidden: entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true)
         }
         state.withLock { $0.axes[key] = axes }
         return axes

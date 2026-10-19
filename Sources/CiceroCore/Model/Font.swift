@@ -52,15 +52,18 @@ public struct AxisRange: Hashable, Sendable, Identifiable {
     public var minimum: Double
     public var maximum: Double
     public var defaultValue: Double
+    /// Set for an axis the font asks apps not to show, like Roboto Flex's parametric ones; it still changes the letters.
+    public var isHidden: Bool
 
     public var id: String { tag }
 
-    public init(tag: String, name: String, minimum: Double, maximum: Double, defaultValue: Double) {
+    public init(tag: String, name: String, minimum: Double, maximum: Double, defaultValue: Double, isHidden: Bool = false) {
         self.tag = tag
         self.name = name
         self.minimum = minimum
         self.maximum = maximum
         self.defaultValue = defaultValue
+        self.isHidden = isHidden
     }
 }
 

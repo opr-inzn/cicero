@@ -108,25 +108,33 @@ private struct FamilyInfo: View {
     let face: LibraryFace
 
     var body: some View {
-        @Bindable var model = model
         VStack(spacing: 0) {
             Text(family.name)
                 .font(.headline)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding([.horizontal, .top], 16)
-            Picker("Tab", selection: $model.infoTab) {
-                ForEach(InfoTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker("Tab", selection: tab) {
+                ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .tabsPickerStyle()
             .labelsHidden()
             .padding(12)
             Divider()
-            switch model.infoTab {
+            switch tab.wrappedValue {
             case .info: ScrollView { InfoRows(family: family, face: face) }
             case .features: FeatureControls(family: family, face: face.face)
+            case .axes: AxisControls(family: family)
             }
         }
+    }
+
+    /// Axes only for a variable family.
+    private var tabs: [InfoTab] { family.isVariable ? InfoTab.allCases : InfoTab.allCases.filter { $0 != .axes } }
+
+    /// Info in the place of Axes for a family that isn't variable, and Axes again for the next that is.
+    private var tab: Binding<InfoTab> {
+        Binding { model.infoTab == .axes && !family.isVariable ? .info : model.infoTab } set: { model.infoTab = $0 }
     }
 }
 
@@ -442,7 +450,7 @@ extension View {
 }
 
 private extension View {
-    /// Info and Features are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
+    /// Info, Features and Axes are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
     @ViewBuilder func tabsPickerStyle() -> some View {
         if #available(macOS 27, *) { pickerStyle(.tabs) } else { pickerStyle(.segmented) }
     }

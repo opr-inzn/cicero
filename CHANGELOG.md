@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- On a font page, a variable style has a slider for each of its axes under the Style menu, like Weight, Width, Optical Size or the designer’s own, to set the text anywhere along them, or type a value. The Style menu says **Custom** then, and **Reset** next to it goes back to the style. Optical Size follows the text’s size until you move it.
+- The Info panel has an **Axes** tab for a variable family: a slider for each of its axes, like Weight, Width, Optical Size or the designer’s own, with its tag, to move the family’s previews along them, in the browser and on its font page, text and glyphs alike, or type a value. Axes the font hides, like Roboto Flex’s parametric ones, come last. On a font page, **Axes** opens the tab, and once an axis has moved, the Style menu says **Custom**, with **Reset** next to it. Optical Size follows the size the text is drawn at until you move it.
 - A variable family shows at its font’s default, the origin its other styles are drawn from, on every axis but weight, which follows the preview weight: SF Pro at its normal width, rather than Compressed, everywhere it’s previewed. After the update, Cicero reads your variable fonts again once.
 
 ## 1.6

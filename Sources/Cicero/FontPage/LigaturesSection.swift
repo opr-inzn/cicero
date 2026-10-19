@@ -9,6 +9,8 @@ import SwiftUI
 struct LigaturesSection: View {
     @Environment(PreviewSettings.self) private var preview
     let face: FontFace
+    /// Axes moved in the Info panel, by tag.
+    let variations: [String: Double]
     /// Cells per row: the glyphs'.
     let columns: Int
     let groups: [LigatureGroup]
@@ -66,7 +68,7 @@ struct LigaturesSection: View {
     private func cell(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         let isShown = popover?.tag == group.tag && popover?.characters == ligature.characters
         // The glyphs' size; a long one is scaled down to fit.
-        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: preview.weight)
+        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: preview.weight, variations: variations)
             .padding(.horizontal, 2)
             .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
             .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
@@ -85,7 +87,7 @@ struct LigaturesSection: View {
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         VStack(spacing: 10) {
-            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: preview.weight)
+            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: preview.weight, variations: variations)
                 .frame(width: 220, height: 130)
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
                 .font(.title3)
@@ -119,10 +121,11 @@ struct GlyphImage: View {
     let glyph: CGGlyph
     let size: CGFloat
     var weight: Double = 400
+    var variations: [String: Double] = [:]
 
     var body: some View {
         Canvas { context, area in
-            let font = FontLoader.shared.font(face, size: size, weight: weight)
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
             var glyph = glyph
             guard let outline = CTFontCreatePathForGlyph(font, glyph, nil) else { return }
             var bounds = CGRect.zero
