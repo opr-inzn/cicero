@@ -411,8 +411,10 @@ public struct FeatureGlyph: Hashable, Sendable {
                 guard let input = entry.components.first, let character = characters[input], characters[entry.glyph] == nil,
                       entry.glyph != input
                 else { return nil }
-                // Accents for capitals are the accented capitals' business, not worth a cell each.
-                if feature.tag == "case", let group = GlyphGroup.of(character), group == .diacriticalMarks || group == .combiningMarks {
+                // Accents for capitals are the accented capitals' business, not worth a cell each; Greek's too, like the
+                // tonos, which the Greek group lists.
+                if feature.tag == "case", let group = GlyphGroup.of(character), group == .diacriticalMarks || group == .combiningMarks
+                    || (group == .greek && Unicode.Scalar(character)?.properties.generalCategory == .modifierSymbol) {
                     return nil
                 }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
