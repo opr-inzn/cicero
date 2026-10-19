@@ -4,7 +4,7 @@ import Foundation
 /// then signs, symbols and accents, and last the letters, marks and signs of scripts other than Latin.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
-    case dingbatNumerals, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals, punctuationAndSymbols
+    case circledFigures, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals, punctuationAndSymbols
     case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, global
 
     public var title: String {
@@ -16,7 +16,7 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .ligatures: "Ligatures"
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
-        case .dingbatNumerals: "Dingbat Numerals"
+        case .circledFigures: "Circled Figures"
         case .currency: "Currency"
         case .mathematicalOperators: "Mathematical Operators"
         case .superscripts: "Superscript"
@@ -55,7 +55,9 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         if name.contains("FRACTION") { return .fractions }
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
         if name.contains("ARROW") { return .arrows }
-        if block.hasPrefix("Enclosed Alphanumeric") || (block == "Dingbats" && properties.numericType != nil) { return .dingbatNumerals }
+        // Figures in circles, like ① and ❶, and the blocks' other numbered ones, like ⑴ and ⒈. The letters there, like Ⓐ
+        // or the Ⓟ some fonts have for ℗, go with the symbols.
+        if (block.hasPrefix("Enclosed Alphanumeric") || block == "Dingbats") && properties.numericType != nil { return .circledFigures }
         // Latin letters in other blocks too, like ə in IPA Extensions.
         let latin = block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
