@@ -1,12 +1,13 @@
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
-/// then punctuation, which any text has, before currency and the other signs, then accents, then Greek, which a type
-/// designer lists after Latin, and last the letters, marks and signs of other scripts.
+/// then punctuation, which any text has, before currency and the other signs, then Greek, which a type designer lists
+/// after Latin, the letters, marks and signs of other scripts, and last the accents and marks, which have no letter
+/// to sit on and are looked for least.
 public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
     case circledFigures, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
-    case diacriticalMarks, combiningMarks, caseSensitiveForms, arrows, greek, graphical
+    case caseSensitiveForms, arrows, greek, graphical, diacriticalMarks, combiningMarks
 
     public var title: String {
         switch self {
@@ -27,12 +28,12 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .numerators: "Numerators"
         case .denominators: "Denominators"
         case .ordinals: "Ordinals"
-        case .diacriticalMarks: "Diacritical Marks"
-        case .combiningMarks: "Combining Marks"
         case .caseSensitiveForms: "Case Sensitive Forms"
         case .arrows: "Arrows"
         case .greek: "Greek"
         case .graphical: "Graphical"
+        case .diacriticalMarks: "Diacritical Marks"
+        case .combiningMarks: "Combining Marks"
         }
     }
 

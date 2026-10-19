@@ -15,6 +15,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The ohm sign Ω is in **Punctuation and Symbols**, after ℮ with the kelvin and angstrom signs, rather than with other scripts’ letters; so are letter-like symbols such as ℓ, ℝ and ℵ.
 - **Glyphs** has a **Greek** group, before the last one: capitals, then small letters, each followed by its accented forms, then Greek’s own accents and punctuation. Greek letters in a Latin font, like the Δ and Ω many have, were with other scripts.
 - The last group of glyphs is called **Graphical** rather than **Global**: the logos, icons and other glyphs a font keeps in private use, and the letters of scripts other than Latin and Greek.
+- **Diacritical Marks** and **Combining Marks** come last in **Glyphs**, after **Graphical**.
 - A variable family no longer lists a style its font doesn’t name. When none of the named ones sits at the font’s default, macOS adds the default as one more, which showed as a second Regular, next to the font’s own at a slightly different weight. It stays where no named style is at the default on every axis but weight, as the family’s previews show it there. After the update, Cicero reads your variable fonts again once.
 
 ## 1.7
