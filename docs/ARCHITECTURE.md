@@ -34,9 +34,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Every change goes through fontd and waits for it (copies are registered too, files are unregistered
   before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
-  With `installsIntoCiceroFolder` (the app sets it from the user's setting on the `engine` it hands out), copies go
-  into ~/Library/Fonts/Cicero, a folder for each family (`CiceroFolder.swift`: folder names, taking away folders left
-  empty, and moving the copies installed before there and back).
+  The app's `engine` carries the Font Library (`fontLibrary`, from `UserData.fontLibraryPath`) and whether to install
+  into it (`installsIntoFontLibrary`): copies then go into a folder for each family there and are registered where
+  they are, recorded as installed copies and in place, and files in the library are only ever registered and
+  unregistered (`FontLibrary.swift`: folder names, taking away folders left empty, moving the copies installed in
+  ~/Library/Fonts before into the library, moving the library, and where it can't go).
 - **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
   (copy, register, confirm), scans (find, parse, build, save cache), restoring the saved library, applying a library, and coverage,
   for timing them in Instruments.

@@ -28,8 +28,8 @@ extension AppModel {
         panel.allowedContentTypes = Self.fontTypes
         panel.prompt = installsAddedFiles ? "Install" : "Add"
         panel.message = switch data.installMethod {
-        case .copy: "Choose font files. They’re copied into your Fonts folder and turned on. The originals stay where they are."
-        case .move: "Choose font files. They’re moved into your Fonts folder and turned on."
+        case .copy: "Choose font files. They’re copied into \(installPlace) and turned on. The originals stay where they are."
+        case .move: "Choose font files. They’re moved into \(installPlace) and turned on."
         case .ask, .inPlace: "Choose font files. They’re listed in your library where they are, without being activated."
         }
         guard panel.runModal() == .OK else { return }
@@ -122,6 +122,9 @@ extension AppModel {
     /// copying or moving.
     var installsAddedFiles: Bool { data.installMethod == .copy || data.installMethod == .move }
 
+    /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Font Library".
+    var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your Fonts folder" }
+
     /// Brings in the font files the library doesn't have yet: lists them where they are, under Added Fonts, or with
     /// fonts activated by copying or moving, copies or moves them into ~/Library/Fonts, where they're on and in All
     /// Fonts like any installed font, along with files under Added Fonts that are off. `mayMove` false copies them
@@ -139,7 +142,8 @@ extension AppModel {
         let paths = paths.filter { !left.contains($0) }
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
-        let replacement = AddedDuplicates.replacement(of: using, installing: installsAddedFiles, library: library, fontFiles: data.fontFiles)
+        let replacement = AddedDuplicates.replacement(of: using, installing: installsAddedFiles, library: library, fontFiles: data.fontFiles,
+                                                      fontLibrary: data.fontLibraryPath)
         let switching = Set(replacement.switches.compactMap(\.target?.face.path))
         let movable = movableFiles(among: paths)
         let installing = !installsAddedFiles ? [] : paths.filter { path in

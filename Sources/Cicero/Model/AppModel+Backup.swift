@@ -121,8 +121,10 @@ extension AppModel {
         let saved = await Task.detached(priority: .userInitiated) { (try? backup.saveSnapshot(current)) != nil }.value
         guard saved else { return showToast("Couldn’t save the current setup first, so nothing was restored") }
 
+        // Restoring the settings brings the backup's Font Library, if it has one; otherwise its fonts go into this one.
+        let fontLibrary = settings && !contents.userData.fontLibraryPath.isEmpty ? nil : current.fontLibraryPath
         var fontResult: FontRestoreResult?
-        if fonts { fontResult = await backup.restoreFonts(contents, progress: progress) }
+        if fonts { fontResult = await backup.restoreFonts(contents, fontLibrary: fontLibrary, progress: progress) }
         let fallbackFolder = (fontResult?.fallback ?? 0) > 0 ? backup.fallbackFolder : nil
         if let fontResult, fontResult.cancelled {
             if let fallbackFolder { addFallbackFolder(fallbackFolder) }
@@ -130,7 +132,7 @@ extension AppModel {
             return showToast("Stopped restoring")
         }
 
-        let restored = backup.userData(from: contents)
+        let restored = backup.userData(from: contents, fontLibrary: fontLibrary)
         await enqueued { model in
             if settings {
                 var data = restored

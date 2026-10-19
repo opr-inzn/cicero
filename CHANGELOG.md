@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- **Keep installed fonts in a Cicero folder**, in Settings → General, puts the fonts Cicero copies or moves into your Fonts folder into `~/Library/Fonts/Cicero`, in a folder for each family, rather than right into your Fonts folder among everything else. Fonts Cicero installed before stay where they are until you click **Move Them** next to the setting, which also moves them back out when you turn it off. A family's folder goes when its last font is turned off or removed.
+- **Keep installed fonts in Cicero’s Font Library**, in Settings → General, has the fonts Cicero installs go into a folder of its own, `~/Cicero/Font Library`, in a folder for each family, and macOS uses them from there, rather than from copies in your Fonts folder. Turning one off leaves it in the library, listed and off, ready to turn on again. The library shows as **Font Library** under **Folders** in the sidebar. **Change** moves it to an empty folder of your choice, fonts and all, and **Move Them** brings in the fonts Cicero installed in your Fonts folder before.
 
 ## 1.6
 

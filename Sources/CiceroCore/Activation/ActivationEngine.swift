@@ -220,21 +220,25 @@ public struct ActivationEngine: Sendable {
     /// Moves files `trash` wasn't allowed to move, after macOS asks for an administrator's password, and returns
     /// the paths that went. Tests replace it so no password is asked for.
     public var trashAsAdministrator: @Sendable ([URL]) async -> Set<String> = { await AdministratorTrash.move($0) }
-    /// Copies go into Cicero's folder in ~/Library/Fonts, a folder for each family (see `Locations.ciceroFolder`),
-    /// rather than right into ~/Library/Fonts.
-    public var installsIntoCiceroFolder = false
+    /// Cicero's Font Library (see `UserData.fontLibraryPath`). Fonts in it are always used where they are, and turning
+    /// one off leaves it there.
+    public var fontLibrary: URL?
+    /// Fonts Cicero installs go into `fontLibrary`, a folder for each family, and are registered there, rather than copied
+    /// into ~/Library/Fonts.
+    public var installsIntoFontLibrary = false
 
     public init(locations: Locations, registrar: any FontRegistrar = CoreTextRegistrar()) {
         self.locations = locations
         self.registrar = registrar
     }
 
-    /// Copies into ~/Library/Fonts (into the family's folder in Cicero's, see `installsIntoCiceroFolder`) or registers
-    /// in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`,
-    /// files in `movable` (ones the user added one at a time) are moved there instead (see `removeOriginals`), and
-    /// the rest copied. Faces from app-only folders are always registered in place, after going back into the
-    /// folder if Cicero moved them out; faces in a Fonts folder that macOS has off are turned on
-    /// there. Temporarily active faces are made permanent.
+    /// Copies into ~/Library/Fonts, or into the family's folder in the Font Library (see `installsIntoFontLibrary`), or
+    /// registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`, files in `movable` (ones the user
+    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied; going into the Font
+    /// Library, so are files from Cicero's Deactivated folder, which only keeps fonts while they're off. Faces from
+    /// app-only folders and from the Font Library are always registered in place, the former after going back into
+    /// the folder if Cicero moved them out; faces in a Fonts folder that macOS has off are turned on there.
+    /// Temporarily active faces are made permanent.
     ///
     /// Copies are registered too: left alone, they reach apps only when macOS notices the file, seconds
     /// later. A file counts as activated once macOS reports it active, so it's usable in every app as
@@ -266,7 +270,7 @@ public struct ActivationEngine: Sendable {
                 }
             } else if isInsideFontsFolder(path) {
                 toRegister.append((path, false))
-            } else if face.app != nil || method == .inPlace {
+            } else if face.app != nil || method == .inPlace || isInFontLibrary(path) {
                 toRegister.append((path, true))
             } else {
                 toCopy.append((path, face.face.familyName))
@@ -297,7 +301,11 @@ public struct ActivationEngine: Sendable {
         let done = Set(targets.map(\.face.path)).subtracting(failed)
         let message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count,
                                    done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed)))
-        if method == .move { removeOriginals(of: installed.filter { movable.contains($0.source) }) }
+        removeOriginals(of: installed.filter { copy in
+            method == .move && movable.contains(copy.source)
+                || isInFontLibrary(copy.destination) && isInDeactivatedFolder(copy.source)
+                    && !records.installedCopies.contains { $0.key != copy.destination && $0.value == copy.source }
+        })
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
@@ -340,6 +348,7 @@ public struct ActivationEngine: Sendable {
                 }
             } else {
                 records.installedCopies[copy.destination] = copy.source
+                if isInFontLibrary(copy.destination) { records.inPlace.insert(copy.destination) }
                 kept.append(copy)
             }
         }
@@ -723,13 +732,16 @@ public struct ActivationEngine: Sendable {
         return records
     }
 
-    /// Copies a font used in place into ~/Library/Fonts, then stops using the original in place.
+    /// Copies a font used in place into ~/Library/Fonts (or the Font Library), then stops using the original in place.
+    /// One in the Font Library is installed already.
     @concurrent
     public func installCopy(of face: LibraryFace, records: ActivationRecords) async -> ActivationResult {
         var records = records
         let path = face.face.path
         let name = FontNames.describe([face])
-        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy \(name ?? "the font") into your Fonts folder")
+        guard !isInFontLibrary(path) else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "\(name ?? "The font") is in your Font Library") }
+        let place = installsIntoFontLibrary && fontLibrary != nil ? "your Font Library" : "your Fonts folder"
+        let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy \(name ?? "the font") into \(place)")
         guard let copy = try? placeCopy(of: path, family: face.face.familyName) else { return failure }
         guard await registerAndConfirm([copy.destination], scope: .persistent).isEmpty else {
             if copy.isNew {
@@ -739,6 +751,7 @@ public struct ActivationEngine: Sendable {
             return failure
         }
         records.installedCopies[copy.destination] = path
+        if isInFontLibrary(copy.destination) { records.inPlace.insert(copy.destination) }
         if records.inPlace.contains(path) {
             _ = await registrar.unregister([Self.url(path)], scope: .persistent)
             records.inPlace.remove(path)
@@ -842,7 +855,7 @@ public struct ActivationEngine: Sendable {
         var isNew: Bool
     }
 
-    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in Cicero's (see `installFolder`). It's
+    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in the Font Library (see `installFolder`). It's
     /// copied into Cicero's staging folder first (a clone, on the same disk) and then moved in, so macOS never sees a
     /// half-written file. A file of the same name with the same contents is already installed; another file of that
     /// name gets "Name 2.otf".

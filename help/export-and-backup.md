@@ -62,7 +62,7 @@ A backup doesn’t hold settings that belong to one Mac: the appearance, **Open 
 2. Choose a `.cicerobackup` file.
 3. Cicero asks “Restore the Backup from” and the date it was made. Choose what to restore:
    - **Sets, folders and settings** says what’s in the backup, like “4 sets, 2 smart sets, 7 tags, 3 folders and 1 coverage set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
-   - **Font files**, when the backup has them, puts each font back where it was, unless a file is already there.
+   - **Font files**, when the backup has them, puts each font back where it was, unless a file is already there. Fonts from the backup’s [Font Library](activating.md#the-font-library) go back into it when you restore the settings too, and into your Font Library when you don’t.
 4. Click **Restore**.
 
 When it’s done, a message says what came back, like “Restored 4 sets and 3,790 font files; 22 were already there”.

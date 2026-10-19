@@ -12,7 +12,7 @@ final class AppModel {
     @ObservationIgnored let locations = Locations.standard
     @ObservationIgnored let scanner: LibraryScanner
     @ObservationIgnored let store: UserDataStore
-    /// The engine as made at launch; `engine` puts copies where the user chose.
+    /// The engine as made at launch; `engine` knows the Font Library.
     @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
@@ -22,10 +22,11 @@ final class AppModel {
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
 
-    /// Turns fonts on and off, installing copies right into ~/Library/Fonts or into Cicero's folder there, as the user chose.
+    /// Turns fonts on and off, installing them into ~/Library/Fonts or the Font Library, as the user chose.
     var engine: ActivationEngine {
         var engine = launchEngine
-        engine.installsIntoCiceroFolder = data.installsIntoCiceroFolder
+        engine.fontLibrary = data.fontLibrary?.url
+        engine.installsIntoFontLibrary = data.installsIntoFontLibrary
         return engine
     }
 
@@ -230,6 +231,8 @@ final class AppModel {
         guesser = ClassificationGuesser(caches: locations.caches)
         guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
+        // Files from before there was a Font Library get its first place, saved with the next change.
+        if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
         if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
         restoreGroups()
@@ -630,6 +633,7 @@ final class AppModel {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
             if data.showCreativeCloudFonts, family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
             if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
+            if family.folderIDs.contains(WatchedFolder.fontLibraryID) { ownFolders.insert(WatchedFolder.fontLibraryID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.lists(family) else { continue }
             if let name = foundryName(family) { names.insert(name) }

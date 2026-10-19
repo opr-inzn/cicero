@@ -129,7 +129,7 @@ struct DocumentFontsSheet: View {
                 // Copied even when fonts are activated by moving: Spotlight may have found it in another document's folder.
                 if model.installsAddedFiles {
                     Button("Install") { model.addFontFiles([path], mayMove: false) }
-                        .help("Copies the file into your Fonts folder and turns it on")
+                        .help("Copies the file into \(model.installPlace) and turns it on")
                 } else {
                     Button("Add") { model.addFontFiles([path]) }
                         .help("Lists the file in your library where it is, under Added Fonts")

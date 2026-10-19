@@ -18,10 +18,10 @@ struct ActivationSheet: View {
             }
             HStack(spacing: 12) {
                 option("Install a Copy", icon: "doc.on.doc",
-                       detail: "Copies the files into your Fonts folder. The originals stay where they are.") { choose(.copy) }
+                       detail: "Copies the files into \(model.installPlace). The originals stay where they are.") { choose(.copy) }
                 if offersMove {
-                    option("Move Into Fonts Folder", icon: "folder",
-                           detail: "Moves the files you added into your Fonts folder. The folders they were in stay.") { choose(.move) }
+                    option(model.data.installsIntoFontLibrary ? "Move Into Font Library" : "Move Into Fonts Folder", icon: "folder",
+                           detail: "Moves the files you added into \(model.installPlace). The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",
                        detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }

@@ -114,6 +114,7 @@ struct DuplicatesSheet: View {
         let state = style.state.isActive ? "on" : "off"
         if path.hasPrefix(model.locations.userFonts.path + "/") { return "\(state) in your Fonts folder" }
         if path.hasPrefix(model.locations.deactivated.path + "/") { return "\(state) in the Deactivated folder" }
+        if let library = model.data.fontLibrary, path.hasPrefix(library.path + "/") { return "\(state) in \(model.folderName(WatchedFolder.fontLibraryID))" }
         if model.data.fontFiles.contains(path) { return "\(state) in \(model.folderName(WatchedFolder.addedFilesID))" }
         if let folder = model.data.namedFolders.filter({ path.hasPrefix($0.path + "/") }).max(by: { $0.path.count < $1.path.count }) {
             return "\(state) in \(folder.displayName)"
