@@ -62,6 +62,8 @@ extension AppModel {
         var folders: [URL] = []
         var files: [String] = []
         var documents: [URL] = []
+        // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
+        var webFonts: Set<String> = []
         // Another font manager's library or collections open the Import sheet.
         let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
         for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
@@ -75,12 +77,16 @@ extension AppModel {
                 files.append(url.path)
             } else if DocumentFonts.fileExtensions.contains(pathExtension) {
                 documents.append(url)
+            } else if ["woff", "woff2"].contains(pathExtension) {
+                webFonts.insert(pathExtension.uppercased())
             }
         }
         // One document at a time: the sheet shows one.
         if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
             guard documents.isEmpty, imports.isEmpty else { return }
+            // "WOFF2 can’t be installed", or "Web fonts can’t be installed" for both kinds.
+            if !webFonts.isEmpty { return showToast("\(webFonts.count == 1 ? webFonts.first! : "Web fonts") can’t be installed") }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
         if !folders.isEmpty {

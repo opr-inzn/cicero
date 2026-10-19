@@ -71,7 +71,9 @@ They come with macOS, which needs them, so they’re always on. To keep them out
 
 ### Which file formats does Cicero read?
 
-OpenType and TrueType fonts (`.otf`, `.ttf`), font collections (`.ttc`, `.otc`), Mac datafork fonts (`.dfont`) and web fonts (`.woff`, `.woff2`).
+OpenType and TrueType fonts (`.otf`, `.ttf`), font collections (`.ttc`, `.otc`) and Mac datafork fonts (`.dfont`).
+
+Web fonts (`.woff`, `.woff2`) are made for websites, and Adobe apps can’t use them, so Cicero leaves them out. One that’s on already stays on, but Cicero doesn’t list it: to turn it off, take it out of the Fonts folder in your Library. Nor does Cicero read PostScript Type 1 fonts, which Adobe apps no longer support either. Use the OpenType or TrueType versions of these fonts instead.
 
 ### A folder in iCloud Drive looks empty in Cicero
 

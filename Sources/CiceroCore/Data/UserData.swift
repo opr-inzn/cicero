@@ -113,7 +113,8 @@ public struct UserData: Codable, Equatable, Sendable {
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
         folderNames = try value(.folderNames, d.folderNames)
-        fontFiles = try value(.fontFiles, d.fontFiles)
+        // Web fonts, which versions before 1.6 added, are no longer read.
+        fontFiles = try value(.fontFiles, d.fontFiles).filter { FontFormat.fileExtensions.contains(($0 as NSString).pathExtension.lowercased()) }
         missingFontFiles = try value(.missingFontFiles, d.missingFontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)

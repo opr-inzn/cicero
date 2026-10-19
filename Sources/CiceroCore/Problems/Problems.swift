@@ -618,7 +618,7 @@ public enum ProblemDetector {
     // MARK: Unreadable
 
     private static func unreadable(_ context: inout Context) -> [Problem] {
-        context.library.unreadableFiles.filter { !["woff", "woff2"].contains(($0 as NSString).pathExtension.lowercased()) }.map { path in
+        context.library.unreadableFiles.map { path in
             var fixes: [ProblemFix] = [.reveal([path])]
             if !ActivationEngine.isProtected(path) { fixes.append(.trash([path])) }
             return Problem(
