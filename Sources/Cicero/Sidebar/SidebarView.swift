@@ -418,6 +418,8 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                // Turns at once, while the section's rows open and close.
+                .transaction { $0.animation = nil }
                 .frame(width: 14)
                 .padding(.trailing, 4)
                 .opacity(isHovered ? 1 : 0)
