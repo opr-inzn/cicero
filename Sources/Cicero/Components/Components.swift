@@ -380,6 +380,13 @@ struct ValueField: View {
     }
 }
 
+/// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
+struct StillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.contentShape(.rect)
+    }
+}
+
 /// A borderless + or − under a list, as in System Settings. The default button style gives each
 /// a glass capsule on macOS 26, narrower when disabled.
 struct ListEditButton: View {

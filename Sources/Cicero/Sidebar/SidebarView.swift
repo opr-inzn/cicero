@@ -196,7 +196,7 @@ private struct SidebarContent: View {
             Text("Library")
             Spacer()
             Button(model.isEditingSidebar ? "Done" : "Edit") { model.isEditingSidebar.toggle() }
-            .buttonStyle(.plain)
+            .buttonStyle(StillButtonStyle())
             .font(.subheadline.weight(model.isEditingSidebar ? .semibold : .regular))
             .foregroundStyle(model.isEditingSidebar ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
