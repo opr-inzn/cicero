@@ -85,9 +85,9 @@ final class AppModel {
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
     private(set) var dataRevision = 0
-    /// Settings → General → Guess classifications: from the shapes of the letters (`letterGuesses`) and, with Apple
-    /// Intelligence, from the names (see `ClassificationGuesser`), for the families nothing in their files classifies.
-    /// Saved in user defaults.
+    /// Settings → General → Classify fonts automatically: from the shapes of the letters (`letterGuesses`) and, with
+    /// Apple Intelligence, from the names (see `ClassificationGuesser`), for the families nothing in their files
+    /// classifies. Saved in user defaults.
     var guessesClassifications: Bool {
         didSet {
             guard guessesClassifications != oldValue else { return }
@@ -102,8 +102,8 @@ final class AppModel {
         }
     }
     static let guessesClassificationsKey = "classification.guessesFromNames"
-    /// Whether to ask, as the window opens, if Cicero should guess classifications: at the first launch, until it's
-    /// answered. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
+    /// Whether to ask, as the window opens, if Cicero should classify fonts automatically: at the first launch, until
+    /// it's answered. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
     private(set) var asksAboutGuessing = false
     static let asksAboutGuessingKey = "classification.asksAboutGuessing"
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
@@ -671,7 +671,7 @@ final class AppModel {
         refreshGroups()
     }
 
-    /// Answers the first launch's question: whether to guess classifications from now on.
+    /// Answers the first launch's question: whether to classify fonts automatically from now on.
     func answerGuessing(_ guesses: Bool) {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Self.asksAboutGuessingKey)

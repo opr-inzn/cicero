@@ -83,11 +83,11 @@ struct MainWindow: View {
             Text(Self.trashMessage(plan))
         }
         // At the first launch, before anything is guessed.
-        .alert("Guess Classifications?", isPresented: Binding(get: { model.asksAboutGuessing }, set: { _ in })) {
-            Button("Guess") { model.answerGuessing(true) }
-            Button("Don’t Guess", role: .cancel) { model.answerGuessing(false) }
+        .alert("Classify Your Fonts Automatically?", isPresented: Binding(get: { model.asksAboutGuessing }, set: { _ in })) {
+            Button("Classify") { model.answerGuessing(true) }
+            Button("Don’t Classify", role: .cancel) { model.answerGuessing(false) }
         } message: {
-            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can guess from the shapes of their letters and, with Apple Intelligence, from their names, on this Mac. Without guesses, they stay Unclassified until you choose. You can change this in Settings → General.")
+            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters and, with Apple Intelligence, from their names, on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Settings → General.")
         }
         .alert(
             model.textPrompt?.title ?? "",

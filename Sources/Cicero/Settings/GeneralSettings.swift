@@ -49,7 +49,11 @@ struct GeneralSettings: View {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 Toggle(isOn: $model.guessesClassifications) {
-                    Text("Guess classifications")
+                    HStack(spacing: 6) {
+                        Text("Classify fonts automatically")
+                        Tag(text: "On-device Intelligence", tint: .purple)
+                            .help("Cicero’s own model reads the letters, and Apple Intelligence the names, on this Mac. Nothing is sent.")
+                    }
                     Text(guessingExplanation)
                 }
             }
@@ -93,12 +97,12 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
     private var guessingExplanation: String {
-        let what = "When a font’s files don’t say, Cicero guesses from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
+        let what = "When a font’s files don’t say, Cicero tells from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
         return switch ClassificationGuesser.availability {
         case .available: what
-        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to guess from names too."
+        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to tell from names too."
         case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
-        case .unavailable: "When a font’s files don’t say, Cicero guesses from the shapes of its letters, on this Mac. Nothing is sent."
+        case .unavailable: "When a font’s files don’t say, Cicero tells from the shapes of its letters, on this Mac. Nothing is sent."
         }
     }
 
