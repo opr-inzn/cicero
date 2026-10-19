@@ -12,7 +12,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - **File → Find Fonts in Document** reads Photoshop files (`.psd` and `.psb`) too: the fonts their text layers use.
 - Settings → General sorts its switches into **Installation**, **Activation** and **Library**; **Show test fonts installed for Adobe apps** is under Library, next to the other fonts you can show or hide.
 - The OpenType features you turn on in the Info panel change the text on the family’s font page, and nothing else: the list, grid and specimens, Quick Look, Compare and the page’s list of styles, now headed **Styles**, show each style as it is.
-- A font page’s **Glyphs** lists the alternates the font’s features offer, like a stylistic set’s single-storey a, small capitals, old-style figures or character variants, each after the character it’s for, with its feature’s tag in the corner, like ss01. Click one to see which feature offers it, by the name the font gives it; type a feature’s name or tag, like `ss01`, into the filter to see its alternates.
+- A font page’s **Glyphs** lists the alternates the font’s features offer, like a stylistic set’s single-storey a, small capitals, old-style figures or character variants, each after the character it’s for, with a grey dot. Click one to see which feature offers it, by the name the font gives it; type a feature’s name or tag, like `ss01`, into the filter to see its alternates.
+- A font page’s glyphs and ligatures are those of the style its text is set in: choose another in the **Style** menu, or move its axes, and they follow.
 
 ## 1.6
 

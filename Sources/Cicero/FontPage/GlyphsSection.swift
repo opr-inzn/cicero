@@ -5,12 +5,14 @@ import SwiftUI
 /// Every character a style has, and the glyphs its features draw in place of characters', like tabular figures, by
 /// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
 /// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
-/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with the feature's tag.
+/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with a grey dot.
 /// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
+    /// The style whose glyphs these are: the text's, or the one before it while its glyphs are read.
+    let face: FontFace
     /// Cells per row, from the page's width.
     let columns: Int
     /// The style's characters, but those listed as ligatures, and its feature glyphs.
@@ -33,6 +35,14 @@ struct GlyphsSection: View {
         case alternate(FeatureAlternate)
     }
 
+    /// The style the page's text is set in, chosen in its Style menu or the one for the preview weight, at its
+    /// weight and with its axes as moved: the glyphs are its.
+    private struct Style {
+        let face: FontFace
+        let weight: Double
+        let variations: [String: Double]
+    }
+
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 24
@@ -45,7 +55,9 @@ struct GlyphsSection: View {
     }
 
     var body: some View {
-        let face = family.face(nearestWeight: preview.weight).face
+        let (chosen, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let style = chosen.id == face.id ? Style(face: face, weight: weight, variations: model.variations(for: family, face: face.id))
+            : Style(face: face, weight: face.styleWeight, variations: [:])
         let shown = filtered(sections)
         let shownLigatures = filtered(ligatures)
         HStack(spacing: 12) {
@@ -69,21 +81,21 @@ struct GlyphsSection: View {
                 .padding(.vertical, 40)
         } else {
             ForEach(shown.filter { $0.group <= .ligatures }) { section in
-                self.section(section, face: face)
+                self.section(section, style: style)
             }
             // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes.
             if !shownLigatures.isEmpty {
-                LigaturesSection(face: face, variations: model.variations(for: family), columns: columns, groups: shownLigatures,
+                LigaturesSection(face: style.face, weight: style.weight, variations: style.variations, columns: columns, groups: shownLigatures,
                                  characters: ligatureCharacters)
             }
             ForEach(shown.filter { $0.group > .ligatures }) { section in
-                self.section(section, face: face)
+                self.section(section, style: style)
             }
             Color.clear.frame(height: 6)
         }
     }
 
-    private func section(_ section: GlyphSection, face: FontFace) -> some View {
+    private func section(_ section: GlyphSection, style: Style) -> some View {
         let filter = Filter(query)
         let cells = section.scalars.flatMap { [Cell.character($0)] + shownAlternates(of: $0, filter).map(Cell.alternate) }
             + section.glyphs.map(Cell.feature)
@@ -94,7 +106,7 @@ struct GlyphsSection: View {
             // are all one height, so the guesses are right.
             let rows = (cells.count + columns - 1) / columns
             ForEach(0..<rows, id: \.self) { row in
-                glyphRow(cells[row * columns ..< min((row + 1) * columns, cells.count)], face: face)
+                glyphRow(cells[row * columns ..< min((row + 1) * columns, cells.count)], style: style)
                     .padding(.horizontal, Self.inset)
                     .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
             }
@@ -123,13 +135,13 @@ struct GlyphsSection: View {
     /// One popover per row, pointing at the clicked cell, rather than one per cell: each is worked out
     /// again whenever the page updates. The cells share out the row's width, so they reach the page's edge
     /// whatever it is, without the page drawing them again as it changes; a short last row keeps their width.
-    private func glyphRow(_ cells: ArraySlice<Cell>, face: FontFace) -> some View {
+    private func glyphRow(_ cells: ArraySlice<Cell>, style: Style) -> some View {
         let column = popover.flatMap { cells.firstIndex(of: $0) }.map { $0 - cells.startIndex }
         // The clicked cell's bottom middle, within two points: the cells are as wide as the row allows.
         let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
         return HStack(spacing: Self.spacing) {
             ForEach(cells, id: \.self) { cell in
-                glyph(cell, face: face)
+                glyph(cell, style: style)
             }
             ForEach(cells.count..<columns, id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell)
@@ -137,25 +149,25 @@ struct GlyphsSection: View {
         }
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let popover {
-                details(popover, face: face)
+                details(popover, style: style)
             }
         }
     }
 
     /// A character's name, codes and keystroke, and a button that copies it; for a feature's glyph, the character's,
     /// and the feature's name.
-    private func details(_ cell: Cell, face: FontFace) -> some View {
+    private func details(_ cell: Cell, style: Style) -> some View {
         VStack(spacing: 10) {
             switch cell {
             case .character(let scalar):
-                character(scalar, face: face, size: 96)
+                character(scalar, style: style, size: 96)
                     .frame(minWidth: 160, minHeight: 130)
                 Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: scalar)
                 Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(scalar)) }
                     .help("Copies “\(Self.text(scalar))”")
             case .feature(let glyph):
-                GlyphImage(face: face, glyph: glyph.glyph, size: 96, weight: preview.weight, variations: model.variations(for: family))
+                GlyphImage(face: style.face, glyph: glyph.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
                 Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 Text("\(glyph.featureName) (\(glyph.feature))").font(.callout).foregroundStyle(.secondary)
@@ -166,7 +178,7 @@ struct GlyphsSection: View {
                     .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureName) on")
             case .alternate(let alternate):
                 let names = alternate.featureNames.formatted(.list(type: .or))
-                GlyphImage(face: face, glyph: alternate.glyph, size: 96, weight: preview.weight, variations: model.variations(for: family))
+                GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
                 Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 // "Single-storey a (ss07)"
@@ -206,27 +218,22 @@ struct GlyphsSection: View {
         Unicode.Scalar(scalar).map { String(Character($0)) } ?? ""
     }
 
-    private func glyph(_ cell: Cell, face: FontFace) -> some View {
+    private func glyph(_ cell: Cell, style: Style) -> some View {
         Group {
             switch cell {
-            case .character(let scalar): character(scalar, face: face, size: Self.glyphSize)
+            case .character(let scalar): character(scalar, style: style, size: Self.glyphSize)
             case .feature(let glyph):
-                GlyphImage(face: face, glyph: glyph.glyph, size: Self.glyphSize, weight: preview.weight, variations: model.variations(for: family))
+                GlyphImage(face: style.face, glyph: glyph.glyph, size: Self.glyphSize, weight: style.weight, variations: style.variations)
             case .alternate(let alternate):
-                GlyphImage(face: face, glyph: alternate.glyph, size: Self.glyphSize, weight: preview.weight, variations: model.variations(for: family))
+                GlyphImage(face: style.face, glyph: alternate.glyph, size: Self.glyphSize, weight: style.weight, variations: style.variations)
             }
         }
         .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
         .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-        // An alternate, after the character's own glyph: the tag of the feature that offers it, like "ss01".
+        // An alternate, after the character's own glyph; grey, as colours stand for tags.
         .overlay(alignment: .topTrailing) {
-            if case .alternate(let alternate) = cell, let tag = alternate.features.first {
-                Text(tag)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-                    .padding(.trailing, 5)
-                    .accessibilityHidden(true)
+            if case .alternate = cell {
+                Circle().fill(.secondary).frame(width: 6, height: 6).padding(5)
             }
         }
         .contentShape(.rect)
@@ -240,12 +247,12 @@ struct GlyphsSection: View {
     /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
     /// its outline instead: set on its own it has nothing to sit on and showed nothing.
     @ViewBuilder
-    private func character(_ scalar: UInt32, face: FontFace, size: CGFloat) -> some View {
-        if Self.isCombining(scalar), let glyph = Self.glyph(of: scalar, in: FontLoader.shared.font(face, size: size, weight: preview.weight)) {
-            GlyphImage(face: face, glyph: glyph, size: size, weight: preview.weight, variations: model.variations(for: family))
+    private func character(_ scalar: UInt32, style: Style, size: CGFloat) -> some View {
+        if Self.isCombining(scalar), let glyph = Self.glyph(of: scalar, in: FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)) {
+            GlyphImage(face: style.face, glyph: glyph, size: size, weight: style.weight, variations: style.variations)
         } else {
-            FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: face, size: size, weight: preview.weight,
-                     variations: model.variations(for: family))
+            FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: style.face, size: size, weight: style.weight,
+                     variations: style.variations)
         }
     }
 

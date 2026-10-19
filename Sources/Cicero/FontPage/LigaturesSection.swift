@@ -7,8 +7,9 @@ import SwiftUI
 /// as its right-click menu does. Like the glyphs' groups, rows of fixed cells in the page's stack, under a header per
 /// feature like a group's.
 struct LigaturesSection: View {
-    @Environment(PreviewSettings.self) private var preview
+    /// The style the page's text is set in, at its weight.
     let face: FontFace
+    let weight: Double
     /// Axes moved in the Info panel, by tag.
     let variations: [String: Double]
     /// Cells per row: the glyphs'.
@@ -68,7 +69,7 @@ struct LigaturesSection: View {
     private func cell(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         let isShown = popover?.tag == group.tag && popover?.characters == ligature.characters
         // The glyphs' size; a long one is scaled down to fit.
-        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: preview.weight, variations: variations)
+        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
             .padding(.horizontal, 2)
             .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
             .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
@@ -87,7 +88,7 @@ struct LigaturesSection: View {
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         VStack(spacing: 10) {
-            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: preview.weight, variations: variations)
+            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: weight, variations: variations)
                 .frame(width: 220, height: 130)
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
                 .font(.title3)

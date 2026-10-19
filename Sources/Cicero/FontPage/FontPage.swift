@@ -23,9 +23,14 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        let face = family.face(nearestWeight: preview.weight).face
-        // Usually ready before the page opens: the browser starts on a family when it's selected.
-        let content = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        // The style the text is set in, whose glyphs the page lists.
+        let face = model.previewStyle(of: family, weight: preview.weight).face.face
+        // Usually ready before the page opens: the browser starts on a family when it's selected. While another style's
+        // are read, the last one's stay, in that style, rather than a spinner in their place.
+        let ready = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
+            family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
+        }
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Header(family: family)
@@ -44,11 +49,12 @@ struct FontPage: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
                     // their cells after their titles, moved what was already there.
-                    if let content {
+                    if let shown {
                         if let glyphColumns {
-                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, characterCount: content.characterCount,
-                                          ligatures: content.ligatures, ligatureCharacters: content.ligatureCharacters,
-                                          alternates: content.alternates)
+                            let content = shown.content
+                            GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
+                                          characterCount: content.characterCount, ligatures: content.ligatures,
+                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
