@@ -24,7 +24,7 @@ struct GeneralSettings: View {
                 .pickerStyle(.segmented)
                 .formRowCentered()
             }
-            Section("Installing") {
+            Section("Installation") {
                 LabeledContent {
                     PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
                                 selection: $model.data.installMethod)
@@ -57,7 +57,7 @@ struct GeneralSettings: View {
                     Text(duplicateExplanation)
                 }
             }
-            Section("Activating") {
+            Section("Activation") {
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
                     Text("Ask before activating more than \(UserData.manyFamilies) families at once")
                     Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
@@ -81,7 +81,7 @@ struct GeneralSettings: View {
                 }
                 .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
             }
-            Section("Browsing") {
+            Section("Library") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 // The folders type designers export fonts to, to test them in Adobe apps.

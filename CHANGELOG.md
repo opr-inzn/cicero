@@ -10,7 +10,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Variable fonts are drawn at their own optical size, the font’s default or the named style’s, rather than one matched to the size of the text, so previews show the letters as they were drawn at the origin. Move Optical Size in the Axes tab to try another. After the update, Cicero reads your variable fonts again once.
 - Turn on **Activate the fonts documents use in Adobe apps** in Settings → General, and when you open a document in InDesign, Illustrator or Photoshop, Cicero turns on the fonts from your library it uses that are off, and turns them off again when the app quits, like an application set. The first time, macOS asks whether Cicero may control the app.
 - **File → Find Fonts in Document** reads Photoshop files (`.psd` and `.psb`) too: the fonts their text layers use.
-- Settings → General sorts its switches into **Installing**, **Activating** and **Browsing**; **Show test fonts installed for Adobe apps** is in Browsing, next to the other fonts you can show or hide.
+- Settings → General sorts its switches into **Installation**, **Activation** and **Library**; **Show test fonts installed for Adobe apps** is under Library, next to the other fonts you can show or hide.
 
 ## 1.6
 
