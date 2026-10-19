@@ -89,27 +89,16 @@ struct AxisControls: View {
         .help(isOpen ? "Hide the axes the font hides" : "Show the axes the font hides")
     }
 
-    /// The axis's name and tag, the value and a button to put it back once it's moved, then a slider the panel's width.
+    /// The axis's name and tag, and the value, then a slider the panel's width.
     private func row(_ axis: AxisRange, style: FaceID, moved: [String: Double], drawn: [String: Double]) -> some View {
         let value = Binding { moved[axis.tag] ?? drawn[axis.tag] ?? axis.defaultValue } set: { set(axis.tag, to: $0, on: style, moved: moved) }
         let range = axis.minimum...axis.maximum
-        let isMoved = moved[axis.tag] != nil
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(axis.name).lineLimit(1)
                 Text(axis.tag).foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 ValueField(axis.name, value: value, range: range, step: axis.step)
-                // At the end of the row, as on Google Fonts, and on every axis, dimmed until it's moved, so the values
-                // line up.
-                Button {
-                    set(axis.tag, to: nil, on: style, moved: moved)
-                } label: {
-                    Label("Reset \(axis.name)", systemImage: "arrow.counterclockwise").labelStyle(.iconOnly)
-                }
-                .buttonStyle(.borderless)
-                .disabled(!isMoved)
-                .help("Back to the style’s own place on it")
             }
             ValueSlider(value: value, range: range, step: axis.step)
                 .accessibilityLabel(axis.name)
@@ -117,11 +106,11 @@ struct AxisControls: View {
         .help("\(axis.name) (\(axis.tag)), from \(axis.minimum.formatted()) to \(axis.maximum.formatted()), \(axis.defaultValue.formatted()) by default")
     }
 
-    /// Moves an axis of the style, or with nil puts it back; the family's other axes stay where they were moved.
-    private func set(_ tag: String, to value: Double?, on style: FaceID, moved: [String: Double]) {
+    /// Moves an axis of the style; the family's other axes stay where they were moved.
+    private func set(_ tag: String, to value: Double, on style: FaceID, moved: [String: Double]) {
         var values = moved
         values[tag] = value
-        model.familyAxes[family.id] = values.isEmpty ? nil : AdjustedAxes(face: style, values: values)
+        model.familyAxes[family.id] = AdjustedAxes(face: style, values: values)
     }
 }
 
