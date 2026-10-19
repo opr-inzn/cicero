@@ -190,6 +190,8 @@ struct Tag: View {
     let tint: Color
     /// A symbol before the text.
     var systemImage: String?
+    /// A capsule of its own colour, with the text in the tint as it is, rather than a pale one of the tint.
+    var fill: Color?
 
     var body: some View {
         HStack(spacing: 2.5) {
@@ -199,8 +201,8 @@ struct Tag: View {
         .font(.system(size: 9, weight: .semibold))
         .padding(.horizontal, 5)
         .padding(.vertical, 1.5)
-        .background(tint.opacity(0.14), in: .capsule)
-        .foregroundStyle(tint.opacity(0.9))
+        .background(fill ?? tint.opacity(0.14), in: .capsule)
+        .foregroundStyle(fill == nil ? tint.opacity(0.9) : tint)
         .fixedSize()
     }
 }
