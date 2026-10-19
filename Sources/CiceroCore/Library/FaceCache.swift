@@ -34,9 +34,10 @@ extension Classification {
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
     /// Part of the library cache's version too, as it writes faces the same way.
-    static let version: UInt32 = 10
-    /// Laid out like this version, but without `FontFace.isAtOrigin`: its variable fonts are read again.
-    private static let withoutOrigins: UInt32 = 9
+    static let version: UInt32 = 11
+    /// Laid out like this version, but their variable fonts are read again: 9 had no `FontFace.isAtOrigin`, and
+    /// 10 kept the default CoreText adds to a variable font without a named instance there (see `FontFileReader`).
+    private static let variableFontsOutdated: Set<UInt32> = [9, 10]
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -62,7 +63,7 @@ enum FaceCache {
             do {
                 guard try reader.u32() == magic else { return nil }
                 let saved = try reader.u32()
-                guard saved == version || saved == withoutOrigins else { return nil }
+                guard saved == version || variableFontsOutdated.contains(saved) else { return nil }
                 let count = Int(try reader.u32())
                 var files: [String: CachedFile] = [:]
                 files.reserveCapacity(count)
@@ -74,7 +75,7 @@ enum FaceCache {
                     var faces: [FontFace] = []
                     faces.reserveCapacity(faceCount)
                     for _ in 0..<faceCount { faces.append(try reader.face(path: path)) }
-                    if saved == withoutOrigins && faces.contains(where: { $0.weightAxis != nil || !$0.axes.isEmpty }) { continue }
+                    if variableFontsOutdated.contains(saved) && faces.contains(where: { $0.weightAxis != nil || !$0.axes.isEmpty }) { continue }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
                 }
                 return files
