@@ -4,8 +4,10 @@ import Foundation
 /// letters' embedding (see `LetterEmbedding`), to find those that look most like one. Each measure counts in steps
 /// of about as much as it takes to see a difference, so none counts for more by being a bigger number, and then by
 /// how much it shows: weight and serifs more than spacing, and the widths more still, as the embedding hardly tells
-/// them. The embedding counts like one more measure, in steps of `embeddingStep`. Families of different classifications are farther apart. Made once for a library, then asked as
-/// often as needed.
+/// them. The embedding counts like one more measure, in steps of `embeddingStep`. Families of different
+/// classifications are farther apart. Of families whose names say what size they're for, a text cut's text cuts come
+/// before display ones, its own display sibling among them, and the other way round. Made once for a library, then
+/// asked as often as needed.
 public struct SimilarFonts: Sendable {
     private let ids: [String]
     private let positions: [String: Int]
@@ -14,6 +16,7 @@ public struct SimilarFonts: Sendable {
     /// Their embeddings, one after the other; empty when they don't count.
     private let embeddings: [Float]
     private let classifications: [String?]
+    private let sizes: [OpticalSize?]
     /// `steps`, in the order of the measures.
     private let scales: [Float]
     private let weights: [Float]
@@ -46,6 +49,30 @@ public struct SimilarFonts: Sendable {
     /// Added to the distance between families whose classifications differ, when both have one.
     public static let otherClassification: Float = 4
 
+    /// The sizes a family's name says it's drawn for, as its siblings' names differ: a family's Text and Display.
+    public enum OpticalSize: Sendable {
+        /// Text, Caption, Micro, Agate.
+        case text
+        /// Display, Headline, Poster, Deck, Banner, Titling, and Fine.
+        case display
+
+        /// nil for a name that doesn't say, as most don't.
+        public init?(name: String) {
+            let words = Set(name.lowercased().split { !$0.isLetter }.map(String.init))
+            if !words.isDisjoint(with: ["display", "headline", "poster", "deck", "banner", "titling", "fine"]) {
+                self = .display
+            } else if !words.isDisjoint(with: ["text", "caption", "micro", "agate"]) {
+                self = .text
+            } else {
+                return nil
+            }
+        }
+    }
+
+    /// How many of the nearest families are put in order of size (see `nearestWithDistances`) at least, whatever the
+    /// limit, so that a shorter list, as a font page's, is the start of a longer one, as Show Similar Fonts'.
+    static let sizedLength = 30
+
     /// - Parameters:
     ///   - measurements: a family's regular style's, nil when it couldn't be measured; such families are left out,
     ///     unless no measure counts.
@@ -56,7 +83,7 @@ public struct SimilarFonts: Sendable {
                 classification: (Family) -> String?, weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
                 embeddingWeight: Float = SimilarFonts.embeddingWeight, otherClassification: Float = SimilarFonts.otherClassification) {
         let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
-        var ids: [String] = [], values: [Float] = [], vectors: [Float] = [], classifications: [String?] = []
+        var ids: [String] = [], values: [Float] = [], vectors: [Float] = [], classifications: [String?] = [], sizes: [OpticalSize?] = []
         for family in families {
             let measured = measurements(family), embedded = embedding ? embeddings?(family) : nil
             guard measured != nil || !measuring, embedded != nil || !embedding, measured != nil || embedded != nil else { continue }
@@ -64,12 +91,14 @@ public struct SimilarFonts: Sendable {
             values += measured?.values ?? Array(repeating: .nan, count: Self.measures)
             vectors += embedded ?? []
             classifications.append(classification(family))
+            sizes.append(OpticalSize(name: family.name))
         }
         self.ids = ids
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         self.values = values
         self.embeddings = vectors
         self.classifications = classifications
+        self.sizes = sizes
         scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
@@ -86,15 +115,26 @@ public struct SimilarFonts: Sendable {
         nearestWithDistances(to: id, limit: limit).map(\.id)
     }
 
+    /// The nearest first, but for families whose names say what size they're for (see `OpticalSize`): when the
+    /// family's does too, those of its size come first among them, in their order, then the others, its sibling for
+    /// another size among them, so a family's Text lists other Text faces, like STIX Two Text, before its own
+    /// Display. Families whose names don't say keep their places.
     public func nearestWithDistances(to id: String, limit: Int) -> [(id: String, distance: Float)] {
         guard let reference = positions[id] else { return [] }
-        var found: [(id: String, distance: Float)] = []
+        var found: [(index: Int, distance: Float)] = []
         found.reserveCapacity(ids.count)
         for other in ids.indices where other != reference {
-            found.append((ids[other], distance(reference, other)))
+            found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        return Array(found.prefix(limit))
+        var nearest = Array(found.prefix(max(limit, Self.sizedLength)))
+        if let own = sizes[reference] {
+            let slots = nearest.indices.filter { sizes[nearest[$0].index] != nil }
+            let named = slots.map { nearest[$0] }
+            let ordered = named.filter { sizes[$0.index] == own } + named.filter { sizes[$0.index] != own }
+            for (slot, entry) in zip(slots, ordered) { nearest[slot] = entry }
+        }
+        return nearest.prefix(limit).map { (ids[$0.index], $0.distance) }
     }
 
     /// How many steps apart a measure one family has and the other hasn't counts as.
