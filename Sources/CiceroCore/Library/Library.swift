@@ -804,15 +804,7 @@ public final class LibraryScanner: Sendable {
         let grouped = byFamily
         var families = Array(byFamily.keys).concurrentMap { name in
             let members = grouped[name]!
-            let faces = members.map(\.0).sorted { a, b in
-                // Narrowest first, then lightest: by each named instance's place on the axes, as a variable
-                // font's instances share one width and weight class.
-                if a.face.styleWidth != b.face.styleWidth { return a.face.styleWidth < b.face.styleWidth }
-                if a.face.styleWeight != b.face.styleWeight { return a.face.styleWeight < b.face.styleWeight }
-                if a.face.isItalic != b.face.isItalic { return !a.face.isItalic }
-                if a.face.styleName != b.face.styleName { return a.face.styleName.caseInsensitiveCompare(b.face.styleName) == .orderedAscending }
-                return a.face.id < b.face.id
-            }
+            let faces = members.map(\.0).sorted { Self.stylePrecedes($0.face, $1.face) }
             return Family(
                 name: name, faces: faces, state: Self.familyState(of: faces),
                 folderIDs: members.reduce(into: Set<UUID>()) { $0.formUnion($1.1) },
@@ -858,6 +850,32 @@ public final class LibraryScanner: Sendable {
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
                        unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
                        goneFiles: reach.goneFiles)
+    }
+
+    /// A family's styles in order, as a foundry lists them. Lightest first, by each named instance's place on the
+    /// weight axis, as a variable font's instances share one weight class. Then along the designer's own axes, in the
+    /// font's order, lowest first, as they name families within the family, like Sans, Text and Serif on a Serif
+    /// axis. Then narrowest first, Sans Compressed and Sans Condensed before Sans; then along the
+    /// other registered axes, like optical size; and each upright before its italic.
+    static func stylePrecedes(_ a: FontFace, _ b: FontFace) -> Bool {
+        if a.styleWeight != b.styleWeight { return a.styleWeight < b.styleWeight }
+        if let order = precedes(a, b, along: { $0.first?.isUppercase == true }) { return order }
+        if a.styleWidth != b.styleWidth { return a.styleWidth < b.styleWidth }
+        if let order = precedes(a, b, along: { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }) {
+            return order
+        }
+        if a.isItalic != b.isItalic { return !a.isItalic }
+        if a.styleName != b.styleName { return a.styleName.caseInsensitiveCompare(b.styleName) == .orderedAscending }
+        return a.id < b.id
+    }
+
+    /// Whether `a` sits lower than `b` on the first of the axes `tags` picks, in `a`'s order, that they're apart on;
+    /// nil when they aren't apart on any, or don't share them.
+    private static func precedes(_ a: FontFace, _ b: FontFace, along tags: (String) -> Bool) -> Bool? {
+        for axis in a.axes where tags(axis.tag) {
+            if let value = b.axes.first(where: { $0.tag == axis.tag })?.value, value != axis.value { return axis.value < value }
+        }
+        return nil
     }
 
     /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate — then by path.

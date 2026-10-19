@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - In the sidebar, a section title’s **+** stays where it is when the pointer comes over the title and its chevron shows; it moved aside to make room.
+- A family’s styles are listed lightest first, those of one weight along the designer’s own axes, then narrowest first, each followed by its italic: a family with Sans and Serif styles in three widths lists its Thin ones as Sans Compressed, Sans Condensed, Sans, then Serif Compressed and so on. Families with several widths used to list each width’s weights in turn.
 
 ## 1.7
 
