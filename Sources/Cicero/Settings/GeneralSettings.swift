@@ -25,13 +25,6 @@ struct GeneralSettings: View {
                 .formRowCentered()
             }
             Section("Installation") {
-                LabeledContent {
-                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
-                                selection: $model.data.installMethod)
-                } label: {
-                    Text("Activate fonts by")
-                    Text(activationExplanation)
-                }
                 Toggle(isOn: $model.data.installsIntoFontLibrary) {
                     Text("Keep installed fonts in Cicero’s Font Library")
                     Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library.")
@@ -51,6 +44,13 @@ struct GeneralSettings: View {
                     }
                 }
                 LabeledContent {
+                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
+                                selection: $model.data.installMethod)
+                } label: {
+                    Text("Activate fonts by")
+                    Text(activationExplanation)
+                }
+                LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
                 } label: {
                     Text("When an added font is already in your library")
@@ -58,10 +58,6 @@ struct GeneralSettings: View {
                 }
             }
             Section("Activation") {
-                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
-                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
-                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
-                }
                 Toggle(isOn: Binding(
                     get: { loginItem == .enabled || loginItem == .requiresApproval },
                     set: { loginItem = LoginItem.set($0, model: model) }
@@ -70,6 +66,10 @@ struct GeneralSettings: View {
                     Text(loginItem == .requiresApproval
                         ? "Allow Cicero in System Settings → General → Login Items."
                         : "Application sets activate fonts only while Cicero is open.")
+                }
+                Toggle(isOn: $model.data.asksBeforeActivatingMany) {
+                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
+                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     HStack(spacing: 4) {
