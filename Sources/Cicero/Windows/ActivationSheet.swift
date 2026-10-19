@@ -26,6 +26,8 @@ struct ActivationSheet: View {
                 option("Leave Files Where They Are", icon: "link",
                        detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }
             }
+            // Every option as tall as the tallest.
+            .fixedSize(horizontal: false, vertical: true)
             Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
             HStack {
                 if prompt.switching == nil && prompt.faces.contains(where: \.canActivateTemporarily) {
@@ -51,16 +53,21 @@ struct ActivationSheet: View {
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
+                // As tall for every symbol, so the titles line up.
                 Image(systemName: icon)
                     .font(.system(size: 28))
                     .foregroundStyle(.tint)
+                    .frame(height: 36)
                 Text(title).font(.headline)
+                // A bordered button keeps its label to one line, cutting the rest off, unless told otherwise.
                 Text(detail)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 120)
+            .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity, alignment: .top)
             .padding(12)
         }
         .buttonStyle(.bordered)
