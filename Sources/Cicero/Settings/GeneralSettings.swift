@@ -86,13 +86,7 @@ struct GeneralSettings: View {
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    HStack(spacing: 4) {
-                        Text("Show test fonts installed for Adobe apps")
-                        // Glyphs' own dark green on lime.
-                        Tag(text: "Glyphs", tint: Color(red: 30 / 255, green: 50 / 255, blue: 25 / 255),
-                            fill: Color(red: 154 / 255, green: 1, blue: 0))
-                            .help("Where Glyphs exports fonts to test them in Adobe apps")
-                    }
+                    Text("Show test fonts installed for Adobe apps")
                     Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
