@@ -11,7 +11,7 @@ struct SimilarKey: Equatable {
 
 extension AppModel {
     /// How many families Show Similar Fonts lists after the one they look like.
-    static let similarListed = 30
+    static let similarListed = SimilarFonts.longestList
 
     /// The listed families side by side by their letters and the letters' embedding, with their classifications as the
     /// sidebar has them. Made again when the library, its measurements or the user's data change, which takes a

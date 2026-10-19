@@ -69,9 +69,9 @@ public struct SimilarFonts: Sendable {
         }
     }
 
-    /// How many of the nearest families are put in order of size (see `nearestWithDistances`) at least, whatever the
-    /// limit, so that a shorter list, as a font page's, is the start of a longer one, as Show Similar Fonts'.
-    static let sizedLength = 30
+    /// The longest list asked for, Show Similar Fonts'. Families are put in order of size (see `nearestWithDistances`)
+    /// over at least as many, whatever the limit, so that a shorter list, as a font page's, is the start of it.
+    public static let longestList = 12
 
     /// - Parameters:
     ///   - measurements: a family's regular style's, nil when it couldn't be measured; such families are left out,
@@ -127,7 +127,7 @@ public struct SimilarFonts: Sendable {
             found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        var nearest = Array(found.prefix(max(limit, Self.sizedLength)))
+        var nearest = Array(found.prefix(max(limit, Self.longestList)))
         if let own = sizes[reference] {
             let slots = nearest.indices.filter { sizes[nearest[$0].index] != nil }
             let named = slots.map { nearest[$0] }
