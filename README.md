@@ -52,7 +52,7 @@ If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or 
 
 ## Roadmap
 
-Coming next: **similar fonts**, the families in your library that look most like the one you pick, and **Cicero in Spotlight**, so a family’s name, or a tag, rating or set of yours, finds it in Spotlight. How each could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **similar fonts**, the families in your library that look most like the one you pick. How it could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 
