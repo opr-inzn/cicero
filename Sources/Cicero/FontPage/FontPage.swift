@@ -176,19 +176,6 @@ private struct TypeTester: View {
                     .fixedSize()
                     .help("Which style to show; Automatic follows the preview weight")
                 }
-                if !face.face.axes.isEmpty {
-                    // Together, a little apart from the Style menu.
-                    HStack(spacing: 8) {
-                        AxesButton()
-                        // Laid out while hidden too, so it appears without moving the row.
-                        Button("Reset") { model.familyAxes[family.id] = nil }
-                            .help("Back to the style’s own values")
-                            .opacity(variations.isEmpty ? 0 : 1)
-                            .disabled(variations.isEmpty)
-                            .accessibilityHidden(variations.isEmpty)
-                    }
-                    .padding(.leading, family.faces.count > 1 ? 8 : 0)
-                }
                 Spacer()
                 // Where the row is short of room, the slider narrows; squeezed, the label would wrap and the row grow.
                 HStack(spacing: 8) {
@@ -199,6 +186,9 @@ private struct TypeTester: View {
                 .layoutPriority(1)
                 IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
                     .help("Align left, center or right")
+                if !face.face.axes.isEmpty {
+                    AxesButton()
+                }
             }
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
