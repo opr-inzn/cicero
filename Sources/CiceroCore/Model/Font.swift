@@ -442,7 +442,6 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     case openTypeTrueType = "OpenType TrueType"
     case collection = "Font Collection"
     case datafork = "Datafork TrueType"
-    case web = "Web Font"
     case mixed = "Mixed"
     case other = "Other"
 
@@ -455,7 +454,6 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
         case "ttf": .openTypeTrueType
         case "ttc", "otc": .collection
         case "dfont": .datafork
-        case "woff", "woff2": .web
         default: .other
         }
     }

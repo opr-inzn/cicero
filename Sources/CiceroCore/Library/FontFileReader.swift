@@ -3,7 +3,7 @@ import Foundation
 
 /// Reads a font file's faces with CoreText, without registering it.
 enum FontFileReader {
-    static let fontExtensions: Set<String> = ["otf", "ttf", "ttc", "otc", "dfont", "woff", "woff2"]
+    static let fontExtensions: Set<String> = ["otf", "ttf", "ttc", "otc", "dfont"]
 
     /// Empty when CoreText can't read the file.
     static func faces(atPath path: String) -> [FontFace] {

@@ -710,7 +710,8 @@ public final class LibraryScanner: Sendable {
     private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach) -> [String: CachedFile] {
         state.withLock { state in
             let before = state.files.count
-            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
+            // Not web fonts that versions before 1.6 read, in a folder that's out of reach now.
+            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) && Self.isFontFile($0.key) }
             state.files.merge(parsed) { _, new in new }
             if !parsed.isEmpty || state.files.count != before { state.dirty = true }
             return state.files
