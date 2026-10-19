@@ -142,7 +142,7 @@ Many fonts have optional features, like small caps, old-style figures or stylist
 
 Some features let you choose one option of several; turning one on turns the others off, and turning the chosen one off goes back to the font’s default.
 
-The features you choose apply to that family wherever Cicero previews it, in the list, grid, specimens and font page, until Cicero quits. They don’t change the font file.
+The features you choose apply to that family wherever Cicero previews it, in the list, grid and specimens and in the text and glyphs on its font page, until Cicero quits. The page’s list of styles shows each style as it is. They don’t change the font file.
 
 ## Try variable axes
 

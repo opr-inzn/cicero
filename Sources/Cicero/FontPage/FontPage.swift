@@ -286,7 +286,7 @@ private extension TypeTester {
 }
 
 /// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
-/// rather than with the page.
+/// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above.
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -294,10 +294,9 @@ private struct StyleRows: View {
 
     var body: some View {
         let model = self.model
-        let features = model.features(for: family)
         VStack(spacing: 0) {
             row {
-                Text("Preview")
+                Text("Styles")
             } style: {
                 Text("Style")
             } weight: {
@@ -311,7 +310,7 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight, features: features)
+                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
@@ -329,8 +328,7 @@ private struct StyleRows: View {
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
                 // Onto a set in the sidebar, which takes just this style.
                 .draggable(FontDrag(family: family.id, style: style.face.postScriptName)) {
-                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20,
-                             weight: style.face.styleWeight, features: features)
+                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20, weight: style.face.styleWeight)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.background, in: .rect(cornerRadius: 8))
