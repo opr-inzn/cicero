@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.7.3
 
 - In Settings → General, **Show test fonts installed for Adobe apps** no longer has a **Glyphs** tag next to it. The fonts it shows are tagged **Testing**, and the link below it goes to Glyphs’ guide.
 
