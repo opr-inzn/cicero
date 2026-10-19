@@ -69,6 +69,11 @@ struct GeneralSettings: View {
                         ? "Allow Cicero in System Settings → General → Login Items."
                         : "Application sets activate fonts only while Cicero is open.")
                 }
+                Toggle(isOn: $model.data.activatesDocumentFonts) {
+                    Text("Activate the fonts documents use in InDesign and Illustrator")
+                    Text("When a document open in InDesign or Illustrator uses fonts from your library that are off, Cicero activates them until the app quits. macOS asks once whether Cicero may ask each app.")
+                }
+                .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 Toggle(isOn: $model.guessesClassifications) {

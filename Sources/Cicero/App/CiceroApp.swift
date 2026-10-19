@@ -22,6 +22,7 @@ struct CiceroApp: App {
                     TextEditingKeys.install()
                     model.start()
                     model.appSets.start(model)
+                    model.openDocumentFonts.start(model)
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
                 }

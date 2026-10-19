@@ -64,6 +64,8 @@ public struct UserData: Codable, Equatable, Sendable {
     /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
     /// the key `showAdobeAppFolders` was saved as before.
     public var showCreativeCloudFonts = true
+    /// Turn on the fonts the documents open in InDesign and Illustrator use, while the app is open.
+    public var activatesDocumentFonts = true
     public var records = ActivationRecords()
 
     public init() {}
@@ -147,6 +149,7 @@ public struct UserData: Codable, Equatable, Sendable {
             ?? decoder.container(keyedBy: FormerKeys.self).decodeIfPresent(Bool.self, forKey: .showAdobeFonts)
             ?? d.showAdobeAppFolders
         showCreativeCloudFonts = try value(.showCreativeCloudFonts, d.showCreativeCloudFonts)
+        activatesDocumentFonts = try value(.activatesDocumentFonts, d.activatesDocumentFonts)
         records = try value(.records, d.records)
         // Rules for Slab Serif, a classification there used to be, pick Serif, which it's part of now; unless
         // Slab Serif is one of the user's.
