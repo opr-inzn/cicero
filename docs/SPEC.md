@@ -222,16 +222,22 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   objects not opened. Each font once. A file it can't read says "Couldn’t read the fonts in “Name”."
 - Settings → General → "Activate the fonts documents use in Adobe apps" (`activatesDocumentFonts`, off at first, as
   macOS then asks for Automation once per app): while InDesign, Illustrator or Photoshop is frontmost,
-  `DocumentFontWatcher` asks it over Apple Events every 0.5 s (off the main thread, 10 s timeout; one script per
-  app, compiled once, ~8 ms a time after that, and run only while the app is open, since compiling or telling one
-  that isn't opens it) for its open documents' fonts (InDesign: PostScript name, family and style of `fonts of
-  documents`) or files (Illustrator, Photoshop: `file path of document i`, read with `DocumentFonts`, again only
-  once saved since). None of them asks macOS (CTFontManager font requests) for a document's font. The library's
-  styles that are off, or on for apps, go to `AppSetWatcher.request`, which keeps them on for that app
-  (`whileAppsRun`, the App Set tag) until it quits; turned off by the user meanwhile, they stay off until then. An
-  app that refuses (-1743) isn't asked again until Cicero opens again. InDesign and Illustrator answer while their
-  Missing Fonts dialog is open and set the text once it's closed; Photoshop shows none and takes the fonts up
-  within seconds.
+  `DocumentFontWatcher` asks it every 0.5 s (none while the screens sleep) for its open documents' fonts or files,
+  sending the `core/getd` Apple Events itself, off the main thread, to the app's process (10 s timeout): no
+  AppleScript to compile (~25 ms a time, and compiling or running a script opens an app that has quit), a few ms a
+  check, and no measurable CPU in the app. InDesign: `fPSN`, `fFam` and `fSty` of every `FonT` of every `docu`
+  (codes from InDesign itself, which has no sdef; a missing value counts as "", so the lists line up). Illustrator
+  `aiFS`, Photoshop `Dpth` of every `docu`, read with `DocumentFonts`, again only once saved since; Photoshop fails
+  them all for an unsaved one, so then each document is asked in turn, and Illustrator's "/Untitled-1" is skipped.
+  None of them asks macOS (CTFontManager font requests) for a document's font. The library's styles that are off,
+  or on for apps, go to `AppSetWatcher.request`, which keeps them on for that app (`whileAppsRun`, the App Set tag)
+  until it quits; turned off by the user meanwhile, they stay off until then. An app that refuses (-1743) isn't
+  asked again until Cicero opens again. InDesign and Illustrator answer while their Missing Fonts dialog is open
+  and set the text once it's closed; Photoshop shows none and takes the fonts up within seconds. Measured
+  2026-10-20: InDesign in front takes up a registered font on its own after 1.5–10+ s, and within 0.5 s of coming
+  to the front; the `.idlk` lock file appears ~15 ms into an open, too late to beat its font check; a file in
+  ~/Library/Application Support/Adobe/Fonts isn't taken up faster. Photoshop's `app.refreshFonts()` takes the font
+  up at once but freezes it for ~2 s, so it isn't used.
 - Sheet "Fonts in “Brochure.indd”", "12 fonts · 8 on · 2 off · 2 missing", one row per font, missing first, then off,
   then on, each by name: a status symbol (green check, dashed circle, orange triangle), the name (family and style,
   else the PostScript name) with the PostScript name under it, an "Embedded" tag for a PDF's embedded fonts, the
