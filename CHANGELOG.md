@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.8.2
 
 - Cicero checks for updates each time it opens, as well as once a day while it stays open. It used to check only once a day, counted from its last check, so a new version could take up to a day to show up.
 
