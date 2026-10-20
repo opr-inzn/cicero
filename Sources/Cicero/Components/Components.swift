@@ -5,9 +5,16 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-    /// The Variable tag's: the system teal is too light for small text on its own tint in light mode.
+    /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
+    /// system green in light mode, which is too light for small text on its own tint.
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemTeal : NSColor(srgbRed: 0, green: 0.49, blue: 0.58, alpha: 1)
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
+    })
+    /// The App Set tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
+    static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
+            : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
     })
 }
 
@@ -193,15 +200,62 @@ struct Tag: View {
 
     var body: some View {
         HStack(spacing: 2.5) {
-            if let systemImage { Image(systemName: systemImage).accessibilityHidden(true) }
+            if let systemImage {
+                // Its drawing on the middle of the capitals, with no height of its own, so tags with a symbol are as
+                // tall as those without.
+                Image(systemName: systemImage)
+                    .offset(y: Self.capitalsDrop - Self.inkDrop(of: systemImage))
+                    .frame(height: 0)
+                    .accessibilityHidden(true)
+            }
             Text(text)
         }
-        .font(.system(size: 9, weight: .semibold))
+        .font(Self.font)
         .padding(.horizontal, 5)
-        .padding(.vertical, 1.5)
+        // The capitals in the middle of the capsule.
+        .padding(.top, 1.5 - Self.capitalsDrop)
+        .padding(.bottom, 1.5 + Self.capitalsDrop)
         .background(tint.opacity(0.14), in: .capsule)
         .foregroundStyle(tint.opacity(0.9))
         .fixedSize()
+    }
+
+    private static let font = Font.system(size: 9, weight: .semibold)
+
+    /// How far the middle of the capitals sits below the middle of the text's line: SwiftUI puts the line's height and
+    /// baseline on whole points, as NSLayoutManager does, which leaves them a third of a point low.
+    private static let capitalsDrop: CGFloat = {
+        let font = NSFont.systemFont(ofSize: 9, weight: .semibold)
+        let layout = NSLayoutManager()
+        return layout.defaultBaselineOffset(for: font) - font.capHeight / 2 - layout.defaultLineHeight(for: font) / 2
+    }()
+
+    private static var inkDrops: [String: CGFloat] = [:]
+
+    /// How far the middle of a symbol's drawing sits below the middle of its frame, measured once per symbol: some
+    /// frames leave room the drawing doesn't use, like app.badge.checkmark's, which drew it 0.35 pt high.
+    private static func inkDrop(of symbol: String) -> CGFloat {
+        if let drop = inkDrops[symbol] { return drop }
+        let scale = 20
+        let renderer = ImageRenderer(content: Image(systemName: symbol).font(font))
+        renderer.scale = CGFloat(scale)
+        var drop: CGFloat = 0
+        if let image = renderer.cgImage,
+           let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
+                                   bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+           let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            // The rows with ink, from the top.
+            let inked = (0..<image.height).filter { row in
+                (0..<image.width).contains { pixels[(row * image.width + $0) * 4 + 3] > 127 }
+            }
+            if let top = inked.first, let bottom = inked.last {
+                drop = CGFloat(top + bottom + 1 - image.height) / 2 / CGFloat(scale)
+            }
+        }
+        inkDrops[symbol] = drop
+        return drop
     }
 }
 
@@ -232,20 +286,21 @@ struct StatusTag: View {
     let family: Family
 
     var body: some View {
-        if let (text, tint) = content {
-            Tag(text: text, tint: tint).help(help)
+        if let (text, tint, symbol) = content {
+            Tag(text: text, tint: tint, systemImage: symbol).help(help)
         }
     }
 
-    private var content: (String, Color)? {
-        if family.temporaryScope == .whileAppsRun { return ("App Set", .blue) }
-        if family.temporaryScope != nil { return ("Temporary", .blue) }
+    private var content: (String, Color, String?)? {
+        // With the symbols of New Application Set and Activate Temporarily.
+        if family.temporaryScope == .whileAppsRun { return ("App Set", .appSet, "app.badge.checkmark") }
+        if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
         // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
-        if family.isAdobeFonts { return ("Adobe Fonts", .purple) }
+        if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
-        case .system: return ("System", .secondary)
-        case .partial: return ("Partly active", .orange)
-        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red)
+        case .system: return ("System", .secondary, nil)
+        case .partial: return ("Partly active", .orange, nil)
+        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red, nil)
         case .active, .inactive: return nil
         }
     }

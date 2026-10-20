@@ -61,10 +61,10 @@ Small capsules next to a family’s name tell you more about its state:
 | Partly active | Some of its styles are on, others aren’t |
 | Testing (or an app’s name) | On only in Adobe apps (or that app), from a folder they load by themselves, where type designers put fonts to test them. See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders) |
 | Adobe Fonts | From Adobe Fonts, managed in Creative Cloud: on in every app, or in Adobe apps only when its switch sits halfway. See [Adobe Fonts](activating.md#adobe-fonts) |
-| Temporary | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
-| App Set | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
+| Temporary (with a clock) | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
+| App Set (with an app) | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
 
-A teal **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
+A green **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
 
 ## Search
 
