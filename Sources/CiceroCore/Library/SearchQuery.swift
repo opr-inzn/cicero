@@ -110,7 +110,7 @@ extension Family {
         }
         if widths.contains(-1) { terms += SearchQuery.narrow }
         if widths.contains(1) { terms += SearchQuery.wide }
-        let upright = faces.first { !$0.isItalic } ?? faces[0]
+        let upright = Classification.judged(self.faces)[0]
         if upright.familyClass == 5 { terms += SearchQuery.slab }
         if let byClass = Classification(familyClass: upright.familyClass), byClass != classification { terms += byClass.searchTerms }
         terms += Set(faces.map { ($0.path as NSString).pathExtension.lowercased() }).sorted()
