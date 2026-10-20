@@ -16,6 +16,8 @@ public struct SimilarFonts: Sendable {
     private let values: [Float]
     /// Their embeddings, one after the other; empty when they don't count.
     private let embeddings: [Float]
+    /// How many numbers each family's embedding has: `LetterEmbedding.dimensions`, or more for two models' side by side.
+    private let dimensions: Int
     private let classifications: [String?]
     private let sizes: [OpticalSize?]
     /// `design(of:)` each family's name.
@@ -144,6 +146,7 @@ public struct SimilarFonts: Sendable {
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         self.values = values
         self.embeddings = vectors
+        dimensions = ids.isEmpty || vectors.isEmpty ? LetterEmbedding.dimensions : vectors.count / ids.count
         self.classifications = classifications
         self.sizes = sizes
         self.designs = designs
@@ -211,7 +214,6 @@ public struct SimilarFonts: Sendable {
         }
         if embeddingWeight > 0 {
             var squares: Float = 0
-            let dimensions = LetterEmbedding.dimensions
             for index in 0..<dimensions {
                 let difference = embeddings[a * dimensions + index] - embeddings[b * dimensions + index]
                 squares += difference * difference
