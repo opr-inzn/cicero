@@ -59,7 +59,7 @@ Coming next: **similar fonts**, the families in your library that look most like
 Cicero has no accounts and no ads, and nothing about you or your fonts leaves your Mac: everything it knows about your fonts stays in local files. It goes online for two things, and you can turn off either in Settings → General:
 
 - **Usage statistics.** Each time Cicero opens, it sends [TelemetryDeck](https://telemetrydeck.com) its version, the macOS version and a hashed random number that stands for your Mac, to count how many people use Cicero; the first time, it also says your Mac is new. That’s all it sends; the code is in [UsageStatistics.swift](Sources/Cicero/App/UsageStatistics.swift). Turn it off with Share usage statistics.
-- **Updates.** Once a day, Cicero checks GitHub for a new version. Turn it off with Check for updates automatically.
+- **Updates.** Each time Cicero opens, and once a day while it stays open, it checks GitHub for a new version. Turn it off with Check for updates automatically.
 
 Classifications Apple Intelligence guesses are worked out on your Mac too. The Help menu opens web pages in your browser.
 
