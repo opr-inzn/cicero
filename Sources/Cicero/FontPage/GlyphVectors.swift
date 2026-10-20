@@ -22,12 +22,14 @@ enum GlyphVectors {
         return glyphs[0]
     }
 
-    /// Puts the outline on the clipboard as PDF, which design apps paste as paths, and as SVG, as an image and as text,
-    /// for apps like Figma that paste SVG code, as Illustrator's own copies have it. And as a PDF file named after the
-    /// style and the glyph, as the Finder copies a file: Messages and WhatsApp send that, where they named the PDF
-    /// alone “FILE_3121.pdf”, and the Finder pastes it.
+    /// Puts the outline on the clipboard as paths for design apps: InDesign's from Illustrator's clipboard format, as
+    /// it places a PDF as a graphic, and Illustrator's from the PDF, as it reads that format in its own operators only.
+    /// As SVG too, as an image and as text, for apps like Figma that paste SVG code, as Illustrator's own copies have
+    /// it. And as a PDF file named after the style and the glyph, as the Finder copies a file: Messages and WhatsApp
+    /// send that, where they named the PDF alone “FILE_3121.pdf”, and the Finder pastes it.
     static func copy(_ outline: GlyphOutline, style: String, fallback: String) {
         let item = NSPasteboardItem()
+        item.setData(Data(outline.aicb.utf8), forType: .illustratorClipboard)
         let pdf = outline.pdf
         item.setData(pdf, forType: .pdf)
         let svg = outline.svg
@@ -69,4 +71,9 @@ enum GlyphVectors {
             return nil
         }
     }
+}
+
+extension NSPasteboard.PasteboardType {
+    /// Adobe Illustrator's clipboard format (AICB), as Illustrator and InDesign declare it.
+    static let illustratorClipboard = NSPasteboard.PasteboardType("com.adobe.illustrator.aicb")
 }

@@ -72,6 +72,63 @@ public struct GlyphOutline {
         return data as Data
     }
 
+    /// The outline in Adobe Illustrator's clipboard format (AICB), which InDesign and Illustrator paste as paths of
+    /// their own, where they'd place a PDF as a graphic. They run it as PostScript: Illustrator's own copies define
+    /// its short operators first, in Adobe's procedure sets, so this one sticks to PostScript's: one black path,
+    /// filled, its frame's corner at 0, 0.
+    public var aicb: String {
+        var paths = ""
+        func point(_ point: CGPoint) -> String {
+            "\(Self.number(point.x - frame.minX)) \(Self.number(point.y - frame.minY))"
+        }
+        var current = CGPoint.zero, start = CGPoint.zero
+        path.applyWithBlock { element in
+            let points = element.pointee.points
+            switch element.pointee.type {
+            case .moveToPoint:
+                start = points[0]
+                current = points[0]
+                paths += "\(point(points[0])) moveto\n"
+            case .addLineToPoint:
+                current = points[0]
+                paths += "\(point(points[0])) lineto\n"
+            case .addQuadCurveToPoint:
+                // PostScript's curves are cubic: TrueType's quadratic ones, raised.
+                let control = points[0], end = points[1]
+                let first = CGPoint(x: current.x + 2 / 3 * (control.x - current.x), y: current.y + 2 / 3 * (control.y - current.y))
+                let second = CGPoint(x: end.x + 2 / 3 * (control.x - end.x), y: end.y + 2 / 3 * (control.y - end.y))
+                current = end
+                paths += "\(point(first)) \(point(second)) \(point(end)) curveto\n"
+            case .addCurveToPoint:
+                current = points[2]
+                paths += "\(point(points[0])) \(point(points[1])) \(point(points[2])) curveto\n"
+            case .closeSubpath:
+                current = start
+                paths += "closepath\n"
+            @unknown default: break
+            }
+        }
+        let width = Self.number(frame.width), height = Self.number(frame.height)
+        return """
+            %!PS-Adobe-3.0 EPSF-3.0
+            %%Creator: Cicero
+            %%BoundingBox: 0 0 \(Int(frame.width.rounded(.up))) \(Int(frame.height.rounded(.up)))
+            %%HiResBoundingBox: 0 0 \(width) \(height)
+            %%EndComments
+            %%BeginProlog
+            %%EndProlog
+            %%BeginSetup
+            %%EndSetup
+            0 0 0 1 setcmykcolor
+            newpath
+            \(paths)fill
+            %%PageTrailer
+            %%Trailer
+            %%EOF
+
+            """
+    }
+
     /// "Inter Bold a.ss01.svg": the style's full name and the glyph's, or `fallback` for a glyph without a name, with
     /// what the Finder can't have in a file name replaced.
     public func fileName(style: String, fallback: String, extension: String = "svg") -> String {
