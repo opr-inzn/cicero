@@ -6,6 +6,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - Turning on a font Cicero had moved to its Deactivated folder moves its file back into your Fonts folder, also when Cicero copies fonts or uses them where they are. It used to copy the file there and keep it in the Deactivated folder as well, so the font still showed up there while it was on. Fonts left like that leave the Deactivated folder the next time Cicero opens.
 - The Deactivated folder is no longer in the sidebar. Its fonts are off, so they’re under **Inactive**.
+- Clicking a family’s switch in the grid, the list or specimens turns it on or off without selecting it.
 
 ## 1.8
 
