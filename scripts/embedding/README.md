@@ -50,7 +50,8 @@ large (`--details`, from letters-details.u8), which a model then needs in the ap
 for a model with a `strips` or `details` input.
 
 Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the
-tenth of the families it doesn't learn from (`--fold`, 0 to 9; one tenth's scores vary more than a change makes them,
+tenth of the families it doesn't learn from (`--fold`, 0 to 9, or -1 to learn from them all, with none left to judge it
+on; one tenth's scores vary more than a change makes them,
 so compare several): how often a style's nearest other style is its own design's; how much
 the ten nearest upright designs share an upright one's Google tags and category; how many of the ten nearest are
 upright, for an upright design, and italic, for an italic one; and how far apart in width the ten nearest are, in
