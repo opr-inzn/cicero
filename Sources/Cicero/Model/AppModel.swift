@@ -194,6 +194,8 @@ final class AppModel {
     var isImporting = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
+    /// What the toast's Undo does; nil for a toast without one.
+    private(set) var toastUndo: (() -> Void)?
 
     // MARK: Compare
 
@@ -663,14 +665,29 @@ final class AppModel {
 
     // MARK: Toasts
 
-    func showToast(_ message: String) {
+    /// How long a toast with Undo stays.
+    static let undoTime = Duration.seconds(6)
+
+    /// With `undo`, the toast has an Undo button, and stays long enough to reach it (`undoTime`).
+    func showToast(_ message: String, undo: (() -> Void)? = nil) {
         toast = message
+        toastUndo = undo
         toastTask?.cancel()
         toastTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: undo == nil ? .seconds(3) : Self.undoTime)
             guard !Task.isCancelled else { return }
             self?.toast = nil
+            self?.toastUndo = nil
         }
+    }
+
+    /// The toast's Undo: does it, and the toast goes.
+    func undoToast() {
+        let undo = toastUndo
+        toastTask?.cancel()
+        toast = nil
+        toastUndo = nil
+        undo?()
     }
 
     // MARK: Groups

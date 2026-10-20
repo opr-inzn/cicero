@@ -286,7 +286,9 @@ struct FamilyItem: ViewModifier {
                 model.click(family, in: order.families, anchor: &anchor)
                 if NSApp.currentEvent?.clickCount == 2 { model.openFamilyID = family.id }
             }
-            .contextMenu { FamilyMenu(families: model.targets(for: family), model: model) }
+            .contextMenu {
+                FamilyMenu(families: model.targets(for: family), model: model, similarTo: model.similarFamilyID.flatMap(model.family))
+            }
             .draggable(family.id)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)

@@ -76,8 +76,8 @@ enum UsageStatistics {
     }
 
     /// Whether this copy was built with build-app.sh, signed ad hoc and so without a team, unlike a release.
-    /// TelemetryDeck keeps test signals apart from the others.
-    private nonisolated static var isTestBuild: Bool {
+    /// TelemetryDeck keeps test signals apart from the others, and the website test reports (see `SimilarReports`).
+    nonisolated static var isTestBuild: Bool {
         var code: SecCode?
         var staticCode: SecStaticCode?
         var information: CFDictionary?

@@ -108,13 +108,21 @@ struct MainWindow: View {
             // Info panel showing another) would slide into place too.
             ZStack {
                 if let toast = model.toast {
-                    Text(toast)
-                        .font(.callout)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .glassEffect(.regular, in: .capsule)
-                        .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    HStack(spacing: 12) {
+                        Text(toast)
+                        if model.toastUndo != nil {
+                            Button("Undo") { model.undoToast() }
+                                .buttonStyle(.plain)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.tint)
+                        }
+                    }
+                    .font(.callout)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular, in: .capsule)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .animation(.snappy, value: model.toast)

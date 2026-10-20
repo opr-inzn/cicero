@@ -8,6 +8,7 @@ struct GeneralSettings: View {
     @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @AppStorage(UsageStatistics.defaultsKey) private var sharesUsageStatistics = true
+    @AppStorage(SimilarReports.defaultsKey) private var sendsSimilarReports = true
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
@@ -119,11 +120,16 @@ struct GeneralSettings: View {
                     Text("Share usage statistics")
                     Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac. Nothing about you or your fonts is sent.")
                 }
+                Toggle(isOn: $sendsSimilarReports) {
+                    Text("Send not-similar reports")
+                    Text("When you mark a family not similar, Cicero sends the names of the families in that list and the measurements of their letters to Cicero’s website, to improve similar fonts. No font files are sent.")
+                }
             }
         }
         .formStyle(.grouped)
         .onChange(of: appearance) { appearance.apply() }
         .onChange(of: sharesUsageStatistics) { if !sharesUsageStatistics { UsageStatistics.forgetID() } }
+        .onChange(of: sendsSimilarReports) { if !sendsSimilarReports { SimilarReports.forgetID() } }
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)
         .restoreSheet(contents: $restoring)

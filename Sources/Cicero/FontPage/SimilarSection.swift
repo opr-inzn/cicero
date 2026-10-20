@@ -2,8 +2,8 @@ import CiceroCore
 import SwiftUI
 
 /// The families that look most like the page's, each its name set in itself, under the styles and titled as they are:
-/// a click opens one's page, Show More lists as many as Show Similar Fonts does, right there. Left out for a family
-/// Cicero can't measure, like one without Latin letters.
+/// a click opens one's page, Show More lists as many as Show Similar Fonts does, right there, and Not Similar, on a row
+/// the pointer is over, takes one out. Left out for a family Cicero can't measure, like one without Latin letters.
 struct SimilarSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -13,6 +13,8 @@ struct SimilarSection: View {
     static let shown = 6
     /// Whether Show More was chosen; kept for every page from then on.
     @AppStorage("fontPage.similarShowsMore") private var showsMore = false
+    /// The row the pointer is over, which shows Not Similar.
+    @State private var hovered: String?
 
     var body: some View {
         if model.canShowSimilar(family) {
@@ -75,8 +77,20 @@ struct SimilarSection: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        // In the room the name leaves at the row's end, only while the pointer is over it.
+        .overlay(alignment: .trailing) {
+            if hovered == other.id {
+                Button("Not Similar") { model.markNotSimilar([other], to: family) }
+                    .controlSize(.small)
+                    .help("Don’t list \(other.name) as similar to \(family.name)")
+            }
+        }
+        .onHover { inside in
+            if inside { hovered = other.id } else if hovered == other.id { hovered = nil }
+        }
         .accessibilityLabel([other.name, foundry].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAction(named: "Not Similar") { model.markNotSimilar([other], to: family) }
         .help("Open \(other.name)")
-        .contextMenu { FamilyMenu(families: [other], model: model) }
+        .contextMenu { FamilyMenu(families: [other], model: model, similarTo: family) }
     }
 }
