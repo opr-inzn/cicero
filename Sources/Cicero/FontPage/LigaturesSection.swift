@@ -3,9 +3,9 @@ import CoreText
 import SwiftUI
 
 /// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph in a cell
-/// like a character's, in the same columns, the characters it stands for in its tooltip and popover, which copies them,
-/// as its right-click menu does. Like the glyphs' groups, rows of fixed cells in the page's stack, under a header per
-/// feature like a group's.
+/// like a character's, in the same columns, the characters it stands for in its tooltip and popover, which copies them
+/// or its outline, as its right-click menu does, and dragged out as an SVG file. Like the glyphs' groups, rows of fixed
+/// cells in the page's stack, under a header per feature like a group's.
 struct LigaturesSection: View {
     /// The style the page's text is set in, at its weight.
     let face: FontFace
@@ -76,8 +76,10 @@ struct LigaturesSection: View {
             .contentShape(.rect)
             .help(ligature.text)
             .onTapGesture { popover = (group.tag, ligature.characters) }
+            .onDrag { dragItem(ligature) }
             .contextMenu {
                 Button("Copy Characters", systemImage: "doc.on.clipboard") { GlyphsSection.copy(ligature.text) }
+                Button("Copy as Vector", systemImage: "doc.on.clipboard") { GlyphVectors.copy(outline(ligature)) }
                 Button("Copy Unicode", systemImage: "doc.on.clipboard") { GlyphsSection.copy(CharacterCodes.unicode(ligature.characters)) }
             }
         .accessibilityElement()
@@ -90,6 +92,8 @@ struct LigaturesSection: View {
         VStack(spacing: 10) {
             GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: weight, variations: variations)
                 .frame(width: 220, height: 130)
+                .contentShape(.rect)
+                .onDrag { dragItem(ligature) }
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
                 .font(.title3)
             Text(CharacterCodes.unicode(ligature.characters))
@@ -106,11 +110,26 @@ struct LigaturesSection: View {
             }
             // A ligature has no code of its own: what's copied is its characters, which the font draws as this glyph
             // where its feature is on.
-            Button("Copy Characters", systemImage: "doc.on.doc") { GlyphsSection.copy(ligature.text) }
-                .help("Copies “\(ligature.text)”, which this font draws as this ligature with \(group.name) on")
+            VStack {
+                Button("Copy Characters", systemImage: "doc.on.doc") { GlyphsSection.copy(ligature.text) }
+                    .help("Copies “\(ligature.text)”, which this font draws as this ligature with \(group.name) on")
+                Button("Copy as Vector", systemImage: "doc.on.doc") { GlyphVectors.copy(outline(ligature)) }
+                    .disabled(outline(ligature) == nil)
+                    .help("Copies the ligature’s outline, to paste into a design app as a shape you can edit, or as SVG code")
+            }
         }
         .padding(16)
         .frame(maxWidth: 300)
+    }
+
+    private func outline(_ ligature: Ligature) -> GlyphOutline? {
+        GlyphVectors.outline(ligature.glyph, face: face, weight: weight, variations: variations)
+    }
+
+    /// The ligature as an SVG file, named after the style and the glyph, or its characters: "Inter Regular f_i.svg".
+    private func dragItem(_ ligature: Ligature) -> NSItemProvider {
+        let fallback = ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: "_")
+        return GlyphVectors.dragItem(outline(ligature), style: face.fullName, fallback: fallback)
     }
 }
 
