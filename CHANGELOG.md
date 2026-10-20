@@ -10,6 +10,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Fonts with “Stencil”, “Inline”, “Outline”, “Fraktur” or “Blackletter” in their names are Ornamental.
 - A family whose regular weight comes in two widths, like Futura’s Medium and Condensed Medium, is previewed in the normal width.
 - A family you’ve rated shows its stars in the grid, at the right of its name, and in specimens, after its number of styles. They used to show only in the Info panel and the list’s **Rating** column. A family with a note has a small note symbol there too; hold the pointer over it to read the note.
+- Search finds families by what they are, not only by their names: type **variable**, **mono**, **italic**, a classification like **serif**, **sans** or **script**, **display** or **text** for families made for large or small sizes, **condensed** or **extended**, a tag, or a kind of file, like **ttf**. Several words find the families that match each of them, so **variable sans** shows the variable sans serifs, and **inter variable** shows Inter if it’s variable. **mono** no longer shows every font from Monotype, only monospaced fonts and fonts with Mono in their names.
+- Search looks in the names of a family’s styles too, like Condensed Bold, and in the name you gave a foundry.
 
 ## 1.8.2
 

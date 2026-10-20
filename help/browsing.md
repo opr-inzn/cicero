@@ -68,7 +68,23 @@ A green **Variable** tag, with the symbol of sliders, marks a variable family, i
 
 ## Search
 
-Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, manufacturer or [note](organizing.md#notes) contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
+Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, foundry or [note](organizing.md#notes) contains what you type, or the name, PostScript name, designer or vendor ID of one of its styles.
+
+You can also search for what kind of family it is, whatever it’s called:
+
+| Type | To find |
+| --- | --- |
+| **variable** | Variable fonts |
+| **mono** or **monospaced** | Monospaced fonts |
+| **italic** | Families with italics |
+| **serif**, **sans**, **script**, **ornamental**, **symbol** or a classification of your own | Families in that classification. **handwriting** finds scripts too, and **dingbats** symbols |
+| **slab** | Slab serifs, as their fonts say |
+| **display** or **text** | Families made for large or small sizes: their names say so, like Display, Headline or Poster and Text, Caption or Micro, or they’re variable fonts with an optical size axis. **display** finds ornamental families too |
+| **condensed**, **compressed** or **narrow**, and **extended**, **expanded** or **wide** | Families with styles narrower or wider than normal |
+| A tag | Families with that tag |
+| **otf**, **ttf**, **ttc** | Families that come in that kind of file |
+
+Words find the families that match each of them, so **variable sans** shows the variable sans serifs, and **inter variable** shows Inter if it’s variable. A word like these finds a family by what it is, by its name and its styles’ names, and by your note, but not by its foundry, designer or PostScript names: **mono** shows monospaced fonts and fonts with Mono in their names, not every font from Monotype.
 
 ## Find similar fonts
 

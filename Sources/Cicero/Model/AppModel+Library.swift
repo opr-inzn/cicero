@@ -203,18 +203,37 @@ extension AppModel {
     }
 
     private func computeVisibleFamilies() -> [Family] {
-        let query = appliedSearch.trimmingCharacters(in: .whitespaces).lowercased()
+        let matches = searchMatcher(SearchQuery(appliedSearch))
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
-            return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter { library.matches($0, search: query) }
+            return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
-        // The user's notes are searched too.
-        let notes = query.isEmpty ? [:] : data.familyNotes.mapValues { $0.lowercased() }
         return library.families.filter { family in
             guard data.lists(family) else { return false }
-            return tests.contains { $0(family) }
-                && (library.matches(family, search: query) || notes[family.id]?.contains(query) == true)
+            return tests.contains { $0(family) } && matches(family)
+        }
+    }
+
+    /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the
+    /// user's note, the foundry and classification the family is shown in, a built-in classification by its usual
+    /// words too, and its tags.
+    private func searchMatcher(_ search: SearchQuery) -> (Family) -> Bool {
+        guard !search.isEmpty else { return { _ in true } }
+        let library = library, data = data
+        let notes = data.familyNotes.mapValues { $0.lowercased() }
+        let foundryName = foundryNamer(), classificationName = classificationNamer()
+        var classificationTerms: [String: [String]] = [:]
+        for name in data.classifications { classificationTerms[name] = [name.lowercased()] }
+        for classification in Classification.allCases {
+            let shown = name(of: classification)
+            classificationTerms[shown] = [shown.lowercased()] + classification.searchTerms
+        }
+        return { family in
+            let foundry = foundryName(family).flatMap { $0 == family.manufacturer ? nil : $0.lowercased() }
+            let classification = classificationName(family)
+            let terms = (classificationTerms[classification] ?? [classification.lowercased()]) + data.tags(of: family.id).map { $0.lowercased() }
+            return library.matches(family, search: search, note: notes[family.id], texts: foundry.map { [$0] } ?? [], terms: terms)
         }
     }
 
