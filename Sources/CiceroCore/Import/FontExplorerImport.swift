@@ -301,6 +301,8 @@ private struct Reader {
         // Fonts folders Cicero reads anyway, and from SkyFonts, Adobe Fonts or Monotype's cloud, aren't added.
         let fm = FileManager.default
         var missing = 0
+        // A Font Library that isn't on this Mac, and how many of the files were in it.
+        var absentLibrary: (path: String, files: Int)?
         for id in order {
             guard let container = containers[id], !container.isSystem, !container.isCloud else { continue }
             if let newLibrary, container.path.hasPrefix(newLibrary + "/") {
@@ -315,13 +317,13 @@ private struct Reader {
         if let backupFolder, let newLibrary {
             library.bundledFonts = bundled(in: backupFolder, files: order.compactMap { containers[$0]?.path }
                 .filter { $0.hasPrefix(newLibrary + "/") }.map { String($0.dropFirst(newLibrary.count + 1)) })
-        } else if let newLibrary, !fm.fileExists(atPath: newLibrary) {
-            // A database from another Mac, its Font Library not here (yet): the fonts in it can't be listed.
-            missing += library.fontFolderCount
-            library.fontFolder = nil
+        } else if let newLibrary, !fm.fileExists(atPath: newLibrary), library.fontFolderCount > 0 {
+            // A database from another Mac, its Font Library not here (yet), or on a disk that isn't connected: the
+            // fonts in it can't be listed.
+            absentLibrary = (newLibrary, library.fontFolderCount)
             library.fontFolderCount = 0
         }
-        // FontExplorer X left the fonts where they were: nothing to list there.
+        // FontExplorer X left the fonts where they were, or its Font Library isn't here: nothing to list there.
         if library.fontFolderCount == 0 { library.fontFolder = nil }
 
         // The sidebar: sets in folders get the folders' names, as Cicero's sets aren't in folders.
@@ -402,7 +404,16 @@ private struct Reader {
             library.tags.append(ImportedTag(name: FontExplorerImport.labelName(color), color: color, fonts: labelled[number] ?? []))
         }
 
-        if missing > 0 { library.notes.append(missing == 1 ? "1 font file that isn’t on this Mac" : "\(missing.formatted()) font files that aren’t on this Mac") }
+        // The Font Library by where it was looked for, so it can be put there and imported again.
+        if let absentLibrary {
+            let place = absentLibrary.path.hasPrefix(home + "/") ? "~" + absentLibrary.path.dropFirst(home.count) : absentLibrary.path
+            let files = absentLibrary.files == 1 ? "1 font file" : "\(absentLibrary.files.formatted()) font files"
+            library.notes.append("\(files) in \(place) (not on this Mac)")
+        }
+        if missing > 0 {
+            let other = absentLibrary == nil ? "" : "other "
+            library.notes.append(missing == 1 ? "1 \(other)font file that isn’t on this Mac" : "\(missing.formatted()) \(other)font files that aren’t on this Mac")
+        }
         let licensed = containers.values.count(where: \.hasLicense)
         if licensed > 0 { library.notes.append("license details of \(licensed == 1 ? "1 font" : "\(licensed.formatted()) fonts")") }
         if deactivating > 0 {
