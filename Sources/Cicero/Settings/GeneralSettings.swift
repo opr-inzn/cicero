@@ -89,11 +89,13 @@ struct GeneralSettings: View {
                     Text("Show test fonts installed for Adobe apps")
                     Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
-                Toggle(isOn: $model.guessesClassifications) {
+                // Off while Apple Intelligence can't guess, whatever the setting says.
+                let canGuess = ClassificationGuesser.availability == .available
+                Toggle(isOn: canGuess ? $model.guessesClassifications : .constant(false)) {
                     Text("Guess classifications from names")
                     Text(guessingExplanation)
                 }
-                .disabled(ClassificationGuesser.availability == .unavailable(.deviceNotEligible))
+                .disabled(!canGuess)
             }
             Section("Maintenance") {
                 LabeledContent("Library") {
