@@ -6,7 +6,8 @@ import Foundation
 /// how much it shows: weight and serifs more than spacing, and the widths more still, as the embedding hardly tells
 /// them. The embedding counts like one more measure, in steps of `embeddingStep`. Families of different
 /// classifications are farther apart. Of families whose names say what size they're for, a text cut's text cuts come
-/// before display ones, its own display sibling among them, and the other way round. Made once for a library, then
+/// before display ones, its own display sibling among them, and the other way round. Copies of one design, as their
+/// names say (a trial, a variable font, a family for each weight), are listed once. Made once for a library, then
 /// asked as often as needed.
 public struct SimilarFonts: Sendable {
     private let ids: [String]
@@ -17,6 +18,8 @@ public struct SimilarFonts: Sendable {
     private let embeddings: [Float]
     private let classifications: [String?]
     private let sizes: [OpticalSize?]
+    /// `design(of:)` each family's name.
+    private let designs: [String]
     /// `steps`, in the order of the measures.
     private let scales: [Float]
     private let weights: [Float]
@@ -71,6 +74,34 @@ public struct SimilarFonts: Sendable {
         }
     }
 
+    /// The words at the end of a name that make another copy of a design rather than another design: a trial's, a
+    /// variable font's or an OpenType one's, and a weight, for a family cut into one for each weight.
+    static let copyWords: Set<String> = [
+        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus",
+        "hairline", "thin", "extralight", "ultralight", "light", "book", "regular", "medium", "semibold", "demibold", "bold",
+        "extrabold", "ultrabold", "heavy", "black", "extrablack", "semi", "demi", "extra", "ultra",
+    ]
+
+    /// The design a family's name says: the name without the words at its end that make another copy of it
+    /// (`copyWords`), a version or a date (v0.2, 2.001, 260417), and without the Test some foundries start a trial's
+    /// name with, so that Inter Variable, Inter Light and Test Inter are Inter's, while Roboto Mono and DM Serif
+    /// Display are designs of their own.
+    static func design(of name: String) -> String {
+        var words = name.lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
+        if words.count > 1, words[0] == "test" { words.removeFirst() }
+        while words.count > 1, let last = words.last, copyWords.contains(last) || isVersion(last) {
+            words.removeLast()
+        }
+        return words.joined(separator: " ")
+    }
+
+    /// v0.2, v12, 2.001 or 260417, not a number a name has, like Bodoni 72's.
+    private static func isVersion(_ word: String) -> Bool {
+        let digits = word.hasPrefix("v") ? word.dropFirst() : Substring(word)
+        guard digits.first?.isWholeNumber == true, digits.allSatisfy({ $0.isWholeNumber || $0 == "." }) else { return false }
+        return word.hasPrefix("v") || digits.contains(".") || digits.count >= 4
+    }
+
     /// The longest list asked for, Show Similar Fonts'. Families are put in order of size (see `nearestWithDistances`)
     /// over at least as many, whatever the limit, so that a shorter list, as a font page's, is the start of it.
     public static let longestList = 12
@@ -86,6 +117,7 @@ public struct SimilarFonts: Sendable {
                 embeddingWeight: Float = SimilarFonts.embeddingWeight, otherClassification: Float = SimilarFonts.otherClassification) {
         let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
         var ids: [String] = [], values: [Float] = [], vectors: [Float] = [], classifications: [String?] = [], sizes: [OpticalSize?] = []
+        var designs: [String] = []
         for family in families {
             let measured = measurements(family), embedded = embedding ? embeddings?(family) : nil
             guard measured != nil || !measuring, embedded != nil || !embedding, measured != nil || embedded != nil else { continue }
@@ -93,7 +125,8 @@ public struct SimilarFonts: Sendable {
             values += measured?.values ?? Array(repeating: .nan, count: Self.measures)
             vectors += embedded ?? []
             classifications.append(classification(family))
-            sizes.append(OpticalSize(name: family.name))
+            sizes.append(OpticalSize(name: family.id))
+            designs.append(Self.design(of: family.id))
         }
         self.ids = ids
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
@@ -101,6 +134,7 @@ public struct SimilarFonts: Sendable {
         self.embeddings = vectors
         self.classifications = classifications
         self.sizes = sizes
+        self.designs = designs
         scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
@@ -112,7 +146,8 @@ public struct SimilarFonts: Sendable {
 
     public func contains(_ id: String) -> Bool { positions[id] != nil }
 
-    /// The families that look most like this one, the nearest first, without it; empty when it wasn't measured.
+    /// The families that look most like this one, the nearest first, without it and its copies, and each design once;
+    /// empty when it wasn't measured.
     public func nearest(to id: String, limit: Int) -> [String] {
         nearestWithDistances(to: id, limit: limit).map(\.id)
     }
@@ -129,7 +164,12 @@ public struct SimilarFonts: Sendable {
             found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        var nearest = Array(found.prefix(max(limit, Self.longestList)))
+        // The nearest copy of each design, and none of the family's own.
+        var listed: Set<String> = [designs[reference]], nearest: [(index: Int, distance: Float)] = []
+        for entry in found where listed.insert(designs[entry.index]).inserted {
+            nearest.append(entry)
+            if nearest.count == max(limit, Self.longestList) { break }
+        }
         if let own = sizes[reference] {
             let slots = nearest.indices.filter { sizes[nearest[$0].index] != nil }
             let named = slots.map { nearest[$0] }
