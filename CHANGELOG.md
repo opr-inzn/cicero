@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## 1.7.4
+## 1.8
 
 - A font page’s **Glyphs** can give you a glyph’s shape, not only its character. **Copy as Vector**, in a glyph’s popover and its right-click menu, copies its outline in the style, weight and axes the page shows, to paste into a design app as a shape you can edit, or as SVG code. Drag a glyph out of the page to put it into a design app, or into the Finder as an SVG file. That works for alternates, the glyphs features draw and ligatures too, whose shapes **Copy Character** can’t take along.
 - Copying from a glyph’s popover closes it and says what was copied at the bottom of the window, as turning fonts on does: **“g” copied to clipboard**. So do the copy commands in a glyph’s right-click menu. The popover’s buttons no longer darken when clicked.
