@@ -14,6 +14,9 @@ final class DocumentFontWatcher {
         case photoshop = "com.adobe.Photoshop"
     }
 
+    /// The apps asked which fonts their documents use.
+    static let bundleIDs = Set(App.allCases.map(\.rawValue))
+
     private weak var model: AppModel?
     private var observers: [NSObjectProtocol] = []
     private var polling: Task<Void, Never>?

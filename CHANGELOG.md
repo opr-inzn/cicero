@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## 1.7.4
 
+- Fonts Cicero turned on for a document open in InDesign, Illustrator or Photoshop stay on when Cicero quits and opens again, as it does after an update, for as long as the app stays open. They used to go off until the app was next in front, and the app could then find its document’s fonts missing.
 - With **Activate the fonts documents use in Adobe apps** on in Settings → General, Cicero notices the fonts of a document you open in InDesign, Illustrator or Photoshop sooner: it asks the app twice a second rather than every two seconds. The app can still take a few seconds to take up the fonts, and InDesign and Illustrator still show their Missing Fonts dialog as the document opens; the setting now says so.
 - Importing a FontExplorer X database copied from another Mac without its Font Library says where Cicero looked for the folder, like “1,240 font files in ~/FontExplorer X/Font Library (not on this Mac)”, so you can put it there, or connect the disk it’s on, and import again. Those fonts used to be counted with any other font files that aren’t on this Mac.
 

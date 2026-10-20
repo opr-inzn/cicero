@@ -23,6 +23,8 @@ final class AppSetWatcher {
     @ObservationIgnored private var failed: [String: Set<String>] = [:]
     /// Bundle ID of an open app → the PostScript names of the fonts its documents use that it asked for.
     @ObservationIgnored private var requested: [String: Set<String>] = [:]
+    /// Whether `requested` has been taken up again from the records since Cicero opened (see `restoreRequests`).
+    @ObservationIgnored private var restoredRequests = false
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
@@ -93,6 +95,7 @@ final class AppSetWatcher {
 
     private func sync() {
         guard let model, model.hasScanned else { return }
+        if !restoredRequests { restoreRequests() }
         let current = Self.onForAppSets(model.data.records)
         for (path, names) in managed where !current.contains(path) { dismissed.formUnion(names) }
         managed = managed.filter { current.contains($0.key) }
@@ -135,6 +138,31 @@ final class AppSetWatcher {
             // The engine has waited for macOS, so a scan now sees what the sync did.
             let scan = model.rescan()
             for operation in operations { model.settle(operation, after: scan) }
+        }
+    }
+
+    /// The fonts open apps' documents asked for before Cicero last quit, from the records, which keep the apps that
+    /// wanted each file. Otherwise they'd go off until the app is next in front and asked, and an app in the background
+    /// would find the fonts of its open documents gone. A style an application set of the app has is the set's.
+    private func restoreRequests() {
+        restoredRequests = true
+        guard let model, model.data.activatesDocumentFonts else { return }
+        let session = ActivationEngine.currentSession()
+        var apps: [String: Set<String>] = [:]
+        for (path, record) in model.data.records.temporary where record.scope == .whileAppsRun && record.session == session {
+            let open = Set(record.apps ?? []).intersection(running).intersection(DocumentFontWatcher.bundleIDs)
+            if !open.isEmpty { apps[path] = open }
+        }
+        guard !apps.isEmpty else { return }
+        for family in model.library.families {
+            for face in family.faces {
+                for app in apps[face.face.path] ?? [] {
+                    let inSet = model.data.sets.contains { set in
+                        set.apps.contains { $0.bundleID == app } && set.contains(style: face.face.postScriptName, of: family.id)
+                    }
+                    if !inSet { requested[app, default: []].insert(face.face.postScriptName) }
+                }
+            }
         }
     }
 

@@ -231,13 +231,15 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   them all for an unsaved one, so then each document is asked in turn, and Illustrator's "/Untitled-1" is skipped.
   None of them asks macOS (CTFontManager font requests) for a document's font. The library's styles that are off,
   or on for apps, go to `AppSetWatcher.request`, which keeps them on for that app (`whileAppsRun`, the App Set tag)
-  until it quits; turned off by the user meanwhile, they stay off until then. An app that refuses (-1743) isn't
-  asked again until Cicero opens again. InDesign and Illustrator answer while their Missing Fonts dialog is open
-  and set the text once it's closed; Photoshop shows none and takes the fonts up within seconds. Measured
-  2026-10-20: InDesign in front takes up a registered font on its own after 1.5–10+ s, and within 0.5 s of coming
-  to the front; the `.idlk` lock file appears ~15 ms into an open, too late to beat its font check; a file in
-  ~/Library/Application Support/Adobe/Fonts isn't taken up faster. Photoshop's `app.refreshFonts()` takes the font
-  up at once but freezes it for ~2 s, so it isn't used.
+  until it quits; turned off by the user meanwhile, they stay off until then. Cicero opening again takes up the
+  requests from this login session's `whileAppsRun` records (their `apps` that are open and among the three, for
+  the styles none of that app's sets has), so the fonts of a background app's documents don't go off. An app that
+  refuses (-1743) isn't asked again until Cicero opens again. InDesign and Illustrator answer while their Missing
+  Fonts dialog is open and set the text once it's closed; Photoshop shows none and takes the fonts up within
+  seconds. Measured 2026-10-20: InDesign in front takes up a registered font on its own after 1.5–10+ s, and within
+  0.5 s of coming to the front; the `.idlk` lock file appears ~15 ms into an open, too late to beat its font check;
+  a file in ~/Library/Application Support/Adobe/Fonts isn't taken up faster. Photoshop's `app.refreshFonts()` takes
+  the font up at once but freezes it for ~2 s, so it isn't used.
 - Sheet "Fonts in “Brochure.indd”", "12 fonts · 8 on · 2 off · 2 missing", one row per font, missing first, then off,
   then on, each by name: a status symbol (green check, dashed circle, orange triangle), the name (family and style,
   else the PostScript name) with the PostScript name under it, an "Embedded" tag for a PDF's embedded fonts, the
