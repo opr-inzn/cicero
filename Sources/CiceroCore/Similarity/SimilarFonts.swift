@@ -75,24 +75,36 @@ public struct SimilarFonts: Sendable {
     }
 
     /// The words at the end of a name that make another copy of a design rather than another design: a trial's, a
-    /// variable font's or an OpenType one's, and a weight, for a family cut into one for each weight.
+    /// variable font's, an OpenType one's or one for another region's characters (PingFang SC and HK, Hiragino's ProN).
     static let copyWords: Set<String> = [
-        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus",
+        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn",
+        "sc", "tc", "hk", "mo",
+    ]
+    /// The weights at the end of a name, for a family cut into one for each weight.
+    static let weightWords: Set<String> = [
         "hairline", "thin", "extralight", "ultralight", "light", "book", "regular", "medium", "semibold", "demibold", "bold",
-        "extrabold", "ultrabold", "heavy", "black", "extrablack", "semi", "demi", "extra", "ultra",
+        "extrabold", "ultrabold", "heavy", "black", "extrablack",
     ]
 
     /// The design a family's name says: the name without the words at its end that make another copy of it
-    /// (`copyWords`), a version or a date (v0.2, 2.001, 260417), and without the Test some foundries start a trial's
-    /// name with, so that Inter Variable, Inter Light and Test Inter are Inter's, while Roboto Mono and DM Serif
-    /// Display are designs of their own.
+    /// (`copyWords`, `weightWords` with the Semi of a Semi Bold, also before an Italic), a version or a date (v0.2,
+    /// 2.001, 260417), and without the Test some foundries start a trial's name with, so that Inter Variable, Inter Light
+    /// and Test Inter are Inter's, and Inter Bold Italic Inter Italic's, while Roboto Mono and DM Serif Display are
+    /// designs of their own.
     static func design(of name: String) -> String {
         var words = name.lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
         if words.count > 1, words[0] == "test" { words.removeFirst() }
-        while words.count > 1, let last = words.last, copyWords.contains(last) || isVersion(last) {
-            words.removeLast()
+        func stripCopies() {
+            while words.count > 1, let last = words.last, copyWords.contains(last) || weightWords.contains(last) || isVersion(last) {
+                words.removeLast()
+                if weightWords.contains(last), words.count > 1, ["semi", "demi", "extra", "ultra"].contains(words.last!) { words.removeLast() }
+            }
         }
-        return words.joined(separator: " ")
+        stripCopies()
+        guard words.count > 1, ["italic", "italics", "oblique"].contains(words.last!) else { return words.joined(separator: " ") }
+        let slope = words.removeLast()
+        stripCopies()
+        return (words + [slope]).joined(separator: " ")
     }
 
     /// v0.2, v12, 2.001 or 260417, not a number a name has, like Bodoni 72's.
