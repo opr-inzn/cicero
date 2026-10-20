@@ -62,13 +62,7 @@ public final class FontLoader: Sendable {
 
         var descriptor = descriptor(for: face)
         if face.weightAxis != nil || !face.axes.isEmpty {
-            descriptor = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontOpticalSizeAttribute: "none"] as CFDictionary)
-        }
-        if let weight {
-            descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: Self.weightAxisID), weight)
-        }
-        for (tag, value) in variations {
-            descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: AxisTag.identifier(tag)), value)
+            descriptor = Self.descriptor(descriptor, weight: weight, variations: variations)
         }
         for feature in features {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
@@ -76,6 +70,27 @@ public final class FontLoader: Sendable {
         let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
         fonts[key] = font
         return font
+    }
+
+    /// A variable face where `weight` and `variations` put it, its other axes where it sits, at that optical size
+    /// whatever the point size. CoreText reads a setting that leaves a descriptor where it already is (a weight set
+    /// again, or a named style left alone) as the named style itself, which optical sizing "none" then draws at the
+    /// default optical size, losing a style's own or a moved one. So every axis is set at once, after a step to the
+    /// defaults, which only leaves a descriptor where it is when that's where it's drawn.
+    private static func descriptor(_ descriptor: CTFontDescriptor, weight: Double?,
+                                   variations: [(key: String, value: Double)]) -> CTFontDescriptor {
+        var values = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:]
+        if let weight { values[NSNumber(value: weightAxisID)] = NSNumber(value: weight) }
+        for (tag, value) in variations { values[NSNumber(value: AxisTag.identifier(tag))] = NSNumber(value: value) }
+        let axes = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAxesAttribute) as? [[String: Any]] ?? []
+        let defaults = axes.reduce(into: [NSNumber: NSNumber]()) { defaults, axis in
+            guard let identifier = axis[kCTFontVariationAxisIdentifierKey as String] as? NSNumber,
+                  let value = axis[kCTFontVariationAxisDefaultValueKey as String] as? NSNumber else { return }
+            defaults[identifier] = value
+        }
+        let atDefaults = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontVariationAttribute: defaults] as CFDictionary)
+        return CTFontDescriptorCreateCopyWithAttributes(
+            atDefaults, [kCTFontOpticalSizeAttribute: "none", kCTFontVariationAttribute: values] as CFDictionary)
     }
 
     /// A variable face's axes and how far each goes, those the font hides too; none for a static face. Read once per
