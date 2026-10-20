@@ -814,14 +814,7 @@ extension Classification {
     static func of(name: String, faces: [LibraryFace]) -> Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
         let upright = faces.first { !$0.face.isItalic } ?? faces[0]
-        switch upright.face.familyClass {
-        case 1, 2, 3, 4, 5, 7: return .serif
-        case 8: return .sansSerif
-        case 9: return .ornamental
-        case 10: return .script
-        case 12: return .symbol
-        default: break
-        }
+        if let byClass = Classification(familyClass: upright.face.familyClass) { return byClass }
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
@@ -842,6 +835,18 @@ extension Classification {
         if judged.allSatisfy({ $0.letterShape == .monospaced }) { return .monospaced }
         let shapes = judged.map(\.letterShape).filter { $0 != .monospaced }
         return agreed(shapes) ?? agreed(judged.map(\.panose)) ?? .unclassified
+    }
+
+    /// What an OS/2 family class says; nil for one that says nothing Cicero has a classification for.
+    init?(familyClass: Int) {
+        switch familyClass {
+        case 1, 2, 3, 4, 5, 7: self = .serif
+        case 8: self = .sansSerif
+        case 9: self = .ornamental
+        case 10: self = .script
+        case 12: self = .symbol
+        default: return nil
+        }
     }
 
     /// The faces whose letters and PANOSE digits count: the upright ones, or all of them in a family of italics.

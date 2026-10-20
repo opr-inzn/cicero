@@ -107,22 +107,34 @@ public struct Library: Sendable {
         var index: [String: Int] = [:]
         for (position, family) in families.enumerated() { index[family.id] = position }
         self.index = index
-        searchText = families.concurrentMap { family in
-            var words = [family.id, family.manufacturer ?? ""]
-            if family.name != family.id { words.append(family.name) }
-            var seen = Set<String>()
+        search = families.concurrentMap { family in
+            var names = [family.id], others = [family.manufacturer ?? ""]
+            if family.name != family.id { names.append(family.name) }
+            var styles = Set<String>(), credits = Set<String>()
             for face in family.faces.map(\.face) {
-                words.append(face.postScriptName)
-                for word in [face.designer, face.vendorID].compactMap({ $0 }) where seen.insert(word).inserted { words.append(word) }
+                if styles.insert(face.styleName).inserted { names.append(face.styleName) }
+                others.append(face.postScriptName)
+                for word in [face.designer, face.vendorID].compactMap({ $0 }) where credits.insert(word).inserted { others.append(word) }
             }
-            return words.joined(separator: " ").lowercased()
+            return SearchFields(names: names.joined(separator: " ").lowercased(), others: others.joined(separator: " ").lowercased(),
+                                terms: family.searchTerms)
         }
     }
 
     public static let empty = Library(families: [], unreadableFiles: [], activePaths: [], fingerprint: 0)
 
     private let index: [String: Int]
-    private let searchText: [String]
+    private let search: [SearchFields]
+
+    /// What a search looks in for a family, lowercased.
+    private struct SearchFields: Sendable {
+        /// Its names and its styles'.
+        var names: String
+        /// Its foundry, and its styles' PostScript names, designers and vendor IDs.
+        var others: String
+        /// See `Family.searchTerms`.
+        var terms: [String]
+    }
 
     public func family(_ id: String) -> Family? {
         index[id].map { families[$0] }
@@ -130,11 +142,14 @@ public struct Library: Sendable {
 
     public func position(of id: String) -> Int? { index[id] }
 
-    /// Whether a family matches a search: its name (also the one in the Mac's language it shows), foundry, or a style's
-    /// PostScript name, designer or vendor ID contains the (lowercased) query.
-    public func matches(_ family: Family, search lowercasedQuery: String) -> Bool {
-        guard !lowercasedQuery.isEmpty, let position = index[family.id] else { return true }
-        return searchText[position].contains(lowercasedQuery)
+    /// Whether a family matches a search (see `SearchQuery`) by its name (also the one in the Mac's language it shows),
+    /// its styles' names, its foundry, or a style's PostScript name, designer or vendor ID; by what kind of family its
+    /// fonts say it is (see `Family.searchTerms`); or by the app's `note`, other `texts` and `terms` for it, lowercased,
+    /// like its classification and tags. Keywords are looked for in the note too, as in the names.
+    public func matches(_ family: Family, search query: SearchQuery, note: String? = nil, texts: [String] = [], terms: [String] = []) -> Bool {
+        guard !query.isEmpty, let position = index[family.id] else { return true }
+        let fields = search[position]
+        return query.matches(names: note.map { [fields.names, $0] } ?? [fields.names], texts: [fields.others] + texts, terms: fields.terms + terms)
     }
 }
 
