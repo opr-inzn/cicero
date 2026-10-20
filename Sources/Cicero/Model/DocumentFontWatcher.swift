@@ -3,7 +3,7 @@ import CiceroCore
 
 /// Turns on the fonts that documents open in InDesign, Illustrator and Photoshop use, while the app is open. None of
 /// them asks macOS for a font a document uses, so while one of them is in front Cicero asks it, over Apple Events,
-/// every few seconds: InDesign for its documents' fonts, Illustrator and Photoshop for their documents' files, whose
+/// twice a second: InDesign for its documents' fonts, Illustrator and Photoshop for their documents' files, whose
 /// fonts `DocumentFonts` reads. The ones the library has and are off go to `AppSetWatcher`, which keeps them on until
 /// the app quits. InDesign and Illustrator answer while their Missing Fonts dialog is open, and take up the fonts once
 /// it's closed; Photoshop shows none, and takes them up within seconds.
@@ -14,24 +14,38 @@ final class DocumentFontWatcher {
         case photoshop = "com.adobe.Photoshop"
     }
 
+    /// The apps asked which fonts their documents use.
+    static let bundleIDs = Set(App.allCases.map(\.rawValue))
+
     private weak var model: AppModel?
-    private var observer: NSObjectProtocol?
+    private var observers: [NSObjectProtocol] = []
     private var polling: Task<Void, Never>?
+    /// While the screens sleep, no one opens a document, and asking would keep waking the app.
+    private var isAsleep = false
     /// Apps that didn't let Cicero ask them (Automation in Privacy & Security), left alone until Cicero opens again.
     private var refused: Set<App> = []
     /// What each app's documents used when it was asked last, so the same answer isn't matched again.
     private var lastFonts: [App: [DocumentFont]] = [:]
     /// Illustrator and Photoshop files read before → when they were last saved then, and their fonts.
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
-    private static let interval: Duration = .seconds(2)
+    /// Often: asking takes a few milliseconds, and costs the app hardly any time.
+    private static let interval: Duration = .milliseconds(500)
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
         self.model = model
-        observer = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.frontmostChanged() }
+        let changes: [(Notification.Name, asleep: Bool?)] = [
+            (NSWorkspace.didActivateApplicationNotification, nil),
+            (NSWorkspace.screensDidSleepNotification, true),
+            (NSWorkspace.screensDidWakeNotification, false),
+        ]
+        observers = changes.map { name, asleep in
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    if let asleep { self?.isAsleep = asleep }
+                    self?.frontmostChanged()
+                }
+            }
         }
         frontmostChanged()
     }
@@ -46,24 +60,25 @@ final class DocumentFontWatcher {
     private func frontmostChanged() {
         polling?.cancel()
         polling = nil
-        guard let model, model.data.activatesDocumentFonts,
-              let app = NSWorkspace.shared.frontmostApplication?.bundleIdentifier.flatMap(App.init), !refused.contains(app)
+        guard let model, model.data.activatesDocumentFonts, !isAsleep, let running = NSWorkspace.shared.frontmostApplication,
+              let app = running.bundleIdentifier.flatMap(App.init), !refused.contains(app)
         else { return }
         // Matched again each time it comes to the front: the app may have been opened again since.
         lastFonts[app] = nil
+        let pid = running.processIdentifier
         polling = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.ask(app)
-                try? await Task.sleep(for: Self.interval)
+                await self?.ask(app, pid)
+                try? await Task.sleep(for: Self.interval, tolerance: .milliseconds(100))
             }
         }
     }
 
     // MARK: Asking
 
-    private func ask(_ app: App) async {
+    private func ask(_ app: App, _ pid: pid_t) async {
         let answer: [DocumentFont]
-        switch await Self.ask(app) {
+        switch await Self.ask(app, pid) {
         case nil:
             refused.insert(app)
             polling?.cancel()
@@ -110,53 +125,99 @@ final class DocumentFontWatcher {
         case files([String])
     }
 
-    /// The fonts the app's open documents use, or their files; nil when it won't let Cicero ask. Asks off the main
-    /// thread: an app that's busy can take its time to answer.
+    /// The fonts the app's open documents use, or their files; nil when it won't let Cicero ask. Sends the Apple Events
+    /// itself, to the app's process: AppleScript would spend most of the time compiling, and both compiling and running
+    /// a script open an app that has quit. Asks off the main thread: an app that's busy can take its time to answer.
     @concurrent
-    private static func ask(_ app: App) async -> Answer? {
-        switch app {
-        case .inDesign:
-            let target = "tell application id \"\(app.rawValue)\" to get "
-            guard let names = run(target + "PostScript name of fonts of documents"),
-                  let families = run(target + "font family of fonts of documents"),
-                  let styles = run(target + "font style name of fonts of documents")
-            else { return nil }
-            let (n, f, s) = (strings(names), strings(families), strings(styles))
-            guard n.count == f.count, n.count == s.count else { return .fonts([]) }
-            return .fonts(n.indices.map { DocumentFont(postScriptName: n[$0], family: f[$0], style: s[$0]) })
-        case .illustrator, .photoshop:
-            // Unsaved documents have no file, and files are read as last saved.
-            let script = """
-                tell application id "\(app.rawValue)"
-                    set paths to {}
-                    repeat with i from 1 to count documents
-                        try
-                            set end of paths to POSIX path of (file path of document i as alias)
-                        end try
-                    end repeat
-                    return paths
-                end tell
-                """
-            return run(script).map { .files(strings($0)) }
+    private static func ask(_ app: App, _ pid: pid_t) async -> Answer? {
+        let documents = every("docu", of: .null())
+        do {
+            switch app {
+            case .inDesign:
+                // Codes from InDesign itself, which has no dictionary file.
+                let fonts = every("FonT", of: documents)
+                let (n, f, s) = try (
+                    strings(get(property("fPSN", of: fonts), from: pid)),
+                    strings(get(property("fFam", of: fonts), from: pid)),
+                    strings(get(property("fSty", of: fonts), from: pid))
+                )
+                guard n.count == f.count, n.count == s.count else { return .fonts([]) }
+                return .fonts(n.indices.map { DocumentFont(postScriptName: n[$0], family: f[$0], style: s[$0]) })
+            case .illustrator, .photoshop:
+                // Files are read as last saved. Illustrator names an unsaved one like "/Untitled-1".
+                let filePath = app == .illustrator ? "aiFS" : "Dpth"
+                func paths(_ result: NSAppleEventDescriptor) -> [String] {
+                    items(result).compactMap { $0.fileURLValue?.path }.filter { FileManager.default.fileExists(atPath: $0) }
+                }
+                do {
+                    return .files(paths(try get(property(filePath, of: documents), from: pid)))
+                } catch let error as NSError where error.code != errAEEventNotPermitted {
+                    // Photoshop fails them all for one that's unsaved: then each document is asked in turn.
+                    let each = items(try get(documents, from: pid))
+                    return .files(each.flatMap { (try? paths(get(property(filePath, of: $0), from: pid))) ?? [] })
+                }
+            }
+        } catch let error as NSError where error.code == errAEEventNotPermitted {
+            return nil
+        } catch {
+            // Quit, busy for longer than the timeout, or with no documents.
+            return app == .inDesign ? .fonts([]) : .files([])
         }
     }
 
-    /// Runs the script and gives its result: empty when the app isn't open or the script fails, nil only when macOS
-    /// refuses to let Cicero send the app Apple Events. Asks the user first, the first time.
-    nonisolated private static func run(_ source: String) -> NSAppleEventDescriptor? {
-        let script = "with timeout of 10 seconds\n\(source)\nend timeout"
-        var error: NSDictionary?
-        guard let result = NSAppleScript(source: script)?.executeAndReturnError(&error) else {
-            // errAEEventNotPermitted
-            return error?[NSAppleScript.errorNumber] as? Int == -1743 ? nil : NSAppleEventDescriptor.list()
+    /// What the specifier points to, from the app's process, waiting up to 10 s; throws the app's error. macOS asks the
+    /// user first whether Cicero may, the first time.
+    nonisolated private static func get(_ specifier: NSAppleEventDescriptor, from pid: pid_t) throws -> NSAppleEventDescriptor {
+        let event = NSAppleEventDescriptor(
+            eventClass: AEEventClass(kAECoreSuite), eventID: AEEventID(kAEGetData),
+            targetDescriptor: NSAppleEventDescriptor(processIdentifier: pid),
+            returnID: AEReturnID(kAutoGenerateReturnID), transactionID: AETransactionID(kAnyTransactionID)
+        )
+        event.setParam(specifier, forKeyword: keyDirectObject)
+        let reply = try event.sendEvent(options: .defaultOptions, timeout: 10)
+        if let error = reply.paramDescriptor(forKeyword: keyErrorNumber)?.int32Value, error != 0 {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(error))
         }
-        return result
+        return reply.paramDescriptor(forKeyword: keyDirectObject) ?? .list()
     }
 
-    /// The text in a result, in lists in lists too: InDesign gives one list per document.
-    nonisolated private static func strings(_ descriptor: NSAppleEventDescriptor) -> [String] {
-        guard descriptor.descriptorType == typeAEList else { return descriptor.stringValue.map { [$0] } ?? [] }
+    /// `every <class> of <container>`, with the class's code from the app's dictionary.
+    nonisolated private static func every(_ type: String, of container: NSAppleEventDescriptor) -> NSAppleEventDescriptor {
+        var all = DescType(kAEAll)
+        let data = NSAppleEventDescriptor(descriptorType: DescType(typeAbsoluteOrdinal), bytes: &all, length: 4)!
+        return specifier(of: code(type), form: DescType(formAbsolutePosition), data: data, in: container)
+    }
+
+    /// `<property> of <container>`.
+    nonisolated private static func property(_ name: String, of container: NSAppleEventDescriptor) -> NSAppleEventDescriptor {
+        specifier(of: DescType(typeProperty), form: DescType(formPropertyID), data: NSAppleEventDescriptor(typeCode: code(name)), in: container)
+    }
+
+    nonisolated private static func specifier(
+        of type: DescType, form: DescType, data: NSAppleEventDescriptor, in container: NSAppleEventDescriptor
+    ) -> NSAppleEventDescriptor {
+        let record = NSAppleEventDescriptor.record()
+        record.setDescriptor(NSAppleEventDescriptor(typeCode: type), forKeyword: AEKeyword(keyAEDesiredClass))
+        record.setDescriptor(NSAppleEventDescriptor(enumCode: form), forKeyword: AEKeyword(keyAEKeyForm))
+        record.setDescriptor(data, forKeyword: AEKeyword(keyAEKeyData))
+        record.setDescriptor(container, forKeyword: AEKeyword(keyAEContainer))
+        return record.coerce(toDescriptorType: DescType(typeObjectSpecifier))!
+    }
+
+    nonisolated private static func code(_ text: String) -> DescType {
+        text.utf8.reduce(0) { $0 << 8 | DescType($1) }
+    }
+
+    /// The items in a result, in lists in lists too: InDesign gives one list per document.
+    nonisolated private static func items(_ descriptor: NSAppleEventDescriptor) -> [NSAppleEventDescriptor] {
+        guard descriptor.descriptorType == typeAEList else { return [descriptor] }
         guard descriptor.numberOfItems > 0 else { return [] }
-        return (1...descriptor.numberOfItems).flatMap { descriptor.atIndex($0).map(strings) ?? [] }
+        return (1...descriptor.numberOfItems).flatMap { descriptor.atIndex($0).map(items) ?? [] }
+    }
+
+    /// The text of each item, empty for one that has none, such as a font with no style name, so that InDesign's
+    /// lists still line up.
+    nonisolated private static func strings(_ descriptor: NSAppleEventDescriptor) -> [String] {
+        items(descriptor).map { $0.stringValue ?? "" }
     }
 }

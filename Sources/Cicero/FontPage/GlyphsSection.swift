@@ -152,21 +152,30 @@ struct GlyphsSection: View {
         }
     }
 
-    /// A character's name and codes, and a button that copies it; for a feature's glyph, the character's,
-    /// and the feature's name.
+    /// A character's name and codes, and buttons that copy it and its glyph's outline; for a feature's glyph, the
+    /// character's, and the feature's name.
     private func details(_ cell: Cell, style: Style) -> some View {
         VStack(spacing: 10) {
             switch cell {
             case .character(let scalar):
                 character(scalar, style: style, size: 96)
                     .frame(minWidth: 160, minHeight: 130)
+                    .contentShape(.rect)
+                    .onDrag { dragItem(cell, style: style) }
                 Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: scalar)
-                Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(scalar)) }
-                    .help("Copies “\(Self.text(scalar))”")
+                // Stacked: side by side they're wider than the popover.
+                VStack {
+                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
+                        .help("Copies “\(Self.text(scalar))”")
+                    copyVectorButton(cell, style: style)
+                }
+                .buttonStyle(StillPushButtonStyle())
             case .feature(let glyph):
                 GlyphImage(face: style.face, glyph: glyph.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
+                    .contentShape(.rect)
+                    .onDrag { dragItem(cell, style: style) }
                 Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 // "Tabular Figures (tnum)", and "Old-Style Figures (onum)" under it for a tabular old-style figure.
                 Text(zip(glyph.featureNames, glyph.featureTags).map { "\($0) (\($1))" }.joined(separator: "\n"))
@@ -174,37 +183,115 @@ struct GlyphsSection: View {
                 CharacterCodesGrid(scalar: glyph.character)
                 // The glyph has no code of its own: what's copied is the character, which the font draws like this
                 // where the feature is on.
-                Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(glyph.character)) }
-                    .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureNames.formatted(.list(type: .and))) on")
+                VStack {
+                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(glyph.character), shown: Self.shown(glyph.character)) }
+                        .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureNames.formatted(.list(type: .and))) on")
+                    copyVectorButton(cell, style: style)
+                }
+                .buttonStyle(StillPushButtonStyle())
             case .alternate(let alternate):
                 let names = alternate.featureNames.formatted(.list(type: .or))
                 GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
+                    .contentShape(.rect)
+                    .onDrag { dragItem(cell, style: style) }
                 Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 // "Single-storey a (ss07)"
                 Text(zip(alternate.featureNames, alternate.features).map { "\($0) (\($1))" }.joined(separator: "\n"))
                     .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: alternate.character)
-                Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(alternate.character)) }
-                    .help("Copies “\(Self.text(alternate.character))”, which this font draws like this with \(names) on")
+                VStack {
+                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(alternate.character), shown: Self.shown(alternate.character)) }
+                        .help("Copies “\(Self.text(alternate.character))”, which this font draws like this with \(names) on")
+                    copyVectorButton(cell, style: style)
+                }
+                .buttonStyle(StillPushButtonStyle())
             }
         }
         .padding(16)
         .frame(maxWidth: 260)
     }
 
-    /// Copy Character, Copy Unicode and Copy HTML Entity, for a cell's right-click menu: a feature's glyph copies the
-    /// character it's drawn for.
+    /// Copy Character, Copy as Vector, Copy Unicode and Copy HTML Entity, for a cell's right-click menu: a feature's
+    /// glyph copies the character it's drawn for, as text, and its own shape as a vector.
     @ViewBuilder
-    private func copyMenu(_ cell: Cell) -> some View {
-        let scalar = switch cell {
+    private func copyMenu(_ cell: Cell, style: Style) -> some View {
+        let scalar = Self.character(of: cell)
+        Button("Copy Character", systemImage: "doc.on.clipboard") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
+        // Not greyed out for a glyph without an outline: the menus are made with every cell, and the outline isn't.
+        Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(cell, style: style) }
+        Button("Copy Unicode", systemImage: "doc.on.clipboard") { copy(CharacterCodes.unicode(scalar), shown: CharacterCodes.unicode(scalar)) }
+        Button("Copy HTML Entity", systemImage: "doc.on.clipboard") { copy(CharacterCodes.htmlEntity(scalar), shown: CharacterCodes.htmlEntity(scalar)) }
+    }
+
+    /// Copy as Vector, under Copy Character in a glyph's popover.
+    private func copyVectorButton(_ cell: Cell, style: Style) -> some View {
+        Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(cell, style: style) }
+            .disabled(outline(cell, style: style) == nil)
+            .help("Copies the glyph’s outline, to paste into a design app as a shape you can edit, or as SVG code")
+    }
+
+    /// Puts text on the clipboard, closes the popover and says what was copied, at the bottom of the window, as when
+    /// fonts are turned on: "“g” copied to clipboard".
+    private func copy(_ text: String, shown: String) {
+        Self.copy(text)
+        popover = nil
+        model.showToast("\(shown) copied to clipboard")
+    }
+
+    /// The glyph's outline, as for text; a beep for a glyph without one.
+    private func copyVector(_ cell: Cell, style: Style) {
+        guard let outline = outline(cell, style: style) else { return NSSound.beep() }
+        GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell))
+        popover = nil
+        model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
+    }
+
+    /// A character as a toast names it: in quotes, a mark on a dotted circle, as it has nothing to sit on, and one you
+    /// can't see, like a space, by its name.
+    static func shown(_ scalar: UInt32) -> String {
+        guard let character = Unicode.Scalar(scalar) else { return CharacterCodes.unicode(scalar) }
+        switch character.properties.generalCategory {
+        case .spaceSeparator, .lineSeparator, .paragraphSeparator, .control, .format:
+            return GlyphSection.name(of: scalar)?.capitalized ?? CharacterCodes.unicode(scalar)
+        case .nonspacingMark, .enclosingMark, .spacingMark:
+            return "“\u{25CC}\(Character(character))”"
+        default:
+            return "“\(Character(character))”"
+        }
+    }
+
+    private static func character(of cell: Cell) -> UInt32 {
+        switch cell {
         case .character(let scalar): scalar
         case .feature(let glyph): glyph.character
         case .alternate(let alternate): alternate.character
         }
-        Button("Copy Character", systemImage: "doc.on.clipboard") { Self.copy(Self.text(scalar)) }
-        Button("Copy Unicode", systemImage: "doc.on.clipboard") { Self.copy(CharacterCodes.unicode(scalar)) }
-        Button("Copy HTML Entity", systemImage: "doc.on.clipboard") { Self.copy(CharacterCodes.htmlEntity(scalar)) }
+    }
+
+    /// The cell's glyph as a vector, in the page's style: the one the cell shows.
+    private func outline(_ cell: Cell, style: Style) -> GlyphOutline? {
+        let glyph = switch cell {
+        case .character(let scalar): GlyphVectors.glyph(of: scalar, in: GlyphVectors.font(style.face, weight: style.weight, variations: style.variations))
+        case .feature(let glyph): Optional(glyph.glyph)
+        case .alternate(let alternate): Optional(alternate.glyph)
+        }
+        return GlyphVectors.outline(glyph, face: style.face, weight: style.weight, variations: style.variations)
+    }
+
+    /// The cell's glyph as an SVG file, named after the style and the glyph.
+    private func dragItem(_ cell: Cell, style: Style) -> NSItemProvider {
+        GlyphVectors.dragItem(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
+    }
+
+    /// What a glyph's file is called after when the font doesn't name the glyph: its character's code, and the feature
+    /// that draws it, as in "Inter Regular U+0061.ss01.svg".
+    private static func fileFallback(_ cell: Cell) -> String {
+        switch cell {
+        case .character(let scalar): CharacterCodes.unicode(scalar)
+        case .feature(let glyph): "\(CharacterCodes.unicode(glyph.character)).\(glyph.feature)"
+        case .alternate(let alternate): "\(CharacterCodes.unicode(alternate.character)).\(alternate.features.first ?? "alt")"
+        }
     }
 
     /// Puts text on the clipboard, as plain text.
@@ -238,17 +325,19 @@ struct GlyphsSection: View {
         }
         .contentShape(.rect)
         .onTapGesture { popover = cell }
+        // Out of the page as an SVG file, or into a design app as a vector.
+        .onDrag { dragItem(cell, style: style) }
         // VoiceOver opens the popover as a click does.
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { popover = cell }
-        .contextMenu { copyMenu(cell) }
+        .contextMenu { copyMenu(cell, style: style) }
     }
 
     /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
     /// its outline instead: set on its own it has nothing to sit on and showed nothing.
     @ViewBuilder
     private func character(_ scalar: UInt32, style: Style, size: CGFloat) -> some View {
-        if Self.isCombining(scalar), let glyph = Self.glyph(of: scalar, in: FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)) {
+        if Self.isCombining(scalar), let glyph = GlyphVectors.glyph(of: scalar, in: FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)) {
             GlyphImage(face: style.face, glyph: glyph, size: size, weight: style.weight, variations: style.variations)
         } else {
             FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: style.face, size: size, weight: style.weight,
@@ -261,15 +350,6 @@ struct GlyphsSection: View {
         case .nonspacingMark, .enclosingMark: true
         default: false
         }
-    }
-
-    /// The glyph the font maps a character to, if it has one.
-    private static func glyph(of scalar: UInt32, in font: CTFont) -> CGGlyph? {
-        guard let character = Unicode.Scalar(scalar) else { return nil }
-        var units = Array(String(Character(character)).utf16)
-        var glyphs = [CGGlyph](repeating: 0, count: units.count)
-        guard CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count), glyphs[0] != 0 else { return nil }
-        return glyphs[0]
     }
 
     /// What's typed into the filter: a character, part of its Unicode name or a feature's, a U+ code or a feature's tag.

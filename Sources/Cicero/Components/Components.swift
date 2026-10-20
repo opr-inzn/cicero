@@ -442,6 +442,28 @@ struct StillButtonStyle: ButtonStyle {
     }
 }
 
+/// A push button the same as the default one, to the pixel on macOS 26, in light and dark, that stays the same while
+/// it's held down rather than darkening. Greyed out within a point or two of the default one.
+struct StillPushButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        StillPushButton(label: configuration.label)
+    }
+
+    private struct StillPushButton: View {
+        let label: Configuration.Label
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            label
+                .foregroundStyle(isEnabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 26)
+                .background(isEnabled ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: .rect(cornerRadius: 6))
+                .contentShape(.rect(cornerRadius: 6))
+        }
+    }
+}
+
 /// A borderless + or − under a list, as in System Settings. The default button style gives each
 /// a glass capsule on macOS 26, narrower when disabled.
 struct ListEditButton: View {
