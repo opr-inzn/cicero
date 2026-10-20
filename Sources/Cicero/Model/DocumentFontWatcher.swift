@@ -1,9 +1,10 @@
 import AppKit
 import CiceroCore
+import Synchronization
 
 /// Turns on the fonts that documents open in InDesign, Illustrator and Photoshop use, while the app is open. None of
 /// them asks macOS for a font a document uses, so while one of them is in front Cicero asks it, over Apple Events,
-/// every few seconds: InDesign for its documents' fonts, Illustrator and Photoshop for their documents' files, whose
+/// twice a second: InDesign for its documents' fonts, Illustrator and Photoshop for their documents' files, whose
 /// fonts `DocumentFonts` reads. The ones the library has and are off go to `AppSetWatcher`, which keeps them on until
 /// the app quits. InDesign and Illustrator answer while their Missing Fonts dialog is open, and take up the fonts once
 /// it's closed; Photoshop shows none, and takes them up within seconds.
@@ -23,7 +24,8 @@ final class DocumentFontWatcher {
     private var lastFonts: [App: [DocumentFont]] = [:]
     /// Illustrator and Photoshop files read before → when they were last saved then, and their fonts.
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
-    private static let interval: Duration = .seconds(2)
+    /// Often: once an app's script is compiled, asking takes a few milliseconds.
+    private static let interval: Duration = .milliseconds(500)
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
@@ -116,41 +118,67 @@ final class DocumentFontWatcher {
     private static func ask(_ app: App) async -> Answer? {
         switch app {
         case .inDesign:
-            let target = "tell application id \"\(app.rawValue)\" to get "
-            guard let names = run(target + "PostScript name of fonts of documents"),
-                  let families = run(target + "font family of fonts of documents"),
-                  let styles = run(target + "font style name of fonts of documents")
+            guard let lists = run(app, { result in (1...3).map { strings(result.atIndex($0) ?? .list()) } })
             else { return nil }
-            let (n, f, s) = (strings(names), strings(families), strings(styles))
+            let (n, f, s) = (lists[0], lists[1], lists[2])
             guard n.count == f.count, n.count == s.count else { return .fonts([]) }
             return .fonts(n.indices.map { DocumentFont(postScriptName: n[$0], family: f[$0], style: s[$0]) })
         case .illustrator, .photoshop:
-            // Unsaved documents have no file, and files are read as last saved.
-            let script = """
-                tell application id "\(app.rawValue)"
-                    set paths to {}
-                    repeat with i from 1 to count documents
-                        try
-                            set end of paths to POSIX path of (file path of document i as alias)
-                        end try
-                    end repeat
-                    return paths
-                end tell
-                """
-            return run(script).map { .files(strings($0)) }
+            return run(app, strings).map { .files($0) }
         }
     }
 
-    /// Runs the script and gives its result: empty when the app isn't open or the script fails, nil only when macOS
-    /// refuses to let Cicero send the app Apple Events. Asks the user first, the first time.
-    nonisolated private static func run(_ source: String) -> NSAppleEventDescriptor? {
-        let script = "with timeout of 10 seconds\n\(source)\nend timeout"
-        var error: NSDictionary?
-        guard let result = NSAppleScript(source: script)?.executeAndReturnError(&error) else {
-            // errAEEventNotPermitted
-            return error?[NSAppleScript.errorNumber] as? Int == -1743 ? nil : NSAppleEventDescriptor.list()
+    /// What the app is asked, only while it's open: telling an app that has quit opens it again.
+    nonisolated private static func source(_ app: App) -> String {
+        let ask = switch app {
+        case .inDesign:
+            // One list per document in each.
+            "return {PostScript name of fonts of documents, font family of fonts of documents, font style name of fonts of documents}"
+        case .illustrator, .photoshop:
+            // Unsaved documents have no file, and files are read as last saved.
+            """
+            set paths to {}
+            repeat with i from 1 to count documents
+                try
+                    set end of paths to POSIX path of (file path of document i as alias)
+                end try
+            end repeat
+            return paths
+            """
         }
-        return result
+        return """
+            if application id "\(app.rawValue)" is running then
+                tell application id "\(app.rawValue)"
+                    \(ask)
+                end tell
+            end if
+            return {}
+            """
+    }
+
+    /// Each app's script, kept once it has run: compiling it takes most of the time asking does. One runs at a time.
+    nonisolated private static let scripts = Mutex<[App: NSAppleScript]>([:])
+
+    /// Runs the app's script and reads its result: read from an empty list when the app isn't open or the script
+    /// fails, nil only when macOS refuses to let Cicero send the app Apple Events. Asks the user first, the first time.
+    nonisolated private static func run<Result: Sendable>(_ app: App, _ read: (NSAppleEventDescriptor) -> Result) -> Result? {
+        // Compiling a script for an app that isn't open opens it too, to look up its words.
+        guard !NSRunningApplication.runningApplications(withBundleIdentifier: app.rawValue).isEmpty else { return read(.list()) }
+        return scripts.withLock { scripts in
+            guard let script = scripts[app] ?? NSAppleScript(source: "with timeout of 10 seconds\n\(source(app))\nend timeout")
+            else { return read(.list()) }
+            var error: NSDictionary?
+            // Fails with an error rather than a result, though Swift sees one either way.
+            let result = script.executeAndReturnError(&error)
+            if let error {
+                // Compiled again next time, in case the app quit.
+                scripts[app] = nil
+                // errAEEventNotPermitted
+                return error[NSAppleScript.errorNumber] as? Int == -1743 ? nil : read(.list())
+            }
+            scripts[app] = script
+            return read(result)
+        }
     }
 
     /// The text in a result, in lists in lists too: InDesign gives one list per document.

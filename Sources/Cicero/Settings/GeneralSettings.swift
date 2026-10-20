@@ -77,7 +77,7 @@ struct GeneralSettings: View {
                         Tag(text: "BETA", tint: .orange)
                             .help("New, and still being tried out with each app")
                     }
-                    Text("When a document open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero activates them until the app quits. macOS asks once whether Cicero may ask each app.")
+                    Text("When a document open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero activates them until the app quits. It can take a few seconds, and you’ll still see the Missing Fonts dialog as the document opens. macOS asks once whether Cicero may ask each app.")
                 }
                 .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
             }

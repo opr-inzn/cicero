@@ -202,8 +202,8 @@ Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrato
 
 You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same blue **App Set** tag.
 
-- Cicero asks the app in front, every few seconds, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, Illustrator or Photoshop; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
-- The app’s Missing Fonts dialog may still come up while Cicero turns the fonts on. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts. Photoshop shows none: its text layers look as they did when saved, and use the fonts once you edit them.
+- Cicero asks the app in front, twice a second, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, Illustrator or Photoshop; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
+- The app’s Missing Fonts dialog still comes up as the document opens, since Cicero can only ask about a document once it’s open. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts. Photoshop shows none: its text layers look as they did when saved, and use the fonts once you edit them. Either way, the app can take a few seconds to take up the fonts.
 - Illustrator and Photoshop say which files their documents are, and Cicero reads their fonts from the file as last saved, so a document you haven’t saved yet isn’t covered, nor text in a Photoshop smart object.
 - If you turn one of those fonts off while the app is open, Cicero leaves it off until the app quits.
 
