@@ -234,8 +234,8 @@ public struct ActivationEngine: Sendable {
 
     /// Copies into ~/Library/Fonts, or into the family's folder in the Font Library (see `installsIntoFontLibrary`), or
     /// registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`, files in `movable` (ones the user
-    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied; going into the Font
-    /// Library, so are files from Cicero's Deactivated folder, which only keeps fonts while they're off. Faces from
+    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. Files from Cicero's
+    /// Deactivated folder, which only keeps fonts while they're off, are always moved, whatever `method` is. Faces from
     /// app-only folders and from the Font Library are always registered in place, the former after going back into
     /// the folder if Cicero moved them out; faces in a Fonts folder that macOS has off are turned on there.
     /// Temporarily active faces are made permanent.
@@ -270,7 +270,7 @@ public struct ActivationEngine: Sendable {
                 }
             } else if isInsideFontsFolder(path) {
                 toRegister.append((path, false))
-            } else if face.app != nil || method == .inPlace || isInFontLibrary(path) {
+            } else if face.app != nil || method == .inPlace && !isInDeactivatedFolder(path) || isInFontLibrary(path) {
                 toRegister.append((path, true))
             } else {
                 toCopy.append((path, face.face.familyName))
@@ -301,11 +301,15 @@ public struct ActivationEngine: Sendable {
         let done = Set(targets.map(\.face.path)).subtracting(failed)
         let message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count,
                                    done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed)))
-        removeOriginals(of: installed.filter { copy in
+        let removed = removeOriginals(of: installed.filter { copy in
             method == .move && movable.contains(copy.source)
-                || isInFontLibrary(copy.destination) && isInDeactivatedFolder(copy.source)
+                || isInDeactivatedFolder(copy.source)
                     && !records.installedCopies.contains { $0.key != copy.destination && $0.value == copy.source }
         })
+        // Back in ~/Library/Fonts, a file from the Deactivated folder is the user's own again, no copy of anything.
+        for copy in removed where isInDeactivatedFolder(copy.source) && !isInFontLibrary(copy.destination) {
+            records.installedCopies[copy.destination] = nil
+        }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
@@ -357,10 +361,12 @@ public struct ActivationEngine: Sendable {
 
     /// Finishes moving files whose copies are on: deletes each original whose copy has the same contents. The folders
     /// they were in stay, whatever is left in them. An original that can't go, on a disk that's read only say, stays, as
-    /// a copy's would.
-    private func removeOriginals(of copies: [PlacedCopy]) {
-        for copy in copies where !Self.isProtected(copy.source) && Self.isIdenticalCopy(copy.destination, of: copy.source) {
-            try? FileManager.default.removeItem(atPath: copy.source)
+    /// a copy's would. Returns the copies whose originals went.
+    @discardableResult
+    private func removeOriginals(of copies: [PlacedCopy]) -> [PlacedCopy] {
+        copies.filter { copy in
+            !Self.isProtected(copy.source) && Self.isIdenticalCopy(copy.destination, of: copy.source)
+                && (try? FileManager.default.removeItem(atPath: copy.source)) != nil
         }
     }
 
@@ -432,9 +438,9 @@ public struct ActivationEngine: Sendable {
         return result
     }
 
-    /// Turns copies back on as they were: in place, until Cicero quits, or installed again from the file
-    /// that went to the Deactivated folder, or (when it went to the Trash, being the same as its original)
-    /// from its original.
+    /// Turns copies back on as they were: in place, until Cicero quits, or back into ~/Library/Fonts from the
+    /// Deactivated folder, or (when it went to the Trash, being the same as its original) installed again from
+    /// its original.
     private func restore(_ faces: [LibraryFace], origins: [String: String], moved: [String: String], records: ActivationRecords) async -> ActivationResult {
         var inPlace: [LibraryFace] = [], temporary: [LibraryFace] = [], copies: [LibraryFace] = []
         var failed: [String] = []
@@ -777,6 +783,25 @@ public struct ActivationEngine: Sendable {
             for path in leftovers { records.temporary[path] = nil }
         }
         return records
+    }
+
+    /// At launch: turning a font on used to leave its file in the Deactivated folder, as the original of the copy that
+    /// went into ~/Library/Fonts or the Font Library. The copy is the font now, so the file goes, once the copy has the
+    /// same contents and it's the original of no other copy, as `activate` does it now; in ~/Library/Fonts, the copy
+    /// is the user's own again. Returns how many files went.
+    @concurrent
+    public func tidyDeactivatedFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, removed: Int) {
+        var records = records
+        var removed = 0
+        let copiesOf = Dictionary(grouping: records.installedCopies.values, by: { $0 }).mapValues(\.count)
+        for (copy, original) in records.installedCopies where isInDeactivatedFolder(original) && copiesOf[original] == 1 {
+            guard isInsideUserFonts(copy) || isInFontLibrary(copy), Self.isIdenticalCopy(copy, of: original),
+                  (try? FileManager.default.removeItem(atPath: original)) != nil
+            else { continue }
+            if !isInFontLibrary(copy) { records.installedCopies[copy] = nil }
+            removed += 1
+        }
+        return (records, removed)
     }
 
     /// At quit: unregisters "until Cicero quits" activations synchronously.

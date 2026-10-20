@@ -2,6 +2,11 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Turning on a font Cicero had moved to its Deactivated folder moves its file back into your Fonts folder, also when Cicero copies fonts or uses them where they are. It used to copy the file there and keep it in the Deactivated folder as well, so the font still showed up there while it was on. Fonts left like that leave the Deactivated folder the next time Cicero opens.
+- The Deactivated folder is no longer in the sidebar. Its fonts are off, so they’re under **Inactive**.
+
 ## 1.8
 
 - A font page’s **Glyphs** can give you a glyph’s shape, not only its character. **Copy as Vector**, in a glyph’s popover and its right-click menu, copies its outline in the style, weight and axes the page shows, to paste into a design app as a shape you can edit, or as SVG code. Drag a glyph out of the page to put it into a design app, or into the Finder as an SVG file. That works for alternates, the glyphs features draw and ligatures too, whose shapes **Copy Character** can’t take along.

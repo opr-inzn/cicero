@@ -328,7 +328,7 @@ private struct SidebarContent: View {
             if let folder = model.folder(id) {
                 renameFolder(id)
                 Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
-                if id != WatchedFolder.deactivatedID && id != WatchedFolder.fontLibraryID {
+                if id != WatchedFolder.fontLibraryID {
                     Divider()
                     FolderActivationPicker(folder: folder) {
                         model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }

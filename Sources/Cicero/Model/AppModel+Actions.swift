@@ -415,9 +415,8 @@ extension AppModel {
         data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
-    /// The user's folder, or Cicero's Deactivated folder or Font Library, with the name the user gave it.
+    /// The user's folder, or Cicero's Font Library, with the name the user gave it.
     func folder(_ id: UUID) -> WatchedFolder? {
-        if id == WatchedFolder.deactivatedID { return data.named(WatchedFolder(id: id, path: locations.deactivated.path)) }
         if id == WatchedFolder.fontLibraryID { return data.fontLibrary.map(data.named) }
         return data.folders.first { $0.id == id }.map(data.named)
     }
@@ -658,9 +657,7 @@ extension AppModel {
             if ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID), let fontLibrary = data.fontLibrary {
                 folders.append(fontLibrary)
             }
-            if ownFoldersWithFonts.contains(WatchedFolder.deactivatedID) {
-                folders.append(WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path))
-            }
+            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
