@@ -251,6 +251,8 @@ final class AppModel {
     @ObservationIgnored var similarCache: (key: SimilarKey, table: SimilarFonts)?
     /// What the sidebar had selected before Show Similar Fonts, to go back to.
     @ObservationIgnored var similarReturn: Set<SidebarItem>?
+    /// The font page open before Show Similar Fonts, to go back to.
+    @ObservationIgnored var similarReturnPage: String?
     /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
 

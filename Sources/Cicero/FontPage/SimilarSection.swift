@@ -1,34 +1,38 @@
 import CiceroCore
 import SwiftUI
 
-/// The families that look most like the page's, each set in itself, under the styles: a click opens one's page,
-/// Show All fills the browser with more of them. Left out for a family Cicero can't measure, like one without
-/// Latin letters.
+/// The families that look most like the page's, each its name set in itself, under the styles and titled as they are:
+/// a click opens one's page, Show More lists as many as Show Similar Fonts does, right there. Left out for a family
+/// Cicero can't measure, like one without Latin letters.
 struct SimilarSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
 
-    /// How many the page shows.
+    /// How many the page shows, until Show More shows `AppModel.similarListed`.
     static let shown = 6
+    /// Whether Show More was chosen; kept for every page from then on.
+    @AppStorage("fontPage.similarShowsMore") private var showsMore = false
 
     var body: some View {
         if model.canShowSimilar(family) {
-            let similar = model.similarFamilies(to: family, limit: Self.shown)
+            let similar = model.similarFamilies(to: family, limit: AppModel.similarListed)
             if !similar.isEmpty {
-                VStack(spacing: 0) {
-                    header
-                    ForEach(similar) { other in
-                        row(other)
+                VStack(alignment: .leading, spacing: 0) {
+                    header(all: similar.count)
+                    ForEach(similar.prefix(showsMore ? similar.count : Self.shown)) { other in
                         Divider()
+                        row(other)
                     }
+                    Divider()
                 }
                 .padding(.horizontal, 24)
             }
         } else if model.measurementProgress != nil {
             // Measuring the library's letters, the first time: quietly, as it takes a moment.
             VStack(alignment: .leading, spacing: 0) {
-                header
+                header(all: 0)
+                Divider()
                 Text("Comparing this family’s letters with the others’")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -38,18 +42,23 @@ struct SimilarSection: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text("Similar").font(.title2.weight(.semibold))
-            Spacer()
-            if model.canShowSimilar(family) {
-                Button("Show All") { model.showSimilar(to: family) }
-                    .help("Show the \(AppModel.similarListed) families that look most like \(family.name), the closest first")
+    /// Like the styles' title above, with Show More at the end when there are more than `shown` of `all`.
+    private func header(all: Int) -> some View {
+        Text("Similar")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+            // Over the title's row rather than in it, so that it's as high as the styles'.
+            .overlay(alignment: .trailing) {
+                if all > Self.shown {
+                    Button(showsMore ? "Show Less" : "Show More") { showsMore.toggle() }
+                        .controlSize(.small)
+                        .help(showsMore ? "Show the \(Self.shown) closest" : "Show the \(all) families that look most like \(family.name)")
+                }
             }
-        }
-        // As far from the styles above as the glyphs' title is from this.
-        .padding(.top, 56)
-        .padding(.bottom, 8)
+            // As far from the styles above as the glyphs' title is from this.
+            .padding(.top, 50)
     }
 
     private func row(_ other: Family) -> some View {
@@ -58,20 +67,12 @@ struct SimilarSection: View {
         return Button {
             model.openFamilyID = other.id
         } label: {
-            HStack(spacing: 12) {
-                FontText(text: preview.text(for: other), face: face, size: 20, weight: preview.weight, features: model.features(for: other))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(other.name)
-                    .lineLimit(1)
-                    .frame(width: 220, alignment: .leading)
-                Text(foundry ?? "")
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(width: 180, alignment: .leading)
-            }
-            // One height for every row, whatever each font's line spacing; tall glyphs reach past it, never cut off.
-            .frame(height: 44)
-            .contentShape(.rect)
+            // Its name, whatever the preview text, so that the row says which family it is.
+            FontText(text: other.name, face: face, size: 20, weight: preview.weight, features: model.features(for: other))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // One height for every row, whatever each font's line spacing; tall glyphs reach past it, never cut off.
+                .frame(height: 44)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityLabel([other.name, foundry].compactMap { $0 }.joined(separator: ", "))
