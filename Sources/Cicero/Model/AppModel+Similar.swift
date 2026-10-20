@@ -46,7 +46,10 @@ extension AppModel {
     /// Fills the browser with the family and the families that look most like it, the closest first, the way a
     /// search does: the sidebar shows nothing selected, and selecting an item there goes back to it.
     func showSimilar(to family: Family) {
-        if similarFamilyID == nil { similarReturn = selectedItems }
+        if similarFamilyID == nil {
+            similarReturn = selectedItems
+            similarReturnPage = openFamilyID
+        }
         searchText = ""
         selection = nil
         similarFamilyID = family.id
@@ -55,11 +58,14 @@ extension AppModel {
         jumpTargets = [family.id]
     }
 
-    /// Back to what the sidebar had selected before, with the family selected there.
+    /// Back to what the sidebar had selected before, with the family selected there, and to the font page it was
+    /// asked for from, if any.
     func endSimilar() {
         guard let id = similarFamilyID else { return }
         let items = similarReturn ?? [.all]
+        let page = similarReturnPage
         similarReturn = nil
+        similarReturnPage = nil
         selectSidebarItems(items.isEmpty ? [.all] : items)
         if selection == nil { selection = .all }
         similarFamilyID = nil
@@ -67,5 +73,6 @@ extension AppModel {
             selectedIDs = [id]
             jumpTargets = [id]
         }
+        if let page, library.family(page) != nil { openFamilyID = page }
     }
 }
