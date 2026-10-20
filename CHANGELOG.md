@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.9
 
 - Right-click a family and choose **Show Similar Fonts** to see the 12 families in your library that look most like it, the closest first, in place of the sidebar item’s; **Done** goes back. A font page shows the six closest under **Similar**. Cicero measures the letters of each family on your Mac, the first time in a few seconds for a thousand families: how tall the lowercase is, how heavy and how contrasted the strokes are and at what angle, how wide, spaced, slanted and open the letters are, the serifs, the o’s roundness, and the a’s and g’s stories, and looks at them with a model that has learned what letters of a kind look like. A text cut lists other text cuts before display ones, its own display cut among them, and a display cut the other way round. Copies of one design, like a trial, a variable font or a family for each weight, are listed once, the closest of them.
 - Cicero guesses the classification of fonts whose files don’t say from the shapes of their letters, on your Mac, so scripts, display and decorative fonts, italics and variable fonts that stayed Unclassified go where they belong. A guess from the name by Apple Intelligence still comes first, when it has one, and the Info panel says which it is. The first time Cicero opens, it asks whether to classify your fonts automatically; **Classify fonts automatically** in **Settings → General** turns it on and off.
