@@ -1,4 +1,3 @@
-import CoreText
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
@@ -179,7 +178,7 @@ public struct GlyphSection: Identifiable, Sendable {
 
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order: in code point
     /// order within a group, but accented letters by the letter they're made from. Characters `isEmpty` says the font
-    /// draws nothing for are left out, like spaces (see `EmptyGlyphs`). Limits very large fonts to a sensible number of
+    /// draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very large fonts to a sensible number of
     /// characters from each Unicode block.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [],
                                 leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
@@ -282,39 +281,5 @@ public struct GlyphSection: Identifiable, Sendable {
         }
         guard low > 0, blocks[low - 1].range.contains(scalar) else { return nil }
         return blocks[low - 1].name
-    }
-}
-
-/// A font's glyphs that draw nothing, which the glyph grid leaves out as it does spaces: the empty ones a trial font
-/// keeps for the characters it leaves out, say, or an invisible character's. Empty means without an outline or bounds
-/// of its own; an emoji's bitmap has bounds but no outline. None are in a font that draws in colour from layers or
-/// SVG, whose glyphs can have an empty outline of their own and still draw.
-public struct EmptyGlyphs {
-    private let font: CTFont
-    private let inColour: Bool
-
-    public init(font: CTFont) {
-        self.font = font
-        inColour = ["COLR", "SVG ", "CBDT"].contains { name in
-            CTFontCopyTable(font, name.utf8.reduce(0) { $0 << 8 | CTFontTableTag($1) }, []) != nil
-        }
-    }
-
-    public func contains(_ glyph: CGGlyph) -> Bool {
-        guard !inColour else { return false }
-        var glyph = glyph
-        var bounds = CGRect.zero
-        CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyph, &bounds, 1)
-        guard bounds.isEmpty else { return false }
-        return CTFontCreatePathForGlyph(font, glyph, nil)?.isEmpty ?? true
-    }
-
-    /// Whether the glyph the font gives a character draws nothing; not when it has none for it.
-    public func contains(character scalar: UInt32) -> Bool {
-        guard let character = Unicode.Scalar(scalar) else { return false }
-        var units = Array(String(Character(character)).utf16)
-        var glyphs = [CGGlyph](repeating: 0, count: units.count)
-        guard CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count) else { return false }
-        return contains(glyphs[0])
     }
 }

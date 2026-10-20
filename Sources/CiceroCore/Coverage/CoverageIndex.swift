@@ -45,6 +45,8 @@ public struct FaceCoverage: Sendable {
 /// stamp, and answers lookups from any thread.
 public final class CoverageIndex: Sendable {
     private let file: URL
+    /// The cache of the version before, which goes.
+    private let oldFile: URL
     private let languages: LanguageCatalog
     private let state = Mutex(State())
     /// Writes the cache one save at a time, after `update` has returned.
@@ -62,7 +64,9 @@ public final class CoverageIndex: Sendable {
     }
 
     public init(caches: URL, languages: LanguageCatalog) {
-        file = caches.appendingPathComponent("coverage-v2.plist", isDirectory: false)
+        // v3 leaves out characters whose glyphs draw nothing.
+        file = caches.appendingPathComponent("coverage-v3.plist", isDirectory: false)
+        oldFile = caches.appendingPathComponent("coverage-v2.plist", isDirectory: false)
         self.languages = languages
     }
 
@@ -146,14 +150,15 @@ public final class CoverageIndex: Sendable {
         return FaceCoverage(scalars: scalars, order: languages.order, bits: languages.support(in: scalars))
     }
 
-    /// The scalars the face's file says it covers; an installed font of the same name when the
-    /// file can't be read, and nothing when neither exists.
+    /// The scalars the face's file says it covers, but those whose glyphs draw nothing, like a trial font's empty
+    /// ones (see `EmptyGlyphs`); an installed font of the same name when the file can't be read, and nothing when
+    /// neither exists.
     static func scalars(of face: FontFace) -> ScalarRanges {
         let descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         guard CTFontCopyPostScriptName(font) as String == face.postScriptName else { return .empty }
-        return ScalarRanges(characterSet: CTFontCopyCharacterSet(font))
+        return EmptyGlyphs(font: font).drawn(ScalarRanges(characterSet: CTFontCopyCharacterSet(font)))
     }
 
     // MARK: - Disk cache
@@ -162,6 +167,7 @@ public final class CoverageIndex: Sendable {
         state.withLock { state in
             guard !state.loaded else { return }
             state.loaded = true
+            try? FileManager.default.removeItem(at: oldFile)
             guard let data = try? Data(contentsOf: file),
                   let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
                   cache.language == languages.dataVersion

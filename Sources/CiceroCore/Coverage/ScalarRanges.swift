@@ -137,6 +137,22 @@ public struct ScalarRanges: Sendable, Equatable {
         }
     }
 
+    /// The scalars `isIncluded` keeps.
+    public func filter(_ isIncluded: (UInt32) -> Bool) -> ScalarRanges {
+        var kept: [UInt32] = []
+        for i in stride(from: 0, to: bounds.count, by: 2) {
+            for scalar in bounds[i]...bounds[i + 1] where isIncluded(scalar) {
+                if let last = kept.last, last + 1 == scalar {
+                    kept[kept.count - 1] = scalar
+                } else {
+                    kept.append(scalar)
+                    kept.append(scalar)
+                }
+            }
+        }
+        return ScalarRanges(bounds: kept)
+    }
+
     /// Every covered scalar, in order.
     public var scalars: [UInt32] {
         var all: [UInt32] = []

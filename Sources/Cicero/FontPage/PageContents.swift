@@ -129,7 +129,9 @@ final class PageContents {
             let left = group.ligatures.filter { !empty.contains($0.glyph) }
             return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
         }
-        return PageContent(ligatures: drawn, glyphs: GlyphSection.sections(for: scalars, features: featureGlyphs, leavingOut: empty.contains(character:)),
-                           alternates: listed, font: font)
+        // The coverage has only the characters the font draws, and those with nothing to draw that it has.
+        let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
+                                             leavingOut: { EmptyGlyphs.isInvisible($0) && empty.contains(character: $0) })
+        return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font)
     }
 }
