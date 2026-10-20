@@ -271,13 +271,13 @@ struct VariableTag: View {
         }
     }
 
-    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in the order the fonts give them.
+    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in `AxisOrder`.
     private var help: String {
-        var names: [String] = []
+        var axes: [VariationAxis] = []
         for face in family.faces {
-            for axis in face.face.axes where !names.contains(axis.name) { names.append(axis.name) }
+            for axis in face.face.axes where !axes.contains(where: { $0.name == axis.name }) { axes.append(axis) }
         }
-        return names.isEmpty ? "Variable" : "Variable: " + names.joined(separator: ", ")
+        return axes.isEmpty ? "Variable" : "Variable: " + AxisOrder.sorted(axes, by: \.tag).map(\.name).joined(separator: ", ")
     }
 }
 

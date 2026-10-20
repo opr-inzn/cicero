@@ -152,7 +152,7 @@ A variable font is drawn from its design axes, like **Weight**, **Width**, **Opt
 2. Click **Axes**.
 3. Drag a slider, or type a value next to it.
 
-Each axis shows its name and its four-letter tag, like `wdth`. **Reset All** puts them all back. **Optical Size** stays at the font’s own, like every other axis, rather than following the size of the text, until you move it. Axes the font asks apps not to show, like Roboto Flex’s parametric ones, are listed last, under **Hidden Axes**: click it to show or hide them. Cicero remembers whether they’re shown.
+Each axis shows its name and its four-letter tag, like `wdth`. **Weight**, **Width**, **Italic**, **Slant** and **Optical Size** come first, in that order, then the font’s other axes. **Reset All** puts them all back. **Optical Size** stays at the font’s own, like every other axis, rather than following the size of the text, until you move it. Axes the font asks apps not to show, like Roboto Flex’s parametric ones, are listed last, under **Hidden Axes**: click it to show or hide them. Cicero remembers whether they’re shown.
 
 Like features, the axes apply to that family wherever Cicero previews it, in the list, grid, specimens, Quick Look and its font page, text and glyphs alike, until Cicero quits. Choosing a style on the font page puts them back.
 

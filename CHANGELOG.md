@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Cicero checks for updates each time it opens, as well as once a day while it stays open. It used to check only once a day, counted from its last check, so a new version could take up to a day to show up.
 - Moving **Optical Size** in the Axes tab changes the text again once **Weight** has been moved as well. The letters could stay at the font’s default optical size, whatever the slider said.
 - A variable font’s styles that have an optical size of their own, like Text or Display styles, are drawn at it in previews and on the font page. They were drawn at the font’s default optical size.
+- The Axes tab lists **Weight**, **Width**, **Italic**, **Slant** and **Optical Size** first, in that order, then the font’s other axes, so they no longer move around from one family to the next. The **Variable** tag lists them the same way when you hold the pointer over it.
 
 ## 1.8.1
 
