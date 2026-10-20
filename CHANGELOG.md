@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Cicero checks for updates each time it opens, as well as once a day while it stays open. It used to check only once a day, counted from its last check, so a new version could take up to a day to show up.
+
 ## 1.8.1
 
 - Turning on a font Cicero had moved to its Deactivated folder moves its file back into your Fonts folder, also when Cicero copies fonts or uses them where they are. It used to copy the file there and keep it in the Deactivated folder as well, so the font still showed up there while it was on. Fonts left like that leave the Deactivated folder the next time Cicero opens.

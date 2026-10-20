@@ -9,7 +9,7 @@ The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Ci
 ## When Cicero goes online
 
 - **Each time it opens**, to count how many people use Cicero, while **Share usage statistics** is on, under **Updates** in **Settings → General**. It’s on at first. See [Usage statistics](#usage-statistics).
-- **To check GitHub for a new version** of Cicero, and to download it when you choose to install it. Cicero checks by itself while **Check for updates automatically** is on, under **Updates** in **Settings → General**. It’s on at first. Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates**
+- **To check GitHub for a new version** of Cicero, and to download it when you choose to install it. Cicero checks by itself, each time it opens and once a day while it stays open, as long as **Check for updates automatically** is on, under **Updates** in **Settings → General**. It’s on at first. Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates**
 
 ## Apple Intelligence
 

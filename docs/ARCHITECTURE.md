@@ -129,7 +129,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   closed, and draws nothing then; a font file nothing has read yet is read off the main thread first.
 - `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates and the
   automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
-  binary has no Info.plist with the feed.
+  binary has no Info.plist with the feed. With the switch on, it checks right after starting the updater,
+  before Sparkle's first scheduling pass, so Sparkle counts its day from that check.
 - `ApplicationsFolder` (`App/`) asks at launch to move Cicero into the Applications folder, and again
   instead of registering a login item from elsewhere (`LoginItem.set`). It finds disk images with
   DiskArbitration, moves through `AppLocation`, and relaunches the copy from a shell script that waits
