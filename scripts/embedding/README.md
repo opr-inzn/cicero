@@ -21,7 +21,9 @@ swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/Cicer
 # Optionally each style's letter measurements, for the model to learn to tell them: the tests' EmbeddingEvaluation
 # writes them to measurements.tsv (CICERO_EMBEDDING_WORK="$T/work" swift test --filter EmbeddingEvaluation).
 
-"$T/venv/bin/python" -I scripts/embedding/train.py train "$T/work" --measurements "$T/work/measurements.tsv"
+# The model in Resources: designs of a kind alike (--soft), learned for 60 epochs with the first tenth held out.
+"$T/venv/bin/python" -I scripts/embedding/train.py train "$T/work" --measurements "$T/work/measurements.tsv" \
+    --epochs 60 --fold 0 --soft 2 --instance 0.3
 "$T/venv/bin/python" -I scripts/embedding/train.py classify "$T/work"
 "$T/venv/bin/python" -I scripts/embedding/train.py export "$T/work" Resources/LetterEmbedding.mlpackage
 ```
@@ -36,9 +38,13 @@ family, and its siblings named for another size, width or kind (DM Serif Display
 share a batch with, so that slant, width and optical size count. Next to the letters it gets their advances
 (letters-advances.f32), which the squares, each letter centred by its ink, don't show: how wide a face sets its
 letters, and that a monospaced one sets them all as wide. `--stretch` adds designs drawn narrower and wider than they are, which made width
-count a little more and italics less in round two; it's off. So are the other ways to learn that train.py's
-docstring lists, which round five tried: weights and widths as one design (`--invariant`), more text faces (`--mix`),
-designs of a kind alike (`--soft`), a smaller model (`--together small`) and averaged weights (`--ema`); and words
+count a little more and italics less in round two; it's off. The model in Resources learns designs of a kind alike
+(`--soft 2`): as close as their Google tags of kind are alike, an upright and an italic less so, still telling each
+design from the others (`--instance 0.3`). Held-out families' nearest designs share their tags far more often with it
+(0.48 against 0.38, with the measurements), and in a library of commercial fonts more of the families it lists were
+judged alike. The other ways to learn that train.py's
+docstring lists are off, as they did no better: weights and widths as one design (`--invariant`), more text faces
+(`--mix`), stronger soft targets (`--soft 4`), a smaller model (`--together small`) and averaged weights (`--ema`); and words
 set in a line each next to the letters (`--strips`, from letters-strips.u8) and the h and o drawn three times as
 large (`--details`, from letters-details.u8), which a model then needs in the app too: `LetterEmbedding` draws them
 for a model with a `strips` or `details` input.

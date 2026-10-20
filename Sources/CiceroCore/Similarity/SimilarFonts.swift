@@ -27,8 +27,8 @@ public struct SimilarFonts: Sendable {
 
     /// How much each measure counts.
     public static let weights: [LetterMeasurements.Measure: Float] = [
-        .xHeight: 1.5, .ascender: 0.5, .descender: 0.5, .weight: 2.5, .contrast: 2, .stress: 1, .width: 3, .capitalWidth: 1.5,
-        .roundWidth: 1.5, .spacing: 0.5, .slant: 1.5, .serifLength: 2.5, .serifThickness: 1, .aperture: 1,
+        .xHeight: 1.5, .ascender: 0.5, .descender: 0.5, .weight: 2.5, .contrast: 2, .stress: 1, .width: 6, .capitalWidth: 3,
+        .roundWidth: 3, .spacing: 0.5, .slant: 1.5, .serifLength: 2.5, .serifThickness: 1, .aperture: 1,
         .squareness: 0.75, .doubleStoryA: 1, .doubleStoryG: 0.75, .monospaced: 2,
     ]
 
@@ -43,11 +43,13 @@ public struct SimilarFonts: Sendable {
 
     /// How much the embedding counts, and one step of it: the distance between two embeddings, 0 to 2, it takes to
     /// see a difference.
-    public static let embeddingWeight: Float = 0.5
+    public static let embeddingWeight: Float = 1.5
     public static let embeddingStep: Float = 0.1
 
-    /// Added to the distance between families whose classifications differ, when both have one.
-    public static let otherClassification: Float = 4
+    /// Added to the distance between families whose classifications differ, when both have one: enough to take such a
+    /// family a few places down a list, where the sixth nearest and the twelfth are often less than one apart, but not
+    /// out of it.
+    public static let otherClassification: Float = 1
 
     /// The sizes a family's name says it's drawn for, as its siblings' names differ: a family's Text and Display.
     public enum OpticalSize: Sendable {
@@ -164,7 +166,7 @@ public struct SimilarFonts: Sendable {
             }
             sum += embeddingWeight * squares / (Self.embeddingStep * Self.embeddingStep)
         }
-        if let first = classifications[a], let second = classifications[b], first != second { sum += otherClassification }
+        if let first = classifications[a], let second = classifications[b], first != second { return sum.squareRoot() + otherClassification }
         return sum.squareRoot()
     }
 }
