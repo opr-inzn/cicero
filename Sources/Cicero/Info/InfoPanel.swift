@@ -294,8 +294,9 @@ private struct RatingRow: View {
     }
 }
 
-/// The family's note, to write in place. Saved a moment after the typing stops, and at once when the field loses focus or
-/// the panel goes to another family, so a list searched or a smart set by notes doesn't change with every key.
+/// The family's note, to write in place. Return starts a new line, as in a note anywhere else, rather than ending the
+/// editing. Saved a moment after the typing stops, and at once when the field loses focus or the panel goes to another
+/// family, so a list searched or a smart set by notes doesn't change with every key.
 private struct NoteRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -313,6 +314,7 @@ private struct NoteRow: View {
                 .lineLimit(1...12)
                 .focused($isFocused)
                 .labelsHidden()
+                .onKeyPress(.return, action: newLine)
         }
         .onAppear(perform: load)
         .onChange(of: family.id) {
@@ -332,6 +334,14 @@ private struct NoteRow: View {
     private func load() {
         editing = family.id
         text = model.note(of: family) ?? ""
+    }
+
+    /// A line break where the text is selected, as Option-Return puts one in a text field, unless an input method is
+    /// still composing: its Return takes what's typed.
+    private func newLine() -> KeyPress.Result {
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, !editor.hasMarkedText() else { return .ignored }
+        editor.insertNewlineIgnoringFieldEditor(nil)
+        return .handled
     }
 
     /// Saves the text as the note of the family it was written for, which may be the one before.
