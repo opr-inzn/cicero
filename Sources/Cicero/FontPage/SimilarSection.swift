@@ -42,13 +42,13 @@ struct SimilarSection: View {
         }
     }
 
-    /// Like the styles' titles above: the section's, then the columns', when there are rows under them, and at the
-    /// end Show More, when there are more than `shown` of `all`.
+    /// Like the styles' titles above: the section's, then the foundry's, when there are rows under it (the names need
+    /// no title), and at the end Show More, when there are more than `shown` of `all`.
     private func header(columns: Bool, all: Int) -> some View {
         HStack(spacing: 12) {
             Text("Similar").frame(maxWidth: .infinity, alignment: .leading)
             if columns {
-                Text("Family").frame(width: Self.nameWidth, alignment: .leading)
+                Color.clear.frame(width: Self.nameWidth, height: 0)
                 Text("Foundry").frame(width: Self.foundryWidth, alignment: .leading)
             }
         }
