@@ -99,6 +99,10 @@ private struct Tile: View {
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
                     TagDots(colors: model.tagColors(of: family))
+                    if let rating = model.rating(of: family) {
+                        Spacer(minLength: 8)
+                        RatingStars(rating: rating)
+                    }
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(family.rangeLabel)

@@ -9,6 +9,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Importing from FontExplorer X brings its classifications too, your own among them: a family goes in the classification most of its styles have, unless you’ve chosen one for it.
 - Fonts with “Stencil”, “Inline”, “Outline”, “Fraktur” or “Blackletter” in their names are Ornamental.
 - A family whose regular weight comes in two widths, like Futura’s Medium and Condensed Medium, is previewed in the normal width.
+- A family you’ve rated shows its stars in the grid, at the right of its name, and in specimens, after its number of styles. They used to show only in the Info panel and the list’s **Rating** column.
 
 ## 1.8.2
 
