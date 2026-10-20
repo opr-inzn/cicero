@@ -3,7 +3,8 @@ import CoreText
 import Foundation
 
 /// A face's letters drawn small, white on black, each in a square of its own, and how wide each one's advance is, for
-/// `LetterEmbedding` to look at; and a few words set in a line each, in strips (see `words`).
+/// `LetterEmbedding` to look at; and a few words set in a line each, in strips (see `words`), and a few letters large
+/// (see `detailLetters`).
 /// Every face has the same letters in the same squares, its baseline at the same height and its x-height as tall
 /// (its capitals no taller than `largestCapHeight`), so that what differs is how they're drawn. Drawn from their
 /// outlines, without hinting. Needs nothing but CoreText, so that scripts/embedding/render-letters.swift draws the
@@ -29,6 +30,13 @@ enum LetterImages {
     static let stripWidth = 384
     /// Where a line starts, in pixels from its strip's left edge.
     static let stripMargin: CGFloat = 4
+    /// Letters drawn again `detailScale` times as large, each in a square `detailSize` wide, centred across by its ink on
+    /// a baseline `detailBaseline` up: how their serifs, terminals and joins are drawn, which the small squares can't
+    /// show. A letter taller than its square is cut off at the top.
+    static let detailLetters: [Character] = ["h", "o"]
+    static let detailSize = 128
+    static let detailScale: CGFloat = 3
+    static let detailBaseline: CGFloat = 8
 
     struct Drawn: Equatable {
         /// One square after the other, each `size` rows of `size` pixels from the top left, 255 where it's all ink;
@@ -41,11 +49,14 @@ enum LetterImages {
         /// One strip after the other, each `size` rows of `stripWidth` pixels from the top left, a word of `words` set in
         /// each; a letter the face hasn't is left out. Empty unless asked for.
         var strips: [UInt8]
+        /// The `detailLetters` one square after the other, each `detailSize` rows of `detailSize` pixels; a letter the
+        /// face hasn't is an empty square. Empty unless asked for.
+        var details: [UInt8] = []
     }
 
-    /// nil for a face with fewer than `fewest` of the letters drawn as outlines. The strips only with `strips`, for a
-    /// model that looks at them.
-    static func draw(_ font: CTFont, strips withStrips: Bool = false) -> Drawn? {
+    /// nil for a face with fewer than `fewest` of the letters drawn as outlines. The strips only with `strips`, and the
+    /// large letters only with `details`, for a model that looks at them.
+    static func draw(_ font: CTFont, strips withStrips: Bool = false, details withDetails: Bool = false) -> Drawn? {
         let font = inThousandths(font)
         let glyphs = letters.map { glyph(font, $0) }
         let paths = glyphs.map { glyph -> CGPath? in
@@ -90,8 +101,36 @@ enum LetterImages {
             context.flush()
             pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
         }
-        guard let strips = withStrips ? strips(font, scale: scale) : [] else { return nil }
-        return Drawn(pixels: pixels, advances: advances, strips: strips)
+        guard let strips = withStrips ? strips(font, scale: scale) : [],
+              let details = withDetails ? details(font, scale: scale * detailScale) : [] else { return nil }
+        return Drawn(pixels: pixels, advances: advances, strips: strips, details: details)
+    }
+
+    /// `detailLetters` at `scale`, as `draw` draws the small ones.
+    private static func details(_ font: CTFont, scale: CGFloat) -> [UInt8]? {
+        let area = detailSize * detailSize
+        var pixels = [UInt8](repeating: 0, count: area * detailLetters.count)
+        guard let context = CGContext(data: nil, width: detailSize, height: detailSize, bitsPerComponent: 8, bytesPerRow: detailSize,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue),
+              let data = context.data
+        else { return nil }
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        for (position, character) in detailLetters.enumerated() {
+            guard let glyph = glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty
+            else { continue }
+            context.setFillColor(gray: 0, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: detailSize, height: detailSize))
+            var placed = CGAffineTransform(translationX: CGFloat(detailSize) / 2 - path.boundingBoxOfPath.midX * scale, y: detailBaseline)
+                .scaledBy(x: scale, y: scale)
+            guard let shape = path.copy(using: &placed) else { continue }
+            context.setFillColor(gray: 1, alpha: 1)
+            context.addPath(shape)
+            context.fillPath()
+            context.flush()
+            pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
+        }
+        return pixels
     }
 
     /// `words` set at `scale`, each glyph where the one before it advances to: no kerning and no ligatures, nor

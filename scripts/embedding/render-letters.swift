@@ -8,7 +8,8 @@
 // The manifest is a list of {"file": path, "variations": {"wght": 400, …}}, as prepare.py writes it; a variable
 // font's other axes are at their defaults. Writes letters.u8, each entry's squares one after the other (an empty
 // square block for an entry that couldn't be drawn), letters-advances.f32, the letters' advances, 16 floats an
-// entry, letters-strips.u8, its words set in strips, and letters.json, whether each was drawn.
+// entry, letters-strips.u8, its words set in strips, letters-details.u8, its large letters, and letters.json,
+// whether each was drawn.
 
 import CoreText
 import Foundation
@@ -33,20 +34,24 @@ struct RenderLetters {
         var advances = [Float](repeating: 0, count: count * entries.count)
         let stripBlock = LetterImages.size * LetterImages.stripWidth * LetterImages.words.count
         var strips = [UInt8](repeating: 0, count: stripBlock * entries.count)
+        let detailBlock = LetterImages.detailSize * LetterImages.detailSize * LetterImages.detailLetters.count
+        var details = [UInt8](repeating: 0, count: detailBlock * entries.count)
         var drawn = [Bool](repeating: false, count: entries.count)
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: entries.count) { position in
-            guard let font = font(entries[position]), let letters = LetterImages.draw(font, strips: true) else { return }
+            guard let font = font(entries[position]), let letters = LetterImages.draw(font, strips: true, details: true) else { return }
             lock.withLock {
                 pixels.replaceSubrange(position * block..<(position + 1) * block, with: letters.pixels)
                 advances.replaceSubrange(position * count..<(position + 1) * count, with: letters.advances)
                 strips.replaceSubrange(position * stripBlock..<(position + 1) * stripBlock, with: letters.strips)
+                details.replaceSubrange(position * detailBlock..<(position + 1) * detailBlock, with: letters.details)
                 drawn[position] = true
             }
         }
         try Data(pixels).write(to: URL(fileURLWithPath: arguments[2] + ".u8"))
         try advances.withUnsafeBytes { Data($0) }.write(to: URL(fileURLWithPath: arguments[2] + "-advances.f32"))
         try Data(strips).write(to: URL(fileURLWithPath: arguments[2] + "-strips.u8"))
+        try Data(details).write(to: URL(fileURLWithPath: arguments[2] + "-details.u8"))
         try JSONEncoder().encode(drawn).write(to: URL(fileURLWithPath: arguments[2] + ".json"))
         print("drew \(drawn.count(where: { $0 })) of \(entries.count)")
     }

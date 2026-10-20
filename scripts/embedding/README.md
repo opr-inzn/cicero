@@ -39,8 +39,9 @@ letters, and that a monospaced one sets them all as wide. `--stretch` adds desig
 count a little more and italics less in round two; it's off. So are the other ways to learn that train.py's
 docstring lists, which round five tried: weights and widths as one design (`--invariant`), more text faces (`--mix`),
 designs of a kind alike (`--soft`), a smaller model (`--together small`) and averaged weights (`--ema`); and words
-set in a line each next to the letters (`--strips`, from letters-strips.u8), which a model then needs in the app too:
-`LetterEmbedding` draws them for a model with a `strips` input.
+set in a line each next to the letters (`--strips`, from letters-strips.u8) and the h and o drawn three times as
+large (`--details`, from letters-details.u8), which a model then needs in the app too: `LetterEmbedding` draws them
+for a model with a `strips` or `details` input.
 
 Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the
 tenth of the families it doesn't learn from (`--fold`, 0 to 9; one tenth's scores vary more than a change makes them,
