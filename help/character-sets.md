@@ -4,6 +4,8 @@
 
 Cicero checks which characters each font has, so you can find fonts for a text, a language or a standard set of characters.
 
+A font only has a character it draws. A trial font often lists characters it leaves out, with empty glyphs for them, and those don’t count; a space, which draws nothing in any font, does.
+
 It checks each family’s regular upright style. It does this in the background after each scan and remembers the results, so it only has to look at new or changed fonts. Until it’s done, lists that depend on it say “checking characters” in the subtitle.
 
 ## Character sets
