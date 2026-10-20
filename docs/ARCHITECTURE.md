@@ -55,8 +55,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   faces that look alike;
   `MeasurementIndex` measures and embeds every family's regular style in the background after coverage and caches
   the results on disk, as `CoverageIndex` does; `SimilarFonts` ranks the families nearest one, measure by measure in
-  fixed steps, weighted, and by the embedding's distance. The app keeps one `SimilarFonts` for the listed families
-  and makes it again when the library, the measurements or the user's data change.
+  fixed steps, weighted, and by the embedding's distance, leaving out the families the user marked not similar
+  (`UserData.notSimilar`). The app keeps one `SimilarFonts` for the listed families and makes it again when the
+  library, the measurements or the user's data change. `SimilarReport` is what a mark sends, the list by its names
+  and numbers; `SimilarReports` (`App/`) sends it, as `UsageStatistics` sends its signal.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
   preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
   prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead

@@ -26,6 +26,10 @@ public struct UserData: Codable, Equatable, Sendable {
     public var familyRatings: [String: Int] = [:]
     /// Family name → the user's note on it. A family without one has none, never an empty one.
     public var familyNotes: [String: String] = [:]
+    /// Family name → the families the user said don't look like it, from its similar fonts, the latest last. Its
+    /// similar fonts leave them out, theirs leave it out, and so do their copies' (see `SimilarFonts`). Kept when a
+    /// family leaves the library, as its copies still count.
+    public var notSimilar: [String: [String]] = [:]
     /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
     /// False only for libraries saved before there were license tags (license statuses, as they were in 1.5), which get
@@ -127,6 +131,7 @@ public struct UserData: Codable, Equatable, Sendable {
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         familyRatings = try value(.familyRatings, d.familyRatings).filter { (1...5).contains($0.value) }
         familyNotes = try value(.familyNotes, d.familyNotes).filter { !$0.value.isEmpty }
+        notSimilar = try value(.notSimilar, d.notSimilar).filter { !$0.value.isEmpty }
         activations = try value(.activations, d.activations)
         // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)

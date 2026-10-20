@@ -7,8 +7,8 @@ import Foundation
 /// them. The embedding counts like one more measure, in steps of `embeddingStep`. Families of different
 /// classifications are farther apart. Of families whose names say what size they're for, a text cut's text cuts come
 /// before display ones, its own display sibling among them, and the other way round. Copies of one design, as their
-/// names say (a trial, a variable font, a family for each weight), are listed once. Made once for a library, then
-/// asked as often as needed.
+/// names say (a trial, a variable font, a family for each weight), are listed once. Families the user said don't look
+/// alike are left out of each other's lists. Made once for a library, then asked as often as needed.
 public struct SimilarFonts: Sendable {
     private let ids: [String]
     private let positions: [String: Int]
@@ -20,6 +20,8 @@ public struct SimilarFonts: Sendable {
     private let sizes: [OpticalSize?]
     /// `design(of:)` each family's name.
     private let designs: [String]
+    /// A design → the designs the user said don't look like it, either way round.
+    private let unlike: [String: Set<String>]
     /// `steps`, in the order of the measures.
     private let scales: [Float]
     private let weights: [Float]
@@ -124,8 +126,11 @@ public struct SimilarFonts: Sendable {
     ///   - embeddings: a family's regular style's (see `LetterEmbedding`); when given and weighted, families without
     ///     one are left out.
     ///   - classification: nil for one without.
+    ///   - notSimilar: family name → the families the user said don't look like it (`UserData.notSimilar`): left out of
+    ///     its list, it out of theirs, and every copy of either (`design(of:)`) too, so that another doesn't take one's place.
     public init(families: [Family], measurements: (Family) -> LetterMeasurements?, embeddings: ((Family) -> [Float]?)? = nil,
-                classification: (Family) -> String?, weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
+                classification: (Family) -> String?, notSimilar: [String: [String]] = [:],
+                weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
                 embeddingWeight: Float = SimilarFonts.embeddingWeight, otherClassification: Float = SimilarFonts.otherClassification) {
         let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
         var ids: [String] = [], values: [Float] = [], vectors: [Float] = [], classifications: [String?] = [], sizes: [OpticalSize?] = []
@@ -147,6 +152,15 @@ public struct SimilarFonts: Sendable {
         self.classifications = classifications
         self.sizes = sizes
         self.designs = designs
+        var unlike: [String: Set<String>] = [:]
+        for (family, others) in notSimilar {
+            let design = Self.design(of: family)
+            for other in others.map(Self.design(of:)) where other != design {
+                unlike[design, default: []].insert(other)
+                unlike[other, default: []].insert(design)
+            }
+        }
+        self.unlike = unlike
         scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
@@ -158,8 +172,8 @@ public struct SimilarFonts: Sendable {
 
     public func contains(_ id: String) -> Bool { positions[id] != nil }
 
-    /// The families that look most like this one, the nearest first, without it and its copies, and each design once;
-    /// empty when it wasn't measured.
+    /// The families that look most like this one, the nearest first, without it and its copies, and each design once,
+    /// but none the user said doesn't look like it; empty when it wasn't measured.
     public func nearest(to id: String, limit: Int) -> [String] {
         nearestWithDistances(to: id, limit: limit).map(\.id)
     }
@@ -176,8 +190,8 @@ public struct SimilarFonts: Sendable {
             found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        // The nearest copy of each design, and none of the family's own.
-        var listed: Set<String> = [designs[reference]], nearest: [(index: Int, distance: Float)] = []
+        // The nearest copy of each design, none of the family's own, and none the user said doesn't look like it.
+        var listed = unlike[designs[reference], default: []].union([designs[reference]]), nearest: [(index: Int, distance: Float)] = []
         for entry in found where listed.insert(designs[entry.index]).inserted {
             nearest.append(entry)
             if nearest.count == max(limit, Self.longestList) { break }

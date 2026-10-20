@@ -24,6 +24,8 @@ struct ActivationTitles {
 struct FamilyMenu: View {
     let families: [Family]
     let model: AppModel
+    /// The family whose similar fonts these are listed among, to say they don't look like it.
+    var similarTo: Family? = nil
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -75,6 +77,9 @@ struct FamilyMenu: View {
         if families.count == 1 {
             Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: families[0]) }
                 .disabled(!model.canShowSimilar(families[0]))
+        }
+        if let similarTo, families.contains(where: { $0.id != similarTo.id }) {
+            Button("Not Similar to \(similarTo.name)", systemImage: "hand.thumbsdown") { model.markNotSimilar(families, to: similarTo) }
         }
         if families.count > 1 {
             Button("Compare", systemImage: "rectangle.split.1x2") {
