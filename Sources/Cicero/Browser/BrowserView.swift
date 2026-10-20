@@ -38,6 +38,11 @@ struct BrowserView: View {
                 OnlineOnlyBar(folderID: id)
             }
         }
+        .safeAreaBar(edge: .top, spacing: 0) {
+            if let id = model.similarFamilyID {
+                SimilarBar(familyID: id)
+            }
+        }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
         .onChange(of: model.selectedIDs, initial: true) { preparePage() }
         .navigationTitle(model.selectionTitle)
@@ -145,6 +150,46 @@ private struct OnlineOnlyBar: View {
     }
 }
 
+/// Says whose similar fonts the browser shows, with a button to go back to what the sidebar showed.
+private struct SimilarBar: View {
+    @Environment(AppModel.self) private var model
+    let familyID: String
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkle.magnifyingglass")
+                    .foregroundStyle(.secondary)
+                Text(message)
+                    .lineLimit(1)
+                Spacer()
+                if model.measurementProgress != nil {
+                    ProgressView().controlSize(.small)
+                }
+                Button("Done") { model.endSimilar() }
+                    .controlSize(.small)
+                    .help("Go back to what the sidebar showed")
+            }
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            Divider()
+        }
+        .background(.bar)
+    }
+
+    private var message: String {
+        let name = model.family(familyID)?.name ?? familyID
+        if let family = model.family(familyID), model.canShowSimilar(family) {
+            return "The families that look most like \(name), the closest first."
+        }
+        if let progress = model.measurementProgress {
+            return "Measuring letters, \(progress.done.formatted()) of \(progress.total.formatted())"
+        }
+        return "Cicero can’t compare \(name) with other fonts: it hasn’t got the Latin letters Cicero measures."
+    }
+}
+
 /// A watched folder Cicero can't read now, or one whose fonts are all online only.
 private struct FolderOutOfReach: View {
     @Environment(AppModel.self) private var model
@@ -214,6 +259,17 @@ private struct EmptyBrowser: View {
 
     @ViewBuilder
     private var content: some View {
+        if model.similarFamilyID != nil {
+            // Only when the family is gone, or hidden: it comes first otherwise.
+            ContentUnavailableView("Font Not Available", systemImage: "textformat",
+                                   description: Text("This font is no longer in your library."))
+        } else {
+            sidebarItemContent
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarItemContent: some View {
         switch model.selection ?? .all {
         case .folder(let id) where model.availability(ofFolder: id) != nil || model.onlineOnlyCount(inFolder: id) > 0:
             FolderOutOfReach(folderID: id)

@@ -71,6 +71,11 @@ struct FamilyMenu: View {
             NSPasteboard.general.setString(families.map(\.id).joined(separator: "\n"), forType: .string)
         }
         Button("Export", systemImage: "square.and.arrow.up") { model.exportFonts(families, named: nil) }
+        // Measured once its letters are, a moment after it's added; never for one without Latin letters.
+        if families.count == 1 {
+            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: families[0]) }
+                .disabled(!model.canShowSimilar(families[0]))
+        }
         if families.count > 1 {
             Button("Compare", systemImage: "rectangle.split.1x2") {
                 model.compare(families)

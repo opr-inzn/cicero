@@ -13,7 +13,7 @@ The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Ci
 
 ## Apple Intelligence
 
-To guess the classification of fonts nothing else classifies, Cicero gives the language model Apple Intelligence keeps on your Mac each family’s name, foundry, designer and style names. The model runs on your Mac, so nothing is sent. To stop it, turn off **Guess classifications from names** in **Settings → General**; Cicero then forgets its guesses. Without Apple Intelligence, Cicero doesn’t guess.
+To guess the classification of fonts nothing else classifies, Cicero gives the language model Apple Intelligence keeps on your Mac each family’s name, foundry, designer and style names. The model runs on your Mac, so nothing is sent. Cicero also guesses from the shapes of the letters, with a model of its own that comes with it, on your Mac too. To stop both, turn off **Classify fonts automatically** in **Settings → General**; Cicero then forgets its guesses. Without Apple Intelligence, Cicero guesses from the letters only.
 
 The **Help** menu opens pages in your web browser, like this guide on GitHub and the privacy policy on Cicero’s website, and so do the links in **Settings → Coverage** and in **About Cicero**. Cicero itself doesn’t load them.
 
@@ -37,7 +37,7 @@ To stop it, open **Settings → General** and, under **Updates**, turn off **Sha
 | --- | --- |
 | `~/Library/Application Support/Cicero` | Your sets, smart sets, tags, coverage sets, folders, added fonts and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
 | `~/Cicero/Font Library` | The fonts Cicero installs, when you keep them in its [Font Library](activating.md#the-font-library), unless you moved it. |
-| `~/Library/Caches/Cicero` | What Cicero read from your font files, like names and characters, so it doesn’t have to read them again, your font list as Cicero last found it, to show as soon as it opens, and the classifications Apple Intelligence guessed. **Fonts → Rebuild Font List** reads everything again. |
+| `~/Library/Caches/Cicero` | What Cicero read from your font files, like names, characters and the shapes of their letters, so it doesn’t have to read them again, your font list as Cicero last found it, to show as soon as it opens, and the classifications Apple Intelligence guessed. **Fonts → Rebuild Font List** reads everything again. |
 
 Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way, and so is the random number for the usage statistics.
 

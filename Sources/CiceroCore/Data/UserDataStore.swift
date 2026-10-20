@@ -24,6 +24,12 @@ public final class UserDataStore: Sendable {
         legacyURL = locations.support.appendingPathComponent("library.json", isDirectory: false)
     }
 
+    /// Whether there's a library saved from before, as there isn't at the first launch.
+    public var hasSavedData: Bool {
+        let fm = FileManager.default
+        return fm.fileExists(atPath: fileURL.path) || fm.fileExists(atPath: legacyURL.path)
+    }
+
     /// A library from before there were license tags gets them (see `UserData.addLicenseTags`).
     public func load() -> UserData {
         if let data = try? Data(contentsOf: fileURL) {

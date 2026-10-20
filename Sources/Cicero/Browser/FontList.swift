@@ -221,6 +221,8 @@ struct FontList: View {
     @Environment(AppModel.self) private var model
     @State private var sortColumn = FontListColumn.name
     @State private var ascending = true
+    /// Similar fonts come the closest first until a column's header is clicked.
+    @State private var keepsSimilarOrder = true
     /// Standard columns turned off.
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
     /// The year, other series and single sets turned on.
@@ -238,8 +240,8 @@ struct FontList: View {
     var body: some View {
         let columns = shownColumns
         // A column that's been turned off, or whose set was deleted, no longer sorts the list.
-        let sort = columns.contains(sortColumn) ? sortColumn : .name
-        let (rows, families) = model.fontRows(sortedBy: order(sort), columns: columns)
+        let sort: FontListColumn? = model.similarFamilyID != nil && keepsSimilarOrder ? nil : columns.contains(sortColumn) ? sortColumn : .name
+        let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], columns: columns)
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
         ScrollViewReader { proxy in
             ScrollView {
@@ -273,6 +275,7 @@ struct FontList: View {
                 move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)
             }
         }
+        .onChange(of: model.similarFamilyID) { keepsSimilarOrder = true }
     }
 
     private func order(_ column: FontListColumn) -> [KeyPathComparator<FontRow>] {
@@ -350,12 +353,19 @@ struct FontList: View {
         return widths
     }
 
-    private func header(columns: [FontListColumn], widths: [FontListColumn: CGFloat], sort: FontListColumn) -> some View {
+    /// `sort` is nil while similar fonts are in their own order.
+    private func header(columns: [FontListColumn], widths: [FontListColumn: CGFloat], sort: FontListColumn?) -> some View {
         HStack(spacing: FontListRow.spacing) {
             ForEach(columns) { column in
                 HeaderCell(column: column, title: column.title(model), sortColumn: sort, ascending: ascending,
                            resizeEdge: resizeEdge(column, in: columns)) {
-                    if sort == column { ascending.toggle() } else { sortColumn = column; ascending = true }
+                    if sort == column {
+                        ascending.toggle()
+                    } else {
+                        sortColumn = column
+                        ascending = true
+                        keepsSimilarOrder = false
+                    }
                 } resize: { change in
                     resize(column, by: change, widths: widths)
                 } endResize: {
@@ -468,7 +478,8 @@ struct FontList: View {
 private struct HeaderCell: View {
     let column: FontListColumn
     let title: String
-    let sortColumn: FontListColumn
+    /// nil when no column sorts the list.
+    let sortColumn: FontListColumn?
     let ascending: Bool
     /// Where the column's edge for resizing is, if it has one.
     let resizeEdge: HorizontalEdge?

@@ -12,6 +12,7 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **Info and Features.** The info panel shows a font’s details (its designer, vendor ID and embedding permission among them), its tags and rating, your note on it, the languages it supports, its coverage and the Unicode blocks it covers; the Features tab turns OpenType features on in the text on the family’s font page.
 - **Search** by family name, foundry, PostScript name, designer, vendor ID or your note.
 - **Names in your language.** A family whose fonts name it in your Mac’s language, as many Japanese, Chinese and Korean fonts do, shows and sorts by that name: Hiragino Sans is ヒラギノ角ゴシック on a Mac in Japanese.
+- **Similar fonts.** Right-click a family and choose Show Similar Fonts to see the 12 in your library that look most like it, the closest first, measured from the shapes of their letters on your Mac (x-height, weight, contrast and stress, width and spacing, slant, serifs, aperture, and the a’s and g’s stories) and looked at by a small model that has learned what letters of a kind look like. A font page shows the six closest.
 - **Preview Options.** Preview text, size, weight, letter and line spacing, and alignment, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Settings → General.
 - **Customizable sidebar.** Click **Edit** next to Library and every item and group gets a checkbox; uncheck what you don’t want and click **Done**. The same list is in **Settings → Sidebar**, and right-clicking a row offers *Hide from Sidebar*. Drag items into the order you like within their section, as in the Finder, and ⌘- or ⇧-click several items in a section to drag them together or see all their fonts at once. A click anywhere on a section’s title opens or closes it, and View → Hide Sidebar (⌃⌘S) puts it away.
@@ -52,7 +53,7 @@ If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or 
 
 ## Roadmap
 
-Coming next: **similar fonts**, the families in your library that look most like the one you pick. How it could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **similar styles**, Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones. How it could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 
@@ -61,7 +62,7 @@ Cicero has no accounts and no ads, and nothing about you or your fonts leaves yo
 - **Usage statistics.** Each time Cicero opens, it sends [TelemetryDeck](https://telemetrydeck.com) its version, the macOS version and a hashed random number that stands for your Mac, to count how many people use Cicero; the first time, it also says your Mac is new. That’s all it sends; the code is in [UsageStatistics.swift](Sources/Cicero/App/UsageStatistics.swift). Turn it off with Share usage statistics.
 - **Updates.** Each time Cicero opens, and once a day while it stays open, it checks GitHub for a new version. Turn it off with Check for updates automatically.
 
-Classifications Apple Intelligence guesses are worked out on your Mac too. The Help menu opens web pages in your browser.
+Classifications Cicero guesses, from the shapes of the letters or with Apple Intelligence from the names, are worked out on your Mac too. The Help menu opens web pages in your browser.
 
 ## Credits
 

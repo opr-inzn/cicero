@@ -121,6 +121,8 @@ struct FamilyKeys: ViewModifier {
     @State private var lastTyped = Date.distantPast
     /// Quick Look, opening unless a letter follows the space just typed.
     @State private var pendingQuickLook: Task<Void, Never>?
+    /// The family `jumpTargets` last brought to the top, and when.
+    @State private var lastJump: (id: String, date: Date)?
 
     private var families: [Family] { order.families }
 
@@ -197,7 +199,14 @@ struct FamilyKeys: ViewModifier {
                 model.selectedIDs = [first.id]
                 anchor = SelectionAnchor(id: first.id)
                 scrollToTop(first.id)
+                lastJump = (first.id, .now)
                 model.jumpTargets = nil
+            }
+            // A bar that comes with the jump, as Show Similar Fonts' does, moves the top of the view down a moment
+            // later, which would leave the family under it: to the top again.
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, _ in
+                guard let jump = lastJump, Date.now.timeIntervalSince(jump.date) < 1 else { return }
+                scrollToTop(jump.id)
             }
             // Opened from the menu, or open while the view changes: several families go in the order this view shows them.
             .onChange(of: quickLook.isOpen, initial: true) { _, isOpen in

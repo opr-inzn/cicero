@@ -30,6 +30,8 @@ Cicero looks for fonts in these places:
 
 Looking changes nothing: no font is turned on, off, copied or moved until you ask.
 
+The first time it opens, Cicero asks whether to classify your fonts automatically: the ones whose files don’t say what they are. Choose **Classify**, and it sorts them by the shapes of their letters and, with Apple Intelligence, by their names, on your Mac. Choose **Not Now**, and they stay Unclassified until you put them somewhere. You can change your mind with **Classify fonts automatically** in **Settings → General** (see [Classifications](organizing.md#classifications)).
+
 When a scan takes a moment, a small capsule at the bottom right says what Cicero is doing, like “Identifying fonts 200 of 4,000”. Cicero reads each font file once and remembers what it found, so later scans are quick.
 
 After that, Cicero checks which characters each font has, in the background. Lists that depend on it, like a [character set](character-sets.md), say “checking characters” in the window’s subtitle until it’s done.
@@ -84,6 +86,7 @@ What comes over:
 - **Application sets,** with their apps. An app that isn’t on this Mac is found by its name, also with another year, like Adobe InDesign 2026 for Adobe InDesign 2024. Cicero has no fonts to turn off while an app is open, so the **Autodeactivate** part stays behind.
 - **Smart sets,** when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), designer, whether it’s activated, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
 - **Labels,** as tags in their colors, named after them: Red, Orange, Yellow, Green, Blue, Purple and Gray. A family gets a tag for each label its styles have.
+- **Classifications.** A family goes in the classification most of its styles have in FontExplorer X, as if you’d put it there, unless you chose one already. Classifications you made in FontExplorer X come along as your own.
 - **Ratings.** A family gets the stars of its best-rated style, unless you gave it a rating already.
 - **Comments,** as notes. A family’s note gets the comments on its files and styles, each once, unless you wrote a note already.
 - **Activations:** how often each family was turned on and when last, for the **Times Activated** and **Last Activated** rules.

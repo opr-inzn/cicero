@@ -89,13 +89,14 @@ struct GeneralSettings: View {
                     Text("Show test fonts installed for Adobe apps")
                     Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
-                // Off while Apple Intelligence can't guess, whatever the setting says.
-                let canGuess = ClassificationGuesser.availability == .available
-                Toggle(isOn: canGuess ? $model.guessesClassifications : .constant(false)) {
-                    Text("Guess classifications from names")
+                Toggle(isOn: $model.guessesClassifications) {
+                    HStack(spacing: 6) {
+                        Text("Classify fonts automatically")
+                        Tag(text: "On-device Intelligence", tint: .purple)
+                            .help("Cicero’s own model reads the letters, and Apple Intelligence the names, on this Mac. Nothing is sent.")
+                    }
                     Text(guessingExplanation)
                 }
-                .disabled(!canGuess)
             }
             Section("Maintenance") {
                 LabeledContent("Library") {
@@ -130,12 +131,12 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
     private var guessingExplanation: String {
-        let what = "When nothing else classifies a font, Apple Intelligence guesses from its name, on this Mac. Nothing is sent."
+        let what = "When a font’s files don’t say, Cicero tells from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
         return switch ClassificationGuesser.availability {
         case .available: what
-        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to use this."
+        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to tell from names too."
         case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
-        case .unavailable: "Guessing needs Apple Intelligence, which this Mac doesn’t have."
+        case .unavailable: "When a font’s files don’t say, Cicero tells from the shapes of its letters, on this Mac. Nothing is sent."
         }
     }
 

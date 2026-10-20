@@ -624,6 +624,8 @@ public struct Family: Identifiable, Hashable, Sendable {
         weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
     }
 
+    /// The upright style of the nearest weight, and of those the one nearest the normal width (Futura's Medium
+    /// rather than its Condensed Medium).
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
         let hasUpright = faces.contains { !$0.face.isItalic }
         var best: LibraryFace?
@@ -637,7 +639,12 @@ public struct Family: Identifiable, Hashable, Sendable {
                     || abs(candidate.face.styleWeight - 400) < abs(found.face.styleWeight - 400)) {
                     variable = candidate
                 }
-            } else if best == nil || abs(Double(candidate.face.weight) - weight) < abs(Double(best!.face.weight) - weight) {
+            } else if let current = best {
+                let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
+                if distance < bestDistance || distance == bestDistance && abs(candidate.face.width - 5) < abs(current.face.width - 5) {
+                    best = candidate
+                }
+            } else {
                 best = candidate
             }
         }
@@ -818,6 +825,8 @@ extension Classification {
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
+            // A stencil or an outline of a sans serif is still ornamental.
+            (.ornamental, ["stencil", "inline", "outline", "fraktur", "blackletter"]),
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
             (.serif, ["serif", "slab", "garamond", "antiqua"]),
             (.script, ["script", "brush", "hand"]),

@@ -83,6 +83,16 @@ struct MainWindow: View {
         } message: { plan in
             Text(Self.trashMessage(plan))
         }
+        // At the first launch, before anything is guessed.
+        .alert("Classify Your Fonts Automatically?", isPresented: Binding(get: { model.asksAboutGuessing }, set: { _ in })) {
+            // Side by side, Not Now in grey and Classify in the accent colour, the one Return chooses: a longer title, like
+            // Don't Classify, and the alert stacks them.
+            Button("Classify") { model.answerGuessing(true) }
+                .keyboardShortcut(.defaultAction)
+            Button("Not Now", role: .cancel) { model.answerGuessing(false) }
+        } message: {
+            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters and, with Apple Intelligence, from their names, on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Settings → General.")
+        }
         .alert(
             model.textPrompt?.title ?? "",
             isPresented: Binding(get: { model.textPrompt != nil }, set: { if !$0 { model.textPrompt = nil } }),

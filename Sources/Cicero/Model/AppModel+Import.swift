@@ -133,6 +133,7 @@ extension AppModel {
             if fonts > 0 { updated.sidebar.hidden.remove(SidebarSection.folders.key) }
             if result.sets + result.applicationSets + result.smartSets > 0 { updated.sidebar.hidden.remove(SidebarSection.sets.key) }
             if result.tags > 0 { updated.sidebar.hidden.remove(SidebarSection.tags.key) }
+            if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
             model.data = updated
             model.rescan()
             if !faces.isEmpty { model.performActivation(faces, method: .inPlace) }
@@ -146,6 +147,7 @@ extension AppModel {
 extension ImportedLibrary {
     /// Nothing to bring in.
     var isEmpty: Bool {
-        fontFolder == nil && otherFiles.isEmpty && sets.isEmpty && smartSets.isEmpty && tags.isEmpty && ratings.isEmpty && history.isEmpty
+        fontFolder == nil && otherFiles.isEmpty && sets.isEmpty && smartSets.isEmpty && tags.isEmpty && classifications.isEmpty && ratings.isEmpty
+            && history.isEmpty
     }
 }

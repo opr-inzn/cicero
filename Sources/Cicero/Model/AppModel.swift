@@ -17,6 +17,7 @@ final class AppModel {
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
+    @ObservationIgnored let measurements: MeasurementIndex
     @ObservationIgnored let pageContents: PageContents
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let openDocumentFonts = DocumentFontWatcher()
@@ -43,10 +44,19 @@ final class AppModel {
     /// Family → the classification Apple Intelligence guessed from its name (see `ClassificationGuesser`);
     /// `.unclassified` where it couldn't tell.
     private(set) var classificationGuesses: [String: Classification] = [:]
+    /// Family → the classification the model sees in its letters, for the families nothing in their files
+    /// classifies, where it's at least `letterGuessLikelihood` sure (see `MeasurementIndex.classification`).
+    private(set) var letterGuesses: [String: Classification] = [:]
+    /// How sure the model must be of a classification for it to count: a wrong classification is worse than none.
+    static let letterGuessLikelihood: Float = 0.7
     /// Bumped whenever guesses arrive or go; cached lists depend on it.
     private(set) var guessRevision = 0
     /// nil when coverage is up to date.
     private(set) var coverageProgress: CoverageProgress?
+    /// Bumped whenever letter measurements arrive (see `MeasurementIndex`); similar fonts depend on it.
+    private(set) var measurementRevision = 0
+    /// nil when every family's letters are measured.
+    private(set) var measurementProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
@@ -85,7 +95,9 @@ final class AppModel {
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
     private(set) var dataRevision = 0
-    /// Settings → General → Guess classifications from names (see `ClassificationGuesser`). Saved in user defaults.
+    /// Settings → General → Classify fonts automatically: from the shapes of the letters (`letterGuesses`) and, with
+    /// Apple Intelligence, from the names (see `ClassificationGuesser`), for the families nothing in their files
+    /// classifies. Saved in user defaults.
     var guessesClassifications: Bool {
         didSet {
             guard guessesClassifications != oldValue else { return }
@@ -95,11 +107,15 @@ final class AppModel {
             } else {
                 // Turned on again, it asks again.
                 guesser.forget()
-                guessesChanged()
             }
+            guessesChanged()
         }
     }
     static let guessesClassificationsKey = "classification.guessesFromNames"
+    /// Whether to ask, as the window opens, if Cicero should classify fonts automatically: at the first launch, until
+    /// it's answered. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
+    private(set) var asksAboutGuessing = false
+    static let asksAboutGuessingKey = "classification.asksAboutGuessing"
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
     private(set) var tagDots: [String: [TagColor]] = [:]
@@ -109,6 +125,8 @@ final class AppModel {
     /// The sidebar item the browser's title and empty states follow. Setting it selects just that item.
     var selection: SidebarItem? = .all {
         didSet {
+            // Showing a sidebar item again ends Show Similar Fonts.
+            if selection != nil, similarFamilyID != nil { similarFamilyID = nil }
             let items: Set<SidebarItem> = selection.map { [$0] } ?? []
             if selectedItems != items { selectedItems = items }
             guard oldValue != selection else { return }
@@ -126,6 +144,9 @@ final class AppModel {
     }
     /// The style chosen in the open font page's Style menu; nil follows the preview weight.
     var pageStyleID: FaceID?
+    /// The family whose similar fonts the browser shows instead of a sidebar item's, the closest first (see
+    /// `showSimilar`); nil for a sidebar item's.
+    var similarFamilyID: String?
     /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
     /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
@@ -192,6 +213,7 @@ final class AppModel {
     @ObservationIgnored private var scanTask: Task<Void, Never>?
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var coverageTask: Task<Void, Never>?
+    @ObservationIgnored private var measurementTask: Task<Void, Never>?
     @ObservationIgnored private var problemsTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -226,6 +248,9 @@ final class AppModel {
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
+    @ObservationIgnored var similarCache: (key: SimilarKey, table: SimilarFonts)?
+    /// What the sidebar had selected before Show Similar Fonts, to go back to.
+    @ObservationIgnored var similarReturn: Set<SidebarItem>?
     /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
 
@@ -237,9 +262,17 @@ final class AppModel {
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
+        measurements = MeasurementIndex(caches: locations.caches,
+                                        embedder: LetterEmbedding(contentsOf: Bundle.main.url(forResource: "LetterEmbedding", withExtension: "mlmodelc")))
         pageContents = PageContents(coverage: coverage)
         guesser = ClassificationGuesser(caches: locations.caches)
-        guessesClassifications = UserDefaults.standard.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
+        let defaults = UserDefaults.standard
+        if !store.hasSavedData, defaults.object(forKey: Self.guessesClassificationsKey) == nil {
+            defaults.set(true, forKey: Self.asksAboutGuessingKey)
+        }
+        let asks = defaults.bool(forKey: Self.asksAboutGuessingKey)
+        asksAboutGuessing = asks
+        guessesClassifications = !asks && defaults.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
         // Files from before there was a Font Library get its first place, saved with the next change.
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
@@ -426,6 +459,7 @@ final class AppModel {
     func rebuildFontList() {
         scanner.clearCache()
         coverage.clearCache()
+        measurements.clearCache()
         rescan()
     }
 
@@ -474,6 +508,8 @@ final class AppModel {
 
     private func updateCoverage() {
         coverageTask?.cancel()
+        // Measuring starts again after coverage, with the new families; what it measured so far is kept.
+        measurementTask?.cancel()
         let families = library.families
         let coverage = coverage
         let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
@@ -490,6 +526,31 @@ final class AppModel {
             self.coverageProgress = nil
             self.coverageRevision &+= 1
             self.characterSetLookup.reset()
+            self.updateMeasurements()
+        }
+    }
+
+    /// Every family's letters, for similar fonts; after coverage, which lists wait for.
+    private func updateMeasurements() {
+        measurementTask?.cancel()
+        let families = library.families
+        let measurements = measurements
+        let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
+            guard let self else { return }
+            Task { @MainActor in
+                self.measurementProgress = CoverageProgress(done: done, total: total)
+                if done == total || done % 200 == 0 {
+                    self.measurementRevision &+= 1
+                    self.refreshLetterGuesses()
+                }
+            }
+        }
+        measurementTask = Task { [weak self] in
+            await measurements.update(families, progress: report)
+            guard !Task.isCancelled, let self else { return }
+            self.measurementProgress = nil
+            self.measurementRevision &+= 1
+            self.refreshLetterGuesses()
         }
     }
 
@@ -631,6 +692,30 @@ final class AppModel {
 
     private func guessesChanged() {
         classificationGuesses = guesser.guesses
+        guessRevision &+= 1
+        refreshGroups()
+    }
+
+    /// Answers the first launch's question: whether to classify fonts automatically from now on.
+    func answerGuessing(_ guesses: Bool) {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: Self.asksAboutGuessingKey)
+        defaults.set(guesses, forKey: Self.guessesClassificationsKey)
+        asksAboutGuessing = false
+        guessesClassifications = guesses
+    }
+
+    /// The classifications the model sees in the letters of the families nothing in their files classifies. They
+    /// count only while guessing is on (see `classificationGuess`), but are kept, as the measurements are, either way.
+    private func refreshLetterGuesses() {
+        var found: [String: Classification] = [:]
+        for family in library.families where family.classification == .unclassified && !family.mixesSerifAndSans {
+            guard let seen = measurements.classification(of: family.regular.face.id), seen.likelihood >= Self.letterGuessLikelihood else { continue }
+            found[family.id] = seen.classification
+        }
+        guard found != letterGuesses else { return }
+        letterGuesses = found
+        guard guessesClassifications else { return }
         guessRevision &+= 1
         refreshGroups()
     }
