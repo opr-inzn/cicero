@@ -5,9 +5,10 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-    /// The Variable tag's: the system teal is too light for small text on its own tint in light mode.
+    /// The Variable tag's: green, which no status tag uses (teal was too close to App Set's blue), darker than the
+    /// system green in light mode, which is too light for small text on its own tint.
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemTeal : NSColor(srgbRed: 0, green: 0.49, blue: 0.58, alpha: 1)
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
     })
 }
 

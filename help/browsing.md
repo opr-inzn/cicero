@@ -64,7 +64,7 @@ Small capsules next to a family’s name tell you more about its state:
 | Temporary | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
 | App Set | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
 
-A teal **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
+A green **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
 
 ## Search
 
