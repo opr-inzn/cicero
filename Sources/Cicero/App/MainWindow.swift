@@ -22,7 +22,9 @@ struct MainWindow: View {
             )) {
                 BrowserView()
                     .modifier(DetailPage())
-                    .navigationDestination(for: String.self) { FontPage(familyID: $0).modifier(DetailPage()) }
+                    // A page of its own for each family, so one opened from another's, as from Similar, starts at the
+                    // top, as from the browser, rather than scrolled where the other was.
+                    .navigationDestination(for: String.self) { FontPage(familyID: $0).id($0).modifier(DetailPage()) }
             }
             // A font page appears and goes at once, never sliding in, whatever else is animating.
             .transaction(value: model.openFamilyID) { transaction in
