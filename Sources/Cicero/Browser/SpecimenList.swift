@@ -66,6 +66,8 @@ private struct Specimen: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                NoteMark(note: model.note(of: family))
+                RatingStars(rating: model.rating(of: family))
                 Spacer(minLength: 8)
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)

@@ -43,13 +43,13 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, with the family’s stars at the right if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
 
 The grid is the view Cicero starts with.
 
 ### Specimens
 
-One wide row per family: the name, the foundry and number of styles, the sample at the preview size, and up to 14 of its style names, each set in its own style.
+One wide row per family: the name, the foundry and number of styles, the family’s stars if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), the sample at the preview size, and up to 14 of its style names, each set in its own style.
 
 ### Status tags
 

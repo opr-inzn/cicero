@@ -254,13 +254,13 @@ Give a family one to five stars, to pick out your favorites or the ones you’d 
 - On a font page, right-click the text, the header or a style for the same menu.
 - In the [Info panel](browsing.md#see-a-fonts-details), click a star under **Rating**. Click the one it has again to take the rating away.
 
-To see ratings in the list, right-click the column headers and choose **Rating**; click its header to sort by it. To keep your favorites together, make a [smart set](#smart-sets) with a **Rating** rule, like **Rating** **is more than** ★★★.
+A rated family shows its stars in the grid and specimens. To see ratings in the list, right-click the column headers and choose **Rating**; click its header to sort by it. To keep your favorites together, make a [smart set](#smart-sets) with a **Rating** rule, like **Rating** **is more than** ★★★.
 
 ## Notes
 
 Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type, pressing Return for a new line; Cicero saves it as you go. Delete the text to take the note away.
 
-Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
+A family with a note has a small note symbol next to its name in the grid and specimens; hold the pointer over it to read the note. Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
 
 ## Foundries
 

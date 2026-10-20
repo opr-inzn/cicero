@@ -245,6 +245,38 @@ enum Rating {
     static func description(_ count: Int) -> String { count == 1 ? "1 star" : "\(count) stars" }
 }
 
+/// A family's stars on its card in the grid and specimens; nothing without a rating.
+struct RatingStars: View {
+    let rating: Int?
+
+    var body: some View {
+        if let rating {
+            Text(Rating.stars(rating))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .accessibilityLabel(Rating.description(rating))
+        }
+    }
+}
+
+/// A small symbol on a family's card in the grid and specimens when it has a note, which shows as its tooltip;
+/// nothing without one.
+struct NoteMark: View {
+    let note: String?
+
+    var body: some View {
+        if let note {
+            Image(systemName: "note.text")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help(note)
+                .accessibilityLabel("Note")
+                .accessibilityValue(note)
+        }
+    }
+}
+
 /// Which classification families are in: Automatic, the one their fonts suggest, or one the user puts them in, the
 /// one Automatic suggests too, which keeps them there whatever Cicero suggests later; and a new one.
 struct ClassificationMenuItems: View {
