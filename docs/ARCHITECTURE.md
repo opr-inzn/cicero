@@ -17,7 +17,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   state in the library), `Family` (faces plus everything lists and filters need, computed once, the
   classification among them). `LetterShapes` (`Library/`) judges serif, sans serif or monospaced from the
   outlines and widths of a few letters when the scanner reads a face whose file doesn't say; the answer is
-  cached with the face.
+  cached with the face. `LocalizedNames` (`Library/`) reads the family's names in other languages from the name
+  table, all of them, cached with the face, and picks the one for the Mac's languages: a `Family`'s `name` is the
+  one it shows, its `id` the fonts' own, which the user's data keys by.
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
   which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
   with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
@@ -26,7 +28,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
   only for that file.
 - **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
-  tags (license tags to begin with) and their colours, foundry names, character sets, sidebar choices, install method, activation records).
+  tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
@@ -34,6 +36,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Every change goes through fontd and waits for it (copies are registered too, files are unregistered
   before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
+  The app's `engine` carries the Font Library (`fontLibrary`, from `UserData.fontLibraryPath`) and whether to install
+  into it (`installsIntoFontLibrary`): copies then go into a folder for each family there and are registered where
+  they are, recorded as installed copies and in place, and files in the library are only ever registered and
+  unregistered (`FontLibrary.swift`: folder names, taking away folders left empty, moving the copies installed in
+  ~/Library/Fonts before into the library, moving the library, and where it can't go).
 - **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
   (copy, register, confirm), scans (find, parse, build, save cache), restoring the saved library, applying a library, and coverage,
   for timing them in Instruments.
@@ -61,7 +68,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
   UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
-  Illustrator file (XMP) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
+  Illustrator file (XMP) or Photoshop file (text layers) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
   (`Library/`: by file, PostScript name, or family and style names); `FontFileSearch` asks Spotlight for font files
   by PostScript name.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
@@ -72,7 +79,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   goes and what happens to the original (`move`), the path a translocated app was opened from
   (Security.framework SPI looked up with dlsym), and the copy that strips quarantine (`install`, whose
   Trash tests replace).
-- **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
+- **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive; `FontListCSV` writes
+  the font list as CSV;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.
   Restoring trusts nothing in the archive: only font files, only into font locations, and only
@@ -83,7 +91,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   and immutable through `SQLiteFile`, the system's SQLite) or its backups, and `FontBookImport` Font Book's
   `.collection` archives (their font descriptors read as attributes, without AppKit), into an `ImportedLibrary`:
   fonts named by file, PostScript name or family and style, sets, smart sets with their rules already in Cicero's
-  terms, labels as tags, ratings, activation history. `LibraryImport` adds the other app's fonts to the user data,
+  terms, labels as tags, ratings, comments, activation history. `LibraryImport` adds the other app's fonts to the user data,
   then, once a scan has read them, matches the rest to the library and adds it, only ever adding.
 
 ## The app
@@ -132,7 +140,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   closed, and draws nothing then; a font file nothing has read yet is read off the main thread first.
 - `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates and the
   automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
-  binary has no Info.plist with the feed.
+  binary has no Info.plist with the feed. With the switch on, it checks right after starting the updater,
+  before Sparkle's first scheduling pass, so Sparkle counts its day from that check.
 - `ApplicationsFolder` (`App/`) asks at launch to move Cicero into the Applications folder, and again
   instead of registering a login item from elsewhere (`LoginItem.set`). It finds disk images with
   DiskArbitration, moves through `AppLocation`, and relaunches the copy from a shell script that waits

@@ -99,7 +99,8 @@ final class ClassificationGuesser {
         var styles: [String]
 
         init(_ family: Family) {
-            name = family.name
+            // As the fonts give it, not as shown in the Mac's language.
+            name = family.id
             foundry = family.manufacturer
             designer = family.faces.lazy.compactMap(\.face.designer).first
             var seen = Set<String>()

@@ -169,8 +169,10 @@ public struct LibraryBackup: Sendable {
         move(path, from: "~", to: home)
     }
 
-    /// The path with one home folder swapped for another; other paths as they are.
+    /// The path with one home folder (or other folder) swapped for another; other paths as they are, and every path when
+    /// `old` is empty.
     static func move(_ path: String, from old: String, to new: String) -> String {
+        guard !old.isEmpty else { return path }
         if path == old { return new }
         return path.hasPrefix(old + "/") ? new + path.dropFirst(old.count) : path
     }
@@ -334,12 +336,15 @@ public struct LibraryBackup: Sendable {
     /// (`fontLocations`). A file meant for anywhere else, or that can't go back (no permission, or the
     /// folder belongs to an app that isn't installed), goes into the fallback folder with its path kept
     /// under it. A file that isn't a font, or whose place in the archive leads out of the unzipped folder
-    /// or through a symbolic link, is left out. Runs off the main thread; cancelling stops it between files.
+    /// or through a symbolic link, is left out. Fonts that were in the backup's Font Library go into `fontLibrary`, if
+    /// given (see `userData(from:fontLibrary:)`). Runs off the main thread; cancelling stops it between files.
     @concurrent
-    public func restoreFonts(_ contents: BackupContents, progress: @escaping @Sendable (Int, Int) -> Void) async -> FontRestoreResult {
+    public func restoreFonts(_ contents: BackupContents, fontLibrary: String? = nil, progress: @escaping @Sendable (Int, Int) -> Void) async -> FontRestoreResult {
         let fm = FileManager.default
         var result = FontRestoreResult()
-        let roots = fontLocations(watching: userData(from: contents).folders)
+        let data = userData(from: contents, fontLibrary: fontLibrary)
+        let roots = fontLocations(watching: data.folders, fontLibrary: data.fontLibraryPath)
+        let libraries = fontLibraries(of: contents, restoringInto: fontLibrary)
         let fonts = contents.manifest.fonts.filter { $0.archivePath != nil }
         for (index, font) in fonts.enumerated() {
             if Task.isCancelled {
@@ -347,7 +352,7 @@ public struct LibraryBackup: Sendable {
                 break
             }
             progress(index, fonts.count)
-            let target = expand(font.path)
+            let target = Self.move(expand(font.path), from: libraries.backup, to: libraries.restored)
             guard Self.isFontFile(target), let source = Self.archivedFile(font.archivePath!, in: contents.folder) else {
                 result.failed += 1
                 continue
@@ -396,15 +401,24 @@ public struct LibraryBackup: Sendable {
     }
 
     /// Where a restore puts fonts back and which paths it takes records about: ~/Library/Fonts,
-    /// /Library/Fonts, Cicero's Deactivated folder, the backup's watched folders and Adobe's shared font
-    /// folders (and the Fonts folder next to an Adobe app, see `isFontLocation`). Only plain absolute
+    /// /Library/Fonts, Cicero's Deactivated folder, the backup's watched folders, the Font Library and Adobe's shared
+    /// font folders (and the Fonts folder next to an Adobe app, see `isFontLocation`). Only plain absolute
     /// paths, never macOS's folders.
-    private func fontLocations(watching folders: [WatchedFolder]) -> [String] {
+    private func fontLocations(watching folders: [WatchedFolder], fontLibrary: String) -> [String] {
         let paths = [
             locations.userFonts.path, locations.allUsersFonts.path, locations.deactivated.path,
             "/Library/Application Support/Adobe/Fonts", home.appendingPathComponent("Library/Application Support/Adobe/Fonts").path,
-        ] + folders.map(\.path)
+        ] + folders.map(\.path) + (fontLibrary.isEmpty ? [] : [fontLibrary])
         return paths.filter { Self.isPlainPath($0) && !ActivationEngine.isProtected($0 + "/") }
+    }
+
+    /// The backup's Font Library on this Mac (its path moved to this home folder) and the one its fonts go back into:
+    /// `target` if given, else the same. Both empty for a backup from before there was one, which has none to move.
+    func fontLibraries(of contents: BackupContents, restoringInto target: String?) -> (backup: String, restored: String) {
+        let saved = contents.userData.fontLibraryPath
+        guard !saved.isEmpty else { return ("", target ?? "") }
+        let backup = Self.move(saved, from: contents.manifest.home, to: home.path)
+        return (backup, target ?? backup)
     }
 
     /// Whether a path is a font file in one of `roots` (from `fontLocations`) or in the Fonts folder next to
@@ -452,10 +466,14 @@ public struct LibraryBackup: Sendable {
     /// one. Temporary activations are over. Records are kept only about font files in font locations
     /// (`fontLocations`), installed copies only in ~/Library/Fonts and files kept out of an app's folder
     /// only in Cicero's Deactivated folder: activating moves such a file back to the folder its record
-    /// names. The rest are merged by `mergedRecords`.
-    public func userData(from contents: BackupContents) -> UserData {
+    /// names. The rest are merged by `mergedRecords`. The Font Library is the backup's unless `fontLibrary` says where
+    /// it's to be, as this Mac's when only fonts are restored: the paths in the backup's move there.
+    public func userData(from contents: BackupContents, fontLibrary: String? = nil) -> UserData {
         let oldHome = contents.manifest.home
-        func map(_ path: String) -> String { Self.move(path, from: oldHome, to: home.path) }
+        let libraries = fontLibraries(of: contents, restoringInto: fontLibrary)
+        func map(_ path: String) -> String {
+            Self.move(Self.move(path, from: oldHome, to: home.path), from: libraries.backup, to: libraries.restored)
+        }
         func map(_ dictionary: [String: String]) -> [String: String] {
             Dictionary(dictionary.map { (map($0.key), map($0.value)) }, uniquingKeysWith: { first, _ in first })
         }
@@ -463,10 +481,14 @@ public struct LibraryBackup: Sendable {
         data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName, isActive: $0.isActive) }
         data.fontFiles = data.fontFiles.map(map)
         data.missingFontFiles = [:]
-        let roots = fontLocations(watching: data.folders)
+        data.fontLibraryPath = libraries.restored
+        let roots = fontLocations(watching: data.folders, fontLibrary: data.fontLibraryPath)
         func isFont(_ path: String) -> Bool { Self.isFontLocation(path, in: roots) }
         func isFont(_ path: String, in folder: URL) -> Bool { path.hasPrefix(folder.path + "/") && isFont(path) }
-        data.records.installedCopies = map(data.records.installedCopies).filter { isFont($0.key, in: locations.userFonts) && isFont($0.value) }
+        let fontLibrary = data.fontLibraryPath.isEmpty ? nil : URL(fileURLWithPath: data.fontLibraryPath, isDirectory: true)
+        data.records.installedCopies = map(data.records.installedCopies).filter { copy, origin in
+            (isFont(copy, in: locations.userFonts) || fontLibrary.map { isFont(copy, in: $0) } == true) && isFont(origin)
+        }
         data.records.inPlace = Set(data.records.inPlace.map(map).filter(isFont))
         data.records.temporary = [:]
         data.records.appFolderOrigins = map(data.records.appFolderOrigins).filter { isFont($0.key, in: locations.deactivated) && isFont($0.value) }

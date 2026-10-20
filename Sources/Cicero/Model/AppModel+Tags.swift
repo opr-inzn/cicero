@@ -110,4 +110,15 @@ extension AppModel {
         for family in families { data.familyRatings[family.id] = stars }
         self.data = data
     }
+
+    func note(of family: Family) -> String? {
+        data.familyNotes[family.id]
+    }
+
+    /// The family's note as written; nothing but spaces and new lines takes it away.
+    func setNote(_ note: String, for family: Family) {
+        let note = note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note
+        guard data.familyNotes[family.id] != note else { return }
+        data.familyNotes[family.id] = note
+    }
 }

@@ -81,17 +81,18 @@ Cicero can bring over what you set up in FontExplorer X Pro or Font Book, so you
 
 What comes over:
 
-- **Your fonts.** FontExplorer X’s Font Library is added as a folder, called **FontExplorer X** in the sidebar, and the fonts it used from other folders are listed where they are, under **Added Fonts**. Nothing is moved or turned on. From a `.fexbackup` with fonts, they’re put back where the Font Library was, in your home folder, without writing over anything.
+- **Your fonts.** FontExplorer X’s Font Library is added as a folder, called **FontExplorer X** in the sidebar, and the fonts it used from other folders are listed where they are, under **Added Fonts**. Nothing is moved or turned on. From a `.fexbackup` with fonts, they’re put back where the Font Library was, in your home folder, without writing over anything. A database copied from another Mac needs its Font Library where it was, in your home folder or on a disk that’s connected; if it isn’t, Cicero says where it looked, and once the folder is there, importing again brings in its fonts.
 - **Sets,** with the folders they were in in their names, like “Clients / Acme”. FontExplorer X puts files in sets, so a set gets every style in its files: a whole family when it has them all, otherwise just those styles.
 - **Application sets,** with their apps. An app that isn’t on this Mac is found by its name, also with another year, like Adobe InDesign 2026 for Adobe InDesign 2024. Cicero has no fonts to turn off while an app is open, so the **Autodeactivate** part stays behind.
 - **Smart sets,** when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), designer, whether it’s activated, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
 - **Labels,** as tags in their colors, named after them: Red, Orange, Yellow, Green, Blue, Purple and Gray. A family gets a tag for each label its styles have.
 - **Classifications.** A family goes in the classification most of its styles have in FontExplorer X, as if you’d put it there, unless you chose one already. Classifications you made in FontExplorer X come along as your own.
 - **Ratings.** A family gets the stars of its best-rated style, unless you gave it a rating already.
+- **Comments,** as notes. A family’s note gets the comments on its files and styles, each once, unless you wrote a note already.
 - **Activations:** how often each family was turned on and when last, for the **Times Activated** and **Last Activated** rules.
 - **The fonts that were on,** turned on again where they are. Quit FontExplorer X first, so it doesn’t turn them off when it quits.
 
-Comments and license details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
+License details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
 
 ### Font Book
 
@@ -111,7 +112,7 @@ Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (
 
 ## Keep Cicero up to date
 
-Cicero checks for new versions by itself and asks before it installs one.
+Cicero checks for new versions each time it opens and once a day while it stays open, and asks before it installs one.
 
 - To check now, choose **Cicero → Check for Updates**
 - To stop checking by itself, open **Settings → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**

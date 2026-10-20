@@ -61,6 +61,7 @@ private struct Specimen: View {
                 Text(family.name).font(.headline).lineLimit(1)
                 TagDots(colors: model.tagColors(of: family))
                 StatusTag(family: family)
+                VariableTag(family: family)
                 Text([foundry, family.stylesLabel].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -71,8 +72,8 @@ private struct Specimen: View {
             }
             FontText(
                 text: preview.text(for: family), face: family.face(nearestWeight: preview.weight).face,
-                size: preview.size, weight: preview.weight,
-                features: model.features(for: family), kerning: preview.kerning(at: preview.size)
+                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
+                kerning: preview.kerning(at: preview.size)
             )
             .frame(maxWidth: .infinity, alignment: preview.alignment.frame)
             if family.faces.count > 1 {

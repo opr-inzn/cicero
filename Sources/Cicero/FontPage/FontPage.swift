@@ -1,3 +1,4 @@
+import AppKit
 import CiceroCore
 import SwiftUI
 
@@ -23,9 +24,14 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        let face = family.face(nearestWeight: preview.weight).face
-        // Usually ready before the page opens: the browser starts on a family when it's selected.
-        let content = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        // The style the text is set in, whose glyphs the page lists.
+        let face = model.previewStyle(of: family, weight: preview.weight).face.face
+        // Usually ready before the page opens: the browser starts on a family when it's selected. While another style's
+        // are read, the last one's stay, in that style, rather than a spinner in their place.
+        let ready = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
+        let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
+            family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
+        }
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Header(family: family)
@@ -45,10 +51,12 @@ struct FontPage: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
                     // their cells after their titles, moved what was already there.
-                    if let content {
+                    if let shown {
                         if let glyphColumns {
-                            GlyphsSection(family: family, columns: glyphColumns, sections: content.glyphs, characterCount: content.characterCount,
-                                          ligatures: content.ligatures, ligatureCharacters: content.ligatureCharacters)
+                            let content = shown.content
+                            GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
+                                          characterCount: content.characterCount, ligatures: content.ligatures,
+                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
@@ -158,70 +166,98 @@ private struct TypeTester: View {
     @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
-    /// nil follows the preview weight.
-    @State private var styleID: FaceID?
 
     var body: some View {
-        let chosen = family.faces.first { $0.id == styleID }
-        let face = chosen ?? family.face(nearestWeight: preview.weight)
-        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
+        let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 if family.faces.count > 1 {
-                    Picker("Style", selection: $styleID) {
-                        Text("Automatic").tag(FaceID?.none)
+                    Picker("Style", selection: choice(isAdjusted: !variations.isEmpty)) {
+                        Text("Automatic").tag(StyleChoice.automatic)
                         Divider()
-                        ForEach(family.faces) { Text($0.face.styleName).tag(Optional($0.id)) }
+                        ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
+                        if !variations.isEmpty {
+                            Divider()
+                            Text("Custom").tag(StyleChoice.custom)
+                        }
                     }
                     .fixedSize()
                     .help("Which style to show; Automatic follows the preview weight")
                 }
                 Spacer()
+                // Where the row is short of room, the slider narrows; squeezed, the label would wrap and the row grow.
                 HStack(spacing: 8) {
-                    Text("Size").foregroundStyle(.secondary)
-                    ValueSlider(value: $size, range: 12...240).frame(width: 160)
+                    Text("Size").foregroundStyle(.secondary).fixedSize()
+                    ValueSlider(value: $size, range: 12...240).frame(minWidth: 80, maxWidth: 160)
                     ValueField("Size", value: $size, range: 12...240, unit: " pt")
                 }
+                .layoutPriority(1)
                 IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
                     .help("Align left, center or right")
+                if !face.face.axes.isEmpty {
+                    AxesButton()
+                }
             }
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
-                editor(face: face, weight: weight)
+                editor(FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
+                                              features: model.features(for: family)))
             }
             .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
     }
+
+    /// The Style menu's choice: Custom once an axis has been moved, until a style is chosen again.
+    private func choice(isAdjusted: Bool) -> Binding<StyleChoice> {
+        Binding {
+            isAdjusted ? .custom : model.pageStyleID.map(StyleChoice.style) ?? .automatic
+        } set: { choice in
+            switch choice {
+            case .automatic: model.pageStyleID = nil
+            case .style(let id): model.pageStyleID = id
+            case .custom: return
+            }
+            model.familyAxes[family.id] = nil
+        }
+    }
+}
+
+private enum StyleChoice: Hashable {
+    case automatic
+    case style(FaceID)
+    case custom
+}
+
+/// Shows the Info panel at its Axes tab, or hides it when it's showing them.
+private struct AxesButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button {
+            let isShowing = model.isInfoPresented && model.infoTab == .axes
+            model.infoTab = .axes
+            model.isInfoPresented = !isShowing
+        } label: {
+            Label("Axes", systemImage: "slider.horizontal.3")
+        }
+        .help("Move the style’s axes, in the Info panel")
+    }
 }
 
 private extension TypeTester {
     @ViewBuilder
-    func editor(face: LibraryFace, weight: Double) -> some View {
-        let ctFont = FontLoader.shared.font(face.face, size: size, weight: weight, features: model.features(for: family))
-        let font = Font(ctFont)
+    func editor(_ ctFont: CTFont) -> some View {
         let kerning = preview.kerning(at: size)
-        let lineHeight = preview.lineHeight(at: size)
         let lineHeightPoints = size * preview.lineSpacing / 100
         let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
-        // An invisible copy of the text sets the editor's height, so it grows with the page instead of
-        // scrolling inside it. The 5 pt matches the editor's padding at each end of a line.
-        Text(text.hasSuffix("\n") || text.isEmpty ? text + " " : text)
-            .font(font)
-            .kerning(kerning)
-            .lineHeight(lineHeight)
-            .multilineTextAlignment(alignment.text)
-            .frame(maxWidth: .infinity, alignment: alignment.frame)
-            .padding(.horizontal, 5)
-            .padding(.vertical, overhang)
-            .hidden()
-            .overlay {
-                SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
-                             alignment: alignment.paragraph, overhang: overhang) {
-                    FamilyMenu(families: [family], model: model)
-                }
-            }
+        // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
+        SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+                     alignment: alignment.paragraph, overhang: overhang) {
+            FamilyMenu(families: [family], model: model)
+        }
             .frame(minHeight: 280)
             .padding(.vertical, 20)
             // Around the text too, which has it in its own menu (see `SampleEditor`).
@@ -245,7 +281,9 @@ private extension TypeTester {
 }
 
 /// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
-/// rather than with the page.
+/// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above.
+/// After Weight, a column for each other axis the styles sit apart on, like Width or one of the designer's own, in
+/// the order the styles are listed by (see `Family.styleAxes`).
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -253,14 +291,25 @@ private struct StyleRows: View {
 
     var body: some View {
         let model = self.model
-        let features = model.features(for: family)
+        let headerFont = NSFont.systemFont(ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold)
+        let axes = family.styleAxes.map { (tag: $0.tag, name: $0.name, width: Self.width(fitting: [$0.name], in: headerFont)) }
+        // As wide as the longest name, up to a point: some run to Serif Compressed Thin Italic.
+        let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: 240)
+        // The switch and the longest status its styles say, or come to with their switches, so turning one on or off
+        // doesn't move the columns; the rest of the page's width goes to the samples.
+        let statuses = family.faces.flatMap { style in
+            [style.state.label, "Active", "Inactive"] + (style.app.map { [FaceState.appOnly($0).label] } ?? [])
+        }
+        let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         VStack(spacing: 0) {
-            row {
-                Text("Preview")
+            row(styleWidth: styleWidth, statusWidth: statusWidth) {
+                Text("Styles")
             } style: {
                 Text("Style")
             } weight: {
                 Text("Weight")
+            } axes: {
+                ForEach(axes, id: \.tag) { Text($0.name).frame(width: $0.width, alignment: .leading) }
             } status: {
                 Text("Status")
             }
@@ -269,12 +318,19 @@ private struct StyleRows: View {
             .padding(.vertical, 6)
             ForEach(family.faces) { style in
                 Divider()
-                row {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight, features: features)
+                row(styleWidth: styleWidth, statusWidth: statusWidth) {
+                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
                     Text("\(Int(style.face.styleWeight.rounded()))").monospacedDigit().foregroundStyle(.secondary)
+                } axes: {
+                    ForEach(axes, id: \.tag) { axis in
+                        Text(style.face.styleValue(on: axis.tag)?.formatted(.number.grouping(.never).precision(.fractionLength(0...1))) ?? "")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: axis.width, alignment: .leading)
+                    }
                 } status: {
                     HStack(spacing: 8) {
                         MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {
@@ -288,8 +344,7 @@ private struct StyleRows: View {
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
                 // Onto a set in the sidebar, which takes just this style.
                 .draggable(FontDrag(family: family.id, style: style.face.postScriptName)) {
-                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20,
-                             weight: style.face.styleWeight, features: features)
+                    FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20, weight: style.face.styleWeight)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.background, in: .rect(cornerRadius: 8))
@@ -301,13 +356,21 @@ private struct StyleRows: View {
         .padding(.top, 12)
     }
 
-    private func row(@ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
-                     @ViewBuilder weight: () -> some View, @ViewBuilder status: () -> some View) -> some View {
+    /// As wide as the widest of `texts` set in `font`, within `minimum` and `maximum`.
+    private static func width(fitting texts: [String], in font: NSFont, minimum: CGFloat = 56, maximum: CGFloat = .infinity) -> CGFloat {
+        let widest = texts.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return min(max(minimum, widest.rounded(.up)), maximum)
+    }
+
+    private func row(styleWidth: CGFloat, statusWidth: CGFloat, @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
+                     @ViewBuilder weight: () -> some View, @ViewBuilder axes: () -> some View,
+                     @ViewBuilder status: () -> some View) -> some View {
         HStack(spacing: 12) {
             preview().frame(maxWidth: .infinity, alignment: .leading)
-            style().lineLimit(1).frame(width: 140, alignment: .leading)
+            style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
             weight().frame(width: 56, alignment: .leading)
-            status().frame(width: 210, alignment: .leading)
+            axes().lineLimit(1)
+            status().frame(width: statusWidth, alignment: .leading)
         }
     }
 }

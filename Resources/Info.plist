@@ -22,8 +22,6 @@
 				<string>public.truetype-collection-font</string>
 				<string>public.opentype-collection-font</string>
 				<string>com.apple.truetype-datafork-suitcase-font</string>
-				<string>org.w3c.woff</string>
-				<string>org.w3c.woff2</string>
 			</array>
 		</dict>
 	</array>
@@ -42,15 +40,15 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.6</string>
+	<string>1.8.2</string>
 	<key>CFBundleVersion</key>
-	<string>22</string>
+	<string>29</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.graphics-design</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Cicero asks macOS to restart your Mac when you choose Restart Now after clearing font caches.</string>
+	<string>Cicero asks InDesign, Illustrator and Photoshop which fonts their open documents use, to activate the ones that are off, and asks macOS to restart your Mac when you choose Restart Now after clearing font caches.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Cicero reads the fonts in your library that are kept here, like ones you added or a folder it watches, and looks here for the fonts a document uses when you choose Find on This Mac. Nothing leaves your Mac.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

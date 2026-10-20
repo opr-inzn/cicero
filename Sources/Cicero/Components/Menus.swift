@@ -66,7 +66,9 @@ struct FamilyMenu: View {
         Button("Reveal in Finder", systemImage: "finder") { model.reveal(families) }
         Button(families.count == 1 ? "Copy Family Name" : "Copy Family Names", systemImage: "doc.on.clipboard") {
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(families.map(\.name).joined(separator: "\n"), forType: .string)
+            // The fonts' own names, which apps and style sheets know them by everywhere, also for a family shown in the
+            // Mac's language.
+            NSPasteboard.general.setString(families.map(\.id).joined(separator: "\n"), forType: .string)
         }
         Button("Export", systemImage: "square.and.arrow.up") { model.exportFonts(families, named: nil) }
         // Measured once its letters are, a moment after it's added; never for one without Latin letters.

@@ -29,7 +29,8 @@ public struct DocumentFont: Hashable, Sendable {
 
 /// Reads which fonts a document uses, without opening it in the app that made it and without anything
 /// leaving the Mac: PDFs (and Illustrator files, which are PDFs inside) from their pages' font resources,
-/// IDML from its font list, and InDesign and Illustrator files from the font list in their XMP metadata.
+/// IDML from its font list, InDesign and Illustrator files from the font list in their XMP metadata, and Photoshop
+/// files from their text layers.
 /// Every reader trusts nothing in the file: what it can't read, it leaves out.
 public enum DocumentFonts {
     public enum Failure: Error, Equatable {
@@ -37,7 +38,7 @@ public enum DocumentFonts {
         case unsupported
     }
 
-    public static let fileExtensions: Set<String> = ["pdf", "ai", "idml", "indd", "indt"]
+    public static let fileExtensions: Set<String> = ["pdf", "ai", "idml", "indd", "indt", "psd", "psb"]
 
     /// The fonts the document uses, each once, in the order found. Reads the file; call off the main thread.
     public static func read(_ url: URL) throws -> [DocumentFont] {
@@ -52,6 +53,8 @@ public enum DocumentFonts {
             fonts = try idml(url)
         case "indd", "indt":
             fonts = xmp(try data(url))
+        case "psd", "psb":
+            fonts = try photoshop(try data(url))
         default:
             throw Failure.unsupported
         }

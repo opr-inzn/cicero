@@ -274,11 +274,10 @@ private struct FamilyQuickLook: View {
     private static let inset: CGFloat = 28
 
     var body: some View {
-        let features = model.features(for: family)
         ScrollView {
             // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
-                sample(features: features)
+                sample()
                     .padding(.horizontal, Self.inset)
                     .padding(.top, 12)
                     .padding(.bottom, 24)
@@ -288,7 +287,7 @@ private struct FamilyQuickLook: View {
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 10)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight, features: features)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight)
                             .padding(.horizontal, Self.inset)
                             .padding(.vertical, 5)
                     }
@@ -303,19 +302,20 @@ private struct FamilyQuickLook: View {
     }
 
     /// Lined up and spaced as Preview Options say.
-    private func sample(features: [FeatureSetting]) -> some View {
+    private func sample() -> some View {
         let face = family.regular.face
+        let variations = model.variations(for: family)
         let alignment = preview.alignment
         return Group {
             if preview.sampleText.isEmpty {
                 VStack(alignment: alignment.horizontal, spacing: 14) {
-                    QuickLookText(text: PreviewSettings.tileSample, face: face, size: 96, features: features, kerning: preview.kerning(at: 96))
+                    QuickLookText(text: PreviewSettings.tileSample, face: face, size: 96, variations: variations, kerning: preview.kerning(at: 96))
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: Self.alphabet, face: face, size: 24, features: features, kerning: preview.kerning(at: 24),
+                    QuickLookText(text: Self.alphabet, face: face, size: 24, variations: variations, kerning: preview.kerning(at: 24),
                                   lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
                 }
             } else {
-                QuickLookText(text: preview.sampleText, face: face, size: 56, features: features, kerning: preview.kerning(at: 56),
+                QuickLookText(text: preview.sampleText, face: face, size: 56, variations: variations, kerning: preview.kerning(at: 56),
                               lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
             }
         }
@@ -377,7 +377,7 @@ private struct QuickLookText: View {
     let face: FontFace
     let size: Double
     var weight: Double = 400
-    var features: [FeatureSetting] = []
+    var variations: [String: Double] = [:]
     var kerning: Double = 0
     var lineLimit: Int? = 1
     var lineHeight: AttributedString.LineHeight?
@@ -385,7 +385,8 @@ private struct QuickLookText: View {
 
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
-            FontText(text: text, face: face, size: size, weight: weight, features: features, kerning: kerning, lineLimit: lineLimit, lineHeight: lineHeight)
+            FontText(text: text, face: face, size: size, weight: weight, variations: variations, kerning: kerning,
+                     lineLimit: lineLimit, lineHeight: lineHeight)
         } else {
             Text(text)
                 .font(.system(size: size))
@@ -393,10 +394,10 @@ private struct QuickLookText: View {
                 .lineHeight(lineHeight)
                 .hidden()
                 .task(id: face.id) {
-                    let (face, size, weight, features) = (face, size, weight, features)
+                    let (face, size, weight, variations) = (face, size, weight, variations)
                     // Makes the font too, so drawing it is a cache hit.
                     await Task.detached(priority: .userInitiated) {
-                        _ = FontLoader.shared.font(face, size: size, weight: weight, features: features)
+                        _ = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
                     }.value
                     readPath = face.path
                 }

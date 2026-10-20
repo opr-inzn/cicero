@@ -6,6 +6,10 @@
 
 Click an item in the sidebar, like **All Fonts**, a folder or a set, and the browser shows its families. To see the fonts of several items at once, ⌘-click or ⇧-click them; see [Select several items](organizing.md#select-several-items).
 
+### Names in your language
+
+A font can name its family in other languages too, as many Japanese, Chinese and Korean fonts do. When it has a name in your Mac’s language, the first in **System Settings → General → Language & Region**, Cicero shows the family by that name and sorts it by it: Hiragino Sans is ヒラギノ角ゴシック on a Mac in Japanese. With English first, families show by their own names. The **Family** row in the [Info panel](#see-a-fonts-details) has the family’s own name, and searching finds either.
+
 ## Choose a view
 
 Use the switcher at the left of the toolbar. Every view shows each family in its own fonts and has an on/off switch for it.
@@ -39,7 +43,7 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF”, “TTF” or “Variable”. Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
 
 The grid is the view Cicero starts with.
 
@@ -57,12 +61,14 @@ Small capsules next to a family’s name tell you more about its state:
 | Partly active | Some of its styles are on, others aren’t |
 | Testing (or an app’s name) | On only in Adobe apps (or that app), from a folder they load by themselves, where type designers put fonts to test them. See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders) |
 | Adobe Fonts | From Adobe Fonts, managed in Creative Cloud: on in every app, or in Adobe apps only when its switch sits halfway. See [Adobe Fonts](activating.md#adobe-fonts) |
-| Temporary | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
-| App Set | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
+| Temporary (with a clock) | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
+| App Set (with an app) | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
+
+A green **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
 
 ## Search
 
-Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name or manufacturer contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
+Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, manufacturer or [note](organizing.md#notes) contains what you type, or the PostScript name, designer or vendor ID of one of its styles.
 
 ## Find similar fonts
 
@@ -107,16 +113,16 @@ Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**)
 From top to bottom, a font page has:
 
 - **The header:** the family name in its own regular style, then its foundry, format, “Variable” for a variable font, and how many styles it has and how many of them are active, partly active (on in Adobe apps only) and inactive. On the right, **Activate** and **Deactivate**. When Cicero can’t turn a family off, **Deactivate** is dimmed; hold the pointer over it to see why. A family from [Adobe Fonts](activating.md#adobe-fonts) has **Manage in Creative Cloud** instead.
-- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it tags or a rating, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**.
+- **The text:** a large sample you can type into. Choose a **Style** (Automatic follows the weight in Preview Options; a variable font is otherwise at its default, the origin its styles are drawn from), set the **Size** from 12 to 240 pt, and align the text left, center or right. The space between its lines is the **Line Spacing** in Preview Options. Cicero remembers your text. Right-click it, or the header, for the family’s menu, as in the browser: give it tags or a rating, add it to a set or change its classification, among others. The text’s menu starts with **Cut**, **Copy** and **Paste**. For a variable style, **Axes** opens the Info panel at its [Axes](#try-variable-axes) tab. Once you’ve moved an axis there, the Style menu says **Custom**: choosing a style, or **Reset All** in the tab, goes back.
 - **Styles,** when the family has more than one: each style set in itself, with its name, weight, and a switch to turn just that style on or off. Its status says how it’s on, like “Active until Cicero quits”. Right-click a style for its menu: activate or deactivate it, turn it on just for now, reveal its file, copy its PostScript name, or move it to the Trash. Under the family’s name, it has the family’s **Add to Set**, **Tags**, **Rating** and **Classification** too.
 - **Similar:** the six families that look most like this one, each set in itself, with its foundry. Click one to open its page, or **Show All** for more in the browser (see [Find similar fonts](#find-similar-fonts)).
-- **Glyphs:** every character in the font, grouped by kind in the order a type designer would list them: **Uppercase** and **Lowercase** from A to Z, then **Uppercase Accents** and **Lowercase Accents** (with the other Latin letters, like Æ, Þ and ß), **Ligatures**, **Proportional Figures** and **Tabular Figures**, **Dingbat Numerals**, **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Punctuation and Symbols**, **Diacritical Marks**, **Combining Marks**, **Case Sensitive Forms**, **Arrows**, and **Global** for the letters and figures of other scripts. The glyphs the style’s features draw in place of characters are in their groups too, like its tabular figures (tnum), superscripts (sups) and case-sensitive forms (case); click one to see which feature draws it. The ligatures the style makes are in the Ligatures group, in a section per feature, like **Standard Ligatures** (see [See a font’s ligatures](#see-a-fonts-ligatures)). To find characters, type into the filter field: a character, part of its Unicode name, or a code like U+00E9. Ligatures made of what you type show too: “f” finds ff, fi and ffl. Click a character to see it large, with its name, its Unicode code, its HTML entities (the named one when HTML has one, like `&eacute;`, and the numeric one, like `&#xE9;`, which works for any character) and, when your keyboard layout types it, its keystroke, like ⌥E, then E for é on a U.S. keyboard (a dead key, then the letter). **Copy Character** there puts it on the clipboard; right-click a character for **Copy Character**, **Copy Unicode** and **Copy HTML Entity**. A glyph a feature draws copies the character it stands for, which looks like the glyph where the feature is on.
+- **Glyphs:** every character in the style the text is set in, the one chosen in the **Style** menu, at its axes as you’ve moved them, grouped by kind in the order a type designer would list them: **Uppercase** and **Lowercase** from A to Z, then **Uppercase Accents** and **Lowercase Accents** (with the other Latin letters, like Æ, Þ and ß), **Ligatures**, **Proportional Figures** and **Tabular Figures**, **Circled Figures** (like ① and ❶), **Punctuation and Symbols** (with signs like Ω for ohms), **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Case Sensitive Forms**, **Arrows**, **Greek** (capitals, then small letters, each followed by its accented forms), **Graphical** for the glyphs a font keeps in private use, like its foundry’s logos and icons, and the letters and figures of other scripts, and last **Diacritical Marks** and **Combining Marks**. The glyphs the style’s features draw in place of characters are in their groups too, like its tabular figures (tnum), superscripts (sups) and case-sensitive forms (case); click one to see which feature draws it. The alternates its features offer, like a stylistic set’s single-storey a, small capitals or old-style figures, follow the characters they’re for, each with a grey dot; click one to see which feature offers it, by the name the font gives it. Figures are listed by kind instead, each kind starting a row: lining figures, then old-style ones, then their other alternates, like a slashed zero, and under **Tabular Figures** the signs that go with them last, like a tabular dollar. The ligatures the style makes are in the Ligatures group, in a section per feature, like **Standard Ligatures** (see [See a font’s ligatures](#see-a-fonts-ligatures)). To find characters, type into the filter field: a character, part of its Unicode name, or a code like U+00E9. Ligatures made of what you type show too: “f” finds ff, fi and ffl. Click a character to see it large, with its name, its Unicode code and its HTML entities (the named one when HTML has one, like `&eacute;`, and the numeric one, like `&#xE9;`, which works for any character). **Copy Character** there puts it on the clipboard and closes the popover, and the bottom of the window says what was copied; right-click a character for **Copy Character**, **Copy Unicode** and **Copy HTML Entity**. A glyph a feature draws copies the character it stands for, which looks like the glyph where the feature is on. **Copy as Vector**, there and in the right-click menu, copies the glyph’s own outline, as the page shows it, in the style chosen and at its axes as you’ve moved them: paste it into Illustrator, InDesign or another design app as a shape you can edit, or as SVG code into an app that takes it, like Figma, or a text editor. Pasted into Messages, Mail or the Finder, it’s an SVG file named after the style and the glyph, as when you drag it out. It’s how you take out the shape of an alternate, or of a glyph a feature draws. To make a file of it, drag the glyph out of the page into the Finder: it becomes an SVG file named after the style and the glyph, like “Inter Regular a.ss01.svg”. Dragged into a design app, it’s a shape there too. The outline is black, at 100 points to the em, in a frame from the font’s descender to its ascender and across the glyph’s width, so glyphs from one font line up on a baseline; a glyph that reaches further gets a bigger frame, so nothing of it is cut off.
 
 ## See a font’s ligatures
 
-Under **Glyphs**, in the **Ligatures** group, a font page lists the ligatures the style makes: single glyphs that stand for several characters, like ﬁ for “fi”. Most fonts give ﬁ and ﬂ a character of their own too; they’re listed once, under their ligature feature, and clicking one shows its character’s code, like U+FB01. They’re grouped by the OpenType feature that makes them: **Standard Ligatures**, which apps use unless you turn them off, then **Discretionary**, **Historical**, **Contextual** and **Required Ligatures**. Each shows the ligature’s glyph in a cell like a character’s; hold the pointer over it to see the characters it stands for. Click one to see it large, with its characters, their codes and its feature. **Copy Characters** there, or in its right-click menu, puts the characters on the clipboard, and **Copy Unicode** in the menu their codes.
+Under **Glyphs**, in the **Ligatures** group, a font page lists the ligatures the style makes: single glyphs that stand for several characters, like ﬁ for “fi”. Most fonts give ﬁ and ﬂ a character of their own too; they’re listed once, under their ligature feature, and clicking one shows its character’s code, like U+FB01. They’re grouped by the OpenType feature that makes them: **Standard Ligatures**, which apps use unless you turn them off, then **Discretionary**, **Historical**, **Contextual** and **Required Ligatures**. Each shows the ligature’s glyph in a cell like a character’s; hold the pointer over it to see the characters it stands for. Click one to see it large, with its characters, their codes and its feature. **Copy Characters** there, or in its right-click menu, puts the characters on the clipboard, and **Copy Unicode** in the menu their codes. **Copy as Vector**, in both, copies the ligature’s outline, and you can drag it out of the page, as with any glyph.
 
-Cicero lists the ligatures of characters you can type. Ligatures of alternates, or of forms only other features make, are left out, and so are fonts that make ligatures the Apple way (AAT) rather than the OpenType way. To try discretionary ligatures in previews, turn them on in the [Features](#try-opentype-features) tab.
+Cicero lists the ligatures of characters you can type. Ligatures of alternates, or of forms only other features make, are left out, and so are fonts that make ligatures the Apple way (AAT) rather than the OpenType way. To try discretionary ligatures in the text on the font page, turn them on in the [Features](#try-opentype-features) tab.
 
 ## See a font’s details
 
@@ -124,6 +130,7 @@ Click **Info** in the toolbar, or choose **Fonts → Show Info** (⌘I). The Inf
 
 The panel describes the style being previewed, the one closest to the weight in Preview Options. Its **Info** tab shows:
 
+- **Note**: your [note](organizing.md#notes) on the family, at the top. Click it to write one.
 - **Status**, and the font’s names: family, style, full name and PostScript name
 - **Tags**: the family’s tags, or **No Tags**. **Change** gives it more or takes them off.
 - **Rating**: five stars to click to give the family a [rating](organizing.md#ratings). Click the one it has again to take the rating away.
@@ -146,7 +153,19 @@ Many fonts have optional features, like small caps, old-style figures or stylist
 
 Some features let you choose one option of several; turning one on turns the others off, and turning the chosen one off goes back to the font’s default.
 
-The features you choose apply to that family wherever Cicero previews it, in the list, grid, specimens and font page, until Cicero quits. They don’t change the font file.
+The features you choose change the text on that family’s font page, until Cicero quits; everywhere else, like the list, grid and specimens and the page’s list of styles, its styles show as they are. Every alternate a feature offers is under **Glyphs** too, after the character it’s for, with a grey dot, whether the feature is on or not. They don’t change the font file.
+
+## Try variable axes
+
+A variable font is drawn from its design axes, like **Weight**, **Width**, **Optical Size** or **Slant**, or the designer’s own, like Roboto Flex’s **Grade**. Cicero shows it at its default on each, the origin its styles are drawn from, Optical Size included, at the weight in Preview Options. To move it along them:
+
+1. Select a variable family and open the Info panel, or click **Axes** on its font page.
+2. Click **Axes**.
+3. Drag a slider, or type a value next to it.
+
+Each axis shows its name and its four-letter tag, like `wdth`. **Weight**, **Width**, **Italic**, **Slant** and **Optical Size** come first, in that order, then the font’s other axes. **Reset All** puts them all back. **Optical Size** stays at the font’s own, like every other axis, rather than following the size of the text, until you move it. Axes the font asks apps not to show, like Roboto Flex’s parametric ones, are listed last, under **Hidden Axes**: click it to show or hide them. Cicero remembers whether they’re shown.
+
+Like features, the axes apply to that family wherever Cicero previews it, in the list, grid, specimens, Quick Look and its font page, text and glyphs alike, until Cicero quits. Choosing a style on the font page puts them back.
 
 ## Change the preview text and size
 

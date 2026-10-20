@@ -13,6 +13,8 @@ public struct ImportChoices: Equatable, Sendable {
     public var tags = true
     public var ratings = true
     public var classifications = true
+    /// Comments, as notes.
+    public var comments = true
     public var history = true
     /// Turn on, in place, the fonts that were on in the other app.
     public var activate = false
@@ -39,6 +41,8 @@ public struct ImportSummary: Equatable, Sendable {
     /// Families put in a classification, and the user's own classifications made for them.
     public var classifiedFamilies = 0
     public var classifications = 0
+    /// Families that got a note from comments.
+    public var notedFamilies = 0
     /// Styles to turn on, as they were on in the other app.
     public var activated = 0
     /// Fonts the sets, tags or ratings name that aren't in the library.
@@ -278,6 +282,20 @@ public enum LibraryImport {
                 }
                 data.classificationOverrides[id] = name
                 summary.classifiedFamilies += 1
+            }
+        }
+
+        // A family's note is its comments, each once, unless it has a note already.
+        if choices.comments {
+            var notes: [String: [String]] = [:]
+            for comment in imported.comments {
+                let text = comment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                for family in families(comment.fonts) where !(notes[family.id] ?? []).contains(text) { notes[family.id, default: []].append(text) }
+            }
+            for (family, texts) in notes where data.familyNotes[family] == nil {
+                data.familyNotes[family] = texts.joined(separator: "\n")
+                summary.notedFamilies += 1
             }
         }
 

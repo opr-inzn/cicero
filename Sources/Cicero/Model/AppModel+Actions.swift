@@ -9,10 +9,14 @@ extension AppModel {
     }
 
     /// Asks how to activate when the install method is Ask, unless every face comes from a folder
-    /// an app loads by itself (those are always used where they are).
-    func activate(_ faces: [LibraryFace], title: String) {
+    /// an app loads by itself (those are always used where they are). Asks first whether to turn on so many when that's
+    /// more than `UserData.manyFamilies` families, unless `confirmed`.
+    func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
+        if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
+            return manyActivationPrompt = prompt
+        }
         let needsChoice = targets.contains { $0.app == nil }
         if data.installMethod == .ask && needsChoice {
             activationPrompt = ActivationPrompt(title: title, faces: targets)
@@ -34,14 +38,34 @@ extension AppModel {
         activateTemporarily(families.flatMap(\.faces))
     }
 
-    /// Until Cicero quits.
-    func activateTemporarily(_ faces: [LibraryFace]) {
+    /// Until Cicero quits. Asks first when that's many families, unless `confirmed`, like `activate`.
+    func activateTemporarily(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canActivateTemporarily)
         guard !targets.isEmpty else { return showToast("Already on") }
+        if !confirmed, let prompt = manyActivationPrompt(for: targets, title: "", temporarily: true) {
+            return manyActivationPrompt = prompt
+        }
         let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, records: model.data.records)
             model.finish(result, operation: operation)
+        }
+    }
+
+    /// A question for turning on more than `UserData.manyFamilies` families at once, while the user wants one.
+    private func manyActivationPrompt(for faces: [LibraryFace], title: String, temporarily: Bool) -> ManyActivationPrompt? {
+        guard data.asksBeforeActivatingMany else { return nil }
+        let families = Set(faces.map(\.face.familyName)).count
+        guard families > UserData.manyFamilies else { return nil }
+        return ManyActivationPrompt(title: title, faces: faces, families: families, temporarily: temporarily)
+    }
+
+    /// Goes on with an activation the user agreed to.
+    func confirm(_ prompt: ManyActivationPrompt) {
+        if prompt.temporarily {
+            activateTemporarily(prompt.faces, confirmed: true)
+        } else {
+            activate(prompt.faces, title: prompt.title, confirmed: true)
         }
     }
 
@@ -148,6 +172,61 @@ extension AppModel {
         }
     }
 
+    // MARK: Font Library
+
+    /// The fonts Cicero installed right in ~/Library/Fonts while it installs into the Font Library, with the family each
+    /// file is in, for its folder there (see `ActivationEngine.misplacedCopies`).
+    func misplacedInstalledFonts() -> (paths: [String], families: [String: String]) {
+        let paths = engine.misplacedCopies(in: data.records)
+        guard !paths.isEmpty else { return ([], [:]) }
+        let wanted = Set(paths)
+        var families: [String: String] = [:]
+        for family in library.families {
+            for face in family.faces {
+                for path in [face.face.path] + face.otherCopies where wanted.contains(path) && families[path] == nil {
+                    families[path] = family.id
+                }
+            }
+        }
+        return (paths, families)
+    }
+
+    /// Moves the fonts Cicero installed right in ~/Library/Fonts into the Font Library (see `misplacedInstalledFonts`).
+    func moveInstalledFonts() {
+        let (paths, families) = misplacedInstalledFonts()
+        guard !paths.isEmpty else { return }
+        enqueue { model in
+            let result = await model.engine.moveInstalledCopies(paths, families: families, records: model.data.records)
+            model.finish(result)
+        }
+    }
+
+    /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;
+    /// a folder it can't go into is refused, saying why (see `ActivationEngine.refusal`).
+    func changeFontLibrary() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        panel.message = "Choose an empty folder for Cicero’s Font Library, or make a new one. Its fonts move there."
+        panel.directoryURL = data.fontLibrary?.url.deletingLastPathComponent()
+        guard panel.runModal() == .OK, let url = panel.url?.standardizedFileURL else { return }
+        if let reason = ActivationEngine.refusal(forFontLibraryAt: url, current: data.fontLibrary?.url, folders: data.scannedFolders(), locations: locations) {
+            let alert = NSAlert()
+            alert.messageText = "The Font Library can’t go into “\(url.lastPathComponent)”."
+            alert.informativeText = reason
+            alert.runModal()
+            return
+        }
+        enqueue { model in
+            let result = await model.engine.moveFontLibrary(to: url, records: model.data.records)
+            if result.failed.isEmpty { model.data.fontLibraryPath = url.path }
+            model.finish(result)
+        }
+    }
+
     // MARK: Trash
 
     func requestTrash(_ families: [Family]) {
@@ -178,6 +257,7 @@ extension AppModel {
         for index in data.sets.indices { data.sets[index].remove(families: [name]) }
         data.familyTags[name] = nil
         data.familyRatings[name] = nil
+        data.familyNotes[name] = nil
         data.activations[name] = nil
         data.foundryOverrides[name] = nil
         selectedIDs.remove(name)
@@ -335,9 +415,9 @@ extension AppModel {
         data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
-    /// The user's folder, or Cicero's Deactivated folder, with the name the user gave it.
+    /// The user's folder, or Cicero's Font Library, with the name the user gave it.
     func folder(_ id: UUID) -> WatchedFolder? {
-        if id == WatchedFolder.deactivatedID { return data.named(WatchedFolder(id: id, path: locations.deactivated.path)) }
+        if id == WatchedFolder.fontLibraryID { return data.fontLibrary.map(data.named) }
         return data.folders.first { $0.id == id }.map(data.named)
     }
 
@@ -574,9 +654,10 @@ extension AppModel {
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
             }
-            if ownFoldersWithFonts.contains(WatchedFolder.deactivatedID) {
-                folders.append(WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path))
+            if ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID), let fontLibrary = data.fontLibrary {
+                folders.append(fontLibrary)
             }
+            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"

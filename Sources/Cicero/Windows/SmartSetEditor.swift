@@ -100,11 +100,12 @@ private struct RuleRow: View {
     }
 
     /// The user's folders, then Testing when its fonts are shown, Adobe Fonts when there are some and they're shown,
-    /// and Added Fonts when there are some.
+    /// Added Fonts when there are some, and the Font Library when it has fonts.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
             + (model.data.fontFiles.isEmpty ? [] : [WatchedFolder.addedFilesID])
+            + (model.ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID) ? [WatchedFolder.fontLibraryID] : [])
         return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
     }
 
@@ -124,6 +125,7 @@ private struct RuleRow: View {
         case .classification: model.classificationNames[0]
         case .tag: model.data.tags.first ?? ""
         case .rating: "5"
+        case .note: ""
         case .set: model.data.sets.first?.id.uuidString ?? ""
         case .folder: folderOptions.first?.id ?? ""
         case .status: SmartRuleValue.statuses[0]
@@ -152,6 +154,9 @@ private struct RuleRow: View {
             }
         case .designer:
             text
+        case .note:
+            TextField("Text", text: $rule.value, prompt: Text("Text, or empty for any note"))
+                .frame(minWidth: 180, maxWidth: 260)
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
@@ -318,6 +323,7 @@ private extension SmartRule.Field {
         case .classification: "Classification"
         case .tag: "Tag"
         case .rating: "Rating"
+        case .note: "Note"
         case .set: "Set"
         case .folder: "Folder"
         case .status: "Status"

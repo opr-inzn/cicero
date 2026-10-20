@@ -45,6 +45,7 @@ struct MainWindow: View {
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.activationPrompt : nil }, set: { model.activationPrompt = $0 })) {
             ActivationSheet(prompt: $0)
         }
+        .confirmsManyActivations(when: model.documentFonts == nil)
         .sheet(item: $model.documentFonts) { DocumentFontsSheet(report: $0) }
         // A sheet of its own for each library, rather than the last one's with its choices.
         .sheet(item: $model.importing) { ImportSheet(prompt: $0).id($0.id) }

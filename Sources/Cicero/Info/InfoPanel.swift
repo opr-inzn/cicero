@@ -108,25 +108,33 @@ private struct FamilyInfo: View {
     let face: LibraryFace
 
     var body: some View {
-        @Bindable var model = model
         VStack(spacing: 0) {
             Text(family.name)
                 .font(.headline)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding([.horizontal, .top], 16)
-            Picker("Tab", selection: $model.infoTab) {
-                ForEach(InfoTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker("Tab", selection: tab) {
+                ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .tabsPickerStyle()
             .labelsHidden()
             .padding(12)
             Divider()
-            switch model.infoTab {
+            switch tab.wrappedValue {
             case .info: ScrollView { InfoRows(family: family, face: face) }
             case .features: FeatureControls(family: family, face: face.face)
+            case .axes: AxisControls(family: family)
             }
         }
+    }
+
+    /// Axes only for a variable family.
+    private var tabs: [InfoTab] { family.isVariable ? InfoTab.allCases : InfoTab.allCases.filter { $0 != .axes } }
+
+    /// Info in the place of Axes for a family that isn't variable, and Axes again for the next that is.
+    private var tab: Binding<InfoTab> {
+        Binding { model.infoTab == .axes && !family.isVariable ? .info : model.infoTab } set: { model.infoTab = $0 }
     }
 }
 
@@ -138,6 +146,8 @@ private struct InfoRows: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // First: what the user wrote about the family.
+            NoteRow(family: family)
             row("Status", face.state.label)
             TagsRow(family: family)
             RatingRow(family: family)
@@ -285,6 +295,63 @@ private struct RatingRow: View {
     }
 }
 
+/// The family's note, to write in place. Return starts a new line, as in a note anywhere else, rather than ending the
+/// editing. Saved a moment after the typing stops, and at once when the field loses focus or the panel goes to another
+/// family, so a list searched or a smart set by notes doesn't change with every key.
+private struct NoteRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+    @State private var text = ""
+    /// The family `text` is the note of.
+    @State private var editing: String?
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Note").font(.caption).foregroundStyle(.secondary)
+            TextField("Note", text: $text, prompt: Text("Add a Note"), axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.callout)
+                .lineLimit(1...12)
+                .focused($isFocused)
+                .labelsHidden()
+                .onKeyPress(.return, action: newLine)
+        }
+        .onAppear(perform: load)
+        .onChange(of: family.id) {
+            save()
+            load()
+        }
+        // A note changed elsewhere, as by restoring a backup, unless it's being written here.
+        .onChange(of: model.note(of: family)) { if !isFocused { load() } }
+        .onChange(of: isFocused) { if !isFocused { save() } }
+        .onDisappear(perform: save)
+        .task(id: text) {
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { save() }
+        }
+    }
+
+    private func load() {
+        editing = family.id
+        text = model.note(of: family) ?? ""
+    }
+
+    /// A line break where the text is selected, as Option-Return puts one in a text field, unless an input method is
+    /// still composing: its Return takes what's typed.
+    private func newLine() -> KeyPress.Result {
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, !editor.hasMarkedText() else { return .ignored }
+        editor.insertNewlineIgnoringFieldEditor(nil)
+        return .handled
+    }
+
+    /// Saves the text as the note of the family it was written for, which may be the one before.
+    private func save() {
+        guard let editing, let family = model.family(editing) else { return }
+        model.setNote(text, for: family)
+    }
+}
+
 // MARK: - Features
 
 private struct FeatureControls: View {
@@ -394,7 +461,7 @@ extension View {
 }
 
 private extension View {
-    /// Info and Features are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
+    /// Info, Features and Axes are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
     @ViewBuilder func tabsPickerStyle() -> some View {
         if #available(macOS 27, *) { pickerStyle(.tabs) } else { pickerStyle(.segmented) }
     }

@@ -18,19 +18,21 @@ struct ActivationSheet: View {
             }
             HStack(spacing: 12) {
                 option("Install a Copy", icon: "doc.on.doc",
-                       detail: "Copies the files into your Fonts folder. The originals stay where they are.") { choose(.copy) }
+                       detail: "Copies the files into \(model.installPlace). The originals stay where they are.") { choose(.copy) }
                 if offersMove {
-                    option("Move Into Fonts Folder", icon: "folder",
-                           detail: "Moves the files you added into your Fonts folder. The folders they were in stay.") { choose(.move) }
+                    option(model.data.installsIntoFontLibrary ? "Move Into Font Library" : "Move Into Fonts Folder", icon: "folder",
+                           detail: "Moves the files you added into \(model.installPlace). The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",
                        detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }
             }
+            // Every option as tall as the tallest.
+            .fixedSize(horizontal: false, vertical: true)
             Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
             HStack {
                 if prompt.switching == nil && prompt.faces.contains(where: \.canActivateTemporarily) {
                     Button("Activate Temporarily") {
-                        model.activateTemporarily(prompt.faces)
+                        model.activateTemporarily(prompt.faces, confirmed: true)
                         dismiss()
                     }
                     .help(prompt.faces.count == 1 ? "Turns the font on until Cicero quits." : "Turns the fonts on until Cicero quits.")
@@ -51,16 +53,21 @@ struct ActivationSheet: View {
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
+                // As tall for every symbol, so the titles line up.
                 Image(systemName: icon)
                     .font(.system(size: 28))
                     .foregroundStyle(.tint)
+                    .frame(height: 36)
                 Text(title).font(.headline)
+                // A bordered button keeps its label to one line, cutting the rest off, unless told otherwise.
                 Text(detail)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 120)
+            .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity, alignment: .top)
             .padding(12)
         }
         .buttonStyle(.bordered)
@@ -75,5 +82,39 @@ struct ActivationSheet: View {
             model.performActivation(prompt.faces, method: method)
         }
         dismiss()
+    }
+}
+
+extension View {
+    /// Asks whether to turn on as many families as `AppModel.manyActivationPrompt` holds, when `isActive`: the main window
+    /// asks unless a sheet of its own is up, which asks from there.
+    func confirmsManyActivations(when isActive: Bool = true) -> some View {
+        modifier(ManyActivationConfirmation(isActive: isActive))
+    }
+}
+
+private struct ManyActivationConfirmation: ViewModifier {
+    let isActive: Bool
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        // On a view of its own, so the window's other alerts don't get the switch.
+        content.background {
+            Color.clear
+                .alert(
+                    model.manyActivationPrompt.map { "Activate \($0.families.formatted()) families?" } ?? "",
+                    isPresented: Binding(get: { isActive && model.manyActivationPrompt != nil }, set: { if !$0 { model.manyActivationPrompt = nil } }),
+                    presenting: model.manyActivationPrompt
+                ) { prompt in
+                    Button(prompt.temporarily ? "Activate Temporarily" : "Activate") { model.confirm(prompt) }
+                    Button("Cancel", role: .cancel) {}
+                } message: { _ in
+                    Text("Apps list every font that’s on in their font menus, and so many at once can make them slower to open.")
+                }
+                .dialogSuppressionToggle("Don’t ask again", isSuppressed: Binding(
+                    get: { !model.data.asksBeforeActivatingMany },
+                    set: { model.data.asksBeforeActivatingMany = !$0 }
+                ))
+        }
     }
 }

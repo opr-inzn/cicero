@@ -22,6 +22,7 @@ struct CiceroApp: App {
                     TextEditingKeys.install()
                     model.start()
                     model.appSets.start(model)
+                    model.openDocumentFonts.start(model)
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
                 }
@@ -91,6 +92,7 @@ struct CiceroCommands: Commands {
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+            Button("Export Font List", systemImage: "tablecells") { model.exportFontListOfSelectionOrList() }
             Divider()
             Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
             Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }

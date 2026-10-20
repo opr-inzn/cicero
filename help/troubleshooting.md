@@ -55,7 +55,7 @@ See [Turn fonts off](activating.md#turn-fonts-off).
 
 ### Does Cicero change my font files?
 
-No. Cicero never edits a font file. It copies files into your Fonts folder when you install a copy, moves files into its Deactivated folder when you turn them off, and moves files to the Trash only when you ask, or when a copy it installed is no longer needed.
+No. Cicero never edits a font file. It copies files into your Fonts folder, or its Font Library, when you install a copy, moves files into its Deactivated folder when you turn them off, and moves files to the Trash only when you ask, or when a copy it installed is no longer needed.
 
 ### What happens to my fonts when I quit Cicero?
 
@@ -71,7 +71,9 @@ They come with macOS, which needs them, so they’re always on. To keep them out
 
 ### Which file formats does Cicero read?
 
-OpenType and TrueType fonts (`.otf`, `.ttf`), font collections (`.ttc`, `.otc`), Mac datafork fonts (`.dfont`) and web fonts (`.woff`, `.woff2`).
+OpenType and TrueType fonts (`.otf`, `.ttf`), font collections (`.ttc`, `.otc`) and Mac datafork fonts (`.dfont`).
+
+Web fonts (`.woff`, `.woff2`) are made for websites, and Adobe apps can’t use them, so Cicero leaves them out. One that’s on already stays on, but Cicero doesn’t list it: to turn it off, take it out of the Fonts folder in your Library. Nor does Cicero read PostScript Type 1 fonts, which Adobe apps no longer support either. Use the OpenType or TrueType versions of these fonts instead.
 
 ### A folder in iCloud Drive looks empty in Cicero
 

@@ -71,7 +71,7 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a folder in the sidebar:
 
-- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Problems. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
+- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Problems. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Folder**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a folder’s fonts on](activating.md#keep-a-folders-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.
@@ -79,11 +79,15 @@ Right-click a folder in the sidebar:
 
 ### Testing
 
-The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Testing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Testing** isn’t one of your folders: you turn it on or off with **Show test fonts installed for Adobe apps** under **Type Designer Mode** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Testing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
+The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Testing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Testing** isn’t one of your folders: you turn it on or off with **Show test fonts installed for Adobe apps** under **Library** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Testing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
 
 ### Adobe Fonts
 
 The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show test fonts installed for Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Settings → General**: they’re then left out of every list, smart sets and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
+
+### Font Library
+
+Cicero’s own folder for the fonts it installs, when you keep them there. It shows while it has fonts. See [The Font Library](activating.md#the-font-library).
 
 ### Deactivated
 
@@ -119,7 +123,7 @@ If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next
 - Drag font files from the Finder onto the browser or a font page. Drop them while the browser shows a set, and they join that set too.
 - In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All**
 
-Cicero reads OpenType, TrueType, font collections, datafork TrueType and web fonts (WOFF and WOFF2). Cicero then shows them in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder, whichever way you activate fonts.
+Cicero reads OpenType, TrueType, font collections and datafork TrueType. It leaves out web fonts (WOFF and WOFF2), which are made for websites: Adobe apps can’t use them. Cicero then shows the fonts you added in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or a watched folder, are just shown. Dropping a folder adds it as a folder, whichever way you activate fonts.
 
 ### Fonts already in your library
 
@@ -127,7 +131,7 @@ A font file you add may have fonts your library has already, from another file: 
 
 - **Skip It** leaves the file out. The library’s copy stays in use, and Cicero shows it.
 - **Add as Another Copy** lists or installs the file next to the library’s copy, as for any other file. You can switch between them later with [Use Copy From](activating.md#use-another-copy-of-a-font).
-- **Use the Added One** adds the file and uses it in place of the library’s copy. Where that copy is on, it goes off the way deactivating turns a font off, so no font is lost: a copy Cicero installed goes to the Trash when its original is still in your library, any other file in your Fonts folder goes to Cicero’s Deactivated folder, and a font used where it is just turns off. Then the added one goes on, the way you activate fonts; when Cicero asks each time, it’s installed in place of a copy in your Fonts folder, else used where it is. A copy under Added Fonts that the added file replaces stops being listed. Fonts that come with macOS or an app, and Adobe Fonts, stay on; apps may then get those.
+- **Use the Added One** adds the file and uses it in place of the library’s copy. Where that copy is on, it goes off the way deactivating turns a font off, so no font is lost: a copy Cicero installed goes to the Trash when its original is still in your library, any other file in your Fonts folder goes to Cicero’s Deactivated folder, and a font used where it is, or in Cicero’s [Font Library](activating.md#the-font-library), just turns off. Then the added one goes on, the way you activate fonts; when Cicero asks each time, it’s installed in place of a copy in your Fonts folder, else used where it is. A copy under Added Fonts that the added file replaces stops being listed. Fonts that come with macOS or an app, and Adobe Fonts, stay on; apps may then get those.
 
 The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Use the Added One** when the added one is newer, else at **Skip It**; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
 
@@ -187,17 +191,18 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 
 | Field | Comparisons | Value |
 | --- | --- | --- |
-| Name | contains, doesn’t contain, begins with, is | Text |
+| Name | contains, doesn’t contain, begins with, is | Text, matched against the family’s name and the one it shows in your Mac’s language |
 | Foundry | is, is not, contains | A foundry, or text for “contains” |
 | Designer | contains, doesn’t contain, is | Text, matched against the designer any of the family’s styles credits |
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | is, is not | One of your tags |
 | Rating | is, is not, is more than, is less than | No Rating, or one to five stars (see [Ratings](#ratings)) |
+| Note | contains, doesn’t contain | Text in the family’s [note](#notes); left empty, every family with a note, or (doesn’t contain) without one |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
 | Kind | is, is not | Variable, Monospaced or Has Italics |
-| Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType, Web Font and others |
+| Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType and others |
 | Number of Styles | is, is more than, is less than | A number |
 | OpenType Feature | is supported, isn’t supported | Small Capitals, Old-Style Figures, Tabular Figures, Fractions, Stylistic Sets, Swashes and others, in any of the family’s styles |
 | Embedding | is, is not | Installable, Editable, Preview & Print or Restricted: what the font’s license lets a document do with it, as its files say. A family’s is its most restrictive style’s |
@@ -250,6 +255,12 @@ Give a family one to five stars, to pick out your favorites or the ones you’d 
 - In the [Info panel](browsing.md#see-a-fonts-details), click a star under **Rating**. Click the one it has again to take the rating away.
 
 To see ratings in the list, right-click the column headers and choose **Rating**; click its header to sort by it. To keep your favorites together, make a [smart set](#smart-sets) with a **Rating** rule, like **Rating** **is more than** ★★★.
+
+## Notes
+
+Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type, pressing Return for a new line; Cicero saves it as you go. Delete the text to take the note away.
+
+Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
 
 ## Foundries
 

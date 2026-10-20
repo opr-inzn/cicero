@@ -44,6 +44,40 @@ public struct VariationAxis: Hashable, Codable, Sendable {
     }
 }
 
+/// How far one of a variable font's axes goes, for a slider: Weight from 100 to 900, 400 by default.
+/// The order axes are listed in: weight, width, italic, slant and optical size first, then the others in the order the
+/// font gives them, the designer's own among them.
+public enum AxisOrder {
+    static let registered = ["wght", "wdth", "ital", "slnt", "opsz"]
+
+    public static func sorted<Axis>(_ axes: [Axis], by tag: (Axis) -> String) -> [Axis] {
+        func rank(_ axis: Axis) -> Int { registered.firstIndex(of: tag(axis)) ?? registered.count }
+        return axes.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
+    }
+}
+
+public struct AxisRange: Hashable, Sendable, Identifiable {
+    /// As `VariationAxis.tag`.
+    public var tag: String
+    public var name: String
+    public var minimum: Double
+    public var maximum: Double
+    public var defaultValue: Double
+    /// Set for an axis the font asks apps not to show, like Roboto Flex's parametric ones; it still changes the letters.
+    public var isHidden: Bool
+
+    public var id: String { tag }
+
+    public init(tag: String, name: String, minimum: Double, maximum: Double, defaultValue: Double, isHidden: Bool = false) {
+        self.tag = tag
+        self.name = name
+        self.minimum = minimum
+        self.maximum = maximum
+        self.defaultValue = defaultValue
+        self.isHidden = isHidden
+    }
+}
+
 /// What the font's license lets a document do with it, as the OS/2 table's embedding bits say: from the least
 /// restrictive to the most, the order `rank` follows.
 public enum Embedding: String, CaseIterable, Codable, Sendable {
@@ -191,19 +225,26 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var width: Int
     /// A variable font's axes, without the ones it hides, with this instance's position on each; empty for a static font.
     public var axes: [VariationAxis]
+    /// Set for a variable font's named instance at the font's default, its origin, on every axis but weight, hidden
+    /// ones too: upright, at its normal width and default optical size. One of these stands for the family, at the
+    /// weight a preview asks for.
+    public var isAtOrigin: Bool
     /// When the face came out, as near as its file says (see `FontFileReader.year`).
     public var year: Int?
     /// What its license lets a document do with it; nil without an OS/2 table.
     public var embedding: Embedding?
     /// The OpenType features its GSUB table has, of those smart sets ask for.
     public var features: OpenTypeFeatures
+    /// Language → the family's name in it, for the languages besides English the font names its family in, where that
+    /// differs from `familyName` (see `LocalizedNames`).
+    public var localizedFamilyNames: [String: String]
 
     public init(
         id: FaceID, postScriptName: String, familyName: String, styleName: String, fullName: String,
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
-        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], year: Int? = nil,
-        embedding: Embedding? = nil, features: OpenTypeFeatures = []
+        weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], isAtOrigin: Bool = false, year: Int? = nil,
+        embedding: Embedding? = nil, features: OpenTypeFeatures = [], localizedFamilyNames: [String: String] = [:]
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -223,9 +264,16 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.weightAxis = weightAxis
         self.width = width
         self.axes = axes
+        self.isAtOrigin = isAtOrigin
         self.year = year
         self.embedding = embedding
         self.features = features
+        self.localizedFamilyNames = localizedFamilyNames
+    }
+
+    /// The family's name in the Mac's language, when the font has one; else its own.
+    public var displayFamilyName: String {
+        LocalizedNames.name(in: localizedFamilyNames) ?? familyName
     }
 
     /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
@@ -239,6 +287,12 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var styleWidth: Double {
         if let value = axes.first(where: { $0.tag == "wdth" })?.value { return value }
         return [50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200][min(max(width, 1), 9) - 1]
+    }
+
+    /// Where the face sits on an axis: on width, `styleWidth`; on another, a variable font's named instance's place;
+    /// nil on an axis it doesn't have.
+    public func styleValue(on tag: String) -> Double? {
+        tag == "wdth" ? styleWidth : axes.first { $0.tag == tag }?.value
     }
 
     public var path: String { id.path }
@@ -433,7 +487,6 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     case openTypeTrueType = "OpenType TrueType"
     case collection = "Font Collection"
     case datafork = "Datafork TrueType"
-    case web = "Web Font"
     case mixed = "Mixed"
     case other = "Other"
 
@@ -446,7 +499,6 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
         case "ttf": .openTypeTrueType
         case "ttc", "otc": .collection
         case "dfont": .datafork
-        case "woff", "woff2": .web
         default: .other
         }
     }
@@ -455,8 +507,11 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
 /// A font family with everything lists, sorting and filters need worked out once, when the library
 /// is built, so views never recompute it.
 public struct Family: Identifiable, Hashable, Sendable {
-    /// The family name.
+    /// The family name, as the fonts give it; the user's data knows the family by it.
     public let id: String
+    /// The name to show: the family's in the Mac's language, when its fonts have one (ヒラギノ角ゴシック for Hiragino Sans
+    /// on a Mac in Japanese), else `id`.
+    public let name: String
     /// Sorted by weight, then upright before italic, then style name.
     public let faces: [LibraryFace]
     public let state: FamilyState
@@ -475,8 +530,13 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let hasItalics: Bool
     /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
     public let rangeLabel: String
-    /// The kinds of file the faces come in, for tile captions: "OTF", "Variable", "OTF · Variable".
+    /// The kinds of file the faces come in, variable ones apart, for the exported font list: "OTF", "Variable",
+    /// "OTF · Variable".
     public let formatLabel: String
+    /// The kinds of file the faces come in, variable ones too, for tile captions: "OTF", "TTF", "OTF · TTF".
+    public var fileKinds: String {
+        Set(faces.map { ($0.face.path as NSString).pathExtension.uppercased() }).sorted().joined(separator: " · ")
+    }
     /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public let app: String?
     /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
@@ -492,8 +552,23 @@ public struct Family: Identifiable, Hashable, Sendable {
     /// Set when every active face is temporarily active with this scope.
     public let temporaryScope: TemporaryScope?
 
-    public var name: String { id }
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
+    /// The axes besides weight its styles sit apart on, by tag and the font's name for them, in the order they're
+    /// listed by (see `LibraryScanner.stylePrecedes`): the designer's own, like a Serif axis, then width, a static
+    /// family's too, then the other registered ones, like optical size. Not italic or slant, which style names say.
+    public var styleAxes: [(tag: String, name: String)] {
+        var names = ["wdth": "Width"]
+        var tags: [String] = []
+        for axis in faces.lazy.flatMap(\.face.axes) where !tags.contains(axis.tag) {
+            tags.append(axis.tag)
+            names[axis.tag] = axis.name
+        }
+        let designers = tags.filter { $0.first?.isUppercase == true }
+        let registered = tags.filter { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }
+        return (designers + ["wdth"] + registered)
+            .filter { tag in Set(faces.map { $0.face.styleValue(on: tag) }).count > 1 }
+            .map { (tag: $0, name: names[$0] ?? $0) }
+    }
     /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
     /// What its license lets a document do with every one of its styles: the most restrictive of their embedding.
@@ -504,6 +579,10 @@ public struct Family: Identifiable, Hashable, Sendable {
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         precondition(!faces.isEmpty, "A family has at least one face")
         id = name
+        let regular = Self.nearest(400, in: faces)
+        // The regular style's, else any style's: a family's styles name it alike.
+        self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
+            ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
         self.faces = faces
         self.state = state
         self.folderIDs = folderIDs
@@ -522,7 +601,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         format = formats.count == 1 ? formats.first! : .mixed
         classification = Classification.of(name: name, faces: faces)
         mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
-        regular = Self.nearest(400, in: faces)
+        self.regular = regular
         activeCount = faces.count { $0.state.isActive }
         hasActive = activeCount > 0
         hasActivatable = faces.contains(where: \.canActivate)
@@ -539,9 +618,10 @@ public struct Family: Identifiable, Hashable, Sendable {
         return app == nil ? (positions.contains(.on) ? .on : .off) : SwitchPosition(positions)
     }
 
-    /// The face to preview at a weight: a variable face when there is one, else the closest upright weight.
+    /// The face to preview at a weight: a variable face when there is one, which draws any weight, else the closest
+    /// upright weight.
     public func face(nearestWeight weight: Double) -> LibraryFace {
-        weight == 400 ? regular : Self.nearest(weight, in: faces)
+        weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
     }
 
     /// The upright style of the nearest weight, and of those the one nearest the normal width (Futura's Medium
@@ -549,18 +629,26 @@ public struct Family: Identifiable, Hashable, Sendable {
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
         let hasUpright = faces.contains { !$0.face.isItalic }
         var best: LibraryFace?
+        var variable: LibraryFace?
         for candidate in faces where !hasUpright || !candidate.face.isItalic {
-            if candidate.face.weightAxis != nil { return candidate }
-            guard let current = best else {
-                best = candidate
-                continue
-            }
-            let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
-            if distance < bestDistance || distance == bestDistance && abs(candidate.face.width - 5) < abs(current.face.width - 5) {
+            if candidate.face.weightAxis != nil {
+                // The instance at the font's origin, the regular weight of those there, rather than the first
+                // one, which in SF Pro is Compressed.
+                guard let found = variable else { variable = candidate; continue }
+                if candidate.face.isAtOrigin && (!found.face.isAtOrigin
+                    || abs(candidate.face.styleWeight - 400) < abs(found.face.styleWeight - 400)) {
+                    variable = candidate
+                }
+            } else if let current = best {
+                let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
+                if distance < bestDistance || distance == bestDistance && abs(candidate.face.width - 5) < abs(current.face.width - 5) {
+                    best = candidate
+                }
+            } else {
                 best = candidate
             }
         }
-        return best ?? faces[0]
+        return variable ?? best ?? faces[0]
     }
 
     /// Counts the weights and widths. A variable font's styles are its named instances, placed by their axis

@@ -22,7 +22,7 @@ extension AppModel {
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = DocumentFonts.fileExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
         panel.prompt = "Find Fonts"
-        panel.message = "Choose a PDF, IDML, InDesign or Illustrator file to see which fonts it uses."
+        panel.message = "Choose a PDF, IDML, InDesign, Illustrator or Photoshop file to see which fonts it uses."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         findFonts(in: url)
     }

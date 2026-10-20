@@ -144,6 +144,22 @@ extension AppModel {
 
     func features(for family: Family) -> [FeatureSetting] { familyFeatures[family.id] ?? [] }
 
+    /// Where the Info panel put the family's axes, by tag, for the style that stands for it unless another is given;
+    /// none for a style they weren't moved on.
+    func variations(for family: Family, face: FaceID? = nil) -> [String: Double] {
+        guard let adjusted = familyAxes[family.id], adjusted.face == face ?? family.regular.id else { return [:] }
+        return adjusted.values
+    }
+
+    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one for
+    /// the preview weight, at that weight.
+    func previewStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
+        if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
+            return (chosen, chosen.face.styleWeight)
+        }
+        return (family.face(nearestWeight: weight), weight)
+    }
+
     // MARK: The list
 
     /// The families the browser shows for the sidebar selection and search. Cached; recomputed only
@@ -193,9 +209,12 @@ extension AppModel {
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter { library.matches($0, search: query) }
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
+        // The user's notes are searched too.
+        let notes = query.isEmpty ? [:] : data.familyNotes.mapValues { $0.lowercased() }
         return library.families.filter { family in
             guard data.lists(family) else { return false }
-            return tests.contains { $0(family) } && library.matches(family, search: query)
+            return tests.contains { $0(family) }
+                && (library.matches(family, search: query) || notes[family.id]?.contains(query) == true)
         }
     }
 
@@ -247,12 +266,16 @@ extension AppModel {
         }
         switch rule.field {
         case .name:
+            // The fonts' own name, or the one in the Mac's language a family shows.
             let lower = value.lowercased()
+            func names(_ family: Family) -> [String] {
+                family.name == family.id ? [family.id.lowercased()] : [family.id.lowercased(), family.name.lowercased()]
+            }
             switch rule.comparison {
-            case .contains: return { lower.isEmpty || $0.name.lowercased().contains(lower) }
-            case .doesNotContain: return { lower.isEmpty || !$0.name.lowercased().contains(lower) }
-            case .beginsWith: return { $0.name.lowercased().hasPrefix(lower) }
-            default: return { $0.name.lowercased() == lower }
+            case .contains: return { family in lower.isEmpty || names(family).contains { $0.contains(lower) } }
+            case .doesNotContain: return { family in lower.isEmpty || !names(family).contains { $0.contains(lower) } }
+            case .beginsWith: return { family in names(family).contains { $0.hasPrefix(lower) } }
+            default: return { family in names(family).contains(lower) }
             }
         case .foundry:
             if rule.comparison == .contains {
@@ -275,6 +298,15 @@ extension AppModel {
         case .tag:
             let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
             return compare { tagged.contains($0.id) }
+        case .note:
+            // Without text: whether the family has a note at all.
+            let lower = value.lowercased()
+            let notes = data.familyNotes.mapValues { $0.lowercased() }
+            let contains = rule.comparison != .doesNotContain
+            return { family in
+                guard let note = notes[family.id] else { return !contains }
+                return (lower.isEmpty || note.contains(lower)) == contains
+            }
         case .rating:
             // No rating is 0 stars.
             let ratings = data.familyRatings

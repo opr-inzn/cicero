@@ -46,6 +46,8 @@ public struct ImportedLibrary: Sendable {
     public var ratings: [ImportedRating] = []
     /// The classifications FontExplorer X gave single styles.
     public var classifications: [ImportedClassification] = []
+    /// Comments on font files or single styles, for their families' notes.
+    public var comments: [ImportedComment] = []
     /// How often the other app turned font files on, and when last.
     public var history: [ImportedHistory] = []
     /// Fonts that were on in the other app.
@@ -164,6 +166,17 @@ public struct ImportedRating: Hashable, Sendable {
     public init(font: ImportedFont, stars: Int) {
         self.font = font
         self.stars = stars
+    }
+}
+
+/// A comment on a font file or a style, for its family's note.
+public struct ImportedComment: Hashable, Sendable {
+    public var fonts: [ImportedFont]
+    public var text: String
+
+    public init(fonts: [ImportedFont], text: String) {
+        self.fonts = fonts
+        self.text = text
     }
 }
 

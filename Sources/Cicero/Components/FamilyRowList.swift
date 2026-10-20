@@ -94,7 +94,7 @@ struct FamilyRowList<Row: View>: View {
                 let targets = selection.contains(family.id) && selection.count > 1 ? ids.filter(selection.contains) : [family.id]
                 FamilyMenu(families: targets.compactMap(model.family), model: model)
             }
-            .draggable(family.name)
+            .draggable(family.id)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { open(family.id) }

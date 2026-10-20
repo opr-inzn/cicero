@@ -5,6 +5,17 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
+    /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
+    /// system green in light mode, which is too light for small text on its own tint.
+    static let variable = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
+    })
+    /// The App Set tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
+    static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
+            : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
+    })
 }
 
 /// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
@@ -15,6 +26,8 @@ struct FontText: View {
     let face: FontFace
     let size: Double
     var weight: Double = 400
+    /// Axes moved in the Info panel, by tag.
+    var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     var kerning: Double = 0
     var lineLimit: Int? = 1
@@ -24,7 +37,7 @@ struct FontText: View {
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let font = FontLoader.shared.font(face, size: size, weight: weight, features: features)
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
             Text(text.isEmpty ? " " : text)
                 .font(Font(font))
                 .kerning(kerning)
@@ -182,15 +195,89 @@ struct ActivationSwitch: View {
 struct Tag: View {
     let text: String
     let tint: Color
+    /// A symbol before the text.
+    var systemImage: String?
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
-            .background(tint.opacity(0.14), in: .capsule)
-            .foregroundStyle(tint.opacity(0.9))
-            .fixedSize()
+        HStack(spacing: 2.5) {
+            if let systemImage {
+                // Its drawing on the middle of the capitals, with no height of its own, so tags with a symbol are as
+                // tall as those without.
+                Image(systemName: systemImage)
+                    .offset(y: Self.capitalsDrop - Self.inkDrop(of: systemImage))
+                    .frame(height: 0)
+                    .accessibilityHidden(true)
+            }
+            Text(text)
+        }
+        .font(Self.font)
+        .padding(.horizontal, 5)
+        // The capitals in the middle of the capsule.
+        .padding(.top, 1.5 - Self.capitalsDrop)
+        .padding(.bottom, 1.5 + Self.capitalsDrop)
+        .background(tint.opacity(0.14), in: .capsule)
+        .foregroundStyle(tint.opacity(0.9))
+        .fixedSize()
+    }
+
+    private static let font = Font.system(size: 9, weight: .semibold)
+
+    /// How far the middle of the capitals sits below the middle of the text's line: SwiftUI puts the line's height and
+    /// baseline on whole points, as NSLayoutManager does, which leaves them a third of a point low.
+    private static let capitalsDrop: CGFloat = {
+        let font = NSFont.systemFont(ofSize: 9, weight: .semibold)
+        let layout = NSLayoutManager()
+        return layout.defaultBaselineOffset(for: font) - font.capHeight / 2 - layout.defaultLineHeight(for: font) / 2
+    }()
+
+    private static var inkDrops: [String: CGFloat] = [:]
+
+    /// How far the middle of a symbol's drawing sits below the middle of its frame, measured once per symbol: some
+    /// frames leave room the drawing doesn't use, like app.badge.checkmark's, which drew it 0.35 pt high.
+    private static func inkDrop(of symbol: String) -> CGFloat {
+        if let drop = inkDrops[symbol] { return drop }
+        let scale = 20
+        let renderer = ImageRenderer(content: Image(systemName: symbol).font(font))
+        renderer.scale = CGFloat(scale)
+        var drop: CGFloat = 0
+        if let image = renderer.cgImage,
+           let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
+                                   bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+           let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            // The rows with ink, from the top.
+            let inked = (0..<image.height).filter { row in
+                (0..<image.width).contains { pixels[(row * image.width + $0) * 4 + 3] > 127 }
+            }
+            if let top = inked.first, let bottom = inked.last {
+                drop = CGFloat(top + bottom + 1 - image.height) / 2 / CGFloat(scale)
+            }
+        }
+        inkDrops[symbol] = drop
+        return drop
+    }
+}
+
+/// Marks a variable family wherever it's listed, apart from the kinds of file, with the symbol of its axes and, on
+/// hover, their names.
+struct VariableTag: View {
+    let family: Family
+
+    var body: some View {
+        if family.isVariable {
+            Tag(text: "Variable", tint: .variable, systemImage: "slider.horizontal.3")
+                .help(help)
+        }
+    }
+
+    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in `AxisOrder`.
+    private var help: String {
+        var axes: [VariationAxis] = []
+        for face in family.faces {
+            for axis in face.face.axes where !axes.contains(where: { $0.name == axis.name }) { axes.append(axis) }
+        }
+        return axes.isEmpty ? "Variable" : "Variable: " + AxisOrder.sorted(axes, by: \.tag).map(\.name).joined(separator: ", ")
     }
 }
 
@@ -199,20 +286,21 @@ struct StatusTag: View {
     let family: Family
 
     var body: some View {
-        if let (text, tint) = content {
-            Tag(text: text, tint: tint).help(help)
+        if let (text, tint, symbol) = content {
+            Tag(text: text, tint: tint, systemImage: symbol).help(help)
         }
     }
 
-    private var content: (String, Color)? {
-        if family.temporaryScope == .whileAppsRun { return ("App Set", .blue) }
-        if family.temporaryScope != nil { return ("Temporary", .blue) }
+    private var content: (String, Color, String?)? {
+        // With the symbols of New Application Set and Activate Temporarily.
+        if family.temporaryScope == .whileAppsRun { return ("App Set", .appSet, "app.badge.checkmark") }
+        if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
         // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
-        if family.isAdobeFonts { return ("Adobe Fonts", .purple) }
+        if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
-        case .system: return ("System", .secondary)
-        case .partial: return ("Partly active", .orange)
-        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red)
+        case .system: return ("System", .secondary, nil)
+        case .partial: return ("Partly active", .orange, nil)
+        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red, nil)
         case .active, .inactive: return nil
         }
     }
@@ -343,7 +431,36 @@ struct ValueField: View {
     }
 
     private func formatted(_ value: Double) -> String {
-        String(format: step < 1 ? "%.1f" : "%.0f", value)
+        String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
+    }
+}
+
+/// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
+struct StillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.contentShape(.rect)
+    }
+}
+
+/// A push button the same as the default one, to the pixel on macOS 26, in light and dark, that stays the same while
+/// it's held down rather than darkening. Greyed out within a point or two of the default one.
+struct StillPushButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        StillPushButton(label: configuration.label)
+    }
+
+    private struct StillPushButton: View {
+        let label: Configuration.Label
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            label
+                .foregroundStyle(isEnabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 26)
+                .background(isEnabled ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: .rect(cornerRadius: 6))
+                .contentShape(.rect(cornerRadius: 6))
+        }
     }
 }
 

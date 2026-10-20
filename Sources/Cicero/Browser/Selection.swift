@@ -278,13 +278,16 @@ struct FamilyItem: ViewModifier {
         content
             .id(family.id)
             .contentShape(.rect)
-            .onTapGesture(count: 2) { model.openFamilyID = family.id }
-            .simultaneousGesture(TapGesture().onEnded {
+            // One tap gesture, which the switch's own takes precedence over, so turning a family on or off leaves the
+            // selection as it is. The second click of a double-click opens the family; a gesture for two taps would
+            // hold every click back until it knew there was no second.
+            .onTapGesture {
                 focus()
                 model.click(family, in: order.families, anchor: &anchor)
-            })
+                if NSApp.currentEvent?.clickCount == 2 { model.openFamilyID = family.id }
+            }
             .contextMenu { FamilyMenu(families: model.targets(for: family), model: model) }
-            .draggable(family.name)
+            .draggable(family.id)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.openFamilyID = family.id }

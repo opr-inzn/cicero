@@ -2,8 +2,9 @@ import AppKit
 import CiceroCore
 import Observation
 
-/// Keeps application sets' fonts on while their apps are open. Follows which apps are running, and
-/// syncs when that, the sets or the library change.
+/// Keeps application sets' fonts on while their apps are open, and the fonts an app's documents asked for (see
+/// `DocumentFontWatcher`) while that app is open. Follows which apps are running, and syncs when that, the sets, the
+/// requests or the library change.
 @Observable
 final class AppSetWatcher {
     /// Bundle IDs of the apps running now.
@@ -20,6 +21,10 @@ final class AppSetWatcher {
     @ObservationIgnored private var dismissed: Set<String> = []
     /// Files that wouldn't turn on, with the apps that wanted them: tried again only once those change.
     @ObservationIgnored private var failed: [String: Set<String>] = [:]
+    /// Bundle ID of an open app → the PostScript names of the fonts its documents use that it asked for.
+    @ObservationIgnored private var requested: [String: Set<String>] = [:]
+    /// Whether `requested` has been taken up again from the records since Cicero opened (see `restoreRequests`).
+    @ObservationIgnored private var restoredRequests = false
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
@@ -37,6 +42,20 @@ final class AppSetWatcher {
         running.contains(app.bundleID)
     }
 
+    /// Keeps these fonts on for the app until it quits, along with the ones it asked for before.
+    func request(_ postScriptNames: Set<String>, for bundleID: String) {
+        guard running.contains(bundleID), !postScriptNames.isSubset(of: requested[bundleID] ?? []) else { return }
+        requested[bundleID, default: []].formUnion(postScriptNames)
+        scheduleSync(after: .zero)
+    }
+
+    /// Lets go of the fonts apps' documents asked for: they turn off, unless a set wants them.
+    func forgetRequests() {
+        guard !requested.isEmpty else { return }
+        requested = [:]
+        scheduleSync(after: .zero)
+    }
+
     // MARK: Changes
 
     private func runningAppsChanged() {
@@ -44,7 +63,8 @@ final class AppSetWatcher {
         guard now != running, let model else { return }
         let changed = now.symmetricDifference(running)
         running = now
-        let linked = Set(model.data.sets.flatMap(\.apps).map(\.bundleID))
+        let linked = Set(model.data.sets.flatMap(\.apps).map(\.bundleID)).union(requested.keys)
+        requested = requested.filter { now.contains($0.key) }
         if !changed.isDisjoint(with: linked) { scheduleSync(after: .zero) }
     }
 
@@ -75,6 +95,7 @@ final class AppSetWatcher {
 
     private func sync() {
         guard let model, model.hasScanned else { return }
+        if !restoredRequests { restoreRequests() }
         let current = Self.onForAppSets(model.data.records)
         for (path, names) in managed where !current.contains(path) { dismissed.formUnion(names) }
         managed = managed.filter { current.contains($0.key) }
@@ -120,25 +141,58 @@ final class AppSetWatcher {
         }
     }
 
-    /// Each file the open apps' sets have → those apps, and its face. Leaves out fonts Cicero can't
-    /// turn on or off, the ones the user dismissed, and ones that failed for the same apps before.
+    /// The fonts open apps' documents asked for before Cicero last quit, from the records, which keep the apps that
+    /// wanted each file. Otherwise they'd go off until the app is next in front and asked, and an app in the background
+    /// would find the fonts of its open documents gone. A style an application set of the app has is the set's.
+    private func restoreRequests() {
+        restoredRequests = true
+        guard let model, model.data.activatesDocumentFonts else { return }
+        let session = ActivationEngine.currentSession()
+        var apps: [String: Set<String>] = [:]
+        for (path, record) in model.data.records.temporary where record.scope == .whileAppsRun && record.session == session {
+            let open = Set(record.apps ?? []).intersection(running).intersection(DocumentFontWatcher.bundleIDs)
+            if !open.isEmpty { apps[path] = open }
+        }
+        guard !apps.isEmpty else { return }
+        for family in model.library.families {
+            for face in family.faces {
+                for app in apps[face.face.path] ?? [] {
+                    let inSet = model.data.sets.contains { set in
+                        set.apps.contains { $0.bundleID == app } && set.contains(style: face.face.postScriptName, of: family.id)
+                    }
+                    if !inSet { requested[app, default: []].insert(face.face.postScriptName) }
+                }
+            }
+        }
+    }
+
+    /// Each file the open apps' sets have, or their documents asked for → those apps, and its face. Leaves out fonts
+    /// Cicero can't turn on or off, the ones the user dismissed, and ones that failed for the same apps before.
     private func plan() -> (wanted: [String: Set<String>], faces: [String: LibraryFace]) {
         guard let model else { return ([:], [:]) }
         var wanted: [String: Set<String>] = [:]
         var faces: [String: LibraryFace] = [:]
         var wantedNames = Set<String>()
+        func want(_ face: LibraryFace, for apps: Set<String>) {
+            guard !ActivationEngine.isProtected(face.face.path) else { return }
+            wantedNames.insert(face.face.postScriptName)
+            guard !dismissed.contains(face.face.postScriptName) else { return }
+            wanted[face.face.path, default: []].formUnion(apps)
+            faces[face.face.path] = face
+        }
         for set in model.data.sets where !set.apps.isEmpty {
             let apps = Set(set.apps.map(\.bundleID)).intersection(running)
             guard !apps.isEmpty else { continue }
             for name in set.memberFamilies {
                 guard let family = model.library.family(name) else { continue }
                 // Only the styles it has of a family it has some of.
-                for face in family.faces where set.contains(style: face.face.postScriptName, of: name) && !ActivationEngine.isProtected(face.face.path) {
-                    wantedNames.insert(face.face.postScriptName)
-                    guard !dismissed.contains(face.face.postScriptName) else { continue }
-                    wanted[face.face.path, default: []].formUnion(apps)
-                    faces[face.face.path] = face
-                }
+                for face in family.faces where set.contains(style: face.face.postScriptName, of: name) { want(face, for: apps) }
+            }
+        }
+        if !requested.isEmpty {
+            for face in model.library.families.lazy.flatMap(\.faces) {
+                let apps = Set(requested.filter { $0.value.contains(face.face.postScriptName) }.keys).intersection(running)
+                if !apps.isEmpty { want(face, for: apps) }
             }
         }
         dismissed.formIntersection(wantedNames)
@@ -162,7 +216,12 @@ final class AppSetWatcher {
     private func appNames(wanting wanted: [String: Set<String>]) -> String {
         let ids = wanted.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         var seen = Set<String>()
-        let names = (model?.data.sets ?? []).flatMap(\.apps).filter { ids.contains($0.bundleID) && seen.insert($0.bundleID).inserted }.map(\.name)
+        var names = (model?.data.sets ?? []).flatMap(\.apps).filter { ids.contains($0.bundleID) && seen.insert($0.bundleID).inserted }.map(\.name)
+        // Apps that asked for their documents' fonts without being in a set.
+        for app in NSWorkspace.shared.runningApplications {
+            guard let id = app.bundleIdentifier, ids.contains(id), seen.insert(id).inserted else { continue }
+            names.append(app.localizedName ?? id)
+        }
         return names.formatted(.list(type: .and))
     }
 

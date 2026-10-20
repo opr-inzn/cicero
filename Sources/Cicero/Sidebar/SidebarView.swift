@@ -86,16 +86,19 @@ private struct SidebarContent: View {
             if editing || model.isVisible(section.key) {
                 let groups = section == .characterSets ? model.characterSetGroups : []
                 let rows = section == .characterSets ? [] : model.rows(for: section)
-                Section(isExpanded: expansion(section)) {
-                    if section == .characterSets {
-                        characterSetGroups(groups)
-                    } else {
-                        movableRows(rows, in: section.rawValue, section: section)
-                    }
-                    if editing && rows.isEmpty && groups.isEmpty {
-                        Text("Nothing here yet")
-                            .foregroundStyle(.tertiary)
-                            .selectionDisabled()
+                // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside (see `SectionHeader`).
+                Section {
+                    if model.isExpanded(section) {
+                        if section == .characterSets {
+                            characterSetGroups(groups)
+                        } else {
+                            movableRows(rows, in: section.rawValue, section: section)
+                        }
+                        if editing && rows.isEmpty && groups.isEmpty {
+                            Text("Nothing here yet")
+                                .foregroundStyle(.tertiary)
+                                .selectionDisabled()
+                        }
                     }
                 } header: {
                     sectionHeader(section)
@@ -133,9 +136,11 @@ private struct SidebarContent: View {
             } label: {
                 // Only the chevron toggles a group in a selectable list; make the title do it too. A tap
                 // rather than a button, so the title doesn't dim while it's pressed. An icon and full-strength
-                // text like the rows around it, as a playlist folder has in Music's sidebar.
+                // text like the rows around it, as a playlist folder has in Music's sidebar. Coloured here, as the
+                // rows are (see `SidebarLabel`), or the list grays it while another window is in front.
                 Label(group.title, systemImage: "character.book.closed")
                     .lineLimit(1)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
                     .onTapGesture {
@@ -194,7 +199,7 @@ private struct SidebarContent: View {
             Text("Library")
             Spacer()
             Button(model.isEditingSidebar ? "Done" : "Edit") { model.isEditingSidebar.toggle() }
-            .buttonStyle(.plain)
+            .buttonStyle(StillButtonStyle())
             .font(.subheadline.weight(model.isEditingSidebar ? .semibold : .regular))
             .foregroundStyle(model.isEditingSidebar ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
@@ -204,21 +209,13 @@ private struct SidebarContent: View {
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
-        HStack(spacing: 6) {
+        SectionHeader(title: section.title, isExpanded: expansion(section),
+                      isDimmed: model.isEditingSidebar && !model.isVisible(section.key)) {
             if model.isEditingSidebar {
                 checkbox(section.key, section.title)
             }
-            Text(section.title)
-                .opacity(model.isEditingSidebar && !model.isVisible(section.key) ? 0.45 : 1)
-            Spacer()
+        } trailing: {
             if !model.isEditingSidebar { addButton(section) }
-        }
-        .padding(.trailing, 10)
-        // Only the chevron toggles a section in a sidebar list; make the whole title row do it too.
-        .contentShape(.rect)
-        .onTapGesture {
-            let isExpanded = expansion(section)
-            withAnimation(.snappy) { isExpanded.wrappedValue.toggle() }
         }
     }
 
@@ -331,7 +328,7 @@ private struct SidebarContent: View {
             if let folder = model.folder(id) {
                 renameFolder(id)
                 Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
-                if id != WatchedFolder.deactivatedID {
+                if id != WatchedFolder.fontLibraryID {
                     Divider()
                     FolderActivationPicker(folder: folder) {
                         model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
@@ -388,6 +385,7 @@ private struct SidebarContent: View {
         if model.canExport(row.item) {
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: row.item, named: row.title) }
+            Button("Export Font List", systemImage: "tablecells") { model.exportFontList(model.families(in: row.item), named: row.title) }
         }
         Divider()
         if model.isVisible(row.key) {
@@ -395,6 +393,47 @@ private struct SidebarContent: View {
         }
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
                    systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
+    }
+}
+
+/// A section's title, with its checkbox while editing and its + at the end, and a chevron before the + while the pointer
+/// is over the row. The list has a chevron that shows the same way, but after the +, narrowing the header as it comes
+/// and goes, which moved the +; keeping its place empty left a gap. The whole row opens and closes the section. Its
+/// own view, so the pointer coming and going doesn't redo the sidebar's rows.
+private struct SectionHeader<Leading: View, Trailing: View>: View {
+    let title: String
+    @Binding var isExpanded: Bool
+    let isDimmed: Bool
+    @ViewBuilder let leading: Leading
+    @ViewBuilder let trailing: Trailing
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            leading
+            Text(title)
+                .opacity(isDimmed ? 0.45 : 1)
+                .accessibilityAction(named: isExpanded ? "Collapse" : "Expand", toggle)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                // Turns at once, while the section's rows open and close.
+                .transaction { $0.animation = nil }
+                .frame(width: 14)
+                .padding(.trailing, 4)
+                .opacity(isHovered ? 1 : 0)
+                .accessibilityHidden(true)
+            trailing
+        }
+        .padding(.trailing, 10)
+        .contentShape(.rect)
+        .onHover { isHovered = $0 }
+        .onTapGesture(perform: toggle)
+    }
+
+    private func toggle() {
+        withAnimation(.snappy) { isExpanded.toggle() }
     }
 }
 

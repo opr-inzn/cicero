@@ -35,6 +35,8 @@ public final class FontLoader: Sendable {
         var lanes = 0
         /// Bumped by `invalidate`, so fonts made from an old version of a file are never served again.
         var generations: [String: Int] = [:]
+        /// Variable faces' axes, by face and generation (see `axes(of:)`).
+        var axes: [String: [AxisRange]] = [:]
     }
 
     /// The 'wght' axis.
@@ -42,19 +44,25 @@ public final class FontLoader: Sendable {
 
     public init() {}
 
-    /// `weight` sets the weight axis of variable faces (clamped to its range); ignored otherwise.
-    public func font(_ face: FontFace, size: CGFloat, weight: Double? = nil, features: [FeatureSetting] = []) -> CTFont {
+    /// `weight` sets the weight axis of variable faces (clamped to its range); ignored otherwise. `variations` sets
+    /// any of their axes, by tag, the weight axis over `weight`; the slider that sets one keeps it in range. A variable
+    /// face is otherwise drawn exactly where it sits on its axes, optical size included: CoreText would match that to
+    /// the point size, and drops a setting of the default to do so.
+    public func font(_ face: FontFace, size: CGFloat, weight: Double? = nil, variations: [String: Double] = [:],
+                     features: [FeatureSetting] = []) -> CTFont {
         let weight = face.weightAxis.flatMap { axis in weight.map { min(max($0, axis.minimum), axis.maximum) } }
+        let variations = face.axes.isEmpty ? [] : variations.sorted { $0.key < $1.key }
         let features = features.sorted { ($0.type, $0.selector) < ($1.type, $1.selector) }
         let generation = state.withLock { $0.generations[face.path] ?? 0 }
         var key = "\(face.id)|\(generation)|\(Int((size * 2).rounded()))"
         if let weight { key += "|w\(Int(weight.rounded()))" }
+        for (tag, value) in variations { key += "|\(tag)=\(value)" }
         for feature in features { key += "|\(feature.type):\(feature.selector)" }
         if let font = fonts[key] { return font }
 
         var descriptor = descriptor(for: face)
-        if let weight {
-            descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: Self.weightAxisID), weight)
+        if face.weightAxis != nil || !face.axes.isEmpty {
+            descriptor = Self.descriptor(descriptor, weight: weight, variations: variations)
         }
         for feature in features {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
@@ -62,6 +70,60 @@ public final class FontLoader: Sendable {
         let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
         fonts[key] = font
         return font
+    }
+
+    /// A variable face where `weight` and `variations` put it, its other axes where it sits, at that optical size
+    /// whatever the point size. CoreText reads a setting that leaves a descriptor where it already is (a weight set
+    /// again, or a named style left alone) as the named style itself, which optical sizing "none" then draws at the
+    /// default optical size, losing a style's own or a moved one. So every axis is set at once, after a step to the
+    /// defaults, which only leaves a descriptor where it is when that's where it's drawn.
+    private static func descriptor(_ descriptor: CTFontDescriptor, weight: Double?,
+                                   variations: [(key: String, value: Double)]) -> CTFontDescriptor {
+        var values = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:]
+        if let weight { values[NSNumber(value: weightAxisID)] = NSNumber(value: weight) }
+        for (tag, value) in variations { values[NSNumber(value: AxisTag.identifier(tag))] = NSNumber(value: value) }
+        let axes = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAxesAttribute) as? [[String: Any]] ?? []
+        let defaults = axes.reduce(into: [NSNumber: NSNumber]()) { defaults, axis in
+            guard let identifier = axis[kCTFontVariationAxisIdentifierKey as String] as? NSNumber,
+                  let value = axis[kCTFontVariationAxisDefaultValueKey as String] as? NSNumber else { return }
+            defaults[identifier] = value
+        }
+        let atDefaults = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontVariationAttribute: defaults] as CFDictionary)
+        return CTFontDescriptorCreateCopyWithAttributes(
+            atDefaults, [kCTFontOpticalSizeAttribute: "none", kCTFontVariationAttribute: values] as CFDictionary)
+    }
+
+    /// A variable face's axes and how far each goes, those the font hides too, in `AxisOrder`; none for a static face.
+    /// Read once per face, as CoreText looks up the axes' names each time it's asked.
+    public func axes(of face: FontFace) -> [AxisRange] {
+        guard !face.axes.isEmpty else { return [] }
+        let key = state.withLock { "\(face.id)|\($0.generations[face.path] ?? 0)" }
+        if let axes = state.withLock({ $0.axes[key] }) { return axes }
+        let entries = CTFontCopyVariationAxes(font(face, size: 12)) as? [[String: Any]] ?? []
+        let read = entries.compactMap { entry -> AxisRange? in
+            guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
+                  let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
+                  let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double,
+                  let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double,
+                  minimum < maximum
+            else { return nil }
+            let tag = AxisTag.string(identifier)
+            let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
+            return AxisRange(tag: tag, name: name.isEmpty || name == tag ? AxisTag.registeredNames[tag] ?? tag : name,
+                             minimum: minimum, maximum: maximum, defaultValue: defaultValue,
+                             isHidden: entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true)
+        }
+        let axes = AxisOrder.sorted(read, by: \.tag)
+        state.withLock { $0.axes[key] = axes }
+        return axes
+    }
+
+    /// Where a font is drawn on each of its axes, by tag: the named instance's place and the values it was made with.
+    /// Axes left out are at their defaults.
+    public static func variation(of font: CTFont) -> [String: Double] {
+        (CTFontCopyVariation(font) as? [NSNumber: NSNumber] ?? [:]).reduce(into: [:]) {
+            $0[AxisTag.string($1.key.uint32Value)] = $1.value.doubleValue
+        }
     }
 
     /// Loads descriptors for these faces at low priority, in order, ahead of what earlier calls asked for.
@@ -182,6 +244,21 @@ public final class FontLoader: Sendable {
         }
         return descriptors
     }
+}
+
+/// An axis's four-character tag, and the number CoreText knows it by: 'wght' is 0x77676874.
+enum AxisTag {
+    static func string(_ identifier: UInt32) -> String {
+        String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .isoLatin1) ?? ""
+    }
+
+    static func identifier(_ tag: String) -> UInt32 {
+        tag.unicodeScalars.prefix(4).reduce(0) { $0 << 8 | ($1.value & 0xFF) }
+    }
+
+    /// The names of the common axes, for fonts that name one by its tag or not at all.
+    static let registeredNames = ["wght": "Weight", "wdth": "Width", "opsz": "Optical Size", "ital": "Italic",
+                                  "slnt": "Slant", "GRAD": "Grade"]
 }
 
 /// The faces of one file. CTFontDescriptor is immutable and thread-safe, just not marked Sendable.

@@ -20,9 +20,12 @@ public struct Locations: Sendable {
     /// Where Creative Cloud keeps the Adobe Fonts that Adobe apps turned on for themselves, as for a document
     /// that uses them: a hidden folder whose fonts only Adobe apps load, under hidden names.
     public var adobeFontsInAdobeApps: URL?
+    /// ~/Cicero/Font Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
+    /// By default in the home folder `userFonts` is in, so a test run with another home keeps its own.
+    public var defaultFontLibrary: URL
 
     public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
-                adobeFontsInAdobeApps: URL? = nil) {
+                adobeFontsInAdobeApps: URL? = nil, defaultFontLibrary: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
@@ -30,6 +33,8 @@ public struct Locations: Sendable {
         self.systemFonts = systemFonts
         self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
+        self.defaultFontLibrary = defaultFontLibrary
+            ?? userFonts.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Cicero/Font Library", isDirectory: true)
     }
 
     public static var standard: Locations {
@@ -103,7 +108,8 @@ public struct Library: Sendable {
         for (position, family) in families.enumerated() { index[family.id] = position }
         self.index = index
         searchText = families.concurrentMap { family in
-            var words = [family.name, family.manufacturer ?? ""]
+            var words = [family.id, family.manufacturer ?? ""]
+            if family.name != family.id { words.append(family.name) }
             var seen = Set<String>()
             for face in family.faces.map(\.face) {
                 words.append(face.postScriptName)
@@ -124,8 +130,8 @@ public struct Library: Sendable {
 
     public func position(of id: String) -> Int? { index[id] }
 
-    /// Whether a family matches a search: its name, foundry, or a style's PostScript name, designer or vendor
-    /// ID contains the (lowercased) query.
+    /// Whether a family matches a search: its name (also the one in the Mac's language it shows), foundry, or a style's
+    /// PostScript name, designer or vendor ID contains the (lowercased) query.
     public func matches(_ family: Family, search lowercasedQuery: String) -> Bool {
         guard !lowercasedQuery.isEmpty, let position = index[family.id] else { return true }
         return searchText[position].contains(lowercasedQuery)
@@ -170,7 +176,8 @@ public final class LibraryScanner: Sendable {
         var files: [String: CachedFile] = [:]
         var loaded = false
         var dirty = false
-        /// Finder-order positions from the last full sort, so scans with no new family skip `localizedStandardCompare`.
+        /// Finder-order positions from the last full sort, so scans with no new family skip `localizedStandardCompare`
+        /// (see `sorted`).
         var ranks: [String: Int] = [:]
         /// The last library built and a hash of what it was built from, so an unchanged rescan returns it as is.
         var last: (inputs: Int, library: Library)?
@@ -496,9 +503,11 @@ public final class LibraryScanner: Sendable {
         }
         let deactivated = WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path)
         for folder in input.folders + [deactivated] {
-            // Adobe's folders and Cicero's own are listed only when they're there.
+            // Adobe's folders and Cicero's own are listed only when they're there; the Font Library counts as away when
+            // it's on a disk that isn't connected, or one Cicero may not read, like the user's folders.
             if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.deactivatedID,
                let availability = FolderAvailability.of(folder.path) {
+                if folder.id == WatchedFolder.fontLibraryID && availability == .notFound { continue }
                 reach.folders[folder.id] = availability
                 reach.folderPaths.append(folder.path + "/")
                 continue
@@ -701,7 +710,8 @@ public final class LibraryScanner: Sendable {
     private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach) -> [String: CachedFile] {
         state.withLock { state in
             let before = state.files.count
-            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
+            // Not web fonts that versions before 1.6 read, in a folder that's out of reach now.
+            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) && Self.isFontFile($0.key) }
             state.files.merge(parsed) { _, new in new }
             if !parsed.isEmpty || state.files.count != before { state.dirty = true }
             return state.files
@@ -791,26 +801,17 @@ public final class LibraryScanner: Sendable {
         for members in byFamily.values {
             for (face, _, stamp) in members { stamps[face.id] = stamp }
         }
-        let names = sortedNames(Array(byFamily.keys))
         let grouped = byFamily
-        var families = names.concurrentMap { name in
+        var families = Array(byFamily.keys).concurrentMap { name in
             let members = grouped[name]!
-            let faces = members.map(\.0).sorted { a, b in
-                // Narrowest first, then lightest: by each named instance's place on the axes, as a variable
-                // font's instances share one width and weight class.
-                if a.face.styleWidth != b.face.styleWidth { return a.face.styleWidth < b.face.styleWidth }
-                if a.face.styleWeight != b.face.styleWeight { return a.face.styleWeight < b.face.styleWeight }
-                if a.face.isItalic != b.face.isItalic { return !a.face.isItalic }
-                if a.face.styleName != b.face.styleName { return a.face.styleName.caseInsensitiveCompare(b.face.styleName) == .orderedAscending }
-                return a.face.id < b.face.id
-            }
+            let faces = members.map(\.0).sorted { Self.stylePrecedes($0.face, $1.face) }
             return Family(
                 name: name, faces: faces, state: Self.familyState(of: faces),
                 folderIDs: members.reduce(into: Set<UUID>()) { $0.formUnion($1.1) },
                 manufacturer: faces.lazy.compactMap { Foundry.normalized($0.face.manufacturer) }.first
             )
         }
-        families = Self.unifyingManufacturerCase(families)
+        families = Self.unifyingManufacturerCase(sorted(families))
         unreadable.sort()
 
         var offline = Set<String>()
@@ -849,6 +850,32 @@ public final class LibraryScanner: Sendable {
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
                        unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
                        goneFiles: reach.goneFiles)
+    }
+
+    /// A family's styles in order, as a foundry lists them. Lightest first, by each named instance's place on the
+    /// weight axis, as a variable font's instances share one weight class. Then along the designer's own axes, in the
+    /// font's order, lowest first, as they name families within the family, like Sans, Text and Serif on a Serif
+    /// axis. Then narrowest first, Sans Compressed and Sans Condensed before Sans; then along the
+    /// other registered axes, like optical size; and each upright before its italic.
+    static func stylePrecedes(_ a: FontFace, _ b: FontFace) -> Bool {
+        if a.styleWeight != b.styleWeight { return a.styleWeight < b.styleWeight }
+        if let order = precedes(a, b, along: { $0.first?.isUppercase == true }) { return order }
+        if a.styleWidth != b.styleWidth { return a.styleWidth < b.styleWidth }
+        if let order = precedes(a, b, along: { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }) {
+            return order
+        }
+        if a.isItalic != b.isItalic { return !a.isItalic }
+        if a.styleName != b.styleName { return a.styleName.caseInsensitiveCompare(b.styleName) == .orderedAscending }
+        return a.id < b.id
+    }
+
+    /// Whether `a` sits lower than `b` on the first of the axes `tags` picks, in `a`'s order, that they're apart on;
+    /// nil when they aren't apart on any, or don't share them.
+    private static func precedes(_ a: FontFace, _ b: FontFace, along tags: (String) -> Bool) -> Bool? {
+        for axis in a.axes where tags(axis.tag) {
+            if let value = b.axes.first(where: { $0.tag == axis.tag })?.value, value != axis.value { return axis.value < value }
+        }
+        return nil
     }
 
     /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate — then by path.
@@ -921,25 +948,29 @@ public final class LibraryScanner: Sendable {
             let key = String(manufacturer.lowercased().filter { $0.isLetter || $0.isNumber })
             if let spelling = spellings[key] {
                 guard spelling != manufacturer else { return family }
-                return Family(name: family.name, faces: family.faces, state: family.state, folderIDs: family.folderIDs, manufacturer: spelling)
+                return Family(name: family.id, faces: family.faces, state: family.state, folderIDs: family.folderIDs, manufacturer: spelling)
             }
             spellings[key] = manufacturer
             return family
         }
     }
 
-    /// Finder order. A full `localizedStandardCompare` sort costs tens of milliseconds, so its result
-    /// is remembered as ranks and reused while no new family name appears.
-    private func sortedNames(_ names: [String]) -> [String] {
-        state.withLock { state in
-            if names.allSatisfy({ state.ranks[$0] != nil }) {
-                return names.sorted { state.ranks[$0]! < state.ranks[$1]! }
+    /// Finder order of the names they show. A full `localizedStandardCompare` sort costs tens of milliseconds, so its
+    /// result is remembered as ranks and reused while no new name appears.
+    private func sorted(_ families: [Family]) -> [Family] {
+        // A family shown in the Mac's language by that name, and its own after it, so two that show alike stay apart.
+        let keys = families.map { $0.name == $0.id ? $0.id : $0.name + "\u{0}" + $0.id }
+        let order: [String] = state.withLock { state in
+            if keys.allSatisfy({ state.ranks[$0] != nil }) {
+                return keys.sorted { state.ranks[$0]! < state.ranks[$1]! }
             }
             // Sorted from a fixed starting order, so the result never depends on dictionary order.
-            let sorted = names.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            let sorted = keys.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             state.ranks = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($1, $0) })
             return sorted
         }
+        let byKey = Dictionary(uniqueKeysWithValues: zip(keys, families))
+        return order.map { byKey[$0]! }
     }
 }
 

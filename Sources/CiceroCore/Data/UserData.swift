@@ -24,6 +24,8 @@ public struct UserData: Codable, Equatable, Sendable {
     public var tagColors: [String: TagColor] = [:]
     /// Family name → the stars the user gave it, 1…5. A family without any has no rating.
     public var familyRatings: [String: Int] = [:]
+    /// Family name → the user's note on it. A family without one has none, never an empty one.
+    public var familyNotes: [String: String] = [:]
     /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
     /// False only for libraries saved before there were license tags (license statuses, as they were in 1.5), which get
@@ -42,8 +44,18 @@ public struct UserData: Codable, Equatable, Sendable {
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .ask
+    /// The fonts Cicero installs go into its Font Library (`fontLibraryPath`), a folder for each family, and are used from
+    /// there, rather than copied into ~/Library/Fonts (see `ActivationEngine.installsIntoFontLibrary`).
+    public var installsIntoFontLibrary = false
+    /// Where Cicero's Font Library is: `Locations.defaultFontLibrary` unless the user moved it. Empty in files from before
+    /// there was one, until the app fills in the default.
+    public var fontLibraryPath = ""
     /// What to do with an added font file whose fonts the library has already, from another file.
     public var duplicateHandling: DuplicateHandling = .ask
+    /// Ask before turning on more than `manyFamilies` families at once.
+    public var asksBeforeActivatingMany = true
+    /// How many families at once turning on can be without asking first (see `asksBeforeActivatingMany`).
+    public static let manyFamilies = 100
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
     /// as one Testing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
@@ -52,6 +64,9 @@ public struct UserData: Codable, Equatable, Sendable {
     /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
     /// the key `showAdobeAppFolders` was saved as before.
     public var showCreativeCloudFonts = true
+    /// Turn on the fonts the documents open in InDesign, Illustrator and Photoshop use, while the app is open. Off until the user
+    /// turns it on, as macOS then asks whether Cicero may control each app.
+    public var activatesDocumentFonts = false
     public var records = ActivationRecords()
 
     public init() {}
@@ -101,7 +116,8 @@ public struct UserData: Codable, Equatable, Sendable {
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
         folderNames = try value(.folderNames, d.folderNames)
-        fontFiles = try value(.fontFiles, d.fontFiles)
+        // Web fonts, which versions before 1.6 added, are no longer read.
+        fontFiles = try value(.fontFiles, d.fontFiles).filter { FontFormat.fileExtensions.contains(($0 as NSString).pathExtension.lowercased()) }
         missingFontFiles = try value(.missingFontFiles, d.missingFontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)
@@ -110,6 +126,7 @@ public struct UserData: Codable, Equatable, Sendable {
         // A colour a later version adds is no colour here, rather than a file that doesn't load.
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         familyRatings = try value(.familyRatings, d.familyRatings).filter { (1...5).contains($0.value) }
+        familyNotes = try value(.familyNotes, d.familyNotes).filter { !$0.value.isEmpty }
         activations = try value(.activations, d.activations)
         // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
@@ -122,14 +139,18 @@ public struct UserData: Codable, Equatable, Sendable {
         sidebar = try value(.sidebar, d.sidebar)
         // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
+        installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
+        fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
+        asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
             ?? decoder.container(keyedBy: FormerKeys.self).decodeIfPresent(Bool.self, forKey: .showAdobeFonts)
             ?? d.showAdobeAppFolders
         showCreativeCloudFonts = try value(.showCreativeCloudFonts, d.showCreativeCloudFonts)
+        activatesDocumentFonts = try value(.activatesDocumentFonts, d.activatesDocumentFonts)
         records = try value(.records, d.records)
         // Rules for Slab Serif, a classification there used to be, pick Serif, which it's part of now; unless
         // Slab Serif is one of the user's.
@@ -175,9 +196,15 @@ public struct UserData: Codable, Equatable, Sendable {
         (showSystemFonts || family.state != .system) && (showCreativeCloudFonts || !family.isAdobeFonts)
     }
 
-    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown.
+    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown, and the Font Library.
     public func scannedFolders() -> [WatchedFolder] {
-        folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : [])
+        folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : []) + [fontLibrary].compactMap(\.self)
+    }
+
+    /// Cicero's Font Library as a folder the scan reads, whether or not fonts are installed into it now: the fonts in it
+    /// stay in the library. nil until it has a place.
+    public var fontLibrary: WatchedFolder? {
+        fontLibraryPath.isEmpty ? nil : WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
     }
 
     /// A folder with the name the user gave it, if any, as its `displayName`.
@@ -246,6 +273,8 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
     public static let deactivatedID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
+    /// Cicero's Font Library (see `UserData.fontLibraryPath`).
+    public static let fontLibraryID = UUID(uuidString: "00000000-0000-0000-0000-000000F0711B")!
     /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
     /// them as one item.
     public static let adobeAppsID = UUID(uuidString: "00000000-0000-0000-0000-00000000AD0B")!
@@ -274,11 +303,13 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Deactivated", "Testing" (Adobe's folders, where type designers test fonts),
-    /// "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts, else the name.
+    /// The name the user gave it; else "Deactivated", "Font Library", "Testing" (Adobe's folders, where type designers
+    /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
+    /// else the name.
     public var displayName: String {
         if let customName { return customName }
         if id == Self.deactivatedID { return "Deactivated" }
+        if id == Self.fontLibraryID { return "Font Library" }
         if id == Self.adobeAppsID { return "Testing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
         if id == Self.addedFilesID { return "Added Fonts" }
@@ -459,14 +490,15 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
 
 
     public enum Field: String, Codable, CaseIterable, Sendable {
-        case name, foundry, designer, classification, tag, rating, set, folder, status, kind, format, styles, feature, embedding, language
-        case characterSet, added, timesActivated, lastActivated
+        case name, foundry, designer, classification, tag, rating, note, set, folder, status, kind, format, styles, feature, embedding
+        case language, characterSet, added, timesActivated, lastActivated
 
         public var comparisons: [Comparison] {
             switch self {
             case .name: [.contains, .doesNotContain, .beginsWith, .is]
             case .foundry: [.is, .isNot, .contains]
             case .designer: [.contains, .doesNotContain, .is]
+            case .note: [.contains, .doesNotContain]
             case .rating: [.is, .isNot, .greaterThan, .lessThan]
             case .styles, .timesActivated: [.is, .greaterThan, .lessThan]
             case .added, .lastActivated: [.inLast, .notInLast]
@@ -587,7 +619,8 @@ public enum InstallMethod: String, Codable, CaseIterable, Sendable {
 
 /// What Cicero did to turn fonts on, so it can turn them off again correctly.
 public struct ActivationRecords: Codable, Equatable, Sendable {
-    /// Installed copy in ~/Library/Fonts → the file it was copied from.
+    /// Installed copy → the file it was copied from: in ~/Library/Fonts, or in Cicero's Font Library, where it's
+    /// registered where it is (in `inPlace`) while it's on.
     public var installedCopies: [String: String] = [:]
     /// Files registered where they are (persistent).
     public var inPlace: Set<String> = []

@@ -28,8 +28,8 @@ extension AppModel {
         panel.allowedContentTypes = Self.fontTypes
         panel.prompt = installsAddedFiles ? "Install" : "Add"
         panel.message = switch data.installMethod {
-        case .copy: "Choose font files. They’re copied into your Fonts folder and turned on. The originals stay where they are."
-        case .move: "Choose font files. They’re moved into your Fonts folder and turned on."
+        case .copy: "Choose font files. They’re copied into \(installPlace) and turned on. The originals stay where they are."
+        case .move: "Choose font files. They’re moved into \(installPlace) and turned on."
         case .ask, .inPlace: "Choose font files. They’re listed in your library where they are, without being activated."
         }
         guard panel.runModal() == .OK else { return }
@@ -40,7 +40,7 @@ extension AppModel {
     /// Folders are added as folders; font files the library doesn't have yet are listed where they are, or
     /// installed with fonts activated by copying or moving (see `addFontFiles`). Once a scan has read them, the browser
     /// goes to the first of their families, selected (see `showOpenedFiles`).
-    /// Dropped into a set, they join it. A document (PDF, IDML, InDesign, Illustrator) shows the fonts it uses.
+    /// Dropped into a set, they join it. A document (PDF, IDML, InDesign, Illustrator, Photoshop) shows the fonts it uses.
     /// Several arriving one by one, as from the Finder, are added together.
     func open(_ urls: [URL], into set: UUID? = nil) {
         openQueue.urls += urls
@@ -62,6 +62,8 @@ extension AppModel {
         var folders: [URL] = []
         var files: [String] = []
         var documents: [URL] = []
+        // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
+        var webFonts: Set<String> = []
         // Another font manager's library or collections open the Import sheet.
         let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
         for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
@@ -75,12 +77,16 @@ extension AppModel {
                 files.append(url.path)
             } else if DocumentFonts.fileExtensions.contains(pathExtension) {
                 documents.append(url)
+            } else if ["woff", "woff2"].contains(pathExtension) {
+                webFonts.insert(pathExtension.uppercased())
             }
         }
         // One document at a time: the sheet shows one.
         if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
             guard documents.isEmpty, imports.isEmpty else { return }
+            // "WOFF2 can’t be installed", or "Web fonts can’t be installed" for both kinds.
+            if !webFonts.isEmpty { return showToast("\(webFonts.count == 1 ? webFonts.first! : "Web fonts") can’t be installed") }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
         if !folders.isEmpty {
@@ -122,6 +128,9 @@ extension AppModel {
     /// copying or moving.
     var installsAddedFiles: Bool { data.installMethod == .copy || data.installMethod == .move }
 
+    /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Font Library".
+    var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your Fonts folder" }
+
     /// Brings in the font files the library doesn't have yet: lists them where they are, under Added Fonts, or with
     /// fonts activated by copying or moving, copies or moves them into ~/Library/Fonts, where they're on and in All
     /// Fonts like any installed font, along with files under Added Fonts that are off. `mayMove` false copies them
@@ -139,7 +148,8 @@ extension AppModel {
         let paths = paths.filter { !left.contains($0) }
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
-        let replacement = AddedDuplicates.replacement(of: using, installing: installsAddedFiles, library: library, fontFiles: data.fontFiles)
+        let replacement = AddedDuplicates.replacement(of: using, installing: installsAddedFiles, library: library, fontFiles: data.fontFiles,
+                                                      fontLibrary: data.fontLibraryPath)
         let switching = Set(replacement.switches.compactMap(\.target?.face.path))
         let movable = movableFiles(among: paths)
         let installing = !installsAddedFiles ? [] : paths.filter { path in

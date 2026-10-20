@@ -12,15 +12,25 @@ final class AppModel {
     @ObservationIgnored let locations = Locations.standard
     @ObservationIgnored let scanner: LibraryScanner
     @ObservationIgnored let store: UserDataStore
-    @ObservationIgnored let engine: ActivationEngine
+    /// The engine as made at launch; `engine` knows the Font Library.
+    @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
     @ObservationIgnored let measurements: MeasurementIndex
     @ObservationIgnored let pageContents: PageContents
     @ObservationIgnored let appSets = AppSetWatcher()
+    @ObservationIgnored let openDocumentFonts = DocumentFontWatcher()
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
+
+    /// Turns fonts on and off, installing them into ~/Library/Fonts or the Font Library, as the user chose.
+    var engine: ActivationEngine {
+        var engine = launchEngine
+        engine.fontLibrary = data.fontLibrary?.url
+        engine.installsIntoFontLibrary = data.installsIntoFontLibrary
+        return engine
+    }
 
     // MARK: Library
 
@@ -129,7 +139,11 @@ final class AppModel {
     var selectedItems: Set<SidebarItem> = [.all]
     var selectedIDs: Set<String> = []
     /// The family whose page is pushed over the browser.
-    var openFamilyID: String?
+    var openFamilyID: String? {
+        didSet { if openFamilyID != oldValue { pageStyleID = nil } }
+    }
+    /// The style chosen in the open font page's Style menu; nil follows the preview weight.
+    var pageStyleID: FaceID?
     /// The family whose similar fonts the browser shows instead of a sidebar item's, the closest first (see
     /// `showSimilar`); nil for a sidebar item's.
     var similarFamilyID: String?
@@ -146,10 +160,15 @@ final class AppModel {
     var infoTab: InfoTab = .info
     /// OpenType features chosen in the Info panel, per family, applied wherever it's previewed.
     var familyFeatures: [String: [FeatureSetting]] = [:]
+    /// Where the Info panel's sliders put a variable family's axes, per family, applied wherever the style they were
+    /// moved on is previewed.
+    var familyAxes: [String: AdjustedAxes] = [:]
 
     // MARK: Prompts
 
     var activationPrompt: ActivationPrompt?
+    /// Turning on many families at once, waiting for the user to agree (see `UserData.asksBeforeActivatingMany`).
+    var manyActivationPrompt: ManyActivationPrompt?
     /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
     var copySwitchPrompt: CopySwitchRequest?
     /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
@@ -239,7 +258,7 @@ final class AppModel {
         let locations = Locations.standard
         scanner = LibraryScanner(locations: locations)
         store = UserDataStore(locations: locations)
-        engine = ActivationEngine(locations: locations)
+        launchEngine = ActivationEngine(locations: locations)
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
@@ -255,6 +274,8 @@ final class AppModel {
         asksAboutGuessing = asks
         guessesClassifications = !asks && defaults.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
+        // Files from before there was a Font Library get its first place, saved with the next change.
+        if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
         if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
         restoreGroups()
@@ -288,6 +309,10 @@ final class AppModel {
         }
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
+            let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
+            model.data.records = tidied.records
+            // The first scan may have listed the files before they went.
+            if tidied.removed > 0 { model.rescan() }
         }
         dropAdobeFolders()
         rescan()
@@ -706,7 +731,7 @@ final class AppModel {
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
             if data.showCreativeCloudFonts, family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
-            if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
+            if family.folderIDs.contains(WatchedFolder.fontLibraryID) { ownFolders.insert(WatchedFolder.fontLibraryID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.lists(family) else { continue }
             if let name = foundryName(family) { names.insert(name) }
@@ -767,6 +792,24 @@ struct DownloadProgress: Equatable {
 enum InfoTab: String, CaseIterable {
     case info = "Info"
     case features = "Features"
+    case axes = "Axes"
+}
+
+/// The axes moved on a variable style's sliders, by tag, for that style only.
+struct AdjustedAxes: Equatable {
+    let face: FaceID
+    var values: [String: Double]
+}
+
+/// Turning on more families at once than `UserData.manyFamilies`.
+struct ManyActivationPrompt: Identifiable {
+    let id = UUID()
+    /// What `AppModel.activate` was asked to call them.
+    var title: String
+    var faces: [LibraryFace]
+    var families: Int
+    /// Until Cicero quits.
+    var temporarily: Bool
 }
 
 struct ActivationPrompt: Identifiable {

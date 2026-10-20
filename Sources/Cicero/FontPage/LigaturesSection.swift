@@ -3,12 +3,16 @@ import CoreText
 import SwiftUI
 
 /// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph in a cell
-/// like a character's, in the same columns, the characters it stands for in its tooltip and popover, which copies them,
-/// as its right-click menu does. Like the glyphs' groups, rows of fixed cells in the page's stack, under a header per
-/// feature like a group's.
+/// like a character's, in the same columns, the characters it stands for in its tooltip and popover, which copies them
+/// or its outline, as its right-click menu does, and dragged out as an SVG file. Like the glyphs' groups, rows of fixed
+/// cells in the page's stack, under a header per feature like a group's.
 struct LigaturesSection: View {
-    @Environment(PreviewSettings.self) private var preview
+    @Environment(AppModel.self) private var model
+    /// The style the page's text is set in, at its weight.
     let face: FontFace
+    let weight: Double
+    /// Axes moved in the Info panel, by tag.
+    let variations: [String: Double]
     /// Cells per row: the glyphs'.
     let columns: Int
     let groups: [LigatureGroup]
@@ -66,16 +70,20 @@ struct LigaturesSection: View {
     private func cell(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         let isShown = popover?.tag == group.tag && popover?.characters == ligature.characters
         // The glyphs' size; a long one is scaled down to fit.
-        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: preview.weight)
+        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
             .padding(.horizontal, 2)
             .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
             .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
             .contentShape(.rect)
             .help(ligature.text)
             .onTapGesture { popover = (group.tag, ligature.characters) }
+            .onDrag { dragItem(ligature) }
             .contextMenu {
-                Button("Copy Characters", systemImage: "doc.on.clipboard") { GlyphsSection.copy(ligature.text) }
-                Button("Copy Unicode", systemImage: "doc.on.clipboard") { GlyphsSection.copy(CharacterCodes.unicode(ligature.characters)) }
+                Button("Copy Characters", systemImage: "doc.on.clipboard") { copy(ligature.text, shown: "“\(ligature.text)”") }
+                Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(ligature) }
+                Button("Copy Unicode", systemImage: "doc.on.clipboard") {
+                    copy(CharacterCodes.unicode(ligature.characters), shown: CharacterCodes.unicode(ligature.characters))
+                }
             }
         .accessibilityElement()
         .accessibilityLabel("Ligature of \(ligature.text)")
@@ -85,8 +93,10 @@ struct LigaturesSection: View {
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         VStack(spacing: 10) {
-            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: preview.weight)
+            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: weight, variations: variations)
                 .frame(width: 220, height: 130)
+                .contentShape(.rect)
+                .onDrag { dragItem(ligature) }
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
                 .font(.title3)
             Text(CharacterCodes.unicode(ligature.characters))
@@ -103,37 +113,80 @@ struct LigaturesSection: View {
             }
             // A ligature has no code of its own: what's copied is its characters, which the font draws as this glyph
             // where its feature is on.
-            Button("Copy Characters", systemImage: "doc.on.doc") { GlyphsSection.copy(ligature.text) }
-                .help("Copies “\(ligature.text)”, which this font draws as this ligature with \(group.name) on")
+            VStack {
+                Button("Copy Characters", systemImage: "doc.on.doc") { copy(ligature.text, shown: "“\(ligature.text)”") }
+                    .help("Copies “\(ligature.text)”, which this font draws as this ligature with \(group.name) on")
+                Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(ligature) }
+                    .disabled(outline(ligature) == nil)
+                    .help("Copies the ligature’s outline, to paste into a design app as a shape you can edit, or as SVG code")
+            }
+            .buttonStyle(StillPushButtonStyle())
         }
         .padding(16)
         .frame(maxWidth: 300)
     }
+
+    /// As for a glyph: copies, closes the popover and says what was copied.
+    private func copy(_ text: String, shown: String) {
+        GlyphsSection.copy(text)
+        popover = nil
+        model.showToast("\(shown) copied to clipboard")
+    }
+
+    private func copyVector(_ ligature: Ligature) {
+        guard let outline = outline(ligature) else { return NSSound.beep() }
+        GlyphVectors.copy(outline, style: face.fullName, fallback: Self.fileFallback(ligature))
+        popover = nil
+        model.showToast("“\(ligature.text)” copied to clipboard as a vector")
+    }
+
+    private func outline(_ ligature: Ligature) -> GlyphOutline? {
+        GlyphVectors.outline(ligature.glyph, face: face, weight: weight, variations: variations)
+    }
+
+    /// The ligature as an SVG file, named after the style and the glyph.
+    private func dragItem(_ ligature: Ligature) -> NSItemProvider {
+        GlyphVectors.dragItem(outline(ligature), style: face.fullName, fallback: Self.fileFallback(ligature))
+    }
+
+    /// What its file is called after when the font doesn't name the glyph: its characters, as in "Inter Regular f_i.svg".
+    private static func fileFallback(_ ligature: Ligature) -> String {
+        ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: "_")
+    }
 }
 
-/// One glyph of a face, by its ID, drawn from its outline: a ligature has no character of its own to set.
-/// Centred on the font's ascender and descender, so glyphs side by side share a baseline, and scaled down
-/// when it's wider than the room.
+/// One glyph of a face, by its ID: a ligature or an alternate has no character of its own to set. Drawn as text is,
+/// not filled from its outline, which came out a quarter lighter than the characters set next to it, as macOS
+/// thickens text a little when it draws it. Centred on the font's ascender and descender, so glyphs side by side
+/// share a baseline, and scaled down when it's wider than the room.
 struct GlyphImage: View {
     let face: FontFace
     let glyph: CGGlyph
     let size: CGFloat
     var weight: Double = 400
+    var variations: [String: Double] = [:]
 
     var body: some View {
         Canvas { context, area in
-            let font = FontLoader.shared.font(face, size: size, weight: weight)
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
             var glyph = glyph
-            guard let outline = CTFontCreatePathForGlyph(font, glyph, nil) else { return }
             var bounds = CGRect.zero
             CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyph, &bounds, 1)
+            guard !bounds.isEmpty else { return }
             // The font's ascent and descent, or as far as the glyph reaches past them: all of it fits the cell.
             let ascent = max(CTFontGetAscent(font), bounds.maxY), descent = max(CTFontGetDescent(font), -bounds.minY)
             let scale = min(1, (area.width - 6) / max(bounds.width, 1), area.height / max(ascent + descent, 1))
             let x = (area.width - bounds.width * scale) / 2 - bounds.minX * scale
             let baseline = (area.height + (ascent - descent) * scale) / 2
-            let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: x, ty: baseline)
-            context.fill(Path(outline).applying(transform), with: .foreground)
+            let color = Color.primary.resolve(in: context.environment).cgColor
+            context.withCGContext { cg in
+                cg.setFillColor(color)
+                // From the canvas's top-left origin to the glyph's baseline, with y going up.
+                cg.translateBy(x: x, y: baseline)
+                cg.scaleBy(x: scale, y: -scale)
+                var origin = CGPoint.zero
+                CTFontDrawGlyphs(font, &glyph, &origin, 1, cg)
+            }
         }
         .accessibilityHidden(true)
     }
