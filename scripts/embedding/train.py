@@ -14,7 +14,13 @@ count. And the embedding should tell Google's tags (Didone, geometric sans, sten
 so that designs of a kind come out close, and, given them, each style's letter measurements (LetterMeasurements.swift,
 one line per manifest entry: its row, then the values, tab-separated), so that it sees weight, widths and x-height
 as they do. Designs whose letters are drawn alike are one design to it. A tenth of the families, by the first word
-of their names, are held out to see how it does on designs it hasn't seen.
+of their names, are held out to see how it does on designs it hasn't seen (--fold says which).
+
+Other ways to learn, each off unless asked: --invariant has it learn a family's weights and widths as one design,
+drawn wider, narrower, bolder and lighter too, and leave them to the measurements; --mix learns from serif and sans
+serif families more often than from display and handwriting ones; --soft has designs whose Google tags of a kind are
+alike come out close, not only a design's styles; --together small sees the letters together with a sixth of the
+numbers; --ema judges and saves the weights averaged over the last steps.
 
 Then `classify` learns which of Cicero's classifications a design's embedding says it is, the embedding as it is:
 serif, sans serif, script or ornamental, from Google's metadata (see `label`). Monospaced ones are left out, as
@@ -57,24 +63,42 @@ def block(inputs, outputs, stride=1):
 
 
 class Embedder(nn.Module):
-    def __init__(self, tags):
+    def __init__(self, tags, together="dense"):
         super().__init__()
         self.letter = nn.Sequential(
             *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
             nn.AdaptiveAvgPool2d(4), nn.Flatten(), nn.Linear(128 * 16, 128), nn.ReLU(inplace=True),
         )
-        # What it sees in each letter, and how wide each letter's advance is.
+        # What it sees in each letter, and how wide each letter's advance is: all of it at once ("dense", two thirds
+        # of the model's numbers), or each letter's first told in 32 numbers, the same way for every letter ("small",
+        # --together), in a sixth of them.
+        self.kind = together
+        if together == "small":
+            self.each = nn.Sequential(nn.Linear(129, 32), nn.ReLU(inplace=True))
+        inputs, middle = (LETTERS * 32, 256) if together == "small" else (LETTERS * 129, 512)
         self.together = nn.Sequential(
-            nn.Linear(LETTERS * 129, 512), nn.BatchNorm1d(512), nn.ReLU(inplace=True), nn.Linear(512, DIMENSIONS),
+            nn.Linear(inputs, middle), nn.BatchNorm1d(middle), nn.ReLU(inplace=True), nn.Linear(middle, DIMENSIONS),
         )
         self.tags = nn.Linear(DIMENSIONS, tags)
         self.measures = nn.Linear(DIMENSIONS, MEASURES)
 
+    def combine(self, each, advances):
+        """What it sees in each letter, (n, 16, 128), and the advances, (n, 16) → (n, 128) of length 1. No shape is
+        taken from the input, for `Exported`."""
+        if self.kind == "small":
+            letters = self.each(torch.cat([each, advances[:, :, None]], 2)).reshape(-1, LETTERS * 32)
+            return F.normalize(self.together(letters), dim=1)
+        return F.normalize(self.together(torch.cat([each.reshape(-1, LETTERS * 128), advances], 1)), dim=1)
+
     def forward(self, letters, advances):
         """(n, 16, 64, 64), 0 to 1, and (n, 16), in squares → (n, 128) of length 1."""
         count = letters.shape[0]
-        each = self.letter(letters.reshape(count * LETTERS, 1, SIZE, SIZE)).reshape(count, LETTERS * 128)
-        return F.normalize(self.together(torch.cat([each, advances], 1)), dim=1)
+        return self.combine(self.letter(letters.reshape(count * LETTERS, 1, SIZE, SIZE)).reshape(count, LETTERS, 128), advances)
+
+
+def embedder(saved):
+    """The model a checkpoint saved, as it was made."""
+    return Embedder(len(saved["tags"]) + len(CATEGORIES), saved.get("together", "dense"))
 
 
 def classifier():
@@ -92,8 +116,7 @@ class Exported(nn.Module):
         self.classify = classify
 
     def forward(self, letters, advances):
-        each = self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS * 128)
-        embedding = F.normalize(self.model.together(torch.cat([each, advances], 1)), dim=1)
+        embedding = self.model.combine(self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS, 128), advances)
         if self.classify is None:
             return embedding
         return embedding, F.softmax(self.classify(embedding), dim=1)
@@ -149,6 +172,15 @@ SIBLING_WORDS = {"display", "text", "headline", "caption", "fine", "deck", "post
 def sibling_root(name):
     """The family's name without the words that name an optical size or width, which its siblings share."""
     words = [word for word in name.lower().split() if word not in SIBLING_WORDS]
+    return " ".join(words) or name.lower()
+
+
+# Words that name a family's width: Roboto Condensed and Saira Semi Condensed are Roboto and Saira, for --invariant.
+WIDTH_WORDS = {"condensed", "narrow", "compressed", "expanded", "extended", "wide", "semi", "extra", "ultra"}
+
+
+def without_width(name):
+    words = [word for word in name.lower().split() if word not in WIDTH_WORDS]
     return " ".join(words) or name.lower()
 
 
@@ -244,6 +276,23 @@ def augment(batch, advances):
     return moved * keep, advances * scale[:, None] * keep[:, :, 0, 0]
 
 
+def vary(letters, advances, wider=0.5, heavier=0.3):
+    """For --invariant, each style now and then drawn up to a fifth wider or narrower (`wider` of them), its advances
+    with it, and bolder or lighter by up to a pixel (`heavier` of them), about a weight, so that the embedding learns
+    them as the same design: the measurements tell widths and weights. Which styles were changed, too."""
+    count, device = letters.shape[0], letters.device
+    widened = torch.rand(count, device=device) < wider
+    factors = torch.empty(count, device=device).uniform_(math.log(0.8), math.log(1.25)).exp()
+    factors = torch.where(widened, factors, torch.ones_like(factors))
+    letters, advances = stretch(letters, factors), advances * factors[:, None]
+    bolder = F.max_pool2d(letters, 3, 1, 1)
+    lighter = -F.max_pool2d(-letters, 3, 1, 1)
+    changed = torch.rand(count, device=device) < heavier
+    towards = torch.where((torch.rand(count, device=device) < 0.5)[:, None, None, None], bolder, lighter)
+    amount = torch.empty(count, 1, 1, 1, device=device).uniform_(0.3, 1) * changed[:, None, None, None]
+    return letters + amount * (towards - letters), advances, widened | changed
+
+
 def stretch(batch, factors):
     """Each style drawn wider or narrower by its factor, about the middle of each square."""
     theta = torch.zeros(batch.shape[0], 2, 3, device=batch.device)
@@ -260,6 +309,25 @@ def contrastive(embeddings, temperature):
     similarities.fill_diagonal_(-1e4)
     targets = torch.cat([torch.arange(count, 2 * count), torch.arange(0, count)]).to(embeddings.device)
     return F.cross_entropy(similarities, targets)
+
+
+def soft_contrastive(embeddings, kinds, italic, temperature, target_temperature):
+    """For --soft, how near each row should be to the others: its other view nearest, then the designs whose Google
+    tags of a kind are alike (Didone, geometric…, `kinds` of length 1 or 0), less so when one is italic and the other
+    not, others least; and how far the embeddings are from it (Kullback-Leibler). Rows i and i + n are two views of one
+    design; rows of designs without such tags are left to `contrastive`."""
+    count = embeddings.shape[0] // 2
+    rows = torch.arange(2 * count, device=embeddings.device)
+    partners = torch.cat([rows[count:], rows[:count]])
+    alike = 0.8 * (kinds @ kinds.T) * torch.where(italic[:, None] == italic[None, :], 1.0, 0.5)
+    alike[rows, partners] = 1
+    alike.fill_diagonal_(-1e4)
+    wanted = F.softmax(alike / target_temperature, dim=1)
+    similarities = embeddings @ embeddings.T / temperature
+    similarities.fill_diagonal_(-1e4)
+    loss = (wanted * (wanted.clamp_min(1e-12).log() - F.log_softmax(similarities, dim=1))).sum(1)
+    known = kinds.norm(dim=1) > 0
+    return loss[known].mean() if known.any() else loss.sum() * 0
 
 
 @torch.no_grad()
@@ -371,6 +439,13 @@ def train(arguments):
     # Only part of the families, with their siblings, to see what more of them would do (--share).
     if arguments.share < 1:
         classes = [group for group in classes if zlib.crc32(designs[group[0]]["root"].encode()) % 1000 < arguments.share * 1000]
+    # A family's widths, and its siblings named for another width, as one design (--invariant).
+    if arguments.invariant:
+        joined = {}
+        for group in classes:
+            design = designs[group[0]]
+            joined.setdefault((without_width(design["family"]), design["italic"], design["size"]), []).extend(group)
+        classes = list(joined.values())
     families = sorted({designs[index]["family"] for group in classes for index in group})
     print(f"training on {len(classes)} designs ({sum(map(len, classes))} before merging) of {len(families)} families, "
           f"{sum(not designs[group[0]]['italic'] and designs[group[0]]['width'] == 100 and not designs[group[0]]['size'] for group in classes)} "
@@ -381,10 +456,17 @@ def train(arguments):
         for index in group:
             by_root.setdefault(designs[index]["root"], set()).add(position)
     roots = sorted(by_root)
+    # How often each family comes in an epoch (--mix): text faces more than display and handwriting ones, as a
+    # library has more of them than Google.
+    MIX = {"SERIF": 2.0, "SANS_SERIF": 1.5, "DISPLAY": 0.6, "HANDWRITING": 0.5, "MONOSPACE": 1.0}
+    often = {root: MIX[designs[classes[min(by_root[root])][0]]["category"]] if arguments.mix else 1.0 for root in roots}
+    kind_mask = torch.tensor([1.0 if name.startswith(KINDS) else 0.0 for name in tag_names] + [0.0] * len(CATEGORIES), device=device)
 
     everything = torch.tensor(drawn.pixels, device=device)
     spans = torch.tensor(drawn.advances, device=device)
     targets = torch.tensor([design["target"] for design in designs], device=device)
+    kinds = F.normalize(targets * kind_mask, dim=1)
+    italics = torch.tensor([design["italic"] for design in designs], device=device)
     tagged = torch.tensor([design["tagged"] for design in designs], device=device)
     # Tags of a kind count for more than the expressive ones (calm, playful…), the category most.
     tag_weights = torch.tensor([1.0 if name.startswith(KINDS) else 0.3 for name in tag_names] + [1.0] * len(CATEGORIES), device=device)
@@ -393,30 +475,53 @@ def train(arguments):
     measure_weights = torch.ones(MEASURES, device=device)
     measure_weights[WIDTHS] = arguments.widths
 
-    model = Embedder(len(tag_names) + len(CATEGORIES)).to(device)
+    model = Embedder(len(tag_names) + len(CATEGORIES), arguments.together).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=arguments.rate, weight_decay=arguments.decay)
+    # The model's weights as they were over the last steps, which it is judged by and saved as (--ema).
+    average = None
+    if arguments.ema:
+        from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
+        average = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(arguments.ema), use_buffers=True)
     steps_per_epoch = len(classes) // arguments.batch
     total = arguments.epochs * steps_per_epoch
     schedule = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=arguments.rate, total_steps=total, pct_start=0.05)
     out = work / arguments.name
+    # Every weight of a design for --invariant, else those a weight or so from its regular.
+    views = "all" if arguments.invariant else "views"
     for epoch in range(arguments.epochs):
         model.train()
         # Families in a random order, each with its siblings, cut into batches of exactly as many designs: a batch of
         # another size would have the GPU work out and keep another graph, and its memory grows with every one.
-        order, taken = [], set()
-        for root in random.sample(roots, len(roots)):
-            for position in sorted(by_root[root] - taken):
-                taken.add(position)
-                order.append(classes[position])
-        batches = [order[start:start + arguments.batch] for start in range(0, len(order) - arguments.batch + 1, arguments.batch)]
+        if arguments.mix:
+            # Some families twice, but never twice in a batch, where one would be the other's negative.
+            coming = [root for root in roots for _ in range(int(often[root]) + (random.random() < often[root] % 1))]
+            batches, batch, waiting = [], [], []
+            for root in random.sample(coming, len(coming)):
+                ready, waiting = [*waiting, *sorted(by_root[root])], []
+                for position in ready:
+                    if position in batch:
+                        waiting.append(position)
+                        continue
+                    batch.append(position)
+                    if len(batch) == arguments.batch:
+                        batches.append([classes[position] for position in batch])
+                        batch = []
+            batches = batches[:steps_per_epoch]
+        else:
+            order, taken = [], set()
+            for root in random.sample(roots, len(roots)):
+                for position in sorted(by_root[root] - taken):
+                    taken.add(position)
+                    order.append(classes[position])
+            batches = [order[start:start + arguments.batch] for start in range(0, len(order) - arguments.batch + 1, arguments.batch)]
         losses = []
         for chosen in batches:
             first_rows, second_rows, owners = [], [], []
             for group in chosen:
                 # Two views: of one design of the group, or of two, which are drawn alike anyway.
                 a, b = designs[random.choice(group)], designs[random.choice(group)]
-                first_rows.append(random.choice(a["views"]))
-                second_rows.append(random.choice(b["views"]))
+                first_rows.append(random.choice(a[views]))
+                second_rows.append(random.choice(b[views]))
                 owners.append(random.choice(group))
             # Some designs again, drawn wider or narrower, as designs of their own: two views of each, alike.
             stretched = random.sample(range(len(chosen)), round(len(chosen) * arguments.stretch))
@@ -432,10 +537,16 @@ def train(arguments):
                 for offset in (count, total + count):
                     letters[offset:offset + len(stretched)] = stretch(letters[offset:offset + len(stretched)], factors)
                     advances[offset:offset + len(stretched)] *= factors[:, None]
+            varied = torch.zeros(len(rows), dtype=torch.bool, device=device)
+            if arguments.invariant:
+                letters, advances, varied = vary(letters, advances)
             letters, advances = augment(letters, advances)
             embeddings = model(letters, advances)
-            loss = contrastive(embeddings, arguments.temperature)
             owners = torch.tensor(owners + owners, device=device)
+            loss = arguments.instance * contrastive(embeddings, arguments.temperature)
+            if arguments.soft:
+                loss = loss + arguments.soft * soft_contrastive(embeddings, kinds[owners], italics[owners], arguments.temperature,
+                                                                arguments.soft_temperature)
             known = tagged[owners]
             if known.any():
                 logits = model.tags(embeddings[known] * 8)
@@ -448,7 +559,7 @@ def train(arguments):
                 plain = torch.ones(len(rows), 1, dtype=torch.bool, device=device)
                 for offset in (count, len(first_rows) + count):
                     plain[offset:offset + len(stretched)] = False
-                known &= plain
+                known &= plain & ~varied[:, None]
                 guessed = model.measures(embeddings * 8)
                 each = F.smooth_l1_loss(guessed, wanted.nan_to_num(), reduction="none") * measure_weights
                 loss = loss + arguments.measures * each[known].mean()
@@ -456,11 +567,15 @@ def train(arguments):
             loss.backward()
             optimizer.step()
             schedule.step()
+            if average is not None:
+                average.update_parameters(model)
             losses.append(loss.item())
         if epoch % arguments.every == arguments.every - 1 or epoch == arguments.epochs - 1:
-            scores = evaluate(model_distance(model, drawn, device), designs, tag_names, measurements)
+            judged = average.module if average is not None else model
+            scores = evaluate(model_distance(judged, drawn, device), designs, tag_names, measurements)
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
-            torch.save({"model": model.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores, "fold": arguments.fold}, out)
+            torch.save({"model": judged.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores, "fold": arguments.fold,
+                        "together": arguments.together}, out)
     print(f"saved {out}")
 
 
@@ -478,7 +593,7 @@ def classify(arguments):
         if any(designs[index]["held_out"] for index in group):
             for index in group:
                 designs[index]["held_out"] = True
-    model = Embedder(len(saved["tags"]) + len(CATEGORIES)).to(device)
+    model = embedder(saved).to(device)
     model.load_state_dict(saved["model"])
     labelled = [design for design in designs if design["label"] is not None]
     learn = [(row, design["label"]) for design in labelled if not design["held_out"] for row in design["all"]]
@@ -523,7 +638,7 @@ def export(arguments):
 
     work = Path(arguments.work).expanduser()
     saved = torch.load(arguments.checkpoint or work / "model.pt", map_location="cpu")
-    model = Embedder(len(saved["tags"]) + len(CATEGORIES))
+    model = embedder(saved)
     model.load_state_dict(saved["model"])
     model.eval()
     head = None
@@ -575,6 +690,15 @@ def main():
     training.add_argument("--seed", type=int, default=1)
     training.add_argument("--fold", type=int, default=0, help="which tenth of the families to hold out, 0 to 9")
     training.add_argument("--share", type=float, default=1.0, help="the share of the other families to learn from")
+    training.add_argument("--invariant", action="store_true", help="learn a design's weights and widths as one, as the "
+                          "measurements tell them: every weight, widths and siblings named for one, drawn wider, narrower, bolder and lighter")
+    training.add_argument("--mix", action="store_true", help="learn from serif and sans serif families more often than display and handwriting ones")
+    training.add_argument("--soft", type=float, default=0.0, help="how much learning that designs of a kind are alike counts (see soft_contrastive)")
+    training.add_argument("--soft-temperature", type=float, default=0.2)
+    training.add_argument("--instance", type=float, default=1.0, help="how much telling each design from the others counts")
+    training.add_argument("--together", choices=["dense", "small"], default="dense", help="how the letters are seen together (see Embedder)")
+    training.add_argument("--ema", type=float, default=0.0, help="judge and save the model's weights averaged over the last "
+                          "steps, each step counting this much less than the next (0.98), instead of as they are")
     classifying = commands.add_parser("classify")
     classifying.add_argument("work")
     classifying.add_argument("--checkpoint", help="instead of the work folder's model.pt; the classifier is saved in it")

@@ -36,10 +36,13 @@ family, and its siblings named for another size, width or kind (DM Serif Display
 share a batch with, so that slant, width and optical size count. Next to the letters it gets their advances
 (letters-advances.f32), which the squares, each letter centred by its ink, don't show: how wide a face sets its
 letters, and that a monospaced one sets them all as wide. `--stretch` adds designs drawn narrower and wider than they are, which made width
-count a little more and italics less in round two; it's off.
+count a little more and italics less in round two; it's off. So are the other ways to learn that train.py's
+docstring lists, which round five tried: weights and widths as one design (`--invariant`), more text faces (`--mix`),
+designs of a kind alike (`--soft`), a smaller model (`--together small`) and averaged weights (`--ema`).
 
 Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the
-tenth of the families it doesn't learn from: how often a style's nearest other style is its own design's; how much
+tenth of the families it doesn't learn from (`--fold`, 0 to 9; one tenth's scores vary more than a change makes them,
+so compare several): how often a style's nearest other style is its own design's; how much
 the ten nearest upright designs share an upright one's Google tags and category; how many of the ten nearest are
 upright, for an upright design, and italic, for an italic one; and how far apart in width the ten nearest are, in
 `SimilarFonts`' steps. A new model changes every family's embedding: raise `MeasurementIndex.version` with it.
