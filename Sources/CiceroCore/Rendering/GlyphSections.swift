@@ -177,16 +177,18 @@ public struct GlyphSection: Identifiable, Sendable {
     public static let limit = 6000
 
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order: in code point
-    /// order within a group, but accented letters by the letter they're made from. Limits very large fonts to a
-    /// sensible number of characters from each Unicode block.
-    public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = []) -> [GlyphSection] {
+    /// order within a group, but accented letters by the letter they're made from. Characters `isEmpty` says the font
+    /// draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very large fonts to a sensible number of
+    /// characters from each Unicode block.
+    public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [],
+                                leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
         var buckets: [GlyphGroup: [UInt32]] = [:]
         var perBlock: [String: Int] = [:]
         for range in coverage.ranges {
             for value in range {
                 guard let group = GlyphGroup.of(value) else { continue }
                 let block = Self.block(of: value) ?? ""
-                guard perBlock[block, default: 0] < limit else { continue }
+                guard perBlock[block, default: 0] < limit, !isEmpty(value) else { continue }
                 perBlock[block, default: 0] += 1
                 buckets[group, default: []].append(value)
             }

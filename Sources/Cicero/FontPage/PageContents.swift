@@ -9,7 +9,7 @@ nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
     /// The characters and feature glyphs by group, but characters listed as ligatures.
     let glyphs: [GlyphSection]
-    /// Every character the face has, those listed as ligatures included.
+    /// Every character the face draws, those listed as ligatures included.
     let characterCount: Int
     /// The character a ligature's glyph is too, by glyph.
     let ligatureCharacters: [CGGlyph: UInt32]
@@ -108,21 +108,30 @@ final class PageContents {
         if recent.count > Self.kept { ready[recent.removeFirst()] = nil }
     }
 
-    /// Both together, so the page never shows one without the other.
+    /// Both together, so the page never shows one without the other. Glyphs that draw nothing, like a trial font's
+    /// empty ones, are left out: a character's, a feature's, an alternate or a ligature.
     @concurrent
     private static func read(_ face: FontFace, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
         async let features = FeatureGlyph.read(face)
         async let alternates = FeatureAlternates.read(face)
+        let font = FontLoader.shared.font(face, size: 12)
+        let empty = EmptyGlyphs(font: font)
         let scalars = await coverage.coverage(computing: face).scalars
-        let featureGlyphs = await features
+        let featureGlyphs = await features.filter { !empty.contains($0.glyph) }
         // Those in groups of their own, like tabular figures, aren't listed again after their characters.
         let grouped = Set(featureGlyphs.map(\.glyph))
         let listed = await alternates.compactMapValues { list in
-            let left = list.filter { !grouped.contains($0.glyph) }
+            let left = list.filter { !grouped.contains($0.glyph) && !empty.contains($0.glyph) }
             return left.isEmpty ? nil : left
         }
-        return PageContent(ligatures: await ligatures, glyphs: GlyphSection.sections(for: scalars, features: featureGlyphs),
-                           alternates: listed, font: FontLoader.shared.font(face, size: 12))
+        let drawn = await ligatures.compactMap { group in
+            let left = group.ligatures.filter { !empty.contains($0.glyph) }
+            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
+        }
+        // The coverage has only the characters the font draws, and those with nothing to draw that it has.
+        let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
+                                             leavingOut: { EmptyGlyphs.isInvisible($0) && empty.contains(character: $0) })
+        return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font)
     }
 }
