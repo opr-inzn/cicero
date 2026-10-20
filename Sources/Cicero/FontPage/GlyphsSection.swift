@@ -2,7 +2,7 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Every character a style has, and the glyphs its features draw in place of characters', like tabular figures, by
+/// Every character a style draws, and the glyphs its features draw in place of characters', like tabular figures, by
 /// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
 /// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
 /// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with a grey dot;
