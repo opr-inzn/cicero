@@ -2,11 +2,6 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
-
-- Search finds families by what they are, not only by their names: type **variable**, **mono**, **italic**, a classification like **serif**, **sans** or **script**, **display** or **text** for families made for large or small sizes, **condensed** or **extended**, a tag, or a kind of file, like **ttf**. Several words find the families that match each of them, so **variable sans** shows the variable sans serifs, and **inter variable** shows Inter if it’s variable. **mono** no longer shows every font from Monotype, only monospaced fonts and fonts with Mono in their names.
-- Search looks in the names of a family’s styles too, like Condensed Bold, and in the name you gave a foundry.
-
 ## 1.9
 
 - Right-click a family and choose **Show Similar Fonts** to see the 12 families in your library that look most like it, the closest first, in place of the sidebar item’s; **Done** goes back. A font page shows the six closest under **Similar**. Cicero measures the letters of each family on your Mac, the first time in a few seconds for a thousand families: how tall the lowercase is, how heavy and how contrasted the strokes are and at what angle, how wide, spaced, slanted and open the letters are, the serifs, the o’s roundness, and the a’s and g’s stories, and looks at them with a model that has learned what letters of a kind look like. A text cut lists other text cuts before display ones, its own display cut among them, and a display cut the other way round. Copies of one design, like a trial, a variable font or a family for each weight, are listed once, the closest of them.
@@ -14,6 +9,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Importing from FontExplorer X brings its classifications too, your own among them: a family goes in the classification most of its styles have, unless you’ve chosen one for it.
 - Fonts with “Stencil”, “Inline”, “Outline”, “Fraktur” or “Blackletter” in their names are Ornamental.
 - A family whose regular weight comes in two widths, like Futura’s Medium and Condensed Medium, is previewed in the normal width.
+- Search finds families by what they are, not only by their names: type **variable**, **mono**, **italic**, a classification like **serif**, **sans** or **script**, **display** or **text** for families made for large or small sizes, **condensed** or **extended**, a tag, or a kind of file, like **ttf**. Several words find the families that match each of them, so **variable sans** shows the variable sans serifs, and **inter variable** shows Inter if it’s variable. **mono** no longer shows every font from Monotype, only monospaced fonts and fonts with Mono in their names.
+- Search looks in the names of a family’s styles too, like Condensed Bold, and in the name you gave a foundry.
 
 ## 1.8.2
 
