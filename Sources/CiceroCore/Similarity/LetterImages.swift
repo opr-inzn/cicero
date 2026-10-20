@@ -3,7 +3,7 @@ import CoreText
 import Foundation
 
 /// A face's letters drawn small, white on black, each in a square of its own, and how wide each one's advance is, for
-/// `LetterEmbedding` to look at.
+/// `LetterEmbedding` to look at; and a few words set in a line each, in strips (see `words`).
 /// Every face has the same letters in the same squares, its baseline at the same height and its x-height as tall
 /// (its capitals no taller than `largestCapHeight`), so that what differs is how they're drawn. Drawn from their
 /// outlines, without hinting. Needs nothing but CoreText, so that scripts/embedding/render-letters.swift draws the
@@ -20,6 +20,15 @@ enum LetterImages {
     static let largestCapHeight: CGFloat = 40
     /// Fewer letters than this drawn, and the face hasn't enough of the Latin alphabet to say what it looks like.
     static let fewest = 8
+    /// Words set in a line each, at the letters' size and on their baseline: the widest letters against the narrowest,
+    /// and straight stems in a row, between zeros. They show how a face spaces its letters and how wide they run
+    /// against each other, which the squares, one letter each, don't.
+    static let words = ["0WWMMmm0", "0IIllii0"]
+    /// A strip's width, in pixels; it's `size` tall. A line wider than that, as an expanded face's line of Ws, is cut
+    /// off at the right.
+    static let stripWidth = 384
+    /// Where a line starts, in pixels from its strip's left edge.
+    static let stripMargin: CGFloat = 4
 
     struct Drawn: Equatable {
         /// One square after the other, each `size` rows of `size` pixels from the top left, 255 where it's all ink;
@@ -29,10 +38,14 @@ enum LetterImages {
         /// 0 for a letter the face hasn't: what the squares, each letter centred by its ink, don't show, as how a
         /// monospaced face's i and m are as wide.
         var advances: [Float]
+        /// One strip after the other, each `size` rows of `stripWidth` pixels from the top left, a word of `words` set in
+        /// each; a letter the face hasn't is left out. Empty unless asked for.
+        var strips: [UInt8]
     }
 
-    /// nil for a face with fewer than `fewest` of the letters drawn as outlines.
-    static func draw(_ font: CTFont) -> Drawn? {
+    /// nil for a face with fewer than `fewest` of the letters drawn as outlines. The strips only with `strips`, for a
+    /// model that looks at them.
+    static func draw(_ font: CTFont, strips withStrips: Bool = false) -> Drawn? {
         let font = inThousandths(font)
         let glyphs = letters.map { glyph(font, $0) }
         let paths = glyphs.map { glyph -> CGPath? in
@@ -77,7 +90,41 @@ enum LetterImages {
             context.flush()
             pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
         }
-        return Drawn(pixels: pixels, advances: advances)
+        guard let strips = withStrips ? strips(font, scale: scale) : [] else { return nil }
+        return Drawn(pixels: pixels, advances: advances, strips: strips)
+    }
+
+    /// `words` set at `scale`, each glyph where the one before it advances to: no kerning and no ligatures, nor
+    /// another font's glyph for one the face hasn't.
+    private static func strips(_ font: CTFont, scale: CGFloat) -> [UInt8]? {
+        let area = size * stripWidth
+        var pixels = [UInt8](repeating: 0, count: area * words.count)
+        guard let context = CGContext(data: nil, width: stripWidth, height: size, bitsPerComponent: 8, bytesPerRow: stripWidth,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue),
+              let data = context.data
+        else { return nil }
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        for (position, word) in words.enumerated() {
+            context.setFillColor(gray: 0, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: stripWidth, height: size))
+            let line = CGMutablePath()
+            var pen = stripMargin
+            for character in word {
+                guard var glyph = glyph(font, character) else { continue }
+                var placed = CGAffineTransform(translationX: pen, y: baseline).scaledBy(x: scale, y: scale)
+                if let path = CTFontCreatePathForGlyph(font, glyph, &placed) { line.addPath(path) }
+                var advance = CGSize.zero
+                CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
+                pen += advance.width * scale
+            }
+            context.setFillColor(gray: 1, alpha: 1)
+            context.addPath(line)
+            context.fillPath()
+            context.flush()
+            pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
+        }
+        return pixels
     }
 
     /// The font at 1,000 units to the em, at its own optical size: the one its variation sets, else its axis's default.

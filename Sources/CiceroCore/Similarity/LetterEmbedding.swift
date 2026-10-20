@@ -5,8 +5,9 @@ import Foundation
 import Synchronization
 
 /// What a face's letters look like as `dimensions` numbers, from a small model that learned it from Google Fonts'
-/// families (scripts/embedding): it looks at the letters and their advances as `LetterImages` draws them, and faces
-/// that look alike, scripts, stencils and outlines too, come out close together. The numbers have a length of 1, so
+/// families (scripts/embedding): it looks at the letters and their advances as `LetterImages` draws them (and the
+/// words it sets in strips, for a model that takes them), and faces that look alike, scripts, stencils and outlines
+/// too, come out close together. The numbers have a length of 1, so
 /// two faces are 0 apart when alike and up to 2 when not. Next to the letter measurements in `SimilarFonts`. The model also says
 /// which of `classifications` the face is likely to be, for the families nothing in their files classifies.
 public final class LetterEmbedding: Sendable {
@@ -46,10 +47,19 @@ public final class LetterEmbedding: Sendable {
 
     /// nil for a face with too few of the letters, as `LetterImages` says, and when the model can't be loaded.
     public func read(_ font: CTFont) -> Reading? {
-        guard let drawn = LetterImages.draw(font) else { return nil }
+        // The words in strips are drawn only for a model that takes them.
+        let takesStrips = model.withLock { state -> Bool in
+            if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
+            guard case .loaded(let model) = state else { return false }
+            return model.modelDescription.inputDescriptionsByName["strips"] != nil
+        }
+        guard let drawn = LetterImages.draw(font, strips: takesStrips) else { return nil }
         var letters = [Float](repeating: 0, count: drawn.pixels.count)
         vDSP.convertElements(of: drawn.pixels, to: &letters)
         letters = vDSP.divide(letters, 255)
+        var lines = [Float](repeating: 0, count: drawn.strips.count)
+        vDSP.convertElements(of: drawn.strips, to: &lines)
+        lines = vDSP.divide(lines, 255)
         let found = model.withLock { state -> Reading? in
             if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
             guard case .loaded(let model) = state else { return nil }
@@ -61,6 +71,12 @@ public final class LetterEmbedding: Sendable {
             advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances) }
             var inputs: [String: Any] = ["letters": input]
             if model.modelDescription.inputDescriptionsByName["advances"] != nil { inputs["advances"] = advances }
+            if takesStrips {
+                let shape = [1, LetterImages.words.count, LetterImages.size, LetterImages.stripWidth] as [NSNumber]
+                guard let strips = try? MLMultiArray(shape: shape, dataType: .float32) else { return nil }
+                strips.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: lines) }
+                inputs["strips"] = strips
+            }
             guard let features = try? MLDictionaryFeatureProvider(dictionary: inputs),
                   let output = try? model.prediction(from: features),
                   let embedding = output.featureValue(for: "embedding")?.multiArrayValue.map(Self.values)

@@ -20,7 +20,9 @@ Other ways to learn, each off unless asked: --invariant has it learn a family's 
 drawn wider, narrower, bolder and lighter too, and leave them to the measurements; --mix learns from serif and sans
 serif families more often than from display and handwriting ones; --soft has designs whose Google tags of a kind are
 alike come out close, not only a design's styles; --together small sees the letters together with a sixth of the
-numbers; --ema judges and saves the weights averaged over the last steps.
+numbers; --ema judges and saves the weights averaged over the last steps; --strips also sees the words LetterImages
+sets in a line each (0WWMMmm0, 0IIllii0: spacing, and how wide letters run against narrow ones), from
+letters-strips.u8.
 
 Then `classify` learns which of Cicero's classifications a design's embedding says it is, the embedding as it is:
 serif, sans serif, script or ornamental, from Google's metadata (see `label`). Monospaced ones are left out, as
@@ -41,6 +43,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 LETTERS, SIZE, DIMENSIONS = 16, 64, 128
+# The words LetterImages sets in strips, as many as there are, each SIZE tall and STRIP_WIDTH wide, the line starting
+# STRIP_MARGIN pixels from the left.
+STRIPS, STRIP_WIDTH, STRIP_MARGIN = 2, 384, 4
 # The baseline, in pixels from the top (LetterImages.baseline is from the bottom).
 BASELINE = SIZE - 18
 CATEGORIES = ["SANS_SERIF", "SERIF", "DISPLAY", "HANDWRITING", "MONOSPACE"]
@@ -63,8 +68,9 @@ def block(inputs, outputs, stride=1):
 
 
 class Embedder(nn.Module):
-    def __init__(self, tags, together="dense"):
+    def __init__(self, tags, together="dense", strips=False):
         super().__init__()
+        assert not (strips and together == "small"), "the strips are seen with the dense layer only"
         self.letter = nn.Sequential(
             *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
             nn.AdaptiveAvgPool2d(4), nn.Flatten(), nn.Linear(128 * 16, 128), nn.ReLU(inplace=True),
@@ -75,30 +81,42 @@ class Embedder(nn.Module):
         self.kind = together
         if together == "small":
             self.each = nn.Sequential(nn.Linear(129, 32), nn.ReLU(inplace=True))
-        inputs, middle = (LETTERS * 32, 256) if together == "small" else (LETTERS * 129, 512)
+        # The words in strips (--strips), each seen the same way as 128 numbers, of the line's upper and lower half
+        # in 24 steps across, next to the letters.
+        self.sees_strips = strips
+        if strips:
+            self.strip = nn.Sequential(
+                *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
+                *block(128, 32), nn.AdaptiveAvgPool2d((2, 24)), nn.Flatten(), nn.Linear(32 * 48, 128), nn.ReLU(inplace=True),
+            )
+        inputs, middle = (LETTERS * 32, 256) if together == "small" else (LETTERS * 129 + (STRIPS * 128 if strips else 0), 512)
         self.together = nn.Sequential(
             nn.Linear(inputs, middle), nn.BatchNorm1d(middle), nn.ReLU(inplace=True), nn.Linear(middle, DIMENSIONS),
         )
         self.tags = nn.Linear(DIMENSIONS, tags)
         self.measures = nn.Linear(DIMENSIONS, MEASURES)
 
-    def combine(self, each, advances):
-        """What it sees in each letter, (n, 16, 128), and the advances, (n, 16) → (n, 128) of length 1. No shape is
-        taken from the input, for `Exported`."""
+    def combine(self, each, advances, strips=None):
+        """What it sees in each letter, (n, 16, 128), the advances, (n, 16), and the strips, (n, 2, 64, 384) when it
+        sees them → (n, 128) of length 1. No shape is taken from the input, for `Exported`."""
         if self.kind == "small":
             letters = self.each(torch.cat([each, advances[:, :, None]], 2)).reshape(-1, LETTERS * 32)
             return F.normalize(self.together(letters), dim=1)
-        return F.normalize(self.together(torch.cat([each.reshape(-1, LETTERS * 128), advances], 1)), dim=1)
+        seen = [each.reshape(-1, LETTERS * 128), advances]
+        if self.sees_strips:
+            seen.append(self.strip(strips.reshape(-1, 1, SIZE, STRIP_WIDTH)).reshape(-1, STRIPS * 128))
+        return F.normalize(self.together(torch.cat(seen, 1)), dim=1)
 
-    def forward(self, letters, advances):
-        """(n, 16, 64, 64), 0 to 1, and (n, 16), in squares → (n, 128) of length 1."""
+    def forward(self, letters, advances, strips=None):
+        """(n, 16, 64, 64), 0 to 1, (n, 16), in squares, and (n, 2, 64, 384), 0 to 1, when it sees the strips →
+        (n, 128) of length 1."""
         count = letters.shape[0]
-        return self.combine(self.letter(letters.reshape(count * LETTERS, 1, SIZE, SIZE)).reshape(count, LETTERS, 128), advances)
+        return self.combine(self.letter(letters.reshape(count * LETTERS, 1, SIZE, SIZE)).reshape(count, LETTERS, 128), advances, strips)
 
 
 def embedder(saved):
     """The model a checkpoint saved, as it was made."""
-    return Embedder(len(saved["tags"]) + len(CATEGORIES), saved.get("together", "dense"))
+    return Embedder(len(saved["tags"]) + len(CATEGORIES), saved.get("together", "dense"), saved.get("strips", False))
 
 
 def classifier():
@@ -115,8 +133,8 @@ class Exported(nn.Module):
         self.model = model
         self.classify = classify
 
-    def forward(self, letters, advances):
-        embedding = self.model.combine(self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS, 128), advances)
+    def forward(self, letters, advances, strips=None):
+        embedding = self.model.combine(self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS, 128), advances, strips)
         if self.classify is None:
             return embedding
         return embedding, F.softmax(self.classify(embedding), dim=1)
@@ -185,17 +203,21 @@ def without_width(name):
 
 
 class Letters:
-    """What render-letters.swift drew: each entry's squares, 0 to 255, and its letters' advances, in squares."""
+    """What render-letters.swift drew: each entry's squares, 0 to 255, its letters' advances, in squares, and its
+    words in strips, 0 to 255, when they were drawn (read when asked)."""
 
     def __init__(self, work):
         self.pixels = np.fromfile(work / "letters.u8", dtype=np.uint8).reshape(-1, LETTERS, SIZE, SIZE)
         self.advances = np.fromfile(work / "letters-advances.f32", dtype=np.float32).reshape(-1, LETTERS)
+        strips = work / "letters-strips.u8"
+        self.strips = np.memmap(strips, dtype=np.uint8, mode="r").reshape(-1, STRIPS, SIZE, STRIP_WIDTH) if strips.exists() else None
 
     def __len__(self):
         return len(self.pixels)
 
-    def tensors(self, rows, device):
-        return torch.tensor(self.pixels[rows], device=device).float() / 255, torch.tensor(self.advances[rows], device=device)
+    def tensors(self, rows, device, strips=False):
+        found = (torch.tensor(self.pixels[rows], device=device).float() / 255, torch.tensor(self.advances[rows], device=device))
+        return found + (torch.tensor(self.strips[rows], device=device).float() / 255,) if strips else found
 
 
 def load(work, fold=0):
@@ -255,9 +277,10 @@ def held_out(name, fold=0):
     return zlib.crc32(name.split()[0].lower().encode()) % 10 == fold
 
 
-def augment(batch, advances):
+def augment(batch, advances, strips=None):
     """Each style a little bigger or smaller about its baseline, its advances with it, and moved a pixel or two, and
-    a letter or two missing now and then."""
+    a letter or two missing now and then; its strips, when given, as much bigger or smaller about the line's start
+    and moved as much."""
     count = batch.shape[0]
     device = batch.device
     scale = torch.empty(count, device=device).uniform_(0.9, 1.1)
@@ -273,7 +296,17 @@ def augment(batch, advances):
     grid = F.affine_grid(theta, list(batch.shape), align_corners=False)
     moved = F.grid_sample(batch, grid, align_corners=False, padding_mode="zeros")
     keep = (torch.rand(count, LETTERS, 1, 1, device=device) > 0.08).float()
-    return moved * keep, advances * scale[:, None] * keep[:, :, 0, 0]
+    if strips is None:
+        return moved * keep, advances * scale[:, None] * keep[:, :, 0, 0]
+    start = STRIP_MARGIN / (STRIP_WIDTH / 2) - 1
+    theta = torch.zeros(count, 2, 3, device=device)
+    theta[:, 0, 0] = 1 / scale
+    theta[:, 1, 1] = 1 / scale
+    theta[:, 0, 2] = start - (start + shift_x * SIZE / STRIP_WIDTH) / scale
+    theta[:, 1, 2] = base - (base + shift_y) / scale
+    grid = F.affine_grid(theta, list(strips.shape), align_corners=False)
+    lines = F.grid_sample(strips, grid, align_corners=False, padding_mode="zeros")
+    return moved * keep, advances * scale[:, None] * keep[:, :, 0, 0], lines
 
 
 def vary(letters, advances, wider=0.5, heavier=0.3):
@@ -335,7 +368,7 @@ def embed(model, letters, rows, device, batch=256):
     model.eval()
     found = []
     for start in range(0, len(rows), batch):
-        found.append(model(*letters.tensors(rows[start:start + batch], device)))
+        found.append(model(*letters.tensors(rows[start:start + batch], device, model.sees_strips)))
     return torch.cat(found)
 
 
@@ -464,6 +497,7 @@ def train(arguments):
 
     everything = torch.tensor(drawn.pixels, device=device)
     spans = torch.tensor(drawn.advances, device=device)
+    lines = torch.tensor(np.asarray(drawn.strips), device=device) if arguments.strips else None
     targets = torch.tensor([design["target"] for design in designs], device=device)
     kinds = F.normalize(targets * kind_mask, dim=1)
     italics = torch.tensor([design["italic"] for design in designs], device=device)
@@ -475,7 +509,8 @@ def train(arguments):
     measure_weights = torch.ones(MEASURES, device=device)
     measure_weights[WIDTHS] = arguments.widths
 
-    model = Embedder(len(tag_names) + len(CATEGORIES), arguments.together).to(device)
+    assert not (arguments.strips and (arguments.invariant or arguments.stretch)), "--strips aren't drawn wider or narrower yet"
+    model = Embedder(len(tag_names) + len(CATEGORIES), arguments.together, arguments.strips).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=arguments.rate, weight_decay=arguments.decay)
     # The model's weights as they were over the last steps, which it is judged by and saved as (--ema).
     average = None
@@ -540,8 +575,11 @@ def train(arguments):
             varied = torch.zeros(len(rows), dtype=torch.bool, device=device)
             if arguments.invariant:
                 letters, advances, varied = vary(letters, advances)
-            letters, advances = augment(letters, advances)
-            embeddings = model(letters, advances)
+            if lines is not None:
+                letters, advances, strips = augment(letters, advances, lines[rows].float() / 255)
+            else:
+                (letters, advances), strips = augment(letters, advances), None
+            embeddings = model(letters, advances, strips)
             owners = torch.tensor(owners + owners, device=device)
             loss = arguments.instance * contrastive(embeddings, arguments.temperature)
             if arguments.soft:
@@ -575,7 +613,7 @@ def train(arguments):
             scores = evaluate(model_distance(judged, drawn, device), designs, tag_names, measurements)
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
             torch.save({"model": judged.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores, "fold": arguments.fold,
-                        "together": arguments.together}, out)
+                        "together": arguments.together, "strips": arguments.strips}, out)
     print(f"saved {out}")
 
 
@@ -647,26 +685,29 @@ def export(arguments):
         head.load_state_dict(saved["classifier"])
         head.eval()
     exported = Exported(model, head).eval()
-    example = (torch.rand(1, LETTERS, SIZE, SIZE), torch.rand(1, LETTERS))
+    example = (torch.rand(1, LETTERS, SIZE, SIZE), torch.rand(1, LETTERS)) + ((torch.rand(1, STRIPS, SIZE, STRIP_WIDTH),) if model.sees_strips else ())
     traced = torch.jit.trace(exported, example)
     converted = ct.convert(
         traced,
-        inputs=[ct.TensorType(name="letters", shape=example[0].shape), ct.TensorType(name="advances", shape=example[1].shape)],
+        inputs=[ct.TensorType(name=name, shape=value.shape) for name, value in zip(["letters", "advances", "strips"], example)],
         outputs=[ct.TensorType(name="embedding", dtype=np.float32)]
         + ([ct.TensorType(name="classification", dtype=np.float32)] if head is not None else []),
         minimum_deployment_target=ct.target.macOS15,
         compute_precision=ct.precision.FLOAT16,
     )
-    converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, and their advances, in squares, as 128 numbers of "
+    converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, and their advances, in squares, "
+                                   + ("and its words in strips, 0 to 1, " if model.sees_strips else "") + "as 128 numbers of "
                                    "length 1, alike fonts close, and how likely it is to be " + ", ".join(CLASSES) + ". Learned from "
                                    "Google Fonts families under the OFL, Apache and UFL licenses.")
     converted.version = f"epoch {saved['epoch']}"
     converted.save(arguments.output)
     drawn = Letters(work)
-    letters, advances = drawn.pixels[:1].astype(np.float32) / 255, drawn.advances[:1]
-    expected = exported(torch.tensor(letters), torch.tensor(advances))
+    inputs = {"letters": drawn.pixels[:1].astype(np.float32) / 255, "advances": drawn.advances[:1]}
+    if model.sees_strips:
+        inputs["strips"] = np.asarray(drawn.strips[:1]).astype(np.float32) / 255
+    expected = exported(*(torch.tensor(value) for value in inputs.values()))
     expected = (expected[0] if head is not None else expected).detach().numpy()
-    found = converted.predict({"letters": letters, "advances": advances})["embedding"]
+    found = converted.predict(inputs)["embedding"]
     print(f"saved {arguments.output}; Core ML and PyTorch differ by {np.abs(found - expected).max():.4f} at most")
 
 
@@ -697,6 +738,7 @@ def main():
     training.add_argument("--soft-temperature", type=float, default=0.2)
     training.add_argument("--instance", type=float, default=1.0, help="how much telling each design from the others counts")
     training.add_argument("--together", choices=["dense", "small"], default="dense", help="how the letters are seen together (see Embedder)")
+    training.add_argument("--strips", action="store_true", help="see the words LetterImages sets in strips too (letters-strips.u8)")
     training.add_argument("--ema", type=float, default=0.0, help="judge and save the model's weights averaged over the last "
                           "steps, each step counting this much less than the next (0.98), instead of as they are")
     classifying = commands.add_parser("classify")
