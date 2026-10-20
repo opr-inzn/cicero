@@ -242,7 +242,7 @@ struct GlyphsSection: View {
     /// The glyph's outline, as for text; a beep for a glyph without one.
     private func copyVector(_ cell: Cell, style: Style) {
         guard let outline = outline(cell, style: style) else { return NSSound.beep() }
-        GlyphVectors.copy(outline)
+        GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell))
         popover = nil
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
     }
@@ -279,15 +279,19 @@ struct GlyphsSection: View {
         return GlyphVectors.outline(glyph, face: style.face, weight: style.weight, variations: style.variations)
     }
 
-    /// The cell's glyph as an SVG file, named after the style and the glyph, or, for a glyph the font doesn't name, its
-    /// character's code and the feature that draws it: "Inter Regular U+0061.ss01.svg".
+    /// The cell's glyph as an SVG file, named after the style and the glyph.
     private func dragItem(_ cell: Cell, style: Style) -> NSItemProvider {
-        let fallback = switch cell {
+        GlyphVectors.dragItem(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
+    }
+
+    /// What a glyph's file is called after when the font doesn't name the glyph: its character's code, and the feature
+    /// that draws it, as in "Inter Regular U+0061.ss01.svg".
+    private static func fileFallback(_ cell: Cell) -> String {
+        switch cell {
         case .character(let scalar): CharacterCodes.unicode(scalar)
         case .feature(let glyph): "\(CharacterCodes.unicode(glyph.character)).\(glyph.feature)"
         case .alternate(let alternate): "\(CharacterCodes.unicode(alternate.character)).\(alternate.features.first ?? "alt")"
         }
-        return GlyphVectors.dragItem(outline(cell, style: style), style: style.face.fullName, fallback: fallback)
     }
 
     /// Puts text on the clipboard, as plain text.

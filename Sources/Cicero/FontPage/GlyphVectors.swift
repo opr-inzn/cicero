@@ -23,13 +23,19 @@ enum GlyphVectors {
     }
 
     /// Puts the outline on the clipboard as PDF, which design apps paste as paths, and as SVG, as an image and as text,
-    /// for apps like Figma that paste SVG code, as Illustrator's own copies have it.
-    static func copy(_ outline: GlyphOutline) {
+    /// for apps like Figma that paste SVG code, as Illustrator's own copies have it. And as a PDF file named after the
+    /// style and the glyph, as the Finder copies a file: Messages and WhatsApp send that, where they named the PDF
+    /// alone “FILE_3121.pdf”, and the Finder pastes it.
+    static func copy(_ outline: GlyphOutline, style: String, fallback: String) {
         let item = NSPasteboardItem()
-        item.setData(outline.pdf, forType: .pdf)
+        let pdf = outline.pdf
+        item.setData(pdf, forType: .pdf)
         let svg = outline.svg
         item.setData(Data(svg.utf8), forType: NSPasteboard.PasteboardType(UTType.svg.identifier))
         item.setString(svg, forType: .string)
+        if let file = temporaryFile(outline.fileName(style: style, fallback: fallback, extension: "pdf"), pdf) {
+            item.setString(file.absoluteString, forType: .fileURL)
+        }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([item])
     }
@@ -37,14 +43,7 @@ enum GlyphVectors {
     /// A glyph to drag: an SVG file, which the Finder copies and design apps place, and its PDF. Nothing to drop for a
     /// glyph without an outline.
     static func dragItem(_ outline: GlyphOutline?, style: String, fallback: String) -> NSItemProvider {
-        guard let outline else { return NSItemProvider() }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Glyphs", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let file = folder.appendingPathComponent(outline.fileName(style: style, fallback: fallback))
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Data(outline.svg.utf8).write(to: file)
-        } catch {
+        guard let outline, let file = temporaryFile(outline.fileName(style: style, fallback: fallback), Data(outline.svg.utf8)) else {
             return NSItemProvider()
         }
         let provider = NSItemProvider(contentsOf: file) ?? NSItemProvider()
@@ -55,5 +54,19 @@ enum GlyphVectors {
             return nil
         }
         return provider
+    }
+
+    /// A file of its own in a new temporary folder, so it can have the name given: what's copied or dragged.
+    private static func temporaryFile(_ name: String, _ data: Data) -> URL? {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Glyphs", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let file = folder.appendingPathComponent(name)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: file)
+            return file
+        } catch {
+            return nil
+        }
     }
 }

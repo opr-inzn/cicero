@@ -135,7 +135,7 @@ struct LigaturesSection: View {
 
     private func copyVector(_ ligature: Ligature) {
         guard let outline = outline(ligature) else { return NSSound.beep() }
-        GlyphVectors.copy(outline)
+        GlyphVectors.copy(outline, style: face.fullName, fallback: Self.fileFallback(ligature))
         popover = nil
         model.showToast("“\(ligature.text)” copied to clipboard as a vector")
     }
@@ -144,10 +144,14 @@ struct LigaturesSection: View {
         GlyphVectors.outline(ligature.glyph, face: face, weight: weight, variations: variations)
     }
 
-    /// The ligature as an SVG file, named after the style and the glyph, or its characters: "Inter Regular f_i.svg".
+    /// The ligature as an SVG file, named after the style and the glyph.
     private func dragItem(_ ligature: Ligature) -> NSItemProvider {
-        let fallback = ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: "_")
-        return GlyphVectors.dragItem(outline(ligature), style: face.fullName, fallback: fallback)
+        GlyphVectors.dragItem(outline(ligature), style: face.fullName, fallback: Self.fileFallback(ligature))
+    }
+
+    /// What its file is called after when the font doesn't name the glyph: its characters, as in "Inter Regular f_i.svg".
+    private static func fileFallback(_ ligature: Ligature) -> String {
+        ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: "_")
     }
 }
 
