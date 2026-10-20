@@ -92,7 +92,7 @@ To try a font without installing it, turn it on until Cicero quits:
 
 When the fonts are already on, for good or until Cicero quits, these items are dimmed or left out.
 
-Nothing is copied. The family gets a blue **Temporary** tag, and its styles say “Active until Cicero quits”. When you quit Cicero, it turns the fonts off again. If Cicero quits unexpectedly, it turns them off the next time it opens.
+Nothing is copied. The family gets a blue **Temporary** tag with a clock, and its styles say “Active until Cicero quits”. When you quit Cicero, it turns the fonts off again. If Cicero quits unexpectedly, it turns them off the next time it opens.
 
 Fonts for Adobe apps can be turned on temporarily too: they’re on in every app until Cicero quits, then back to how they were.
 
@@ -200,7 +200,7 @@ Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrato
 
 ### Fonts documents open in Adobe apps use
 
-You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same blue **App Set** tag.
+You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same graphite **App Set** tag.
 
 - Cicero asks the app in front, every few seconds, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, Illustrator or Photoshop; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
 - The app’s Missing Fonts dialog may still come up while Cicero turns the fonts on. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts. Photoshop shows none: its text layers look as they did when saved, and use the fonts once you edit them.
@@ -222,7 +222,7 @@ To give apps to a set you already have, right-click it and choose **Activate wit
 A few rules:
 
 - Fonts that are on for any other reason are never touched. Fonts you turned on yourself stay on.
-- Fonts an application set turned on get a blue **App Set** tag, and say “Active while its app is open”.
+- Fonts an application set turned on get a graphite **App Set** tag with the symbol of an app, and say “Active while its app is open”.
 - If you turn one of those fonts off, or on for good, while its app is open, Cicero leaves it that way until the app quits.
 - Cicero has to be open for this to work, and in your Applications folder. So it can [open when you log in](#open-cicero-at-login).
 - If you quit Cicero while an app is open, its fonts stay on until Cicero opens again or you log out.

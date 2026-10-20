@@ -5,10 +5,16 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-    /// The Variable tag's: green, which no status tag uses (teal was too close to App Set's blue), darker than the
+    /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
     /// system green in light mode, which is too light for small text on its own tint.
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
+    })
+    /// The App Set tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
+    static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
+            : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
     })
 }
 
@@ -233,20 +239,21 @@ struct StatusTag: View {
     let family: Family
 
     var body: some View {
-        if let (text, tint) = content {
-            Tag(text: text, tint: tint).help(help)
+        if let (text, tint, symbol) = content {
+            Tag(text: text, tint: tint, systemImage: symbol).help(help)
         }
     }
 
-    private var content: (String, Color)? {
-        if family.temporaryScope == .whileAppsRun { return ("App Set", .blue) }
-        if family.temporaryScope != nil { return ("Temporary", .blue) }
+    private var content: (String, Color, String?)? {
+        // With the symbols of New Application Set and Activate Temporarily.
+        if family.temporaryScope == .whileAppsRun { return ("App Set", .appSet, "app.badge.checkmark") }
+        if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
         // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
-        if family.isAdobeFonts { return ("Adobe Fonts", .purple) }
+        if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
-        case .system: return ("System", .secondary)
-        case .partial: return ("Partly active", .orange)
-        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red)
+        case .system: return ("System", .secondary, nil)
+        case .partial: return ("Partly active", .orange, nil)
+        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red, nil)
         case .active, .inactive: return nil
         }
     }

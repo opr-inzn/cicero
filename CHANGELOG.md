@@ -5,7 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## 1.7.4
 
 - Importing a FontExplorer X database copied from another Mac without its Font Library says where Cicero looked for the folder, like “1,240 font files in ~/FontExplorer X/Font Library (not on this Mac)”, so you can put it there, or connect the disk it’s on, and import again. Those fonts used to be counted with any other font files that aren’t on this Mac.
-- The **Variable** tag is green, so it no longer looks like the blue **App Set** and **Temporary** tags next to it.
+- The **Variable** tag is green and the **App Set** tag graphite, so they no longer look like the blue **Temporary** tag, and both temporary tags have the symbol of the command that turns fonts on that way: an app for **App Set**, a clock for **Temporary**.
 
 ## 1.7.3
 
