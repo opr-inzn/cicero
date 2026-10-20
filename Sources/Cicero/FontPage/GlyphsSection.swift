@@ -166,10 +166,11 @@ struct GlyphsSection: View {
                 CharacterCodesGrid(scalar: scalar)
                 // Stacked: side by side they're wider than the popover.
                 VStack {
-                    Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(scalar)) }
+                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
                         .help("Copies “\(Self.text(scalar))”")
                     copyVectorButton(cell, style: style)
                 }
+                .buttonStyle(StillPushButtonStyle())
             case .feature(let glyph):
                 GlyphImage(face: style.face, glyph: glyph.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
@@ -183,10 +184,11 @@ struct GlyphsSection: View {
                 // The glyph has no code of its own: what's copied is the character, which the font draws like this
                 // where the feature is on.
                 VStack {
-                    Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(glyph.character)) }
+                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(glyph.character), shown: Self.shown(glyph.character)) }
                         .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureNames.formatted(.list(type: .and))) on")
                     copyVectorButton(cell, style: style)
                 }
+                .buttonStyle(StillPushButtonStyle())
             case .alternate(let alternate):
                 let names = alternate.featureNames.formatted(.list(type: .or))
                 GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
@@ -199,10 +201,11 @@ struct GlyphsSection: View {
                     .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: alternate.character)
                 VStack {
-                    Button("Copy Character", systemImage: "doc.on.doc") { Self.copy(Self.text(alternate.character)) }
+                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(alternate.character), shown: Self.shown(alternate.character)) }
                         .help("Copies “\(Self.text(alternate.character))”, which this font draws like this with \(names) on")
                     copyVectorButton(cell, style: style)
                 }
+                .buttonStyle(StillPushButtonStyle())
             }
         }
         .padding(16)
@@ -214,18 +217,48 @@ struct GlyphsSection: View {
     @ViewBuilder
     private func copyMenu(_ cell: Cell, style: Style) -> some View {
         let scalar = Self.character(of: cell)
-        Button("Copy Character", systemImage: "doc.on.clipboard") { Self.copy(Self.text(scalar)) }
+        Button("Copy Character", systemImage: "doc.on.clipboard") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
         // Not greyed out for a glyph without an outline: the menus are made with every cell, and the outline isn't.
-        Button("Copy as Vector", systemImage: "doc.on.clipboard") { GlyphVectors.copy(outline(cell, style: style)) }
-        Button("Copy Unicode", systemImage: "doc.on.clipboard") { Self.copy(CharacterCodes.unicode(scalar)) }
-        Button("Copy HTML Entity", systemImage: "doc.on.clipboard") { Self.copy(CharacterCodes.htmlEntity(scalar)) }
+        Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(cell, style: style) }
+        Button("Copy Unicode", systemImage: "doc.on.clipboard") { copy(CharacterCodes.unicode(scalar), shown: CharacterCodes.unicode(scalar)) }
+        Button("Copy HTML Entity", systemImage: "doc.on.clipboard") { copy(CharacterCodes.htmlEntity(scalar), shown: CharacterCodes.htmlEntity(scalar)) }
     }
 
     /// Copy as Vector, under Copy Character in a glyph's popover.
     private func copyVectorButton(_ cell: Cell, style: Style) -> some View {
-        Button("Copy as Vector", systemImage: "doc.on.doc") { GlyphVectors.copy(outline(cell, style: style)) }
+        Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(cell, style: style) }
             .disabled(outline(cell, style: style) == nil)
             .help("Copies the glyph’s outline, to paste into a design app as a shape you can edit, or as SVG code")
+    }
+
+    /// Puts text on the clipboard, closes the popover and says what was copied, at the bottom of the window, as when
+    /// fonts are turned on: "“g” copied to clipboard".
+    private func copy(_ text: String, shown: String) {
+        Self.copy(text)
+        popover = nil
+        model.showToast("\(shown) copied to clipboard")
+    }
+
+    /// The glyph's outline, as for text; a beep for a glyph without one.
+    private func copyVector(_ cell: Cell, style: Style) {
+        guard let outline = outline(cell, style: style) else { return NSSound.beep() }
+        GlyphVectors.copy(outline)
+        popover = nil
+        model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
+    }
+
+    /// A character as a toast names it: in quotes, a mark on a dotted circle, as it has nothing to sit on, and one you
+    /// can't see, like a space, by its name.
+    static func shown(_ scalar: UInt32) -> String {
+        guard let character = Unicode.Scalar(scalar) else { return CharacterCodes.unicode(scalar) }
+        switch character.properties.generalCategory {
+        case .spaceSeparator, .lineSeparator, .paragraphSeparator, .control, .format:
+            return GlyphSection.name(of: scalar)?.capitalized ?? CharacterCodes.unicode(scalar)
+        case .nonspacingMark, .enclosingMark, .spacingMark:
+            return "“\u{25CC}\(Character(character))”"
+        default:
+            return "“\(Character(character))”"
+        }
     }
 
     private static func character(of cell: Cell) -> UInt32 {

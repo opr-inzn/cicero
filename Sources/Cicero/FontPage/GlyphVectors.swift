@@ -23,9 +23,8 @@ enum GlyphVectors {
     }
 
     /// Puts the outline on the clipboard as PDF, which design apps paste as paths, and as SVG, as an image and as text,
-    /// for apps like Figma that paste SVG code, as Illustrator's own copies have it. A beep for a glyph without one.
-    static func copy(_ outline: GlyphOutline?) {
-        guard let outline else { return NSSound.beep() }
+    /// for apps like Figma that paste SVG code, as Illustrator's own copies have it.
+    static func copy(_ outline: GlyphOutline) {
         let item = NSPasteboardItem()
         item.setData(outline.pdf, forType: .pdf)
         let svg = outline.svg

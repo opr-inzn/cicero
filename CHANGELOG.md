@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## 1.7.4
 
 - A font page’s **Glyphs** can give you a glyph’s shape, not only its character. **Copy as Vector**, in a glyph’s popover and its right-click menu, copies its outline in the style, weight and axes the page shows, to paste into a design app as a shape you can edit, or as SVG code. Drag a glyph out of the page to put it into a design app, or into the Finder as an SVG file. That works for alternates, the glyphs features draw and ligatures too, whose shapes **Copy Character** can’t take along.
+- Copying from a glyph’s popover closes it and says what was copied at the bottom of the window, as turning fonts on does: **“g” copied to clipboard**. So do the copy commands in a glyph’s right-click menu. The popover’s buttons no longer darken when clicked.
 - Importing a FontExplorer X database copied from another Mac without its Font Library says where Cicero looked for the folder, like “1,240 font files in ~/FontExplorer X/Font Library (not on this Mac)”, so you can put it there, or connect the disk it’s on, and import again. Those fonts used to be counted with any other font files that aren’t on this Mac.
 - The **Variable** tag is green and the **App Set** tag graphite, so they no longer look like the blue **Temporary** tag, and both temporary tags have the symbol of the command that turns fonts on that way: an app for **App Set**, a clock for **Temporary**.
 - A tag’s text and symbol sit in the middle of it. The text sat a little low, and some symbols a little high.
