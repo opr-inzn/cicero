@@ -271,6 +271,13 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.localizedFamilyNames = localizedFamilyNames
     }
 
+    /// A style of ornaments or symbols rather than letters, like Hoefler Text's Ornaments: its OS/2 family class says
+    /// Symbolic, or its name says Ornaments or Dingbats. It doesn't stand for a family that has other styles.
+    public var isOrnaments: Bool {
+        let name = styleName.lowercased()
+        return familyClass == 12 || name.contains("ornament") || name.contains("dingbat")
+    }
+
     /// The family's name in the Mac's language, when the font has one; else its own.
     public var displayFamilyName: String {
         LocalizedNames.name(in: localizedFamilyNames) ?? familyName
@@ -625,8 +632,11 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
 
     /// The upright style of the nearest weight, and of those the one nearest the normal width (Futura's Medium
-    /// rather than its Condensed Medium).
+    /// rather than its Condensed Medium), and not one of ornaments.
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
+        // Not a style of ornaments, which ties with the Regular in Hoefler Text, unless that's all there is.
+        let letters = faces.filter { !$0.face.isOrnaments }
+        let faces = letters.isEmpty ? faces : letters
         let hasUpright = faces.contains { !$0.face.isItalic }
         var best: LibraryFace?
         var variable: LibraryFace?
@@ -813,8 +823,7 @@ extension Classification {
     /// of it is: a family's Mono styles don't count against its others.
     static func of(name: String, faces: [LibraryFace]) -> Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
-        let upright = faces.first { !$0.face.isItalic } ?? faces[0]
-        if let byClass = Classification(familyClass: upright.face.familyClass) { return byClass }
+        if let byClass = Classification(familyClass: judged(faces)[0].familyClass) { return byClass }
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
@@ -849,9 +858,12 @@ extension Classification {
         }
     }
 
-    /// The faces whose letters and PANOSE digits count: the upright ones, or all of them in a family of italics.
+    /// The faces whose OS/2 family class (the first one's), letters and PANOSE digits count: the upright ones, or all of
+    /// them in a family of italics, but for a style of ornaments, unless the family has nothing else (see `isOrnaments`).
     static func judged(_ faces: [LibraryFace]) -> [FontFace] {
-        let uprights = faces.filter { !$0.face.isItalic }
-        return (uprights.isEmpty ? faces : uprights).map(\.face)
+        let letters = faces.map(\.face).filter { !$0.isOrnaments }
+        let candidates = letters.isEmpty ? faces.map(\.face) : letters
+        let uprights = candidates.filter { !$0.isItalic }
+        return uprights.isEmpty ? candidates : uprights
     }
 }
