@@ -19,25 +19,19 @@ struct SimilarSection: View {
             let similar = model.similarFamilies(to: family, limit: AppModel.similarListed)
             if !similar.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
-                    header(columns: true)
+                    header(columns: true, all: similar.count)
                     ForEach(similar.prefix(showsMore ? similar.count : Self.shown)) { other in
                         Divider()
                         row(other)
                     }
                     Divider()
-                    if similar.count > Self.shown {
-                        Button(showsMore ? "Show Fewer" : "Show More") { showsMore.toggle() }
-                            .controlSize(.small)
-                            .padding(.top, 8)
-                            .help(showsMore ? "Show the \(Self.shown) closest" : "Show the \(similar.count) families that look most like \(family.name)")
-                    }
                 }
                 .padding(.horizontal, 24)
             }
         } else if model.measurementProgress != nil {
             // Measuring the library's letters, the first time: quietly, as it takes a moment.
             VStack(alignment: .leading, spacing: 0) {
-                header(columns: false)
+                header(columns: false, all: 0)
                 Divider()
                 Text("Comparing this family’s letters with the others’")
                     .font(.callout)
@@ -48,8 +42,9 @@ struct SimilarSection: View {
         }
     }
 
-    /// Like the styles' titles above: the section's, then the columns', when there are rows under them.
-    private func header(columns: Bool) -> some View {
+    /// Like the styles' titles above: the section's, then the columns', when there are rows under them, and at the
+    /// end Show More, when there are more than `shown` of `all`.
+    private func header(columns: Bool, all: Int) -> some View {
         HStack(spacing: 12) {
             Text("Similar").frame(maxWidth: .infinity, alignment: .leading)
             if columns {
@@ -60,6 +55,14 @@ struct SimilarSection: View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.secondary)
         .padding(.vertical, 6)
+        // Over the foundry's column, which its title leaves room in, so the titles stay over their columns.
+        .overlay(alignment: .trailing) {
+            if all > Self.shown {
+                Button(showsMore ? "Show Less" : "Show More") { showsMore.toggle() }
+                    .controlSize(.small)
+                    .help(showsMore ? "Show the \(Self.shown) closest" : "Show the \(all) families that look most like \(family.name)")
+            }
+        }
         // As far from the styles above as the glyphs' title is from this.
         .padding(.top, 50)
     }
