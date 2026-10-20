@@ -2,16 +2,16 @@ import CiceroCore
 import SwiftUI
 
 /// The families that look most like the page's, each its name set in itself, under the styles and titled as they are:
-/// a click opens one's page, Show More lists as many as Show Similar Fonts does, right there, and Not Similar, on a row
+/// a click opens one's page, Show All lists as many as Show Similar Fonts does, right there, and Not Similar, on a row
 /// the pointer is over, takes one out. Left out for a family Cicero can't measure, like one without Latin letters.
 struct SimilarSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
 
-    /// How many the page shows, until Show More shows `AppModel.similarListed`.
+    /// How many the page shows, until Show All shows `AppModel.similarListed`.
     static let shown = 6
-    /// Whether Show More was chosen; kept for every page from then on.
+    /// Whether Show All was chosen; kept for every page from then on.
     @AppStorage("fontPage.similarShowsMore") private var showsMore = false
     /// The row the pointer is over, which shows Not Similar.
     @State private var hovered: String?
@@ -44,7 +44,7 @@ struct SimilarSection: View {
         }
     }
 
-    /// Like the styles' title above, with Show More at the end when there are more than `shown` of `all`.
+    /// Like the styles' title above, with Show All at the end when there are more than `shown` of `all`.
     private func header(all: Int) -> some View {
         Text("Similar")
             .font(.subheadline.weight(.semibold))
@@ -54,8 +54,13 @@ struct SimilarSection: View {
             // Over the title's row rather than in it, so that it's as high as the styles'.
             .overlay(alignment: .trailing) {
                 if all > Self.shown {
-                    Button(showsMore ? "Show Less" : "Show More") { showsMore.toggle() }
-                        .controlSize(.small)
+                    // Like the sidebar's Edit: grey text at the title's size, not a bezeled button heavier than the title.
+                    Button(showsMore ? "Show Less" : "Show All") { showsMore.toggle() }
+                        .buttonStyle(StillButtonStyle())
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                        .contentShape(.rect)
                         .help(showsMore ? "Show the \(Self.shown) closest" : "Show the \(all) families that look most like \(family.name)")
                 }
             }

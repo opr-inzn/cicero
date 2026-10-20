@@ -166,8 +166,10 @@ private struct SimilarBar: View {
                 if model.measurementProgress != nil {
                     ProgressView().controlSize(.small)
                 }
+                // Text in the accent colour, as the bar's way back.
                 Button("Done") { model.endSimilar() }
-                    .controlSize(.small)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
                     .help("Go back to what the sidebar showed")
             }
             .font(.callout)
