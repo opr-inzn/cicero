@@ -276,6 +276,10 @@ final class AppModel {
         }
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
+            let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
+            model.data.records = tidied.records
+            // The first scan may have listed the files before they went.
+            if tidied.removed > 0 { model.rescan() }
         }
         dropAdobeFolders()
         rescan()
@@ -642,7 +646,6 @@ final class AppModel {
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
             if data.showCreativeCloudFonts, family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
-            if family.folderIDs.contains(WatchedFolder.deactivatedID) { ownFolders.insert(WatchedFolder.deactivatedID) }
             if family.folderIDs.contains(WatchedFolder.fontLibraryID) { ownFolders.insert(WatchedFolder.fontLibraryID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.lists(family) else { continue }

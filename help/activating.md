@@ -124,9 +124,9 @@ Files in your Fonts folder are turned off before they move, so apps let go of th
 
 Cicero keeps the files it moves out of your Fonts folder and out of app font folders in its Deactivated folder, `~/Library/Application Support/Cicero/Deactivated`.
 
-- While it has fonts, the folder shows up as **Deactivated** under **Folders** in the sidebar.
-- Its fonts stay in your library, listed as inactive. Turn one on again whenever you like.
-- To see the files, right-click **Deactivated** and choose **Reveal in Finder**.
+- Its fonts stay in your library, under **Inactive**. The folder isn’t in the sidebar.
+- Turning one on again moves its file back out: into your Fonts folder (or the [Font Library](#the-font-library), when Cicero installs there), or into the app’s folder it came from. So the folder only ever has fonts that are off.
+- To see a font’s file, right-click the font and choose **Reveal in Finder**.
 
 ## Fonts Cicero can’t turn off
 
