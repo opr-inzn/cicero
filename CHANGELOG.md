@@ -8,6 +8,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The **Variable** tag is green and the **App Set** tag graphite, so they no longer look like the blue **Temporary** tag, and both temporary tags have the symbol of the command that turns fonts on that way: an app for **App Set**, a clock for **Temporary**.
 - A tag’s text and symbol sit in the middle of it. The text sat a little low, and some symbols a little high.
 - In Settings → General, **Guess classifications from names** is off and greyed out while Apple Intelligence is off or still getting ready, and on a Mac that can’t have it. It used to show as on.
+- A family’s note in the Info panel can have more than one line: Return starts a new one. It used to end the editing and select the whole note, so the next key typed over it.
 
 ## 1.7.3
 

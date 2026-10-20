@@ -258,7 +258,7 @@ To see ratings in the list, right-click the column headers and choose **Rating**
 
 ## Notes
 
-Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type; Cicero saves it as you go. Delete the text to take the note away.
+Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type, pressing Return for a new line; Cicero saves it as you go. Delete the text to take the note away.
 
 Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
 
