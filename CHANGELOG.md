@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.7.4
 
 - Importing a FontExplorer X database copied from another Mac without its Font Library says where Cicero looked for the folder, like “1,240 font files in ~/FontExplorer X/Font Library (not on this Mac)”, so you can put it there, or connect the disk it’s on, and import again. Those fonts used to be counted with any other font files that aren’t on this Mac.
 
