@@ -45,6 +45,17 @@ public struct VariationAxis: Hashable, Codable, Sendable {
 }
 
 /// How far one of a variable font's axes goes, for a slider: Weight from 100 to 900, 400 by default.
+/// The order axes are listed in: weight, width, italic, slant and optical size first, then the others in the order the
+/// font gives them, the designer's own among them.
+public enum AxisOrder {
+    static let registered = ["wght", "wdth", "ital", "slnt", "opsz"]
+
+    public static func sorted<Axis>(_ axes: [Axis], by tag: (Axis) -> String) -> [Axis] {
+        func rank(_ axis: Axis) -> Int { registered.firstIndex(of: tag(axis)) ?? registered.count }
+        return axes.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
+    }
+}
+
 public struct AxisRange: Hashable, Sendable, Identifiable {
     /// As `VariationAxis.tag`.
     public var tag: String
