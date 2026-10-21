@@ -20,12 +20,15 @@ public struct Locations: Sendable {
     /// Where Creative Cloud keeps the Adobe Fonts that Adobe apps turned on for themselves, as for a document
     /// that uses them: a hidden folder whose fonts only Adobe apps load, under hidden names.
     public var adobeFontsInAdobeApps: URL?
+    /// Creative Cloud's list of the Adobe Fonts it keeps, with each one's page on Adobe Fonts' website (see
+    /// `AdobeFontsPages`).
+    public var adobeFontsList: URL?
     /// ~/Cicero/Font Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
     /// By default in the home folder `userFonts` is in, so a test run with another home keeps its own.
     public var defaultFontLibrary: URL
 
     public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
-                adobeFontsInAdobeApps: URL? = nil, defaultFontLibrary: URL? = nil) {
+                adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
@@ -33,6 +36,7 @@ public struct Locations: Sendable {
         self.systemFonts = systemFonts
         self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
+        self.adobeFontsList = adobeFontsList
         self.defaultFontLibrary = defaultFontLibrary
             ?? userFonts.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Cicero/Font Library", isDirectory: true)
     }
@@ -47,7 +51,8 @@ public struct Locations: Sendable {
             allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true),
             systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)],
             home: realHome,
-            adobeFontsInAdobeApps: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.w", isDirectory: true)
+            adobeFontsInAdobeApps: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.w", isDirectory: true),
+            adobeFontsList: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.c/entitlements.xml")
         )
     }
 

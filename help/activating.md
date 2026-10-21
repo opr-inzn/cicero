@@ -160,9 +160,9 @@ The fonts you turn on in Adobe Fonts, in Creative Cloud, are on in every app. Ci
 
 Adobe apps can also turn on Adobe Fonts by themselves, for instance for a document that uses them. Those are on in Adobe apps only: their switch sits halfway, and their styles say **Active in Adobe apps**, like the fonts in Adobe’s folders.
 
-Creative Cloud turns these fonts on and off, so their switches don’t move. To change them, click **Manage in Creative Cloud** on the font page, or choose it from the family’s right-click menu. It opens the Creative Cloud app.
+Creative Cloud turns these fonts on and off, so their switches don’t move. To change them, click **Manage in Adobe Fonts** on the font page, or choose it from the family’s right-click menu. It opens the family’s page on the Adobe Fonts website, where you turn its styles on and off. Creative Cloud then adds them to your Mac or takes them away, and Cicero’s lists follow. Cicero finds the page in the list Creative Cloud keeps of your fonts. When it can’t, the button says **Manage in Creative Cloud** and opens the Creative Cloud app. For all of them at once, right-click **Adobe Fonts** under **Folders** and choose **Manage in Creative Cloud**.
 
-A font you also have yourself is listed as your copy, which you turn on and off as usual. A copy from Adobe Fonts never makes yours a spare one, which [Problems](problems.md) would offer to remove: Creative Cloud takes its copy away when the font is turned off there.
+A font you also have yourself is listed as your copy, which you turn on and off as usual. A copy from Adobe Fonts never makes yours a spare one, which [Problems](problems.md) would offer to remove: Creative Cloud takes its copy away when the font is turned off there. While both are on, [Installed Twice](problems.md#installed-twice) lists them, with **Remove in Adobe Fonts…** for the copy from Adobe Fonts.
 
 ## Fonts in Adobe apps’ folders
 

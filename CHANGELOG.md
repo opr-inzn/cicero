@@ -17,6 +17,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - In the Compare window’s **Stacked** layout, a font’s row stays where it is when you add a font whose letters reach further above or below. Each row is now as tall as its own font needs; before, every row grew to fit the tallest.
 - In Preview Options, **Size** starts at 24 pt rather than 8, and a smaller size goes up to 24.
 - The Compare window has a size of its own, from 24 to 720 pt, set with **Size** in its **Preview Options**. **View → Zoom In** and **Zoom Out** (⌘+ and ⌘−, or ⌘= on a US keyboard) make the fonts bigger and smaller. Changing it there leaves the main window’s previews as they are, and the size in the main window’s Preview Options no longer changes Compare.
+- A font page for a family from Adobe Fonts has **Manage in Adobe Fonts**, which opens the family’s own page on the Adobe Fonts website, where you turn it on and off. Its right-click menu has it too. Before, **Manage in Creative Cloud** opened the Creative Cloud app, where you had to look for the family. Cicero finds the page in the list Creative Cloud keeps of your fonts, and opens the Creative Cloud app as before when it can’t.
+- In **Problems**, **Installed Twice** has **Remove in Adobe Fonts…** for a copy from Adobe Fonts, which Cicero can’t turn off. It opens the family’s page on the Adobe Fonts website, so you can remove it there and keep your own copy. Creative Cloud then takes its copy away.
 
 ## 1.9.3
 

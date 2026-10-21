@@ -316,6 +316,7 @@ private struct FixButtons: View {
         HStack(spacing: 6) {
             ForEach(fixes, id: \.self) { fix in
                 Button(title(fix), role: isDestructive(fix) ? .destructive : nil) { model.apply(fix, family: family) }
+                    .help(help(fix))
             }
         }
     }
@@ -324,6 +325,11 @@ private struct FixButtons: View {
     private func title(_ fix: ProblemFix) -> String {
         if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy" : "Remove Copies" }
         return fix.title
+    }
+
+    private func help(_ fix: ProblemFix) -> String {
+        guard case .removeFromAdobeFonts = fix else { return "" }
+        return "Opens the family’s page on Adobe Fonts, where you remove it. Creative Cloud then takes its copy away."
     }
 
     private func isDestructive(_ fix: ProblemFix) -> Bool {

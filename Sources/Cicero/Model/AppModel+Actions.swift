@@ -944,6 +944,8 @@ extension AppModel {
                 let result = await model.engine.installCopy(of: face, records: model.data.records)
                 model.finish(result)
             }
+        case .removeFromAdobeFonts(let paths):
+            CreativeCloud.open(paths)
         }
     }
 
