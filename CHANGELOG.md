@@ -9,6 +9,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - What you drag is a small label, with “Aa” in the family’s letters and its name, and how many families there are when you drag several, and it’s gone the moment you drop it, as in the Finder. It used to be the whole card, which slid off to one side after you dropped it. A style row from a font page is dragged the same way.
 - Search finds what you type where a word begins: **am** finds American Typewriter, but no longer every family from a foundry with “am” inside its name, or every name with “am” in the middle of a word. When no word begins with what you type, it still looks inside the words of names, so **vetica** finds Helvetica.
 - The search field suggests families as you type, up to eight whose names begin with what you’ve typed, or have a word that does, each with “Aa” in its own letters. Choose one to search for its whole name, with that family selected and in view.
+- A family’s right-click menu no longer has **Copy Family Name**.
+- The **Rating** menu starts with **No Rating**, then lists the stars from five down to one.
 
 ## 1.9
 
