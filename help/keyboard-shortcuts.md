@@ -54,6 +54,13 @@ While you type in a text field, like the search field, the preview text or a fon
 | ↩ | Opens the family’s font page |
 | Space or Esc | Closes the preview |
 
+## Compare
+
+| Shortcut | Does |
+| --- | --- |
+| ⌘+ | Makes the fonts bigger |
+| ⌘− | Makes them smaller |
+
 ## Font pages
 
 | Shortcut | Does |

@@ -13,11 +13,12 @@ enum CompareLayout: String, CaseIterable {
 }
 
 /// Families next to each other, each in a style of its choosing: one row each on a shared baseline, or drawn over
-/// each other in tints.
+/// each other in tints, at a size of the window's own.
 struct CompareWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
+    @AppStorage("compare.size") private var size = 72.0
     /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
     @State private var read: Set<String> = []
 
@@ -29,7 +30,7 @@ struct CompareWindow: View {
         }
         // A family whose file is on a server joins the others once it's been read in the background.
         let waiting = entries.map(\.path).filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
-        let samples = entries.filter { !waiting.contains($0.path) }.map { CompareSample($0.entry, family: $0.family, model: model, preview: preview) }
+        let samples = entries.filter { !waiting.contains($0.path) }.map { CompareSample($0.entry, family: $0.family, size: size, model: model, preview: preview) }
         Group {
             if entries.isEmpty {
                 ContentUnavailableView("Nothing to Compare", systemImage: "square.on.square",
@@ -61,7 +62,8 @@ struct CompareWindow: View {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
                               help: "One row per font, or every font over each other")
             }
-            ToolbarCapsule { PreviewOptionsButton() }
+            ToolbarCapsule { ToolbarSizeStepper(size: $size, range: 8...960) }
+            ToolbarCapsule { PreviewOptionsButton(showsSize: false) }
         }
     }
 }
@@ -88,15 +90,15 @@ private struct CompareSample: Identifiable {
     let tint: Color
     let id: UUID
 
-    init(_ entry: CompareEntry, family: Family, model: AppModel, preview: PreviewSettings) {
+    init(_ entry: CompareEntry, family: Family, size: Double, model: AppModel, preview: PreviewSettings) {
         self.family = family
         id = entry.id
         let chosen = Self.chosenStyle(of: entry, in: family)
         style = chosen?.id
         face = Self.face(for: entry, in: family, preview: preview)
         let weight = chosen.map(\.face.styleWeight) ?? preview.weight
-        let font = FontLoader.shared.font(face.face, size: preview.size, weight: weight, variations: model.variations(for: family, face: face.id))
-        line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: preview.kerning(at: preview.size))
+        let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
+        line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: preview.kerning(at: size))
         tint = Self.tints[entry.tint % Self.tints.count]
     }
 

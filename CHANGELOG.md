@@ -11,6 +11,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A smart set’s **Rating** rule lists five stars first, after **No Rating**, as the **Rating** menu of a family does.
 - A smart set’s **Tag** rule shows each tag with its color, as the **Tags** menu of a family does.
 - A smart set’s **Status** rule says **Active in Adobe Apps Only** in place of **Active in Apps Only**, and only while **Show test fonts installed for Adobe apps** is on.
+- The Compare window has a size of its own, up to 960 pt, in the toolbar between **−** and **+**. ⌘+ and ⌘− make the fonts bigger and smaller, and you can type a size too. The size in Preview Options no longer changes Compare, so the main window’s previews stay as they are.
 
 ## 1.9.3
 

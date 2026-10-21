@@ -198,17 +198,19 @@ Click **Preview Options** in the toolbar:
 - **Leading:** the distance from one line to the next, from 80 to 250 % of the size; 120 % at first. It applies wherever a sample runs over several lines: on font pages and in Quick Look.
 - **Alignment:** left, center or right, for the samples in specimens and Quick Look. Font pages have their own alignment, next to the size.
 
-The same options apply to every view, font pages and the Compare window. Cicero remembers them.
+The same options apply to every view, font pages and the Compare window, but the size: font pages and the Compare window have their own. Cicero remembers them.
 
 ## Compare fonts
 
 1. Select two or more families.
 2. Choose **Fonts → Compare** (⌥⌘C), or right-click them and choose **Compare**.
 
-The Compare window shows them with the preview text, size, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
+The Compare window shows them with the preview text, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
 
 - **Stacked:** one row per font, all on the same baseline, with the name and style under each.
 - **Overlay:** every font drawn over the others in its own color, on a shared baseline, with their names below. The last one is drawn on top.
+
+The Compare window has a size of its own, from 8 to 960 pt, 72 pt at first, so you can look at the fonts up close without changing the previews in the main window. Click **−** or **+** in the toolbar, or press ⌘− or ⌘+, to go to the next smaller or bigger common size, like 96, 120 or 144 pt, or click the size and type one.
 
 Each font is in the style nearest the weight in Preview Options at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to following the weight. **Compare Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
 

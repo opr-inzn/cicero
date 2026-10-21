@@ -99,6 +99,67 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 }
 
+/// A size between − and + buttons, for a toolbar capsule. The buttons, ⌘− and ⌘+, step through common sizes,
+/// ⌘= too where + takes ⇧, and the size takes one typed in.
+struct ToolbarSizeStepper: View {
+    @Binding var size: Double
+    let range: ClosedRange<Double>
+    @Environment(\.appearsActive) private var appearsActive
+
+    /// Each a fifth to a third bigger than the one before; a size typed in between goes to the next one either way.
+    static let sizes: [Double] = [8, 9, 10, 11, 12, 14, 16, 18, 24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720, 960]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button("Smaller", systemImage: "minus", action: smaller)
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(size <= range.lowerBound)
+                .help("Smaller")
+            // As wide as the biggest size, so the stepper keeps its width, with the size in the middle. Grey in a
+            // window in the background, as the buttons are: a toolbar greys a field's text, not the unit's.
+            Text("\(Int(range.upperBound)) pt")
+                .hidden()
+                .overlay {
+                    HStack(spacing: 0) {
+                        ValueField("Size", value: $size, range: range, width: nil)
+                        Text(" pt")
+                    }
+                    .foregroundStyle(appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                    .fixedSize()
+                }
+                .monospacedDigit()
+                .padding(.horizontal, 2)
+            Button("Bigger", systemImage: "plus", action: bigger)
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(size >= range.upperBound)
+                .help("Bigger")
+        }
+        .modifier(StepperButtonStyle())
+        .background {
+            Button("Bigger", action: bigger)
+                .keyboardShortcut("=", modifiers: .command)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+        .fixedSize()
+    }
+
+    private func bigger() {
+        size = min(Self.sizes.first { $0 > size } ?? range.upperBound, range.upperBound)
+    }
+
+    private func smaller() {
+        size = max(Self.sizes.last { $0 < size } ?? range.lowerBound, range.lowerBound)
+    }
+
+    /// `ToolbarButtonStyle` on macOS 26, inside the capsule's glass; on macOS 15, just the symbols, as one control.
+    private struct StepperButtonStyle: ViewModifier {
+        func body(content: Content) -> some View {
+            if #available(macOS 26, *) { content.buttonStyle(.toolbar) } else { content.buttonStyle(.borderless).labelStyle(.iconOnly) }
+        }
+    }
+}
+
 /// A toolbar button, highlighted while it's on or pressed, and dimmed like AppKit's while it's disabled
 /// or its window is in the background. Sizes are AppKit's: a button fills its 36 pt glass capsule, and a
 /// picker's segments are inside it, `segmentInset` from its edges; the picker draws the chosen one's lens.
