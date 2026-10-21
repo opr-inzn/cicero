@@ -769,7 +769,7 @@ private struct PreviewOptions: View {
                 row("Size", $preview.size, range: 8...160, unit: " pt")
                 row("Weight", $preview.weight, range: 100...900)
                 row("Letter Spacing", $preview.tracking, range: -10...40, step: 0.5, unit: "%")
-                row("Line Spacing", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
+                row("Leading", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
                 LabeledContent("Alignment") {
                     Picker("Alignment", selection: $preview.alignment) {
