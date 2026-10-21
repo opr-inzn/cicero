@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.9.2
 
 - In **Preview Options**, the preview text field spans the whole width, with “Preview Text” in it while it’s empty, in place of a label beside it. **Presets** no longer lists **Font Name**, as clearing the field shows each family’s name, nor the accented letters.
 - A font page has room for a script font’s swashes, like Zapfino’s: the family’s name is set smaller where its swashes would run into the line under it, so the header is as tall as any other font’s, the text no longer leaves an empty gap below it, and swashes reaching past the ends of its lines show in the page’s margins rather than being cut off.
