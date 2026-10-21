@@ -45,12 +45,17 @@ struct CompareWindow: View {
         let samples = entries.filter { !waiting.contains($0.path) }.map { CompareSample($0.entry, family: $0.family, size: size, model: model, preview: preview) }
         Group {
             if entries.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing to Compare", systemImage: "square.on.square")
-                } description: {
-                    Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")
-                } actions: {
-                    Button("Add Families") { isAdding = true }
+                // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls
+                // under it.
+                ScrollView {
+                    ContentUnavailableView {
+                        Label("Nothing to Compare", systemImage: "square.on.square")
+                    } description: {
+                        Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")
+                    } actions: {
+                        Button("Add Families") { isAdding = true }
+                    }
+                    .containerRelativeFrame([.horizontal, .vertical])
                 }
             } else {
                 ScrollView([.horizontal, .vertical]) {
@@ -82,7 +87,6 @@ struct CompareWindow: View {
             read.formUnion(waiting)
         }
         .focusedSceneValue(\.compareSize, $size)
-        .navigationSubtitle(subtitle(entries.map(\.family)))
         .toolbar {
             ToolbarCapsule { AddFamiliesButton(isPresented: $isAdding) }
             ToolbarCapsule {
@@ -103,17 +107,6 @@ extension CompareWindow {
     /// The next of `steps` down from `size`.
     static func smaller(than size: Double) -> Double {
         steps.last { $0 < size } ?? sizes.lowerBound
-    }
-}
-
-private extension CompareWindow {
-    /// "2 families", and how many styles when a family is there in more than one: "2 families · 3 styles". One family
-    /// for each sample. None while there's nothing to compare.
-    func subtitle(_ samples: [Family]) -> String {
-        let families = Set(samples.map(\.id)).count
-        guard families > 0 else { return "" }
-        let text = families == 1 ? "1 family" : "\(families) families"
-        return samples.count > families ? "\(text) · \(samples.count) styles" : text
     }
 }
 
@@ -314,11 +307,7 @@ private struct OverlayLayout: View {
         let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
         VStack(alignment: .leading, spacing: 16) {
-            Canvas { context, size in
-                var baseline = Path()
-                baseline.move(to: CGPoint(x: overhang, y: crisp(ascent)))
-                baseline.addLine(to: CGPoint(x: size.width, y: crisp(ascent)))
-                context.stroke(baseline, with: .color(.secondary.opacity(0.35)), lineWidth: 1)
+            Canvas { context, _ in
                 for sample in samples {
                     let color = sample.tint.opacity(0.7).resolve(in: context.environment).cgColor
                     context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
@@ -345,8 +334,6 @@ private struct OverlayLayout: View {
             .background(.fill.tertiary, in: .capsule)
     }
 
-    /// Centres a one-point line on a pixel row.
-    private func crisp(_ y: CGFloat) -> CGFloat { y.rounded() + 0.5 }
 }
 
 /// Samples laid out by `layout` that can be dragged to new places among each other. The dragged one follows
