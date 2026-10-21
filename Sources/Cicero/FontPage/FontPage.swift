@@ -220,7 +220,7 @@ private struct TypeTester: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
+    @AppStorage("typeTester.text") private var text = Self.defaultText
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
     /// What's typed over the text in a font's own script, on this family's page only (see `shownText`).
@@ -260,6 +260,10 @@ private struct TypeTester: View {
             .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
+        // Text left empty as the last page closed, which the editor doesn't hear about.
+        .onAppear {
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = Self.defaultText }
+        }
     }
 
     @ViewBuilder
@@ -347,12 +351,12 @@ private struct AxesButton: View {
 private extension TypeTester {
     @ViewBuilder
     func editor(_ face: FontFace, _ ctFont: CTFont) -> some View {
-        let text = shownText(face)
+        let (text, defaultText) = shownText(face)
         let kerning = preview.kerning(at: size)
         let lineHeightPoints = size * preview.lineSpacing / 100
         let room = Self.room(for: text.wrappedValue, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
-        SampleEditor(text: text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+        SampleEditor(text: text, defaultText: defaultText, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
                      alignment: alignment.paragraph, margin: 24, roomAbove: room.above, roomBelow: room.below) {
             FamilyMenu(families: [family], model: model)
         }
@@ -366,16 +370,18 @@ private extension TypeTester {
     }
 
     /// The text to show and type into: what's been typed, kept from one page to the next, or, for a font with none of its
-    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only.
-    func shownText(_ face: FontFace) -> Binding<String> {
+    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only. And
+    /// what it goes back to when it's left empty.
+    func shownText(_ face: FontFace) -> (text: Binding<String>, defaultText: String) {
         let sample = model.scriptSamples.text(text, for: face, long: true)
-        guard sample != text else { return $text }
+        guard sample != text else { return ($text, Self.defaultText) }
         let family = family.id
-        return Binding {
+        let text = Binding {
             ownScript.flatMap { $0.family == family ? $0.text : nil } ?? sample
         } set: {
             ownScript = (family, $0)
         }
+        return (text, sample)
     }
 
     /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
@@ -388,6 +394,8 @@ private extension TypeTester {
         let descent = CTFontGetDescent(font).rounded()
         return (max(0, line.ascent - (lineHeight - descent)).rounded(.up), max(0, line.descent - descent).rounded(.up))
     }
+
+    static let defaultText = "Sphinx of black quartz, judge my vow."
 
     /// Centered, unless the left alignment was chosen when there were only those two.
     static var savedAlignment: SampleAlignment {

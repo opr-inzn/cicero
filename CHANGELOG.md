@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- A font page’s text no longer stays empty: delete it all and click somewhere else, and “Sphinx of black quartz, judge my vow.” is back, or text in the font’s own script for a font without Latin letters. A page that opens with the text left empty shows it too.
+
 ## 1.9.2
 
 - In **Preview Options**, the preview text field spans the whole width, with “Preview Text” in it while it’s empty, in place of a label beside it. **Presets** no longer lists **Font Name**, as clearing the field shows each family’s name, nor the accented letters.

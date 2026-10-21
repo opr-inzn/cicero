@@ -7,9 +7,10 @@ import SwiftUI
 /// reaches. It's as tall as its lines at the width the page gives it, and the room above and below them for
 /// glyphs reaching past them (`roomAbove`, `roomBelow`); `margin` at either side of the lines is room for glyphs
 /// reaching past their ends, as nothing is drawn outside the view. A right-click shows Cut, Copy and Paste, then
-/// `menu`.
+/// `menu`. Left empty, it shows `defaultText` again.
 struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
+    let defaultText: String
     let font: CTFont
     let kerning: Double
     let lineHeight: Double
@@ -19,12 +20,13 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     let roomBelow: CGFloat
     @ViewBuilder let menu: () -> MenuContent
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, defaultText: defaultText) }
 
     func makeNSView(context: Context) -> NSTextView {
         let view = SampleTextView(usingTextLayoutManager: true)
         view.textLayoutManager?.delegate = context.coordinator
         view.delegate = context.coordinator
+        view.textStorage?.delegate = context.coordinator
         view.drawsBackground = false
         view.isRichText = false
         view.importsGraphics = false
@@ -40,6 +42,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
 
     func updateNSView(_ view: NSTextView, context: Context) {
         context.coordinator.text = $text
+        context.coordinator.defaultText = defaultText
         if view.string != text { view.string = text }
         update(view, context: context)
     }
@@ -105,20 +108,39 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate, NSTextLayoutManagerDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate, NSTextLayoutManagerDelegate {
         var text: Binding<String>
+        var defaultText: String
         var style: Style?
         /// The text's length when the style was last set: text pasted since may have brought its own.
         var styledLength = 0
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, defaultText: String) {
             self.text = text
+            self.defaultText = defaultText
         }
 
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? NSTextView else { return }
             styledLength = view.textStorage?.length ?? 0
-            text.wrappedValue = view.string
+        }
+
+        /// Every change to the text, an undone one too, which the text view doesn't tell its delegate about.
+        func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range: NSRange,
+                         changeInLength: Int) {
+            guard editedMask.contains(.editedCharacters), storage.string != text.wrappedValue else { return }
+            text.wrappedValue = storage.string
+        }
+
+        /// Puts the default text back when the text is left with nothing to see, as a step of its own to undo.
+        func textDidEndEditing(_ notification: Notification) {
+            guard let view = notification.object as? NSTextView, let storage = view.textStorage,
+                  view.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            let all = NSRange(location: 0, length: storage.length)
+            view.breakUndoCoalescing()
+            guard view.shouldChangeText(in: all, replacementString: defaultText) else { return }
+            storage.replaceCharacters(in: all, with: NSAttributedString(string: defaultText, attributes: view.typingAttributes))
+            view.didChangeText()
         }
 
         func textLayoutManager(_ manager: NSTextLayoutManager, textLayoutFragmentFor location: any NSTextLocation,
