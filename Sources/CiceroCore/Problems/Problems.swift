@@ -85,6 +85,9 @@ public enum ProblemFix: Hashable, Sendable {
     case removeFromSet(UUID, family: String)
     /// Copy a font used from an external disk into ~/Library/Fonts and stop using it in place.
     case installCopy(String)
+    /// Open the page on Adobe Fonts' website of the family these files from Adobe Fonts are from, to remove them there:
+    /// Creative Cloud takes them away then.
+    case removeFromAdobeFonts([String])
 
     public var title: String {
         switch self {
@@ -94,6 +97,7 @@ public enum ProblemFix: Hashable, Sendable {
         case .forgetInPlace, .forgetInstalledCopy: "Forget"
         case .removeFromSet: "Remove from Set"
         case .installCopy: "Install a Copy Instead"
+        case .removeFromAdobeFonts: "Remove in Adobe Fonts…"
         }
     }
 }
@@ -322,6 +326,9 @@ public enum ProblemDetector {
                 var fixes: [ProblemFix] = [.reveal([path])]
                 if let id = deactivatable[path] {
                     fixes.append(.deactivate([id]))
+                } else if ActiveSource.isAdobeFonts(path) {
+                    // Creative Cloud's copy goes when the font is removed from Adobe Fonts, never by Cicero.
+                    fixes.append(.removeFromAdobeFonts([path]))
                 } else if !ActivationEngine.isProtected(path), context.copies.areSpare([path]) {
                     // Not when the file also holds styles, or other families, that are nowhere else.
                     fixes.append(.trash([path]))
@@ -473,7 +480,7 @@ public enum ProblemDetector {
 
     /// Reveal for each folder holding more than one of the paths, and the files' own Move to Trash or Deactivate
     /// for all of them at once when every file has it and `canCombine` allows it for the folder's files (and
-    /// whether that's trashing them).
+    /// whether that's trashing them), or Remove in Adobe Fonts when every file has that.
     private static func folderFixes(_ paths: [String], _ fileFixes: [String: [ProblemFix]],
                                     canCombine: (_ files: Set<String>, _ trashing: Bool) -> Bool) -> [String: [ProblemFix]] {
         var result: [String: [ProblemFix]] = [:]
@@ -481,14 +488,18 @@ public enum ProblemDetector {
             var fixes: [ProblemFix] = [.reveal(files)]
             var trash: [String] = []
             var deactivate: [FaceID] = []
+            var adobeFonts: [String] = []
             for fix in files.flatMap({ fileFixes[$0] ?? [] }) {
                 switch fix {
                 case .trash(let paths): trash += paths
                 case .deactivate(let ids): deactivate += ids
+                case .removeFromAdobeFonts(let paths): adobeFonts += paths
                 default: break
                 }
             }
-            if trash.count == files.count {
+            if adobeFonts.count == files.count {
+                fixes.append(.removeFromAdobeFonts(adobeFonts))
+            } else if trash.count == files.count {
                 if canCombine(Set(files), true) { fixes.append(.trash(trash)) }
             } else if deactivate.count == files.count {
                 if canCombine(Set(files), false) { fixes.append(.deactivate(deactivate)) }

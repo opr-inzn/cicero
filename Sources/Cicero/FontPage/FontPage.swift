@@ -114,9 +114,14 @@ private struct Header: View {
                         .disabled(true)
                         .help(lockedReason)
                 }
-                // Creative Cloud turns Adobe Fonts on and off, not Cicero.
+                // Creative Cloud turns Adobe Fonts on and off, not Cicero: on the family's page on Adobe Fonts' website.
                 if hasAdobeFonts {
-                    Button("Manage in Creative Cloud") { CreativeCloud.open() }
+                    if let page = CreativeCloud.page(for: family) {
+                        Button("Manage in Adobe Fonts") { NSWorkspace.shared.open(page) }
+                            .help("Opens the family’s page on Adobe Fonts, where you turn it on and off")
+                    } else {
+                        Button("Manage in Creative Cloud") { CreativeCloud.open() }
+                    }
                 }
             }
         }

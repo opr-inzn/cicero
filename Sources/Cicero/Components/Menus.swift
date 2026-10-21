@@ -53,7 +53,11 @@ struct FamilyMenu: View {
             Button(titles.deactivate, systemImage: "circle.dashed") { model.deactivate(families) }
         }
         if families.contains(where: { $0.faces.contains(where: \.isAdobeFonts) }) {
-            Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
+            if families.count == 1, let page = CreativeCloud.page(for: families[0]) {
+                Button("Manage in Adobe Fonts", systemImage: "arrow.up.forward.square") { NSWorkspace.shared.open(page) }
+            } else {
+                Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
+            }
         }
         if families.count == 1 {
             CopySourcesMenu(styles: families[0].faces, title: families[0].name, model: model)

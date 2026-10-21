@@ -11,6 +11,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - A smart set’s **Rating** rule lists five stars first, after **No Rating**, as the **Rating** menu of a family does.
 - A smart set’s **Tag** rule shows each tag with its color, as the **Tags** menu of a family does.
 - A smart set’s **Status** rule says **Active in Adobe Apps Only** in place of **Active in Apps Only**, and only while **Show test fonts installed for Adobe apps** is on.
+- A font page for a family from Adobe Fonts has **Manage in Adobe Fonts**, which opens the family’s own page on the Adobe Fonts website, where you turn it on and off. Its right-click menu has it too. Before, **Manage in Creative Cloud** opened the Creative Cloud app, where you had to look for the family. Cicero finds the page in the list Creative Cloud keeps of your fonts, and opens the Creative Cloud app as before when it can’t.
+- In **Problems**, **Installed Twice** has **Remove in Adobe Fonts…** for a copy from Adobe Fonts, which Cicero can’t turn off. It opens the family’s page on the Adobe Fonts website, so you can remove it there and keep your own copy. Creative Cloud then takes its copy away.
 
 ## 1.9.3
 
