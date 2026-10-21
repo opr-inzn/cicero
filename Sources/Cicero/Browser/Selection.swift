@@ -147,13 +147,17 @@ struct FamilyKeys: ViewModifier {
             .onKeyPress(.space, phases: [.down, .repeat]) { press in
                 guard press.modifiers.isDisjoint(with: [.command, .option, .control, .shift]) else { return .ignored }
                 guard press.phase == .down else { return .handled }  // Holding the bar down opens or closes it once.
-                // While a name is being typed, a space is part of it ("New York") if a letter follows it at once;
-                // otherwise it opens Quick Look a moment later, as it would have straight away.
-                if pendingQuickLook == nil, !typed.hasSuffix(" "), !typed.isEmpty, Date.now.timeIntervalSince(lastTyped) <= 1 {
+                // While a name is being typed, a space is part of it ("New York") if a letter follows it soon after;
+                // otherwise it opens Quick Look a moment later, as it would have straight away. Where no family's
+                // name goes on with a space, it opens Quick Look at once.
+                if pendingQuickLook == nil, !typed.hasSuffix(" "), !typed.isEmpty, Date.now.timeIntervalSince(lastTyped) <= 1,
+                   families.contains(where: {
+                       $0.name.range(of: typed + " ", options: [.anchored, .caseInsensitive, .diacriticInsensitive]) != nil
+                   }) {
                     typed += " "
                     lastTyped = .now
                     pendingQuickLook = Task {
-                        try? await Task.sleep(for: .milliseconds(200))
+                        try? await Task.sleep(for: .milliseconds(500))
                         guard !Task.isCancelled else { return }
                         pendingQuickLook = nil
                         typed = ""
