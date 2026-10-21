@@ -31,8 +31,9 @@ struct FontText: View {
     var features: [FeatureSetting] = []
     var kerning: Double = 0
     var lineLimit: Int? = 1
-    /// For text that runs over several lines; nil for the font's own line spacing.
-    var lineHeight: AttributedString.LineHeight?
+    /// For text that runs over several lines, the distance from one line's baseline to the next in points; nil for the
+    /// font's own line spacing.
+    var lineHeight: Double?
     @State private var readPath: String?
 
     var body: some View {
@@ -42,13 +43,13 @@ struct FontText: View {
                 .font(Font(font))
                 .kerning(kerning)
                 .lineLimit(lineLimit)
-                .lineHeight(lineHeight)
+                .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))
         } else {
             Text(text.isEmpty ? " " : text)
                 .font(.system(size: size))
                 .lineLimit(lineLimit)
-                .lineHeight(lineHeight)
+                .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
                 .hidden()
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
@@ -318,7 +319,7 @@ struct StatusTag: View {
     }
 }
 
-/// The system slider on macOS 27, which draws it itself, and one drawn by Cicero on macOS 26, whose slider's
+/// The system slider on macOS 27, which draws it itself, and one drawn by Cicero before that: macOS 26's slider's
 /// glass knob disappears in toolbar popovers. Continuous, rounded to the step: a stepped system slider can
 /// show a tick for every step.
 struct ValueSlider: View {
@@ -647,23 +648,28 @@ final class SegmentTarget: NSObject {
 extension View {
     /// A bar over the top of the scroll view in this view, on the window's background, which what scrolls under it
     /// fades into just below it, as under the main window's title, rather than meeting at an edge. The system's soft
-    /// edge fades less far than a tall bar reaches, so rows showed behind its lower half.
-    func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
+    /// edge fades less far than a tall bar reaches, so rows showed behind its lower half. macOS 15 has no edge effect to
+    /// hide, and an inset that what scrolls goes under does the same there.
+    @ViewBuilder func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
         let fade: CGFloat = 18
-        return scrollEdgeEffectHidden(true, for: .top)
-            .contentMargins(.top, fade, for: .scrollContent)
-            .safeAreaBar(edge: .top, spacing: 0) {
-                bar()
-                    .background(.background)
-                    .overlay(alignment: .bottom) {
-                        Rectangle()
-                            .fill(.background)
-                            .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
-                            .frame(height: fade)
-                            .offset(y: fade)
-                            .allowsHitTesting(false)
-                    }
+        let fadingBar = bar()
+            .background(.background)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(.background)
+                    .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
+                    .frame(height: fade)
+                    .offset(y: fade)
+                    .allowsHitTesting(false)
             }
+        if #available(macOS 26, *) {
+            scrollEdgeEffectHidden(true, for: .top)
+                .contentMargins(.top, fade, for: .scrollContent)
+                .safeAreaBar(edge: .top, spacing: 0) { fadingBar }
+        } else {
+            contentMargins(.top, fade, for: .scrollContent)
+                .safeAreaInset(edge: .top, spacing: 0) { fadingBar }
+        }
     }
 
     /// For a section footer in a grouped form: moves it closer to its card than the default gap.
@@ -735,7 +741,7 @@ struct PreviewOptionsButton: View {
         } label: {
             Label("Preview Options", systemImage: "textformat.size")
         }
-        .buttonStyle(.toolbar)
+        .toolbarButtonStyle()
         .help("Preview text, size, weight, spacing and alignment")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions() }
     }

@@ -260,10 +260,10 @@ struct FontList: View {
             }
             // A bar below the toolbar rather than headers pinned over the rows, so the rows go under the toolbar
             // and the headers together, behind one edge with a line under it, as in the Finder.
-            .safeAreaBar(edge: .top, spacing: 0) {
+            .topBar {
                 header(columns: columns, widths: widths, sort: sort)
             }
-            .scrollEdgeEffectStyle(.hard, for: .top)
+            .hardTopScrollEdge()
             .visibleHeight($visibleHeight)
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)

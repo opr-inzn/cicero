@@ -49,7 +49,7 @@ struct CompareWindow: View {
         }
         .frame(minWidth: 600, minHeight: 400)
         .background(Color.canvas)
-        .dropDestination(for: String.self) { names, _ in _ = model.addToCompare(names) }
+        .drops(of: String.self) { names in _ = model.addToCompare(names) }
         .task(id: waiting) {
             guard !waiting.isEmpty else { return }
             await FontLoader.shared.read(waiting)

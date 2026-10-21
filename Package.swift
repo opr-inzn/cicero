@@ -7,7 +7,7 @@ let hasTests = FileManager.default.fileExists(atPath: Context.packageDirectory +
 
 let package = Package(
     name: "Cicero",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v15)],
     dependencies: [
         // Updates (see scripts/build-app.sh for how the framework gets into the app).
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),

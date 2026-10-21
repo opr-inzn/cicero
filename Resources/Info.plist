@@ -46,7 +46,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.graphics-design</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>26.0</string>
+	<string>15.0</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Cicero asks InDesign, Illustrator and Photoshop which fonts their open documents use, to activate the ones that are off, and asks macOS to restart your Mac when you choose Restart Now after clearing font caches.</string>
 	<key>NSDesktopFolderUsageDescription</key>

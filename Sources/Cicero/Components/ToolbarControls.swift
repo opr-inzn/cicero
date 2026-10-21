@@ -1,7 +1,8 @@
 import SwiftUI
 
 // Toolbar controls that highlight only what's chosen or on, never what's under the pointer: AppKit's
-// light up on hover, in a gray of their own, and Cicero has no hover states.
+// light up on hover, in a gray of their own, and Cicero has no hover states. On macOS 15, which has no glass, the
+// toolbar has the system's own controls instead.
 
 /// A toolbar item in a glass capsule of its own, 8 pt from the next as the Info button is from the search
 /// field. AppKit puts neighbouring items in one capsule, and a ToolbarSpacer between them leaves 16 pt.
@@ -9,8 +10,12 @@ struct ToolbarCapsule<Content: View>: ToolbarContent {
     @ViewBuilder let content: () -> Content
 
     var body: some ToolbarContent {
-        ToolbarItem { content().glassEffect(.regular, in: .capsule) }
-            .sharedBackgroundVisibility(.hidden)
+        if #available(macOS 26, *) {
+            ToolbarItem { content().glassEffect(.regular, in: .capsule) }
+                .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem { content() }
+        }
     }
 }
 
@@ -38,6 +43,27 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 
     var body: some View {
+        if #available(macOS 26, *) {
+            onGlass
+        } else {
+            Picker(label, selection: $selection) {
+                ForEach(values, id: \.self) { value in
+                    Group {
+                        if let symbol { Label(title(value), systemImage: symbol(value)) } else { Text(title(value)) }
+                    }
+                    .tag(value)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelStyle(.iconOnly)
+            .labelsHidden()
+            .fixedSize()
+            .help(help ?? "")
+        }
+    }
+
+    @available(macOS 26, *)
+    private var onGlass: some View {
         // Segments as wide as the widest, like AppKit's.
         HStack(spacing: 0) {
             ForEach(values, id: \.self) { value in
@@ -106,13 +132,24 @@ struct ToolbarButtonStyle: ButtonStyle {
 /// A toolbar toggle, highlighted while it's on.
 struct ToolbarToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
-        Button { configuration.isOn.toggle() } label: { configuration.label }
-            .buttonStyle(ToolbarButtonStyle(isOn: configuration.isOn))
+        if #available(macOS 26, *) {
+            Button { configuration.isOn.toggle() } label: { configuration.label }
+                .buttonStyle(ToolbarButtonStyle(isOn: configuration.isOn))
+        } else {
+            Toggle(configuration).toggleStyle(.button)
+        }
     }
 }
 
 extension ButtonStyle where Self == ToolbarButtonStyle {
     static var toolbar: ToolbarButtonStyle { ToolbarButtonStyle() }
+}
+
+extension View {
+    /// `ToolbarButtonStyle` on macOS 26; the system's toolbar buttons on macOS 15.
+    @ViewBuilder func toolbarButtonStyle() -> some View {
+        if #available(macOS 26, *) { buttonStyle(.toolbar) } else { self }
+    }
 }
 
 extension ToggleStyle where Self == ToolbarToggleStyle {

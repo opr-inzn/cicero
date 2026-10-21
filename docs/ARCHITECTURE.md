@@ -108,13 +108,15 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   character set lookups, custom character sets) are cached and keyed on the inputs they depend on. The
   sidebar's choices (open sections, order, hidden items) are user data that no list depends on, so changing
   them leaves `dataRevision`, and the browser's list, as they are.
-- `ClassificationGuesser` (`Model/`) asks Apple Intelligence's on-device model to guess, from their names,
+- `ClassificationGuesser` (`Model/`) asks Apple Intelligence's on-device model (macOS 26; its `availability` is
+  `.unavailable` on macOS 15) to guess, from their names,
   the classification of families nothing in their files classifies, one at a time after scans, and keeps the
   answers in the caches. `letterGuesses` holds what `LetterEmbedding`'s model sees in their letters, as
   `MeasurementIndex` caches it. `classificationGuess` applies the name's guess, else the letters', below the user's
   choices and only while guessing is on; `guessRevision`, in `VisibleKey`, refills lists as they come.
 - `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
-  light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
+  light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))` on macOS 26, extra
+  `lineSpacing` on macOS 15: `lineHeight(_:natural:)`), which
   the font page's editor (`SampleEditor`, an NSTextView with the same line height) follows too, so its text
   and the hidden copy that sizes it agree. Not SwiftUI's `TextEditor`, which, like `Text`, cuts glyphs off at
   the font's ascent and descent: `SampleEditor`'s layout fragments (`UnclippedFragment`) widen their rendering
@@ -162,6 +164,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   is an NSOutlineView; a marker view behind the "Fonts" header finds it and sets its drop feedback to
   `.gap`, the one AppKit setting the sidebar changes. Everything else (selection, moves, menus, headers)
   stays SwiftUI's.
+- The deployment target is macOS 15. What Cicero uses of macOS 26 (glass, bars over scroll views, exact line
+  heights, drop sessions and configurations, the on-device language model) is behind `#available(macOS 26, *)`,
+  mostly in small modifiers in `Components/Compatibility.swift` (`glass(in:)`, `topBar`, `drops(of:)`, …) that
+  give macOS 15 what it has instead, so call sites read the same for both. The SPEC's "macOS 15" lists them.
 
 ## Rules of thumb
 

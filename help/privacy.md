@@ -14,7 +14,7 @@ The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Ci
 
 ## Apple Intelligence
 
-To recognize the classification of fonts nothing else classifies, Cicero gives the language model Apple Intelligence keeps on your Mac each family’s name, foundry, designer and style names. The model runs on your Mac, so nothing is sent. Cicero also recognizes classifications from the shapes of the letters, with a model of its own that comes with it, on your Mac too. To stop both, turn off **Classify fonts automatically** in **Settings → General**; Cicero then forgets the classifications it recognized. Without Apple Intelligence, Cicero recognizes them from the letters only.
+To recognize the classification of fonts nothing else classifies, Cicero on macOS 26 gives the language model Apple Intelligence keeps on your Mac each family’s name, foundry, designer and style names. The model runs on your Mac, so nothing is sent. Cicero also recognizes classifications from the shapes of the letters, with a model of its own that comes with it, on your Mac too. To stop both, turn off **Classify fonts automatically** in **Settings → General**; Cicero then forgets the classifications it recognized. Without Apple Intelligence, and on macOS 15, Cicero recognizes them from the letters only.
 
 The **Help** menu opens pages in your web browser, like this guide on GitHub and the privacy policy on Cicero’s website, and so do the links in **Settings → Coverage** and in **About Cicero**. Cicero itself doesn’t load them.
 

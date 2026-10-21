@@ -93,7 +93,7 @@ struct MainWindow: View {
                 .keyboardShortcut(.defaultAction)
             Button("Not Now", role: .cancel) { model.answerGuessing(false) }
         } message: {
-            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters and, with Apple Intelligence, from their names, on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Settings → General.")
+            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Settings → General.")
         }
         .alert(
             model.textPrompt?.title ?? "",
@@ -122,7 +122,7 @@ struct MainWindow: View {
                     .font(.callout)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .glassEffect(.regular, in: .capsule)
+                    .glass(in: .capsule)
                     .padding(.bottom, 24)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -169,16 +169,10 @@ private struct FileDrop: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .dropDestination(for: URL.self) { urls, _ in
+            // From outside Cicero: families dragged within the window are names, not files.
+            .drops(of: URL.self, fromOutsideOnly: true, isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
                 model.open(urls, into: set)
-            }
-            .onDropSessionUpdated { session in
-                switch session.phase {
-                // From outside Cicero: families dragged within the window are names, not files.
-                case .entering, .active: isTargeted = session.localSession == nil
-                default: isTargeted = false
-                }
             }
             .overlay {
                 if isTargeted {

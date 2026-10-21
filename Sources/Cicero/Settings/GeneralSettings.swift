@@ -1,5 +1,4 @@
 import CiceroCore
-import FoundationModels
 import ServiceManagement
 import SwiftUI
 
@@ -93,7 +92,9 @@ struct GeneralSettings: View {
                     HStack(spacing: 6) {
                         Text("Classify fonts automatically")
                         Tag(text: "On-device Intelligence", tint: .purple)
-                            .help("Cicero’s own model reads the letters, and Apple Intelligence the names, on this Mac. Nothing is sent.")
+                            .help(ClassificationGuesser.readsNames
+                                  ? "Cicero’s own model reads the letters, and Apple Intelligence the names, on this Mac. Nothing is sent."
+                                  : "Cicero’s own model reads the letters, on this Mac. Nothing is sent.")
                     }
                     Text(guessingExplanation)
                 }
@@ -133,13 +134,13 @@ struct GeneralSettings: View {
         .restoreSheet(contents: $restoring)
     }
 
-    /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
+    /// Follows Apple Intelligence as it's turned on or off (see `ClassificationGuesser.availability`).
     private var guessingExplanation: String {
         let what = "When a font’s files don’t say, Cicero tells from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
         return switch ClassificationGuesser.availability {
         case .available: what
-        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to tell from names too."
-        case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
+        case .notEnabled: what + " Turn on Apple Intelligence in System Settings to tell from names too."
+        case .notReady: what + " Apple Intelligence is getting ready."
         case .unavailable: "When a font’s files don’t say, Cicero tells from the shapes of its letters, on this Mac. Nothing is sent."
         }
     }

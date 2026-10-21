@@ -37,7 +37,7 @@ struct ProblemsView: View {
         .toolbar {
             ToolbarItem {
                 Button("Check Again", systemImage: "arrow.clockwise") { model.rescan() }
-                    .buttonStyle(.toolbar)
+                    .toolbarButtonStyle()
                     .disabled(model.scanProgress != nil)
                     .help("Look through the library again")
             }
