@@ -20,7 +20,7 @@ extension FocusedValues {
 /// Families next to each other, each in a style of its choosing: one row each on a shared baseline, or drawn over
 /// each other in tints, at a size of the window's own.
 struct CompareWindow: View {
-    static let sizes: ClosedRange<Double> = 8...960
+    static let sizes: ClosedRange<Double> = 24...720
 
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview

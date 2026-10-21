@@ -108,7 +108,7 @@ struct ToolbarSizeStepper: View {
     @Environment(\.appearsActive) private var appearsActive
 
     /// Each a fifth to a third bigger than the one before; a size typed in between goes to the next one either way.
-    static let sizes: [Double] = [8, 9, 10, 11, 12, 14, 16, 18, 24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720, 960]
+    static let sizes: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
 
     var body: some View {
         HStack(spacing: 0) {
