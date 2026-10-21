@@ -62,7 +62,7 @@ capsule on every side, that slides to the next one chosen.
     (Change menu, the same items), or dropping families on a classification row. Menu: Rename Classification (built-in
     ones too; their own name back undoes it; a name that's taken says so; overrides, smart set rules and the sidebar
     follow), Delete Classification for the user's own (its families go back to Automatic, its smart set rules go).
-  - **Coverage** (titled like the Settings tab; + new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Google Fonts, Unicode Blocks, Your Coverage Sets — with every set shown unless hidden (Edit, Settings). Unicode Blocks and Google Fonts start collapsed. Menu for custom: Edit Coverage Set, Delete Coverage Set.
+  - **Coverage** (titled like the Settings tab; + new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Google Fonts, Unicode Blocks, Your Coverage Sets — with every set shown unless hidden (Edit, Settings). The section starts collapsed, as Foundries and Classifications do, and within it Unicode Blocks and Google Fonts. Menu for custom: Edit Coverage Set, Delete Coverage Set.
 - The menus of sets, smart sets, tags, folders, foundries, classifications and character sets also have Export Fonts and Export Font List (that row's families, see Export and backup). Every row menu also has Hide from Sidebar and Edit Sidebar.
 - Order: rows drag to a new place within their own section (character sets within their group), never
   into another one; as in Finder's sidebar, the rows around the place they'd land slide apart to open a gap

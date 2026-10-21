@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- The sidebar’s **Coverage** starts closed the first time Cicero opens, like **Foundries** and **Classifications**, so its many character sets don’t fill a new sidebar. Click its title to open it.
+
 ## 1.9
 
 - Cicero runs on macOS 15 Sequoia as well as macOS 26. On macOS 15 it looks like the other apps there, with the system’s toolbar controls and without Liquid Glass. Recognizing classifications from fonts’ names with Apple Intelligence needs macOS 26, so on macOS 15 Cicero recognizes them from the shapes of their letters only.
