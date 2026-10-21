@@ -2,8 +2,17 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 1.9.4
 
+- The Compare window is in the **Window** menu, and opens with nothing selected, from there or from **Fonts → Compare**. Click **+** in its toolbar to add families from anywhere in your library: type a name and click one, or press Return. Families already there have a checkmark; click one again to take it out.
+- With one family selected, **Fonts → Compare** adds it to the fonts already in the Compare window, so families far apart in your library can go there one by one. A family’s menu says **Add to Compare** for it. With several, Compare starts over with them, as before.
+- The Compare window has a size of its own, from 24 to 720 pt, set with **Size** in its **Preview Options**. **View → Zoom In** and **Zoom Out** (⌘+ and ⌘−, or ⌘= on a US keyboard) make the fonts bigger and smaller. Changing it there leaves the main window’s previews as they are, and the size in the main window’s Preview Options no longer changes Compare.
+- The Compare window’s title is just **Compare**, without a count of its families, and there’s no line under its toolbar when it’s empty. **Overlay** no longer draws a grey line along the baseline.
+- In the Compare window’s **Stacked** layout, a font’s row stays where it is when you add a font whose letters reach further above or below. Each row is now as tall as its own font needs; before, every row grew to fit the tallest.
+- In Preview Options, **Size** starts at 24 pt rather than 8, and a smaller size goes up to 24.
+- In specimens, a family’s style names sit on one baseline. A style whose letters reach higher or lower than the others’, like a bold or condensed one, sat a little lower or higher.
+- A font page for a family from Adobe Fonts has **Manage in Adobe Fonts**, which opens the family’s own page on the Adobe Fonts website, where you turn it on and off. Its right-click menu has it too. Before, **Manage in Creative Cloud** opened the Creative Cloud app, where you had to look for the family. Cicero finds the page in the list Creative Cloud keeps of your fonts, and opens the Creative Cloud app as before when it can’t.
+- In **Problems**, **Installed Twice** has **Remove in Adobe Fonts…** for a copy from Adobe Fonts, which Cicero can’t turn off. It opens the family’s page on the Adobe Fonts website, so you can remove it there and keep your own copy. Creative Cloud then takes its copy away.
 - Smart sets have a **Has Note** rule, **Yes** for every family with a note or **No** for every family without one. Before, you left the text of a **Note** rule empty.
 - New smart set rules no longer offer **Times Activated** and **Last Activated**. Smart sets that have them keep them.
 - In a smart set’s rules, numbers go in a box without arrows, and **Number of Styles** no longer says “styles” after its number. Text goes in a box too.
@@ -11,15 +20,6 @@ Each version’s notes here become its release notes on the [releases page](http
 - A smart set’s **Rating** rule lists five stars first, after **No Rating**, as the **Rating** menu of a family does.
 - A smart set’s **Tag** rule shows each tag with its color, as the **Tags** menu of a family does.
 - A smart set’s **Status** rule says **Active in Adobe Apps Only** in place of **Active in Apps Only**, and only while **Show test fonts installed for Adobe apps** is on.
-- The Compare window is in the **Window** menu, and opens with nothing selected, from there or from **Fonts → Compare**. Click **+** in its toolbar to add families from anywhere in your library: type a name and click one, or press Return. Families already there have a checkmark; click one again to take it out.
-- With one family selected, **Fonts → Compare** adds it to the fonts already in the Compare window, so families far apart in your library can go there one by one. A family’s menu says **Add to Compare** for it. With several, Compare starts over with them, as before.
-- In specimens, a family’s style names sit on one baseline. A style whose letters reach higher or lower than the others’, like a bold or condensed one, sat a little lower or higher.
-- In the Compare window’s **Stacked** layout, a font’s row stays where it is when you add a font whose letters reach further above or below. Each row is now as tall as its own font needs; before, every row grew to fit the tallest.
-- In Preview Options, **Size** starts at 24 pt rather than 8, and a smaller size goes up to 24.
-- The Compare window’s title is just **Compare**, without a count of its families, and there’s no line under its toolbar when it’s empty. **Overlay** no longer draws a grey line along the baseline.
-- The Compare window has a size of its own, from 24 to 720 pt, set with **Size** in its **Preview Options**. **View → Zoom In** and **Zoom Out** (⌘+ and ⌘−, or ⌘= on a US keyboard) make the fonts bigger and smaller. Changing it there leaves the main window’s previews as they are, and the size in the main window’s Preview Options no longer changes Compare.
-- A font page for a family from Adobe Fonts has **Manage in Adobe Fonts**, which opens the family’s own page on the Adobe Fonts website, where you turn it on and off. Its right-click menu has it too. Before, **Manage in Creative Cloud** opened the Creative Cloud app, where you had to look for the family. Cicero finds the page in the list Creative Cloud keeps of your fonts, and opens the Creative Cloud app as before when it can’t.
-- In **Problems**, **Installed Twice** has **Remove in Adobe Fonts…** for a copy from Adobe Fonts, which Cicero can’t turn off. It opens the family’s page on the Adobe Fonts website, so you can remove it there and keep your own copy. Creative Cloud then takes its copy away.
 
 ## 1.9.3
 
