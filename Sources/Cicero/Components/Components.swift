@@ -696,50 +696,78 @@ extension View {
     }
 }
 
-/// Lays children out left to right, wrapping onto new lines.
+/// Lays children out left to right, wrapping onto new lines, each line's children on its first text's baseline: a
+/// family's styles, each set in itself, would otherwise sit as high as each face's ascent puts it.
 struct FlowLayout: Layout {
     var spacing: CGFloat
     var lineSpacing: CGFloat
 
-    /// The children's sizes, measured once per update rather than for every proposal and again to place them:
-    /// specimens are a lazy stack's rows, which it measures over and over while scrolling, and each child is
-    /// text in a face of its own.
-    func makeCache(subviews: Subviews) -> [CGSize] {
-        subviews.map { $0.sizeThatFits(.unspecified) }
+    /// A child's size and how far down its first text's baseline is.
+    struct Child {
+        var size: CGSize
+        var baseline: CGFloat
     }
 
-    func updateCache(_ cache: inout [CGSize], subviews: Subviews) {
+    /// The children measured once per update rather than for every proposal and again to place them: specimens are
+    /// a lazy stack's rows, which it measures over and over while scrolling, and each child is text in a face of its
+    /// own.
+    func makeCache(subviews: Subviews) -> [Child] {
+        subviews.map { subview in
+            let dimensions = subview.dimensions(in: .unspecified)
+            return Child(size: CGSize(width: dimensions.width, height: dimensions.height), baseline: dimensions[.firstTextBaseline])
+        }
+    }
+
+    func updateCache(_ cache: inout [Child], subviews: Subviews) {
         cache = makeCache(subviews: subviews)
     }
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) -> CGSize {
         let width = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
-        for size in cache {
-            if x > 0 && x + size.width > width {
-                y += lineHeight + lineSpacing
-                x = 0
-                lineHeight = 0
-            }
-            x += size.width + spacing
-            widest = max(widest, x - spacing)
-            lineHeight = max(lineHeight, size.height)
-        }
-        return CGSize(width: min(widest, width), height: y + lineHeight)
+        let lines = lines(of: cache, width: width)
+        let widest = lines.map(\.width).max() ?? 0
+        let height = lines.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(lines.count - 1, 0))
+        return CGSize(width: min(widest, width), height: height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) {
-        var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
-        for (subview, size) in zip(subviews, cache) {
-            if x > bounds.minX && x + size.width > bounds.maxX {
-                y += lineHeight + lineSpacing
-                x = bounds.minX
-                lineHeight = 0
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) {
+        var y = bounds.minY
+        for line in lines(of: cache, width: bounds.width) {
+            var x = bounds.minX
+            for index in line.children {
+                let child = cache[index]
+                subviews[index].place(at: CGPoint(x: x, y: y + line.baseline - child.baseline), proposal: ProposedViewSize(child.size))
+                x += child.size.width + spacing
             }
-            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            lineHeight = max(lineHeight, size.height)
+            y += line.height + lineSpacing
         }
+    }
+
+    /// The children on a line, its width, its baseline, as far down as the lowest of theirs, and its height, down to
+    /// the lowest of their bottoms below that.
+    private struct Line {
+        var children: [Int] = []
+        var width: CGFloat = 0
+        var baseline: CGFloat = 0
+        var below: CGFloat = 0
+        var height: CGFloat { baseline + below }
+    }
+
+    private func lines(of children: [Child], width: CGFloat) -> [Line] {
+        var lines: [Line] = []
+        for (index, child) in children.enumerated() {
+            let gap = lines.last.map { $0.children.isEmpty ? 0 : spacing } ?? 0
+            if lines.isEmpty || (lines[lines.count - 1].width > 0 && lines[lines.count - 1].width + gap + child.size.width > width) {
+                lines.append(Line())
+            }
+            var line = lines.removeLast()
+            line.width += (line.children.isEmpty ? 0 : spacing) + child.size.width
+            line.baseline = max(line.baseline, child.baseline)
+            line.below = max(line.below, child.size.height - child.baseline)
+            line.children.append(index)
+            lines.append(line)
+        }
+        return lines
     }
 }
 

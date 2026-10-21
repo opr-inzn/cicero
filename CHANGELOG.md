@@ -13,6 +13,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A smart set’s **Status** rule says **Active in Adobe Apps Only** in place of **Active in Apps Only**, and only while **Show test fonts installed for Adobe apps** is on.
 - The Compare window is in the **Window** menu, and opens with nothing selected, from there or from **Fonts → Compare**. Click **+** in its toolbar to add families from anywhere in your library: type a name and click one, or press Return. Families already there have a checkmark; click one again to take it out.
 - With one family selected, **Fonts → Compare** adds it to the fonts already in the Compare window, so families far apart in your library can go there one by one. A family’s menu says **Add to Compare** for it. With several, Compare starts over with them, as before.
+- In specimens, a family’s style names sit on one baseline. A style whose letters reach higher or lower than the others’, like a bold or condensed one, sat a little lower or higher.
 - The Compare window has a size of its own, up to 960 pt, in the toolbar between **−** and **+**. **View → Zoom In** and **Zoom Out** (⌘+ and ⌘−, or ⌘= on a US keyboard) make the fonts bigger and smaller, and you can type a size too. The size in Preview Options no longer changes Compare, so the main window’s previews stay as they are.
 
 ## 1.9.3

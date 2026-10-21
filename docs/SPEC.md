@@ -128,7 +128,7 @@ capsule on every side, that slides to the next one chosen.
   it's normal, then the name. A family with more styles than weight and width tell apart (italics,
   optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
   the tooltip. Tiles scale with the preview size.
-- **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, "Foundry · N styles", switch; the sample at preview size, lined up as Preview Options' alignment says; up to 14 style names set in themselves (+N more).
+- **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, "Foundry · N styles", switch; the sample at preview size, lined up as Preview Options' alignment says; up to 14 style names set in themselves (+N more), each line of them on one baseline (`FlowLayout` lines its children up by their first text's baseline, not their tops, which sit as high as each face's ascent puts them).
 - Tag dot: an 8 pt circle in the tag's colour, with no ring (side by side, 2 pt apart, for a family tagged
   several ways before 1.5). Cards are opaque (the card's grey on the window's background), so the
   picture dragged to the sidebar looks like the card.
