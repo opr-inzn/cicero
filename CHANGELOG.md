@@ -11,6 +11,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The search field suggests families as you type, up to eight whose names begin with what you’ve typed, or have a word that does, each with “Aa” in its own letters. Choose one to search for its whole name, with that family selected and in view.
 - A family’s right-click menu no longer has **Copy Family Name**.
 - The **Rating** menu starts with **No Rating**, then lists the stars from five down to one.
+- Right-click a group under **Coverage**, like **Unicode Blocks**, and choose **Hide from Sidebar** to hide the whole group. It used to offer only **Edit Sidebar**.
 
 ## 1.9
 

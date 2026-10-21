@@ -774,6 +774,13 @@ extension AppModel {
         return data.sidebar.ordered(ordered, in: SidebarSection.characterSets.rawValue) { "charsetgroup.\($0.id)" }
     }
 
+    /// Hides every set in a character set group, which takes the group out of the sidebar.
+    func hideGroup(_ id: String) {
+        guard let group = characterSetGroups.first(where: { $0.id == id }) else { return }
+        data.sidebar.hidden.formUnion(group.rows.map(\.key))
+        deselect { !isShown($0) }
+    }
+
     func isGroupExpanded(_ id: String) -> Bool { !data.sidebar.collapsed.contains("charsetgroup.\(id)") }
 
     func setGroupExpanded(_ id: String, _ expanded: Bool) {

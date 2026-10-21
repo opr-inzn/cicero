@@ -157,6 +157,12 @@ private struct SidebarContent: View {
                     .modifier(GroupDrop(group: group.id, dragged: draggedGroup, target: $groupDropTarget) { dragged in
                         withAnimation(.snappy) { move(dragged, onto: group.id) }
                     })
+                    .contextMenu {
+                        if group.rows.contains(where: { model.isVisible($0.key) }) {
+                            Button("Hide from Sidebar", systemImage: "eye.slash") { model.hideGroup(group.id) }
+                        }
+                        editSidebarButton
+                    }
             }
         }
     }
@@ -380,8 +386,12 @@ private struct SidebarContent: View {
         if model.isVisible(row.key) {
             Button("Hide from Sidebar", systemImage: "eye.slash") { model.setVisible(row.key, false) }
         }
+        editSidebarButton
+    }
+
+    private var editSidebarButton: some View {
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
-                   systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
+               systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
     }
 }
 
