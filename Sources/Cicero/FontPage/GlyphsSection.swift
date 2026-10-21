@@ -113,7 +113,7 @@ struct GlyphsSection: View {
         } header: {
             HStack(spacing: 6) {
                 Text(section.title).font(.headline)
-                Text("— \(total.formatted())").font(.callout).foregroundStyle(.secondary)
+                Text("– \(total.formatted())").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
