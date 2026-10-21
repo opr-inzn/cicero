@@ -277,16 +277,16 @@ Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Sy
 2. Words in the name, like “Mono”, “Stencil”, “Slab”, “Sans”, “Grotesk”, “Script” or “Symbol”.
 3. The shapes of the letters. An I and an l with feet on both sides are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing.
 4. The font’s PANOSE numbers, another way fonts can say what they are.
-5. With **Classify fonts automatically** on in **Settings → General**, a guess, made on your Mac:
-   - With Apple Intelligence on, from the family’s name, when the name says. The Info panel says “Guessed from the name by Apple Intelligence” under such a classification.
-   - Otherwise from the shapes of its letters, when Cicero is sure enough: it tells serif, sans serif, script and ornamental letters apart, italics, display and variable fonts too, the way it learned to from thousands of freely licensed fonts. The Info panel says “Guessed from the shapes of its letters”.
+5. With **Classify fonts automatically** on in **Settings → General**, a classification Cicero recognizes, on your Mac:
+   - With Apple Intelligence on, from the family’s name, when the name says. The Info panel says “Recognized from its name by Apple Intelligence” under such a classification.
+   - Otherwise from the shapes of its letters, when Cicero is sure enough: it tells serif, sans serif, script and ornamental letters apart, italics, display and variable fonts too, the way it learned to from thousands of freely licensed fonts. The Info panel says “Recognized from the shapes of its letters”.
 
-   Cicero asks whether to classify fonts automatically the first time it opens. Turn **Classify fonts automatically** off, and the guesses go: those families are Unclassified again.
+   Cicero asks whether to classify fonts automatically the first time it opens. Turn **Classify fonts automatically** off, and those classifications go: the families are Unclassified again.
 
 A family none of them tells stays Unclassified, rather than ending up in the wrong classification.
 
 - **Make your own classification:** click **+** next to **Classifications**, or choose **Classification → New Classification** from a family’s right-click menu to put it straight in. Yours stay in the sidebar even while they’re empty.
-- **Put a family in another classification:** right-click it and choose one from **Classification**, use **Change** next to **Classification** in the Info panel, or drag it onto a classification in the sidebar. To keep a family where Cicero put it, choose that classification: a later version of Cicero, or a new guess, won’t move it. **Automatic** puts it back where its fonts say it belongs. Your choices are saved with your library, so they’re the same each time Cicero opens, and backups include them.
+- **Put a family in another classification:** right-click it and choose one from **Classification**, use **Change** next to **Classification** in the Info panel, or drag it onto a classification in the sidebar. To keep a family where Cicero put it, choose that classification: a later version of Cicero, or a classification it recognizes later, won’t move it. **Automatic** puts it back where its fonts say it belongs. Your choices are saved with your library, so they’re the same each time Cicero opens, and backups include them.
 - **Rename a classification:** right-click it and choose **Rename Classification**. This works for Cicero’s own too; give one its old name back to undo that. Smart sets follow.
 - **Delete one of yours:** right-click it and choose **Delete Classification**. Its families go back to the classifications their fonts suggest.
 - **Hide a classification:** click **Edit** at the top of the sidebar and uncheck it, or choose **Hide from Sidebar** from its right-click menu.
