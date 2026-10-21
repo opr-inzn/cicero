@@ -248,7 +248,7 @@ public struct GlyphSection: Identifiable, Sendable {
     public static let limit = 6000
 
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
-    /// point order within a group; private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
+    /// point order within a group, but for superscripts and subscripts (see `superscriptOrder`); private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
     /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very
     /// large fonts to a sensible number of characters from each Unicode block.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [], privateUse: [UInt32: GlyphGroup] = [:],
@@ -264,6 +264,9 @@ public struct GlyphSection: Identifiable, Sendable {
                 perBlock[block, default: 0] += 1
                 buckets[group, default: []].append(value)
             }
+        }
+        for group in [GlyphGroup.superscripts, .subscripts] {
+            buckets[group] = buckets[group]?.sorted { Self.superscriptOrder(of: $0) < Self.superscriptOrder(of: $1) }
         }
         let glyphs = Dictionary(grouping: features, by: \.group)
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
@@ -281,6 +284,17 @@ public struct GlyphSection: Identifiable, Sendable {
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
             return scalars.isEmpty && featured.isEmpty ? nil : GlyphSection(group: group, scalars: scalars, glyphs: featured)
         }
+    }
+
+    /// Where a superscript or subscript goes in its group: the figures from 0 to 9, then the signs, like ⁺, then the
+    /// letters, like ʰ, each in code point order. Unicode keeps ¹ ² ³ in Latin-1 and the other figures in a block of
+    /// their own, after letters like ʰ, so code point order alone scattered them.
+    static func superscriptOrder(of value: UInt32) -> (Int, Double, UInt32) {
+        let properties = Unicode.Scalar(value)?.properties
+        if let number = properties?.numericValue, properties?.numericType == .digit || properties?.numericType == .decimal {
+            return (0, number, value)
+        }
+        return (properties?.isAlphabetic == true ? 2 : 1, 0, value)
     }
 
     /// The groups of a font's private-use characters whose glyphs are named after a character, like the uni0E34.alt1 a
