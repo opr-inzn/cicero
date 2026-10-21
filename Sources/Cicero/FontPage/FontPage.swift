@@ -279,12 +279,12 @@ private struct TypeTester: View {
         }
     }
 
-    /// The text's size, and its line spacing, which is Preview Options' too.
+    /// The text's size, and its leading, which is Preview Options' too.
     private var sliders: some View {
         HStack(spacing: 16) {
             slider("Size", $size, range: 12...240, unit: " pt")
-            slider("Line Spacing", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
-                .help("The distance between lines, in percent of the size; the same as Line Spacing in Preview Options")
+            slider("Leading", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
+                .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
         }
     }
 
