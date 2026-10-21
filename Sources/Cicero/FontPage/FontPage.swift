@@ -230,32 +230,25 @@ private struct TypeTester: View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                if family.faces.count > 1 {
-                    Picker("Style", selection: choice(isAdjusted: !variations.isEmpty)) {
-                        Text("Automatic").tag(StyleChoice.automatic)
-                        Divider()
-                        ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
-                        if !variations.isEmpty {
-                            Divider()
-                            Text("Custom").tag(StyleChoice.custom)
-                        }
+            // On one row where there's room, else the sliders on a row of their own: with the Info panel open, a narrow
+            // window has too little for all of them, and squeezed, the labels would wrap and the row grow.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    stylePicker(isAdjusted: !variations.isEmpty)
+                    Spacer()
+                    sliders
+                    buttons(hasAxes: !face.face.axes.isEmpty)
+                }
+                VStack(spacing: 10) {
+                    HStack(spacing: 16) {
+                        stylePicker(isAdjusted: !variations.isEmpty)
+                        Spacer()
+                        buttons(hasAxes: !face.face.axes.isEmpty)
                     }
-                    .fixedSize()
-                    .help("Which style to show; Automatic follows the preview weight")
-                }
-                Spacer()
-                // Where the row is short of room, the slider narrows; squeezed, the label would wrap and the row grow.
-                HStack(spacing: 8) {
-                    Text("Size").foregroundStyle(.secondary).fixedSize()
-                    ValueSlider(value: $size, range: 12...240).frame(minWidth: 80, maxWidth: 160)
-                    ValueField("Size", value: $size, range: 12...240, unit: " pt")
-                }
-                .layoutPriority(1)
-                IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
-                    .help("Align left, center or right")
-                if !face.face.axes.isEmpty {
-                    AxesButton()
+                    HStack(spacing: 16) {
+                        Spacer(minLength: 0)
+                        sliders
+                    }
                 }
             }
             .padding(.top, 12)
@@ -267,6 +260,51 @@ private struct TypeTester: View {
             .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
+    }
+
+    @ViewBuilder
+    private func stylePicker(isAdjusted: Bool) -> some View {
+        if family.faces.count > 1 {
+            Picker("Style", selection: choice(isAdjusted: isAdjusted)) {
+                Text("Automatic").tag(StyleChoice.automatic)
+                Divider()
+                ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
+                if isAdjusted {
+                    Divider()
+                    Text("Custom").tag(StyleChoice.custom)
+                }
+            }
+            .fixedSize()
+            .help("Which style to show; Automatic follows the preview weight")
+        }
+    }
+
+    /// The text's size, and its line spacing, which is Preview Options' too.
+    private var sliders: some View {
+        HStack(spacing: 16) {
+            slider("Size", $size, range: 12...240, unit: " pt")
+            slider("Line Spacing", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
+                .help("The distance between lines, in percent of the size; the same as Line Spacing in Preview Options")
+        }
+    }
+
+    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too.
+    private func slider(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String) -> some View {
+        HStack(spacing: 8) {
+            Text(title).foregroundStyle(.secondary).fixedSize()
+            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
+            ValueField(title, value: value, range: range, step: step, unit: unit)
+        }
+        .layoutPriority(1)
+    }
+
+    @ViewBuilder
+    private func buttons(hasAxes: Bool) -> some View {
+        IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
+            .help("Align left, center or right")
+        if hasAxes {
+            AxesButton()
+        }
     }
 
     /// The Style menu's choice: Custom once an axis has been moved, until a style is chosen again.
