@@ -93,7 +93,7 @@ private struct Header: View {
     var body: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
-                FontText(text: family.name, face: family.regular.face, size: 34)
+                FontText(text: family.name, face: family.regular.face, size: 34, roomForGlyphs: true)
                     .truncationMode(.tail)
                 Text(summary)
                     .font(.callout)
@@ -252,26 +252,30 @@ private extension TypeTester {
     func editor(_ ctFont: CTFont) -> some View {
         let kerning = preview.kerning(at: size)
         let lineHeightPoints = size * preview.lineSpacing / 100
-        let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
+        let room = Self.room(for: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
         SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
-                     alignment: alignment.paragraph, overhang: overhang) {
+                     alignment: alignment.paragraph, margin: 24, roomAbove: room.above, roomBelow: room.below) {
             FamilyMenu(families: [family], model: model)
         }
             .frame(minHeight: 280)
             .padding(.vertical, 20)
+            // Out over the page's margins, for glyphs reaching past the lines' ends, like a swash at the start of one.
+            .padding(.horizontal, -24)
             // Around the text too, which has it in its own menu (see `SampleEditor`).
             .contentShape(.rect)
             .contextMenu { FamilyMenu(families: [family], model: model) }
     }
 
-    /// Room above and below the lines for glyphs that reach past them, which the editor would cut off at its
-    /// edges: as much of the text's height as the line spacing leaves out, at either end, as the editor may
-    /// put it either side, and a quarter of the size more, as it sets its lines a few points lower than the
-    /// copy that sizes it.
-    static func overhang(of text: String, in font: CTFont, kerning: Double, lineHeight: Double) -> CGFloat {
+    /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
+    /// above or what follows. The editor sets each baseline the font's descent above the bottom of its line, so all
+    /// that the line spacing leaves out of the font's height goes above the first line, like a script font's
+    /// ascenders at tight spacing, and below the last only what reaches lower than the font's descent. Its glyphs'
+    /// own reach counts where it's greater than the font's (see `TextLine`).
+    static func room(for text: String, in font: CTFont, kerning: Double, lineHeight: Double) -> (above: CGFloat, below: CGFloat) {
         let line = TextLine(text, font: font, kerning: kerning)
-        return max(0, line.ascent + line.descent - lineHeight) + CTFontGetSize(font) / 4
+        let descent = CTFontGetDescent(font).rounded()
+        return (max(0, line.ascent - (lineHeight - descent)).rounded(.up), max(0, line.descent - descent).rounded(.up))
     }
 
     /// Centered, unless the left alignment was chosen when there were only those two.

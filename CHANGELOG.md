@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - In **Preview Options**, the preview text field spans the whole width, with “Preview Text” in it while it’s empty, in place of a label beside it.
+- A font page has room for a script font’s swashes, like Zapfino’s: the family’s name above no longer runs into the line under it, the text no longer leaves an empty gap below it, and swashes reaching past the ends of its lines show in the page’s margins rather than being cut off.
 
 ## 1.9.1
 
