@@ -197,11 +197,12 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | is, is not | One of your tags |
 | Rating | is, is not, is more than, is less than | No Rating, or one to five stars (see [Ratings](#ratings)) |
-| Note | contains, doesn’t contain | Text in the family’s [note](#notes); left empty, every family with a note, or (doesn’t contain) without one |
+| Note | contains, doesn’t contain | Text in the family’s [note](#notes) |
+| Has Note | Yes, No | Whether the family has a [note](#notes) |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
-| Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
-| Kind | is, is not | Variable, Monospaced or Has Italics |
+| Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is there while **Show test fonts installed for Adobe apps** is on, for the fonts only Adobe apps load (see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders)) |
+| Kind | is, is not | Variable, Monospaced or Italic, for a family with italic styles |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType and others |
 | Number of Styles | is, is more than, is less than | A number |
 | OpenType Feature | is supported, isn’t supported | Small Capitals, Old-Style Figures, Tabular Figures, Fractions, Stylistic Sets, Swashes and others, in any of the family’s styles |
@@ -209,12 +210,10 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Language | is supported, isn’t supported | A language, chosen from a searchable list that starts with yours |
 | Coverage | includes, doesn’t include | Any built-in set or one of your coverage sets |
 | Date Added | is in the last, isn’t in the last | A number of days |
-| Times Activated | is, is more than, is less than | A number of times |
-| Last Activated | is in the last, isn’t in the last | A number of days |
 
 A smart set with a language or coverage rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
 
-**Times Activated** and **Last Activated** count from the version of Cicero that added them. Each time a family comes on, Cicero counts it: whether you turned it on, an application set or a document did, or another app or the Finder did, like a font you put in your Fonts folder, while Cicero is open or by the time it next opens. Fonts that come with macOS aren’t counted. A family that hasn’t come on since then has been activated 0 times, and wasn’t activated in the last however many days. To find the fonts you haven’t used for a year, make a smart set with **Last Activated** **isn’t in the last** 365 days.
+Smart sets with a **Times Activated** or **Last Activated** rule, made with an earlier version of Cicero or [imported from FontExplorer X](getting-started.md#fontexplorer-x), keep it, though new rules no longer offer them.
 
 ## Tags
 
@@ -257,7 +256,7 @@ A rated family shows its stars in the grid and specimens. To see ratings in the 
 
 Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type, pressing Return for a new line; Cicero saves it as you go. Delete the text to take the note away.
 
-A family with a note has a small note symbol next to its name in the grid and specimens; hold the pointer over it to read the note. Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
+A family with a note has a small note symbol next to its name in the grid and specimens; hold the pointer over it to read the note. Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or **Has Note** **Yes** for every family with a note and **Has Note** **No** for every family without one.
 
 ## Foundries
 

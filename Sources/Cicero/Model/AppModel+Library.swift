@@ -344,7 +344,7 @@ extension AppModel {
             let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
             return compare { tagged.contains($0.id) }
         case .note:
-            // Without text: whether the family has a note at all.
+            // Without text: whether the family has a note at all, as Has Note says, for sets made before there was one.
             let lower = value.lowercased()
             let notes = data.familyNotes.mapValues { $0.lowercased() }
             let contains = rule.comparison != .doesNotContain
@@ -352,6 +352,9 @@ extension AppModel {
                 guard let note = notes[family.id] else { return !contains }
                 return (lower.isEmpty || note.contains(lower)) == contains
             }
+        case .hasNote:
+            let noted = data.familyNotes
+            return compare { noted[$0.id] != nil }
         case .rating:
             // No rating is 0 stars.
             let ratings = data.familyRatings
