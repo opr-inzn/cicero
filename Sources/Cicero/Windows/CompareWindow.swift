@@ -254,33 +254,31 @@ private struct CompareSample: Identifiable {
     }
 }
 
-/// One row per font; every row's baseline sits at the same offset, so the samples line up. Dragging a row
-/// changes the order.
+/// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
+/// fonts that reach further join or leave below it. Dragging a row changes the order.
 private struct StackedLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        let ascent = samples.map(\.line.ascent).max() ?? 0
-        let descent = samples.map(\.line.descent).max() ?? 0
         let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
-            row(sample, ascent: ascent, descent: descent, overhang: overhang, width: width)
+            row(sample, overhang: overhang, width: width)
         } lifted: { sample in
             // Opaque, so the rows it passes don't show through.
-            row(sample, ascent: ascent, descent: descent, overhang: overhang, width: width)
+            row(sample, overhang: overhang, width: width)
                 .background { Color.canvas.padding(-8) }
         }
     }
 
-    private func row(_ sample: CompareSample, ascent: CGFloat, descent: CGFloat, overhang: CGFloat, width: CGFloat) -> some View {
+    private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.primary.resolve(in: context.environment).cgColor
-                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
+                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: sample.line.ascent), color: color) }
             }
-            .frame(width: overhang + width, height: ascent + descent)
+            .frame(width: overhang + width, height: sample.line.ascent + sample.line.descent)
             .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
