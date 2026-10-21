@@ -96,59 +96,6 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
             return .punctuationAndSymbols
         }
     }
-
-    /// The order a type designer would list these groups' characters in, rather than where Unicode put them. For
-    /// punctuation and symbols: the stops, then slashes and bars, brackets, dashes, quotes, then the signs, with those
-    /// for units, like Ω for ohms, after ℮.
-    private static let orders: [GlyphGroup: [UInt32: Int]] = [
-        .punctuationAndSymbols: ".,:;\u{2026}!\u{A1}?\u{BF}\u{203D}\u{B7}\u{2022}*#/\\|\u{A6}()[]{}\u{2329}\u{232A}\u{27E8}\u{27E9}-\u{AD}\u{2010}\u{2011}\u{2012}\u{2013}\u{2014}\u{2015}_'\"\u{2018}\u{2019}\u{201A}\u{201B}\u{201C}\u{201D}\u{201E}\u{201F}\u{2039}\u{203A}\u{AB}\u{BB}\u{2032}\u{2033}@&\u{B6}\u{A7}\u{A9}\u{AE}\u{2117}\u{2122}\u{B0}\u{2020}\u{2021}%\u{2030}\u{2031}\u{212E}\u{2126}\u{2127}\u{212A}\u{212B}^`",
-        .mathematicalOperators: "+\u{2212}\u{B1}\u{D7}\u{F7}=\u{2260}\u{2248}~\u{223C}<>\u{2264}\u{2265}\u{AC}\u{2215}\u{2219}\u{221E}\u{221A}\u{2202}\u{2206}\u{220F}\u{2211}\u{222B}\u{2205}\u{2227}\u{2228}\u{2229}\u{222A}\u{2208}\u{2209}\u{2200}\u{2203}\u{25CA}",
-        .currency: "$\u{20AC}\u{A3}\u{A5}\u{A2}\u{20B9}\u{20BD}\u{20A9}\u{20BA}\u{20B4}\u{20AA}\u{20AB}\u{20A6}\u{20B1}\u{20BF}\u{E3F}\u{20A1}\u{20B5}\u{20B8}\u{20AE}\u{A4}",
-    ].mapValues { list in
-        Dictionary(list.unicodeScalars.enumerated().map { ($1.value, $0) }, uniquingKeysWith: { first, _ in first })
-    }
-
-    /// Where a character goes in such a group: its place in the order, else after those, by kind, then code point.
-    public static func order(of value: UInt32, in group: GlyphGroup) -> [Int] {
-        if let index = orders[group]?[value] { return [0, index] }
-        let kind: Int = switch Unicode.Scalar(value)?.properties.generalCategory {
-        case .otherPunctuation: 1
-        case .openPunctuation, .closePunctuation: 2
-        case .dashPunctuation, .connectorPunctuation: 3
-        case .initialPunctuation, .finalPunctuation: 4
-        case .otherSymbol: 5
-        default: 6
-        }
-        return [kind, Int(value)]
-    }
-
-    /// Where a character goes in the Greek group: capitals, then small letters, each in the alphabet's order with the
-    /// accented ones after the letter they're made from (Α Ά Ἀ …, then α ά ἀ …), and the letters outside the 24, like
-    /// the archaic ϝ or the symbol form ϑ, after those; then the accents and signs, like ΄, then the punctuation, like ;.
-    static func greekOrder(of value: UInt32) -> [Int] {
-        let kind: Int = switch Unicode.Scalar(value)?.properties.generalCategory {
-        case .uppercaseLetter, .titlecaseLetter: 0
-        case .lowercaseLetter: 1
-        case .otherPunctuation: 3
-        default: 2
-        }
-        guard kind < 2 else { return [kind, Int(value)] }
-        let base = base(of: value)
-        let inAlphabet = 0x391...0x3A9 ~= base || 0x3B1...0x3C9 ~= base
-        return [kind, inAlphabet ? 0 : 1, Int(base), base == value ? 0 : 1, Int(value)]
-    }
-
-    /// The letter an accented one is made from, for listing Á, Â and Ä together: its decomposition's first character,
-    /// else the letter its name says it is ("O" in LATIN CAPITAL LETTER O WITH STROKE).
-    static func base(of value: UInt32) -> UInt32 {
-        guard let scalar = Unicode.Scalar(value) else { return value }
-        let decomposed = String(Character(scalar)).decomposedStringWithCanonicalMapping.unicodeScalars
-        if decomposed.count > 1, let first = decomposed.first { return first.value }
-        guard let name = scalar.properties.name, let letter = name.range(of: "LETTER "), let with = name.range(of: " WITH ") else { return value }
-        let base = name[letter.upperBound..<with.lowerBound]
-        guard base.count == 1, let character = base.unicodeScalars.first else { return value }
-        return name.contains("SMALL") ? Character(character).lowercased().unicodeScalars.first!.value : character.value
-    }
 }
 
 /// A cell of the font page's glyph grid: a character, a glyph a feature draws for one in a group of its own, like a
@@ -176,10 +123,9 @@ public struct GlyphSection: Identifiable, Sendable {
     /// Keeps the grid usable for fonts with tens of thousands of CJK characters: as many from each Unicode block.
     public static let limit = 6000
 
-    /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order: in code point
-    /// order within a group, but accented letters by the letter they're made from. Characters `isEmpty` says the font
-    /// draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very large fonts to a sensible number of
-    /// characters from each Unicode block.
+    /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
+    /// point order within a group. Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see
+    /// `EmptyGlyphs`). Limits very large fonts to a sensible number of characters from each Unicode block.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [],
                                 leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
         var buckets: [GlyphGroup: [UInt32]] = [:]
@@ -193,27 +139,6 @@ public struct GlyphSection: Identifiable, Sendable {
                 buckets[group, default: []].append(value)
             }
         }
-        for group in [GlyphGroup.uppercaseAccents, .lowercaseAccents] {
-            buckets[group] = buckets[group]?.map { (GlyphGroup.base(of: $0), $0) }.sorted { $0 < $1 }.map(\.1)
-        }
-        buckets[.greek] = buckets[.greek]?.sorted { GlyphGroup.greekOrder(of: $0).lexicographicallyPrecedes(GlyphGroup.greekOrder(of: $1)) }
-        // By value rather than where Unicode put them (¹²³ in Latin-1, the rest in their own block), the fraction slash
-        // first; letters, which have none, after.
-        for group in [GlyphGroup.superscripts, .subscripts, .fractions] {
-            buckets[group] = buckets[group]?.sorted { left, right in
-                let a = Self.value(of: left), b = Self.value(of: right)
-                return a != b ? a < b : left < right
-            }
-            if group == .fractions, var list = buckets[group], let slash = list.firstIndex(of: 0x2044) {
-                list.insert(list.remove(at: slash), at: 0)
-                buckets[group] = list
-            }
-        }
-        for group in [GlyphGroup.punctuationAndSymbols, .mathematicalOperators, .currency] {
-            buckets[group] = buckets[group]?.sorted {
-                GlyphGroup.order(of: $0, in: group).lexicographicallyPrecedes(GlyphGroup.order(of: $1, in: group))
-            }
-        }
         let glyphs = Dictionary(grouping: features, by: \.group)
         return GlyphGroup.allCases.compactMap { group in
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
@@ -224,7 +149,7 @@ public struct GlyphSection: Identifiable, Sendable {
     /// The section's cells in runs, each starting a row of its own, with `alternates` giving a character's: in most
     /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
     /// ones, then old-style ones, whichever the font's own are, then their other alternates, like a slashed zero, then
-    /// the signs a feature draws to go with them, in the order of their own groups: a tabular percent, then a dollar.
+    /// the signs a feature draws to go with them, by their own groups, then code point: a tabular percent, then a dollar.
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
         guard group == .proportionalFigures || group == .tabularFigures else {
             return [scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) } + glyphs.map(GlyphCell.feature)]
@@ -252,16 +177,11 @@ public struct GlyphSection: Identifiable, Sendable {
         runs[.signs] = runs[.signs]?.sorted { left, right in
             func place(_ cell: GlyphCell) -> [Int] {
                 guard case .feature(let glyph) = cell, let group = GlyphGroup.of(glyph.character) else { return [Int.max] }
-                return [group.rawValue] + GlyphGroup.order(of: glyph.character, in: group)
+                return [group.rawValue, Int(glyph.character)]
             }
             return place(left).lexicographicallyPrecedes(place(right))
         }
         return Run.allCases.compactMap { runs[$0] }
-    }
-
-    /// A character's numeric value, for sorting; letters, which have none, after.
-    private static func value(of scalar: UInt32) -> Double {
-        Unicode.Scalar(scalar)?.properties.numericValue ?? .infinity
     }
 
     /// The Unicode name, e.g. "LATIN SMALL LETTER A WITH ACUTE".
