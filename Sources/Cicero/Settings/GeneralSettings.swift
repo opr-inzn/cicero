@@ -89,13 +89,7 @@ struct GeneralSettings: View {
                     Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
-                    HStack(spacing: 6) {
-                        Text("Classify fonts automatically")
-                        Tag(text: "On-device Intelligence", tint: .purple)
-                            .help(ClassificationGuesser.readsNames
-                                  ? "Cicero’s own model reads the letters, and Apple Intelligence the names, on this Mac. Nothing is sent."
-                                  : "Cicero’s own model reads the letters, on this Mac. Nothing is sent.")
-                    }
+                    Text("Classify fonts automatically")
                     Text(guessingExplanation)
                 }
             }
