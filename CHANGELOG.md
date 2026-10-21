@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Smart sets have a **Has Note** rule, **Yes** for every family with a note or **No** for every family without one. Before, you left the text of a **Note** rule empty.
 - New smart set rules no longer offer **Times Activated** and **Last Activated**. Smart sets that have them keep them.
 - In a smart set’s rules, numbers go in a box without arrows, and **Number of Styles** no longer says “styles” after its number. Text goes in a box too.
+- A smart set’s **Kind** rule says **Italic** in place of **Has Italics**.
 
 ## 1.9.3
 

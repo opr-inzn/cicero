@@ -261,7 +261,7 @@ private struct RuleRow: View {
         switch value {
         case "variable": "Variable"
         case "monospaced": "Monospaced"
-        default: "Has Italics"
+        default: "Italic"
         }
     }
 }
