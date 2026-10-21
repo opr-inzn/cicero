@@ -1,6 +1,6 @@
 # Cicero Help
 
-Cicero is a font manager for macOS 26 on Apple silicon. It shows every font on your Mac and in the folders you add, lets you try them out, and turns them on only when you need them.
+Cicero is a font manager for macOS 15 and later on Apple silicon. It shows every font on your Mac and in the folders you add, lets you try them out, and turns them on only when you need them.
 
 New to Cicero? Start with [Getting started](getting-started.md). To open this guide from the app, choose **Help → Cicero Help**.
 

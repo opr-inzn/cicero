@@ -38,7 +38,7 @@ struct BrowserView: View {
                 OnlineOnlyBar(folderID: id)
             }
         }
-        .safeAreaBar(edge: .top, spacing: 0) {
+        .topBar {
             if let id = model.similarFamilyID {
                 SimilarBar(familyID: id)
             }
@@ -105,7 +105,7 @@ private struct ScanCapsule: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .glassEffect(.regular, in: .capsule)
+            .glass(in: .capsule)
             .padding(16)
         }
     }

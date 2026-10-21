@@ -82,6 +82,7 @@ private struct SidebarContent: View {
         } header: {
             header
         }
+        .notCollapsible()
         ForEach(model.sections) { section in
             if editing || model.isVisible(section.key) {
                 let groups = section == .characterSets ? model.characterSetGroups : []
@@ -103,6 +104,7 @@ private struct SidebarContent: View {
                 } header: {
                     sectionHeader(section)
                 }
+                .notCollapsible()
             }
         }
     }
@@ -151,23 +153,10 @@ private struct SidebarContent: View {
                             RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.horizontal, -6)
                         }
                     }
-                    .draggable(beginDrag(of: group.id))
-                    // A move, not the default copy, so the pointer doesn't get a green plus.
-                    .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
-                                                         operationsOutsideApp: .init(allowCopy: false)))
-                    .dropDestination(for: GroupDrag.self) { drags, _ in
-                        guard let dragged = drags.first?.group, dragged != group.id else { return }
+                    .modifier(GroupDragSource { beginDrag(of: group.id) })
+                    .modifier(GroupDrop(group: group.id, dragged: draggedGroup, target: $groupDropTarget) { dragged in
                         withAnimation(.snappy) { move(dragged, onto: group.id) }
-                    }
-                    .dropConfiguration { _ in DropConfiguration(operation: draggedGroup == group.id ? .forbidden : .move) }
-                    .onDropSessionUpdated { session in
-                        switch session.phase {
-                        case .entering, .active:
-                            if draggedGroup != group.id { groupDropTarget = group.id }
-                        default:
-                            if groupDropTarget == group.id { groupDropTarget = nil }
-                        }
-                    }
+                    })
             }
         }
     }
@@ -290,15 +279,15 @@ private struct SidebarContent: View {
         // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
             content
-                .dropDestination(for: FontDrag.self) { drags, _ in
+                .drops(of: FontDrag.self, isOver: { isOver in
+                    if isOver {
+                        highlight.dropTarget = row.item
+                    } else if highlight.dropTarget == row.item {
+                        highlight.dropTarget = nil
+                    }
+                }) { drags in
                     highlight.dropTarget = nil
                     _ = model.handleDrop(drags, on: row.item)
-                }
-                .onDropSessionUpdated { session in
-                    switch session.phase {
-                    case .entering, .active: highlight.dropTarget = row.item
-                    default: if highlight.dropTarget == row.item { highlight.dropTarget = nil }
-                    }
                 }
         } else {
             content
@@ -503,6 +492,84 @@ private nonisolated struct GroupDrag: Codable, Transferable {
 private extension UTType {
     /// Declared in Info.plist.
     nonisolated static let ciceroSidebarGroup = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-group")
+}
+
+/// Makes a group's title draggable. On macOS 15 a title dragged with `draggable` never left the list.
+private struct GroupDragSource: ViewModifier {
+    /// Made as the drag starts.
+    let payload: () -> GroupDrag
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.draggable(payload())
+        } else {
+            content.onDrag {
+                let provider = NSItemProvider()
+                provider.register(payload())
+                return provider
+            }
+        }
+    }
+}
+
+/// Makes a group's title take another group's title dropped onto it, lit up while one is over it. A move, not the
+/// default copy, so the pointer doesn't get a green plus, and forbidden onto the dragged group's own title.
+private struct GroupDrop: ViewModifier {
+    let group: String
+    /// The group being dragged (see `beginDrag(of:)`).
+    let dragged: String?
+    @Binding var target: String?
+    let move: (String) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
+                                                     operationsOutsideApp: .init(allowCopy: false)))
+                .dropDestination(for: GroupDrag.self) { drags, _ in
+                    guard let dragged = drags.first?.group, dragged != group else { return }
+                    move(dragged)
+                }
+                .dropConfiguration { _ in DropConfiguration(operation: dragged == group ? .forbidden : .move) }
+                .onDropSessionUpdated { session in
+                    switch session.phase {
+                    case .entering, .active:
+                        if dragged != group { target = group }
+                    default:
+                        if target == group { target = nil }
+                    }
+                }
+        } else {
+            // macOS 15 has no drop configurations; a delegate proposes the operation instead.
+            content.onDrop(of: [.ciceroSidebarGroup], delegate: Delegate(group: group, dragged: dragged, target: $target, move: move))
+        }
+    }
+
+    private struct Delegate: DropDelegate {
+        let group: String
+        let dragged: String?
+        @Binding var target: String?
+        let move: (String) -> Void
+
+        func dropUpdated(info: DropInfo) -> DropProposal? {
+            DropProposal(operation: dragged == group ? .forbidden : .move)
+        }
+
+        func dropEntered(info: DropInfo) {
+            if dragged != group { target = group }
+        }
+
+        func dropExited(info: DropInfo) {
+            if target == group { target = nil }
+        }
+
+        func performDrop(info: DropInfo) -> Bool {
+            if target == group { target = nil }
+            guard let dragged, dragged != group else { return false }
+            move(dragged)
+            return true
+        }
+    }
 }
 
 /// Makes the list open a gap where dragged rows will land, the rows around it sliding apart as in Finder's

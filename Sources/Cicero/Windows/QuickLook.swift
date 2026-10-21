@@ -347,7 +347,7 @@ private struct FamilyQuickLook: View {
         .font(.callout)
         .padding(.horizontal, 14)
         .frame(height: 36)
-        .glassEffect(.regular, in: .capsule)
+        .glass(in: .capsule)
         .padding(12)
     }
 
@@ -380,7 +380,7 @@ private struct QuickLookText: View {
     var variations: [String: Double] = [:]
     var kerning: Double = 0
     var lineLimit: Int? = 1
-    var lineHeight: AttributedString.LineHeight?
+    var lineHeight: Double?
     @State private var readPath: String?
 
     var body: some View {
@@ -391,7 +391,7 @@ private struct QuickLookText: View {
             Text(text)
                 .font(.system(size: size))
                 .lineLimit(lineLimit)
-                .lineHeight(lineHeight)
+                .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
                 .hidden()
                 .task(id: face.id) {
                     let (face, size, weight, variations) = (face, size, weight, variations)

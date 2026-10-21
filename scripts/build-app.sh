@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # SwiftPM's build system links without telling clang which SDK it is, so the app would say it was built
-# with the SDK of its deployment target (26), and a newer macOS would give it that release's look and
+# with the SDK of its deployment target (15), and a newer macOS would give it that release's look and
 # behaviour. Hand the SDK to the link step too.
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 BUILD=(swift build -c release --arch arm64 -Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$SDK")
@@ -44,7 +44,7 @@ xcrun coremlcompiler compile Resources/LetterEmbedding.mlpackage "$APP/Contents/
 # actool runs through a helper process, so it needs absolute paths.
 PARTIAL="$(mktemp -d)/partial.plist"
 xcrun actool "$PWD/Resources/AppIcon.icon" --compile "$PWD/$APP/Contents/Resources" \
-    --platform macosx --minimum-deployment-target 26.0 --app-icon AppIcon \
+    --platform macosx --minimum-deployment-target 15.0 --app-icon AppIcon \
     --output-partial-info-plist "$PARTIAL" >/dev/null
 
 IDENTITY="${SIGN_IDENTITY:--}"

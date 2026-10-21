@@ -31,13 +31,30 @@ final class ClassificationGuesser {
         guesses = saved?.version == Self.version ? saved!.guesses : [:]
     }
 
-    static var availability: SystemLanguageModel.Availability { SystemLanguageModel.default.availability }
+    /// Whether the model can answer. macOS 15 has none that apps can ask.
+    enum Availability { case available, notEnabled, notReady, unavailable }
+
+    /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
+    static var availability: Availability {
+        guard #available(macOS 26, *) else { return .unavailable }
+        return switch SystemLanguageModel.default.availability {
+        case .available: .available
+        case .unavailable(.appleIntelligenceNotEnabled): .notEnabled
+        case .unavailable(.modelNotReady): .notReady
+        case .unavailable: .unavailable
+        }
+    }
+
+    /// Whether this Mac's macOS has a model to tell from names at all, Apple Intelligence on or not.
+    static var readsNames: Bool {
+        if #available(macOS 26, *) { true } else { false }
+    }
 
     /// Asks about the families that have no guess yet, in place of any it hasn't got to. `found` is called as
     /// guesses come, a few at a time.
     func guess(_ families: [Family], found: @escaping () -> Void) {
         pending = families.filter { guesses[$0.id] == nil && !failed.contains($0.id) }.map(Question.init)
-        guard task == nil, !pending.isEmpty, case .available = Self.availability else { return }
+        guard task == nil, !pending.isEmpty, Self.availability == .available else { return }
         task = Task { [weak self] in await self?.work(found: found) }
     }
 
@@ -52,6 +69,8 @@ final class ClassificationGuesser {
     }
 
     private func work(found: @escaping () -> Void) async {
+        // Never started on macOS 15 (see `availability`).
+        guard #available(macOS 26, *) else { return }
         var reported = ContinuousClock.now
         var changed = false
         func report() {
@@ -116,6 +135,7 @@ final class ClassificationGuesser {
         }
     }
 
+    @available(macOS 26, *)
     @Generable
     nonisolated enum Kind {
         case serif, sansSerif, monospaced, script, ornamental, symbol, unknown
@@ -156,6 +176,7 @@ final class ClassificationGuesser {
         Answer unknown rather than guess.
         """
 
+    @available(macOS 26, *)
     private static func ask(_ question: Question) async -> Outcome {
         let session = LanguageModelSession(model: .default, instructions: instructions)
         do {

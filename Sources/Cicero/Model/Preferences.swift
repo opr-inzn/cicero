@@ -52,9 +52,9 @@ final class PreviewSettings {
         size * tracking / 100
     }
 
-    /// The distance from one line's baseline to the next at a size.
-    func lineHeight(at size: Double) -> AttributedString.LineHeight {
-        .exact(points: size * lineSpacing / 100)
+    /// The distance from one line's baseline to the next at a size, in points.
+    func lineHeight(at size: Double) -> Double {
+        size * lineSpacing / 100
     }
 }
 

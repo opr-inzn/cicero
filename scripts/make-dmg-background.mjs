@@ -55,7 +55,7 @@ const page = `<!doctype html>
 <svg class="arrow" width="48" height="12" viewBox="0 0 48 12" fill="none" stroke="#a5a49f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
   <path d="M1 6h45M41 1l5 5-5 5"/>
 </svg>
-<p class="needs">Requires macOS 26 on Apple silicon</p>
+<p class="needs">Requires macOS 15 or later on Apple silicon</p>
 `;
 
 const work = mkdtempSync(join(tmpdir(), "cicero-dmg-background-"));
