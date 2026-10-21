@@ -131,6 +131,7 @@ final class PageContents {
         }
         // The coverage has only the characters the font draws, and those with nothing to draw that it has.
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
+                                             privateUse: GlyphSection.privateUseGroups(in: font, coverage: scalars),
                                              leavingOut: { EmptyGlyphs.isInvisible($0) && empty.contains(character: $0) })
         return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font)
     }

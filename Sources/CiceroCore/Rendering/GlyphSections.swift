@@ -1,3 +1,4 @@
+import CoreText
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
@@ -173,15 +174,16 @@ public struct GlyphSection: Identifiable, Sendable {
     public static let limit = 6000
 
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
-    /// point order within a group. Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see
-    /// `EmptyGlyphs`). Limits very large fonts to a sensible number of characters from each Unicode block.
-    public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [],
+    /// point order within a group; private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
+    /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very
+    /// large fonts to a sensible number of characters from each Unicode block.
+    public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [], privateUse: [UInt32: GlyphGroup] = [:],
                                 leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
         var buckets: [GlyphGroup: [UInt32]] = [:]
         var perBlock: [String: Int] = [:]
         for range in coverage.ranges {
             for value in range {
-                guard let group = GlyphGroup.of(value) else { continue }
+                guard let group = privateUse[value] ?? GlyphGroup.of(value) else { continue }
                 let block = Self.block(of: value) ?? ""
                 guard perBlock[block, default: 0] < limit, !isEmpty(value) else { continue }
                 perBlock[block, default: 0] += 1
@@ -200,6 +202,50 @@ public struct GlyphSection: Identifiable, Sendable {
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
             return scalars.isEmpty && featured.isEmpty ? nil : GlyphSection(group: group, scalars: scalars, glyphs: featured)
         }
+    }
+
+    /// The groups of a font's private-use characters whose glyphs are named after a character, like the uni0E34.alt1 a
+    /// Thai font keeps at U+F701, a sara i shifted left: that character's group, so they're listed with the script
+    /// they're for rather than as Graphical. A name like uni0E34 or u1F600 says the character; another, like the a in
+    /// a.alt, is the name of the glyph the font maps the character to. Those named after nothing, like a foundry's
+    /// logo, aren't given one.
+    public static func privateUseGroups(in font: CTFont, coverage: ScalarRanges) -> [UInt32: GlyphGroup] {
+        var named: [UInt32: String] = [:]
+        for range in coverage.ranges where range.upperBound >= 0xE000 {
+            for value in range where Unicode.Scalar(value)?.properties.generalCategory == .privateUse {
+                guard let glyph = Self.glyph(of: value, in: font), let name = CTFontCopyNameForGlyph(font, glyph) as String?,
+                      let base = name.split(separator: ".").first?.split(separator: "_").first.map(String.init)
+                else { continue }
+                named[value] = base
+            }
+        }
+        guard !named.isEmpty else { return [:] }
+        // The glyphs the base names are names of, and the characters the font maps to those.
+        let glyphs = Dictionary(uniqueKeysWithValues: Set(named.values).map { ($0, CTFontGetGlyphWithName(font, $0 as CFString)) })
+        let characters = LigatureGroup.characterGlyphs(of: font, needed: Set(glyphs.values.filter { $0 != 0 }))
+        return named.compactMapValues { base in
+            guard let character = Self.character(named: base) ?? glyphs[base].flatMap({ characters[$0] }),
+                  let group = GlyphGroup.of(character), group != .graphical
+            else { return nil }
+            return group
+        }
+    }
+
+    private static func glyph(of value: UInt32, in font: CTFont) -> CGGlyph? {
+        guard let scalar = Unicode.Scalar(value) else { return nil }
+        var units = Array(String(Character(scalar)).utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: units.count)
+        return CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count) && glyphs[0] != 0 ? glyphs[0] : nil
+    }
+
+    /// The character a glyph name like uni0E34 or u1F600 says, its first in a ligature's uni0066006C.
+    static func character(named name: String) -> UInt32? {
+        let hex: Substring
+        if name.hasPrefix("uni"), name.count >= 7 { hex = name.dropFirst(3).prefix(4) }
+        else if name.hasPrefix("u"), (5...7).contains(name.count) { hex = name.dropFirst() }
+        else { return nil }
+        guard let value = UInt32(hex, radix: 16), Unicode.Scalar(value)?.properties.generalCategory != .privateUse else { return nil }
+        return value
     }
 
     /// How many of `shown`, some or all of a font's `sections` in their order, come before the ligatures it makes: the

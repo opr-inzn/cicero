@@ -335,16 +335,23 @@ struct GlyphsSection: View {
         .contextMenu { copyMenu(cell, style: style) }
     }
 
-    /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
-    /// its outline instead: set on its own it has nothing to sit on and showed nothing.
+    /// A character set in the font. One that takes no room of its own is drawn from its outline instead: a mark that
+    /// combines with the character before it (an acute, a cedilla), or one a font keeps in private use, like a Thai tone
+    /// mark shifted left, set on its own has nothing to sit on and showed nothing.
     @ViewBuilder
     private func character(_ scalar: UInt32, style: Style, size: CGFloat) -> some View {
-        if Self.isCombining(scalar), let glyph = GlyphVectors.glyph(of: scalar, in: FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)) {
+        let font = FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)
+        if let glyph = GlyphVectors.glyph(of: scalar, in: font), Self.isCombining(scalar) || Self.takesNoRoom(glyph, in: font) {
             GlyphImage(face: style.face, glyph: glyph, size: size, weight: style.weight, variations: style.variations)
         } else {
             FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: style.face, size: size, weight: style.weight,
                      variations: style.variations)
         }
+    }
+
+    private static func takesNoRoom(_ glyph: CGGlyph, in font: CTFont) -> Bool {
+        var glyph = glyph
+        return CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, nil, 1) == 0
     }
 
     private static func isCombining(_ scalar: UInt32) -> Bool {
