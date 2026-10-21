@@ -99,8 +99,9 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 }
 
-/// A size between − and + buttons, for a toolbar capsule. The buttons, ⌘− and ⌘+, step through common sizes,
-/// ⌘= too where + takes ⇧, and the size takes one typed in.
+/// A size between − and + buttons, for a toolbar capsule. The buttons step through common sizes, and the size takes
+/// one typed in. ⌘− and ⌘+ belong to menu items doing the same (Compare's View → Zoom Out and Zoom In): the menu bar
+/// matches a menu item's ⌘+ to the keyboard's own keys, ⌘= on a US keyboard and the + key on a German one.
 struct ToolbarSizeStepper: View {
     @Binding var size: Double
     let range: ClosedRange<Double>
@@ -111,10 +112,9 @@ struct ToolbarSizeStepper: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Button("Smaller", systemImage: "minus", action: smaller)
-                .keyboardShortcut("-", modifiers: .command)
+            Button("Zoom Out", systemImage: "minus") { size = Self.smaller(than: size, in: range) }
                 .disabled(size <= range.lowerBound)
-                .help("Smaller")
+                .help("Zoom Out")
             // As wide as the biggest size, so the stepper keeps its width, with the size in the middle. Grey in a
             // window in the background, as the buttons are: a toolbar greys a field's text, not the unit's.
             Text("\(Int(range.upperBound)) pt")
@@ -129,27 +129,22 @@ struct ToolbarSizeStepper: View {
                 }
                 .monospacedDigit()
                 .padding(.horizontal, 2)
-            Button("Bigger", systemImage: "plus", action: bigger)
-                .keyboardShortcut("+", modifiers: .command)
+            Button("Zoom In", systemImage: "plus") { size = Self.bigger(than: size, in: range) }
                 .disabled(size >= range.upperBound)
-                .help("Bigger")
+                .help("Zoom In")
         }
         .modifier(StepperButtonStyle())
-        .background {
-            Button("Bigger", action: bigger)
-                .keyboardShortcut("=", modifiers: .command)
-                .opacity(0)
-                .accessibilityHidden(true)
-        }
         .fixedSize()
     }
 
-    private func bigger() {
-        size = min(Self.sizes.first { $0 > size } ?? range.upperBound, range.upperBound)
+    /// The next of `sizes` up from `size`, kept to `range`.
+    static func bigger(than size: Double, in range: ClosedRange<Double>) -> Double {
+        min(sizes.first { $0 > size } ?? range.upperBound, range.upperBound)
     }
 
-    private func smaller() {
-        size = max(Self.sizes.last { $0 < size } ?? range.lowerBound, range.lowerBound)
+    /// The next of `sizes` down from `size`, kept to `range`.
+    static func smaller(than size: Double, in range: ClosedRange<Double>) -> Double {
+        max(sizes.last { $0 < size } ?? range.lowerBound, range.lowerBound)
     }
 
     /// `ToolbarButtonStyle` on macOS 26, inside the capsule's glass; on macOS 15, just the symbols, as one control.

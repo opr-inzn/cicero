@@ -12,9 +12,16 @@ enum CompareLayout: String, CaseIterable {
     }
 }
 
+extension FocusedValues {
+    /// Compare's size, for View → Zoom In and Zoom Out while its window is in front.
+    @Entry var compareSize: Binding<Double>?
+}
+
 /// Families next to each other, each in a style of its choosing: one row each on a shared baseline, or drawn over
 /// each other in tints, at a size of the window's own.
 struct CompareWindow: View {
+    static let sizes: ClosedRange<Double> = 8...960
+
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
@@ -71,6 +78,7 @@ struct CompareWindow: View {
             await FontLoader.shared.read(waiting)
             read.formUnion(waiting)
         }
+        .focusedSceneValue(\.compareSize, $size)
         .navigationSubtitle(subtitle(entries.map(\.family)))
         .toolbar {
             ToolbarCapsule { AddFamiliesButton(isPresented: $isAdding) }
@@ -78,7 +86,7 @@ struct CompareWindow: View {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
                               help: "One row per font, or every font over each other")
             }
-            ToolbarCapsule { ToolbarSizeStepper(size: $size, range: 8...960) }
+            ToolbarCapsule { ToolbarSizeStepper(size: $size, range: Self.sizes) }
             ToolbarCapsule { PreviewOptionsButton(showsSize: false) }
         }
     }
