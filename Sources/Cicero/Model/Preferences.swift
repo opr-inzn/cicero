@@ -7,7 +7,7 @@ import SwiftUI
 /// user defaults.
 @Observable
 final class PreviewSettings {
-    static let presets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@", "ÀÉÎÕÜ ñçß øæœ"]
+    static let presets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@"]
     /// What grid tiles show when no sample text is set: capitals, lowercase, a descender and figures.
     static let tileSample = "Aa Gg 123"
 
