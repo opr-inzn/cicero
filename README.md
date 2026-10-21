@@ -53,7 +53,7 @@ If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or 
 
 ## Roadmap
 
-Coming next: **similar styles**, Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones. How it could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **better similar lists**, from a letter model trained on more families and judged on fonts it has never seen, then **similar styles**, Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 
