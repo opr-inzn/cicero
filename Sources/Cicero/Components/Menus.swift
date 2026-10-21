@@ -80,6 +80,11 @@ struct FamilyMenu: View {
                 model.compare(families)
                 openWindow(id: WindowID.compare)
             }
+        } else {
+            Button("Add to Compare", systemImage: "rectangle.split.1x2") {
+                _ = model.addToCompare(families.map(\.id))
+                openWindow(id: WindowID.compare)
+            }
         }
         Divider()
 

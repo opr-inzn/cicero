@@ -241,6 +241,20 @@ extension AppModel {
         return Array(sorted.prefix(8))
     }
 
+    /// The families Compare's Add Families lists for what's typed: of every family the library lists, whatever the
+    /// sidebar shows, those the main window's search would find, names that begin with it first, then names with a
+    /// word that does, then the rest, each in the library's order. All of them while nothing's typed.
+    func compareCandidates(for typed: String) -> [Family] {
+        let query = SearchQuery(typed)
+        let listed = library.families.filter(data.lists)
+        guard !query.isEmpty else { return listed }
+        var found = listed.filter(searchMatcher(query))
+        // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
+        if found.isEmpty { found = listed.filter(searchMatcher(query.anywhereInNames)) }
+        let ranks = found.map { query.suggestionRank(of: $0.name.lowercased()) ?? 2 }
+        return (0...2).flatMap { rank in zip(found, ranks).filter { $0.1 == rank }.map(\.0) }
+    }
+
     /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the
     /// user's note, the foundry and classification the family is shown in, a built-in classification by its usual
     /// words too, and its tags.

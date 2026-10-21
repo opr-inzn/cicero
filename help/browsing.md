@@ -205,6 +205,8 @@ The same options apply to every view, font pages and the Compare window, but the
 1. Select two or more families.
 2. Choose **Fonts → Compare** (⌥⌘C), or right-click them and choose **Compare**.
 
+You can also open the Compare window by itself, with **Window → Compare**, or **Fonts → Compare** with no families selected, and pick the fonts there: click **+** in its toolbar (or **Add Families**, while it’s empty), type a name, and click a family or press Return to add it. ↑ and ↓ move to the next family found. Families already there have a checkmark; click one again to take it out. The list has every family in your library, wherever it is and whatever the main window shows, so families far apart are as easy to put together as neighbors.
+
 The Compare window shows them with the preview text, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
 
 - **Stacked:** one row per font, all on the same baseline, with the name and style under each.
@@ -216,4 +218,4 @@ Each font is in the style nearest the weight in Preview Options at first. To com
 
 To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
 
-To add fonts, drag families from the main window into the Compare window. To take one out, click its remove button. Choosing **Compare** again starts over with the new selection.
+To add fonts, drag families from the main window into the Compare window, or select one family and choose **Fonts → Compare**, or right-click it and choose **Add to Compare**: it joins the fonts already there. To take one out, click its remove button. Choosing **Compare** with several families selected starts over with them.

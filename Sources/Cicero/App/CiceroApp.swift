@@ -50,7 +50,6 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 960, height: 640)
         .restorationBehavior(.disabled)
-        .commandsRemoved()
         .handlesExternalEvents(matching: [])
 
         Settings {
@@ -129,12 +128,13 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(selection.isEmpty)
             Divider()
+            // Several families start over; one joins those there, so families far apart in the library can be put
+            // together one by one; none just opens the window.
             Button("Compare", systemImage: "rectangle.split.1x2") {
-                model.compare(selection)
+                if selection.count > 1 { model.compare(selection) } else { _ = model.addToCompare(selection.map(\.id)) }
                 openWindow(id: WindowID.compare)
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
-            .disabled(selection.count < 2)
             Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: selection[0]) }
                 .disabled(selection.count != 1 || !model.canShowSimilar(selection[0]))
             Button("Character Toolbox", systemImage: "character.textbox") { openWindow(id: WindowID.toolbox) }

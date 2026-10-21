@@ -20,7 +20,7 @@
 | ⌘I | **Fonts → Show Info** |
 | ⇧⌘R | **Fonts → Reveal in Finder** |
 | ⌘⌫ | **Fonts → Move to Trash** |
-| ⌥⌘C | **Fonts → Compare** (two or more families selected) |
+| ⌥⌘C | **Fonts → Compare**: several families selected start over, one joins the others, none just opens the window |
 | ⌥⌘T | **Fonts → Character Toolbox** |
 | ⌘R | **Fonts → Rescan Library** |
 | ⌘? | **Help → Cicero Help** |
@@ -60,6 +60,14 @@ While you type in a text field, like the search field, the preview text or a fon
 | --- | --- |
 | ⌘+ | Makes the fonts bigger |
 | ⌘− | Makes them smaller |
+
+In **Add Families**:
+
+| Shortcut | Does |
+| --- | --- |
+| ↑ ↓ | Moves to the next or previous family found |
+| ↩ | Adds the family, or takes it out when it has a checkmark |
+| Esc | Closes it |
 
 ## Font pages
 
