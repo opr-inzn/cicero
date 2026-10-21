@@ -41,7 +41,7 @@ When you mark a family [not similar](browsing.md#find-similar-fonts) to the one 
 - Cicero’s version and build number, the version of macOS, and which version of the measurements and the model the numbers come from
 - a random number Cicero made on your Mac, hashed, so that several reports from one Mac count as one person’s
 
-That’s all: not the font files, not pictures of the letters, not your name, your Mac’s name or the rest of your library. The website keeps each report, with the time it arrived but not your IP address, to improve similar fonts. The code that sends it is in [SimilarReports.swift](https://github.com/opr-inzn/cicero/blob/main/Sources/Cicero/App/SimilarReports.swift).
+That’s all: not the font files, not pictures of the letters, not your name, your Mac’s name or the rest of your library. Cicero sends at most 20 reports a day; families you mark after that stay out of your lists all the same, on your Mac. The website keeps each report, with the time it arrived but not your IP address, to improve similar fonts. The code that sends it is in [SimilarReports.swift](https://github.com/opr-inzn/cicero/blob/main/Sources/Cicero/App/SimilarReports.swift).
 
 To stop it, open **Settings → General** and, under **Updates**, turn off **Share usage statistics**, which stops the [usage statistics](#usage-statistics) too. Marking a family not similar then only takes it out of the list, on your Mac: Cicero sends nothing, and forgets the random number.
 

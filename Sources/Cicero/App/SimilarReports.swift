@@ -6,9 +6,16 @@ import Foundation
 /// fonts, while Settings → General → Share usage statistics is on (it is at first; `UsageStatistics.isOn`). Without it, a
 /// mark stays on the Mac, in the user's data. Each report once; one that fails isn't sent again. With it, a hash of a
 /// random ID Cicero keeps for this Mac, its own rather than the usage statistics', so that each Mac's reports count as one
-/// person's. Turning the statistics off forgets it, so turning them on again starts a new one.
+/// person's. Turning the statistics off forgets it, so turning them on again starts a new one. At most `dailyLimit` a
+/// day, so that no one Mac uses up what the website may keep in a month.
 enum SimilarReports {
     private static let idKey = "similarReports.id"
+    /// The day reports were last sent ("2026-10-21", the Mac's own), and how many that day.
+    private static let dayKey = "similarReports.day"
+    private static let countKey = "similarReports.count"
+
+    /// How many reports a day one Mac sends at most; the marks past it stay on the Mac, in the user's data.
+    static let dailyLimit = 20
     private nonisolated static let url = URL(string: "https://cicero.maximilianinzinger.com/api/similar-reports")!
 
     /// A report of these families from this list, ready to send; nil while usage statistics are off, and from a binary
@@ -27,7 +34,9 @@ enum SimilarReports {
                              test: false, shownIn: shownIn, family: family, notSimilar: notSimilar, list: list)
     }
 
+    /// Sends the report, unless today's `dailyLimit` is used up.
     static func send(_ report: SimilarReport) {
+        guard countToday() else { return }
         DispatchQueue.global(qos: .utility).async {
             var report = report
             report.test = UsageStatistics.isTestBuild
@@ -42,8 +51,19 @@ enum SimilarReports {
         }
     }
 
+    /// Counts a report as today's: false, counting nothing, when today's `dailyLimit` is used up.
+    private static func countToday() -> Bool {
+        let defaults = UserDefaults.standard
+        let today = ISO8601DateFormatter.string(from: .now, timeZone: .current, formatOptions: .withFullDate)
+        let sent = defaults.string(forKey: dayKey) == today ? defaults.integer(forKey: countKey) : 0
+        guard sent < dailyLimit else { return false }
+        defaults.set(today, forKey: dayKey)
+        defaults.set(sent + 1, forKey: countKey)
+        return true
+    }
+
     /// When the user turns usage statistics off.
     static func forgetID() {
-        UserDefaults.standard.removeObject(forKey: idKey)
+        for key in [idKey, dayKey, countKey] { UserDefaults.standard.removeObject(forKey: key) }
     }
 }
