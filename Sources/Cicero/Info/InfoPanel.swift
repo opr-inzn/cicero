@@ -218,7 +218,7 @@ private struct ClassificationRow: View {
             }
             Text(model.classificationName(of: family)).font(.callout)
             if model.data.classificationOverrides[family.id] == nil, let guess = model.guessedClassification(of: family) {
-                Text(guess.source == .name ? "Guessed from the name by Apple Intelligence" : "Guessed from the shapes of its letters")
+                Text(guess.source == .name ? "Recognized from its name by Apple Intelligence" : "Recognized from the shapes of its letters")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
