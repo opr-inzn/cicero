@@ -28,7 +28,7 @@ struct GeneralSettings: View {
             Section("Installation") {
                 Toggle(isOn: $model.data.installsIntoFontLibrary) {
                     Text("Keep installed fonts in Cicero’s Font Library")
-                    Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library.")
+                    Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library. Microsoft Office can’t use fonts from the library.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
@@ -169,7 +169,7 @@ struct GeneralSettings: View {
         case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
         case .copy: "Copying duplicates font files into \(place)."
         case .move: "Moving puts font files into \(place); the folders they were in stay."
-        case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves."
+        case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves. Microsoft Office can’t use them."
         }
     }
 }

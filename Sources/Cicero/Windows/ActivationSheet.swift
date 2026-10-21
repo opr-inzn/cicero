@@ -24,7 +24,7 @@ struct ActivationSheet: View {
                            detail: "Moves the files you added into \(model.installPlace). The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",
-                       detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working.") { choose(.inPlace) }
+                       detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working. Microsoft Office can’t use them.") { choose(.inPlace) }
             }
             // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
