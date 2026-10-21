@@ -212,7 +212,7 @@ The Compare window shows them with the preview text, weight and spacing from Pre
 - **Stacked:** one row per font, each starting at the same place, with the name and style under each. A row is as tall as its font needs, so the rows above stay where they are as you add or take out fonts.
 - **Overlay:** every font drawn over the others in its own color, on a shared baseline, with their names below. The last one is drawn on top.
 
-The Compare window has a size of its own, from 24 to 720 pt, 72 pt at first, so you can look at the fonts up close without changing the previews in the main window. Click **−** or **+** in the toolbar, or choose **View → Zoom Out** or **Zoom In** (⌘− and ⌘+), to go to the next smaller or bigger common size, like 96, 120 or 144 pt, or click the size and type one.
+The Compare window has a size of its own, from 24 to 720 pt, 72 pt at first, so you can look at the fonts up close without changing the previews in the main window. Set it with **Size** in the Compare window’s **Preview Options**, or choose **View → Zoom Out** or **Zoom In** (⌘− and ⌘+) to go to the next smaller or bigger common size, like 96, 120 or 144 pt.
 
 Each font is in the style nearest the weight in Preview Options at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to following the weight. **Compare Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
 
