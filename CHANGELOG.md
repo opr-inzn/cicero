@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- In **Preview Options**, the preview text field spans the whole width, with “Preview Text” in it while it’s empty, in place of a label beside it.
+
 ## 1.9.1
 
 - The first time Cicero opens, the sidebar’s **Coverage** starts closed, like **Foundries**, so its many character sets don’t fill a new sidebar, and **Classifications** starts open. Click a section’s title to open or close it.
