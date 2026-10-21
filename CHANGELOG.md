@@ -16,6 +16,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Search looks in the names of a family’s styles too, like Condensed Bold, and in the name you gave a foundry.
 - A family with a style of ornaments, like Hoefler Text, is previewed in its Regular and classified by its letters. Hoefler Text’s Ornaments style used to stand for the family, so its previews showed ornaments, it was classified Symbol, and its coverage and similar fonts were its ornaments’.
 - **Settings → General** says that Microsoft Office can’t use fonts left where they are or kept in the Font Library. Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, and only from the second time they open after a font went on. [Fonts in Microsoft Office](help/activating.md#fonts-in-microsoft-office) has the details.
+- When you type to jump to a family, a space waits longer for the next letter of the name, as in Times New Roman, before it opens Quick Look. It used to open Quick Look a fifth of a second after the space, before many a next letter came. Where no family’s name goes on with a space, the space opens Quick Look at once.
 
 ## 1.8.2
 
