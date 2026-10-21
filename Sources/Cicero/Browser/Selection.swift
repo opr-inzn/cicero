@@ -294,7 +294,9 @@ struct FamilyItem: ViewModifier {
                 FamilyMenu(families: model.targets(for: family), model: model, similarTo: model.similarFamilyID.flatMap(model.family))
             }
             // The whole selection when the family is part of it, as for the menu.
-            .draggable(FontDrag(families: model.targets(for: family).map(\.id)))
+            .fontDrag { FontDrag(families: model.targets(for: family).map(\.id)) } preview: {
+                FamilyDragPreview(family: family, count: model.targets(for: family).count)
+            }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.openFamilyID = family.id }

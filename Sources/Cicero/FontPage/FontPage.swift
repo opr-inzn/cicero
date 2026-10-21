@@ -343,7 +343,7 @@ private struct StyleRows: View {
                 .contentShape(.rect)
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
                 // Onto a set in the sidebar, which takes just this style.
-                .draggable(FontDrag(family: family.id, style: style.face.postScriptName)) {
+                .fontDrag { FontDrag(family: family.id, style: style.face.postScriptName) } preview: {
                     FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20, weight: style.face.styleWeight)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)

@@ -78,6 +78,12 @@ capsule on every side, that slides to the next one chosen.
 - Dropping family names (drag from the browser or the Character Toolbox; dragging one of several selected families drags them
   all, as their menu acts on all of them) onto a set, tag, foundry or classification adds them; the
   row they're over is drawn in the accent colour with white title and symbol (a status's dot keeps its colour).
+  Drags are AppKit's (`FontDragSource`, started from a drag gesture): what's dragged is a small label at the pointer,
+  "Aa" in the family's regular style and its name, with a red count when it's several, or a style row's name in that
+  style. Drops land on AppKit views behind the rows and the Compare window (`FontDropTarget`), which leave clicks to
+  the rows, so the label goes the moment it's dropped, as in the Finder. With SwiftUI's draggable the dragged item had
+  the whole card's frame, and on macOS 26 the label slid to that frame's corner after a drop; SwiftUI's drop
+  destination also held it up a third of a second longer.
 - The list draws no selection (`selectionHighlightStyle = .none`): a selected row has its title and symbol in the accent
   colour on a light grey rounded fill, whether or not the list has focus (`SidebarHighlight`).
 - Creating a set, tag, classification or coverage set un-hides its section.

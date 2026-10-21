@@ -279,16 +279,16 @@ private struct SidebarContent: View {
         // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
             content
-                .drops(of: FontDrag.self, isOver: { isOver in
+                .background(FontDropTarget(isOver: { isOver in
                     if isOver {
-                        highlight.dropTarget = row.item
+                        if highlight.dropTarget != row.item { highlight.dropTarget = row.item }
                     } else if highlight.dropTarget == row.item {
                         highlight.dropTarget = nil
                     }
                 }) { drags in
                     highlight.dropTarget = nil
                     _ = model.handleDrop(drags, on: row.item)
-                }
+                })
         } else {
             content
         }
