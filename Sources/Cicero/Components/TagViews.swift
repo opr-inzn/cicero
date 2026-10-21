@@ -16,7 +16,7 @@ extension TagColor {
         }
     }
 
-    /// A light brown between the Finder's colours, for Licensed + Non-Commercial: Licensed's, toned down.
+    /// A light brown between the Finder's colours, Licensed's toned down, that Licensed + Non-Commercial started in.
     private static let sand = Color(nsColor: NSColor(name: "sand") { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0.82, green: 0.75, blue: 0.62, alpha: 1)

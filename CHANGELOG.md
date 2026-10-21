@@ -14,6 +14,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font page’s **Similar** always opens with the six closest, also after **Show All** on another page or when you come back to the same family. **Show All** used to stay on from one page to the next.
 - Invisible characters a font has no glyph for, like the variation selectors of Japanese fonts, no longer show as empty cells in **Glyphs**.
 - Marks that take no room of their own, like the shifted Thai tone marks fonts keep in private use, show in **Glyphs** and their popover. Their cells were empty.
+- Cicero comes with four license tags: **Licensed**, **Unlicensed**, **Open Source** and **Trial**. **Licensed + Non-Commercial**, **Partially Licensed** and **Public Domain** go from your library, once, if you never gave them to a family or used them in a smart set and they still have their colors; the ones you used stay.
 
 ## 1.9.1
 

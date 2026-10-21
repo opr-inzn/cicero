@@ -188,8 +188,9 @@ extension AppModel {
                 var data = restored
                 // This Mac's activation state, merged below.
                 data.records = model.data.records
-                // A backup from before there were license tags gets them, as a library from then does as it loads.
-                data.addLicenseTags()
+                // A backup from before there were license tags gets them, and one from 1.9.1 or before loses the former
+                // ones it never used, as a library from then does as it loads.
+                data.updateLicenseTags()
                 model.data = data
                 model.selection = .all
             }

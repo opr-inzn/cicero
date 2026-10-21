@@ -47,8 +47,9 @@ capsule on every side, that slides to the next one chosen.
     License in 1.5 to 1.5.2, when a family had one at a time; + new tag: the New Tag sheet, a name and a
     row of colour dots, None, the Finder's seven and sand, starting on the first colour no tag has; an empty name
     is the colour's; a name that's taken says so and can't be created). A new library starts with Licensed (green),
-    Licensed + Non-Commercial (sand), Unlicensed (red), Partially Licensed (yellow), Public Domain (purple), Open
-    Source (blue) and Trial (orange). One row per tag in the order they were made, a dot in its colour (a picture,
+    Unlicensed (red), Open Source (blue) and Trial (orange); up to 1.9.1 also Licensed + Non-Commercial (sand),
+    Partially Licensed (yellow) and Public Domain (purple), which a library from then loses once as it loads, each
+    when in its colour, on no family and in no smart set. One row per tag in the order they were made, a dot in its colour (a picture,
     not a tinted symbol, which the list darkened on the accent colour; or tag when it has none). Menu:
     Rename Tag (a name that's taken says so), Color (None, Red, Orange, Yellow, Green, Blue, Purple, Gray,
     Sand; each with its dot, as are tags in a family's Tag menu: `.titleAndIcon`, since menus built

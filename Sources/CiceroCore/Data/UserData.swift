@@ -33,8 +33,11 @@ public struct UserData: Codable, Equatable, Sendable {
     /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
     /// False only for libraries saved before there were license tags (license statuses, as they were in 1.5), which get
-    /// them once as they load (see `addLicenseTags`).
+    /// them once as they load (see `updateLicenseTags`).
     public var licenseStatusesAdded = true
+    /// False only for libraries saved by 1.9.1 or before, which started with `formerLicenseTags` too, and lose them once
+    /// as they load (see `updateLicenseTags`).
+    public var formerLicenseTagsRemoved = true
     /// Family name → foundry, overriding the files' manufacturer.
     public var foundryOverrides: [String: String] = [:]
     /// Manufacturer as the files name it → the name to show.
@@ -79,35 +82,49 @@ public struct UserData: Codable, Equatable, Sendable {
     public static var newLibrary: UserData {
         var data = UserData()
         data.licenseStatusesAdded = false
-        data.addLicenseTags()
+        data.updateLicenseTags()
         return data
     }
 
     /// The tags a library starts with, for keeping track of what may be done with each family, in their order and
     /// colours. Tags like any other: the user can rename or delete them.
     public static let licenseTags: [(name: String, color: TagColor)] = [
-        ("Licensed", .green), ("Licensed + Non-Commercial", .sand), ("Unlicensed", .red), ("Partially Licensed", .yellow),
-        ("Public Domain", .purple), ("Open Source", .blue), ("Trial", .orange),
+        ("Licensed", .green), ("Unlicensed", .red), ("Open Source", .blue), ("Trial", .orange),
     ]
 
-    /// Puts the license tags it doesn't have yet first, in their colours, once. Red, Yellow and Green, the tags a
-    /// library started with before, go when they're as they came: in their colours, on no family and in no smart set.
-    /// Tags of the user's own stay, after these.
-    public mutating func addLicenseTags() {
-        guard !licenseStatusesAdded else { return }
-        licenseStatusesAdded = true
+    /// The license tags a library started with up to 1.9.1, besides `licenseTags`.
+    public static let formerLicenseTags: [(name: String, color: TagColor)] = [
+        ("Licensed + Non-Commercial", .sand), ("Partially Licensed", .yellow), ("Public Domain", .purple),
+    ]
+
+    /// Once, puts the license tags a library doesn't have yet first, in their colours; Red, Yellow and Green, the tags a
+    /// library started with before, go. Once, too, `formerLicenseTags` go. Each only when it's as it came (see
+    /// `removeUnusedTags`). Tags of the user's own stay, after these.
+    public mutating func updateLicenseTags() {
+        if !licenseStatusesAdded {
+            licenseStatusesAdded = true
+            formerLicenseTagsRemoved = true
+            removeUnusedTags([TagColor.red, .yellow, .green].map { ($0.rawValue.capitalized, $0) })
+            let missing = Self.licenseTags.filter { !tags.contains($0.name) }
+            tags.insert(contentsOf: missing.map(\.name), at: 0)
+            for tag in missing { tagColors[tag.name] = tag.color }
+        }
+        if !formerLicenseTagsRemoved {
+            formerLicenseTagsRemoved = true
+            removeUnusedTags(Self.formerLicenseTags)
+        }
+    }
+
+    /// Deletes the tags that are as they came: in their colours, on no family and in no smart set.
+    private mutating func removeUnusedTags(_ candidates: [(name: String, color: TagColor)]) {
         let used = Set(familyTags.values.joined())
             .union(smartSets.flatMap(\.rules).filter { $0.field == .tag }.map(\.value))
-        for color in [TagColor.red, .yellow, .green] {
-            let name = color.rawValue.capitalized
+        for (name, color) in candidates {
             guard tags.contains(name), tagColors[name] == color, !used.contains(name) else { continue }
             tags.removeAll { $0 == name }
             tagColors[name] = nil
             sidebar.forget("tag.\(name)")
         }
-        let missing = Self.licenseTags.filter { !tags.contains($0.name) }
-        tags.insert(contentsOf: missing.map(\.name), at: 0)
-        for tag in missing { tagColors[tag.name] = tag.color }
     }
 
     /// Missing keys take their defaults, so files from older versions keep loading.
@@ -135,6 +152,8 @@ public struct UserData: Codable, Equatable, Sendable {
         activations = try value(.activations, d.activations)
         // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
+        // Missing in files from 1.9.1 and before, which are yet to lose the former license tags.
+        formerLicenseTagsRemoved = try value(.formerLicenseTagsRemoved, false)
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
         foundryRenames = try value(.foundryRenames, d.foundryRenames)
         classifications = try value(.classifications, d.classifications)
@@ -255,7 +274,7 @@ public struct ActivationHistory: Codable, Equatable, Sendable {
     }
 }
 
-/// The colours a tag can have: the Finder's, and sand, for Licensed + Non-Commercial.
+/// The colours a tag can have: the Finder's, and sand, a light brown that Licensed + Non-Commercial started in.
 public enum TagColor: String, Codable, CaseIterable, Sendable {
     case red, orange, yellow, green, blue, purple, gray, sand
 
