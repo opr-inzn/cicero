@@ -124,6 +124,7 @@ private struct AddFamiliesButton: View {
 /// or takes it out when it's checked, there already; ↑ and ↓ move the highlight. It stays open for the next.
 private struct AddFamilies: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.self) private var environment
     @State private var text = ""
     @State private var families: [Family] = []
     /// nil: the first family listed.
@@ -179,28 +180,31 @@ private struct AddFamilies: View {
         highlighted.flatMap { id in families.contains { $0.id == id } ? id : nil } ?? families.first?.id
     }
 
-    /// A check while it's in Compare, "Aa" in its regular style and its name; highlighted in the accent colour, as a
-    /// selected row is in the Character Toolbox.
+    /// "Aa" in its regular style, its name and a check while it's in Compare, as the search field's suggestions show
+    /// a family: the name in the label colour and "Aa" in the secondary one, resolved, as the popover's material
+    /// lightens a colour that changes with the appearance, and the highlighted one in white on the selection colour.
     private func row(_ family: Family, isCompared: Bool, isHighlighted: Bool) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
+            // A fixed width keeps the names lined up however wide each family's letters are, as in the suggestions.
+            FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
+                .foregroundStyle(isHighlighted ? Color.white : Color(Color.secondary.resolve(in: environment)))
+                .frame(width: 28)
+                .padding(.trailing, 3)
+            Text(family.name)
+                .foregroundStyle(isHighlighted ? Color.white : Color(Color.primary.resolve(in: environment)))
+                .lineLimit(1)
+            Spacer(minLength: 8)
             Image(systemName: "checkmark")
                 .font(.callout.weight(.semibold))
-                .foregroundStyle(.tint)
+                .foregroundStyle(isHighlighted ? Color.white : Color.accentColor)
                 .opacity(isCompared ? 1 : 0)
-                .frame(width: 16)
-            // A fixed width keeps the names lined up however wide each family's letters are, as in the search field's
-            // suggestions.
-            FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
-                .frame(width: 28)
-                .padding(.trailing, 2)
-            Text(family.name).lineLimit(1)
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+        .padding(.leading, 6)
+        .padding(.trailing, 14)
+        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
         .background {
             if isHighlighted {
-                RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)).padding(.horizontal, 4)
+                RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .selectedContentBackgroundColor)).padding(.horizontal, 5)
             }
         }
         .id(family.id)
