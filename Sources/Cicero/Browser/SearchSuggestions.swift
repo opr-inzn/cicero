@@ -14,9 +14,11 @@ struct SearchSuggestions: View {
                     Label {
                         Text(family.name)
                     } icon: {
-                        // A fixed width keeps the names lined up however wide each family's letters are.
+                        // A fixed width keeps the names lined up however wide each family's letters are, and a little
+                        // room after it keeps a wide Aa from running into its name.
                         FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
                             .frame(width: 28)
+                            .padding(.trailing, 2)
                     }
                     .searchCompletion(family.name)
                 }
