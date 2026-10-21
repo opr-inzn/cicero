@@ -3,20 +3,20 @@ import CryptoKit
 import Foundation
 
 /// Sending the user's not-similar reports (see `SimilarReport`) to Cicero's website, which keeps them to improve similar
-/// fonts, while Settings → General → Send not-similar reports is on (it is at first). Each report once; one that fails
-/// isn't sent again. With it, a hash of a random ID Cicero keeps for this Mac, so that each Mac's reports count as one
-/// person's. Turned off, nothing is sent and the ID is forgotten, so turning it on again starts a new one.
+/// fonts, while Settings → General → Share usage statistics is on (it is at first; `UsageStatistics.isOn`). Without it, a
+/// mark stays on the Mac, in the user's data. Each report once; one that fails isn't sent again. With it, a hash of a
+/// random ID Cicero keeps for this Mac, its own rather than the usage statistics', so that each Mac's reports count as one
+/// person's. Turning the statistics off forgets it, so turning them on again starts a new one.
 enum SimilarReports {
-    static let defaultsKey = "similarReports.isOn"
     private static let idKey = "similarReports.id"
     private nonisolated static let url = URL(string: "https://cicero.maximilianinzinger.com/api/similar-reports")!
 
-    /// A report of these families from this list, ready to send; nil while sending is off, and from a binary run from
-    /// .build (swift run), which has no version to send.
+    /// A report of these families from this list, ready to send; nil while usage statistics are off, and from a binary
+    /// run from .build (swift run), which has no version to send.
     static func report(family: SimilarReport.Entry, notSimilar: [String], list: [SimilarReport.Entry],
                        shownIn: SimilarReport.Place) -> SimilarReport? {
         let defaults = UserDefaults.standard
-        guard defaults.object(forKey: defaultsKey) as? Bool ?? true, Bundle.main.bundleURL.pathExtension == "app",
+        guard UsageStatistics.isOn, Bundle.main.bundleURL.pathExtension == "app",
               let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
               let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String else { return nil }
         let id = defaults.string(forKey: idKey) ?? UUID().uuidString
@@ -42,7 +42,7 @@ enum SimilarReports {
         }
     }
 
-    /// When the user turns the reports off.
+    /// When the user turns usage statistics off.
     static func forgetID() {
         UserDefaults.standard.removeObject(forKey: idKey)
     }

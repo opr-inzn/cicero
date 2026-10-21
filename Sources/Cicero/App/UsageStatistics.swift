@@ -16,13 +16,17 @@ enum UsageStatistics {
     /// Cicero's app in TelemetryDeck, from its dashboard. Nothing is sent while it's empty.
     private nonisolated static let appID = "E1677081-90F9-4658-91F1-B9C63EFDAEAD"
 
+    /// Whether Share usage statistics is on, as it is at first. Not-similar reports go with it (see `SimilarReports`).
+    static var isOn: Bool {
+        UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? true
+    }
+
     /// Sends this launch's signal. Once, when the app has finished launching; a signal that fails isn't
     /// sent again, except the one saying the Mac is new, which the next launch tries again.
     static func sendLaunch() {
         let defaults = UserDefaults.standard
         // A binary run from .build (swift run) has no version to send.
-        guard defaults.object(forKey: defaultsKey) as? Bool ?? true,
-              !appID.isEmpty, Bundle.main.bundleURL.pathExtension == "app",
+        guard isOn, !appID.isEmpty, Bundle.main.bundleURL.pathExtension == "app",
               let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
               let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String else { return }
         let id = defaults.string(forKey: idKey) ?? UUID().uuidString
