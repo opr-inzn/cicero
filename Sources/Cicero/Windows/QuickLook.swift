@@ -309,13 +309,15 @@ private struct FamilyQuickLook: View {
         return Group {
             if preview.sampleText.isEmpty {
                 VStack(alignment: alignment.horizontal, spacing: 14) {
-                    QuickLookText(text: PreviewSettings.tileSample, face: face, size: 96, variations: variations, kerning: preview.kerning(at: 96))
+                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96,
+                                  variations: variations, kerning: preview.kerning(at: 96))
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: Self.alphabet, face: face, size: 24, variations: variations, kerning: preview.kerning(at: 24),
-                                  lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
+                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
+                                  kerning: preview.kerning(at: 24), lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
                 }
             } else {
-                QuickLookText(text: preview.sampleText, face: face, size: 56, variations: variations, kerning: preview.kerning(at: 56),
+                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
+                              variations: variations, kerning: preview.kerning(at: 56),
                               lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
             }
         }

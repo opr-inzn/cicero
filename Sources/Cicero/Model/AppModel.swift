@@ -15,6 +15,8 @@ final class AppModel {
     /// The engine as made at launch; `engine` knows the Font Library.
     @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
+    /// Text in a font's own script, for previews of a font with none of the letters asked for (see `ScriptSample`).
+    @ObservationIgnored let scriptSamples: ScriptSamples
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
     @ObservationIgnored let measurements: MeasurementIndex
@@ -264,6 +266,7 @@ final class AppModel {
         store = UserDataStore(locations: locations)
         launchEngine = ActivationEngine(locations: locations)
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
+        scriptSamples = ScriptSamples(languages: languages)
         characterSetCatalog = CharacterSetCatalog(contentsOf: Bundle.main.url(forResource: "CharacterSets", withExtension: "json"))
         coverage = CoverageIndex(caches: locations.caches, languages: languages)
         measurements = MeasurementIndex(caches: locations.caches,

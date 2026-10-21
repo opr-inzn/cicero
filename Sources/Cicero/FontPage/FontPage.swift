@@ -166,6 +166,8 @@ private struct TypeTester: View {
     @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
+    /// What's typed over the text in a font's own script, on this family's page only (see `shownText`).
+    @State private var ownScript: (family: String, text: String)?
 
     var body: some View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
@@ -202,7 +204,7 @@ private struct TypeTester: View {
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
-                editor(FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
+                editor(face.face, FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
                                               features: model.features(for: family)))
             }
             .frame(minHeight: 320)
@@ -249,12 +251,13 @@ private struct AxesButton: View {
 
 private extension TypeTester {
     @ViewBuilder
-    func editor(_ ctFont: CTFont) -> some View {
+    func editor(_ face: FontFace, _ ctFont: CTFont) -> some View {
+        let text = shownText(face)
         let kerning = preview.kerning(at: size)
         let lineHeightPoints = size * preview.lineSpacing / 100
-        let room = Self.room(for: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
+        let room = Self.room(for: text.wrappedValue, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
-        SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+        SampleEditor(text: text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
                      alignment: alignment.paragraph, margin: 24, roomAbove: room.above, roomBelow: room.below) {
             FamilyMenu(families: [family], model: model)
         }
@@ -265,6 +268,19 @@ private extension TypeTester {
             // Around the text too, which has it in its own menu (see `SampleEditor`).
             .contentShape(.rect)
             .contextMenu { FamilyMenu(families: [family], model: model) }
+    }
+
+    /// The text to show and type into: what's been typed, kept from one page to the next, or, for a font with none of its
+    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only.
+    func shownText(_ face: FontFace) -> Binding<String> {
+        let sample = model.scriptSamples.text(text, for: face, long: true)
+        guard sample != text else { return $text }
+        let family = family.id
+        return Binding {
+            ownScript.flatMap { $0.family == family ? $0.text : nil } ?? sample
+        } set: {
+            ownScript = (family, $0)
+        }
     }
 
     /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
@@ -323,7 +339,8 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row(styleWidth: styleWidth, statusWidth: statusWidth) {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
+                    FontText(text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face, size: 20,
+                             weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
