@@ -4,8 +4,8 @@ import Foundation
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
 /// then punctuation, which any text has, before currency and the other signs, then each other script, Greek first, as
 /// Unicode lists them, then what's in no script, like the private-use glyphs, and last the accents and marks, which
-/// have no letter to sit on and are looked for least. A font with one script and no Latin letters starts with that
-/// script (see `GlyphSection.sections`).
+/// have no letter to sit on and are looked for least. A font without Latin letters starts with its scripts (see
+/// `GlyphSection.sections`).
 public enum GlyphGroup: Hashable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
     case circledFigures, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
@@ -267,11 +267,15 @@ public struct GlyphSection: Identifiable, Sendable {
         }
         let glyphs = Dictionary(grouping: features, by: \.group)
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
-        // A font whose letters are all in one script other than Latin, like an Arabic or a Greek one, starts with them.
-        let scriptGroups = groups.filter(\.isScript)
-        if scriptGroups.count == 1, let script = scriptGroups.first, !groups.contains(where: { $0 < .ligatures }) {
-            groups.removeAll { $0 == script }
-            groups.insert(script, at: 0)
+        // A font without Latin letters, like an Arabic or a Syriac one, starts with its scripts: the one it has the most
+        // letters of, then the others, like the Arabic figures of a Syriac font, in Unicode's order.
+        if !groups.contains(where: { $0 < .ligatures }) {
+            let main = groups.filter(\.isScript).max { a, b in
+                let (x, y) = (buckets[a]?.count ?? 0, buckets[b]?.count ?? 0)
+                return x != y ? x < y : b < a
+            }
+            let leading = groups.filter(\.isScript).sorted { a, b in a != b && (a == main || b != main && a < b) }
+            groups = leading + groups.filter { !$0.isScript }
         }
         return groups.compactMap { group in
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
@@ -324,10 +328,11 @@ public struct GlyphSection: Identifiable, Sendable {
     }
 
     /// How many of `shown`, some or all of a font's `sections` in their order, come before the ligatures it makes: the
-    /// letters, Latin's or those of the one script the font starts with, and the Ligatures group's characters, like ﬀ.
+    /// letters, Latin's or those of the scripts a font without Latin starts with, and the Ligatures group's characters,
+    /// like ﬀ.
     public static func beforeLigatures(_ shown: [GlyphSection], of sections: [GlyphSection]) -> Int {
-        let leading = sections.first.flatMap { $0.group.isScript ? $0.group : nil }
-        let start = shown.first.map { $0.group == leading ? 1 : 0 } ?? 0
+        let leading = Set(sections.prefix { $0.group.isScript }.map(\.group))
+        let start = shown.prefix { leading.contains($0.group) }.count
         return start + shown.dropFirst(start).prefix { $0.group <= .ligatures }.count
     }
 
