@@ -382,51 +382,39 @@ struct ValueField: View {
     var step: Double = 1
     /// After the number: " pt", "%".
     var unit = ""
-    /// Number and unit together; nil makes them only as wide as they are, as between a stepper's buttons.
-    var width: CGFloat? = 52
     @State private var text = ""
     @FocusState private var isFocused: Bool
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "", width: CGFloat? = 52) {
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") {
         self.title = title
         _value = value
         self.range = range
         self.step = step
         self.unit = unit
-        self.width = width
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            if width == nil {
-                // As wide as what's typed: a plain field sets its text without an inset.
-                Text(text.isEmpty ? "0" : text).hidden().overlay { field }
-            } else {
-                field
-            }
+            TextField(title, text: $text)
+                .labelsHidden()
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.trailing)
+                .focused($isFocused)
+                .onSubmit(commit)
+                .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                    let steps = press.modifiers.contains(.shift) ? 10.0 : 1
+                    set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
+                    return .handled
+                }
             // In the number's colour: forms grey a row's value text.
             Text(unit).foregroundStyle(.primary)
         }
         .monospacedDigit()
-        .frame(width: width, alignment: .trailing)
+        .frame(width: 52, alignment: .trailing)
         .onAppear { text = formatted(value) }
         // The slider moved; typing leaves the value alone until it's committed.
         .onChange(of: value) { text = formatted($1) }
         .onChange(of: isFocused) { if !$1 { commit() } }
-    }
-
-    private var field: some View {
-        TextField(title, text: $text)
-            .labelsHidden()
-            .textFieldStyle(.plain)
-            .multilineTextAlignment(.trailing)
-            .focused($isFocused)
-            .onSubmit(commit)
-            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
-                let steps = press.modifiers.contains(.shift) ? 10.0 : 1
-                set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
-                return .handled
-            }
     }
 
     /// What's typed, with a decimal comma or point.
@@ -773,8 +761,9 @@ struct FlowLayout: Layout {
 
 /// The toolbar button with sample text, size, weight and spacing.
 struct PreviewOptionsButton: View {
-    /// Off where the window has a size of its own, as Compare does.
-    var showsSize = true
+    /// A size of the window's own, as Compare has, in place of the previews'.
+    var size: Binding<Double>?
+    var sizeRange: ClosedRange<Double> = 8...160
     @State private var isPresented = false
 
     var body: some View {
@@ -784,14 +773,15 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help(showsSize ? "Preview text, size, weight, spacing and alignment" : "Preview text, weight, spacing and alignment")
-        .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(showsSize: showsSize) }
+        .help("Preview text, size, weight, spacing and alignment")
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(size: size, sizeRange: sizeRange) }
     }
 }
 
 private struct PreviewOptions: View {
     @Environment(PreviewSettings.self) private var preview
-    let showsSize: Bool
+    let size: Binding<Double>?
+    let sizeRange: ClosedRange<Double>
 
     var body: some View {
         @Bindable var preview = preview
@@ -809,9 +799,7 @@ private struct PreviewOptions: View {
                 .fixedSize()
             }
             Section {
-                if showsSize {
-                    row("Size", $preview.size, range: 8...160, unit: " pt")
-                }
+                row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
                 row("Weight", $preview.weight, range: 100...900)
                 row("Tracking", $preview.tracking, range: -10...40, step: 0.5, unit: "%")
                     .help("The space added between letters, in percent of the em, on top of the font’s kerning")

@@ -21,6 +21,9 @@ extension FocusedValues {
 /// each other in tints, at a size of the window's own.
 struct CompareWindow: View {
     static let sizes: ClosedRange<Double> = 24...720
+    /// What View → Zoom In and Zoom Out step through, each a fifth to a third bigger than the one before; a size set in
+    /// between goes to the next one either way.
+    static let steps: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
 
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -86,9 +89,20 @@ struct CompareWindow: View {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
                               help: "One row per font, or every font over each other")
             }
-            ToolbarCapsule { ToolbarSizeStepper(size: $size, range: Self.sizes) }
-            ToolbarCapsule { PreviewOptionsButton(showsSize: false) }
+            ToolbarCapsule { PreviewOptionsButton(size: $size, sizeRange: Self.sizes) }
         }
+    }
+}
+
+extension CompareWindow {
+    /// The next of `steps` up from `size`.
+    static func bigger(than size: Double) -> Double {
+        steps.first { $0 > size } ?? sizes.upperBound
+    }
+
+    /// The next of `steps` down from `size`.
+    static func smaller(than size: Double) -> Double {
+        steps.last { $0 < size } ?? sizes.lowerBound
     }
 }
 

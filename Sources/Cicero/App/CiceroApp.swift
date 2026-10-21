@@ -102,17 +102,17 @@ struct CiceroCommands: Commands {
         }
         // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
         SidebarCommands()
-        // Compare's size, while its window is in front, as the − and + in its toolbar. The menu bar matches ⌘+ to the
+        // Compare's size, while its window is in front, the one in its Preview Options. The menu bar matches ⌘+ to the
         // keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
         CommandGroup(after: .sidebar) {
             Divider()
             Button("Zoom In", systemImage: "plus.magnifyingglass") {
-                if let size = compareSize { compareSize = ToolbarSizeStepper.bigger(than: size, in: CompareWindow.sizes) }
+                if let size = compareSize { compareSize = CompareWindow.bigger(than: size) }
             }
             .keyboardShortcut("+", modifiers: .command)
             .disabled(compareSize.map { $0 >= CompareWindow.sizes.upperBound } ?? true)
             Button("Zoom Out", systemImage: "minus.magnifyingglass") {
-                if let size = compareSize { compareSize = ToolbarSizeStepper.smaller(than: size, in: CompareWindow.sizes) }
+                if let size = compareSize { compareSize = CompareWindow.smaller(than: size) }
             }
             .keyboardShortcut("-", modifiers: .command)
             .disabled(compareSize.map { $0 <= CompareWindow.sizes.lowerBound } ?? true)
