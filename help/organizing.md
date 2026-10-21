@@ -20,7 +20,7 @@ The item you’ve selected is in the accent color. To hide the whole sidebar, ch
 
 ### Open or close a section
 
-Click anywhere on a section’s title. The groups inside **Coverage** open and close the same way. **Foundries**, **Classifications** and **Coverage** start closed, and so do the **Unicode Blocks** and **Google Fonts** groups inside **Coverage**.
+Click anywhere on a section’s title. The groups inside **Coverage** open and close the same way. **Foundries** and **Coverage** start closed, and so do the **Unicode Blocks** and **Google Fonts** groups inside **Coverage**.
 
 ### Hide items you don’t use
 
