@@ -514,7 +514,7 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
 
 
     public enum Field: String, Codable, CaseIterable, Sendable {
-        case name, foundry, designer, classification, tag, rating, note, set, folder, status, kind, format, styles, feature, embedding
+        case name, foundry, designer, classification, tag, rating, note, hasNote, set, folder, status, kind, format, styles, feature, embedding
         case language, characterSet, added, timesActivated, lastActivated
 
         public var comparisons: [Comparison] {

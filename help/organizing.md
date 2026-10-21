@@ -197,7 +197,8 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Classification | is, is not | Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol or Unclassified |
 | Tag | is, is not | One of your tags |
 | Rating | is, is not, is more than, is less than | No Rating, or one to five stars (see [Ratings](#ratings)) |
-| Note | contains, doesn’t contain | Text in the family’s [note](#notes); left empty, every family with a note, or (doesn’t contain) without one |
+| Note | contains, doesn’t contain | Text in the family’s [note](#notes) |
+| Has Note | Yes, No | Whether the family has a [note](#notes) |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
@@ -257,7 +258,7 @@ A rated family shows its stars in the grid and specimens. To see ratings in the 
 
 Write a note on a family: where its license is, which client it’s for, what it pairs well with. In the [Info panel](browsing.md#see-a-fonts-details), click under **Note** and type, pressing Return for a new line; Cicero saves it as you go. Delete the text to take the note away.
 
-A family with a note has a small note symbol next to its name in the grid and specimens; hold the pointer over it to read the note. Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or leave the text empty for every family with a note.
+A family with a note has a small note symbol next to its name in the grid and specimens; hold the pointer over it to read the note. Searching finds families by their notes too. To keep families with notes together, make a [smart set](#smart-sets) with a **Note** rule, like **Note** **contains** Acme, or **Has Note** **Yes** for every family with a note and **Has Note** **No** for every family without one.
 
 ## Foundries
 

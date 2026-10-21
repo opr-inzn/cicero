@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Smart sets have a **Has Note** rule, **Yes** for every family with a note or **No** for every family without one. Before, you left the text of a **Note** rule empty.
+
 ## 1.9.3
 
 - A font page’s text and name, and the Compare window, are set with the font’s kerning. With **Tracking** at 0, they were set without it, so pairs like V and a stood apart. Tracking is added to the kerning, as in the grid, the list and specimens.

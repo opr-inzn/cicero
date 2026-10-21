@@ -125,7 +125,7 @@ private struct RuleRow: View {
         case .classification: model.classificationNames[0]
         case .tag: model.data.tags.first ?? ""
         case .rating: "5"
-        case .note: ""
+        case .note, .hasNote: ""
         case .set: model.data.sets.first?.id.uuidString ?? ""
         case .folder: folderOptions.first?.id ?? ""
         case .status: SmartRuleValue.statuses[0]
@@ -155,8 +155,9 @@ private struct RuleRow: View {
         case .designer:
             text
         case .note:
-            TextField("Text", text: $rule.value, prompt: Text("Text, or empty for any note"))
-                .frame(minWidth: 180, maxWidth: 260)
+            text
+        case .hasNote:
+            EmptyView()
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
@@ -324,6 +325,7 @@ private extension SmartRule.Field {
         case .tag: "Tag"
         case .rating: "Rating"
         case .note: "Note"
+        case .hasNote: "Has Note"
         case .set: "Set"
         case .folder: "Folder"
         case .status: "Status"
@@ -343,7 +345,7 @@ private extension SmartRule.Field {
 
 private extension SmartRule.Comparison {
     /// The wording depends on the field: a set "is in", a language or an OpenType feature "is supported", coverage
-    /// "includes". A tag "is" any of the family's.
+    /// "includes", Has Note is Yes or No. A tag "is" any of the family's.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"
@@ -352,6 +354,8 @@ private extension SmartRule.Comparison {
         case (.language, .isNot), (.feature, .isNot): "isn’t supported"
         case (.characterSet, .is): "includes"
         case (.characterSet, .isNot): "doesn’t include"
+        case (.hasNote, .is): "Yes"
+        case (.hasNote, .isNot): "No"
         case (_, .contains): "contains"
         case (_, .doesNotContain): "doesn’t contain"
         case (_, .beginsWith): "begins with"
