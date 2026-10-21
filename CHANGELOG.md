@@ -15,6 +15,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - With one family selected, **Fonts → Compare** adds it to the fonts already in the Compare window, so families far apart in your library can go there one by one. A family’s menu says **Add to Compare** for it. With several, Compare starts over with them, as before.
 - In specimens, a family’s style names sit on one baseline. A style whose letters reach higher or lower than the others’, like a bold or condensed one, sat a little lower or higher.
 - In the Compare window’s **Stacked** layout, a font’s row stays where it is when you add a font whose letters reach further above or below. Each row is now as tall as its own font needs; before, every row grew to fit the tallest.
+- In Preview Options, **Size** starts at 24 pt rather than 8, and a smaller size goes up to 24.
 - The Compare window has a size of its own, from 24 to 720 pt, set with **Size** in its **Preview Options**. **View → Zoom In** and **Zoom Out** (⌘+ and ⌘−, or ⌘= on a US keyboard) make the fonts bigger and smaller. Changing it there leaves the main window’s previews as they are, and the size in the main window’s Preview Options no longer changes Compare.
 
 ## 1.9.3

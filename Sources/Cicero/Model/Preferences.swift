@@ -10,6 +10,8 @@ final class PreviewSettings {
     static let presets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@"]
     /// What grid tiles show when no sample text is set: capitals, lowercase, a descender and figures.
     static let tileSample = "Aa Gg 123"
+    /// Preview Options' Size; a smaller size saved before 24 pt was the least goes up to it.
+    static let sizes: ClosedRange<Double> = 24...160
 
     /// Empty means each family's own name.
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
@@ -36,7 +38,7 @@ final class PreviewSettings {
 
     init() {
         sampleText = defaults.string(forKey: Keys.sampleText) ?? ""
-        size = defaults.object(forKey: Keys.size) as? Double ?? 32
+        size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
         weight = defaults.object(forKey: Keys.weight) as? Double ?? 400
         tracking = defaults.object(forKey: Keys.tracking) as? Double ?? 0
         lineSpacing = defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120

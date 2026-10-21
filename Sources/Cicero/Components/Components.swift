@@ -763,7 +763,7 @@ struct FlowLayout: Layout {
 struct PreviewOptionsButton: View {
     /// A size of the window's own, as Compare has, in place of the previews'.
     var size: Binding<Double>?
-    var sizeRange: ClosedRange<Double> = 8...160
+    var sizeRange: ClosedRange<Double> = PreviewSettings.sizes
     @State private var isPresented = false
 
     var body: some View {
