@@ -93,8 +93,7 @@ private struct Header: View {
     var body: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
-                FontText(text: family.name, face: family.regular.face, size: 34, roomForGlyphs: true)
-                    .truncationMode(.tail)
+                FamilyName(name: family.name, face: family.regular.face)
                 Text(summary)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -155,6 +154,64 @@ private struct Header: View {
         case .app: "Comes with an app, which manages it"
         default: "Managed outside Cicero"
         }
+    }
+}
+
+/// The family's name in its own regular face, for the header: 34 pt on a line as tall as most fonts' names take, the same
+/// for every family, so headers don't grow with a font's line spacing; or, when its glyphs reach further than the room
+/// around that line, like Zapfino's swashes, smaller, just as much as it takes for them to fit whole, in the middle of it.
+/// Cut short with "…" when it's wider than the room.
+private struct FamilyName: View {
+    let name: String
+    let face: FontFace
+    static let size: CGFloat = 34
+    /// The line, and the room its glyphs may take above it, short of the toolbar's edge, and below it, short of the summary.
+    static let line: CGFloat = 41
+    static let above: CGFloat = 16
+    static let below: CGFloat = 4
+    /// Room before the name for glyphs reaching back past its start, like a swash on a first capital.
+    static let lead: CGFloat = 12
+
+    var body: some View {
+        ReadingFonts(paths: [face.path]) {
+            Canvas { context, area in
+                let color = Color.primary.resolve(in: context.environment).cgColor
+                context.withCGContext { Self.draw(name, face: face, in: area, color: color, into: $0) }
+            }
+        }
+        .frame(height: Self.above + Self.line + Self.below)
+        .padding(.top, -Self.above)
+        .padding(.bottom, -Self.below)
+        .padding(.leading, -Self.lead)
+        .accessibilityElement()
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private static func draw(_ name: String, face: FontFace, in area: CGSize, color: CGColor, into context: CGContext) {
+        func line(_ size: CGFloat) -> (font: CTFont, line: CTLine, ink: CGRect) {
+            let font = FontLoader.shared.font(face, size: size, weight: 400)
+            let line = TextLine(name, font: font, kerning: 0).line
+            return (font, line, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds))
+        }
+        var set = line(size)
+        // On the line as the font's own spacing would put it, its ascent and descent in the middle of it.
+        let ascent = CTFontGetAscent(set.font), descent = CTFontGetDescent(set.font)
+        var baseline = above + (Self.line - ascent - descent) / 2 + ascent
+        if !set.ink.isNull, baseline - set.ink.maxY < 0 || baseline - set.ink.minY > area.height {
+            set = line(size * min(1, area.height / set.ink.height))
+            baseline = (area.height - set.ink.height) / 2 + set.ink.maxY
+        }
+        let ellipsis = TextLine("…", font: set.font, kerning: 0).line
+        let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .end, ellipsis) ?? set.line
+        context.saveGState()
+        context.setFillColor(color)
+        context.textMatrix = .identity
+        context.translateBy(x: lead, y: baseline)
+        context.scaleBy(x: 1, y: -1)
+        context.textPosition = .zero
+        CTLineDraw(shown, context)
+        context.restoreGState()
     }
 }
 

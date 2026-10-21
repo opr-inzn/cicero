@@ -34,9 +34,6 @@ struct FontText: View {
     /// For text that runs over several lines, the distance from one line's baseline to the next in points; nil for the
     /// font's own line spacing.
     var lineHeight: Double?
-    /// Whether it takes room for glyphs reaching past the font's ascent and descent, like a script font's swashes, so
-    /// they don't run into what's above and below it, as they otherwise do.
-    var roomForGlyphs = false
     @State private var readPath: String?
 
     var body: some View {
@@ -48,7 +45,6 @@ struct FontText: View {
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))
-                .padding(roomForGlyphs ? Self.room(for: text, in: font, kerning: kerning) : EdgeInsets())
         } else {
             Text(text.isEmpty ? " " : text)
                 .font(.system(size: size))
@@ -60,14 +56,6 @@ struct FontText: View {
                     readPath = face.path
                 }
         }
-    }
-}
-
-extension FontText {
-    /// How far the text's glyphs reach above the font's ascent and below its descent.
-    static func room(for text: String, in font: CTFont, kerning: Double) -> EdgeInsets {
-        let line = TextLine(text, font: font, kerning: kerning)
-        return EdgeInsets(top: line.ascent - CTFontGetAscent(font), leading: 0, bottom: line.descent - CTFontGetDescent(font), trailing: 0)
     }
 }
 
