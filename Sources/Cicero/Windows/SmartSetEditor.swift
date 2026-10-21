@@ -180,7 +180,7 @@ private struct RuleRow: View {
         case .format:
             options(FontFormat.allCases.map { ($0.rawValue, $0.rawValue) })
         case .styles:
-            number(unit: "styles", in: 0...999)
+            number(in: 0...999)
         case .feature:
             options(OpenTypeFeature.allCases.map { ($0.rawValue, $0.title) })
         case .embedding:
@@ -188,7 +188,7 @@ private struct RuleRow: View {
         case .added, .lastActivated:
             number(unit: "days", in: 1...3650)
         case .timesActivated:
-            number(unit: "times", in: 0...99_999)
+            number(in: 0...99_999)
         case .language:
             LanguagePicker(selection: $rule.value, catalog: model.languages)
         case .characterSet:
@@ -198,6 +198,7 @@ private struct RuleRow: View {
 
     private var text: some View {
         TextField("Text", text: $rule.value, prompt: Text("Text"))
+            .textFieldStyle(.roundedBorder)
             .frame(minWidth: 140, maxWidth: 260)
     }
 
@@ -213,17 +214,19 @@ private struct RuleRow: View {
         }
     }
 
-    private func number(unit: String, in range: ClosedRange<Int>) -> some View {
+    /// A field for the number, with its unit after it where the field's name doesn't say it, like days.
+    private func number(unit: String? = nil, in range: ClosedRange<Int>) -> some View {
         let number = Binding<Int>(
             get: { Int(rule.value) ?? range.lowerBound },
             set: { rule.value = String(min(max($0, range.lowerBound), range.upperBound)) }
         )
-        return HStack(spacing: 4) {
+        return HStack(spacing: 6) {
             TextField("Number", value: number, format: .number.grouping(.never))
-                .multilineTextAlignment(.trailing)
-                .frame(width: 56)
-            Stepper("Number", value: number, in: range)
-            Text(unit)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+            if let unit {
+                Text(unit)
+            }
         }
     }
 
