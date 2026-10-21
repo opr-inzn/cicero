@@ -593,16 +593,16 @@ extension AppModel {
     /// classification is the whole family's, and a tag is given along with the ones the family has.
     func handleDrop(_ drags: [FontDrag], on item: SidebarItem) -> Bool {
         var seen = Set<String>()
-        let families = drags.compactMap { family($0.family) }.filter { seen.insert($0.id).inserted }
+        let families = drags.flatMap(\.families).compactMap { family($0) }.filter { seen.insert($0.id).inserted }
         guard !families.isEmpty else { return false }
         switch item {
         case .set(let id):
             for drag in drags {
-                guard let family = family(drag.family) else { continue }
-                if let style = drag.style, let face = family.faces.first(where: { $0.face.postScriptName == style }) {
+                let dragged = drag.families.compactMap { family($0) }
+                if let style = drag.style, let family = dragged.first, let face = family.faces.first(where: { $0.face.postScriptName == style }) {
                     setMembership(true, for: face, of: family, in: id)
                 } else {
-                    setMembership(true, for: [family], in: id)
+                    setMembership(true, for: dragged, in: id)
                 }
             }
         case .tag(let name): setTag(name, true, for: families)

@@ -90,14 +90,16 @@ struct FamilyRowList<Row: View>: View {
                 focused = true
                 FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor)
             })
-            .contextMenu {
-                let targets = selection.contains(family.id) && selection.count > 1 ? ids.filter(selection.contains) : [family.id]
-                FamilyMenu(families: targets.compactMap(model.family), model: model)
-            }
-            .draggable(family.id)
+            .contextMenu { FamilyMenu(families: targets(for: family.id, in: ids).compactMap(model.family), model: model) }
+            .draggable(FontDrag(families: targets(for: family.id, in: ids)))
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { open(family.id) }
             .accessibilityAction(named: "Select") { FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor) }
+    }
+
+    /// What the menu and a drag take: the whole selection when the family is part of it.
+    private func targets(for id: String, in ids: [String]) -> [String] {
+        selection.contains(id) && selection.count > 1 ? ids.filter(selection.contains) : [id]
     }
 }

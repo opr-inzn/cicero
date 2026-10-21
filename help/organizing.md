@@ -55,7 +55,7 @@ Drag families from the browser onto:
 - **a foundry**, to say they’re from that foundry
 - **a classification**, to put them in it
 
-The item they’re over lights up in the accent color.
+The item they’re over lights up in the accent color. To drop several families at once, select them and drag any one of them.
 
 ## Folders
 

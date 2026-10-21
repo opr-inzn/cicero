@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - The sidebar’s **Coverage** starts closed the first time Cicero opens, like **Foundries** and **Classifications**, so its many character sets don’t fill a new sidebar. Click its title to open it.
+- Dragging one of several selected families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window, takes all of them there, as their right-click menu acts on all of them. It used to take only the family you dragged. The same goes for families selected in the Character Toolbox.
 
 ## 1.9
 

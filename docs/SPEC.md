@@ -75,7 +75,8 @@ capsule on every side, that slides to the next one chosen.
   together: they land side by side in the gap, in their order. The browser then shows the fonts in any of them. Selecting in another section starts over there.
 - Moving through the sidebar quickly (holding an arrow key, clicking from row to row) moves the selection at
   every step; the browser shows the last one once the selection rests for a moment.
-- Dropping family names (drag from the browser) onto a set, tag, foundry or classification adds them; the
+- Dropping family names (drag from the browser or the Character Toolbox; dragging one of several selected families drags them
+  all, as their menu acts on all of them) onto a set, tag, foundry or classification adds them; the
   row they're over is drawn in the accent colour with white title and symbol (a status's dot keeps its colour).
 - The list draws no selection (`selectionHighlightStyle = .none`): a selected row has its title and symbol in the accent
   colour on a light grey rounded fill, whether or not the list has focus (`SidebarHighlight`).

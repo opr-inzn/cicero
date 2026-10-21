@@ -113,7 +113,7 @@ A family without the Latin letters Cicero measures, like most fonts for other sc
 
 Right-click a family for its menu: activate or deactivate it, add it to a set, give it a tag or a classification, reveal its files, copy its name, export it, [show similar fonts](#find-similar-fonts), compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
-You can drag families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window.
+You can drag families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window. When you drag one of several selected families, all of them go.
 
 ## Take a quick look
 
