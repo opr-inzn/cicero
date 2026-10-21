@@ -754,10 +754,9 @@ private struct PreviewOptions: View {
         @Bindable var preview = preview
         Form {
             Section {
-                TextField("Preview Text", text: $preview.sampleText, prompt: Text("Font name"))
+                TextField("Preview Text", text: $preview.sampleText, prompt: Text("Preview Text"))
+                    .labelsHidden()
                 Menu("Presets") {
-                    Button("Font Name") { preview.sampleText = "" }
-                    Divider()
                     ForEach(PreviewSettings.presets, id: \.self) { sample in
                         Button(sample) { preview.sampleText = sample }
                     }

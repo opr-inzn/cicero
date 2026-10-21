@@ -37,7 +37,7 @@ struct LigaturesSection: View {
             } header: {
                 HStack(spacing: 6) {
                     Text(group.name).font(.headline)
-                    Text("— \(group.ligatures.count.formatted())").font(.callout).foregroundStyle(.secondary)
+                    Text("– \(group.ligatures.count.formatted())").font(.callout).foregroundStyle(.secondary)
                     Spacer()
                 }
                 .padding(.horizontal, Self.inset)

@@ -566,8 +566,9 @@ private struct FontListRow: View {
                 VariableTag(family: family)
             }
         case .preview:
+            let face = family.face(nearestWeight: preview.weight).face
             FontText(
-                text: preview.text(for: family), face: family.face(nearestWeight: preview.weight).face,
+                text: model.scriptSamples.text(preview.text(for: family), for: face), face: face,
                 size: 17, weight: preview.weight, variations: model.variations(for: family), kerning: preview.kerning(at: 17)
             )
             // Every row the same height, however tall the font's glyphs, which may run over its edges rather

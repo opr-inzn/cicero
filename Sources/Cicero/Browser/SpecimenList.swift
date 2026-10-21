@@ -72,8 +72,9 @@ private struct Specimen: View {
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
+            let face = family.face(nearestWeight: preview.weight).face
             FontText(
-                text: preview.text(for: family), face: family.face(nearestWeight: preview.weight).face,
+                text: model.scriptSamples.text(preview.text(for: family), for: face, long: true), face: face,
                 size: preview.size, weight: preview.weight, variations: model.variations(for: family),
                 kerning: preview.kerning(at: preview.size)
             )

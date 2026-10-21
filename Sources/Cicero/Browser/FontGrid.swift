@@ -82,9 +82,10 @@ private struct Tile: View {
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
+            let face = family.face(nearestWeight: preview.weight).face
             FontText(
-                text: preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText,
-                face: family.face(nearestWeight: preview.weight).face,
+                text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: face),
+                face: face,
                 size: preview.size, weight: preview.weight, variations: model.variations(for: family),
                 kerning: preview.kerning(at: preview.size)
             )

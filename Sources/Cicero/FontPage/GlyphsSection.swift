@@ -75,15 +75,17 @@ struct GlyphsSection: View {
                                    description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else {
-            ForEach(shown.filter { $0.group <= .ligatures }) { section in
+            let lead = GlyphSection.beforeLigatures(shown, of: sections)
+            ForEach(shown.prefix(lead)) { section in
                 self.section(section, style: style)
             }
-            // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes.
+            // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes, or after the one
+            // script a font without Latin letters starts with.
             if !shownLigatures.isEmpty {
                 LigaturesSection(face: style.face, weight: style.weight, variations: style.variations, columns: columns, groups: shownLigatures,
                                  characters: ligatureCharacters)
             }
-            ForEach(shown.filter { $0.group > .ligatures }) { section in
+            ForEach(shown.dropFirst(lead)) { section in
                 self.section(section, style: style)
             }
             Color.clear.frame(height: 6)
@@ -111,7 +113,7 @@ struct GlyphsSection: View {
         } header: {
             HStack(spacing: 6) {
                 Text(section.title).font(.headline)
-                Text("— \(total.formatted())").font(.callout).foregroundStyle(.secondary)
+                Text("– \(total.formatted())").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
@@ -333,16 +335,23 @@ struct GlyphsSection: View {
         .contextMenu { copyMenu(cell, style: style) }
     }
 
-    /// A character set in the font. A mark that combines with the character before it (an acute, a cedilla) is drawn from
-    /// its outline instead: set on its own it has nothing to sit on and showed nothing.
+    /// A character set in the font. One that takes no room of its own is drawn from its outline instead: a mark that
+    /// combines with the character before it (an acute, a cedilla), or one a font keeps in private use, like a Thai tone
+    /// mark shifted left, set on its own has nothing to sit on and showed nothing.
     @ViewBuilder
     private func character(_ scalar: UInt32, style: Style, size: CGFloat) -> some View {
-        if Self.isCombining(scalar), let glyph = GlyphVectors.glyph(of: scalar, in: FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)) {
+        let font = FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)
+        if let glyph = GlyphVectors.glyph(of: scalar, in: font), Self.isCombining(scalar) || Self.takesNoRoom(glyph, in: font) {
             GlyphImage(face: style.face, glyph: glyph, size: size, weight: style.weight, variations: style.variations)
         } else {
             FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: style.face, size: size, weight: style.weight,
                      variations: style.variations)
         }
+    }
+
+    private static func takesNoRoom(_ glyph: CGGlyph, in font: CTFont) -> Bool {
+        var glyph = glyph
+        return CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, nil, 1) == 0
     }
 
     private static func isCombining(_ scalar: UInt32) -> Bool {

@@ -35,6 +35,16 @@ public struct EmptyGlyphs {
         return contains(glyphs[0])
     }
 
+    /// Whether the font draws nothing for the character: its glyph is empty, or it has none of its own, like the variation
+    /// selectors a font with variation sequences lists without a glyph for them.
+    public func drawsNothing(for scalar: UInt32) -> Bool {
+        guard let character = Unicode.Scalar(scalar) else { return true }
+        var units = Array(String(Character(character)).utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: units.count)
+        guard CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count), glyphs[0] != 0 else { return true }
+        return contains(glyphs[0])
+    }
+
     /// The characters of these the font draws, and those with nothing to draw it has.
     public func drawn(_ scalars: ScalarRanges) -> ScalarRanges {
         inColour ? scalars : scalars.filter { Self.isInvisible($0) || !contains(character: $0) }

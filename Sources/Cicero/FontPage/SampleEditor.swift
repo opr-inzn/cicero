@@ -4,15 +4,19 @@ import SwiftUI
 /// The font page's editable sample: a text view of its own rather than SwiftUI's TextEditor, which cuts off
 /// whatever reaches past the font's ascent and descent (descenders lower than the font says, swashes), and
 /// past each line when the lines are closer than the font is tall. Its lines draw every glyph wherever it
-/// reaches. It's as tall as its lines at the width the page gives it, with `overhang` above and below them for
-/// glyphs reaching past them. A right-click shows Cut, Copy and Paste, then `menu`.
+/// reaches. It's as tall as its lines at the width the page gives it, and the room above and below them for
+/// glyphs reaching past them (`roomAbove`, `roomBelow`); `margin` at either side of the lines is room for glyphs
+/// reaching past their ends, as nothing is drawn outside the view. A right-click shows Cut, Copy and Paste, then
+/// `menu`.
 struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
     let font: CTFont
     let kerning: Double
     let lineHeight: Double
     let alignment: NSTextAlignment
-    let overhang: CGFloat
+    let margin: CGFloat
+    let roomAbove: CGFloat
+    let roomBelow: CGFloat
     @ViewBuilder let menu: () -> MenuContent
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
@@ -46,14 +50,15 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
         guard let width = proposal.width, width.isFinite, let manager = view.textLayoutManager, let container = view.textContainer
         else { return nil }
-        if container.size.width != width { container.size = NSSize(width: width, height: .greatestFiniteMagnitude) }
+        let lineWidth = width - 2 * margin
+        if container.size.width != lineWidth { container.size = NSSize(width: lineWidth, height: .greatestFiniteMagnitude) }
         // The extra line after a final line break, and the one empty text has, count too.
         var bottom: CGFloat = 0
         manager.enumerateTextLayoutFragments(from: manager.documentRange.location, options: [.ensuresLayout, .ensuresExtraLineFragment]) {
             bottom = max(bottom, $0.layoutFragmentFrame.maxY)
             return true
         }
-        return CGSize(width: width, height: bottom.rounded(.up) + 2 * overhang)
+        return CGSize(width: width, height: bottom.rounded(.up) + roomAbove + roomBelow)
     }
 
     /// Made at each right-click, so its checkmarks are up to date.
@@ -67,7 +72,8 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     /// with an input method.
     private func update(_ view: NSTextView, context: Context) {
         setMenu(of: view)
-        view.textContainerInset = NSSize(width: 0, height: overhang)
+        view.textContainerInset = NSSize(width: margin, height: 0)
+        (view as? SampleTextView)?.roomAbove = roomAbove
         let style = Style(font: font, kerning: kerning, lineHeight: lineHeight, alignment: alignment)
         guard style != context.coordinator.style || view.textStorage?.length != context.coordinator.styledLength else { return }
         context.coordinator.style = style
@@ -126,8 +132,19 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
 /// shows the page's menu, not the text view's.
 private final class SampleTextView: NSTextView {
     var makeMenu: (() -> NSMenu)?
+    /// Where the lines start: below the room for glyphs reaching above them. Not a container inset, which would
+    /// leave as much room below.
+    var roomAbove: CGFloat = 0 {
+        didSet {
+            guard roomAbove != oldValue else { return }
+            invalidateTextContainerOrigin()
+            needsDisplay = true
+        }
+    }
     /// The menu last shown, kept until the next: its items act once it has closed.
     private var shownMenu: NSMenu?
+
+    override var textContainerOrigin: NSPoint { NSPoint(x: textContainerInset.width, y: roomAbove) }
 
     override func cancelOperation(_ sender: Any?) {
         nextResponder?.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: sender)

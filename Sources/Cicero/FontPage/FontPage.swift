@@ -93,8 +93,7 @@ private struct Header: View {
     var body: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
-                FontText(text: family.name, face: family.regular.face, size: 34)
-                    .truncationMode(.tail)
+                FamilyName(name: family.name, face: family.regular.face)
                 Text(summary)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -158,6 +157,64 @@ private struct Header: View {
     }
 }
 
+/// The family's name in its own regular face, for the header: 34 pt on a line as tall as most fonts' names take, the same
+/// for every family, so headers don't grow with a font's line spacing; or, when its glyphs reach further than the room
+/// around that line, like Zapfino's swashes, smaller, just as much as it takes for them to fit whole, in the middle of it.
+/// Cut short with "…" when it's wider than the room.
+private struct FamilyName: View {
+    let name: String
+    let face: FontFace
+    static let size: CGFloat = 34
+    /// The line, and the room its glyphs may take above it, short of the toolbar's edge, and below it, short of the summary.
+    static let line: CGFloat = 41
+    static let above: CGFloat = 16
+    static let below: CGFloat = 4
+    /// Room before the name for glyphs reaching back past its start, like a swash on a first capital.
+    static let lead: CGFloat = 12
+
+    var body: some View {
+        ReadingFonts(paths: [face.path]) {
+            Canvas { context, area in
+                let color = Color.primary.resolve(in: context.environment).cgColor
+                context.withCGContext { Self.draw(name, face: face, in: area, color: color, into: $0) }
+            }
+        }
+        .frame(height: Self.above + Self.line + Self.below)
+        .padding(.top, -Self.above)
+        .padding(.bottom, -Self.below)
+        .padding(.leading, -Self.lead)
+        .accessibilityElement()
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private static func draw(_ name: String, face: FontFace, in area: CGSize, color: CGColor, into context: CGContext) {
+        func line(_ size: CGFloat) -> (font: CTFont, line: CTLine, ink: CGRect) {
+            let font = FontLoader.shared.font(face, size: size, weight: 400)
+            let line = TextLine(name, font: font, kerning: 0).line
+            return (font, line, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds))
+        }
+        var set = line(size)
+        // On the line as the font's own spacing would put it, its ascent and descent in the middle of it.
+        let ascent = CTFontGetAscent(set.font), descent = CTFontGetDescent(set.font)
+        var baseline = above + (Self.line - ascent - descent) / 2 + ascent
+        if !set.ink.isNull, baseline - set.ink.maxY < 0 || baseline - set.ink.minY > area.height {
+            set = line(size * min(1, area.height / set.ink.height))
+            baseline = (area.height - set.ink.height) / 2 + set.ink.maxY
+        }
+        let ellipsis = TextLine("…", font: set.font, kerning: 0).line
+        let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .end, ellipsis) ?? set.line
+        context.saveGState()
+        context.setFillColor(color)
+        context.textMatrix = .identity
+        context.translateBy(x: lead, y: baseline)
+        context.scaleBy(x: 1, y: -1)
+        context.textPosition = .zero
+        CTLineDraw(shown, context)
+        context.restoreGState()
+    }
+}
+
 /// A large, editable sample in one style.
 private struct TypeTester: View {
     @Environment(AppModel.self) private var model
@@ -166,48 +223,88 @@ private struct TypeTester: View {
     @AppStorage("typeTester.text") private var text = "Sphinx of black quartz, judge my vow."
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
+    /// What's typed over the text in a font's own script, on this family's page only (see `shownText`).
+    @State private var ownScript: (family: String, text: String)?
 
     var body: some View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                if family.faces.count > 1 {
-                    Picker("Style", selection: choice(isAdjusted: !variations.isEmpty)) {
-                        Text("Automatic").tag(StyleChoice.automatic)
-                        Divider()
-                        ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
-                        if !variations.isEmpty {
-                            Divider()
-                            Text("Custom").tag(StyleChoice.custom)
-                        }
+            // On one row where there's room, else the sliders on a row of their own: with the Info panel open, a narrow
+            // window has too little for all of them, and squeezed, the labels would wrap and the row grow.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    stylePicker(isAdjusted: !variations.isEmpty)
+                    Spacer()
+                    sliders
+                    buttons(hasAxes: !face.face.axes.isEmpty)
+                }
+                VStack(spacing: 10) {
+                    HStack(spacing: 16) {
+                        stylePicker(isAdjusted: !variations.isEmpty)
+                        Spacer()
+                        buttons(hasAxes: !face.face.axes.isEmpty)
                     }
-                    .fixedSize()
-                    .help("Which style to show; Automatic follows the preview weight")
-                }
-                Spacer()
-                // Where the row is short of room, the slider narrows; squeezed, the label would wrap and the row grow.
-                HStack(spacing: 8) {
-                    Text("Size").foregroundStyle(.secondary).fixedSize()
-                    ValueSlider(value: $size, range: 12...240).frame(minWidth: 80, maxWidth: 160)
-                    ValueField("Size", value: $size, range: 12...240, unit: " pt")
-                }
-                .layoutPriority(1)
-                IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
-                    .help("Align left, center or right")
-                if !face.face.axes.isEmpty {
-                    AxesButton()
+                    HStack(spacing: 16) {
+                        Spacer(minLength: 0)
+                        sliders
+                    }
                 }
             }
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
-                editor(FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
+                editor(face.face, FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
                                               features: model.features(for: family)))
             }
             .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
+    }
+
+    @ViewBuilder
+    private func stylePicker(isAdjusted: Bool) -> some View {
+        if family.faces.count > 1 {
+            Picker("Style", selection: choice(isAdjusted: isAdjusted)) {
+                Text("Automatic").tag(StyleChoice.automatic)
+                Divider()
+                ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
+                if isAdjusted {
+                    Divider()
+                    Text("Custom").tag(StyleChoice.custom)
+                }
+            }
+            .fixedSize()
+            .help("Which style to show; Automatic follows the preview weight")
+        }
+    }
+
+    /// The text's size, and its line spacing, which is Preview Options' too.
+    private var sliders: some View {
+        HStack(spacing: 16) {
+            slider("Size", $size, range: 12...240, unit: " pt")
+            slider("Line Spacing", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
+                .help("The distance between lines, in percent of the size; the same as Line Spacing in Preview Options")
+        }
+    }
+
+    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too.
+    private func slider(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String) -> some View {
+        HStack(spacing: 8) {
+            Text(title).foregroundStyle(.secondary).fixedSize()
+            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
+            ValueField(title, value: value, range: range, step: step, unit: unit)
+        }
+        .layoutPriority(1)
+    }
+
+    @ViewBuilder
+    private func buttons(hasAxes: Bool) -> some View {
+        IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
+            .help("Align left, center or right")
+        if hasAxes {
+            AxesButton()
+        }
     }
 
     /// The Style menu's choice: Custom once an axis has been moved, until a style is chosen again.
@@ -249,29 +346,47 @@ private struct AxesButton: View {
 
 private extension TypeTester {
     @ViewBuilder
-    func editor(_ ctFont: CTFont) -> some View {
+    func editor(_ face: FontFace, _ ctFont: CTFont) -> some View {
+        let text = shownText(face)
         let kerning = preview.kerning(at: size)
         let lineHeightPoints = size * preview.lineSpacing / 100
-        let overhang = Self.overhang(of: text, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
+        let room = Self.room(for: text.wrappedValue, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
-        SampleEditor(text: $text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
-                     alignment: alignment.paragraph, overhang: overhang) {
+        SampleEditor(text: text, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+                     alignment: alignment.paragraph, margin: 24, roomAbove: room.above, roomBelow: room.below) {
             FamilyMenu(families: [family], model: model)
         }
             .frame(minHeight: 280)
             .padding(.vertical, 20)
+            // Out over the page's margins, for glyphs reaching past the lines' ends, like a swash at the start of one.
+            .padding(.horizontal, -24)
             // Around the text too, which has it in its own menu (see `SampleEditor`).
             .contentShape(.rect)
             .contextMenu { FamilyMenu(families: [family], model: model) }
     }
 
-    /// Room above and below the lines for glyphs that reach past them, which the editor would cut off at its
-    /// edges: as much of the text's height as the line spacing leaves out, at either end, as the editor may
-    /// put it either side, and a quarter of the size more, as it sets its lines a few points lower than the
-    /// copy that sizes it.
-    static func overhang(of text: String, in font: CTFont, kerning: Double, lineHeight: Double) -> CGFloat {
+    /// The text to show and type into: what's been typed, kept from one page to the next, or, for a font with none of its
+    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only.
+    func shownText(_ face: FontFace) -> Binding<String> {
+        let sample = model.scriptSamples.text(text, for: face, long: true)
+        guard sample != text else { return $text }
+        let family = family.id
+        return Binding {
+            ownScript.flatMap { $0.family == family ? $0.text : nil } ?? sample
+        } set: {
+            ownScript = (family, $0)
+        }
+    }
+
+    /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
+    /// above or what follows. The editor sets each baseline the font's descent above the bottom of its line, so all
+    /// that the line spacing leaves out of the font's height goes above the first line, like a script font's
+    /// ascenders at tight spacing, and below the last only what reaches lower than the font's descent. Its glyphs'
+    /// own reach counts where it's greater than the font's (see `TextLine`).
+    static func room(for text: String, in font: CTFont, kerning: Double, lineHeight: Double) -> (above: CGFloat, below: CGFloat) {
         let line = TextLine(text, font: font, kerning: kerning)
-        return max(0, line.ascent + line.descent - lineHeight) + CTFontGetSize(font) / 4
+        let descent = CTFontGetDescent(font).rounded()
+        return (max(0, line.ascent - (lineHeight - descent)).rounded(.up), max(0, line.descent - descent).rounded(.up))
     }
 
     /// Centered, unless the left alignment was chosen when there were only those two.
@@ -319,7 +434,8 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row(styleWidth: styleWidth, statusWidth: statusWidth) {
-                    FontText(text: preview.text(for: family), face: style.face, size: 20, weight: style.face.styleWeight)
+                    FontText(text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face, size: 20,
+                             weight: style.face.styleWeight)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {

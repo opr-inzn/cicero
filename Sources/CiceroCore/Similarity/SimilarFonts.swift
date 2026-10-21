@@ -127,7 +127,8 @@ public struct SimilarFonts: Sendable {
     ///     one are left out.
     ///   - classification: nil for one without.
     ///   - notSimilar: family name → the families the user said don't look like it (`UserData.notSimilar`): left out of
-    ///     its list, it out of theirs, and every copy of either (`design(of:)`) too, so that another doesn't take one's place.
+    ///     its list, it out of theirs, and every copy of either (`design(of:)`) too, with nothing in their places, so the
+    ///     list is that much shorter.
     public init(families: [Family], measurements: (Family) -> LetterMeasurements?, embeddings: ((Family) -> [Float]?)? = nil,
                 classification: (Family) -> String?, notSimilar: [String: [String]] = [:],
                 weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
@@ -173,7 +174,7 @@ public struct SimilarFonts: Sendable {
     public func contains(_ id: String) -> Bool { positions[id] != nil }
 
     /// The families that look most like this one, the nearest first, without it and its copies, and each design once,
-    /// but none the user said doesn't look like it; empty when it wasn't measured.
+    /// but none the user said doesn't look like it, whose places stay empty; empty when it wasn't measured.
     public func nearest(to id: String, limit: Int) -> [String] {
         nearestWithDistances(to: id, limit: limit).map(\.id)
     }
@@ -190,8 +191,9 @@ public struct SimilarFonts: Sendable {
             found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        // The nearest copy of each design, none of the family's own, and none the user said doesn't look like it.
-        var listed = unlike[designs[reference], default: []].union([designs[reference]]), nearest: [(index: Int, distance: Float)] = []
+        // The nearest copy of each design and none of the family's own; those the user said don't look like it go after,
+        // with nothing in their places, so marking one doesn't bring in the next.
+        var listed: Set = [designs[reference]], nearest: [(index: Int, distance: Float)] = []
         for entry in found where listed.insert(designs[entry.index]).inserted {
             nearest.append(entry)
             if nearest.count == max(limit, Self.longestList) { break }
@@ -202,7 +204,8 @@ public struct SimilarFonts: Sendable {
             let ordered = named.filter { sizes[$0.index] == own } + named.filter { sizes[$0.index] != own }
             for (slot, entry) in zip(slots, ordered) { nearest[slot] = entry }
         }
-        return nearest.prefix(limit).map { (ids[$0.index], $0.distance) }
+        let unliked = unlike[designs[reference], default: []]
+        return nearest.prefix(limit).filter { !unliked.contains(designs[$0.index]) }.map { (ids[$0.index], $0.distance) }
     }
 
     /// How many steps apart a measure one family has and the other hasn't counts as.
