@@ -66,12 +66,6 @@ struct FamilyMenu: View {
         Divider()
 
         Button("Reveal in Finder", systemImage: "finder") { model.reveal(families) }
-        Button(families.count == 1 ? "Copy Family Name" : "Copy Family Names", systemImage: "doc.on.clipboard") {
-            NSPasteboard.general.clearContents()
-            // The fonts' own names, which apps and style sheets know them by everywhere, also for a family shown in the
-            // Mac's language.
-            NSPasteboard.general.setString(families.map(\.id).joined(separator: "\n"), forType: .string)
-        }
         Button("Export", systemImage: "square.and.arrow.up") { model.exportFonts(families, named: nil) }
         // Measured once its letters are, a moment after it's added; never for one without Latin letters.
         if families.count == 1 {
@@ -229,17 +223,18 @@ struct RatingMenuItems: View {
     let model: AppModel
 
     var body: some View {
-        ForEach(1...5, id: \.self) { stars in
+        Toggle("No Rating", isOn: Binding(
+            get: { families.allSatisfy { model.rating(of: $0) == nil } },
+            set: { if $0 { model.setRating(nil, for: families) } }
+        ))
+        // The most stars first.
+        ForEach([5, 4, 3, 2, 1], id: \.self) { stars in
             Toggle(Rating.stars(stars), isOn: Binding(
                 get: { families.allSatisfy { model.rating(of: $0) == stars } },
                 set: { model.setRating($0 ? stars : nil, for: families) }
             ))
             .accessibilityLabel(Rating.description(stars))
         }
-        Toggle("No Rating", isOn: Binding(
-            get: { families.allSatisfy { model.rating(of: $0) == nil } },
-            set: { if $0 { model.setRating(nil, for: families) } }
-        ))
     }
 }
 

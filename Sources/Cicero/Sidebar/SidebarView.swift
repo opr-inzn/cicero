@@ -157,6 +157,12 @@ private struct SidebarContent: View {
                     .modifier(GroupDrop(group: group.id, dragged: draggedGroup, target: $groupDropTarget) { dragged in
                         withAnimation(.snappy) { move(dragged, onto: group.id) }
                     })
+                    .contextMenu {
+                        if group.rows.contains(where: { model.isVisible($0.key) }) {
+                            Button("Hide from Sidebar", systemImage: "eye.slash") { model.hideGroup(group.id) }
+                        }
+                        editSidebarButton
+                    }
             }
         }
     }
@@ -279,16 +285,16 @@ private struct SidebarContent: View {
         // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
             content
-                .drops(of: FontDrag.self, isOver: { isOver in
+                .background(FontDropTarget(isOver: { isOver in
                     if isOver {
-                        highlight.dropTarget = row.item
+                        if highlight.dropTarget != row.item { highlight.dropTarget = row.item }
                     } else if highlight.dropTarget == row.item {
                         highlight.dropTarget = nil
                     }
                 }) { drags in
                     highlight.dropTarget = nil
                     _ = model.handleDrop(drags, on: row.item)
-                }
+                })
         } else {
             content
         }
@@ -380,8 +386,12 @@ private struct SidebarContent: View {
         if model.isVisible(row.key) {
             Button("Hide from Sidebar", systemImage: "eye.slash") { model.setVisible(row.key, false) }
         }
+        editSidebarButton
+    }
+
+    private var editSidebarButton: some View {
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
-                   systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
+               systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
     }
 }
 

@@ -203,7 +203,15 @@ extension AppModel {
     }
 
     private func computeVisibleFamilies() -> [Family] {
-        let matches = searchMatcher(SearchQuery(appliedSearch))
+        let query = SearchQuery(appliedSearch)
+        let found = listedFamilies(where: searchMatcher(query))
+        // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
+        guard found.isEmpty, !query.isEmpty else { return found }
+        return listedFamilies(where: searchMatcher(query.anywhereInNames))
+    }
+
+    /// The families the sidebar selection lists, or Show Similar Fonts, that `matches`.
+    private func listedFamilies(where matches: (Family) -> Bool) -> [Family] {
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
@@ -213,6 +221,24 @@ extension AppModel {
             guard data.lists(family) else { return false }
             return tests.contains { $0(family) } && matches(family)
         }
+    }
+
+    /// What the search field suggests for what's typed: up to eight of the families the browser would list whose names
+    /// begin with it, or have a word that does, those that begin with it first, each alphabetically.
+    func searchSuggestions(for typed: String) -> [Family] {
+        let query = SearchQuery(typed)
+        guard !query.isEmpty else { return [] }
+        var ranks: [String: Int] = [:]
+        let found = listedFamilies { family in
+            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { return false }
+            ranks[family.id] = rank
+            return true
+        }
+        let sorted = found.sorted { a, b in
+            let ranked = (ranks[a.id] ?? 1, ranks[b.id] ?? 1)
+            return ranked.0 != ranked.1 ? ranked.0 < ranked.1 : a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+        return Array(sorted.prefix(8))
     }
 
     /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the

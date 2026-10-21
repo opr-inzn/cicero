@@ -68,7 +68,9 @@ A green **Variable** tag, with the symbol of sliders, marks a variable family, i
 
 ## Search
 
-Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, foundry or [note](organizing.md#notes) contains what you type, or the name, PostScript name, designer or vendor ID of one of its styles.
+Type in the search field in the toolbar. Cicero shows the families in the current sidebar item whose name, foundry or [note](organizing.md#notes) has a word that begins with what you type, or the name, PostScript name, designer or vendor ID of one of its styles. So **am** finds American Typewriter, but not every family from a foundry with “am” inside its name. When no word begins with what you type, Cicero looks inside the words of names too, so **vetica** still finds Helvetica.
+
+As you type, the search field suggests up to eight families whose names begin with it, or have a word that does, each with “Aa” in its own letters. Choose one to search for its whole name: that family is selected and brought into view.
 
 You can also search for what kind of family it is, whatever it’s called:
 
@@ -111,9 +113,9 @@ A family without the Latin letters Cicero measures, like most fonts for other sc
 | Move the selection | ↑ or ↓; in the grid, ← and → move it a tile and ↑ and ↓ a row |
 | Extend the selection | Hold ⇧ with an arrow key |
 
-Right-click a family for its menu: activate or deactivate it, add it to a set, give it a tag or a classification, reveal its files, copy its name, export it, [show similar fonts](#find-similar-fonts), compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
+Right-click a family for its menu: activate or deactivate it, add it to a set, give it a tag or a classification, reveal its files, export it, [show similar fonts](#find-similar-fonts), compare it, remove a font you [added](organizing.md#added-fonts) from the library, or move it to the Trash. When you right-click one of several selected families, the menu acts on all of them.
 
-You can drag families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window.
+You can drag families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window. When you drag one of several selected families, all of them go.
 
 ## Take a quick look
 

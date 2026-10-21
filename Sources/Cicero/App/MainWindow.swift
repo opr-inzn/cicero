@@ -39,6 +39,7 @@ struct MainWindow: View {
             model.searchText = text
             model.openFamilyID = nil
         }), placement: .toolbar, prompt: "Search")
+        .searchSuggestions { SearchSuggestions() }
         // Over the split view, so the panel stays put when a font page opens or closes.
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }

@@ -2,11 +2,13 @@ import Foundation
 
 /// What's typed in the search field. A family matches when the query's words can be split into runs that each begin
 /// one of its terms, the words for what kind of family it is (variable, monospaced, its classification, display or
-/// text, condensed, its tags), or are in one of its texts (its names and its styles', its foundry, a style's
-/// PostScript name, designer or vendor ID, its note). So the whole query in a name finds a family, as before, but
-/// "mono" also finds every monospaced one, "variable sans" variable sans serifs, and "inter variable" Inter if it's
-/// variable. A term only begins with a run, so "serif" doesn't find sans serifs by their classification, and typing
-/// more of a word only ever narrows what's found, unless it stops being a keyword ("mono", then "monot").
+/// text, condensed, its tags), or begin a word in one of its texts (its names and its styles', its foundry, a style's
+/// PostScript name, designer or vendor ID, its note). So the whole query at the start of a word in a name finds a
+/// family, but "mono" also finds every monospaced one, "variable sans" variable sans serifs, and "inter variable" Inter
+/// if it's variable. A term only begins with a run, so "serif" doesn't find sans serifs by their classification, and
+/// a run only begins a word, so "am" finds American Typewriter but not every family from a foundry with "am" inside
+/// its name. Typing more of a word only ever narrows what's found, unless it stops being a keyword ("mono", then
+/// "monot"). Where nothing has a word that begins with it, `anywhereInNames` looks inside words of names too.
 ///
 /// A run that's a keyword, one of the words for a kind of family, is looked for in the family's and its styles' names
 /// and its note only, not in the rest of its texts: "mono" finds monospaced families and families with Mono in a name,
@@ -14,6 +16,8 @@ import Foundation
 public struct SearchQuery: Sendable {
     /// Lowercased, with one space between its words.
     public let text: String
+    /// Whether a run is found inside a word of a name too, not only where one begins.
+    public private(set) var isAnywhereInNames = false
     /// Every run of consecutive words, by first word and length less one: runs[1][0] is the second word, runs[0][1]
     /// the first two.
     private let runs: [[Run]]
@@ -36,13 +40,22 @@ public struct SearchQuery: Sendable {
 
     public var isEmpty: Bool { text.isEmpty }
 
+    /// The same query, finding its runs inside words of names too, like "vetica" in Helvetica: for when nothing has a
+    /// word that begins with them.
+    public var anywhereInNames: SearchQuery {
+        var query = self
+        query.isAnywhereInNames = true
+        return query
+    }
+
     /// Whether the query matches a family with these names (its own and its styles', and its note), other texts and
     /// terms, lowercased.
     public func matches(names: [String], texts: [String], terms: [String]) -> Bool {
         guard !isEmpty else { return true }
         func found(_ run: Run) -> Bool {
-            terms.contains { $0.hasPrefix(run.text) } || names.contains { $0.contains(run.text) }
-                || !run.isKeyword && texts.contains { $0.contains(run.text) }
+            terms.contains { $0.hasPrefix(run.text) }
+                || names.contains { isAnywhereInNames ? $0.contains(run.text) : Self.beginsWord(run.text, in: $0) }
+                || !run.isKeyword && texts.contains { Self.beginsWord(run.text, in: $0) }
         }
         // covered[i]: the words before the i-th split into runs that are found.
         var covered = [true] + Array(repeating: false, count: runs.count)
@@ -51,6 +64,28 @@ public struct SearchQuery: Sendable {
                 covered[start + length + 1] = true
             }
             if covered[runs.count] { return true }
+        }
+        return false
+    }
+
+    /// How well a family's name, lowercased, suits the query as a suggestion in the search field: 0 when the name
+    /// begins with the whole query, 1 when a later word in it does, nil when none does.
+    public func suggestionRank(of name: String) -> Int? {
+        guard !isEmpty else { return nil }
+        if name.hasPrefix(text) { return 0 }
+        return Self.beginsWord(text, in: name) ? 1 : nil
+    }
+
+    /// Whether `run` is in `text` where a word begins: at its start, or after a character that's neither a letter nor
+    /// a digit. A run that doesn't begin with a letter or digit itself, like "-bold", can be anywhere.
+    static func beginsWord(_ run: String, in text: String) -> Bool {
+        guard let first = run.first, first.isLetter || first.isNumber else { return text.contains(run) }
+        var rest = text[...]
+        while let range = rest.range(of: run) {
+            if range.lowerBound == text.startIndex { return true }
+            let before = text[text.index(before: range.lowerBound)]
+            if !before.isLetter && !before.isNumber { return true }
+            rest = text[text.index(after: range.lowerBound)...]
         }
         return false
     }

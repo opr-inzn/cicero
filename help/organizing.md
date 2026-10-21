@@ -20,7 +20,7 @@ The item you’ve selected is in the accent color. To hide the whole sidebar, ch
 
 ### Open or close a section
 
-Click anywhere on a section’s title. The groups inside **Coverage** open and close the same way. **Foundries**, **Classifications**, and the **Unicode Blocks** and **Google Fonts** groups start closed.
+Click anywhere on a section’s title. The groups inside **Coverage** open and close the same way. **Foundries** and **Coverage** start closed, and so do the **Unicode Blocks** and **Google Fonts** groups inside **Coverage**.
 
 ### Hide items you don’t use
 
@@ -28,7 +28,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 2. Uncheck what you don’t want. Unchecked items are dimmed.
 3. Click **Done**. The unchecked items disappear.
 
-To hide one item quickly, right-click it and choose **Hide from Sidebar**.
+To hide one item quickly, right-click it and choose **Hide from Sidebar**. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
 
 The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
 
@@ -55,7 +55,7 @@ Drag families from the browser onto:
 - **a foundry**, to say they’re from that foundry
 - **a classification**, to put them in it
 
-The item they’re over lights up in the accent color.
+The item they’re over lights up in the accent color. To drop several families at once, select them and drag any one of them.
 
 ## Folders
 
