@@ -857,6 +857,15 @@ extension AppModel {
         compareEntries.removeAll { $0.id == id }
     }
 
+    /// Adds the family, or takes it out in every style it's there in.
+    func toggleInCompare(_ familyID: String) {
+        if compareEntries.contains(where: { $0.familyID == familyID }) {
+            compareEntries.removeAll { $0.familyID == familyID }
+        } else {
+            _ = addToCompare([familyID])
+        }
+    }
+
     /// Puts a compared family where another one is, moving the others along.
     func moveInCompare(_ id: UUID, to target: UUID) {
         guard let from = compareEntries.firstIndex(where: { $0.id == id }), let to = compareEntries.firstIndex(where: { $0.id == target }),

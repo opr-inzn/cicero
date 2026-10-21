@@ -50,7 +50,6 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 960, height: 640)
         .restorationBehavior(.disabled)
-        .commandsRemoved()
         .handlesExternalEvents(matching: [])
 
         Settings {
@@ -67,6 +66,7 @@ struct CiceroCommands: Commands {
     let backup: BackupPrompts
     let updates: Updates
     @Environment(\.openWindow) private var openWindow
+    @FocusedBinding(\.compareSize) private var compareSize
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -102,6 +102,21 @@ struct CiceroCommands: Commands {
         }
         // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
         SidebarCommands()
+        // Compare's size, while its window is in front, as the − and + in its toolbar. The menu bar matches ⌘+ to the
+        // keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
+        CommandGroup(after: .sidebar) {
+            Divider()
+            Button("Zoom In", systemImage: "plus.magnifyingglass") {
+                if let size = compareSize { compareSize = ToolbarSizeStepper.bigger(than: size, in: CompareWindow.sizes) }
+            }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(compareSize.map { $0 >= CompareWindow.sizes.upperBound } ?? true)
+            Button("Zoom Out", systemImage: "minus.magnifyingglass") {
+                if let size = compareSize { compareSize = ToolbarSizeStepper.smaller(than: size, in: CompareWindow.sizes) }
+            }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(compareSize.map { $0 <= CompareWindow.sizes.lowerBound } ?? true)
+        }
         CommandMenu("Fonts") {
             let selection = model.selectedFamilies
             Button("Activate", systemImage: "checkmark.circle") { model.activate(selection) }
@@ -129,12 +144,13 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(selection.isEmpty)
             Divider()
+            // Several families start over; one joins those there, so families far apart in the library can be put
+            // together one by one; none just opens the window.
             Button("Compare", systemImage: "rectangle.split.1x2") {
-                model.compare(selection)
+                if selection.count > 1 { model.compare(selection) } else { _ = model.addToCompare(selection.map(\.id)) }
                 openWindow(id: WindowID.compare)
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
-            .disabled(selection.count < 2)
             Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: selection[0]) }
                 .disabled(selection.count != 1 || !model.canShowSimilar(selection[0]))
             Button("Character Toolbox", systemImage: "character.textbox") { openWindow(id: WindowID.toolbox) }

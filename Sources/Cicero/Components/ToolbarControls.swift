@@ -99,11 +99,72 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 }
 
+/// A size between − and + buttons, for a toolbar capsule. The buttons step through common sizes, and the size takes
+/// one typed in. ⌘− and ⌘+ belong to menu items doing the same (Compare's View → Zoom Out and Zoom In): the menu bar
+/// matches a menu item's ⌘+ to the keyboard's own keys, ⌘= on a US keyboard and the + key on a German one.
+struct ToolbarSizeStepper: View {
+    @Binding var size: Double
+    let range: ClosedRange<Double>
+    @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.self) private var environment
+
+    /// Each a fifth to a third bigger than the one before; a size typed in between goes to the next one either way.
+    static let sizes: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button("Zoom Out", systemImage: "minus") { size = Self.smaller(than: size, in: range) }
+                .disabled(size <= range.lowerBound)
+                .help("Zoom Out")
+            // As wide as the biggest size, so the stepper keeps its width, with the size in the middle. Number and unit
+            // in the label colour, resolved: the glass lightens a field's text and darkens a text's when their colour
+            // changes with the appearance. Grey in a window in the background, as the buttons are.
+            Text("\(Int(range.upperBound)) pt")
+                .hidden()
+                .overlay {
+                    HStack(spacing: 0) {
+                        ValueField("Size", value: $size, range: range, width: nil)
+                        Text(" pt")
+                    }
+                    .foregroundStyle(Color(Color(nsColor: appearsActive ? .labelColor : .tertiaryLabelColor).resolve(in: environment)))
+                    .fixedSize()
+                }
+                .monospacedDigit()
+                .padding(.horizontal, 2)
+            Button("Zoom In", systemImage: "plus") { size = Self.bigger(than: size, in: range) }
+                .disabled(size >= range.upperBound)
+                .help("Zoom In")
+        }
+        .modifier(StepperButtonStyle())
+        .fixedSize()
+    }
+
+    /// The next of `sizes` up from `size`, kept to `range`.
+    static func bigger(than size: Double, in range: ClosedRange<Double>) -> Double {
+        min(sizes.first { $0 > size } ?? range.upperBound, range.upperBound)
+    }
+
+    /// The next of `sizes` down from `size`, kept to `range`.
+    static func smaller(than size: Double, in range: ClosedRange<Double>) -> Double {
+        max(sizes.last { $0 < size } ?? range.lowerBound, range.lowerBound)
+    }
+
+    /// `ToolbarButtonStyle`, grey, on macOS 26, inside the capsule's glass; on macOS 15, just the symbols, as one
+    /// control, grey as borderless buttons are.
+    private struct StepperButtonStyle: ViewModifier {
+        func body(content: Content) -> some View {
+            if #available(macOS 26, *) { content.buttonStyle(ToolbarButtonStyle(isSubdued: true)) } else { content.buttonStyle(.borderless).labelStyle(.iconOnly) }
+        }
+    }
+}
+
 /// A toolbar button, highlighted while it's on or pressed, and dimmed like AppKit's while it's disabled
 /// or its window is in the background. Sizes are AppKit's: a button fills its 36 pt glass capsule, and a
 /// picker's segments are inside it, `segmentInset` from its edges; the picker draws the chosen one's lens.
 struct ToolbarButtonStyle: ButtonStyle {
     var isOn = false
+    /// Grey rather than in the label colour, like a stepper's − and + beside the number they change.
+    var isSubdued = false
     fileprivate var segment: Segment?
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.appearsActive) private var appearsActive
@@ -120,7 +181,7 @@ struct ToolbarButtonStyle: ButtonStyle {
         configuration.label
             .labelStyle(.iconOnly)
             .imageScale(.large)
-            .foregroundStyle(isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+            .foregroundStyle(isEnabled && appearsActive ? (isSubdued ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)) : AnyShapeStyle(.tertiary))
             .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 6 : 8)
             .frame(minWidth: segment == nil ? 36 : 36 - 2 * Self.segmentInset, maxWidth: segment == nil ? nil : .infinity,
                    minHeight: 36 - (segment == nil ? 0 : 2 * Self.segmentInset))

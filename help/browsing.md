@@ -198,20 +198,24 @@ Click **Preview Options** in the toolbar:
 - **Leading:** the distance from one line to the next, from 80 to 250 % of the size; 120 % at first. It applies wherever a sample runs over several lines: on font pages and in Quick Look.
 - **Alignment:** left, center or right, for the samples in specimens and Quick Look. Font pages have their own alignment, next to the size.
 
-The same options apply to every view, font pages and the Compare window. Cicero remembers them.
+The same options apply to every view, font pages and the Compare window, but the size: font pages and the Compare window have their own. Cicero remembers them.
 
 ## Compare fonts
 
 1. Select two or more families.
 2. Choose **Fonts → Compare** (⌥⌘C), or right-click them and choose **Compare**.
 
-The Compare window shows them with the preview text, size, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
+You can also open the Compare window by itself, with **Window → Compare**, or **Fonts → Compare** with no families selected, and pick the fonts there: click **+** in its toolbar (or **Add Families**, while it’s empty), type a name, and click a family or press Return to add it. ↑ and ↓ move to the next family found. Families already there have a checkmark; click one again to take it out. The list has every family in your library, wherever it is and whatever the main window shows, so families far apart are as easy to put together as neighbors.
 
-- **Stacked:** one row per font, all on the same baseline, with the name and style under each.
+The Compare window shows them with the preview text, weight and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
+
+- **Stacked:** one row per font, each starting at the same place, with the name and style under each. A row is as tall as its font needs, so the rows above stay where they are as you add or take out fonts.
 - **Overlay:** every font drawn over the others in its own color, on a shared baseline, with their names below. The last one is drawn on top.
+
+The Compare window has a size of its own, from 24 to 720 pt, 72 pt at first, so you can look at the fonts up close without changing the previews in the main window. Click **−** or **+** in the toolbar, or choose **View → Zoom Out** or **Zoom In** (⌘− and ⌘+), to go to the next smaller or bigger common size, like 96, 120 or 144 pt, or click the size and type one.
 
 Each font is in the style nearest the weight in Preview Options at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to following the weight. **Compare Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
 
 To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
 
-To add fonts, drag families from the main window into the Compare window. To take one out, click its remove button. Choosing **Compare** again starts over with the new selection.
+To add fonts, drag families from the main window into the Compare window, or select one family and choose **Fonts → Compare**, or right-click it and choose **Add to Compare**: it joins the fonts already there. To take one out, click its remove button. Choosing **Compare** with several families selected starts over with them.
