@@ -6,6 +6,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - A font page’s text no longer stays empty: delete it all and click somewhere else, and “Sphinx of black quartz, judge my vow.” is back, or text in the font’s own script for a font without Latin letters. A page that opens with the text left empty shows it too.
 - The Info panel’s **Features** no longer lists **Text Spacing** with **Default** and **No Kerning**, as fonts are made to be kerned. Japanese, Chinese and Korean fonts still have **Text Spacing**, for their widths, like **Half Width**.
+- A font page’s text and name, and the Compare window, are set with the font’s kerning. With **Letter Spacing** at 0, they were set without it, so pairs like V and a stood apart. Letter spacing is added to the kerning, as in the grid, the list and specimens.
 
 ## 1.9.2
 

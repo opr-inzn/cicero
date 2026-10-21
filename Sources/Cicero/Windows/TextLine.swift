@@ -17,11 +17,12 @@ struct TextLine {
     let capHeight: CGFloat
 
     init(_ text: String, font: CTFont, kerning: Double) {
-        let attributes: [NSAttributedString.Key: Any] = [
+        var attributes: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
-            NSAttributedString.Key(kCTKernAttributeName as String): kerning,
             NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
         ]
+        // Letter spacing is added to the font's kerning, but a kern of 0 turns that off (see `SampleEditor.Style`).
+        if kerning != 0 { attributes[NSAttributedString.Key(kCTKernAttributeName as String)] = kerning }
         line = CTLineCreateWithAttributedString(NSAttributedString(string: text.isEmpty ? " " : text, attributes: attributes))
         let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         width = max(CTLineGetTypographicBounds(line, nil, nil, nil), ink.maxX.rounded(.up))
