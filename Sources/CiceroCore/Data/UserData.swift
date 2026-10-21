@@ -517,6 +517,10 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
         case name, foundry, designer, classification, tag, rating, note, hasNote, set, folder, status, kind, format, styles, feature, embedding
         case language, characterSet, added, timesActivated, lastActivated
 
+        /// The fields a new rule offers: not Times Activated and Last Activated, which sets that have them, made before
+        /// or imported from FontExplorer X, keep.
+        public static let offered = allCases.filter { $0 != .timesActivated && $0 != .lastActivated }
+
         public var comparisons: [Comparison] {
             switch self {
             case .name: [.contains, .doesNotContain, .beginsWith, .is]

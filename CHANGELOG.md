@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Smart sets have a **Has Note** rule, **Yes** for every family with a note or **No** for every family without one. Before, you left the text of a **Note** rule empty.
+- New smart set rules no longer offer **Times Activated** and **Last Activated**. Smart sets that have them keep them.
 
 ## 1.9.3
 

@@ -77,7 +77,7 @@ private struct RuleRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Picker("Field", selection: field) {
-                ForEach(SmartRule.Field.allCases, id: \.self) { Text($0.title).tag($0) }
+                ForEach(fields, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()
             Picker("Comparison", selection: $rule.comparison) {
@@ -107,6 +107,11 @@ private struct RuleRow: View {
             + (model.data.fontFiles.isEmpty ? [] : [WatchedFolder.addedFilesID])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID) ? [WatchedFolder.fontLibraryID] : [])
         return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
+    }
+
+    /// The fields a new rule offers, and the rule's own when it's one no longer offered.
+    private var fields: [SmartRule.Field] {
+        SmartRule.Field.offered.contains(rule.field) ? SmartRule.Field.offered : SmartRule.Field.offered + [rule.field]
     }
 
     /// Changing the field resets the comparison and value to ones that make sense for it.

@@ -210,12 +210,10 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Language | is supported, isn’t supported | A language, chosen from a searchable list that starts with yours |
 | Coverage | includes, doesn’t include | Any built-in set or one of your coverage sets |
 | Date Added | is in the last, isn’t in the last | A number of days |
-| Times Activated | is, is more than, is less than | A number of times |
-| Last Activated | is in the last, isn’t in the last | A number of days |
 
 A smart set with a language or coverage rule can grow for a while after launch, as Cicero checks the characters in each font. The subtitle says so while it does.
 
-**Times Activated** and **Last Activated** count from the version of Cicero that added them. Each time a family comes on, Cicero counts it: whether you turned it on, an application set or a document did, or another app or the Finder did, like a font you put in your Fonts folder, while Cicero is open or by the time it next opens. Fonts that come with macOS aren’t counted. A family that hasn’t come on since then has been activated 0 times, and wasn’t activated in the last however many days. To find the fonts you haven’t used for a year, make a smart set with **Last Activated** **isn’t in the last** 365 days.
+Smart sets with a **Times Activated** or **Last Activated** rule, made with an earlier version of Cicero or [imported from FontExplorer X](getting-started.md#fontexplorer-x), keep it, though new rules no longer offer them.
 
 ## Tags
 
