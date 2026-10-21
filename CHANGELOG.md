@@ -11,6 +11,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font with none of the letters of the preview text, like an Arabic, Syriac or Thai font for Latin text, shows text in its own script: the names of the languages written in it, in their own letters, like العربية, in the grid, the list, specimens, Quick Look and its font page, where you can type over it. macOS used to set the text in another font, so the font’s weights and axes seemed to change in steps.
 - A font page has a **Line Spacing** slider next to **Size**, for the space between the text’s lines. It’s the one in Preview Options too. Where the window is too narrow for both, they move to a row of their own.
 - A family marked **Not Similar** leaves the list without the next one taking its place, so the list is that much shorter.
+- A font page’s **Similar** always opens with the six closest, also after **Show All** on another page or when you come back to the same family. **Show All** used to stay on from one page to the next.
 - Invisible characters a font has no glyph for, like the variation selectors of Japanese fonts, no longer show as empty cells in **Glyphs**.
 - Marks that take no room of their own, like the shifted Thai tone marks fonts keep in private use, show in **Glyphs** and their popover. Their cells were empty.
 

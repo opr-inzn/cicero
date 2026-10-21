@@ -11,8 +11,8 @@ struct SimilarSection: View {
 
     /// How many the page shows, until Show All shows `AppModel.similarListed`.
     static let shown = 6
-    /// Whether Show All was chosen; kept for every page from then on.
-    @AppStorage("fontPage.similarShowsMore") private var showsMore = false
+    /// Whether Show All was chosen, on this page only: every page opens with the six, the same family's again too.
+    @State private var showsMore = false
     /// The row the pointer is over, which shows Not Similar.
     @State private var hovered: String?
 

@@ -92,7 +92,7 @@ Words find the families that match each of them, so **variable sans** shows the 
 
 Right-click a family and choose **Show Similar Fonts**, or select it and choose **Fonts → Show Similar Fonts**. The browser shows the family and the 12 families in your library that look most like it, the closest first, in the view you’re using. A bar above them says whose they are. To go back to what you were looking at, a font page too, click **Done** in the bar, or choose an item in the sidebar. Search works within them, and in the list they stay closest first until you click a column’s title to sort by it.
 
-A font page shows the six closest under **Similar**, below its styles, each set in itself: click one to open its page, or **Show All** to list all 12 there.
+A font page shows the six closest under **Similar**, below its styles, each set in itself: click one to open its page, or **Show All** to list all 12 there. Every page you open starts with the six again.
 
 If a family doesn’t look like the one it’s listed for, hold the pointer over it under **Similar** and click **Not Similar**, or right-click it there or among the similar fonts in the browser and choose **Not Similar to** that family. It leaves the list, which is that much shorter, as no other family takes its place, and the other way round too: the one it was listed for leaves its list. Changed your mind? Click **Undo** in the note at the bottom of the window. While **Share usage statistics** is on, Cicero also reports it, to make similar fonts better for everyone; with it off, the mark stays on your Mac. See [Not-similar reports](privacy.md#not-similar-reports).
 
