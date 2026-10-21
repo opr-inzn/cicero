@@ -85,8 +85,9 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         }
     }
 
-    /// The group a character goes in; nil for those with nothing to show, like spaces and controls.
-    public static func of(_ value: UInt32) -> GlyphGroup? {
+    /// The group a character goes in, in a font with as many letters of each script as `scripts` says (see `scripts(of:)`);
+    /// nil for those with nothing to show, like spaces and controls.
+    public static func of(_ value: UInt32, in scripts: [String: Int]? = nil) -> GlyphGroup? {
         guard let scalar = Unicode.Scalar(value) else { return nil }
         let properties = scalar.properties
         let category = properties.generalCategory
@@ -97,53 +98,126 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         let name = properties.name ?? ""
         let unicodeBlock = UnicodeBlock.containing(value)
         let block = unicodeBlock?.name ?? ""
+        let isMark = category == .nonspacingMark || category == .spacingMark || category == .enclosingMark
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
-        // A script's own characters, those in its blocks: Arabic's letters, figures, vowel marks and comma, Greek's tonos
-        // and question mark; but its currency signs, like ฿, with the others. The Coptic letters Unicode keeps in Greek's
-        // block, like ϣ, go with the rest of Coptic. Latin's are listed by kind.
-        if let script = unicodeBlock?.script, script != "Latin", category != .currencySymbol {
-            return .script(name.hasPrefix("COPTIC ") ? "Coptic" : script)
+        // Every script's currency signs together, like ฿ and ؋.
+        if category == .currencySymbol { return .currency }
+        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and ℝ: with ℮,
+        // not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators.
+        if block == "Letterlike Symbols" && properties.isAlphabetic { return .punctuationAndSymbols }
+        if block == "Mathematical Alphanumeric Symbols" { return .mathematicalOperators }
+        // A script's own characters. In the blocks for it, all of them: Arabic's letters, figures and tatweel, Greek's tonos
+        // and question mark. Elsewhere, its letters, marks and figures, like Greek's small capitals among the phonetic
+        // letters, the Coptic letters in Greek's block, 々 among CJK punctuation or halfwidth katakana, but not those
+        // Unicode calls superscripts or subscripts. A character several scripts share, like the danda of Devanagari,
+        // Bengali and others, Arabic's comma and vowel marks, which Syriac has too, or its digits, which Thaana has, goes
+        // with the one the font has the most letters of; with none of them, with its own script, if it has one, or the
+        // punctuation or marks. Latin's are listed by kind, like a combining grave in a Latin font with Greek letters too.
+        let ownScript = UnicodeScripts.script(of: value)
+        let blockScript = unicodeBlock?.script
+        let script: String?, all: Bool
+        if let shared = UnicodeScripts.sharing(value) {
+            if let scripts {
+                func letters(_ script: String) -> Int { scripts[script, default: 0] }
+                let others = shared.filter { $0 != "Latin" && letters($0) > 0 }
+                let most = others.max { letters($0) < letters($1) }
+                if let blockScript, let most, others.contains(blockScript), letters(blockScript) * 2 >= letters(most) {
+                    // Its block's script, like Devanagari for its stress signs in a font with more Latin letters, unless the
+                    // font has far more letters of another, like a Syriac font with an Arabic letter or two.
+                    script = blockScript
+                } else if blockScript != nil || shared.max(by: { letters($0) < letters($1) }) != "Latin" {
+                    script = most ?? ownScript
+                } else {
+                    // Shared with Latin, which the font has the most letters of, like a combining acute in a font with Greek
+                    // and Cyrillic too: with the marks or punctuation.
+                    script = nil
+                }
+            } else {
+                script = blockScript.flatMap { shared.contains($0) ? $0 : nil } ?? ownScript
+            }
+            // In a script's block, like the danda, all of them; elsewhere, like the CJK comma 、, only letters, marks and figures.
+            all = blockScript != nil
+        } else if let ownScript {
+            script = ownScript
+            all = blockScript == ownScript
+        } else {
+            // A sign every script could use in a script's block, like Greek's question mark, goes with that script; in a
+            // font without its letters, like the svasti sign of Tibetan's block in a Japanese font, with the symbols.
+            let hasLetters = scripts.map { $0[blockScript ?? "", default: 0] > 0 } ?? true
+            script = hasLetters ? blockScript : nil
+            all = true
+        }
+        if let script, script != "Latin", all || Self.isLetterMarkOrFigure(category) && !Self.isRaisedOrLowered(name) {
+            return .script(script)
         }
         if name.contains("SUBSCRIPT") { return .subscripts }
-        if name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL") || name.hasPrefix("MODIFIER LETTER CAPITAL") {
-            return .superscripts
-        }
+        if Self.isRaisedOrLowered(name) { return .superscripts }
         if name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .ordinals }
         if name.contains("FRACTION") { return .fractions }
-        if name.contains("ARROW") { return .arrows }
+        // Arrows, but not the combining ones, which are marks.
+        if name.contains("ARROW") && !isMark { return .arrows }
         // Figures in circles, like ① and ❶, and the blocks' other numbered ones, like ⑴ and ⒈. The letters there, like Ⓐ
         // or the Ⓟ some fonts have for ℗, go with the symbols.
         if (block.hasPrefix("Enclosed Alphanumeric") || block == "Dingbats") && properties.numericType != nil { return .circledFigures }
-        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and ℝ: with ℮,
-        // not with other scripts' letters.
-        if block == "Letterlike Symbols" && properties.isAlphabetic { return .punctuationAndSymbols }
-        // Latin letters in other blocks too, like ə in IPA Extensions.
-        let latin = block.contains("Latin") || name.hasPrefix("LATIN ")
+        // Latin letters in other blocks too, like ə in IPA Extensions or a fullwidth Ａ.
+        let latin = ownScript == "Latin" || block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
         // A to Z on their own; Æ, Ł, Þ and the like with the accented letters.
         case .uppercaseLetter, .titlecaseLetter:
             return latin ? (0x41...0x5A ~= value ? .uppercase : .uppercaseAccents) : .graphical
         case .lowercaseLetter:
             return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .graphical
+        // Latin's letters without case, like the click ǀ and the glottal stop ʔ; signs that are letters to Unicode but no
+        // script's, like 〆, with the symbols.
+        case .otherLetter:
+            return latin ? .lowercaseAccents : .punctuationAndSymbols
+        // 0 to 9, and figures no script has, like the fullwidth ０; a script's own go with it.
         case .decimalNumber:
-            return block == "Basic Latin" ? .proportionalFigures : .graphical
-        case .currencySymbol:
-            return .currency
+            return .proportionalFigures
         case .mathSymbol:
             // The vertical line is typed as punctuation, with the broken bar.
             return value == 0x7C ? .punctuationAndSymbols : .mathematicalOperators
+        // The accents letters take, like U+0301, and the marks scripts share; a script's own go with its letters.
         case .nonspacingMark, .spacingMark, .enclosingMark:
-            // The accents letters take, like U+0301; other scripts' own marks go with their letters.
-            return block.hasPrefix("Combining") ? .combiningMarks : .graphical
+            return .combiningMarks
         case .modifierSymbol:
-            // Accents set on their own, like ´ and ˘; ^ and ` are typed as punctuation.
-            return value < 0x80 ? .punctuationAndSymbols : .diacriticalMarks
+            // Accents set on their own, like ´ and ˘; ^ and ` are typed as punctuation, and the skin tones of emoji
+            // go with them.
+            return value < 0x80 || name.hasPrefix("EMOJI MODIFIER") ? .punctuationAndSymbols : .diacriticalMarks
+        // Accents and tone letters that are letters to Unicode, like ʹ and ꜗ; others no script has, like the kana
+        // repeat mark 〱, with the symbols.
+        case .modifierLetter:
+            return latin || block == "Spacing Modifier Letters" || block == "Modifier Tone Letters" ? .diacriticalMarks : .punctuationAndSymbols
         case .privateUse, .unassigned:
             return .graphical
-        case .otherLetter, .modifierLetter:
-            return block == "Spacing Modifier Letters" ? .diacriticalMarks : .graphical
         default:
             return .punctuationAndSymbols
+        }
+    }
+
+    /// Whether Unicode names it a superscript or subscript, like ᵝ MODIFIER LETTER SMALL BETA or ₐ.
+    private static func isRaisedOrLowered(_ name: String) -> Bool {
+        name.contains("SUBSCRIPT") || name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL")
+            || name.hasPrefix("MODIFIER LETTER CAPITAL")
+    }
+
+    /// How many letters of each script a font has, like 90 of Bengali and 300 of Latin for a Bengali font with Latin too.
+    public static func scripts(of coverage: ScalarRanges) -> [String: Int] {
+        var found: [String: Int] = [:]
+        for range in coverage.ranges {
+            for value in range {
+                guard let scalar = Unicode.Scalar(value), scalar.properties.isAlphabetic, let script = UnicodeScripts.script(of: value) else { continue }
+                found[script, default: 0] += 1
+            }
+        }
+        return found
+    }
+
+    private static func isLetterMarkOrFigure(_ category: Unicode.GeneralCategory) -> Bool {
+        switch category {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+             .nonspacingMark, .spacingMark, .enclosingMark, .decimalNumber, .letterNumber, .otherNumber: true
+        default: false
         }
     }
 }
@@ -181,9 +255,10 @@ public struct GlyphSection: Identifiable, Sendable {
                                 leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
         var buckets: [GlyphGroup: [UInt32]] = [:]
         var perBlock: [String: Int] = [:]
+        let scripts = GlyphGroup.scripts(of: coverage)
         for range in coverage.ranges {
             for value in range {
-                guard let group = privateUse[value] ?? GlyphGroup.of(value) else { continue }
+                guard let group = privateUse[value] ?? GlyphGroup.of(value, in: scripts) else { continue }
                 let block = Self.block(of: value) ?? ""
                 guard perBlock[block, default: 0] < limit, !isEmpty(value) else { continue }
                 perBlock[block, default: 0] += 1
@@ -193,8 +268,8 @@ public struct GlyphSection: Identifiable, Sendable {
         let glyphs = Dictionary(grouping: features, by: \.group)
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
         // A font whose letters are all in one script other than Latin, like an Arabic or a Greek one, starts with them.
-        let scripts = groups.filter(\.isScript)
-        if scripts.count == 1, let script = scripts.first, !groups.contains(where: { $0 < .ligatures }) {
+        let scriptGroups = groups.filter(\.isScript)
+        if scriptGroups.count == 1, let script = scriptGroups.first, !groups.contains(where: { $0 < .ligatures }) {
             groups.removeAll { $0 == script }
             groups.insert(script, at: 0)
         }
