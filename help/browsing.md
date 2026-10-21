@@ -171,7 +171,7 @@ Many fonts have optional features, like small caps, old-style figures or stylist
 2. Click **Features**.
 3. Turn features on or off with their switches.
 
-Some features let you choose one option of several; turning one on turns the others off, and turning the chosen one off goes back to the font’s default.
+Some features let you choose one option of several; turning one on turns the others off, and turning the chosen one off goes back to the font’s default. Kerning has no switch: fonts are made to be kerned.
 
 The features you choose change the text on that family’s font page, until Cicero quits; everywhere else, like the list, grid and specimens and the page’s list of styles, its styles show as they are. Every alternate a feature offers is under **Glyphs** too, after the character it’s for, with a grey dot, whether the feature is on or not. They don’t change the font file.
 

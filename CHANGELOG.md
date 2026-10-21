@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - A font page’s text no longer stays empty: delete it all and click somewhere else, and “Sphinx of black quartz, judge my vow.” is back, or text in the font’s own script for a font without Latin letters. A page that opens with the text left empty shows it too.
+- The Info panel’s **Features** no longer lists **Text Spacing** with **Default** and **No Kerning**, as fonts are made to be kerned. Japanese, Chinese and Korean fonts still have **Text Spacing**, for their widths, like **Half Width**.
 
 ## 1.9.2
 
