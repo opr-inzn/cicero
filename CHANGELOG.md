@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - In **Preview Options**, the preview text field spans the whole width, with “Preview Text” in it while it’s empty, in place of a label beside it. **Presets** no longer lists **Font Name**: clear the field to show each family’s name again.
 - A font page has room for a script font’s swashes, like Zapfino’s: the family’s name above no longer runs into the line under it, the text no longer leaves an empty gap below it, and swashes reaching past the ends of its lines show in the page’s margins rather than being cut off.
 - A font page’s **Glyphs** lists each group’s characters in Unicode order. Accented letters were sorted by the letter they’re made from, so Æ came after every A with an accent, and Greek, figures, punctuation, currency and mathematical signs each had an order of their own.
+- **Glyphs** gives each script its own group, named after it, like **Cyrillic**, **Hebrew** or **Arabic**, with its letters, figures, marks and punctuation, as **Greek** had one. They were in **Graphical**, which now keeps the glyphs no script has, like a foundry’s logos. A font whose letters are all in one script other than Latin, like an Arabic font, starts with that script.
 
 ## 1.9.1
 

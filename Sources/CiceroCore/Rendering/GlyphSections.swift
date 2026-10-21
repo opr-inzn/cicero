@@ -1,13 +1,24 @@
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
-/// then punctuation, which any text has, before currency and the other signs, then Greek, which a type designer lists
-/// after Latin, the letters, marks and signs of other scripts, and last the accents and marks, which have no letter
-/// to sit on and are looked for least.
-public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
+/// then punctuation, which any text has, before currency and the other signs, then each other script, Greek first, as
+/// Unicode lists them, then what's in no script, like the private-use glyphs, and last the accents and marks, which
+/// have no letter to sit on and are looked for least. A font with one script and no Latin letters starts with that
+/// script (see `GlyphSection.sections`).
+public enum GlyphGroup: Hashable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
     case circledFigures, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
-    case caseSensitiveForms, arrows, greek, graphical, diacriticalMarks, combiningMarks
+    case caseSensitiveForms, arrows
+    /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
+    /// in the Unicode blocks for it.
+    case script(String)
+    case graphical, diacriticalMarks, combiningMarks
+
+    public static let greek = GlyphGroup.script("Greek")
+
+    public var isScript: Bool {
+        if case .script = self { true } else { false }
+    }
 
     public var title: String {
         switch self {
@@ -30,14 +41,48 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         case .ordinals: "Ordinals"
         case .caseSensitiveForms: "Case Sensitive Forms"
         case .arrows: "Arrows"
-        case .greek: "Greek"
+        case .script(let name): name
         case .graphical: "Graphical"
         case .diacriticalMarks: "Diacritical Marks"
         case .combiningMarks: "Combining Marks"
         }
     }
 
-    public static func < (left: GlyphGroup, right: GlyphGroup) -> Bool { left.rawValue < right.rawValue }
+    /// Scripts in the order Unicode lists them, by their first block.
+    public static func < (left: GlyphGroup, right: GlyphGroup) -> Bool {
+        if case .script(let a) = left, case .script(let b) = right {
+            return (UnicodeBlock.firstCodePoint(of: a), a) < (UnicodeBlock.firstCodePoint(of: b), b)
+        }
+        return left.rank < right.rank
+    }
+
+    private var rank: Int {
+        switch self {
+        case .uppercase: 0
+        case .lowercase: 1
+        case .uppercaseAccents: 2
+        case .lowercaseAccents: 3
+        case .ligatures: 4
+        case .proportionalFigures: 5
+        case .tabularFigures: 6
+        case .circledFigures: 7
+        case .punctuationAndSymbols: 8
+        case .currency: 9
+        case .mathematicalOperators: 10
+        case .superscripts: 11
+        case .subscripts: 12
+        case .fractions: 13
+        case .numerators: 14
+        case .denominators: 15
+        case .ordinals: 16
+        case .caseSensitiveForms: 17
+        case .arrows: 18
+        case .script: 19
+        case .graphical: 20
+        case .diacriticalMarks: 21
+        case .combiningMarks: 22
+        }
+    }
 
     /// The group a character goes in; nil for those with nothing to show, like spaces and controls.
     public static func of(_ value: UInt32) -> GlyphGroup? {
@@ -49,14 +94,21 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         default: break
         }
         let name = properties.name ?? ""
-        let block = GlyphSection.block(of: value) ?? ""
+        let unicodeBlock = UnicodeBlock.containing(value)
+        let block = unicodeBlock?.name ?? ""
+        if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
+        // A script's own characters, those in its blocks: Arabic's letters, figures, vowel marks and comma, Greek's tonos
+        // and question mark; but its currency signs, like ฿, with the others. The Coptic letters Unicode keeps in Greek's
+        // block, like ϣ, go with the rest of Coptic. Latin's are listed by kind.
+        if let script = unicodeBlock?.script, script != "Latin", category != .currencySymbol {
+            return .script(name.hasPrefix("COPTIC ") ? "Coptic" : script)
+        }
         if name.contains("SUBSCRIPT") { return .subscripts }
         if name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL") || name.hasPrefix("MODIFIER LETTER CAPITAL") {
             return .superscripts
         }
         if name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .ordinals }
         if name.contains("FRACTION") { return .fractions }
-        if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
         if name.contains("ARROW") { return .arrows }
         // Figures in circles, like ① and ❶, and the blocks' other numbered ones, like ⑴ and ⒈. The letters there, like Ⓐ
         // or the Ⓟ some fonts have for ℗, go with the symbols.
@@ -64,9 +116,6 @@ public enum GlyphGroup: Int, CaseIterable, Comparable, Sendable {
         // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and ℝ: with ℮,
         // not with other scripts' letters.
         if block == "Letterlike Symbols" && properties.isAlphabetic { return .punctuationAndSymbols }
-        // Greek's letters with its own accents and punctuation, like the tonos ΄ and the ano teleia ·; not the Coptic
-        // letters Unicode keeps in its block, like ϣ, which go with the rest of Coptic.
-        if block == "Greek and Coptic" || block == "Greek Extended" { return name.hasPrefix("COPTIC ") ? .graphical : .greek }
         // Latin letters in other blocks too, like ə in IPA Extensions.
         let latin = block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
@@ -140,10 +189,25 @@ public struct GlyphSection: Identifiable, Sendable {
             }
         }
         let glyphs = Dictionary(grouping: features, by: \.group)
-        return GlyphGroup.allCases.compactMap { group in
+        var groups = Set(buckets.keys).union(glyphs.keys).sorted()
+        // A font whose letters are all in one script other than Latin, like an Arabic or a Greek one, starts with them.
+        let scripts = groups.filter(\.isScript)
+        if scripts.count == 1, let script = scripts.first, !groups.contains(where: { $0 < .ligatures }) {
+            groups.removeAll { $0 == script }
+            groups.insert(script, at: 0)
+        }
+        return groups.compactMap { group in
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
             return scalars.isEmpty && featured.isEmpty ? nil : GlyphSection(group: group, scalars: scalars, glyphs: featured)
         }
+    }
+
+    /// How many of `shown`, some or all of a font's `sections` in their order, come before the ligatures it makes: the
+    /// letters, Latin's or those of the one script the font starts with, and the Ligatures group's characters, like ﬀ.
+    public static func beforeLigatures(_ shown: [GlyphSection], of sections: [GlyphSection]) -> Int {
+        let leading = sections.first.flatMap { $0.group.isScript ? $0.group : nil }
+        let start = shown.first.map { $0.group == leading ? 1 : 0 } ?? 0
+        return start + shown.dropFirst(start).prefix { $0.group <= .ligatures }.count
     }
 
     /// The section's cells in runs, each starting a row of its own, with `alternates` giving a character's: in most
@@ -175,11 +239,13 @@ public struct GlyphSection: Identifiable, Sendable {
             runs[isFigure ? run(of: glyph.alongWith) : .signs, default: []].append(.feature(glyph))
         }
         runs[.signs] = runs[.signs]?.sorted { left, right in
-            func place(_ cell: GlyphCell) -> [Int] {
-                guard case .feature(let glyph) = cell, let group = GlyphGroup.of(glyph.character) else { return [Int.max] }
-                return [group.rawValue, Int(glyph.character)]
+            func place(_ cell: GlyphCell) -> (GlyphGroup, UInt32)? {
+                guard case .feature(let glyph) = cell, let group = GlyphGroup.of(glyph.character) else { return nil }
+                return (group, glyph.character)
             }
-            return place(left).lexicographicallyPrecedes(place(right))
+            guard let a = place(left) else { return false }
+            guard let b = place(right) else { return true }
+            return a < b
         }
         return Run.allCases.compactMap { runs[$0] }
     }
@@ -192,14 +258,28 @@ public struct GlyphSection: Identifiable, Sendable {
 
     /// The Unicode block a scalar is in, e.g. "Latin Extended-A".
     public static func block(of scalar: UInt32) -> String? {
-        let blocks = UnicodeBlock.all
+        UnicodeBlock.containing(scalar)?.name
+    }
+}
+
+extension UnicodeBlock {
+    static func containing(_ scalar: UInt32) -> UnicodeBlock? {
         var low = 0
-        var high = blocks.count
+        var high = all.count
         while low < high {
             let mid = (low + high) / 2
-            if blocks[mid].range.lowerBound <= scalar { low = mid + 1 } else { high = mid }
+            if all[mid].range.lowerBound <= scalar { low = mid + 1 } else { high = mid }
         }
-        guard low > 0, blocks[low - 1].range.contains(scalar) else { return nil }
-        return blocks[low - 1].name
+        guard low > 0, all[low - 1].range.contains(scalar) else { return nil }
+        return all[low - 1]
+    }
+
+    /// Where a script's first block starts, for listing scripts in Unicode's order.
+    static func firstCodePoint(of script: String) -> UInt32 {
+        firstCodePoints[script] ?? .max
+    }
+
+    private static let firstCodePoints: [String: UInt32] = all.reduce(into: [:]) { found, block in
+        if let script = block.script, found[script] == nil { found[script] = block.range.lowerBound }
     }
 }

@@ -75,15 +75,17 @@ struct GlyphsSection: View {
                                    description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else {
-            ForEach(shown.filter { $0.group <= .ligatures }) { section in
+            let lead = GlyphSection.beforeLigatures(shown, of: sections)
+            ForEach(shown.prefix(lead)) { section in
                 self.section(section, style: style)
             }
-            // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes.
+            // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes, or after the one
+            // script a font without Latin letters starts with.
             if !shownLigatures.isEmpty {
                 LigaturesSection(face: style.face, weight: style.weight, variations: style.variations, columns: columns, groups: shownLigatures,
                                  characters: ligatureCharacters)
             }
-            ForEach(shown.filter { $0.group > .ligatures }) { section in
+            ForEach(shown.dropFirst(lead)) { section in
                 self.section(section, style: style)
             }
             Color.clear.frame(height: 6)
