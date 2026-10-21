@@ -201,7 +201,7 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Has Note | Yes, No | Whether the family has a [note](#notes) |
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
-| Status | is, is not | Active, Partly Active, Inactive, Active in Apps Only or Installed with macOS |
+| Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is there while **Show test fonts installed for Adobe apps** is on, for the fonts only Adobe apps load (see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders)) |
 | Kind | is, is not | Variable, Monospaced or Italic, for a family with italic styles |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType and others |
 | Number of Styles | is, is more than, is less than | A number |

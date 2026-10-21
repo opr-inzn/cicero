@@ -175,7 +175,9 @@ private struct RuleRow: View {
         case .folder:
             options(folderOptions, empty: "No folders yet")
         case .status:
-            options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
+            // Active in Adobe Apps Only while Adobe apps' test fonts are shown, or for a rule that has it.
+            let statuses = SmartRuleValue.statuses.filter { $0 != "appOnly" || model.data.showAdobeAppFolders || rule.value == $0 }
+            options(statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })
         case .format:
@@ -262,7 +264,7 @@ private struct RuleRow: View {
         case "active": "Active"
         case "partial": "Partly Active"
         case "inactive": "Inactive"
-        case "appOnly": "Active in Apps Only"
+        case "appOnly": "Active in Adobe Apps Only"
         default: "Installed with macOS"
         }
     }
