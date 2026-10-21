@@ -57,10 +57,10 @@ Coming next: **similar styles**, Show Similar Fonts for a single style, so that 
 
 ## Privacy
 
-Cicero has no accounts and no ads, and everything it knows about your fonts stays in local files on your Mac, but for the families you mark not similar, which it reports. It goes online for three things, and you can turn off each in Settings → General:
+Cicero has no accounts and no ads, and everything it knows about your fonts stays in local files on your Mac, but for the families you mark not similar, which it reports while usage statistics are on. It goes online for three things, and you can turn them off in Settings → General:
 
 - **Usage statistics.** Each time Cicero opens, it sends [TelemetryDeck](https://telemetrydeck.com) its version, the macOS version and a hashed random number that stands for your Mac, to count how many people use Cicero; the first time, it also says your Mac is new. That’s all it sends; the code is in [UsageStatistics.swift](Sources/Cicero/App/UsageStatistics.swift). Turn it off with Share usage statistics.
-- **Not-similar reports.** When you mark a family not similar to the one it was listed for, Cicero sends its website that list's family names and the numbers it measured from their letters, with its version, the macOS version and a hashed random number that stands for your Mac, to improve similar fonts. No font files, no pictures of letters. The code is in [SimilarReports.swift](Sources/Cicero/App/SimilarReports.swift). Turn it off with Send not-similar reports.
+- **Not-similar reports.** When you mark a family not similar to the one it was listed for, Cicero sends its website that list's family names and the numbers it measured from their letters, with its version, the macOS version and a hashed random number that stands for your Mac, to improve similar fonts. No font files, no pictures of letters. The code is in [SimilarReports.swift](Sources/Cicero/App/SimilarReports.swift). Share usage statistics turns these off too, and your marks then stay on your Mac.
 - **Updates.** Each time Cicero opens, and once a day while it stays open, it checks GitHub for a new version. Turn it off with Check for updates automatically.
 
 Classifications Cicero recognizes, from the shapes of the letters or with Apple Intelligence from the names, are worked out on your Mac too. The Help menu opens web pages in your browser.

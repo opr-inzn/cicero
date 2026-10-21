@@ -44,8 +44,9 @@ extension AppModel {
     }
 
     /// Leaves the families out of this one's similar fonts, and it out of theirs, as the user says they don't look like
-    /// it; another takes each one's place. Kept in the user's data, and reported, to improve similar fonts, with the list
-    /// as it was (see `SimilarReports`), once the toast's Undo has passed, so a mark undone is never sent.
+    /// it; another takes each one's place. Kept in the user's data, and, while usage statistics are on, reported to improve
+    /// similar fonts, with the list as it was (see `SimilarReports`), once the toast's Undo has passed, so a mark undone is
+    /// never sent.
     func markNotSimilar(_ others: [Family], to family: Family) {
         let marked = data.notSimilar[family.id] ?? []
         let added = others.map(\.id).filter { $0 != family.id && !marked.contains($0) }
@@ -69,7 +70,7 @@ extension AppModel {
         }
     }
 
-    /// The report of these families from the family's list as it is, before they leave it; nil while reports are off.
+    /// The report of these families from the family's list as it is, before they leave it; nil while usage statistics are off.
     private func similarReport(for family: Family, notSimilar: [String]) -> SimilarReport? {
         let measurements = measurements, classification = similarClassifier()
         func entry(_ family: Family, distance: Float?) -> SimilarReport.Entry {
