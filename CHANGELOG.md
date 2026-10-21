@@ -15,6 +15,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Search finds families by what they are, not only by their names: type **variable**, **mono**, **italic**, a classification like **serif**, **sans** or **script**, **display** or **text** for families made for large or small sizes, **condensed** or **extended**, a tag, or a kind of file, like **ttf**. Several words find the families that match each of them, so **variable sans** shows the variable sans serifs, and **inter variable** shows Inter if it’s variable. **mono** no longer shows every font from Monotype, only monospaced fonts and fonts with Mono in their names.
 - Search looks in the names of a family’s styles too, like Condensed Bold, and in the name you gave a foundry.
 - A family with a style of ornaments, like Hoefler Text, is previewed in its Regular and classified by its letters. Hoefler Text’s Ornaments style used to stand for the family, so its previews showed ornaments, it was classified Symbol, and its coverage and similar fonts were its ornaments’.
+- **Settings → General** says that Microsoft Office can’t use fonts left where they are or kept in the Font Library. Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, and only from the second time they open after a font went on. [Fonts in Microsoft Office](help/activating.md#fonts-in-microsoft-office) has the details.
 
 ## 1.8.2
 
