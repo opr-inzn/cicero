@@ -194,7 +194,7 @@ Click **Preview Options** in the toolbar:
 - **Preview Text:** type your own text, or pick one from **Presets**. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”). A font with none of the text’s letters, like an Arabic or a Thai font for Latin text, shows text in its own script instead: the names of languages written in it, in their own letters, like العربية, or its first letters. Otherwise macOS would set the text in another font, and you wouldn’t see the font’s own letters, weights or axes.
 - **Size:** 8 to 160 pt.
 - **Weight:** 100 to 900. Cicero shows the style nearest to it, and the exact weight in a variable font.
-- **Letter Spacing:** from −10 to 40 % of the em.
+- **Tracking:** the space added between letters, from −10 to 40 % of the em, on top of the font’s kerning.
 - **Leading:** the distance from one line to the next, from 80 to 250 % of the size; 120 % at first. It applies wherever a sample runs over several lines: on font pages and in Quick Look.
 - **Alignment:** left, center or right, for the samples in specimens and Quick Look. Font pages have their own alignment, next to the size.
 

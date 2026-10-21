@@ -101,7 +101,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             paragraph.maximumLineHeight = lineHeight
             paragraph.alignment = alignment
             var attributes: [NSAttributedString.Key: Any] = [.font: font as NSFont, .paragraphStyle: paragraph, .foregroundColor: NSColor.textColor]
-            // Letter spacing is a kern added to the font's kerning, but a kern of 0 means no kerning at all, so pairs
+            // Tracking is a kern added to the font's kerning, but a kern of 0 means no kerning at all, so pairs
             // like Va stood apart. Not tracking, which breaks ligatures apart once it isn't 0.
             if kerning != 0 { attributes[.kern] = kerning }
             return attributes

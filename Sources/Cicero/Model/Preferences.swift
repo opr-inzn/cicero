@@ -15,7 +15,7 @@ final class PreviewSettings {
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
     var size: Double { didSet { defaults.set(size, forKey: Keys.size) } }
     var weight: Double { didSet { defaults.set(weight, forKey: Keys.weight) } }
-    /// Letter spacing in percent of the em.
+    /// Tracking, the space added between letters, in percent of the em.
     var tracking: Double { didSet { defaults.set(tracking, forKey: Keys.tracking) } }
     /// Line height in percent of the size, wherever a sample runs over several lines; 120 is what layout apps
     /// call automatic leading.

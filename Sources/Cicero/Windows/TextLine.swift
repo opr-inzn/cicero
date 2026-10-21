@@ -21,7 +21,7 @@ struct TextLine {
             NSAttributedString.Key(kCTFontAttributeName as String): font,
             NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
         ]
-        // Letter spacing is added to the font's kerning, but a kern of 0 turns that off (see `SampleEditor.Style`).
+        // Tracking is added to the font's kerning, but a kern of 0 turns that off (see `SampleEditor.Style`).
         if kerning != 0 { attributes[NSAttributedString.Key(kCTKernAttributeName as String)] = kerning }
         line = CTLineCreateWithAttributedString(NSAttributedString(string: text.isEmpty ? " " : text, attributes: attributes))
         let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
