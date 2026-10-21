@@ -8,6 +8,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - New smart set rules no longer offer **Times Activated** and **Last Activated**. Smart sets that have them keep them.
 - In a smart set’s rules, numbers go in a box without arrows, and **Number of Styles** no longer says “styles” after its number. Text goes in a box too.
 - A smart set’s **Kind** rule says **Italic** in place of **Has Italics**.
+- A smart set’s **Rating** rule lists five stars first, after **No Rating**, as the **Rating** menu of a family does.
 
 ## 1.9.3
 

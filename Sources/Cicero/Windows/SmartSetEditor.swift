@@ -168,7 +168,8 @@ private struct RuleRow: View {
         case .tag:
             options(model.data.tags.map { ($0, $0) }, empty: "No tags yet")
         case .rating:
-            options([("0", "No Rating")] + (1...5).map { (String($0), Rating.stars($0)) })
+            // The most stars first, as in the family's Rating menu.
+            options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:
             options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No sets yet")
         case .folder:
