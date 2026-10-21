@@ -166,7 +166,7 @@ private struct RuleRow: View {
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
-            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet")
+            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
         case .rating:
             // The most stars first, as in the family's Rating menu.
             options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
@@ -203,13 +203,22 @@ private struct RuleRow: View {
             .frame(minWidth: 140, maxWidth: 260)
     }
 
+    /// A pop-up of the options, each with the dot of its colour, if it has one, like a tag's.
     @ViewBuilder
-    private func options(_ options: [(id: String, title: String)], empty: String = "") -> some View {
+    private func options(_ options: [(id: String, title: String)], empty: String = "", colors: [String: TagColor] = [:]) -> some View {
         if options.isEmpty {
             Text(empty).foregroundStyle(.secondary)
         } else {
             Picker("Value", selection: $rule.value) {
-                ForEach(options, id: \.id) { Text($0.title).tag($0.id) }
+                ForEach(options, id: \.id) { option in
+                    if let color = colors[option.id] {
+                        Label { Text(option.title) } icon: { Image(nsImage: color.menuImage) }
+                            .labelStyle(.titleAndIcon)
+                            .tag(option.id)
+                    } else {
+                        Text(option.title).tag(option.id)
+                    }
+                }
             }
             .fixedSize()
         }
