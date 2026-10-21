@@ -584,6 +584,11 @@ final class AppModel {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled, let self, self.appliedSearch != self.searchText else { return }
             self.appliedSearch = self.searchText
+            // A family's whole name, as when it's chosen from the suggestions: that family, selected and in view.
+            let name = SearchQuery(self.searchText).text
+            if let family = self.visibleFamilies.first(where: { $0.name.lowercased() == name }) {
+                self.jumpTargets = [family.id]
+            }
         }
     }
 

@@ -6,6 +6,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - The sidebar’s **Coverage** starts closed the first time Cicero opens, like **Foundries** and **Classifications**, so its many character sets don’t fill a new sidebar. Click its title to open it.
 - Dragging one of several selected families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window, takes all of them there, as their right-click menu acts on all of them. It used to take only the family you dragged. The same goes for families selected in the Character Toolbox.
+- Search finds what you type where a word begins: **am** finds American Typewriter, but no longer every family from a foundry with “am” inside its name, or every name with “am” in the middle of a word. When no word begins with what you type, it still looks inside the words of names, so **vetica** finds Helvetica.
+- The search field suggests families as you type, up to eight whose names begin with what you’ve typed, or have a word that does, each with “Aa” in its own letters. Choose one to search for its whole name, with that family selected and in view.
 
 ## 1.9
 
