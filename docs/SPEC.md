@@ -39,7 +39,7 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   Recently Added (tray.and.arrow.down; not a clock, which is Active until Cicero quits), System Fonts (apple.logo, only while
   system fonts are shown), Problems (exclamationmark.triangle, count badge). A saved order of these rows from before
   Recently Added puts it last.
-- Recently Added (`SidebarItem.recent`): the families with a style that arrived in the last 30 days
+- Recently Added (`SidebarItem.recent`): the families with a style that arrived in the last 7 days
   (`AppModel.recentDays`), by `Family.lastAdded`: the latest Date Added of its styles (Finder's, else the file's creation
   date; see Library), leaving out styles that come with macOS or an app, whose files are as new as the last update of
   either. A family's Date Added column stays its earliest style's. On its own, it lists the latest first in every view
@@ -47,7 +47,7 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   import, and keep the library's order among themselves; the list keeps that order, with no column's sort arrow, until a
   column's title is clicked, as for Show Similar Fonts, and again each time Recently Added is chosen. With other library
   rows selected too, the families of all of them in the library's order. No Export Fonts on its menu, like the other
-  fixed rows. Empty: "Nothing Added Recently", "Fonts that arrive on your Mac show up here for 30 days." A file opened
+  fixed rows. Empty: "Nothing Added Recently", "Fonts that arrive on your Mac show up here for a week." A file opened
   where it is keeps the date it arrived in its folder, so an old one doesn't show; one Cicero installs a copy of does.
 - Sections, each collapsible and hideable:
   - **Folders** (+ adds folders). The folders Adobe apps load fonts from by themselves — /Library/Application Support/Adobe/Fonts, ~/Library/Application Support/Adobe/Fonts (all Adobe apps) and the Fonts folder next to any Adobe app, like /Applications/Adobe InDesign 2026/Fonts (that app only) — are one "Testing" item (`WatchedFolder.adobeAppsID`), shown while it has fonts (row menu: Reveal in Finder). Adobe Fonts (every CoreSync file, on for every app or only in Adobe apps) are one "Adobe Fonts" item (`adobeFontsID`), shown while it has fonts, whatever the switch (row menu: Manage in Creative Cloud; no Export Fonts); a family is in it when any copy is, like a folder. Type designers export fonts there to test them; they're unrelated to Adobe Fonts from Creative Cloud (CoreSync), which are always listed and tagged "Adobe Fonts", never "Adobe". They aren't in the user's folders: Settings → General → Library → "Show test fonts installed for Adobe apps" (on by default; saved as `showAdobeAppFolders`, formerly `showAdobeFonts`) switches them, and only them; adding one of them with + turns the switch on. Every folder row's menu starts with Rename Folder (a prompt with the current name; the name lives in `UserData.folderNames` by folder ID, the folder on disk keeps its own; empty or the folder's own name removes it; shown wherever a folder's name is: sidebar and window title, Settings → Folders, smart set rules, Problems, Use Copy From; Cicero's own items take one too; forgotten when the folder is removed). Row menu for the user's folders: Reveal in Finder; "Fonts in This Folder" picker —

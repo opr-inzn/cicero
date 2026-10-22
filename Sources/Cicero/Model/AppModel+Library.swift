@@ -231,7 +231,7 @@ extension AppModel {
     }
 
     /// How many days a family stays in Recently Added.
-    static let recentDays = 30
+    static let recentDays = 7
 
     /// Whether the browser lists its families in an order of its own, which the list keeps until a column's header is
     /// clicked: similar fonts, the closest first, and Recently Added, the latest first.

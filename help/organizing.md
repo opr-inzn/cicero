@@ -11,7 +11,7 @@ At the top of the sidebar are six items that are always there:
 | All Fonts | Every family in your library |
 | Active | Families with at least one style on |
 | Inactive | Families with at least one style off |
-| Recently Added | Families with a style that arrived on your Mac in the last 30 days, the latest first (see [Recently Added](#recently-added)) |
+| Recently Added | Families with a style that arrived on your Mac in the last week, the latest first (see [Recently Added](#recently-added)) |
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Problems | Things worth fixing, with a count. See [Problems](problems.md) |
 
@@ -19,7 +19,7 @@ Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Class
 
 ### Recently Added
 
-**Recently Added** shows the fonts you got lately, so the ones you just added are easy to find again. A family is there for 30 days after a style of it arrived on your Mac, however it came: added in Cicero, copied into your Fonts folder, turned on in Adobe Fonts or put there by an installer. Fonts that come with macOS or an app don’t count, since an update gives them new dates.
+**Recently Added** shows the fonts you got lately, so the ones you just added are easy to find again. A family is there for a week after a style of it arrived on your Mac, however it came: added in Cicero, copied into your Fonts folder, turned on in Adobe Fonts or put there by an installer. Fonts that come with macOS or an app don’t count, since an update gives them new dates.
 
 The fonts that arrived last come first, in every view. Fonts that arrived within a few minutes of each other, as when you add a folder of them, stay together in alphabetical order. In the list, click a column’s title to sort them by it instead; they’re latest first again the next time you choose **Recently Added**.
 

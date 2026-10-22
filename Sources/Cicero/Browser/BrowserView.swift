@@ -319,7 +319,7 @@ private struct EmptyBrowser: View {
                                    description: Text("Turn a font on and it shows up here."))
         case .recent:
             ContentUnavailableView("Nothing Added Recently", systemImage: "tray.and.arrow.down",
-                                   description: Text("Fonts that arrive on your Mac show up here for \(AppModel.recentDays) days."))
+                                   description: Text("Fonts that arrive on your Mac show up here for a week."))
         case .set:
             ContentUnavailableView("Empty Set", systemImage: "square.stack",
                                    description: Text("Drag fonts onto the set in the sidebar, or right-click a font and choose Add to Set."))
