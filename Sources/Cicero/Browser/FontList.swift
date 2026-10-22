@@ -221,8 +221,8 @@ struct FontList: View {
     @Environment(AppModel.self) private var model
     @State private var sortColumn = FontListColumn.name
     @State private var ascending = true
-    /// Similar fonts come the closest first until a column's header is clicked.
-    @State private var keepsSimilarOrder = true
+    /// Similar fonts come the closest first, and Recently Added the latest first, until a column's header is clicked.
+    @State private var keepsOwnOrder = true
     /// Standard columns turned off.
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
     /// The year, other series and single sets turned on.
@@ -240,7 +240,7 @@ struct FontList: View {
     var body: some View {
         let columns = shownColumns
         // A column that's been turned off, or whose set was deleted, no longer sorts the list.
-        let sort: FontListColumn? = model.similarFamilyID != nil && keepsSimilarOrder ? nil : columns.contains(sortColumn) ? sortColumn : .name
+        let sort: FontListColumn? = model.hasOwnOrder && keepsOwnOrder ? nil : columns.contains(sortColumn) ? sortColumn : .name
         let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], columns: columns)
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
         ScrollViewReader { proxy in
@@ -275,7 +275,8 @@ struct FontList: View {
                 move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)
             }
         }
-        .onChange(of: model.similarFamilyID) { keepsSimilarOrder = true }
+        .onChange(of: model.similarFamilyID) { keepsOwnOrder = true }
+        .onChange(of: model.selectedItems) { keepsOwnOrder = true }
     }
 
     private func order(_ column: FontListColumn) -> [KeyPathComparator<FontRow>] {
@@ -353,7 +354,7 @@ struct FontList: View {
         return widths
     }
 
-    /// `sort` is nil while similar fonts are in their own order.
+    /// `sort` is nil while the families are in their own order.
     private func header(columns: [FontListColumn], widths: [FontListColumn: CGFloat], sort: FontListColumn?) -> some View {
         HStack(spacing: FontListRow.spacing) {
             ForEach(columns) { column in
@@ -364,7 +365,7 @@ struct FontList: View {
                     } else {
                         sortColumn = column
                         ascending = true
-                        keepsSimilarOrder = false
+                        keepsOwnOrder = false
                     }
                 } resize: { change in
                     resize(column, by: change, widths: widths)

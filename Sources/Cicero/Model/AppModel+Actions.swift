@@ -626,6 +626,8 @@ extension AppModel {
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
             SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", item: .active),
             SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", item: .inactive),
+            // Not a clock, which stands for fonts on until Cicero quits.
+            SidebarRow(key: "library.recent", title: "Recently Added", icon: "tray.and.arrow.down", item: .recent),
             // With system fonts off in Settings, they're nowhere, this item included.
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
@@ -744,7 +746,7 @@ extension AppModel {
     /// The list of the sidebar an item is in, named as in `SidebarPreferences.order`.
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
-        case .all, .active, .inactive, .system, .problems: "library"
+        case .all, .active, .inactive, .system, .recent, .problems: "library"
         case .folder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .tag: SidebarSection.tags.rawValue

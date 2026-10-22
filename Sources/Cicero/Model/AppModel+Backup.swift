@@ -35,7 +35,7 @@ extension AppModel {
         // Creative Cloud's files never leave it.
         case .folder(WatchedFolder.adobeFontsID): false
         case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
-        case .all, .active, .inactive, .system, .problems: false
+        case .all, .active, .inactive, .system, .recent, .problems: false
         }
     }
 

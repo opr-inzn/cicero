@@ -3,6 +3,8 @@ import CiceroCore
 
 enum SidebarItem: Hashable {
     case all, active, inactive, system, problems
+    /// Families with a style that arrived on the Mac in the last `AppModel.recentDays` days.
+    case recent
     case folder(UUID)
     case set(UUID)
     case smartSet(UUID)
@@ -221,11 +223,19 @@ extension AppModel {
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
-        return library.families.filter { family in
+        let listed = library.families.filter { family in
             guard data.lists(family) else { return false }
             return tests.contains { $0(family) } && matches(family)
         }
+        return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
+
+    /// How many days a family stays in Recently Added.
+    static let recentDays = 30
+
+    /// Whether the browser lists its families in an order of its own, which the list keeps until a column's header is
+    /// clicked: similar fonts, the closest first, and Recently Added, the latest first.
+    var hasOwnOrder: Bool { similarFamilyID != nil || selectedItems == [.recent] }
 
     /// What the search field suggests for what's typed: up to eight of the families the browser would list whose names
     /// begin with it, or have a word that does, those that begin with it first, each alphabetically.
@@ -288,6 +298,9 @@ extension AppModel {
         case .active: return { $0.hasActive }
         case .inactive: return { family in family.faces.contains { $0.state == .inactive } }
         case .system: return { $0.state == .system }
+        case .recent:
+            let cutoff = Date.now.addingTimeInterval(-Double(Self.recentDays) * 86_400)
+            return { $0.lastAdded.map { $0 > cutoff } ?? false }
         case .problems: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
         case .set(let id):
