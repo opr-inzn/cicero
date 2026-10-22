@@ -26,7 +26,7 @@ struct GeneralSettings: View {
             Section("Installation") {
                 Toggle(isOn: $model.data.installsIntoFontLibrary) {
                     Text("Keep installed fonts in Cicero’s Font Library")
-                    Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library. Microsoft Office can’t use fonts from the library.")
+                    Text("Instead of putting the fonts it installs into ~/Library/Fonts, Cicero keeps them in a folder of its own, with a folder for each family, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
