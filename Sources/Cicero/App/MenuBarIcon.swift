@@ -3,7 +3,7 @@ import AppKit
 // Written by scripts/make-menu-bar-icon.py from the app icon's cube and font. Don't edit.
 enum MenuBarIcon {
     /// The cube, `height` points high, as a template image, which the menu bar draws in its own colour, black or white:
-    /// the letters cut out, and where the faces meet, so it still reads as a cube in one colour.
+    /// the letters cut out, the faces meeting without a gap.
     static func image(height: CGFloat) -> NSImage {
         let scale = height / 690.0
         let image = NSImage(size: NSSize(width: (597.6 * scale).rounded(.up), height: height), flipped: true) { _ in
@@ -14,30 +14,11 @@ enum MenuBarIcon {
             cube.windingRule = .evenOdd
             NSColor.black.set()
             cube.fill()
-            let seams = Self.seams()
-            seams.transform(using: AffineTransform(scale: scale))
-            // At least a pixel, so the cuts stay sharp on a screen at 1x.
-            let pixelsPerPoint = NSGraphicsContext.current?.cgContext.convertToDeviceSpace(CGSize(width: 1, height: 1)).width ?? 1
-            seams.lineWidth = max(0.75, 1 / max(pixelsPerPoint, 1))
-            NSGraphicsContext.current?.compositingOperation = .destinationOut
-            seams.stroke()
             return true
         }
         image.isTemplate = true
         image.accessibilityDescription = "Cicero"
         return image
-    }
-
-    /// From the near corner, where the three faces meet, to the cube's outline.
-    private static func seams() -> NSBezierPath {
-        let path = NSBezierPath()
-        path.move(to: NSPoint(x: 298.8, y: 345.0))
-        path.line(to: NSPoint(x: 0.0, y: 172.5))
-        path.move(to: NSPoint(x: 298.8, y: 345.0))
-        path.line(to: NSPoint(x: 597.6, y: 172.5))
-        path.move(to: NSPoint(x: 298.8, y: 345.0))
-        path.line(to: NSPoint(x: 298.8, y: 690.0))
-        return path
     }
 
     /// The top face, with its one cut out.
