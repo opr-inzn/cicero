@@ -2,6 +2,13 @@ import AppKit
 import CiceroCore
 import UniformTypeIdentifiers
 
+/// The families of a document's fonts that the library has, in the order the Fonts in Document sheet lists them, for the
+/// browser to show (Show in Library).
+struct DocumentList: Equatable {
+    let name: String
+    let families: [String]
+}
+
 /// The fonts a document uses, for the Fonts in Document sheet, which shows them against the library.
 struct DocumentFontsReport: Identifiable {
     let id = UUID()
@@ -40,6 +47,33 @@ extension AppModel {
                 showToast("Couldn’t read the fonts in “\(url.lastPathComponent)”")
             }
         }
+    }
+
+    /// The families of the document's fonts that the library has, each once.
+    func libraryFamilies(of report: DocumentFontsReport) -> [String] {
+        var seen = Set<String>()
+        return documentMatches(report).compactMap(\.family).filter { seen.insert($0).inserted }
+    }
+
+    /// Fills the browser with the families the document uses that the library has, as Show Similar Fonts does: the
+    /// sidebar shows nothing selected, and selecting an item there, or Done in the bar above them, goes back.
+    func showInLibrary(_ report: DocumentFontsReport) {
+        if similarFamilyID == nil, documentList == nil {
+            listReturn = selectedItems
+            listReturnPage = openFamilyID
+        }
+        searchText = ""
+        selection = nil
+        similarFamilyID = nil
+        documentList = DocumentList(name: report.name, families: libraryFamilies(of: report))
+        openFamilyID = nil
+        selectedIDs = []
+    }
+
+    /// Done in the bar above Show in Library's families.
+    func endDocumentList() {
+        guard documentList != nil else { return }
+        returnFromList()
     }
 
     /// The fonts an app says its document uses, as InDesign does for Find Fonts in Current Document in the menu bar.

@@ -47,6 +47,12 @@ struct DocumentFontsSheet: View {
                     Text(message).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer()
+                Button("Show in Library") {
+                    model.showInLibrary(report)
+                    dismiss()
+                }
+                .disabled(model.libraryFamilies(of: report).isEmpty)
+                .help("Shows the document’s fonts that are in your library in the main window, each set in itself")
                 Button("Make Set") { message = model.makeSet(for: report) }
                     .help("A set named “\(report.setName)” with the document’s fonts that are in your library")
                 Button("Activate All") { model.activateAll(in: report) }

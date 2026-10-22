@@ -41,6 +41,10 @@ struct BrowserView: View {
         .topBar {
             if let id = model.similarFamilyID {
                 SimilarBar(familyID: id)
+            } else if let list = model.documentList {
+                ListBar(symbol: "doc.text.magnifyingglass", message: "The fonts “\(list.name)” uses that are in your library.") {
+                    model.endDocumentList()
+                }
             }
         }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
@@ -156,28 +160,9 @@ private struct SimilarBar: View {
     let familyID: String
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: "sparkle.magnifyingglass")
-                    .foregroundStyle(.secondary)
-                Text(message)
-                    .lineLimit(1)
-                Spacer()
-                if model.measurementProgress != nil {
-                    ProgressView().controlSize(.small)
-                }
-                // Text in the accent colour, as the bar's way back.
-                Button("Done") { model.endSimilar() }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
-                    .help("Go back to what the sidebar showed")
-            }
-            .font(.callout)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            Divider()
+        ListBar(symbol: "sparkle.magnifyingglass", message: message, isWorking: model.measurementProgress != nil) {
+            model.endSimilar()
         }
-        .background(.bar)
     }
 
     private var message: String {
@@ -189,6 +174,40 @@ private struct SimilarBar: View {
             return "Measuring letters, \(progress.done.formatted()) of \(progress.total.formatted())"
         }
         return "Cicero can’t compare \(name) with other fonts: it hasn’t got the Latin letters Cicero measures."
+    }
+}
+
+/// Above a list the browser shows instead of a sidebar item's (Show Similar Fonts, Show in Library): what it is, and
+/// Done, the way back.
+private struct ListBar: View {
+    let symbol: String
+    let message: String
+    var isWorking = false
+    let done: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .foregroundStyle(.secondary)
+                Text(message)
+                    .lineLimit(1)
+                Spacer()
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                }
+                // Text in the accent colour, as the bar's way back.
+                Button("Done", action: done)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                    .help("Go back to what the sidebar showed")
+            }
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            Divider()
+        }
+        .background(.bar)
     }
 }
 
@@ -265,6 +284,9 @@ private struct EmptyBrowser: View {
             // Only when the family is gone, or hidden: it comes first otherwise.
             ContentUnavailableView("Font Not Available", systemImage: "textformat",
                                    description: Text("This font is no longer in your library."))
+        } else if let list = model.documentList {
+            ContentUnavailableView("No Fonts in Your Library", systemImage: "doc.text.magnifyingglass",
+                                   description: Text("None of the fonts “\(list.name)” uses are in your library."))
         } else {
             sidebarItemContent
         }

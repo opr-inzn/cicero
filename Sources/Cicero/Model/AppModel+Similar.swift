@@ -95,12 +95,13 @@ extension AppModel {
     /// Fills the browser with the family and the families that look most like it, the closest first, the way a
     /// search does: the sidebar shows nothing selected, and selecting an item there goes back to it.
     func showSimilar(to family: Family) {
-        if similarFamilyID == nil {
-            similarReturn = selectedItems
-            similarReturnPage = openFamilyID
+        if similarFamilyID == nil, documentList == nil {
+            listReturn = selectedItems
+            listReturnPage = openFamilyID
         }
         searchText = ""
         selection = nil
+        documentList = nil
         similarFamilyID = family.id
         openFamilyID = nil
         selectedIDs = [family.id]
@@ -111,17 +112,24 @@ extension AppModel {
     /// asked for from, if any.
     func endSimilar() {
         guard let id = similarFamilyID else { return }
-        let items = similarReturn ?? [.all]
-        let page = similarReturnPage
-        similarReturn = nil
-        similarReturnPage = nil
-        selectSidebarItems(items.isEmpty ? [.all] : items)
-        if selection == nil { selection = .all }
-        similarFamilyID = nil
+        returnFromList()
         if visibleFamilies.contains(where: { $0.id == id }) {
             selectedIDs = [id]
             jumpTargets = [id]
         }
+    }
+
+    /// Back to what the sidebar had selected before Show Similar Fonts or Show in Library, and to the font page open
+    /// then, if any.
+    func returnFromList() {
+        let items = listReturn ?? [.all]
+        let page = listReturnPage
+        listReturn = nil
+        listReturnPage = nil
+        selectSidebarItems(items.isEmpty ? [.all] : items)
+        if selection == nil { selection = .all }
+        similarFamilyID = nil
+        documentList = nil
         if let page, library.family(page) != nil { openFamilyID = page }
     }
 }

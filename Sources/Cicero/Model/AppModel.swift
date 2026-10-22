@@ -128,8 +128,9 @@ final class AppModel {
     /// The sidebar item the browser's title and empty states follow. Setting it selects just that item.
     var selection: SidebarItem? = .all {
         didSet {
-            // Showing a sidebar item again ends Show Similar Fonts.
+            // Showing a sidebar item again ends Show Similar Fonts and Show in Library.
             if selection != nil, similarFamilyID != nil { similarFamilyID = nil }
+            if selection != nil, documentList != nil { documentList = nil }
             let items: Set<SidebarItem> = selection.map { [$0] } ?? []
             if selectedItems != items { selectedItems = items }
             guard oldValue != selection else { return }
@@ -150,6 +151,9 @@ final class AppModel {
     /// The family whose similar fonts the browser shows instead of a sidebar item's, the closest first (see
     /// `showSimilar`); nil for a sidebar item's.
     var similarFamilyID: String?
+    /// The families a document uses that the library has, which the browser shows instead of a sidebar item's, from the
+    /// Fonts in Document sheet's Show in Library (see `showInLibrary`); nil otherwise.
+    var documentList: DocumentList?
     /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
     /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
@@ -254,10 +258,10 @@ final class AppModel {
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
     @ObservationIgnored var similarCache: (key: SimilarKey, table: SimilarFonts)?
-    /// What the sidebar had selected before Show Similar Fonts, to go back to.
-    @ObservationIgnored var similarReturn: Set<SidebarItem>?
-    /// The font page open before Show Similar Fonts, to go back to.
-    @ObservationIgnored var similarReturnPage: String?
+    /// What the sidebar had selected before Show Similar Fonts or Show in Library, to go back to.
+    @ObservationIgnored var listReturn: Set<SidebarItem>?
+    /// The font page open before Show Similar Fonts or Show in Library, to go back to.
+    @ObservationIgnored var listReturnPage: String?
     /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
 

@@ -76,6 +76,7 @@ struct VisibleKey: Equatable {
     var coverageRevision: Int
     var guessRevision: Int
     var similar: String?
+    var document: DocumentList?
     /// 0 unless the browser shows similar fonts, so measurements arriving don't make other lists again.
     var measurementRevision: Int
 }
@@ -176,7 +177,7 @@ extension AppModel {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
             dataRevision: dataRevision, coverageRevision: coverageRevision, guessRevision: guessRevision,
-            similar: similarFamilyID, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
+            similar: similarFamilyID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
     }
 
@@ -210,8 +211,11 @@ extension AppModel {
         return listedFamilies(where: searchMatcher(query.anywhereInNames))
     }
 
-    /// The families the sidebar selection lists, or Show Similar Fonts, that `matches`.
+    /// The families the sidebar selection lists, or Show Similar Fonts, or Show in Library, that `matches`.
     private func listedFamilies(where matches: (Family) -> Bool) -> [Family] {
+        if let list = documentList {
+            return list.families.compactMap { library.family($0) }.filter { data.lists($0) && matches($0) }
+        }
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
