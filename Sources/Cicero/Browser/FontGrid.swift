@@ -21,9 +21,9 @@ struct FontGrid: View {
     /// How much higher the tags above a tile's sample and the name and caption below it make it.
     static let labels: CGFloat = 51
 
-    /// The sample's height: the size, with room above and below. The type's line reaches a little past it at big sizes, into
-    /// space its letters don't use, which is why it's drawn unclipped.
-    static func sampleHeight(size: Double) -> CGFloat { size + 24 }
+    /// The sample's height: the size, with room above and below, more of it for small type. The type's line reaches a little
+    /// past it at big sizes, into space its letters don't use, which is why it's drawn unclipped.
+    static func sampleHeight(size: Double) -> CGFloat { size * 0.85 + 44 }
 
     /// How narrow a tile can be: at least 1.3 times as wide as it's high, so tiles stay landscape, and as wide as the sample
     /// text at the preview size in the system font, with a little to spare, so it isn't made smaller to fit.

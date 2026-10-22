@@ -149,7 +149,7 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   it's normal, then the name. A family with more styles than weight and width tell apart (italics,
   optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
   the tooltip. 10 pt beside a tile's contents, 14 pt above and below. Tiles fit the type, which is always the preview
-  size (`FontGrid`), by three rules: the sample is the size + 24 pt high (unclipped: the type's line reaches a little
+  size (`FontGrid`), by three rules: the sample is the size × 0.85 + 44 pt high, so small type has more room around it (unclipped: the type's line reaches a little
   past it at big sizes, into room its letters don't use); a tile is at least 1.3 times as wide as it's high, so tiles
   stay landscape, and as wide as the sample (the preview text, else "Aa Gg 123") in the system font at that size × 1.1
   + 28 pt; as many tiles fit in a row as can be that wide, from one to five, as wide as fills the row, however many
