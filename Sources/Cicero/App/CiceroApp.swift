@@ -14,7 +14,7 @@ struct CiceroApp: App {
     init() {
         let model = AppModel()
         let updates = Updates()
-        let menuBarItem = MenuBarItem(model: model, updates: updates)
+        let menuBarItem = MenuBarItem(model: model)
         _model = State(initialValue: model)
         _updates = State(initialValue: updates)
         _menuBarItem = State(initialValue: menuBarItem)
@@ -83,12 +83,11 @@ struct CiceroCommands: Commands {
     let updates: Updates
     let menuBarItem: MenuBarItem
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
     var body: some Commands {
-        // The menu bar's commands are made at launch and have these even while no window is open.
-        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
+        // The menu bar's commands are made at launch and have this even while no window is open.
+        let _ = menuBarItem.connect(openWindow: openWindow)
         CommandGroup(replacing: .appInfo) {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])

@@ -117,7 +117,7 @@ Cicero has an icon in the menu bar, the cube of its app icon. Click it to open C
 - The fonts that are on for open apps, because of their [application sets](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
 - Your sets, as the sidebar lists them. A checkmark means all of a set’s fonts are on, a dash that some are. Choose a set to turn its fonts on, or off when it has a checkmark
 - **Auto-activate Fonts in Adobe Apps**, the switch that’s also in **Settings → General**
-- **Settings…**, **Check for Updates** and **Quit Cicero**
+- **Quit Cicero**
 
 Closing Cicero’s windows doesn’t quit it, so application sets keep working.
 

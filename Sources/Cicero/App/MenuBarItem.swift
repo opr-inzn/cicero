@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Cicero's icon in the menu bar, while Settings → General → Show Cicero in the menu bar is on (it is at first). A click
 /// opens the main window. A right-click, a click with two fingers or a Control-click opens a menu: the fonts on for open
-/// apps and until Cicero quits, the sets as the sidebar lists them, a switch for the fonts Adobe documents use,
-/// Settings, Check for Updates and Quit. VoiceOver's Show Menu action opens it too. The sets are in the menu itself, not
+/// apps and until Cicero quits, the sets as the sidebar lists them, the switch for auto-activating fonts in Adobe apps,
+/// and Quit. VoiceOver's Show Menu action opens it too. The sets are in the menu itself, not
 /// a submenu: an item of a submenu can't bring Cicero to the front, as asking how to activate needs.
 ///
 /// With the icon there, Show Cicero in the Dock can be off: Cicero is then in the Dock and the app switcher only while
@@ -15,29 +15,25 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
     static let showsIconKey = "menuBar.showsIcon"
     static let showsDockIconKey = "menuBar.showsDockIcon"
 
-    /// Handed over by `CiceroCommands`, whose environment has them even while no window is open.
+    /// Handed over by `CiceroCommands`, whose environment has it even while no window is open.
     var openWindow: OpenWindowAction?
-    var openSettings: OpenSettingsAction?
 
     private let model: AppModel
-    private let updates: Updates
     private let defaults = UserDefaults.standard
     private var statusItem: NSStatusItem?
     private let menu = NSMenu()
     private var observers: [NSObjectProtocol] = []
 
-    init(model: AppModel, updates: Updates) {
+    init(model: AppModel) {
         self.model = model
-        self.updates = updates
         super.init()
         defaults.register(defaults: [Self.showsIconKey: true, Self.showsDockIconKey: true])
         menu.delegate = self
     }
 
-    /// Hands over the window actions; returns nothing, so `CiceroCommands` can call it as it's made.
-    func connect(openWindow: OpenWindowAction, openSettings: OpenSettingsAction) {
+    /// Hands over the window action; returns nothing, so `CiceroCommands` can call it as it's made.
+    func connect(openWindow: OpenWindowAction) {
         self.openWindow = openWindow
-        self.openSettings = openSettings
     }
 
     /// At launch.
@@ -138,8 +134,8 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let status = statusLines()
-        for (title, symbol) in status {
-            let line = menuItem(title, symbol: symbol, action: nil)
+        for title in status {
+            let line = menuItem(title, action: nil)
             line.isEnabled = false
             menu.addItem(line)
         }
@@ -150,29 +146,22 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
             for item in sets { menu.addItem(item) }
             menu.addItem(.separator())
         }
-        let documentFonts = menuItem("Auto-activate Fonts in Adobe Apps", symbol: "doc.text.magnifyingglass", action: #selector(toggleDocumentFonts))
+        let documentFonts = menuItem("Auto-activate Fonts in Adobe Apps", action: #selector(toggleDocumentFonts))
         documentFonts.state = model.data.activatesDocumentFonts ? .on : .off
         menu.addItem(documentFonts)
         menu.addItem(.separator())
-        menu.addItem(menuItem("Settings…", symbol: "gearshape", action: #selector(showSettings)))
-        let check = menuItem("Check for Updates", symbol: "arrow.triangle.2.circlepath", action: #selector(checkForUpdates))
-        check.isEnabled = updates.canCheckForUpdates
-        menu.addItem(check)
-        menu.addItem(.separator())
-        menu.addItem(menuItem("Quit Cicero", symbol: "power", action: #selector(quit)))
+        menu.addItem(menuItem("Quit Cicero", action: #selector(quit)))
     }
 
-    /// Symbols only where menus show them, as the menu bar's menus do (see `Compatibility`).
-    private func menuItem(_ title: String, symbol: String, action: Selector?) -> NSMenuItem {
+    private func menuItem(_ title: String, action: Selector?) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
-        if #available(macOS 26, *) { item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) }
         return item
     }
 
     /// "Inter and Roboto on for InDesign", a line for each open app with fonts on for it (its application sets', and
     /// its documents'), then "12 families on until Cicero quits".
-    private func statusLines() -> [(String, String)] {
+    private func statusLines() -> [String] {
         let session = ActivationEngine.currentSession()
         let temporary = model.data.records.temporary.filter { $0.value.session == session }
         guard !temporary.isEmpty else { return [] }
@@ -190,12 +179,12 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
             case .whileAppsRun: for app in record.apps ?? [] { forApps[app, default: []] += inFile }
             }
         }
-        var lines = forApps.compactMap { app, faces -> (String, String)? in
+        var lines = forApps.compactMap { app, faces -> String? in
             guard let name = appName(app), let fonts = FontNames.describe(faces) else { return nil }
-            return ("\(fonts) on for \(name)", "app.badge.checkmark")
+            return "\(fonts) on for \(name)"
         }
-        .sorted { $0.0.localizedStandardCompare($1.0) == .orderedAscending }
-        if let fonts = FontNames.describe(untilQuit) { lines.append(("\(fonts) on until Cicero quits", "clock")) }
+        .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        if let fonts = FontNames.describe(untilQuit) { lines.append("\(fonts) on until Cicero quits") }
         return lines
     }
 
@@ -208,7 +197,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
     private func setItems() -> [NSMenuItem] {
         guard model.isVisible(SidebarSection.sets.key) else { return [] }
         return model.rows(for: .sets).filter { model.isVisible($0.key) }.map { row in
-            let item = menuItem(row.title, symbol: row.icon, action: #selector(toggleSet))
+            let item = menuItem(row.title, action: #selector(toggleSet))
             let faces = model.faces(in: row.item)
             let on = faces.count { $0.position == .on }
             item.state = on == 0 ? .off : on == faces.count ? .on : .mixed
@@ -236,14 +225,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
 
     @objc private func toggleDocumentFonts() {
         model.data.activatesDocumentFonts.toggle()
-    }
-
-    @objc private func showSettings() {
-        bringForward { openSettings?() }
-    }
-
-    @objc private func checkForUpdates() {
-        bringForward { updates.checkForUpdates() }
     }
 
     @objc private func quit() {
