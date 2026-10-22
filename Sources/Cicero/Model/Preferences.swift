@@ -11,7 +11,7 @@ final class PreviewSettings {
     /// What grid tiles show when no sample text is set: capitals, lowercase, a descender and figures.
     static let tileSample = "Aa Gg 123"
     /// Preview Options' Size; a smaller size saved before 24 pt was the least goes up to it.
-    static let sizes: ClosedRange<Double> = 24...160
+    static let sizes: ClosedRange<Double> = 24...200
 
     /// Empty means each family's own name.
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
