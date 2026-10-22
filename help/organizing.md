@@ -226,7 +226,7 @@ Mark families with tags, which show as colored dots next to their names in the l
 | Open Source | Blue |
 | Trial | Orange |
 
-They’re tags like any other: rename them, delete them, or make your own. Libraries from before Cicero 1.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. Libraries from Cicero 1.9.1 and before also lose the Licensed + Non-Commercial, Partially Licensed and Public Domain tags they started with, once, if you never used them. From 1.5 to 1.6 a family had one tag at a time; the tags families had then, they keep.
+They’re tags like any other: rename them, delete them, or make your own. Libraries from before Cicero 0.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. Libraries from Cicero 0.9.1 and before also lose the Licensed + Non-Commercial, Partially Licensed and Public Domain tags they started with, once, if you never used them. From 0.5 to 0.6 a family had one tag at a time; the tags families had then, they keep.
 
 ### Tag fonts
 
