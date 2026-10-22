@@ -380,7 +380,6 @@ private struct SidebarContent: View {
         if model.canExport(row.item) {
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: row.item, named: row.title) }
-            Button("Export Font List", systemImage: "tablecells") { model.exportFontList(model.families(in: row.item), named: row.title) }
         }
         Divider()
         if model.isVisible(row.key) {

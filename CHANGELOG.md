@@ -9,6 +9,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - With the icon in the menu bar, **Show Cicero in the Dock** can be off: Cicero is then in the Dock only while one of its windows is open, and closing the last one takes you back to the app you were in.
 - Application sets and the fonts Adobe documents use start working as Cicero opens, also when it opens without its window. Before, they waited for the window.
 - **Settings…** in the Cicero menu is called **Preferences** (⌘,), and messages that point to it say **Preferences → General**.
+- **Export Font List** is gone, from the File menu and the sidebar’s menus.
 - The **Fonts in Document** sheet counts a document’s fonts as active and inactive, as the rest of Cicero does, rather than on and off: “12 fonts · 8 active · 2 inactive · 2 missing”.
 - **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
 

@@ -70,56 +70,6 @@ extension AppModel {
         }
     }
 
-    // MARK: Font list
-
-    /// A list of the browser's selection, or with nothing selected of every family in the list (see `exportFontList`).
-    func exportFontListOfSelectionOrList() {
-        let selected = selectedFamilies
-        if !selected.isEmpty {
-            exportFontList(selected, named: nil)
-        } else {
-            exportFontList(visibleFamilies, named: selectedItems.count == 1 ? selectionTitle : nil)
-        }
-    }
-
-    /// Asks where to save a CSV file listing the families, for a spreadsheet, writes it and reveals it. Called `name`,
-    /// else after the one family or "N Families".
-    func exportFontList(_ families: [Family], named name: String?) {
-        guard !families.isEmpty else { return showToast("No fonts to list") }
-        let panel = NSSavePanel()
-        panel.title = "Export Font List"
-        panel.prompt = "Export"
-        panel.nameFieldLabel = "Export As:"
-        panel.canCreateDirectories = true
-        panel.allowedContentTypes = [.commaSeparatedText]
-        panel.nameFieldStringValue = (name ?? (families.count == 1 ? families[0].name : "\(families.count) Families")) + ".csv"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let foundryName = foundryNamer()
-        let classificationName = classificationNamer()
-        let rows = families.map { family in
-            FontListCSV.Row(family: family, foundry: foundryName(family), classification: classificationName(family), status: statusTitle(of: family),
-                            tags: data.tags(of: family.id), rating: rating(of: family), note: note(of: family))
-        }
-        do {
-            try FontListCSV.data(rows).write(to: url, options: .atomic)
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-            showToast("\(FontNames.describe(families: families.map(\.name)) ?? "") listed in “\(url.lastPathComponent)”")
-        } catch {
-            showToast("Couldn’t save the font list")
-        }
-    }
-
-    /// Whether a family is on, in words, as the font list has it.
-    private func statusTitle(of family: Family) -> String {
-        switch family.state {
-        case .active: family.temporaryScope != nil ? "Active Temporarily" : "Active"
-        case .partial: "Partly Active"
-        case .inactive: "Inactive"
-        case .appOnly(let app): "Active in \(FaceState.appDescription(app))"
-        case .system: "Installed with macOS"
-        }
-    }
-
     // MARK: Backup
 
     private var backup: LibraryBackup { LibraryBackup(locations: locations) }
