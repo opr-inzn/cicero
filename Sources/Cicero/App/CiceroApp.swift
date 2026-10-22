@@ -83,11 +83,12 @@ struct CiceroCommands: Commands {
     let updates: Updates
     let menuBarItem: MenuBarItem
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
     var body: some Commands {
-        // The menu bar's commands are made at launch and have this even while no window is open.
-        let _ = menuBarItem.connect(openWindow: openWindow)
+        // The menu bar's commands are made at launch and have these even while no window is open.
+        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
         CommandGroup(replacing: .appInfo) {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
@@ -221,6 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UsageStatistics.sendLaunch()
+        PreferencesItem.keepNamed()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -278,6 +280,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             addsFonts = false
             // Not while the main window is still appearing: the panel runs a loop of its own.
             DispatchQueue.main.async { model.presentAddFontsPanel() }
+        }
+    }
+}
+
+/// The Cicero menu's settings item, called Preferences. SwiftUI makes it, as for any app with a Settings scene, and
+/// calls it Settings… again whenever it updates the menu. It gives that title to whatever holds ⌘, (a command group of
+/// Cicero's own too, which leaves two), so its own item is named again whenever the Cicero menu changes.
+enum PreferencesItem {
+    static let title = "Preferences"
+    private static var observers: [NSObjectProtocol] = []
+    private static var mainMenu: NSKeyValueObservation?
+
+    static func keepNamed() {
+        guard observers.isEmpty else { return }
+        for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { note in
+                let menu = (note.object as AnyObject?).map(ObjectIdentifier.init)
+                MainActor.assumeIsolated {
+                    if menu != nil, menu == appMenu.map(ObjectIdentifier.init) { rename() }
+                }
+            })
+        }
+        // A main menu SwiftUI makes anew is put in place whole, without telling about its items.
+        mainMenu = NSApp.observe(\.mainMenu) { _, _ in
+            MainActor.assumeIsolated { rename() }
+        }
+        rename()
+    }
+
+    private static var appMenu: NSMenu? { NSApp.mainMenu?.items.first?.submenu }
+
+    private static func rename() {
+        for item in appMenu?.items ?? [] where item.keyEquivalent == "," && item.keyEquivalentModifierMask == .command && item.title != title {
+            item.title = title
         }
     }
 }

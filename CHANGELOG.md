@@ -4,10 +4,11 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- Cicero has an icon in the menu bar. Click it to open Cicero. Right-click it, or click it with two fingers, for a menu with the fonts that are on for open apps and until Cicero quits, your sets to turn on and off, **Add Fonts**, **Find Fonts in Document**, **Auto-activate Fonts in Adobe Apps** and **Quit Cicero**. Drop font files on it to add them, or a document to see the fonts it uses. Turn it off with **Show Cicero in the menu bar** in **Settings → General**.
+- Cicero has an icon in the menu bar. Click it to open Cicero. Right-click it, or click it with two fingers, for a menu with the fonts that are on for open apps and until Cicero quits, your sets to turn on and off, **Add Fonts**, **Find Fonts in Document**, **Auto-activate Fonts in Adobe Apps**, **Preferences** and **Quit Cicero**. Drop font files on it to add them, or a document to see the fonts it uses. Turn it off with **Show Cicero in the menu bar** in **Settings → General**.
 - Right-click Cicero’s icon in the Dock for its open windows, as other apps list theirs, and **Add Fonts**, as in the File menu. Add Fonts opens Cicero’s window too, so you see the fonts you add.
 - With the icon in the menu bar, **Show Cicero in the Dock** can be off: Cicero is then in the Dock only while one of its windows is open, and closing the last one takes you back to the app you were in.
 - Application sets and the fonts Adobe documents use start working as Cicero opens, also when it opens without its window. Before, they waited for the window.
+- **Settings…** in the Cicero menu is called **Preferences** (⌘,), and messages that point to it say **Preferences → General**.
 - The **Fonts in Document** sheet counts a document’s fonts as active and inactive, as the rest of Cicero does, rather than on and off: “12 fonts · 8 active · 2 inactive · 2 missing”.
 - **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
 

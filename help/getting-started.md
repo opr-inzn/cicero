@@ -108,7 +108,7 @@ Click the switch next to a family. It’s on in every app as soon as the switch 
 
 ## Choose light or dark
 
-Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
+Cicero follows macOS. To choose for Cicero alone, open **Cicero → Preferences** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
 
 ## Cicero in the menu bar
 
@@ -118,7 +118,7 @@ Cicero has an icon in the menu bar, the cube of its app icon. Click it to open C
 - Your sets, as the sidebar lists them. A checkmark means all of a set’s fonts are on, a dash that some are. Choose a set to turn its fonts on, or off when it has a checkmark
 - **Add Fonts** and **Find Fonts in Document**, as in the File menu. Cicero’s window opens too, so you see what they bring
 - **Auto-activate Fonts in Adobe Apps**, the switch that’s also in **Settings → General**
-- **Quit Cicero**
+- **Preferences** and **Quit Cicero**
 
 Closing Cicero’s windows doesn’t quit it, so application sets keep working.
 

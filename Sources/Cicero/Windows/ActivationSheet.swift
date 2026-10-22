@@ -28,7 +28,7 @@ struct ActivationSheet: View {
             }
             // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
-            Toggle("Remember this choice (you can change it in Settings → General)", isOn: $remember)
+            Toggle("Remember this choice (you can change it in Preferences → General)", isOn: $remember)
             HStack {
                 if prompt.switching == nil && prompt.faces.contains(where: \.canActivateTemporarily) {
                     Button("Activate Temporarily") {

@@ -266,8 +266,8 @@ extension AppModel {
         let families = found.filter(data.lists)
         guard !families.isEmpty else {
             return showToast(found[0].state == .system
-                ? "That font comes with macOS, and system fonts are hidden (Settings → General)"
-                : "That font is from Adobe Fonts, which are hidden (Settings → General)")
+                ? "That font comes with macOS, and system fonts are hidden (Preferences → General)"
+                : "That font is from Adobe Fonts, which are hidden (Preferences → General)")
         }
         if let set = opened.set, let name = data.sets.first(where: { $0.id == set })?.name {
             setMembership(true, for: families, in: set)

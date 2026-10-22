@@ -94,7 +94,7 @@ struct MainWindow: View {
                 .keyboardShortcut(.defaultAction)
             Button("Not Now", role: .cancel) { model.answerGuessing(false) }
         } message: {
-            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Settings → General.")
+            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Preferences → General.")
         }
         .alert(
             model.textPrompt?.title ?? "",
