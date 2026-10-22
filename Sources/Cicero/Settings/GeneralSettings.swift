@@ -161,7 +161,7 @@ struct GeneralSettings: View {
         return switch model.data.installMethod {
         case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
         case .copy: "Copying duplicates font files into \(place)."
-        case .move: "Moving puts font files into \(place); the folders they were in stay."
+        case .move: "Moving puts font files into \(place)."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves. Microsoft Office can’t use them."
         }
     }
