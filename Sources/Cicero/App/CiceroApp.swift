@@ -110,14 +110,14 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Button("New Application Set", systemImage: "app.badge.checkmark") { model.newApplicationSet(with: model.selectedFamilies) }
             Divider()
+            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
+            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+            Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             Divider()
             Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
             Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
-            Divider()
-            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
-            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
         }
         // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
         SidebarCommands()
