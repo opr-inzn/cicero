@@ -8,6 +8,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Right-click Cicero’s icon in the Dock for its open windows, as other apps list theirs, and **Add Fonts**, as in the File menu. Add Fonts opens Cicero’s window too, so you see the fonts you add.
 - With the icon in the menu bar, **Show Cicero in the Dock** can be off: Cicero is then in the Dock only while one of its windows is open, and closing the last one takes you back to the app you were in.
 - Application sets and the fonts Adobe documents use start working as Cicero opens, also when it opens without its window. Before, they waited for the window.
+- The **Fonts in Document** sheet counts a document’s fonts as active and inactive, as the rest of Cicero does, rather than on and off: “12 fonts · 8 active · 2 inactive · 2 missing”.
 - **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
 
 ## 1.9.4

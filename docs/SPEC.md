@@ -267,8 +267,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   0.5 s of coming to the front; the `.idlk` lock file appears ~15 ms into an open, too late to beat its font check;
   a file in ~/Library/Application Support/Adobe/Fonts isn't taken up faster. Photoshop's `app.refreshFonts()` takes
   the font up at once but freezes it for ~2 s, so it isn't used.
-- Sheet "Fonts in “Brochure.indd”", "12 fonts · 8 on · 2 off · 2 missing", one row per font, missing first, then off,
-  then on, each by name: a status symbol (green check, dashed circle, orange triangle), the name (family and style,
+- Sheet "Fonts in “Brochure.indd”", "12 fonts · 8 active · 2 inactive · 2 missing" (active and inactive, as the rest of the app says), one row per font, missing first, then inactive,
+  then active, each by name: a status symbol (green check, dashed circle, orange triangle), the name (family and style,
   else the PostScript name) with the PostScript name under it, an "Embedded" tag for a PDF's embedded fonts, the
   status (the face's state label, "Installed with macOS" for one CoreText has though the library doesn't, else "Not
   in your library") and an action: Activate, or for a missing font Find on This Mac, which asks

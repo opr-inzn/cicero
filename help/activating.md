@@ -203,8 +203,8 @@ To see which fonts a document needs, and turn on the ones you have:
 
 1. Choose **File → Find Fonts in Document** and pick the document, or drag it from the Finder onto Cicero’s window.
 2. Cicero lists every font the document uses, missing ones first:
-   - **On** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
-   - **Off** (a dashed circle): it’s in your library but not on. Click **Activate**.
+   - **Active** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
+   - **Inactive** (a dashed circle): it’s in your library but inactive. Click **Activate**.
    - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. With **Copy into ~/Library/Fonts** chosen, the button says **Install** and copies it into your Fonts folder, on. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders; see [Privacy](privacy.md#when-macos-asks-for-permission).
 3. **Activate All** turns on every font of the document that’s in your library. **Make Set** makes a set named after the document with its fonts that are in your library, or adds them to a set of that name.
 
