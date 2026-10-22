@@ -47,7 +47,7 @@ enum ApplicationsFolder {
     static func offerToMove(forOpenAtLogin: Bool) {
         let alert = NSAlert()
         alert.messageText = "Move Cicero to the Applications folder?"
-        alert.informativeText = "Application sets, opening at login and updates work only when Cicero is in the Applications folder."
+        alert.informativeText = "App folders, opening at login and updates work only when Cicero is in the Applications folder."
         alert.addButton(withTitle: "Move to Applications Folder")
         alert.addButton(withTitle: "Do Not Move")
         if !forOpenAtLogin {

@@ -14,7 +14,7 @@ A Mac with Apple silicon and macOS 15 or later. Recognizing classifications from
 
 ## Move Cicero to Applications
 
-If you open Cicero right from the disk image or from your Downloads folder, it offers to move itself to the Applications folder. Let it: [application sets](activating.md#turn-fonts-on-with-an-app), [Open at login](activating.md#open-cicero-at-login) and [updates](#keep-cicero-up-to-date) only work when Cicero is in Applications.
+If you open Cicero right from the disk image or from your Downloads folder, it offers to move itself to the Applications folder. Let it: [app folders](activating.md#turn-fonts-on-with-an-app), [Open at login](activating.md#open-cicero-at-login) and [updates](#keep-cicero-up-to-date) only work when Cicero is in Applications.
 
 If you say no and later turn on **Open at login**, Cicero offers again. You can also quit Cicero and drag it into Applications yourself in the Finder.
 
@@ -40,7 +40,7 @@ After that, Cicero checks which characters each font has, in the background. Lis
 
 The main window has three parts:
 
-- **The sidebar** on the left chooses what to show: **All Fonts**, **Active**, **Inactive**, **Recents**, **System Fonts** and **Conflicts**, then your **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Coverage**. See [Organizing your library](organizing.md).
+- **The sidebar** on the left chooses what to show: **All Fonts**, **Active**, **Inactive**, **Recents**, **System Fonts** and **Conflicts**, then your **Locations**, **Folders**, **Tags**, **Foundries**, **Classifications** and **Coverage**. See [Organizing your library](organizing.md).
 - **The browser** in the middle shows the families of what you chose, as a list, a grid or specimens. The title is the sidebar item’s name, and the subtitle counts the families and how many are active, like “1,298 families · 716 active”. See [Browsing and previewing](browsing.md).
 - **The Info panel** on the right, shown with the **Info** button in the toolbar or **Fonts → Show Info** (⌘I), describes the selected font.
 
@@ -52,12 +52,12 @@ Short messages at the bottom of the window confirm what Cicero did, like “Inte
 
 ## Add your fonts
 
-Keep fonts you don’t always need in folders of your own, and add those folders to Cicero:
+Keep fonts you don’t always need in folders of your own, and add those folders to Cicero as locations:
 
-1. Choose **File → Add Folder** (⇧⌘O), or click **+** next to **Folders** in the sidebar.
+1. Choose **File → Add Location** (⇧⌘O), or click **+** next to **Locations** in the sidebar.
 2. Pick one or more folders and click **Add**.
 
-Their fonts show up in your library without being activated: they’re listed under **Inactive** until you turn them on. See [Folders](organizing.md#folders).
+Their fonts show up in your library without being activated: they’re listed under **Inactive** until you turn them on. See [Locations](organizing.md#locations).
 
 You can add single font files too, without adding the folder they’re in:
 
@@ -81,10 +81,10 @@ Cicero can bring over what you set up in FontExplorer X Pro or Font Book, so you
 
 What comes over:
 
-- **Your fonts.** FontExplorer X’s Font Library is added as a folder, called **FontExplorer X** in the sidebar, and the fonts it used from other folders are listed where they are, under **Added Fonts**. Nothing is moved or turned on. From a `.fexbackup` with fonts, they’re put back where the Font Library was, in your home folder, without writing over anything. A database copied from another Mac needs its Font Library where it was, in your home folder or on a disk that’s connected; if it isn’t, Cicero says where it looked, and once the folder is there, importing again brings in its fonts.
-- **Sets,** with the folders they were in in their names, like “Clients / Acme”. FontExplorer X puts files in sets, so a set gets every style in its files: a whole family when it has them all, otherwise just those styles.
-- **Application sets,** with their apps. An app that isn’t on this Mac is found by its name, also with another year, like Adobe InDesign 2026 for Adobe InDesign 2024. Cicero has no fonts to turn off while an app is open, so the **Autodeactivate** part stays behind.
-- **Smart sets,** when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), designer, whether it’s activated, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
+- **Your fonts.** FontExplorer X’s Font Library is added as a location, called **FontExplorer X** in the sidebar, and the fonts it used from other folders are listed where they are, under **Added Fonts**. Nothing is moved or turned on. From a `.fexbackup` with fonts, they’re put back where the Font Library was, in your home folder, without writing over anything. A database copied from another Mac needs its Font Library where it was, in your home folder or on a disk that’s connected; if it isn’t, Cicero says where it looked, and once the folder is there, importing again brings in its fonts.
+- **Sets,** as folders, with the FontExplorer X folders they were in in their names, like “Clients / Acme”. FontExplorer X puts files in sets, so a folder gets every style in its set’s files: a whole family when it has them all, otherwise just those styles.
+- **Application sets,** as app folders, with their apps. An app that isn’t on this Mac is found by its name, also with another year, like Adobe InDesign 2026 for Adobe InDesign 2024. Cicero has no fonts to turn off while an app is open, so the **Autodeactivate** part stays behind.
+- **Smart sets,** as smart folders, when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), designer, whether it’s activated, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
 - **Labels,** as tags in their colors, named after them: Red, Orange, Yellow, Green, Blue, Purple and Gray. A family gets a tag for each label its styles have.
 - **Classifications.** A family goes in the classification most of its styles have in FontExplorer X, as if you’d put it there, unless you chose one already. Classifications you made in FontExplorer X come along as your own.
 - **Ratings.** A family gets the stars of its best-rated style, unless you gave it a rating already.
@@ -96,11 +96,11 @@ License details stay in FontExplorer X. Cicero opens a copy of its database, so 
 
 ### Font Book
 
-Choose **File → Import from Font Book**. Each collection you made becomes a set with its families and styles, leaving out the fonts you took out of it in Font Book. The ones Font Book comes with, like Fun and Web, start unchecked, and smart collections stay behind. To import collections from another Mac, click **Choose Another** and pick their `.collection` files, from Library/FontCollections in that Mac’s home folder.
+Choose **File → Import from Font Book**. Each collection you made becomes a folder with its families and styles, leaving out the fonts you took out of it in Font Book. The ones Font Book comes with, like Fun and Web, start unchecked, and smart collections stay behind. To import collections from another Mac, click **Choose Another** and pick their `.collection` files, from Library/FontCollections in that Mac’s home folder.
 
 ### Importing again
 
-An import only adds: a set with the name of one you have gets the fonts it doesn’t have yet, and a smart set with the name of one you have stays as it is, so importing twice changes nothing. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`, as it does before restoring a backup.
+An import only adds: a folder you have with the name of one coming in gets the fonts it doesn’t have yet, and a smart folder you have with the name of one coming in stays as it is, so importing twice changes nothing. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`, as it does before restoring a backup.
 
 ## Turn a font on
 
@@ -114,12 +114,12 @@ Cicero follows macOS. To choose for Cicero alone, open **Cicero → Preferences*
 
 Cicero has an icon in the menu bar, the cube of its app icon. Click it to open Cicero’s window. Drop font files on it to add them, or a PDF, InDesign, Illustrator or Photoshop file to see the fonts it uses. Right-click it, or click it with two fingers, for a menu with:
 
-- The fonts that are on for open apps, because of their [application sets](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
-- Your sets, as the sidebar lists them. A checkmark means all of a set’s fonts are on, a dash that some are. Choose a set to turn its fonts on, or off when it has a checkmark
+- The fonts that are on for open apps, because of their [app folders](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
+- Your folders, as the sidebar lists them. A checkmark means all of a folder’s fonts are on, a dash that some are. Choose a folder to turn its fonts on, or off when it has a checkmark
 - **Add Fonts**, as in the File menu, and **Find Fonts in Current Document**, which shows the fonts of the document you have open in the app you’re in: a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop. The first time, macOS asks whether Cicero may control that app. With no document Cicero can read there, you pick a file instead. Cicero’s window opens too, so you see what they bring
 - **Preferences** and **Quit Cicero**
 
-Closing Cicero’s windows doesn’t quit it, so application sets keep working.
+Closing Cicero’s windows doesn’t quit it, so app folders keep working.
 
 - To do without the icon, open **Settings → General** and turn off **Show Cicero in the menu bar**
 - With the icon there, you can turn off **Show Cicero in the Dock**. Cicero is then in the Dock and the app switcher only while one of its windows is open

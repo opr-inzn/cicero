@@ -222,9 +222,9 @@ private struct SidebarContent: View {
         case .sets:
             Menu {
                 // The symbols the sidebar has for each kind.
-                Button("New Set", systemImage: "square.stack") { model.prompt("New Set", confirm: "Create") { model.addSet(named: $0) } }
-                Button("New Smart Set", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
-                Button("New Application Set", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
+                Button("New Folder", systemImage: "folder") { model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0) } }
+                Button("New Smart Folder", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
+                Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
             } label: {
                 Image(systemName: "plus")
             }
@@ -233,7 +233,7 @@ private struct SidebarContent: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .fixedSize()
-            .help("New set or smart set")
+            .help("New folder or smart folder")
         case .tags:
             plus("New tag") { model.newTag() }
         case .characterSets:
@@ -302,8 +302,8 @@ private struct SidebarContent: View {
 
     /// Shows the folder under another name in Cicero; the folder on disk keeps its own. Left empty, it goes back to that.
     private func renameFolder(_ id: UUID) -> some View {
-        Button("Rename Folder", systemImage: "pencil") {
-            model.prompt("Rename Folder", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+        Button("Rename Location", systemImage: "pencil") {
+            model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
         }
     }
 
@@ -332,23 +332,23 @@ private struct SidebarContent: View {
                     FolderActivationPicker(folder: folder) {
                         model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
                     }
-                    Button("Remove Folder from Library", systemImage: "folder.badge.minus") { model.removeFolder(id) }
+                    Button("Remove Location from Library", systemImage: "folder.badge.minus") { model.removeFolder(id) }
                 }
             }
         case .set(let id):
             if let set = model.data.sets.first(where: { $0.id == id }) {
-                activation(for: row, kind: "Set")
+                activation(for: row, kind: "Folder")
                 Divider()
-                Button("Rename Set", systemImage: "pencil") { model.prompt("Rename Set", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
+                Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
                 Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.editingAppsForSet = id }
-                Button("Delete Set", systemImage: "trash") { model.deleteSet(id) }
+                Button("Delete Folder", systemImage: "trash") { model.deleteSet(id) }
             }
         case .smartSet(let id):
             if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                activation(for: row, kind: "Smart Set")
+                activation(for: row, kind: "Smart Folder")
                 Divider()
-                Button("Edit Smart Set", systemImage: "slider.horizontal.3") { model.editingSmartSet = smartSet }
-                Button("Delete Smart Set", systemImage: "trash") { model.deleteSmartSet(id) }
+                Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.editingSmartSet = smartSet }
+                Button("Delete Smart Folder", systemImage: "trash") { model.deleteSmartSet(id) }
             }
         case .tag(let name):
             Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }

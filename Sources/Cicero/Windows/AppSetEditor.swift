@@ -16,7 +16,7 @@ struct AppSetEditor: View {
         let set = model.data.sets.first { $0.id == setID }
         VStack(alignment: .leading, spacing: 14) {
             Text("Activate “\(set?.name ?? "")” with Apps").font(.title2.bold())
-            Text("When one of these apps opens, Cicero activates the set’s fonts that are off, and deactivates them when the app quits. Fonts you turned on yourself stay on. This works while Cicero is open.")
+            Text("When one of these apps opens, Cicero activates the folder’s fonts that are off, and deactivates them when the app quits. Fonts you turned on yourself stay on. This works while Cicero is open.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             List(selection: $selection) {
@@ -40,7 +40,7 @@ struct AppSetEditor: View {
                 }
             }
             .inCard(
-                add: CardListButton(title: "Add App", help: "Add the apps that need this set’s fonts") { model.presentAppPicker(for: setID) },
+                add: CardListButton(title: "Add App", help: "Add the apps that need this folder’s fonts") { model.presentAppPicker(for: setID) },
                 remove: CardListButton(title: "Remove Apps", help: "Remove the selected apps") {
                     for bundleID in selection { model.removeApp(bundleID, from: setID) }
                     selection = []

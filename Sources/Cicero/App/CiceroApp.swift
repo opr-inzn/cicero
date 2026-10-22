@@ -100,16 +100,16 @@ struct CiceroCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("Add Fonts", systemImage: "doc.badge.plus") { model.presentAddFontsPanel() }
                 .keyboardShortcut("o", modifiers: .command)
-            Button("Add Folder", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
+            Button("Add Location", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Find Fonts in Document", systemImage: "doc.text.magnifyingglass") { model.presentFindFontsPanel() }
-            Button("New Set", systemImage: "square.stack") {
-                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
+            Button("New Folder", systemImage: "folder") {
+                model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("New Smart Set", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
+            Button("New Smart Folder", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
-            Button("New Application Set", systemImage: "app.badge.checkmark") { model.newApplicationSet(with: model.selectedFamilies) }
+            Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet(with: model.selectedFamilies) }
             Divider()
             Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
             Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }

@@ -10,7 +10,7 @@ struct DocumentFontsSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// What Find on This Mac turned up for each missing font, by match.
     @State private var searches: [String: Search] = [:]
-    /// What Make Set did.
+    /// What Make Folder did.
     @State private var message: String?
 
     enum Search {
@@ -55,8 +55,8 @@ struct DocumentFontsSheet: View {
                     }
                     .help("Shows the document’s fonts that are in your library in the main window, each set in itself")
                 }
-                Button("Make Set") { message = model.makeSet(for: report) }
-                    .help("A set named “\(report.setName)” with the document’s fonts that are in your library")
+                Button("Make Folder") { message = model.makeSet(for: report) }
+                    .help("A folder named “\(report.setName)” with the document’s fonts that are in your library")
                 Button("Activate All") { model.activateAll(in: report) }
                     .disabled(off.isEmpty)
                     .help("Turns on every font of the document that’s in your library")

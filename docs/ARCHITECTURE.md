@@ -21,14 +21,14 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   table, all of them, cached with the face, and picks the one for the Mac's languages: a `Family`'s `name` is the
   one it shows, its `id` the fonts' own, which the user's data keys by.
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
-  which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
+  which CoreText's lists don't cover entirely, the Fonts folders, watched folders (the sidebar's Locations), files added one at a time, the Deactivated folder), reads new or changed files
   with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
   lets the app skip rescans that changed nothing. `LibraryCache` saves each library a scan builds that differs from the
   last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window. `FolderWatcher` (FSEvents) says when font files come or go
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
   only for that file.
-- **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
-  tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
+- **Data** (`Data/`): `UserData` is everything the user set up (watched folders, added font files, sets and smart sets, which the
+  UI calls folders and smart folders, tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
@@ -159,7 +159,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   are in `Components/`.
 - The sidebar is a SwiftUI `List`, so every row it shows is a hosting view of its own, about a millisecond
   each to make: `SidebarView` keeps its sections in a view apart from the list, so a change of selection
-  doesn't remake them, only sets and foundries are drop targets (that alone makes a row a third slower to
+  doesn't remake them, only sets (the Folders section) and foundries are drop targets (that alone makes a row a third slower to
   appear), and while the selection changes quickly the browser takes it only once it rests. SwiftUI's List
   is an NSOutlineView; a marker view behind the "Fonts" header finds it and sets its drop feedback to
   `.gap`, the one AppKit setting the sidebar changes. Everything else (selection, moves, menus, headers)

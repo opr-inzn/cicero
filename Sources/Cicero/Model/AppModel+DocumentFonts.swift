@@ -102,10 +102,10 @@ extension AppModel {
         let count = families.count == 1 ? "1 family" : "\(families.count) families"
         if let existing = data.sets.first(where: { $0.name == report.setName }) {
             setMembership(true, for: families, in: existing.id)
-            return "Added \(count) to the set “\(report.setName)”."
+            return "Added \(count) to the folder “\(report.setName)”."
         }
         addSet(named: report.setName, with: families)
-        return "Made the set “\(report.setName)” with \(count)."
+        return "Made the folder “\(report.setName)” with \(count)."
     }
 
     /// Turns on every font of the document that's in the library and off.

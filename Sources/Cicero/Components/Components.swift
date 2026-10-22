@@ -10,7 +10,7 @@ extension Color {
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
     })
-    /// The App Set tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
+    /// The App Folder tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
     static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
@@ -299,8 +299,8 @@ struct StatusTag: View {
     }
 
     private var content: (String, Color, String?)? {
-        // With the symbols of New Application Set and Activate Temporarily.
-        if family.temporaryScope == .whileAppsRun { return ("App Set", .appSet, "app.badge.checkmark") }
+        // With the symbols of New App Folder and Activate Temporarily.
+        if family.temporaryScope == .whileAppsRun { return ("App Folder", .appSet, "app.badge.checkmark") }
         if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
         // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
@@ -503,7 +503,7 @@ struct CardListButton {
 }
 
 extension View {
-    /// A list in a card with + and − along its bottom, like the lists in System Settings: Settings → Folders,
+    /// A list in a card with + and − along its bottom, like the lists in System Settings: Settings → Locations,
     /// and the apps of an application set. Its rows take `cardRow`.
     func inCard(add: CardListButton, remove: CardListButton, canRemove: Bool) -> some View {
         VStack(spacing: 0) {
@@ -535,7 +535,7 @@ extension View {
     }
 }
 
-/// What a folder's fonts are, in its row in Settings → Folders and its menu in the sidebar: Inactive, Active
+/// What a folder's fonts are, in its row in Settings → Locations and its menu in the sidebar: Inactive, Active
 /// (Cicero keeps them on), or active in an app that loads the folder by itself. `askForApp` asks for that app's name.
 struct FolderActivationPicker: View {
     let folder: WatchedFolder
@@ -566,7 +566,7 @@ struct FolderActivationPicker: View {
             Divider()
             Text("Active in Specific App").tag(Self.specificApp)
         } label: {
-            Label("Fonts in This Folder", systemImage: "switch.2")
+            Label("Fonts in This Location", systemImage: "switch.2")
         }
     }
 }
