@@ -17,27 +17,22 @@ struct FontGrid: View {
     static let padding: CGFloat = 10
     /// Above and below a tile's contents: a little more, so the tiles don't feel cramped.
     static let verticalPadding: CGFloat = 14
-    /// The narrowest a tile goes, for its name and caption.
-    static let narrowest: CGFloat = 160
     static let mostColumns = 5
-    /// How narrow a tile can be for its sample: the sample's width at the preview size in the system font, with a little to
-    /// spare, so the type fills the tile without being made smaller; never narrower than the sample is high, so a single
-    /// letter gets a square of its own.
+    /// How much higher the tags above a tile's sample and the name and caption below it make it.
+    static let labels: CGFloat = 51
+
+    /// The sample's height: the size, with room above and below. The type's line reaches a little past it at big sizes, into
+    /// space its letters don't use, which is why it's drawn unclipped.
+    static func sampleHeight(size: Double) -> CGFloat { size + 24 }
+
+    /// How narrow a tile can be: at least 1.3 times as wide as it's high, so tiles stay landscape, and as wide as the sample
+    /// text at the preview size in the system font, with a little to spare, so it isn't made smaller to fit.
     static func minimumWidth(sample: String, size: Double, kerning: Double) -> CGFloat {
+        let height = sampleHeight(size: size) + labels + verticalPadding * 2
         let font = NSFont.systemFont(ofSize: size)
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: font, .kern: kerning]))
-        let text = CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8
-        return max(narrowest, text, sampleHeight(size: size))
+        return max(height * 1.3, CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8)
     }
-
-    /// The sample's height at a preview size: its line and some room above and below, so the tiles follow the type at
-    /// every size without crowding it.
-    static func sampleHeight(size: Double) -> CGFloat { size * 1.6 + 16 }
-
-    /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
-    /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
-    private static let infoPanelRoom = InfoPanelOverlay.width + InfoPanelOverlay.gap * 2
-        + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
 
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
@@ -70,16 +65,11 @@ struct FontGrid: View {
     }
 
     /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum`, from one to five, as wide as fills
-    /// the rows, however many families there are. The Info panel keeps the columns the rows have without it, the tiles
-    /// narrowing instead, as far as 0.6 times `minimum` (their sample shrinks to fit), and never below `narrowest`; past
-    /// that it takes a column away.
+    /// the rows, however many families there are.
     private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat) {
         guard gridWidth > 0 else { return (1, minimum) }
-        let closed = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
-        var count = min(Self.mostColumns, max(1, Int((closed + Self.spacing) / (minimum + Self.spacing))))
-        func filling(_ count: Int) -> CGFloat { (gridWidth - Self.spacing * CGFloat(count - 1)) / CGFloat(count) }
-        while count > 1 && filling(count) < max(Self.narrowest, minimum * 0.6) { count -= 1 }
-        return (count, filling(count))
+        let count = min(Self.mostColumns, max(1, Int((gridWidth + Self.spacing) / (minimum + Self.spacing))))
+        return (count, (gridWidth - Self.spacing * CGFloat(count - 1)) / CGFloat(count))
     }
 }
 
@@ -106,8 +96,7 @@ private struct Tile: View {
                 size: preview.size, weight: preview.weight, variations: model.variations(for: family),
                 kerning: preview.kerning(at: preview.size)
             )
-            // Only where the tiles can't be wide enough: a font far wider than the system font, a window too narrow for
-            // one, text longer than a row, or the Info panel keeping the columns.
+            // Only where a tile can't be wide enough: a font far wider than the system font, or text longer than a row.
             .minimumScaleFactor(0.4)
             .frame(maxWidth: .infinity)
             // Not clipped: what reaches past the font's ascent and descent runs into the padding rather than being cut off.
