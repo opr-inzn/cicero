@@ -118,12 +118,19 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
         statusItem.menu = nil
     }
 
-    /// Opens a window and brings Cicero to the front, in the Dock and with its menus.
+    /// Opens a window and brings Cicero to the front, in the Dock and with its menus. macOS 26 turns down an app's own
+    /// request to come forward, even from a click on its icon in the menu bar (`NSApp.activate()` and
+    /// `NSRunningApplication.activate`, checked with real clicks), so Cicero also asks Launch Services, as the Dock does.
+    /// That sends Cicero a reopen, which opens the main window only when no other window shows.
     private func bringForward(_ open: () -> Void) {
         NSApp.setActivationPolicy(.regular)
         NSApp.unhide(nil)
         NSApp.activate()
         open()
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        // This copy, as it runs: brought forward rather than opened again.
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration)
     }
 
     // MARK: Menu
