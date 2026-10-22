@@ -12,6 +12,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Export Font List** is gone, from the File menu and the sidebar’s menus.
 - The **Fonts in Document** sheet has **Show in Library**, which shows the document’s fonts that are in your library in the main window, each set in itself, as **Show Similar Fonts** shows its list. **Done** in the bar above them takes you back.
 - The **Fonts in Document** sheet counts a document’s fonts as active and inactive, as the rest of Cicero does, rather than on and off: “12 fonts · 8 active · 2 inactive · 2 missing”.
+- In a smart set’s **Kind** rule, the kinds are in alphabetical order: **Italic**, **Monospaced**, **Variable**.
 - **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
 
 ## 1.9.4
