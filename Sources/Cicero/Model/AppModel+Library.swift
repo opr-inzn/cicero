@@ -152,13 +152,14 @@ extension AppModel {
         return adjusted.values
     }
 
-    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one for
-    /// the preview weight, at that weight.
+    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one the
+    /// search names, as "italic" names the italics (see `SearchQuery.Style`), else the one for the preview weight, at
+    /// that weight.
     func previewStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
-        return (family.face(nearestWeight: weight), weight)
+        return family.previewStyle(for: SearchQuery(appliedSearch), weight: weight)
     }
 
     // MARK: The list

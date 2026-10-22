@@ -58,7 +58,7 @@ struct BrowserView: View {
     /// are worked out now, so the page has them as it opens.
     private func preparePage() {
         guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
-        model.pageContents.prepare(family.face(nearestWeight: preview.weight).face)
+        model.pageContents.prepare(model.previewStyle(of: family, weight: preview.weight).face.face)
     }
 
     private func subtitle(_ families: [Family]) -> String {

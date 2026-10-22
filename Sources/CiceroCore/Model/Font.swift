@@ -791,7 +791,7 @@ struct StyleName {
 
     private static let prefixes: Set<String> = ["extra", "ultra", "semi", "demi", "x", "xx", "u"]
 
-    private static let weights: [String: Int] = [
+    static let weights: [String: Int] = [
         "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "lazer": 85, "lz": 85, "thin": 100, "th": 100,
         "ultralight": 190, "ult": 190, "extralight": 200, "xlight": 200, "xlt": 200,
         "light": 300, "lt": 300, "semilight": 340, "book": 350, "bk": 350,
@@ -803,7 +803,7 @@ struct StyleName {
         "black": 900, "bl": 900, "blk": 900, "extrablack": 950, "xblack": 950, "ultrablack": 960, "ultra": 960, "super": 1000,
     ]
 
-    private static let widths: [String: Int] = [
+    static let widths: [String: Int] = [
         "ultracondensed": 1, "ultracompressed": 1, "xxcondensed": 1, "xxcompressed": 1, "xcm": 1,
         "extracondensed": 2, "extracompressed": 2, "xcondensed": 2, "xcompressed": 2, "compressed": 2, "comp": 2, "cm": 2,
         "condensed": 3, "cond": 3, "cn": 3, "narrow": 3,
