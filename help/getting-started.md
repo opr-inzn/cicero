@@ -112,10 +112,11 @@ Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (
 
 ## Cicero in the menu bar
 
-Cicero has an icon in the menu bar, the cube of its app icon. Click it to open Cicero’s window. Right-click it, or click it with two fingers, for a menu with:
+Cicero has an icon in the menu bar, the cube of its app icon. Click it to open Cicero’s window. Drop font files on it to add them, or a PDF, InDesign, Illustrator or Photoshop file to see the fonts it uses. Right-click it, or click it with two fingers, for a menu with:
 
 - The fonts that are on for open apps, because of their [application sets](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
 - Your sets, as the sidebar lists them. A checkmark means all of a set’s fonts are on, a dash that some are. Choose a set to turn its fonts on, or off when it has a checkmark
+- **Add Fonts** and **Find Fonts in Document**, as in the File menu. Cicero’s window opens too, so you see what they bring
 - **Auto-activate Fonts in Adobe Apps**, the switch that’s also in **Settings → General**
 - **Quit Cicero**
 

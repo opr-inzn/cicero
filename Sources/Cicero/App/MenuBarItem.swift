@@ -4,14 +4,15 @@ import SwiftUI
 
 /// Cicero's icon in the menu bar, while Settings → General → Show Cicero in the menu bar is on (it is at first). A click
 /// opens the main window. A right-click, a click with two fingers or a Control-click opens a menu: the fonts on for open
-/// apps and until Cicero quits, the sets as the sidebar lists them, the switch for auto-activating fonts in Adobe apps,
-/// and Quit. VoiceOver's Show Menu action opens it too. The sets are in the menu itself, not
-/// a submenu: an item of a submenu can't bring Cicero to the front, as asking how to activate needs.
+/// apps and until Cicero quits, the sets as the sidebar lists them, Add Fonts and Find Fonts in Document, the switch for
+/// auto-activating fonts in Adobe apps, and Quit. VoiceOver's Show Menu action opens it too. Nothing is in a submenu: an
+/// item of a submenu can't bring Cicero to the front, as asking how to activate needs. Files dropped on the icon open as
+/// files opened from the Finder do: fonts are added, a folder is watched, a document shows the fonts it uses.
 ///
 /// With the icon there, Show Cicero in the Dock can be off: Cicero is then in the Dock and the app switcher only while
 /// one of its windows is open, so its menus and shortcuts are there while it's used, and leaves them when the last
 /// one closes.
-final class MenuBarItem: NSObject, NSMenuDelegate {
+final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
     static let showsIconKey = "menuBar.showsIcon"
     static let showsDockIconKey = "menuBar.showsDockIcon"
 
@@ -76,6 +77,9 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
                     return true
                 }])
             }
+            // Its window hands what's dragged over it to its delegate.
+            item.button?.window?.registerForDraggedTypes([.fileURL])
+            item.button?.window?.delegate = self
             statusItem = item
         } else if !showsIcon, let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
@@ -131,6 +135,9 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
             for item in sets { menu.addItem(item) }
             menu.addItem(.separator())
         }
+        menu.addItem(menuItem("Add Fonts", action: #selector(addFonts)))
+        menu.addItem(menuItem("Find Fonts in Document", action: #selector(findFontsInDocument)))
+        menu.addItem(.separator())
         let documentFonts = menuItem("Auto-activate Fonts in Adobe Apps", action: #selector(toggleDocumentFonts))
         documentFonts.state = model.data.activatesDocumentFonts ? .on : .off
         menu.addItem(documentFonts)
@@ -208,12 +215,52 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
         }
     }
 
+    /// As in the File menu, with the main window, where what the panel brings shows.
+    @objc private func addFonts() {
+        NSApp.bringForward { openWindow?(id: WindowID.main) }
+        // Once the window is there: the panel runs a loop of its own.
+        DispatchQueue.main.async { self.model.presentAddFontsPanel() }
+    }
+
+    @objc private func findFontsInDocument() {
+        NSApp.bringForward { openWindow?(id: WindowID.main) }
+        DispatchQueue.main.async { self.model.presentFindFontsPanel() }
+    }
+
     @objc private func toggleDocumentFonts() {
         model.data.activatesDocumentFonts.toggle()
     }
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+}
+
+// MARK: - Dropping on the icon
+
+extension MenuBarItem: NSDraggingDestination {
+    func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !Self.fileURLs(sender).isEmpty else { return [] }
+        statusItem?.button?.highlight(true)
+        return .copy
+    }
+
+    func draggingExited(_ sender: NSDraggingInfo?) {
+        statusItem?.button?.highlight(false)
+    }
+
+    /// With the main window, where the fonts added or the document's fonts show.
+    func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        statusItem?.button?.highlight(false)
+        let urls = Self.fileURLs(sender)
+        guard !urls.isEmpty else { return false }
+        NSApp.bringForward { openWindow?(id: WindowID.main) }
+        model.open(urls)
+        return true
+    }
+
+    private static func fileURLs(_ info: NSDraggingInfo) -> [URL] {
+        info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
 }
 

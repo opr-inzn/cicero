@@ -28,7 +28,7 @@ struct GeneralSettings: View {
             Section("Menu Bar and Dock") {
                 Toggle(isOn: $showsMenuBarIcon) {
                     Text("Show Cicero in the menu bar")
-                    Text("Click its icon to open Cicero. Right-click it to turn sets on and off, see which fonts are on for apps, or quit Cicero.")
+                    Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts a document uses, turn sets on and off, see which fonts are on for apps, or quit Cicero.")
                 }
                 // On while the menu bar has no icon: Cicero can't leave the Dock then.
                 Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
