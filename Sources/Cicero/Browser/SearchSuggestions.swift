@@ -49,16 +49,16 @@ struct SearchSuggestions: View {
     }
 }
 
-/// A section's title, nearer its own rows than the ones before it: the list gives it a row as tall as the others and
-/// centres it there, so these move it 5 points down, each title alike, 19 points from its first row to 29 from the row
-/// before.
+/// A section's title, nearer its own rows than the ones before it, each title alike: 20 points from its first row and 29
+/// from the row before, where the list puts 24 between them. Its row is a point taller than the others for that; with
+/// less padding the list would centre it in a row as tall as theirs.
 private struct SuggestionsHeader: View {
     let title: String
 
     var body: some View {
         Text(title)
             .padding(.top, 6)
-            .padding(.bottom, -4)
+            .padding(.bottom, -3)
     }
 }
 
