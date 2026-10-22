@@ -285,7 +285,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// The Cicero menu's settings item, called Preferences. SwiftUI makes it, as for any app with a Settings scene, and
 /// calls it Settings… again whenever it updates the menu. It gives that title to whatever holds ⌘, (a command group of
-/// Cicero's own too, which leaves two), so its own item is named again whenever the Cicero menu changes.
+/// Cicero's own too, which leaves two), so its own item is named again whenever any menu changes (SwiftUI can put
+/// the Cicero menu in the menu bar whole, which only the menu bar hears of) and as one opens: a dozen items to look at.
 enum PreferencesItem {
     static let title = "Preferences"
     private static var observers: [NSObjectProtocol] = []
@@ -293,12 +294,9 @@ enum PreferencesItem {
 
     static func keepNamed() {
         guard observers.isEmpty else { return }
-        for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification] {
-            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { note in
-                let menu = (note.object as AnyObject?).map(ObjectIdentifier.init)
-                MainActor.assumeIsolated {
-                    if menu != nil, menu == appMenu.map(ObjectIdentifier.init) { rename() }
-                }
+        for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification, NSMenu.didBeginTrackingNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+                MainActor.assumeIsolated { rename() }
             })
         }
         // A main menu SwiftUI makes anew is put in place whole, without telling about its items.

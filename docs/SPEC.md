@@ -10,8 +10,8 @@ ellipses anywhere, against the HIG: not on items that ask for more input (Export
 a comma: "Copying fonts, 3 of 10"). The one "…" left marks a cut-off preview in the coverage set editor; the menu items macOS adds (Services,
 AutoFill, Start Dictation) keep theirs. SwiftUI's Settings… is called Preferences, without one (`PreferencesItem`):
 SwiftUI puts that item's title back whenever the menu updates, and gives it to whatever holds ⌘, (a command group
-of Cicero's own too, which leaves two items), so Cicero names its item again whenever the Cicero menu changes or
-is made anew.
+of Cicero's own too, which leaves two items), so Cicero names its item again whenever any menu changes (SwiftUI can
+put the Cicero menu in the menu bar whole, which only the menu bar hears of) and as one opens.
 
 No hover states: nothing changes under the pointer (tooltips and the column-resize cursor aside). AppKit's
 toolbar buttons and segmented pickers light up on hover in a grey of their own, so the toolbars use Cicero's
