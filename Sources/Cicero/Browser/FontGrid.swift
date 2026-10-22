@@ -21,18 +21,23 @@ struct FontGrid: View {
     /// How much higher the tags above a tile's sample and the name and caption below it make it.
     static let labels: CGFloat = 51
 
-    /// The sample's height: the size, with room above and below, more of it for small type. The type's line reaches a little
-    /// past it at big sizes, into space its letters don't use, which is why it's drawn unclipped.
-    static func sampleHeight(size: Double) -> CGFloat { size * 0.85 + 44 }
+    /// The sample's height: three quarters of the size, with room above and below, which small type gets more of. The type's
+    /// line reaches past it at big sizes, into space its letters don't use, which is why it's drawn unclipped.
+    static func sampleHeight(size: Double) -> CGFloat { size * 0.75 + 50 }
 
-    /// How narrow a tile can be: at least 1.3 times as wide as it's high, so tiles stay landscape, and as wide as the sample
+    /// How narrow a tile can be: at least 1.4 times as wide as it's high, so tiles stay landscape, and as wide as the sample
     /// text at the preview size in the system font, with a little to spare, so it isn't made smaller to fit.
     static func minimumWidth(sample: String, size: Double, kerning: Double) -> CGFloat {
         let height = sampleHeight(size: size) + labels + verticalPadding * 2
         let font = NSFont.systemFont(ofSize: size)
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: font, .kern: kerning]))
-        return max(height * 1.3, CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8)
+        return max(height * 1.4, CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8)
     }
+
+    /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
+    /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
+    private static let infoPanelRoom = InfoPanelOverlay.width + InfoPanelOverlay.gap * 2
+        + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
 
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
@@ -64,11 +69,13 @@ struct FontGrid: View {
         }
     }
 
-    /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum`, from one to five, as wide as fills
-    /// the rows, however many families there are.
+    /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows without the Info panel,
+    /// from one to five, as wide as fills them, however many families there are. The panel makes the tiles narrower, never
+    /// fewer.
     private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat) {
         guard gridWidth > 0 else { return (1, minimum) }
-        let count = min(Self.mostColumns, max(1, Int((gridWidth + Self.spacing) / (minimum + Self.spacing))))
+        let closed = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
+        let count = min(Self.mostColumns, max(1, Int((closed + Self.spacing) / (minimum + Self.spacing))))
         return (count, (gridWidth - Self.spacing * CGFloat(count - 1)) / CGFloat(count))
     }
 }
@@ -96,7 +103,8 @@ private struct Tile: View {
                 size: preview.size, weight: preview.weight, variations: model.variations(for: family),
                 kerning: preview.kerning(at: preview.size)
             )
-            // Only where a tile can't be wide enough: a font far wider than the system font, or text longer than a row.
+            // Only where a tile can't be wide enough: a font far wider than the system font, text longer than a row, or the
+            // Info panel narrowing the tiles.
             .minimumScaleFactor(0.4)
             .frame(maxWidth: .infinity)
             // Not clipped: what reaches past the font's ascent and descent runs into the padding rather than being cut off.
