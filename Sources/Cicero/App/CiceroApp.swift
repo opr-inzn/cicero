@@ -30,7 +30,8 @@ struct CiceroApp: App {
     }
 
     var body: some Scene {
-        Window("Cicero", id: WindowID.main) {
+        // Library in the Window menu, as in the window list and the Dock (see `WindowList`).
+        Window("Library", id: WindowID.main) {
             MainWindow()
                 .environment(model)
                 .environment(preview)
@@ -210,7 +211,7 @@ struct CiceroCommands: Commands {
 
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
 /// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Makes the Dock icon's menu, with Cicero's windows and Add Fonts, and counts the launch for the usage statistics.
+/// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
     var model: AppModel? {
@@ -222,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UsageStatistics.sendLaunch()
         PreferencesItem.keepNamed()
+        WindowList.start()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -229,36 +231,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flush()
     }
 
-    /// Above the system's items: Cicero's open windows, as the Dock lists other apps' (SwiftUI leaves its windows out of
-    /// the Window menu, where the Dock looks for them), the frontmost checked, then Add Fonts, as in the File menu.
+    /// Above the system's items, and the windows the Dock lists itself (see `WindowList`): Add Fonts, as in the File menu.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
-        let windows = NSApp.orderedWindows.filter { window in
-            window.styleMask.contains(.titled) && !(window is NSPanel) && window.sheetParent == nil
-                && (window.isVisible || window.isMiniaturized) && !window.title.isEmpty
-        }
-        for window in windows {
-            let item = NSMenuItem(title: window.title, action: #selector(showWindow), keyEquivalent: "")
-            item.target = self
-            item.representedObject = window
-            item.state = window == windows.first && !window.isMiniaturized ? .on : .off
-            // As the Dock draws other apps' windows on macOS 26.
-            if #available(macOS 26, *) { item.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) }
-            menu.addItem(item)
-        }
-        if !windows.isEmpty { menu.addItem(.separator()) }
         let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
         addFonts.target = self
         menu.addItem(addFonts)
         return menu
-    }
-
-    @objc private func showWindow(_ sender: NSMenuItem) {
-        guard let window = sender.representedObject as? NSWindow else { return }
-        NSApp.bringForward {
-            if window.isMiniaturized { window.deminiaturize(nil) }
-            window.makeKeyAndOrderFront(nil)
-        }
     }
 
     /// Brings Cicero forward, which opens the main window when none shows, so the fonts added show there, and asks
@@ -311,6 +290,49 @@ enum PreferencesItem {
     private static func rename() {
         for item in appMenu?.items ?? [] where item.keyEquivalent == "," && item.keyEquivalentModifierMask == .command && item.title != title {
             item.title = title
+        }
+    }
+}
+
+/// Cicero's windows in the Window menu's list of open windows, where the Dock finds the windows it lists in an app's
+/// menu, with their symbol and the frontmost checked. SwiftUI leaves its windows out of that list (it has a command for
+/// each scene above it instead), so each is added as it shows, under a name of its own: the main window as Library,
+/// rather than what its sidebar shows, and Settings as Preferences, rather than its tab. A window that closes leaves the
+/// list by itself.
+enum WindowList {
+    private static var observers: [NSObjectProtocol] = []
+
+    static func start() {
+        guard observers.isEmpty else { return }
+        let changes = [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.didChangeOcclusionStateNotification]
+        for name in changes {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { update() }
+            })
+        }
+        update()
+    }
+
+    private static func update() {
+        for window in NSApp.windows where window.isVisible || window.isMiniaturized {
+            guard let title = title(of: window) else { continue }
+            if NSApp.windowsMenu?.items.contains(where: { $0.target === window }) ?? false {
+                NSApp.changeWindowsItem(window, title: title, filename: false)
+            } else {
+                NSApp.addWindowsItem(window, title: title, filename: false)
+            }
+        }
+    }
+
+    /// nil for panels, sheets and the menu bar's own windows.
+    private static func title(of window: NSWindow) -> String? {
+        guard window.styleMask.contains(.titled), !(window is NSPanel), window.sheetParent == nil else { return nil }
+        switch window.identifier?.rawValue {
+        case WindowID.main: return "Library"
+        case WindowID.compare: return "Compare"
+        case WindowID.toolbox: return "Character Toolbox"
+        case let id? where id.contains("Settings"): return PreferencesItem.title
+        default: return window.title.isEmpty ? nil : window.title
         }
     }
 }
