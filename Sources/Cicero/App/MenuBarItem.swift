@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Cicero's icon in the menu bar, while Settings → General → Show Cicero in the menu bar is on (it is at first). A click
 /// opens the main window. A right-click, a click with two fingers or a Control-click opens a menu: the fonts on for open
-/// apps and until Cicero quits, the sets as the sidebar lists them, Add Fonts and Find Fonts in Document, the switch for
-/// auto-activating fonts in Adobe apps, Preferences and Quit. VoiceOver's Show Menu action opens it too. Nothing is in a submenu: an
+/// apps and until Cicero quits, the sets as the sidebar lists them, Add Fonts and Find Fonts in Document, Preferences and
+/// Quit. VoiceOver's Show Menu action opens it too. Nothing is in a submenu: an
 /// item of a submenu can't bring Cicero to the front, as asking how to activate needs. Files dropped on the icon open as
 /// files opened from the Finder do: fonts are added, a folder is watched, a document shows the fonts it uses.
 ///
@@ -140,10 +140,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         menu.addItem(menuItem("Add Fonts", action: #selector(addFonts)))
         menu.addItem(menuItem("Find Fonts in Document", action: #selector(findFontsInDocument)))
         menu.addItem(.separator())
-        let documentFonts = menuItem("Auto-activate Fonts in Adobe Apps", action: #selector(toggleDocumentFonts))
-        documentFonts.state = model.data.activatesDocumentFonts ? .on : .off
-        menu.addItem(documentFonts)
-        menu.addItem(.separator())
         menu.addItem(menuItem(PreferencesItem.title, action: #selector(showPreferences)))
         menu.addItem(menuItem("Quit Cicero", action: #selector(quit)))
     }
@@ -228,10 +224,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
     @objc private func findFontsInDocument() {
         NSApp.bringForward { openWindow?(id: WindowID.main) }
         DispatchQueue.main.async { self.model.presentFindFontsPanel() }
-    }
-
-    @objc private func toggleDocumentFonts() {
-        model.data.activatesDocumentFonts.toggle()
     }
 
     @objc private func showPreferences() {
