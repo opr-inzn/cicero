@@ -24,7 +24,7 @@ struct SearchSuggestions: View {
                     .searchCompletion(token)
                 }
             } header: {
-                SuggestionsHeader(title: "Filters", isFirst: true)
+                SuggestionsHeader(title: "Filters")
             }
         }
         let families = model.searchSuggestions(for: model.searchText)
@@ -43,20 +43,21 @@ struct SearchSuggestions: View {
                     .searchCompletion(family.name)
                 }
             } header: {
-                SuggestionsHeader(title: "Families", isFirst: tokens.isEmpty)
+                SuggestionsHeader(title: "Families")
             }
         }
     }
 }
 
-/// A section's title, nearer its own rows than the ones before it: the list puts it midway between them.
+/// A section's title, nearer its own rows than the ones before it: the list gives it a row as tall as the others and
+/// centres it there, so these move it 5 points down, each title alike, 19 points from its first row to 29 from the row
+/// before.
 private struct SuggestionsHeader: View {
     let title: String
-    let isFirst: Bool
 
     var body: some View {
         Text(title)
-            .padding(.top, isFirst ? 0 : 6)
+            .padding(.top, 6)
             .padding(.bottom, -4)
     }
 }
