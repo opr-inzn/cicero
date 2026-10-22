@@ -68,7 +68,7 @@ struct GeneralSettings: View {
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
                     Text("Ask before activating more than \(UserData.manyFamilies) families at once")
-                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
+                    Text("Apps load every font that’s on as they open, so turning on many at once can slow them down.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     HStack(spacing: 4) {

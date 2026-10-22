@@ -109,7 +109,7 @@ private struct ManyActivationConfirmation: ViewModifier {
                     Button(prompt.temporarily ? "Activate Temporarily" : "Activate") { model.confirm(prompt) }
                     Button("Cancel", role: .cancel) {}
                 } message: { _ in
-                    Text("Apps list every font that’s on in their font menus, and so many at once can make them slower to open.")
+                    Text("Apps load every font that’s on as they open, so this many at once can slow them down.")
                 }
                 .dialogSuppressionToggle("Don’t ask again", isSuppressed: Binding(
                     get: { !model.data.asksBeforeActivatingMany },
