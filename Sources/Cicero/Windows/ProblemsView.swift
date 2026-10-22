@@ -1,7 +1,7 @@
 import CiceroCore
 import SwiftUI
 
-/// Problems grouped by kind, each with an explanation, its files and what to do about them.
+/// Conflicts, as the sidebar calls problems now: grouped by kind, each with an explanation, its files and what to do about them.
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
 
@@ -12,7 +12,7 @@ struct ProblemsView: View {
         }
         Group {
             if groups.isEmpty {
-                ContentUnavailableView("No Problems", systemImage: "checkmark.circle",
+                ContentUnavailableView("No Conflicts", systemImage: "checkmark.circle",
                                        description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts"))
             } else {
                 ScrollView {
@@ -32,7 +32,7 @@ struct ProblemsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.canvas)
-        .navigationTitle("Problems")
+        .navigationTitle("Conflicts")
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem {
@@ -47,8 +47,8 @@ struct ProblemsView: View {
     private var subtitle: String {
         switch model.problems.count(where: { !$0.kind.isMinor }) {
         case 0: ""
-        case 1: "1 problem"
-        case let count: "\(count) problems"
+        case 1: "1 conflict"
+        case let count: "\(count) conflicts"
         }
     }
 }

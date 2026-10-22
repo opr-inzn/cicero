@@ -75,7 +75,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   by PostScript name.
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
-  taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
+  taking a face's last copy with them; Conflicts offers to remove a file only then, and `moveToTrash`
   asks it again for those files right before trashing them.
 - **AppLocation** (`AppLocation.swift`): whether a bundle is in an Applications folder, where a moved copy
   goes and what happens to the original (`move`), the path a translocated app was opened from
