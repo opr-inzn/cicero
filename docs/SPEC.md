@@ -148,8 +148,8 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   width words (Condensed, not XXX Condensed) counted once; a static font's OS/2 width class unless
   it's normal, then the name. A family with more styles than weight and width tell apart (italics,
   optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
-  the tooltip. 10 pt around a tile's contents. The tiles hug the type, which is always the preview size
-  (`FontGrid.layout`): the sample is the size × 1.4 + 8 pt high, unclipped, so rows are as tall as the
+  the tooltip. 10 pt beside a tile's contents, 14 pt above and below. The tiles hug the type, which is always the preview size
+  (`FontGrid.layout`): the sample is the size × 1.6 + 16 pt high, unclipped, so rows are as tall as the
   type and short at small sizes; as many columns fit as tiles that are as wide as the sample (the preview text, else
   "Aa Gg 123") in the system font at that size, × 1.1 + 28 pt, never narrower than they're high (a single letter gets
   square tiles) and at least 160 pt, from one column to five, as wide as fills the rows, however many families there

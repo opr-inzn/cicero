@@ -15,11 +15,13 @@ struct FontGrid: View {
     static let spacing: CGFloat = 12
     /// Around a tile's contents: little, so the sample can be big.
     static let padding: CGFloat = 10
+    /// Above and below a tile's contents: a little more, so the tiles don't feel cramped.
+    static let verticalPadding: CGFloat = 14
     /// The narrowest a tile goes, for its name and caption.
     static let narrowest: CGFloat = 160
     static let mostColumns = 5
     /// What a tile has besides its sample: the padding, the tags and switch above it, and the name and caption below.
-    static let chrome: CGFloat = 72
+    static let chrome: CGFloat = 80
 
     /// How narrow a tile can be for its sample: the sample's width at the preview size in the system font, with a little to
     /// spare, so the type fills the tile without being made smaller; never narrower than it's high, as for a single letter.
@@ -30,8 +32,9 @@ struct FontGrid: View {
         return max(narrowest, text, chrome + sampleHeight(size: size))
     }
 
-    /// The sample's height at a preview size: just its line, so the tiles hug the type at every size.
-    static func sampleHeight(size: Double) -> CGFloat { size * 1.4 + 8 }
+    /// The sample's height at a preview size: its line and some room above and below, so the tiles follow the type at
+    /// every size without crowding it.
+    static func sampleHeight(size: Double) -> CGFloat { size * 1.6 + 16 }
 
     /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
     /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
@@ -138,7 +141,8 @@ private struct Tile: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(FontGrid.padding)
+        .padding(.horizontal, FontGrid.padding)
+        .padding(.vertical, FontGrid.verticalPadding)
         .modifier(FamilyCard(isSelected: isSelected))
     }
 }
