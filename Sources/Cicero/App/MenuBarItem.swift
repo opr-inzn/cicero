@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Cicero's icon in the menu bar, while Settings → General → Show Cicero in the menu bar is on (it is at first). A click
 /// opens the main window. A right-click, a click with two fingers or a Control-click opens a menu: the fonts on for open
-/// apps and until Cicero quits, the sets as the sidebar lists them, Add Fonts and Find Fonts in Document, Preferences and
-/// Quit. VoiceOver's Show Menu action opens it too. Nothing is in a submenu: an
+/// apps and until Cicero quits, the sets as the sidebar lists them, Add Fonts and Find Fonts in Current Document,
+/// Preferences and Quit. VoiceOver's Show Menu action opens it too. Nothing is in a submenu: an
 /// item of a submenu can't bring Cicero to the front, as asking how to activate needs. Files dropped on the icon open as
 /// files opened from the Finder do: fonts are added, a folder is watched, a document shows the fonts it uses.
 ///
@@ -138,7 +138,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
             menu.addItem(.separator())
         }
         menu.addItem(menuItem("Add Fonts", action: #selector(addFonts)))
-        menu.addItem(menuItem("Find Fonts in Document", action: #selector(findFontsInDocument)))
+        menu.addItem(menuItem("Find Fonts in Current Document", action: #selector(findFontsInCurrentDocument)))
         menu.addItem(.separator())
         menu.addItem(menuItem(PreferencesItem.title, action: #selector(showPreferences)))
         menu.addItem(menuItem("Quit Cicero", action: #selector(quit)))
@@ -221,7 +221,33 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         DispatchQueue.main.async { self.model.presentAddFontsPanel() }
     }
 
-    @objc private func findFontsInDocument() {
+    /// The document in front in the app in front, which the menu leaves in front; with none Cicero can read, or with
+    /// Cicero in front, the File menu's panel.
+    @objc private func findFontsInCurrentDocument() {
+        guard let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getpid(),
+              let bundleID = app.bundleIdentifier
+        else { return findFontsInChosenDocument() }
+        let pid = app.processIdentifier, name = app.localizedName ?? "the app in front"
+        Task {
+            do {
+                switch try await DocumentFontWatcher.frontDocument(ofApp: bundleID, pid: pid) {
+                case .file(let url)?:
+                    NSApp.bringForward { openWindow?(id: WindowID.main) }
+                    model.findFonts(in: url)
+                case .fonts(let fonts, let documentName)?:
+                    NSApp.bringForward { openWindow?(id: WindowID.main) }
+                    model.showFonts(fonts, ofDocumentNamed: documentName)
+                case nil:
+                    findFontsInChosenDocument()
+                }
+            } catch {
+                model.showToast("Allow Cicero to control \(name) in System Settings → Privacy & Security → Automation")
+                findFontsInChosenDocument()
+            }
+        }
+    }
+
+    private func findFontsInChosenDocument() {
         NSApp.bringForward { openWindow?(id: WindowID.main) }
         DispatchQueue.main.async { self.model.presentFindFontsPanel() }
     }

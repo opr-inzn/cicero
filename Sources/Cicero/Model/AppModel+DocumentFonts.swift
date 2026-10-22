@@ -42,6 +42,12 @@ extension AppModel {
         }
     }
 
+    /// The fonts an app says its document uses, as InDesign does for Find Fonts in Current Document in the menu bar.
+    func showFonts(_ fonts: [DocumentFont], ofDocumentNamed name: String) {
+        guard !fonts.isEmpty else { return showToast("“\(name)” doesn’t name any fonts") }
+        documentFonts = DocumentFontsReport(url: URL(fileURLWithPath: name), fonts: fonts)
+    }
+
     /// The library's face for each of the document's fonts. Cached until the library changes: the sheet asks on
     /// every update, and matching looks at every face.
     func documentMatches(_ report: DocumentFontsReport) -> [DocumentFontMatch] {

@@ -221,3 +221,65 @@ final class DocumentFontWatcher {
         items(descriptor).map { $0.stringValue ?? "" }
     }
 }
+
+// MARK: - The document in front
+
+extension DocumentFontWatcher {
+    /// What the app in front says about its document in front, for Find Fonts in Current Document.
+    nonisolated enum FrontDocument: Sendable {
+        /// A file Cicero reads the fonts of.
+        case file(URL)
+        /// The fonts InDesign says its document uses, live rather than as last saved, and the document's name.
+        case fonts([DocumentFont], name: String)
+    }
+
+    /// The document in front in an app: InDesign's active document, Illustrator's and Photoshop's current one, Acrobat's
+    /// active one, and for any other app (Preview, say) the document of its front window, as its file. nil when it has
+    /// none, the file isn't saved or isn't one Cicero reads, or the app doesn't say; throws `errAEEventNotPermitted`
+    /// when Cicero may not ask it. macOS asks the user first whether Cicero may, the first time for each app.
+    @concurrent
+    static func frontDocument(ofApp bundleID: String, pid: pid_t) async throws -> FrontDocument? {
+        // Codes from each app's dictionary.
+        func file(_ path: String, of document: NSAppleEventDescriptor) throws -> FrontDocument? {
+            let result = try get(property(path, of: document), from: pid)
+            guard let url = result.fileURLValue ?? result.stringValue.map({ URL(fileURLWithPath: $0) }),
+                  DocumentFonts.fileExtensions.contains(url.pathExtension.lowercased()),
+                  FileManager.default.fileExists(atPath: url.path)
+            else { return nil }
+            return .file(url)
+        }
+        do {
+            switch bundleID {
+            case App.inDesign.rawValue:
+                let document = property("pacd", of: .null())
+                let fonts = every("FonT", of: document)
+                let (n, f, s) = try (
+                    strings(get(property("fPSN", of: fonts), from: pid)),
+                    strings(get(property("fFam", of: fonts), from: pid)),
+                    strings(get(property("fSty", of: fonts), from: pid))
+                )
+                guard n.count == f.count, n.count == s.count else { return nil }
+                let name = (try? get(property("pnam", of: document), from: pid).stringValue) ?? "InDesign document"
+                return .fonts(n.indices.map { DocumentFont(postScriptName: n[$0], family: f[$0], style: s[$0]) }, name: name)
+            case App.illustrator.rawValue:
+                return try file("aiFS", of: property("aiAD", of: .null()))
+            case App.photoshop.rawValue:
+                return try file("Dpth", of: property("pADc", of: .null()))
+            case "com.adobe.Acrobat.Pro", "com.adobe.Reader":
+                return try file("pfal", of: property("padc", of: .null()))
+            default:
+                // The standard suite's front window and its document, which many apps that open files have.
+                var first: Int32 = 1
+                let index = NSAppleEventDescriptor(descriptorType: DescType(typeSInt32), bytes: &first, length: 4)!
+                let window = specifier(of: code("cwin"), form: DescType(formAbsolutePosition), data: index, in: .null())
+                return try file("ppth", of: property("docu", of: window))
+            }
+        } catch let error as NSError where error.code == errAEEventNotPermitted {
+            throw error
+        } catch {
+            // No document, an unsaved one, an app that doesn't know these terms, or one busy for longer than the timeout.
+            return nil
+        }
+    }
+}
+
