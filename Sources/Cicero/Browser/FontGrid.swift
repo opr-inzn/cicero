@@ -15,22 +15,23 @@ struct FontGrid: View {
     static let spacing: CGFloat = 12
     /// Around a tile's contents: little, so the sample can be big.
     static let padding: CGFloat = 10
-    /// The narrowest a tile goes, and the lowest its sample: the preview size changes only the type until the sample needs
-    /// more room (see `minimumWidth` and `sampleHeight`).
-    static let narrowest: CGFloat = 200
-    static let lowestSample: CGFloat = 120
+    /// The narrowest a tile goes, for its name and caption.
+    static let narrowest: CGFloat = 160
     static let mostColumns = 5
+    /// What a tile has besides its sample: the padding, the tags and switch above it, and the name and caption below.
+    static let chrome: CGFloat = 72
 
-    /// How narrow a tile can be for its sample: the sample's width at the preview size in the system font, with some to
-    /// spare for wider fonts and around it, so the type is never made smaller to fit; never narrower than `narrowest`.
+    /// How narrow a tile can be for its sample: the sample's width at the preview size in the system font, with a little to
+    /// spare, so the type fills the tile without being made smaller; never narrower than it's high, as for a single letter.
     static func minimumWidth(sample: String, size: Double, kerning: Double) -> CGFloat {
         let font = NSFont.systemFont(ofSize: size)
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: font, .kern: kerning]))
-        return max(narrowest, CTLineGetTypographicBounds(line, nil, nil, nil) * 1.15 + padding * 2 + 16)
+        let text = CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8
+        return max(narrowest, text, chrome + sampleHeight(size: size))
     }
 
-    /// The sample's height at a preview size: the size's lines, with room for what reaches past the font's ascent and descent.
-    static func sampleHeight(size: Double) -> CGFloat { max(lowestSample, size * 1.8 + 8) }
+    /// The sample's height at a preview size: just its line, so the tiles hug the type at every size.
+    static func sampleHeight(size: Double) -> CGFloat { size * 1.4 + 8 }
 
     /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
     /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
@@ -108,8 +109,8 @@ private struct Tile: View {
             // one, text longer than a row, or the Info panel keeping the columns.
             .minimumScaleFactor(0.4)
             .frame(maxWidth: .infinity)
+            // Not clipped: what reaches past the font's ascent and descent runs into the padding rather than being cut off.
             .frame(height: sampleHeight)
-            .clipped()
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(family.name)

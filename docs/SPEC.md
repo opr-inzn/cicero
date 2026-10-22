@@ -148,13 +148,14 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   width words (Condensed, not XXX Condensed) counted once; a static font's OS/2 width class unless
   it's normal, then the name. A family with more styles than weight and width tell apart (italics,
   optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
-  the tooltip. 10 pt around a tile's contents. The type is always the preview size; the tiles make room for it
-  (`FontGrid.layout`): as many columns as tiles fit that are as wide as the sample (the preview text, else "Aa Gg 123")
-  in the system font at that size, × 1.15 + 36 pt, and at least 200 pt, from one column to five, as wide as fills the
-  rows, however many families there are. The sample is the size × 1.8 + 8 pt high, at least 120 pt. So up to where the
-  sample needs more room, the size changes only the type. The Info panel keeps the columns the rows have without it, the
-  tiles narrowing instead, as far as 0.6 times that width and 200 pt, then takes a column away; only then, and for a font
-  much wider than the system font or text longer than a row, the type shrinks to fit, to 0.4 of the size at most.
+  the tooltip. 10 pt around a tile's contents. The tiles hug the type, which is always the preview size
+  (`FontGrid.layout`): the sample is the size × 1.4 + 8 pt high, unclipped, so rows are as tall as the
+  type and short at small sizes; as many columns fit as tiles that are as wide as the sample (the preview text, else
+  "Aa Gg 123") in the system font at that size, × 1.1 + 28 pt, never narrower than they're high (a single letter gets
+  square tiles) and at least 160 pt, from one column to five, as wide as fills the rows, however many families there
+  are. Bigger type, fewer and bigger tiles. The Info panel keeps the columns the rows have without it, the tiles
+  narrowing instead, as far as 0.6 times that width and 160 pt, then takes a column away; only then, and for a font much
+  wider than the system font or text longer than a row, the type shrinks to fit, to 0.4 of the size at most.
 - **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, "Foundry · N styles", switch; the sample at preview size, lined up as Preview Options' alignment says; up to 14 style names set in themselves (+N more), each line of them on one baseline (`FlowLayout` lines its children up by their first text's baseline, not their tops, which sit as high as each face's ascent puts them).
 - Tag dot: an 8 pt circle in the tag's colour, with no ring (side by side, 2 pt apart, for a family tagged
   several ways before 1.5). Cards are opaque (the card's grey on the window's background), so the
