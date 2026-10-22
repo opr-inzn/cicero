@@ -102,6 +102,52 @@ public struct SearchQuery: Sendable {
         Classification.allCases.flatMap(\.searchTerms) + narrow + wide + slab + opticalSize + FontFileReader.fontExtensions
             + ["variable", "italics", "italic", "text", "display"]
     )
+
+    // MARK: Styles a search names
+
+    /// A style the query names by words for a slope, a width or a weight, for previews to show that style of the families
+    /// it finds rather than their regular: "italic" their italics, "condensed" their condensed styles, "bold italic" their
+    /// bold italics (see `Family.previewStyle(for:weight:)`).
+    public struct Style: Equatable, Sendable {
+        public var isItalic = false
+        /// On the OS/2 scale, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded).
+        public var width: Int?
+        /// On the OS/2 scale, as a style's name spells it out (see `StyleName`).
+        public var weight: Int?
+    }
+
+    /// The style the query names for a family's previews; nil when it names none. Only words spelled out count ("italic",
+    /// not "it"), and not those that begin a word in one of the family's names, lowercased: those name the family, as
+    /// "condensed" does Avenir Next Condensed, which then shows as usual.
+    public func style(forFamilyNamed names: [String]) -> Style? {
+        let words = text.split(separator: " ").filter { word in !names.contains { Self.beginsWord(String(word), in: $0) } }
+        var style = Style()
+        // Joined as in style names, so "semi bold" is semibold.
+        for word in StyleName.words(words.joined(separator: " ")) {
+            if Self.slopeWords.contains(word) {
+                style.isItalic = true
+            } else if Self.widthWords.contains(word) {
+                style.width = style.width ?? StyleName.widths[word]
+            } else if Self.weightWords.contains(word) {
+                style.weight = style.weight ?? StyleName.weights[word]
+            }
+        }
+        return style == Style() ? nil : style
+    }
+
+    static let slopeWords: Set<String> = ["italic", "italics", "oblique"]
+    /// Of `StyleName`'s widths, those spelled out.
+    static let widthWords: Set<String> = [
+        "ultracondensed", "ultracompressed", "extracondensed", "extracompressed", "compressed", "condensed", "narrow",
+        "semicondensed", "semicompressed", "semiextended", "semiexpanded", "semiwide", "extended", "expanded", "wide",
+        "extraextended", "extraexpanded", "extrawide", "ultraextended", "ultraexpanded", "ultrawide",
+    ]
+    /// Of `StyleName`'s weights, those spelled out, but for words more often in a name than for a weight ("roman",
+    /// "super", "ultra").
+    static let weightWords: Set<String> = [
+        "hairline", "thin", "extrathin", "ultrathin", "extralight", "ultralight", "light", "semilight", "book", "regular",
+        "medium", "semibold", "demibold", "bold", "extrabold", "ultrabold", "heavy", "black", "extrablack", "ultrablack",
+    ]
 }
 
 extension Classification {
@@ -150,5 +196,79 @@ extension Family {
         if let byClass = Classification(familyClass: upright.familyClass), byClass != classification { terms += byClass.searchTerms }
         terms += Set(faces.map { ($0.path as NSString).pathExtension.lowercased() }).sorted()
         return terms
+    }
+
+    /// The style to preview the family in for a search, and the weight to draw it at: the one its tokens and typed words
+    /// name (see `SearchToken.style(of:over:)` and `SearchQuery.Style`), else the one for `weight`, at that weight. A
+    /// weight they name is where a variable style of that weight sits on the weight axis, as not every font's axis is on
+    /// the OS/2 scale (one has its Light at 450), else that weight.
+    public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double) -> (face: LibraryFace, weight: Double) {
+        let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
+        guard let style = SearchToken.style(of: tokens, over: typed) else { return (face(nearestWeight: weight), weight) }
+        guard let named = style.weight else { return (face(for: style, weight: weight), weight) }
+        let face = face(for: style, weight: Double(named))
+        let isNamed = face.face.weightAxis != nil && FontFace.hundreds(face.face.namedWeight) == FontFace.hundreds(Double(named))
+        return (face, isNamed ? face.face.styleWeight : Double(named))
+    }
+
+    /// The style nearest one a search names: of the italics when it's italic, else of the uprights; of those, the ones
+    /// nearest its width, on the narrower or wider side when there are any; then the one nearest the weight, by its name
+    /// when that says one (a Bold the file classes at 400 is still Bold), the normal width first among the same weight. A
+    /// variable style comes first, as it draws every weight, and of those the ones where the regular is on the axes the
+    /// search says nothing about. Not one of ornaments, unless that's all there is. When the family has none of a kind,
+    /// the next step chooses among them all, so a family without italics shows its upright.
+    func face(for style: SearchQuery.Style, weight: Double) -> LibraryFace {
+        let letters = faces.filter { !$0.face.isOrnaments }
+        var candidates = letters.isEmpty ? faces : letters
+        func keep(_ test: (LibraryFace) -> Bool) {
+            let kept = candidates.filter(test)
+            if !kept.isEmpty { candidates = kept }
+        }
+        keep { $0.face.isItalic == style.isItalic }
+        if let wanted = style.width {
+            keep { (widthClass(of: $0.face) - 5).signum() == (wanted - 5).signum() }
+            let nearest = candidates.map { abs(widthClass(of: $0.face) - wanted) }.min()
+            keep { abs(widthClass(of: $0.face) - wanted) == nearest }
+        }
+        let variables = candidates.filter { $0.face.weightAxis != nil }
+        if !variables.isEmpty {
+            let named = ["wght"] + (style.isItalic ? ["ital", "slnt"] : []) + (style.width == nil ? [] : ["wdth"])
+            let origin = Dictionary(regular.face.axes.map { ($0.tag, $0.value) }) { first, _ in first }
+            func moved(_ face: FontFace) -> Int {
+                face.axes.count { axis in !named.contains(axis.tag) && origin[axis.tag].map { abs($0 - axis.value) > 0.01 } == true }
+            }
+            let least = variables.map { moved($0.face) }.min()
+            candidates = variables.filter { moved($0.face) == least }
+        }
+        return candidates.min { a, b in
+            let (first, second) = (abs(a.face.namedWeight - weight), abs(b.face.namedWeight - weight))
+            return first != second ? first < second : abs(widthClass(of: a.face) - 5) < abs(widthClass(of: b.face) - 5)
+        }!
+    }
+
+    /// How wide a style is on the OS/2 scale, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded): as its name spells
+    /// it out, else on a width axis against the regular's place on it, as not every font's is in percent (narrower is 3,
+    /// wider 7), else by its OS/2 width class.
+    func widthClass(of face: FontFace) -> Int {
+        if let named = StyleName(face.styleName).width { return named }
+        if let value = face.axes.first(where: { $0.tag == "wdth" })?.value {
+            let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
+            return value < normal ? 3 : value > normal ? 7 : 5
+        }
+        return face.width
+    }
+}
+
+extension FontFace {
+    /// Its weight as its name spells it out, as a Bold the file classes at 400 is still Bold; the regular weight for a
+    /// name of only widths and slopes ("Italic", "Condensed"); else its place on the weight axis or its OS/2 class.
+    var namedWeight: Double {
+        let name = StyleName(styleName)
+        return name.weight.map(Double.init) ?? (name.isRegular ? 400 : styleWeight)
+    }
+
+    /// A weight to the nearest hundred, from 100 to 900: Book (350) is a Regular, Heavy (850) a Black.
+    static func hundreds(_ weight: Double) -> Int {
+        min(max(Int((weight / 100).rounded()) * 100, 100), 900)
     }
 }

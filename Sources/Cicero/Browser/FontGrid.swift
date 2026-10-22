@@ -82,11 +82,11 @@ private struct Tile: View {
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
-            let face = family.face(nearestWeight: preview.weight).face
+            let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             FontText(
-                text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: face),
-                face: face,
-                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
+                text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: style.face),
+                face: style.face,
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
                 kerning: preview.kerning(at: preview.size)
             )
             .minimumScaleFactor(0.4)

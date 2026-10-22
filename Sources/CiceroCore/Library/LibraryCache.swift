@@ -79,7 +79,9 @@ enum LibraryCache {
         data.withUnsafeBytes { buffer -> Library? in
             var reader = ByteReader(buffer: buffer)
             do {
-                guard try reader.u32() == magic, try reader.u32() == version, try reader.u32() == FaceCache.version else { return nil }
+                guard try reader.u32() == magic, try reader.u32() == version else { return nil }
+                let faces = try reader.u32()
+                guard faces == FaceCache.version || faces == FaceCache.withoutFigures else { return nil }
                 let fingerprint = Int(try reader.i64())
                 // Read in one pass; making the families, most of the work, is spread over the cores after.
                 var members: [SavedFamily] = []

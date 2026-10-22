@@ -5,24 +5,41 @@ import SwiftUI
 @main
 struct CiceroApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @State private var model = AppModel()
+    @State private var model: AppModel
     @State private var preview = PreviewSettings()
     @State private var backup = BackupPrompts()
-    @State private var updates = Updates()
+    @State private var updates: Updates
+    @State private var menuBarItem: MenuBarItem
+
+    init() {
+        let model = AppModel()
+        let updates = Updates()
+        let menuBarItem = MenuBarItem(model: model)
+        _model = State(initialValue: model)
+        _updates = State(initialValue: updates)
+        _menuBarItem = State(initialValue: menuBarItem)
+        // At launch rather than as the main window appears: Cicero can open without it, at login or in the menu bar.
+        NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                Appearance.applySaved()
+                model.appSets.start(model)
+                model.openDocumentFonts.start(model)
+                menuBarItem.start()
+            }
+        }
+    }
 
     var body: some Scene {
-        Window("Cicero", id: WindowID.main) {
+        // Library in the Window menu, as in the window list and the Dock (see `WindowList`).
+        Window("Library", id: WindowID.main) {
             MainWindow()
                 .environment(model)
                 .environment(preview)
                 .environment(backup)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
-                    Appearance.applySaved()
                     TextEditingKeys.install()
                     model.start()
-                    model.appSets.start(model)
-                    model.openDocumentFonts.start(model)
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
                 }
@@ -32,7 +49,7 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
-        .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
+        .commands { CiceroCommands(model: model, backup: backup, updates: updates, menuBarItem: menuBarItem) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -65,10 +82,14 @@ struct CiceroCommands: Commands {
     let model: AppModel
     let backup: BackupPrompts
     let updates: Updates
+    let menuBarItem: MenuBarItem
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
     var body: some Commands {
+        // The menu bar's commands are made at launch and have these even while no window is open.
+        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
         CommandGroup(replacing: .appInfo) {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
@@ -90,15 +111,14 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Button("New Application Set", systemImage: "app.badge.checkmark") { model.newApplicationSet(with: model.selectedFamilies) }
             Divider()
+            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
+            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+            Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
-            Button("Export Font List", systemImage: "tablecells") { model.exportFontListOfSelectionOrList() }
             Divider()
             Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
             Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
-            Divider()
-            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
-            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
         }
         // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
         SidebarCommands()
@@ -191,16 +211,19 @@ struct CiceroCommands: Commands {
 
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
 /// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Also counts the launch for the usage statistics.
+/// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Set when the main window appears; files that come before wait for it.
+    /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
     var model: AppModel? {
         didSet { flush() }
     }
     private var waiting: [URL] = []
+    private var addsFonts = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UsageStatistics.sendLaunch()
+        PreferencesItem.keepNamed()
+        WindowList.start()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -208,9 +231,108 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flush()
     }
 
+    /// Above the system's items, and the windows the Dock lists itself (see `WindowList`): Add Fonts, as in the File menu.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
+        addFonts.target = self
+        menu.addItem(addFonts)
+        return menu
+    }
+
+    /// Brings Cicero forward, which opens the main window when none shows, so the fonts added show there, and asks
+    /// for them.
+    @objc private func addFonts() {
+        NSApp.bringForward()
+        addsFonts = true
+        flush()
+    }
+
     private func flush() {
-        guard let model, !waiting.isEmpty else { return }
-        model.open(waiting)
-        waiting = []
+        guard let model else { return }
+        if !waiting.isEmpty {
+            model.open(waiting)
+            waiting = []
+        }
+        if addsFonts {
+            addsFonts = false
+            // Not while the main window is still appearing: the panel runs a loop of its own.
+            DispatchQueue.main.async { model.presentAddFontsPanel() }
+        }
+    }
+}
+
+/// The Cicero menu's settings item, called Preferences. SwiftUI makes it, as for any app with a Settings scene, and
+/// calls it Settings… again whenever it updates the menu. It gives that title to whatever holds ⌘, (a command group of
+/// Cicero's own too, which leaves two), so its own item is named again whenever any menu changes (SwiftUI can put
+/// the Cicero menu in the menu bar whole, which only the menu bar hears of) and as one opens: a dozen items to look at.
+enum PreferencesItem {
+    static let title = "Preferences"
+    private static var observers: [NSObjectProtocol] = []
+    private static var mainMenu: NSKeyValueObservation?
+
+    static func keepNamed() {
+        guard observers.isEmpty else { return }
+        for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification, NSMenu.didBeginTrackingNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+                MainActor.assumeIsolated { rename() }
+            })
+        }
+        // A main menu SwiftUI makes anew is put in place whole, without telling about its items.
+        mainMenu = NSApp.observe(\.mainMenu) { _, _ in
+            MainActor.assumeIsolated { rename() }
+        }
+        rename()
+    }
+
+    private static var appMenu: NSMenu? { NSApp.mainMenu?.items.first?.submenu }
+
+    private static func rename() {
+        for item in appMenu?.items ?? [] where item.keyEquivalent == "," && item.keyEquivalentModifierMask == .command && item.title != title {
+            item.title = title
+        }
+    }
+}
+
+/// Cicero's windows in the Window menu's list of open windows, where the Dock finds the windows it lists in an app's
+/// menu, with their symbol and the frontmost checked. SwiftUI leaves its windows out of that list (it has a command for
+/// each scene above it instead), so each is added as it shows, under a name of its own: the main window as Library,
+/// rather than what its sidebar shows, and Settings as Preferences, rather than its tab. A window that closes leaves the
+/// list by itself.
+enum WindowList {
+    private static var observers: [NSObjectProtocol] = []
+
+    static func start() {
+        guard observers.isEmpty else { return }
+        let changes = [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.didChangeOcclusionStateNotification]
+        for name in changes {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { update() }
+            })
+        }
+        update()
+    }
+
+    private static func update() {
+        for window in NSApp.windows where window.isVisible || window.isMiniaturized {
+            guard let title = title(of: window) else { continue }
+            if NSApp.windowsMenu?.items.contains(where: { $0.target === window }) ?? false {
+                NSApp.changeWindowsItem(window, title: title, filename: false)
+            } else {
+                NSApp.addWindowsItem(window, title: title, filename: false)
+            }
+        }
+    }
+
+    /// nil for panels, sheets and the menu bar's own windows.
+    private static func title(of window: NSWindow) -> String? {
+        guard window.styleMask.contains(.titled), !(window is NSPanel), window.sheetParent == nil else { return nil }
+        switch window.identifier?.rawValue {
+        case WindowID.main: return "Library"
+        case WindowID.compare: return "Compare"
+        case WindowID.toolbox: return "Character Toolbox"
+        case let id? where id.contains("Settings"): return PreferencesItem.title
+        default: return window.title.isEmpty ? nil : window.title
+        }
     }
 }

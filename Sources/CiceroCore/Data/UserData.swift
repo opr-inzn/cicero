@@ -543,7 +543,7 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
 /// Values a smart rule's status, kind and format fields can take.
 public enum SmartRuleValue {
     public static let statuses = ["active", "partial", "inactive", "appOnly", "system"]
-    public static let kinds = ["variable", "monospaced", "italics"]
+    public static let kinds = ["italics", "monospaced", "variable"]
 }
 
 public struct CustomCharacterSet: Codable, Hashable, Identifiable, Sendable {

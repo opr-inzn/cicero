@@ -684,6 +684,7 @@ extension AppModel {
     /// The window title for the sidebar selection: with several items, their names.
     var selectionTitle: String {
         if let id = similarFamilyID { return "Similar to \(library.family(id)?.name ?? id)" }
+        if let list = documentList { return "Fonts in “\(list.name)”" }
         let item = selection ?? .all
         if selectedItems.count > 1 {
             return rows(inList: sidebarList(of: item))

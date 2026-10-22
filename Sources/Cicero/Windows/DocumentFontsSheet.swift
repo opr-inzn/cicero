@@ -1,7 +1,7 @@
 import CiceroCore
 import SwiftUI
 
-/// The fonts a document uses, each against the library: on, in the library but off (with Activate), or missing
+/// The fonts a document uses, each against the library: active, in the library but inactive (with Activate), or missing
 /// (with Find on This Mac, which asks Spotlight for the file). Below, a set named after the document and
 /// everything available turned on at once.
 struct DocumentFontsSheet: View {
@@ -27,7 +27,7 @@ struct DocumentFontsSheet: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Fonts in “\(report.name)”").font(.title2.bold()).lineLimit(1).truncationMode(.middle)
-                Text(summary(matches.count, on: matches.count - off.count - missing.count, off: off.count, missing: missing.count))
+                Text(summary(matches.count, active: matches.count - off.count - missing.count, inactive: off.count, missing: missing.count))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -47,6 +47,14 @@ struct DocumentFontsSheet: View {
                     Text(message).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer()
+                // Only when the library has some of them.
+                if !model.libraryFamilies(of: report).isEmpty {
+                    Button("Show in Library") {
+                        model.showInLibrary(report)
+                        dismiss()
+                    }
+                    .help("Shows the document’s fonts that are in your library in the main window, each set in itself")
+                }
                 Button("Make Set") { message = model.makeSet(for: report) }
                     .help("A set named “\(report.setName)” with the document’s fonts that are in your library")
                 Button("Activate All") { model.activateAll(in: report) }
@@ -97,9 +105,9 @@ struct DocumentFontsSheet: View {
     @ViewBuilder
     private func statusIcon(_ match: DocumentFontMatch) -> some View {
         if isOn(match) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityLabel("On")
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityLabel("Active")
         } else if match.face != nil {
-            Image(systemName: "circle.dashed").foregroundStyle(.secondary).accessibilityLabel("Off")
+            Image(systemName: "circle.dashed").foregroundStyle(.secondary).accessibilityLabel("Inactive")
         } else {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel("Missing")
         }
@@ -177,9 +185,10 @@ struct DocumentFontsSheet: View {
         }
     }
 
-    private func summary(_ total: Int, on: Int, off: Int, missing: Int) -> String {
-        var parts = [total == 1 ? "1 font" : "\(total) fonts", "\(on) on"]
-        if off > 0 { parts.append("\(off) off") }
+    /// "12 fonts · 8 active · 2 inactive · 2 missing", as the rest of the app says it.
+    private func summary(_ total: Int, active: Int, inactive: Int, missing: Int) -> String {
+        var parts = [total == 1 ? "1 font" : "\(total) fonts", "\(active) active"]
+        if inactive > 0 { parts.append("\(inactive) inactive") }
         if missing > 0 { parts.append("\(missing) missing") }
         return parts.joined(separator: " · ")
     }

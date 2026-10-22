@@ -93,6 +93,7 @@ final class AppModel {
                 refreshTagDots()
             }
             if data.showAdobeAppFolders != oldValue.showAdobeAppFolders { rescan() }
+            if data.activatesDocumentFonts != oldValue.activatesDocumentFonts { openDocumentFonts.settingChanged() }
         }
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
@@ -127,8 +128,9 @@ final class AppModel {
     /// The sidebar item the browser's title and empty states follow. Setting it selects just that item.
     var selection: SidebarItem? = .all {
         didSet {
-            // Showing a sidebar item again ends Show Similar Fonts.
+            // Showing a sidebar item again ends Show Similar Fonts and Show in Library.
             if selection != nil, similarFamilyID != nil { similarFamilyID = nil }
+            if selection != nil, documentList != nil { documentList = nil }
             let items: Set<SidebarItem> = selection.map { [$0] } ?? []
             if selectedItems != items { selectedItems = items }
             guard oldValue != selection else { return }
@@ -149,14 +151,24 @@ final class AppModel {
     /// The family whose similar fonts the browser shows instead of a sidebar item's, the closest first (see
     /// `showSimilar`); nil for a sidebar item's.
     var similarFamilyID: String?
+    /// The families a document uses that the library has, which the browser shows instead of a sidebar item's, from the
+    /// Fonts in Document sheet's Show in Library (see `showInLibrary`); nil otherwise.
+    var documentList: DocumentList?
     /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
     /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
     var searchText = "" {
-        didSet { scheduleSearch() }
+        didSet {
+            scheduleSearch()
+            if !searchText.isEmpty { lastTyped = searchText }
+        }
     }
     /// The search lists filter by: follows `searchText` after a short pause.
     private(set) var appliedSearch = ""
+    /// The filters beside the search's text, which lists filter by at once (see `SearchToken` and `setSearchTokens`).
+    private(set) var searchTokens: [SearchToken] = []
+    /// What was last typed in the search field, for the words a token chosen from the suggestions takes the place of.
+    @ObservationIgnored var lastTyped = ""
     var isEditingSidebar = false
     var isInfoPresented = false
     var infoTab: InfoTab = .info
@@ -253,10 +265,10 @@ final class AppModel {
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
     @ObservationIgnored var similarCache: (key: SimilarKey, table: SimilarFonts)?
-    /// What the sidebar had selected before Show Similar Fonts, to go back to.
-    @ObservationIgnored var similarReturn: Set<SidebarItem>?
-    /// The font page open before Show Similar Fonts, to go back to.
-    @ObservationIgnored var similarReturnPage: String?
+    /// What the sidebar had selected before Show Similar Fonts or Show in Library, to go back to.
+    @ObservationIgnored var listReturn: Set<SidebarItem>?
+    /// The font page open before Show Similar Fonts or Show in Library, to go back to.
+    @ObservationIgnored var listReturnPage: String?
     /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
 
@@ -576,6 +588,23 @@ final class AppModel {
     }
 
     // MARK: Search
+
+    /// Sets the search field's tokens, only the last of each kind (see `SearchToken.normalized`). A token chosen from the
+    /// suggestions takes the place of the words typed for it, and the words before them stay ("sans ital" and Italic
+    /// leave "sans"), though the field empties itself.
+    func setSearchTokens(_ tokens: [SearchToken]) {
+        let added = tokens.last { !searchTokens.contains($0) }
+        searchTokens = SearchToken.normalized(tokens)
+        guard let added, let rest = SearchToken.suggestions(for: lastTyped, besides: []).first(where: { $0.token == added })?.typed else { return }
+        lastTyped = rest
+        Task { @MainActor in self.searchText = rest }
+    }
+
+    /// Takes the text and the tokens out of the search field.
+    func clearSearch() {
+        searchText = ""
+        searchTokens = []
+    }
 
     private func scheduleSearch() {
         searchTask?.cancel()

@@ -195,6 +195,21 @@ public struct OpenTypeFeatures: OptionSet, Hashable, Codable, Sendable {
     }
 }
 
+/// The kinds of figure a face can set besides lining, proportional ones, as its plain figures are or a feature makes
+/// them (see `FontFileReader.figures(of:features:)`).
+public struct Figures: OptionSet, Hashable, Codable, Sendable {
+    public let rawValue: UInt8
+
+    public init(rawValue: UInt8) {
+        self.rawValue = rawValue
+    }
+
+    /// All as wide, for columns of numbers.
+    public static let tabular = Figures(rawValue: 1)
+    /// Of the height of the lowercase, some reaching above it and some below the baseline, for figures in text.
+    public static let oldStyle = Figures(rawValue: 2)
+}
+
 /// What a font file says about one of its faces. Read once and cached by file stamp.
 public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public let id: FaceID
@@ -235,6 +250,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var embedding: Embedding?
     /// The OpenType features its GSUB table has, of those smart sets ask for.
     public var features: OpenTypeFeatures
+    public var figures: Figures
     /// Language → the family's name in it, for the languages besides English the font names its family in, where that
     /// differs from `familyName` (see `LocalizedNames`).
     public var localizedFamilyNames: [String: String]
@@ -244,7 +260,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
         weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], isAtOrigin: Bool = false, year: Int? = nil,
-        embedding: Embedding? = nil, features: OpenTypeFeatures = [], localizedFamilyNames: [String: String] = [:]
+        embedding: Embedding? = nil, features: OpenTypeFeatures = [], figures: Figures = [], localizedFamilyNames: [String: String] = [:]
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -268,6 +284,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.year = year
         self.embedding = embedding
         self.features = features
+        self.figures = figures
         self.localizedFamilyNames = localizedFamilyNames
     }
 
@@ -791,7 +808,7 @@ struct StyleName {
 
     private static let prefixes: Set<String> = ["extra", "ultra", "semi", "demi", "x", "xx", "u"]
 
-    private static let weights: [String: Int] = [
+    static let weights: [String: Int] = [
         "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "lazer": 85, "lz": 85, "thin": 100, "th": 100,
         "ultralight": 190, "ult": 190, "extralight": 200, "xlight": 200, "xlt": 200,
         "light": 300, "lt": 300, "semilight": 340, "book": 350, "bk": 350,
@@ -803,7 +820,7 @@ struct StyleName {
         "black": 900, "bl": 900, "blk": 900, "extrablack": 950, "xblack": 950, "ultrablack": 960, "ultra": 960, "super": 1000,
     ]
 
-    private static let widths: [String: Int] = [
+    static let widths: [String: Int] = [
         "ultracondensed": 1, "ultracompressed": 1, "xxcondensed": 1, "xxcompressed": 1, "xcm": 1,
         "extracondensed": 2, "extracompressed": 2, "xcondensed": 2, "xcompressed": 2, "compressed": 2, "comp": 2, "cm": 2,
         "condensed": 3, "cond": 3, "cn": 3, "narrow": 3,

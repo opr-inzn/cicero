@@ -266,8 +266,8 @@ extension AppModel {
         let families = found.filter(data.lists)
         guard !families.isEmpty else {
             return showToast(found[0].state == .system
-                ? "That font comes with macOS, and system fonts are hidden (Settings → General)"
-                : "That font is from Adobe Fonts, which are hidden (Settings → General)")
+                ? "That font comes with macOS, and system fonts are hidden (Preferences → General)"
+                : "That font is from Adobe Fonts, which are hidden (Preferences → General)")
         }
         if let set = opened.set, let name = data.sets.first(where: { $0.id == set })?.name {
             setMembership(true, for: families, in: set)
@@ -278,10 +278,10 @@ extension AppModel {
         // in All Fonts.
         let added = families.allSatisfy { $0.folderIDs.contains(WatchedFolder.addedFilesID) }
         if added && opened.set == nil {
-            searchText = ""
+            clearSearch()
             selection = .folder(WatchedFolder.addedFilesID)
         } else if !ids.isSubset(of: Set(visibleFamilies.map(\.id))) {
-            searchText = ""
+            clearSearch()
             selection = .all
         }
         selectedIDs = [families[0].id]

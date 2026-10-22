@@ -34,10 +34,10 @@ extension Classification {
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450  // "PTFC"
     /// Part of the library cache's version too, as it writes faces the same way.
-    static let version: UInt32 = 11
-    /// Laid out like this version, but their variable fonts are read again: 9 had no `FontFace.isAtOrigin`, and
-    /// 10 kept the default CoreText adds to a variable font without a named instance there (see `FontFileReader`).
-    private static let variableFontsOutdated: Set<UInt32> = [9, 10]
+    static let version: UInt32 = 12
+    /// Laid out like this version, but without `FontFace.figures`, so every file is read again. The library cache
+    /// still restores a library saved with it, its faces without figures, so the window shows its fonts until then.
+    static let withoutFigures: UInt32 = 11
 
     static func encode(_ files: [String: CachedFile]) -> Data {
         var writer = ByteWriter()
@@ -63,7 +63,7 @@ enum FaceCache {
             do {
                 guard try reader.u32() == magic else { return nil }
                 let saved = try reader.u32()
-                guard saved == version || variableFontsOutdated.contains(saved) else { return nil }
+                guard saved == version else { return nil }
                 let count = Int(try reader.u32())
                 var files: [String: CachedFile] = [:]
                 files.reserveCapacity(count)
@@ -75,7 +75,6 @@ enum FaceCache {
                     var faces: [FontFace] = []
                     faces.reserveCapacity(faceCount)
                     for _ in 0..<faceCount { faces.append(try reader.face(path: path)) }
-                    if variableFontsOutdated.contains(saved) && faces.contains(where: { $0.weightAxis != nil || !$0.axes.isEmpty }) { continue }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
                 }
                 return files
@@ -146,7 +145,7 @@ struct ByteWriter {
         write(UInt8(face.familyClass))
         write(face.panose)
         write(face.letterShape)
-        write(UInt8((face.isItalic ? 1 : 0) | (face.isMonospaced ? 2 : 0) | (face.isAtOrigin ? 4 : 0)))
+        write(UInt8((face.isItalic ? 1 : 0) | (face.isMonospaced ? 2 : 0) | (face.isAtOrigin ? 4 : 0)) | face.figures.rawValue << 3)
         write(face.manufacturer)
         write(face.version)
         write(face.designer)
@@ -276,7 +275,7 @@ struct ByteReader {
             isMonospaced: flags & 2 != 0, familyClass: familyClass, panose: panose, letterShape: letterShape, manufacturer: manufacturer,
             version: version, designer: designer, vendorID: vendorID, weightAxis: axis, width: width, axes: axes,
             isAtOrigin: flags & 4 != 0, year: year == 0 ? nil : year, embedding: embedding == 0 ? nil : Embedding.allCases[embedding - 1], features: features,
-            localizedFamilyNames: localizedFamilyNames
+            figures: Figures(rawValue: flags >> 3 & 3), localizedFamilyNames: localizedFamilyNames
         )
     }
 }

@@ -61,7 +61,7 @@ Their fonts show up in your library without being activated: they’re listed un
 
 You can add single font files too, without adding the folder they’re in:
 
-- Choose **File → Add Fonts** (⌘O) and pick the files.
+- Choose **File → Add Fonts** (⌘O), or right-click Cicero’s icon in the Dock and choose **Add Fonts**, and pick the files.
 - Drag font files from the Finder onto Cicero’s window.
 - In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
 
@@ -108,7 +108,21 @@ Click the switch next to a family. It’s on in every app as soon as the switch 
 
 ## Choose light or dark
 
-Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
+Cicero follows macOS. To choose for Cicero alone, open **Cicero → Preferences** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
+
+## Cicero in the menu bar
+
+Cicero has an icon in the menu bar, the cube of its app icon. Click it to open Cicero’s window. Drop font files on it to add them, or a PDF, InDesign, Illustrator or Photoshop file to see the fonts it uses. Right-click it, or click it with two fingers, for a menu with:
+
+- The fonts that are on for open apps, because of their [application sets](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
+- Your sets, as the sidebar lists them. A checkmark means all of a set’s fonts are on, a dash that some are. Choose a set to turn its fonts on, or off when it has a checkmark
+- **Add Fonts**, as in the File menu, and **Find Fonts in Current Document**, which shows the fonts of the document you have open in the app you’re in: a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop. The first time, macOS asks whether Cicero may control that app. With no document Cicero can read there, you pick a file instead. Cicero’s window opens too, so you see what they bring
+- **Preferences** and **Quit Cicero**
+
+Closing Cicero’s windows doesn’t quit it, so application sets keep working.
+
+- To do without the icon, open **Settings → General** and turn off **Show Cicero in the menu bar**
+- With the icon there, you can turn off **Show Cicero in the Dock**. Cicero is then in the Dock and the app switcher only while one of its windows is open
 
 ## Keep Cicero up to date
 

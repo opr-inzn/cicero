@@ -7,6 +7,8 @@ struct GeneralSettings: View {
     @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @AppStorage(UsageStatistics.defaultsKey) private var sharesUsageStatistics = true
+    @AppStorage(MenuBarItem.showsIconKey) private var showsMenuBarIcon = true
+    @AppStorage(MenuBarItem.showsDockIconKey) private var showsDockIcon = true
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
@@ -23,10 +25,24 @@ struct GeneralSettings: View {
                 .pickerStyle(.segmented)
                 .formRowCentered()
             }
+            Section("Menu Bar and Dock") {
+                Toggle(isOn: $showsMenuBarIcon) {
+                    Text("Show Cicero in the menu bar")
+                    Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts of the document you have open, turn sets on and off, see which fonts are on for apps, or quit Cicero.")
+                }
+                // On while the menu bar has no icon: Cicero can't leave the Dock then.
+                Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
+                    Text("Show Cicero in the Dock")
+                    Text(showsMenuBarIcon
+                        ? "When this is off, Cicero is in the Dock only while one of its windows is open."
+                        : "Cicero can leave the Dock only while it’s in the menu bar.")
+                }
+                .disabled(!showsMenuBarIcon)
+            }
             Section("Installation") {
                 Toggle(isOn: $model.data.installsIntoFontLibrary) {
-                    Text("Keep installed fonts in Cicero’s Font Library")
-                    Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library. Microsoft Office can’t use fonts from the library.")
+                    Text("Install fonts into Cicero’s Font Library")
+                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
@@ -68,17 +84,16 @@ struct GeneralSettings: View {
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
                     Text("Ask before activating more than \(UserData.manyFamilies) families at once")
-                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
+                    Text("Apps load every font that’s on as they open, so turning on many at once can slow them down.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     HStack(spacing: 4) {
-                        Text("Activate the fonts documents use in Adobe apps")
-                        Tag(text: "BETA", tint: .orange)
+                        Text("Auto-activate fonts in Adobe apps")
+                        Tag(text: "BETA", tint: .yellow, isFilled: true)
                             .help("New, and still being tried out with each app")
                     }
-                    Text("When a document open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero activates them until the app quits. It can take a few seconds, and you’ll still see the Missing Fonts dialog as the document opens. macOS asks once whether Cicero may ask each app. Use with caution.")
+                    Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it. Use with caution.")
                 }
-                .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
             }
             Section("Library") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
@@ -130,12 +145,12 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off (see `ClassificationGuesser.availability`).
     private var guessingExplanation: String {
-        let what = "When a font’s files don’t say, Cicero tells from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
+        let what = "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes and, with Apple Intelligence, from its name. Everything stays on this Mac."
         return switch ClassificationGuesser.availability {
         case .available: what
-        case .notEnabled: what + " Turn on Apple Intelligence in System Settings to tell from names too."
+        case .notEnabled: what + " Turn on Apple Intelligence in System Settings to use names too."
         case .notReady: what + " Apple Intelligence is getting ready."
-        case .unavailable: "When a font’s files don’t say, Cicero tells from the shapes of its letters, on this Mac. Nothing is sent."
+        case .unavailable: "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes. Everything stays on this Mac."
         }
     }
 
@@ -160,8 +175,8 @@ struct GeneralSettings: View {
         let place = model.data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your user Fonts folder"
         return switch model.data.installMethod {
         case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
-        case .copy: "Copying duplicates font files into \(place)."
-        case .move: "Moving puts font files into \(place); the folders they were in stay."
+        case .copy: "Copying puts font files into \(place) and leaves the originals where they are."
+        case .move: "Moving puts font files into \(place)."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves. Microsoft Office can’t use them."
         }
     }

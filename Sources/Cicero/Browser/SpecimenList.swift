@@ -72,10 +72,10 @@ private struct Specimen: View {
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
-            let face = family.face(nearestWeight: preview.weight).face
+            let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             FontText(
-                text: model.scriptSamples.text(preview.text(for: family), for: face, long: true), face: face,
-                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
+                text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
                 kerning: preview.kerning(at: preview.size)
             )
             .frame(maxWidth: .infinity, alignment: preview.alignment.frame)

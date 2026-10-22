@@ -64,7 +64,7 @@ Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are 
 - fonts turned on temporarily, or by an [application set](#turn-fonts-on-with-an-app)
 - fonts in [Adobe apps’ folders](#fonts-in-adobe-apps-folders), also when they’re on in every app
 
-To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Settings → General**, with **Keep installed fonts in Cicero’s Font Library** off. A font that’s on where it is already has to be turned off and on again that way.
+To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Settings → General**, with **Install fonts into Cicero’s Font Library** off. A font that’s on where it is already has to be turned off and on again that way.
 
 Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too.
 
@@ -72,7 +72,7 @@ Other apps, like Pages and Adobe’s, use fonts from anywhere.
 
 ## The Font Library
 
-Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, the Font Library, and have macOS use them from there. Turn on **Keep installed fonts in Cicero’s Font Library** in **Settings → General**, under **Activate fonts by**. The library is `~/Cicero/Font Library` at first, with a folder for each family, like `~/Cicero/Font Library/Inter`.
+Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, the Font Library, and have macOS use them from there. Turn on **Install fonts into Cicero’s Font Library** in **Settings → General**, under **Activate fonts by**. The library is `~/Cicero/Font Library` at first, with a folder for each family, like `~/Cicero/Font Library/Inter`.
 
 - **Turning a font on**, by copying or moving it, or opening a file from the Finder with either chosen, puts its file into its family’s folder in the library and turns it on there. A file with fonts of more than one family, as a font collection can be, goes into the folder of the family you turned on, or of its first font when you open it from the Finder. When the library has the same file already, Cicero uses that one rather than copying it again. A font in the [Deactivated folder](#the-deactivated-folder) moves into the library.
 - **Turning a font off** only turns it off: the file stays in the library, listed and off, ready to turn on again. It never goes to the Trash or the Deactivated folder. **Move to Trash** removes it from the library, and its family’s folder goes once nothing is left in it.
@@ -203,10 +203,10 @@ To see which fonts a document needs, and turn on the ones you have:
 
 1. Choose **File → Find Fonts in Document** and pick the document, or drag it from the Finder onto Cicero’s window.
 2. Cicero lists every font the document uses, missing ones first:
-   - **On** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
-   - **Off** (a dashed circle): it’s in your library but not on. Click **Activate**.
+   - **Active** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
+   - **Inactive** (a dashed circle): it’s in your library but inactive. Click **Activate**.
    - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. With **Copy into ~/Library/Fonts** chosen, the button says **Install** and copies it into your Fonts folder, on. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders; see [Privacy](privacy.md#when-macos-asks-for-permission).
-3. **Activate All** turns on every font of the document that’s in your library. **Make Set** makes a set named after the document with its fonts that are in your library, or adds them to a set of that name.
+3. **Activate All** turns on every font of the document that’s in your library. **Make Set** makes a set named after the document with its fonts that are in your library, or adds them to a set of that name. **Show in Library** shows those fonts in the main window, each set in itself, with everything you can do there as with any list; **Done** in the bar above them takes you back.
 
 Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrator files (`.ai`) and Photoshop files (`.psd`, `.psb`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.
 
@@ -217,7 +217,7 @@ Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrato
 
 ### Fonts documents open in Adobe apps use
 
-You don’t have to look up a document before you open it. Turn on **Activate the fonts documents use in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same graphite **App Set** tag.
+You don’t have to look up a document before you open it. Turn on **Auto-activate fonts in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [application set](#turn-fonts-on-with-an-app) does, with the same graphite **App Set** tag.
 
 - Cicero asks the app in front, twice a second, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, Illustrator or Photoshop; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
 - The app’s Missing Fonts dialog still comes up as the document opens, since Cicero can only ask about a document once it’s open. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts. Photoshop shows none: its text layers look as they did when saved, and use the fonts once you edit them. Either way, the app can take a few seconds to take up the fonts.

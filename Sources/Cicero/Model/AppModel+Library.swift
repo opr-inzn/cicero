@@ -72,10 +72,12 @@ struct VisibleKey: Equatable {
     var fingerprint: Int
     var selection: Set<SidebarItem>
     var search: String
+    var tokens: [SearchToken]
     var dataRevision: Int
     var coverageRevision: Int
     var guessRevision: Int
     var similar: String?
+    var document: DocumentList?
     /// 0 unless the browser shows similar fonts, so measurements arriving don't make other lists again.
     var measurementRevision: Int
 }
@@ -142,7 +144,15 @@ extension AppModel {
         }
     }
 
-    func features(for family: Family) -> [FeatureSetting] { familyFeatures[family.id] ?? [] }
+    /// The OpenType features chosen for the family in the Info panel, and those for the figures the search's tokens ask
+    /// for where the panel doesn't set the same (see `searchFeatures`).
+    func features(for family: Family) -> [FeatureSetting] {
+        let chosen = familyFeatures[family.id] ?? []
+        return chosen + searchFeatures.filter { feature in !chosen.contains { $0.type == feature.type } }
+    }
+
+    /// The features the browser's previews turn on for the figures the search's tokens ask for.
+    var searchFeatures: [FeatureSetting] { SearchToken.features(of: searchTokens) }
 
     /// Where the Info panel put the family's axes, by tag, for the style that stands for it unless another is given;
     /// none for a style they weren't moved on.
@@ -151,13 +161,19 @@ extension AppModel {
         return adjusted.values
     }
 
-    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one for
-    /// the preview weight, at that weight.
+    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one the
+    /// search's tokens and words name, as "italic" names the italics (see `Family.previewStyle(for:tokens:weight:)`),
+    /// else the one for the preview weight, at that weight.
     func previewStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
-        return (family.face(nearestWeight: weight), weight)
+        return family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens, weight: weight)
+    }
+
+    /// The tokens the search field suggests for what's typed, but for those it has (see `SearchToken.suggestions`).
+    func tokenSuggestions(for typed: String) -> [SearchToken] {
+        SearchToken.suggestions(for: typed, besides: searchTokens).map(\.token)
     }
 
     // MARK: The list
@@ -174,9 +190,9 @@ extension AppModel {
 
     private var visibleKey: VisibleKey {
         VisibleKey(
-            fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch,
+            fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
             dataRevision: dataRevision, coverageRevision: coverageRevision, guessRevision: guessRevision,
-            similar: similarFamilyID, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
+            similar: similarFamilyID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
     }
 
@@ -204,14 +220,17 @@ extension AppModel {
 
     private func computeVisibleFamilies() -> [Family] {
         let query = SearchQuery(appliedSearch)
-        let found = listedFamilies(where: searchMatcher(query))
+        let found = listedFamilies(where: searchMatcher(query, tokens: searchTokens))
         // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
         guard found.isEmpty, !query.isEmpty else { return found }
-        return listedFamilies(where: searchMatcher(query.anywhereInNames))
+        return listedFamilies(where: searchMatcher(query.anywhereInNames, tokens: searchTokens))
     }
 
-    /// The families the sidebar selection lists, or Show Similar Fonts, that `matches`.
+    /// The families the sidebar selection lists, or Show Similar Fonts, or Show in Library, that `matches`.
     private func listedFamilies(where matches: (Family) -> Bool) -> [Family] {
+        if let list = documentList {
+            return list.families.compactMap { library.family($0) }.filter { data.lists($0) && matches($0) }
+        }
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
@@ -257,9 +276,9 @@ extension AppModel {
 
     /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the
     /// user's note, the foundry and classification the family is shown in, a built-in classification by its usual
-    /// words too, and its tags.
-    private func searchMatcher(_ search: SearchQuery) -> (Family) -> Bool {
-        guard !search.isEmpty else { return { _ in true } }
+    /// words too, and its tags; and by the search field's tokens (see `Family.matches`).
+    private func searchMatcher(_ search: SearchQuery, tokens: [SearchToken] = []) -> (Family) -> Bool {
+        guard !search.isEmpty else { return tokens.isEmpty ? { _ in true } : { $0.matches(tokens) } }
         let library = library, data = data
         let notes = data.familyNotes.mapValues { $0.lowercased() }
         let foundryName = foundryNamer(), classificationName = classificationNamer()
@@ -270,6 +289,7 @@ extension AppModel {
             classificationTerms[shown] = [shown.lowercased()] + classification.searchTerms
         }
         return { family in
+            guard tokens.isEmpty || family.matches(tokens) else { return false }
             let foundry = foundryName(family).flatMap { $0 == family.manufacturer ? nil : $0.lowercased() }
             let classification = classificationName(family)
             let terms = (classificationTerms[classification] ?? [classification.lowercased()]) + data.tags(of: family.id).map { $0.lowercased() }

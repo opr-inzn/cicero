@@ -202,7 +202,7 @@ To change it later, right-click it and choose **Edit Smart Set**. To remove it, 
 | Set | is in, isn’t in | One of your sets |
 | Folder | is in, isn’t in | One of your folders, Testing, Adobe Fonts, or Added Fonts |
 | Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is there while **Show test fonts installed for Adobe apps** is on, for the fonts only Adobe apps load (see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders)) |
-| Kind | is, is not | Variable, Monospaced or Italic, for a family with italic styles |
+| Kind | is, is not | Italic, for a family with italic styles, Monospaced or Variable |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType and others |
 | Number of Styles | is, is more than, is less than | A number |
 | OpenType Feature | is supported, isn’t supported | Small Capitals, Old-Style Figures, Tabular Figures, Fractions, Stylistic Sets, Swashes and others, in any of the family’s styles |
@@ -226,7 +226,7 @@ Mark families with tags, which show as colored dots next to their names in the l
 | Open Source | Blue |
 | Trial | Orange |
 
-They’re tags like any other: rename them, delete them, or make your own. Libraries from before Cicero 1.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. Libraries from Cicero 1.9.1 and before also lose the Licensed + Non-Commercial, Partially Licensed and Public Domain tags they started with, once, if you never used them. From 1.5 to 1.6 a family had one tag at a time; the tags families had then, they keep.
+They’re tags like any other: rename them, delete them, or make your own. Libraries from before Cicero 0.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. Libraries from Cicero 0.9.1 and before also lose the Licensed + Non-Commercial, Partially Licensed and Public Domain tags they started with, once, if you never used them. From 0.5 to 0.6 a family had one tag at a time; the tags families had then, they keep.
 
 ### Tag fonts
 
