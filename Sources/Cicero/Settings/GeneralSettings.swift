@@ -130,12 +130,12 @@ struct GeneralSettings: View {
 
     /// Follows Apple Intelligence as it's turned on or off (see `ClassificationGuesser.availability`).
     private var guessingExplanation: String {
-        let what = "When a font’s files don’t say, Cicero tells from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
+        let what = "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes and, with Apple Intelligence, from its name. Everything stays on this Mac."
         return switch ClassificationGuesser.availability {
         case .available: what
-        case .notEnabled: what + " Turn on Apple Intelligence in System Settings to tell from names too."
+        case .notEnabled: what + " Turn on Apple Intelligence in System Settings to use names too."
         case .notReady: what + " Apple Intelligence is getting ready."
-        case .unavailable: "When a font’s files don’t say, Cicero tells from the shapes of its letters, on this Mac. Nothing is sent."
+        case .unavailable: "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes. Everything stays on this Mac."
         }
     }
 
