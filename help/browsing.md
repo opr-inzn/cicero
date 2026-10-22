@@ -43,7 +43,9 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, with the family’s stars at the right if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, with the family’s stars at the right if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it.
+
+**Size** in [Preview Options](#change-the-preview-text-and-size) makes the type in the tiles bigger or smaller, and the tiles stay as they are. Only when the type needs more room do fewer tiles fit in a row, never fewer than three; past that, the type is as big as three tiles in a row leave room for. However many tiles are in a row, they fill the window’s width.
 
 The grid is the view Cicero starts with.
 

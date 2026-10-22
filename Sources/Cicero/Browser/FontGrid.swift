@@ -13,6 +13,18 @@ struct FontGrid: View {
 
     /// Between tiles, and between the last column and the Info panel.
     static let spacing: CGFloat = 12
+    /// Around a tile's contents: little, so the sample can be big.
+    static let padding: CGFloat = 10
+    /// The narrowest a tile goes, whatever the preview size, until its sample needs more room (see `minimumWidth`).
+    static let narrowest: CGFloat = 256
+    static let fewestColumns = 3
+
+    /// How narrow a tile can be for its sample at a preview size: about five times the size for "Aa Gg 123", and never
+    /// narrower than `narrowest`, so up to there the preview size changes only the type, and the tiles stay as they are.
+    static func minimumWidth(size: Double) -> CGFloat { max(narrowest, size * 5 + padding * 2) }
+
+    /// The sample's height in a tile of a width, so tiles keep their shape however big they are.
+    static func sampleHeight(tileWidth: CGFloat) -> CGFloat { tileWidth * 0.4 }
 
     /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
     /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
@@ -20,13 +32,12 @@ struct FontGrid: View {
         + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
 
     var body: some View {
-        let tile = tileWidth(minimum: max(240, preview.size * 8))
-        let count = columns(tile: tile)
+        let (count, tile) = layout(minimum: Self.minimumWidth(size: preview.size))
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
                     ForEach(families) { family in
-                        Tile(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
+                        Tile(family: family, sampleHeight: Self.sampleHeight(tileWidth: tile), isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
@@ -49,27 +60,24 @@ struct FontGrid: View {
         }
     }
 
-    /// As wide as fills the rows, and up to 1.6 times the narrowest a tile goes. The Info panel keeps the columns
-    /// the rows have without it, the tiles narrowing instead, as far as 0.6 times that (their sample shrinks to fit),
-    /// and never below 240 points; past that it takes a column away.
-    private func tileWidth(minimum: CGFloat) -> CGFloat {
-        guard gridWidth > 0 else { return minimum }
+    /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum`, never fewer than three, as wide as
+    /// fills the rows, however many families there are. The Info panel keeps the columns the rows have without it, the
+    /// tiles narrowing instead, as far as 0.6 times `minimum` (their sample shrinks to fit), and never below 240 points;
+    /// past that it takes a column away, down to three.
+    private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat) {
+        guard gridWidth > 0 else { return (1, minimum) }
         let closed = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
-        var count = max(1, ((closed + Self.spacing) / (minimum + Self.spacing)).rounded(.down))
-        func filling(_ count: CGFloat) -> CGFloat { (gridWidth - Self.spacing * (count - 1)) / count }
-        while count > 1 && filling(count) < max(240, minimum * 0.6) { count -= 1 }
-        return min(filling(count), minimum * 1.6, gridWidth)
-    }
-
-    /// Tiles in a row, also for ↑/↓: as many as fit, with half a point to spare for rounding where they fill it.
-    private func columns(tile width: CGFloat) -> Int {
-        max(1, Int((gridWidth + Self.spacing + 0.5) / (width + Self.spacing)))
+        var count = max(Self.fewestColumns, Int((closed + Self.spacing) / (minimum + Self.spacing)))
+        func filling(_ count: Int) -> CGFloat { (gridWidth - Self.spacing * CGFloat(count - 1)) / CGFloat(count) }
+        while count > Self.fewestColumns && filling(count) < max(240, minimum * 0.6) { count -= 1 }
+        return (count, filling(count))
     }
 }
 
 private struct Tile: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
+    let sampleHeight: CGFloat
     let isSelected: Bool
     let model: AppModel
 
@@ -83,16 +91,18 @@ private struct Tile: View {
                     .accessibilityHidden(true)
             }
             let face = family.face(nearestWeight: preview.weight).face
+            // The preview size, or as big as the tile's height takes with room for what reaches past the font's ascent
+            // and descent; smaller still where it's too wide (three tiles in a row can't take every size).
+            let size = min(preview.size, sampleHeight / 2)
             FontText(
                 text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: face),
                 face: face,
-                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
-                kerning: preview.kerning(at: preview.size)
+                size: size, weight: preview.weight, variations: model.variations(for: family),
+                kerning: preview.kerning(at: size)
             )
-            .minimumScaleFactor(0.4)
-            .padding(.horizontal, 8)
+            .minimumScaleFactor(0.3)
             .frame(maxWidth: .infinity)
-            .frame(height: preview.size * 3.4)
+            .frame(height: sampleHeight)
             .clipped()
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -121,7 +131,7 @@ private struct Tile: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(14)
+        .padding(FontGrid.padding)
         .modifier(FamilyCard(isSelected: isSelected))
     }
 }
