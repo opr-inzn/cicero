@@ -210,13 +210,14 @@ struct CiceroCommands: Commands {
 
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
 /// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Also counts the launch for the usage statistics.
+/// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Set when the main window appears; files that come before wait for it.
+    /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
     var model: AppModel? {
         didSet { flush() }
     }
     private var waiting: [URL] = []
+    private var addsFonts = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UsageStatistics.sendLaunch()
@@ -227,9 +228,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flush()
     }
 
+    /// Above the system's items: Add Fonts, as in the File menu.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
+        addFonts.target = self
+        menu.addItem(addFonts)
+        return menu
+    }
+
+    /// Brings Cicero forward, which opens the main window when none shows, so the fonts added show there, and asks
+    /// for them.
+    @objc private func addFonts() {
+        NSApp.bringForward()
+        addsFonts = true
+        flush()
+    }
+
     private func flush() {
-        guard let model, !waiting.isEmpty else { return }
-        model.open(waiting)
-        waiting = []
+        guard let model else { return }
+        if !waiting.isEmpty {
+            model.open(waiting)
+            waiting = []
+        }
+        if addsFonts {
+            addsFonts = false
+            // Not while the main window is still appearing: the panel runs a loop of its own.
+            DispatchQueue.main.async { model.presentAddFontsPanel() }
+        }
     }
 }
