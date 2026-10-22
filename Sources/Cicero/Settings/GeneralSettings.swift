@@ -73,7 +73,7 @@ struct GeneralSettings: View {
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     HStack(spacing: 4) {
                         Text("Auto-activate fonts in Adobe apps")
-                        Tag(text: "BETA", tint: .secondary)
+                        Tag(text: "BETA", tint: .yellow, isFilled: true)
                             .help("New, and still being tried out with each app")
                     }
                     Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it. Use with caution.")
