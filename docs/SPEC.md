@@ -243,7 +243,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   entries of each one's engine data font list (`/ResourceDict /FontSet`) that its runs name (`/StyleRun /RunArray …
   /Font n`, the default style sheet's for a run that names none), never AdobeInvisFont; no pixels read, smart
   objects not opened. Each font once. A file it can't read says "Couldn’t read the fonts in “Name”."
-- Settings → General → "Activate the fonts documents use in Adobe apps" (`activatesDocumentFonts`, off at first, as
+- Settings → General → "Auto-activate fonts in Adobe apps" (`activatesDocumentFonts`, off at first, as
   macOS then asks for Automation once per app): while InDesign, Illustrator or Photoshop is frontmost,
   `DocumentFontWatcher` asks it every 0.5 s (none while the screens sleep) for its open documents' fonts or files,
   sending the `core/getd` Apple Events itself, off the main thread, to the app's process (10 s timeout): no
