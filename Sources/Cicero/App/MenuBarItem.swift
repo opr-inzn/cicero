@@ -150,7 +150,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate {
             for item in sets { menu.addItem(item) }
             menu.addItem(.separator())
         }
-        let documentFonts = menuItem("Activate Fonts Used in Adobe Documents", symbol: "doc.text.magnifyingglass", action: #selector(toggleDocumentFonts))
+        let documentFonts = menuItem("Auto-activate Fonts in Adobe Apps", symbol: "doc.text.magnifyingglass", action: #selector(toggleDocumentFonts))
         documentFonts.state = model.data.activatesDocumentFonts ? .on : .off
         menu.addItem(documentFonts)
         menu.addItem(.separator())
