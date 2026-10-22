@@ -12,7 +12,7 @@ struct SearchSuggestions: View {
     var body: some View {
         let tokens = model.tokenSuggestions(for: model.searchText)
         if !tokens.isEmpty {
-            Section("Filters") {
+            Section {
                 ForEach(tokens) { token in
                     Label {
                         Text(token.title)
@@ -23,11 +23,13 @@ struct SearchSuggestions: View {
                     }
                     .searchCompletion(token)
                 }
+            } header: {
+                SuggestionsHeader(title: "Filters", isFirst: true)
             }
         }
         let families = model.searchSuggestions(for: model.searchText)
         if !families.isEmpty {
-            Section("Families") {
+            Section {
                 ForEach(families) { family in
                     Label {
                         Text(family.name)
@@ -40,8 +42,22 @@ struct SearchSuggestions: View {
                     }
                     .searchCompletion(family.name)
                 }
+            } header: {
+                SuggestionsHeader(title: "Families", isFirst: tokens.isEmpty)
             }
         }
+    }
+}
+
+/// A section's title, nearer its own rows than the ones before it: the list puts it midway between them.
+private struct SuggestionsHeader: View {
+    let title: String
+    let isFirst: Bool
+
+    var body: some View {
+        Text(title)
+            .padding(.top, isFirst ? 0 : 6)
+            .padding(.bottom, -4)
     }
 }
 
