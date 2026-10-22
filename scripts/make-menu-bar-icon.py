@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Writes Sources/Cicero/App/MenuBarIcon.swift: the app icon's cube (see make-icon.py), with C, 1 and 6 from AM
 Gaonkar Display Medium cut out of its faces, as the outline of Cicero's icon in the menu bar. The menu bar draws it
-in one colour, so the faces differ by how opaque they are.
+in one colour, black or white, so where the faces meet is cut out too, SEAM points wide.
 
-    scripts/make-menu-bar-icon.py path/to/AMGaonkar-Display-Medium.otf
+    scripts/make-menu-bar-icon.py path/to/AMGaonkar-Display-Medium.otf [--seam points]
 
 Needs fontTools and pyclipper, as make-icon.py does.
 """
@@ -21,13 +21,14 @@ spec = importlib.util.spec_from_file_location("make_icon", HERE / "make-icon.py"
 icon = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(icon)
 
-# How opaque each face is: the left one in full, as the icon's darkest, the top one lightest, as it catches the light.
-OPACITY = {"left": 1.0, "right": 0.72, "top": 0.45}
+# How wide the cuts between the faces are, in points: as wide as the letters' thinnest strokes at 17 pt.
+SEAM = 0.75
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("font")
+    parser.add_argument("--seam", type=float, default=SEAM)
     args = parser.parse_args()
     glyphs = TTFont(args.font).getGlyphSet()
     cap = TTFont(args.font)["OS/2"].sCapHeight
@@ -75,26 +76,45 @@ def main():
         return path
     }}""")
 
+    near = icon.project((1, 1, 1))
+    seams = "\n".join(
+        f"        path.move(to: {point(near)})\n        path.line(to: {point(icon.project(v))})"
+        for v in ((1, 0, 1), (0, 1, 1), (1, 1, 0)))
     OUT.write_text(f"""import AppKit
 
 // Written by scripts/make-menu-bar-icon.py from the app icon's cube and font. Don't edit.
 enum MenuBarIcon {{
-    /// The cube, `height` points high, as a template image, which the menu bar draws in its own colour: the faces as
-    /// opaque as each catches the light, the letters cut out.
+    /// The cube, `height` points high, as a template image, which the menu bar draws in its own colour, black or white:
+    /// the letters cut out, and where the faces meet, so it still reads as a cube in one colour.
     static func image(height: CGFloat) -> NSImage {{
         let scale = height / {height:.1f}
         let image = NSImage(size: NSSize(width: ({width:.1f} * scale).rounded(.up), height: height), flipped: true) {{ _ in
-            for (face, opacity) in [(top(), {OPACITY["top"]}), (left(), {OPACITY["left"]}), (right(), {OPACITY["right"]})] {{
-                face.transform(using: AffineTransform(scale: scale))
-                face.windingRule = .evenOdd
-                NSColor.black.withAlphaComponent(opacity).setFill()
-                face.fill()
-            }}
+            // One path, so no seam of half-covered pixels shows where two faces meet.
+            let cube = NSBezierPath()
+            for face in [top(), left(), right()] {{ cube.append(face) }}
+            cube.transform(using: AffineTransform(scale: scale))
+            cube.windingRule = .evenOdd
+            NSColor.black.set()
+            cube.fill()
+            let seams = Self.seams()
+            seams.transform(using: AffineTransform(scale: scale))
+            // At least a pixel, so the cuts stay sharp on a screen at 1x.
+            let pixelsPerPoint = NSGraphicsContext.current?.cgContext.convertToDeviceSpace(CGSize(width: 1, height: 1)).width ?? 1
+            seams.lineWidth = max({args.seam}, 1 / max(pixelsPerPoint, 1))
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            seams.stroke()
             return true
         }}
         image.isTemplate = true
         image.accessibilityDescription = "Cicero"
         return image
+    }}
+
+    /// From the near corner, where the three faces meet, to the cube's outline.
+    private static func seams() -> NSBezierPath {{
+        let path = NSBezierPath()
+{seams}
+        return path
     }}
 
 {chr(10).join(chr(10).join([f, ""]) for f in faces).rstrip()}
