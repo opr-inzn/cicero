@@ -7,6 +7,8 @@ struct GeneralSettings: View {
     @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @AppStorage(UsageStatistics.defaultsKey) private var sharesUsageStatistics = true
+    @AppStorage(MenuBarItem.showsIconKey) private var showsMenuBarIcon = true
+    @AppStorage(MenuBarItem.showsDockIconKey) private var showsDockIcon = true
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
@@ -22,6 +24,20 @@ struct GeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .formRowCentered()
+            }
+            Section("Menu Bar and Dock") {
+                Toggle(isOn: $showsMenuBarIcon) {
+                    Text("Show Cicero in the menu bar")
+                    Text("Click its icon to open Cicero. Right-click it to turn sets on and off, see which fonts are on for apps, or quit Cicero.")
+                }
+                // On while the menu bar has no icon: Cicero can't leave the Dock then.
+                Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
+                    Text("Show Cicero in the Dock")
+                    Text(showsMenuBarIcon
+                        ? "When this is off, Cicero is in the Dock only while one of its windows is open."
+                        : "Cicero can leave the Dock only while it’s in the menu bar.")
+                }
+                .disabled(!showsMenuBarIcon)
             }
             Section("Installation") {
                 Toggle(isOn: $model.data.installsIntoFontLibrary) {
@@ -78,7 +94,6 @@ struct GeneralSettings: View {
                     }
                     Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it. Use with caution.")
                 }
-                .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
             }
             Section("Library") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)

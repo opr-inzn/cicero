@@ -5,10 +5,29 @@ import SwiftUI
 @main
 struct CiceroApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @State private var model = AppModel()
+    @State private var model: AppModel
     @State private var preview = PreviewSettings()
     @State private var backup = BackupPrompts()
-    @State private var updates = Updates()
+    @State private var updates: Updates
+    @State private var menuBarItem: MenuBarItem
+
+    init() {
+        let model = AppModel()
+        let updates = Updates()
+        let menuBarItem = MenuBarItem(model: model, updates: updates)
+        _model = State(initialValue: model)
+        _updates = State(initialValue: updates)
+        _menuBarItem = State(initialValue: menuBarItem)
+        // At launch rather than as the main window appears: Cicero can open without it, at login or in the menu bar.
+        NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                Appearance.applySaved()
+                model.appSets.start(model)
+                model.openDocumentFonts.start(model)
+                menuBarItem.start()
+            }
+        }
+    }
 
     var body: some Scene {
         Window("Cicero", id: WindowID.main) {
@@ -18,11 +37,8 @@ struct CiceroApp: App {
                 .environment(backup)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
-                    Appearance.applySaved()
                     TextEditingKeys.install()
                     model.start()
-                    model.appSets.start(model)
-                    model.openDocumentFonts.start(model)
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
                 }
@@ -32,7 +48,7 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
-        .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
+        .commands { CiceroCommands(model: model, backup: backup, updates: updates, menuBarItem: menuBarItem) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -65,10 +81,14 @@ struct CiceroCommands: Commands {
     let model: AppModel
     let backup: BackupPrompts
     let updates: Updates
+    let menuBarItem: MenuBarItem
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
     var body: some Commands {
+        // The menu bar's commands are made at launch and have these even while no window is open.
+        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
         CommandGroup(replacing: .appInfo) {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])

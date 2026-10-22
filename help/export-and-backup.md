@@ -63,7 +63,7 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 - which fonts Cicero turned on, and how
 - with **Include font files**: every font file in your library, other copies included, except the ones that come with macOS or an app, and Adobe Fonts
 
-A backup doesn’t hold settings that belong to one Mac: the appearance, **Open at login**, the update setting, **Share usage statistics**, the preview options and the list’s columns.
+A backup doesn’t hold settings that belong to one Mac: the appearance, the menu bar and Dock settings, **Open at login**, the update setting, **Share usage statistics**, the preview options and the list’s columns.
 
 ## Restore a backup
 

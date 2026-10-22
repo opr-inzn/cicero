@@ -110,6 +110,20 @@ Click the switch next to a family. It’s on in every app as soon as the switch 
 
 Cicero follows macOS. To choose for Cicero alone, open **Cicero → Settings** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
 
+## Cicero in the menu bar
+
+Cicero has an icon in the menu bar, a C. Click it to open Cicero’s window. Right-click it, or click it with two fingers, for a menu with:
+
+- The fonts that are on for open apps, because of their [application sets](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
+- Your sets, as the sidebar lists them. A checkmark means all of a set’s fonts are on, a dash that some are. Choose a set to turn its fonts on, or off when it has a checkmark
+- **Activate Fonts Used in Adobe Documents**, the switch that’s also in **Settings → General**
+- **Settings…**, **Check for Updates** and **Quit Cicero**
+
+Closing Cicero’s windows doesn’t quit it, so application sets keep working.
+
+- To do without the icon, open **Settings → General** and turn off **Show Cicero in the menu bar**
+- With the icon there, you can turn off **Show Cicero in the Dock**. Cicero is then in the Dock and the app switcher only while one of its windows is open
+
 ## Keep Cicero up to date
 
 Cicero checks for new versions each time it opens and once a day while it stays open, and asks before it installs one.

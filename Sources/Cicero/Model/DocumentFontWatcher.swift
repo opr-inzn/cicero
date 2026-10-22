@@ -50,7 +50,7 @@ final class DocumentFontWatcher {
         frontmostChanged()
     }
 
-    /// The switch in Settings changed.
+    /// The setting changed, in Settings or the menu bar's menu.
     func settingChanged() {
         lastFonts = [:]
         if model?.data.activatesDocumentFonts == false { model?.appSets.forgetRequests() }

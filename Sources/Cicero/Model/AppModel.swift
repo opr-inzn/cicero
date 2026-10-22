@@ -93,6 +93,7 @@ final class AppModel {
                 refreshTagDots()
             }
             if data.showAdobeAppFolders != oldValue.showAdobeAppFolders { rescan() }
+            if data.activatesDocumentFonts != oldValue.activatesDocumentFonts { openDocumentFonts.settingChanged() }
         }
     }
     /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.

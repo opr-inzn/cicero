@@ -2,6 +2,13 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Cicero has an icon in the menu bar. Click it to open Cicero. Right-click it, or click it with two fingers, for a menu with the fonts that are on for open apps and until Cicero quits, your sets to turn on and off, **Activate Fonts Used in Adobe Documents**, **Settings…**, **Check for Updates** and **Quit Cicero**. Turn it off with **Show Cicero in the menu bar** in **Settings → General**.
+- With the icon in the menu bar, **Show Cicero in the Dock** can be off: Cicero is then in the Dock only while one of its windows is open, and closing the last one takes you back to the app you were in.
+- Application sets and the fonts Adobe documents use start working as Cicero opens, also when it opens without its window. Before, they waited for the window.
+- **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
+
 ## 1.9.4
 
 - The Compare window is in the **Window** menu, and opens with nothing selected, from there or from **Fonts → Compare**. Click **+** in its toolbar to add families from anywhere in your library: type a name and click one, or press Return. Families already there have a checkmark; click one again to take it out.
