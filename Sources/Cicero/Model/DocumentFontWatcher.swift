@@ -236,7 +236,8 @@ extension DocumentFontWatcher {
     /// The document in front in an app: InDesign's active document, Illustrator's and Photoshop's current one, Acrobat's
     /// active one, and for any other app (Preview, say) the document of its front window, as its file. nil when it has
     /// none, the file isn't saved or isn't one Cicero reads, or the app doesn't say; throws `errAEEventNotPermitted`
-    /// when Cicero may not ask it. macOS asks the user first whether Cicero may, the first time for each app.
+    /// when Cicero may not ask it. macOS asks the user first whether Cicero may, the first time for each app, and this
+    /// waits for the answer.
     @concurrent
     static func frontDocument(ofApp bundleID: String, pid: pid_t) async throws -> FrontDocument? {
         // Codes from each app's dictionary.
@@ -247,6 +248,13 @@ extension DocumentFontWatcher {
                   FileManager.default.fileExists(atPath: url.path)
             else { return nil }
             return .file(url)
+        }
+        // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would
+        // give up after its timeout and take the question away with it.
+        let target = NSAppleEventDescriptor(processIdentifier: pid)
+        if let address = target.aeDesc,
+           AEDeterminePermissionToAutomateTarget(address, AEEventClass(kAECoreSuite), AEEventID(kAEGetData), true) == errAEEventNotPermitted {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(errAEEventNotPermitted))
         }
         do {
             switch bundleID {
