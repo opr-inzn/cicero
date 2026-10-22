@@ -69,8 +69,6 @@ struct FamilyMenu: View {
 
         Divider()
 
-        Button("Reveal in Finder", systemImage: "finder") { model.reveal(families) }
-        Button("Export", systemImage: "square.and.arrow.up") { model.exportFonts(families, named: nil) }
         // Measured once its letters are, a moment after it's added; never for one without Latin letters.
         if families.count == 1 {
             Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: families[0]) }
@@ -90,6 +88,12 @@ struct FamilyMenu: View {
                 openWindow(id: WindowID.compare)
             }
         }
+
+        Divider()
+
+        Button("Reveal in Finder", systemImage: "finder") { model.reveal(families) }
+        Button("Export", systemImage: "square.and.arrow.up") { model.exportFonts(families, named: nil) }
+
         Divider()
 
         // Added one at a time, they can leave the library and stay where they are.
