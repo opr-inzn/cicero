@@ -8,7 +8,7 @@ Go through these in order:
 
 1. **Is the font on?** Find it in Cicero and look at its switch. A family tagged **Partly active** has some styles off; open its font page to see which.
 2. **Is it on in every app?** A font tagged **Testing** or with an app’s name is on in that app only. Click its switch to turn it on everywhere. One tagged **Adobe Fonts** with its switch halfway is on in Adobe apps only: turn it on in Creative Cloud to use it everywhere (see [Adobe Fonts](activating.md#adobe-fonts)). See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
-3. **Was it on just for a while?** Fonts turned on temporarily go off when Cicero quits. Fonts from an [application set](activating.md#turn-fonts-on-with-an-app) are only on while one of the set’s apps is open and Cicero is running.
+3. **Was it on just for a while?** Fonts turned on temporarily go off when Cicero quits. Fonts from an [app folder](activating.md#turn-fonts-on-with-an-app) are only on while one of the folder’s apps is open and Cicero is running.
 4. **Is it Microsoft Office?** Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, not fonts used where they are, and only from the second time they open after the font went on. See [Fonts in Microsoft Office](activating.md#fonts-in-microsoft-office).
 5. **Restart the app.** Most apps see a font as soon as Cicero turns it on, but some only read the font list when they open.
 6. **Look in Problems.** A font used from a disk that’s unplugged, a file that’s gone, or an older copy of the same font on twice can all keep the right font from showing. See [Problems](problems.md).
@@ -30,7 +30,7 @@ The apps rebuild their caches the next time they open. Afterwards, Cicero rebuil
 
 ## Rescan or rebuild the font list
 
-Cicero follows changes by itself: it looks again when fonts are turned on or off, by any app, when files come or go in your folders, and when you come back to Cicero after a while. If its list still looks out of date:
+Cicero follows changes by itself: it looks again when fonts are turned on or off, by any app, when files come or go in your locations, and when you come back to Cicero after a while. If its list still looks out of date:
 
 - **Fonts → Rescan Library** (⌘R) looks through your fonts again. It’s quick, because Cicero remembers what it read from each file.
 - **Fonts → Rebuild Font List**, or **Rebuild** next to **Library** in **Settings → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
@@ -47,7 +47,7 @@ In **Problems**, **Check Again** in the toolbar rescans too.
 
 When you turn a font off, its file may have moved:
 
-- Files that were in your Fonts folder, or in an app’s font folder, are in Cicero’s **Deactivated** folder. Right-click **Deactivated** under **Folders** and choose **Reveal in Finder**.
+- Files that were in your Fonts folder, or in an app’s font folder, are in Cicero’s **Deactivated** folder, `~/Library/Application Support/Cicero/Deactivated`. To find a font’s file, right-click the family and choose **Reveal in Finder**.
 - A copy Cicero had installed goes to the Trash when the original is still there. The original stays where it was.
 
 See [Turn fonts off](activating.md#turn-fonts-off).
@@ -60,7 +60,7 @@ No. Cicero never edits a font file. It copies files into your Fonts folder, or i
 
 ### What happens to my fonts when I quit Cicero?
 
-Fonts you turned on stay on, whether Cicero copied them or uses them where they are. Fonts you turned on temporarily go off. Application sets stop following your apps until Cicero opens again; fonts already on for an open app stay on until then, or until you log out.
+Fonts you turned on stay on, whether Cicero copied them or uses them where they are. Fonts you turned on temporarily go off. App folders stop following your apps until Cicero opens again; fonts already on for an open app stay on until then, or until you log out.
 
 ### A font in my Fonts folder shows as Inactive
 

@@ -233,7 +233,7 @@ private struct FolderOutOfReach: View {
             ContentUnavailableView {
                 Label("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark")
             } description: {
-                Text("The fonts in “\(name)” are back as soon as you connect it. Their sets and tags stay as they are.")
+                Text("The fonts in “\(name)” are back as soon as you connect it. Their folders and tags stay as they are.")
             } actions: {
                 Button("Try Again") { model.rescan() }
             }
@@ -244,7 +244,7 @@ private struct FolderOutOfReach: View {
                 Text("Nothing is at \(((folder?.path ?? "") as NSString).abbreviatingWithTildeInPath) now. If it’s on a disk or a server, connect it. If it moved, remove it from the library and add it again.")
             } actions: {
                 Button("Try Again") { model.rescan() }
-                Button("Remove Folder from Library") { model.removeFolder(folderID) }
+                Button("Remove Location from Library") { model.removeFolder(folderID) }
             }
         case nil:
             let count = model.onlineOnlyCount(inFolder: folderID)
@@ -301,11 +301,11 @@ private struct EmptyBrowser: View {
             FolderOutOfReach(folderID: id)
         case .inactive where model.data.folders.isEmpty && model.data.fontFiles.isEmpty:
             ContentUnavailableView {
-                Label("No Watched Folders", systemImage: "folder.badge.plus")
+                Label("No Locations", systemImage: "folder.badge.plus")
             } description: {
                 Text("Add a folder of fonts, or font files, to browse them here. Nothing gets installed until you activate it.")
             } actions: {
-                Button("Add Folder") { model.presentAddFolderPanel() }
+                Button("Add Location") { model.presentAddFolderPanel() }
                 Button("Add Fonts") { model.presentAddFontsPanel() }
             }
         case .inactive:
@@ -314,22 +314,22 @@ private struct EmptyBrowser: View {
             } description: {
                 Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")
             } actions: {
-                Button("Add Folder") { model.presentAddFolderPanel() }
+                Button("Add Location") { model.presentAddFolderPanel() }
             }
         case .active:
             ContentUnavailableView("Nothing Active", systemImage: "circle.dashed",
                                    description: Text("Turn a font on and it shows up here."))
         case .set:
-            ContentUnavailableView("Empty Set", systemImage: "square.stack",
-                                   description: Text("Drag fonts onto the set in the sidebar, or right-click a font and choose Add to Set."))
+            ContentUnavailableView("Empty Folder", systemImage: "folder",
+                                   description: Text("Drag fonts onto the folder in the sidebar, or right-click a font and choose Add to Folder."))
         case .smartSet(let id):
             ContentUnavailableView {
                 Label("No Matching Fonts", systemImage: "gearshape")
             } description: {
-                Text("No fonts in your library match this smart set’s rules.")
+                Text("No fonts in your library match this smart folder’s rules.")
             } actions: {
                 if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                    Button("Edit Smart Set") { model.editingSmartSet = smartSet }
+                    Button("Edit Smart Folder") { model.editingSmartSet = smartSet }
                 }
             }
         case .characterSet(let id) where model.coverageProgress != nil:

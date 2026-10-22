@@ -329,11 +329,11 @@ struct ImportSheet: View {
     private func resultLines(_ summary: ImportSummary) -> [String] {
         var lines: [String] = []
         let kinds: [(Int, String)] = [
-            (summary.sets, "set"), (summary.applicationSets, "application set"),
-            (summary.smartSets, "smart set"), (summary.tags, "tag"),
+            (summary.sets, "folder"), (summary.applicationSets, "app folder"),
+            (summary.smartSets, "smart folder"), (summary.tags, "tag"),
         ]
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1) }
-        lines.append(made.isEmpty ? "No sets." : made.formatted(.list(type: .and)) + ".")
+        lines.append(made.isEmpty ? "No folders." : made.formatted(.list(type: .and)) + ".")
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
         if summary.activated > 0 { lines.append("\(count(summary.activated, "style")) turned on, as they were in \(appName).") }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
@@ -348,7 +348,7 @@ struct ImportSheet: View {
             lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.formatted(.list(type: .and))), whose rules name sets or labels that didn’t come along.")
         }
         if !summary.missingApps.isEmpty {
-            lines.append("Not on this Mac, so their application sets are without them: \(summary.missingApps.formatted(.list(type: .and))).")
+            lines.append("Not on this Mac, so their app folders are without them: \(summary.missingApps.formatted(.list(type: .and))).")
         }
         return lines
     }

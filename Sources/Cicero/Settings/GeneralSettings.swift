@@ -28,7 +28,7 @@ struct GeneralSettings: View {
             Section("Menu Bar and Dock") {
                 Toggle(isOn: $showsMenuBarIcon) {
                     Text("Show Cicero in the menu bar")
-                    Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts of the document you have open, turn sets on and off, see which fonts are on for apps, or quit Cicero.")
+                    Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts of the document you have open, turn folders on and off, see which fonts are on for apps, or quit Cicero.")
                 }
                 // On while the menu bar has no icon: Cicero can't leave the Dock then.
                 Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
@@ -80,7 +80,7 @@ struct GeneralSettings: View {
                     Text("Open at login")
                     Text(loginItem == .requiresApproval
                         ? "Allow Cicero in System Settings → General → Login Items."
-                        : "Application sets activate fonts only while Cicero is open.")
+                        : "App folders activate fonts only while Cicero is open.")
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
                     Text("Ask before activating more than \(UserData.manyFamilies) families at once")

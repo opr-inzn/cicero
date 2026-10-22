@@ -21,8 +21,9 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .folders: "Folders"
-        case .sets: "Sets"
+        // Folders and Sets until sets took the name Folders.
+        case .folders: "Locations"
+        case .sets: "Folders"
         // The license tags to begin with; called License in 1.5 to 1.5.2, when a family had one.
         case .tags: "Tags"
         case .foundries: "Foundries"
@@ -35,7 +36,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .folders: "folder"
-        case .sets: "square.stack"
+        case .sets: "folder"
         case .tags: "tag"
         case .foundries: "building.2"
         case .classifications: "textformat"

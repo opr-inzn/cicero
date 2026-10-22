@@ -188,7 +188,7 @@ extension ActivationEngine {
             if isIn(current.standardizedFileURL.path) || isIn(current.resolvingSymlinksInPath().path) { return "That folder is in the Font Library." }
         }
         if let watched = folders.first(where: { $0.id != WatchedFolder.fontLibraryID && isIn($0.path) }) {
-            return "That folder is in \(watched.displayName), which your library reads already. Choose one outside your folders."
+            return "That folder is in \(watched.displayName), which your library reads already. Choose one outside your locations."
         }
         let synced = (try? folder.resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true
         if synced || ["/Library/Mobile Documents/", "/Library/CloudStorage/"].contains(where: { (path + "/").contains($0) }) {

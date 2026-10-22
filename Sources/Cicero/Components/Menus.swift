@@ -125,11 +125,11 @@ struct OrganizingMenus: View {
                 ))
             }
             if !model.data.sets.isEmpty { Divider() }
-            Button("New Set from Selection", systemImage: "plus") {
-                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: families) }
+            Button("New Folder from Selection", systemImage: "plus") {
+                model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: families) }
             }
         } label: {
-            Label("Add to Set", systemImage: SidebarSection.sets.icon)
+            Label("Add to Folder", systemImage: SidebarSection.sets.icon)
         }
         Menu { TagMenuItems(families: families, model: model) } label: { Label("Tags", systemImage: SidebarSection.tags.icon) }
         Menu { RatingMenuItems(families: families, model: model) } label: { Label("Rating", systemImage: "star") }
@@ -174,11 +174,11 @@ struct StyleMenu: View {
                 ))
             }
             if !model.data.sets.isEmpty { Divider() }
-            Button("New Set with Style", systemImage: "plus") {
-                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, styles: [family.id: [face.face.postScriptName]]) }
+            Button("New Folder with Style", systemImage: "plus") {
+                model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, styles: [family.id: [face.face.postScriptName]]) }
             }
         } label: {
-            Label("Add Style to Set", systemImage: SidebarSection.sets.icon)
+            Label("Add Style to Folder", systemImage: SidebarSection.sets.icon)
         }
         Divider()
         Section(family.name) {

@@ -35,7 +35,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .external:
             "These fonts are used from a disk that can be unplugged, or a server. They turn off while it’s gone."
         case .duplicates:
-            "The same font is in one of your folders more than once. Copies in different folders, like each client’s, aren’t listed: choose between them with Use Copy From."
+            "The same font is more than once in the same folder. Copies in different folders, like each client’s, aren’t listed: choose between them with Use Copy From."
         }
     }
 }
@@ -95,7 +95,7 @@ public enum ProblemFix: Hashable, Sendable {
         case .deactivate: "Deactivate"
         case .trash(let paths): paths.count == 1 ? "Move to Trash" : "Move Extra Copies to Trash"
         case .forgetInPlace, .forgetInstalledCopy: "Forget"
-        case .removeFromSet: "Remove from Set"
+        case .removeFromSet: "Remove from Folder"
         case .installCopy: "Install a Copy Instead"
         case .removeFromAdobeFonts: "Remove in Adobe Fonts…"
         }
@@ -618,7 +618,7 @@ public enum ProblemDetector {
             for family in set.memberFamilies where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
                 problems.append(Problem(
                     id: "missing.set.\(set.id.uuidString).\(family)", kind: .missing, title: family,
-                    summary: "In the set “\(set.name)”, but not in the library.",
+                    summary: "In the folder “\(set.name)”, but not in the library.",
                     files: [], fixes: [.removeFromSet(set.id, family: family)], fileFixes: [:]
                 ))
             }

@@ -133,7 +133,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         if !status.isEmpty { menu.addItem(.separator()) }
         let sets = setItems()
         if !sets.isEmpty {
-            menu.addItem(.sectionHeader(title: "Sets"))
+            menu.addItem(.sectionHeader(title: "Folders"))
             for item in sets { menu.addItem(item) }
             menu.addItem(.separator())
         }

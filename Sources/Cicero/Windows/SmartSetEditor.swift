@@ -21,7 +21,7 @@ struct SmartSetEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                TextField("Name", text: $draft.name, prompt: Text("Smart Set"))
+                TextField("Name", text: $draft.name, prompt: Text("Smart Folder"))
                 Picker("Match", selection: $draft.matchAll) {
                     Text("All of the rules").tag(true)
                     Text("Any of the rules").tag(false)
@@ -171,9 +171,9 @@ private struct RuleRow: View {
             // The most stars first, as in the family's Rating menu.
             options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:
-            options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No sets yet")
+            options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No folders yet")
         case .folder:
-            options(folderOptions, empty: "No folders yet")
+            options(folderOptions, empty: "No locations yet")
         case .status:
             // Active in Adobe Apps Only while Adobe apps' test fonts are shown, or for a rule that has it.
             let statuses = SmartRuleValue.statuses.filter { $0 != "appOnly" || model.data.showAdobeAppFolders || rule.value == $0 }
@@ -346,8 +346,8 @@ private extension SmartRule.Field {
         case .rating: "Rating"
         case .note: "Note"
         case .hasNote: "Has Note"
-        case .set: "Set"
-        case .folder: "Folder"
+        case .set: "Folder"
+        case .folder: "Location"
         case .status: "Status"
         case .kind: "Kind"
         case .format: "Format"

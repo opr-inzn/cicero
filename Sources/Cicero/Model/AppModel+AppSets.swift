@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 extension AppModel {
     /// Asks for a name, makes the set and shows its apps, so the next step is picking one.
     func newApplicationSet(with families: [Family] = []) {
-        prompt("New Application Set", confirm: "Create") { name in
+        prompt("New App Folder", confirm: "Create") { name in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
             let set = FontSet(name: trimmed, families: families.map(\.id))
@@ -23,7 +23,7 @@ extension AppModel {
         panel.allowsMultipleSelection = true
         panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
         panel.prompt = "Add"
-        panel.message = "Choose the apps that need this set’s fonts."
+        panel.message = "Choose the apps that need this folder’s fonts."
         guard panel.runModal() == .OK else { return }
         addApps(panel.urls, to: setID)
     }

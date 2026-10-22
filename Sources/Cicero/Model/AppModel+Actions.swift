@@ -323,7 +323,7 @@ extension AppModel {
         removeFolders([id])
     }
 
-    /// Several at once with one rescan, as Settings → Folders removes the selected ones.
+    /// Several at once with one rescan, as Settings → Locations removes the selected ones.
     func removeFolders(_ ids: Set<UUID>) {
         turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
         data.folders.removeAll { ids.contains($0.id) }
@@ -503,7 +503,7 @@ extension AppModel {
         return library.families.filter { data.lists($0) && test($0) }
     }
 
-    /// Activate Set on a set's or smart set's menu: every font in it, asking how when the install method is Ask.
+    /// Activate Folder on a folder's or smart folder's menu: every font in it, asking how when the install method is Ask.
     func activateFonts(in item: SidebarItem, named name: String) {
         let faces = faces(in: item)
         guard !faces.isEmpty else { return showToast("There are no fonts in “\(name)”") }
@@ -664,7 +664,7 @@ extension AppModel {
                 return SidebarRow(key: "folder.\($0.id)", title: data.named($0).displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:
-            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "square.stack" : "app.badge.checkmark", item: .set($0.id)) }
+            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "folder" : "app.badge.checkmark", item: .set($0.id)) }
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
         case .tags:
             return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: SidebarSection.tags.icon, item: .tag($0), color: data.tagColors[$0]) }

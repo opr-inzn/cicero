@@ -31,7 +31,7 @@ struct RestoreSheet: View {
                     .foregroundStyle(.secondary)
             }
             Form {
-                option("Sets, folders and settings", isOn: $settings, detail: settingsDetail)
+                option("Folders, locations and settings", isOn: $settings, detail: settingsDetail)
                 if includesFonts {
                     option("Font files", isOn: $fonts, detail: fontsDetail)
                 }
@@ -81,16 +81,16 @@ struct RestoreSheet: View {
         .toggleStyle(.checkbox)
     }
 
-    /// "4 sets, 2 smart sets, 7 tags, 3 folders, 12 added fonts and 1 character set." and what restoring them does.
+    /// "4 folders, 2 smart folders, 7 tags, 3 locations, 12 added fonts and 1 character set." and what restoring them does.
     private var settingsDetail: String {
         let data = contents.userData
         let counts = [
-            (data.sets.count, "set", "sets"), (data.smartSets.count, "smart set", "smart sets"), (data.tags.count, "tag", "tags"),
-            (data.folders.count, "folder", "folders"), (data.fontFiles.count, "added font", "added fonts"),
+            (data.sets.count, "folder", "folders"), (data.smartSets.count, "smart folder", "smart folders"), (data.tags.count, "tag", "tags"),
+            (data.folders.count, "location", "locations"), (data.fontFiles.count, "added font", "added fonts"),
             (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]
         let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
-        let inside = parts.isEmpty ? "No sets or folders, just settings." : parts.formatted(.list(type: .and)) + "."
+        let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.formatted(.list(type: .and)) + "."
         return inside + " Replaces what’s set up now; the current setup is saved first in ~/Library/Application Support/Cicero/Backups."
     }
 

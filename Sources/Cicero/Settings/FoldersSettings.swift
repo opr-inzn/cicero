@@ -28,8 +28,8 @@ struct FoldersSettings: View {
             }
         }
         .inCard(
-            add: CardListButton(title: "Add Folder", help: "Add a folder of fonts") { model.presentAddFolderPanel() },
-            remove: CardListButton(title: "Remove Folders", help: "Remove the selected folders from the library; their files stay where they are") {
+            add: CardListButton(title: "Add Location", help: "Add a folder of fonts") { model.presentAddFolderPanel() },
+            remove: CardListButton(title: "Remove Locations", help: "Remove the selected locations from the library; their files stay where they are") {
                 model.removeFolders(selection)
                 selection = []
             },

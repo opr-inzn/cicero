@@ -15,9 +15,9 @@ Export copies font files into a folder or a ZIP archive, for sending them to som
 
 With no family selected, **File → Export Fonts** exports every family in the browser: everything the sidebar item and search show.
 
-### Export a set, folder or other sidebar item
+### Export a folder, location or other sidebar item
 
-Right-click a set, smart set, tag, folder, foundry, classification or set under Coverage in the sidebar and choose **Export Fonts**. The export is named after it.
+Right-click a folder, smart folder, tag, location, foundry, classification or set under Coverage in the sidebar and choose **Export Fonts**. The export is named after it.
 
 For **All Fonts**, **Active**, **Inactive** or **System Fonts**, select the item, make sure no family is selected, and choose **File → Export Fonts**
 
@@ -27,7 +27,7 @@ For **All Fonts**, **Active**, **Inactive** or **System Fonts**, select the item
 - Each file once, even when it holds several styles or families. Only the file each style is using, not its other copies.
 - No fonts that come with macOS or an app, and no Adobe Fonts. The message afterwards says how many were left out.
 
-If the place you pick already has something with that name and you choose to replace it, Cicero moves the old one to the Trash once the export is complete; if the export fails or you cancel, the old one stays. It never writes over files, and it won’t replace a folder that holds fonts Cicero uses, like your Fonts folder or a watched folder: choose another name or place.
+If the place you pick already has something with that name and you choose to replace it, Cicero moves the old one to the Trash once the export is complete; if the export fails or you cancel, the old one stays. It never writes over files, and it won’t replace a folder that holds fonts Cicero uses, like your Fonts folder or one of your locations: choose another name or place.
 
 Before you send fonts to someone, check that their licenses allow it.
 
@@ -43,10 +43,10 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 
 ### What a backup holds
 
-- your sets (with the apps of application sets), smart sets and coverage sets
+- your folders (with the apps of app folders), smart folders and coverage sets
 - your tags, their colors, and which families have them
 - your ratings and notes, and how many times each family was activated and when last
-- your folders, and what you chose under **Fonts in This Folder**
+- your locations, and what you chose under **Fonts in This Location**
 - the font files you added one at a time, as **Added Fonts**
 - foundry names you changed, and the families you moved to another foundry
 - the sidebar: what’s hidden, the order, and which sections are open
@@ -61,17 +61,17 @@ A backup doesn’t hold settings that belong to one Mac: the appearance, the men
 1. Choose **File → Restore Library**, or click **Restore** next to **Library**, under **Maintenance** in **Settings → General**.
 2. Choose a `.cicerobackup` file.
 3. Cicero asks “Restore the Backup from” and the date it was made. Choose what to restore:
-   - **Sets, folders and settings** says what’s in the backup, like “4 sets, 2 smart sets, 7 tags, 3 folders and 1 coverage set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
+   - **Folders, locations and settings** says what’s in the backup, like “4 folders, 2 smart folders, 7 tags, 3 locations and 1 coverage set”. It replaces what you have set up now. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`.
    - **Font files**, when the backup has them, puts each font back where it was, unless a file is already there. Fonts from the backup’s [Font Library](activating.md#the-font-library) go back into it when you restore the settings too, and into your Font Library when you don’t.
 4. Click **Restore**.
 
-When it’s done, a message says what came back, like “Restored 4 sets and 3,790 font files; 22 were already there”.
+When it’s done, a message says what came back, like “Restored 4 folders and 3,790 font files; 22 were already there”.
 
 ### How fonts go back
 
 - Nothing is written over. A file that’s already in its place stays as it is.
 - Cicero puts only font files back, and only into font folders. Folders that are missing are made.
 - Paths in your home folder move with you, so a backup works on another Mac or under another user name.
-- A file that can’t go back where it was, for example because the folder belongs to an app that isn’t installed, like `/Applications/Adobe InDesign 2025/Fonts`, goes into a folder called **Fonts Restored from Cicero** in your home folder, under the same path. Cicero adds that folder to your library.
+- A file that can’t go back where it was, for example because the folder belongs to an app that isn’t installed, like `/Applications/Adobe InDesign 2025/Fonts`, goes into a folder called **Fonts Restored from Cicero** in your home folder, under the same path. Cicero adds that folder to your library as a location.
 - Font files you added one at a time aren’t in a font folder, so when they aren’t in their place already, they go into **Fonts Restored from Cicero** too.
 - Fonts that were used where they are get turned on again. Copies Cicero installed count again when both the copy and the original are back. Fonts that were on only temporarily stay off.

@@ -8,9 +8,9 @@
 | --- | --- |
 | ⌘, | **Cicero → Preferences** |
 | ⌘O | **File → Add Fonts** |
-| ⇧⌘O | **File → Add Folder** |
-| ⇧⌘N | **File → New Set** |
-| ⌥⌘N | **File → New Smart Set** |
+| ⇧⌘O | **File → Add Location** |
+| ⇧⌘N | **File → New Folder** |
+| ⌥⌘N | **File → New Smart Folder** |
 | ⇧⌘E | **File → Export Fonts** |
 | ⌘+ | **View → Zoom In** (the Compare window) |
 | ⌘− | **View → Zoom Out** (the Compare window) |
@@ -94,4 +94,4 @@ In the lists of families on both tabs:
 
 ## Sheets
 
-In sheets like the smart set editor, the coverage set editor and Clear Font Caches, ↩ clicks the blue button, like **Create**, **Save** or **Clear**.
+In sheets like the smart folder editor, the coverage set editor and Clear Font Caches, ↩ clicks the blue button, like **Create**, **Save** or **Clear**.
