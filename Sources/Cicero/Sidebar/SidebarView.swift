@@ -310,6 +310,10 @@ private struct SidebarContent: View {
     @ViewBuilder
     private func menu(for row: SidebarRow) -> some View {
         switch row.item {
+        case .temporary:
+            // Only the styles on until Cicero quits: the families' other styles stay as they are.
+            Button("Activate Permanently", systemImage: "checkmark.circle") { model.activateFonts(in: row.item, named: row.title) }
+            Button("Deactivate", systemImage: "circle.dashed") { model.deactivateFonts(in: row.item) }
         case .folder(WatchedFolder.adobeAppsID):
             renameFolder(WatchedFolder.adobeAppsID)
             Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }

@@ -595,6 +595,23 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
     /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
+    /// When its latest style arrived on the Mac, of those that didn't come with macOS or an app: their files are as new
+    /// as the last update of either. `dateAdded` is the earliest of them all.
+    public var lastAdded: Date? {
+        faces.lazy.filter { $0.state.source != .macOS && $0.state.source != .app }.compactMap(\.dateAdded).max()
+    }
+
+    /// The latest to arrive first, by `lastAdded`. Families that arrived less than ten minutes after the one before
+    /// came with it, as from one import, and keep their order among themselves.
+    public static func latestFirst(_ families: [Family]) -> [Family] {
+        let times = families.map { $0.lastAdded ?? .distantPast }
+        let arrival = times.indices.sorted { times[$0] < times[$1] }
+        var batch = Array(repeating: 0, count: times.count)
+        for (previous, index) in zip(arrival, arrival.dropFirst()) {
+            batch[index] = batch[previous] + (times[index].timeIntervalSince(times[previous]) < 600 ? 0 : 1)
+        }
+        return families.indices.sorted { batch[$0] != batch[$1] ? batch[$0] > batch[$1] : $0 < $1 }.map { families[$0] }
+    }
     /// What its license lets a document do with every one of its styles: the most restrictive of their embedding.
     public var embedding: Embedding? { faces.lazy.compactMap(\.face.embedding).max { $0.rank < $1.rank } }
     /// The OpenType features any of its styles has.

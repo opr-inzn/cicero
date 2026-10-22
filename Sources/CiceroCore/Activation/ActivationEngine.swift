@@ -906,6 +906,8 @@ public struct ActivationEngine: Sendable {
             removeEmptyFolders(around: destination.path)
             throw error
         }
+        // A font back from the Deactivated folder, which it only left the Fonts folder for, arrives no more than then.
+        if isInDeactivatedFolder(path), let added = Self.dateAdded(of: source) { Self.setDateAdded(added, of: destination) }
         return PlacedCopy(destination: destination.path, source: path, isNew: true)
     }
 
@@ -915,7 +917,7 @@ public struct ActivationEngine: Sendable {
         let fm = FileManager.default
         try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true)
         let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: locations.deactivated)
-        try fm.moveItem(at: Self.url(path), to: destination)
+        try Self.move(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
 
@@ -927,7 +929,7 @@ public struct ActivationEngine: Sendable {
         let destination = FileManager.default.fileExists(atPath: origin)
             ? Self.uniqueURL(for: original.lastPathComponent, in: original.deletingLastPathComponent())
             : original
-        try FileManager.default.moveItem(at: Self.url(path), to: destination)
+        try Self.move(Self.url(path), to: destination)
         records.appFolderOrigins[path] = nil
         return destination.path
     }
@@ -949,7 +951,7 @@ public struct ActivationEngine: Sendable {
         let fm = FileManager.default
         try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true)
         let destination = Self.uniqueURL(for: url.lastPathComponent, in: locations.deactivated)
-        try fm.moveItem(at: url, to: destination)
+        try Self.move(url, to: destination)
         return destination.path
     }
 
@@ -965,6 +967,28 @@ public struct ActivationEngine: Sendable {
               (copy.st_flags | source.st_flags) & UInt32(SF_DATALESS) == 0
         else { return false }
         return FileManager.default.contentsEqual(atPath: path, andPath: original)
+    }
+
+    /// Moves a file and gives it back its Date Added, which macOS sets anew for a file moved into another folder: a font
+    /// Cicero turns off or on, or puts into the Font Library, arrives no more than it did before (see `Family.lastAdded`).
+    static func move(_ source: URL, to destination: URL) throws {
+        let added = dateAdded(of: source)
+        try FileManager.default.moveItem(at: source, to: destination)
+        if let added { setDateAdded(added, of: destination) }
+    }
+
+    /// Finder's Date Added, where the disk keeps one.
+    static func dateAdded(of url: URL) -> Date? {
+        try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate
+    }
+
+    /// Sets Finder's Date Added, where the disk keeps one; elsewhere the file keeps the date it has.
+    static func setDateAdded(_ date: Date, of url: URL) {
+        var list = attrlist(bitmapcount: u_short(ATTR_BIT_MAP_COUNT), reserved: 0, commonattr: attrgroup_t(ATTR_CMN_ADDEDTIME),
+                            volattr: 0, dirattr: 0, fileattr: 0, forkattr: 0)
+        let seconds = date.timeIntervalSince1970.rounded(.down)
+        var time = timespec(tv_sec: Int(seconds), tv_nsec: Int((date.timeIntervalSince1970 - seconds) * 1_000_000_000))
+        _ = setattrlist(url.path, &list, &time, MemoryLayout<timespec>.size, 0)
     }
 
     /// "Name.otf", then "Name 2.otf", "Name 3.otf"…

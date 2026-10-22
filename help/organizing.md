@@ -4,17 +4,27 @@
 
 ## The sidebar
 
-At the top of the sidebar are five items that are always there:
+At the top of the sidebar are these items:
 
 | Item | Shows |
 | --- | --- |
 | All Fonts | Every family in your library |
 | Active | Families with at least one style on |
 | Inactive | Families with at least one style off |
+| Temporary | Families with a style on until Cicero quits, while there are any (see [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now)) |
+| Recents | Families with a style that arrived on your Mac in the last week, the latest first (see [Recents](#recents)) |
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
-| Problems | Things worth fixing, with a count. See [Problems](problems.md) |
+| Conflicts | Things worth fixing, with a count. See [Conflicts](problems.md) |
 
 Below them are sections: **Folders**, **Sets**, **Tags**, **Foundries**, **Classifications** and **Coverage**.
+
+### Recents
+
+**Recents** shows the fonts you got lately, so the ones you just added are easy to find again. A family is there for a week after a style of it arrived on your Mac, however it came: added in Cicero, copied into your Fonts folder, turned on in Adobe Fonts or put there by an installer. Fonts that come with macOS or an app don’t count, since an update gives them new dates. Turning a font off and on again doesn’t count either.
+
+The fonts that arrived last come first, in every view. Fonts that arrived within a few minutes of each other, as when you add a folder of them, stay together in alphabetical order. In the list, click a column’s title to sort them by it instead; they’re latest first again the next time you choose **Recents**.
+
+A font file you open where it is, without Cicero installing a copy, counts from when it arrived in its folder, so an old file doesn’t show up here.
 
 The item you’ve selected is in the accent color. To hide the whole sidebar, choose **View → Hide Sidebar** (⌃⌘S), and **View → Show Sidebar** to bring it back.
 
@@ -71,7 +81,7 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a folder in the sidebar:
 
-- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Problems. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
+- **Rename Folder**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Folder**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a folder’s fonts on](activating.md#keep-a-folders-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Folder from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Folders** and click **−**.
@@ -101,7 +111,7 @@ The first time Cicero looks in a cloud service’s folder, macOS asks whether it
 
 ### Folders on a server or an external disk
 
-Add a folder on a network disk or a USB drive like any other. While the disk isn’t connected, its folder has a question mark in the sidebar, its fonts are out of your library, and the folder says “Isn’t connected”. Its fonts are back as soon as you connect the disk, and they keep their tags and their places in sets; Problems doesn’t list them as missing meanwhile.
+Add a folder on a network disk or a USB drive like any other. While the disk isn’t connected, its folder has a question mark in the sidebar, its fonts are out of your library, and the folder says “Isn’t connected”. Its fonts are back as soon as you connect the disk, and they keep their tags and their places in sets; Conflicts doesn’t list them as missing meanwhile.
 
 Cicero sees fonts you add to a server folder from your Mac at once. Fonts someone else adds show up the next time Cicero looks, when you come back to it after a minute or more, or when you choose **Fonts → Rescan Library** (⌘R).
 

@@ -1,14 +1,14 @@
-# Problems
+# Conflicts
 
-[Cicero Help](README.md) › Problems
+[Cicero Help](README.md) › Conflicts
 
-Click **Problems** in the sidebar to see what Cicero found wrong with your fonts. The number next to it counts the problems, not counting [Shared Style Names](#shared-style-names). When there’s nothing to fix, it says “No Problems”.
+Click **Conflicts** in the sidebar to see what Cicero found wrong with your fonts. The number next to it counts the conflicts, not counting [Shared Style Names](#shared-style-names). When there’s nothing to fix, it says “No Conflicts”.
 
-Problems are in groups. Each group starts with a short explanation, then shows a card per font, with its files and buttons to fix it. To look again after you’ve changed something outside Cicero, click **Check Again** in the toolbar.
+Conflicts are in groups. Each group starts with a short explanation, then shows a card per font, with its files and buttons to fix it. To look again after you’ve changed something outside Cicero, click **Check Again** in the toolbar.
 
 ## How files are shown
 
-- When several files of a problem are in the same folder, they share one row: the folder, their versions and dates, and “18 files” to show them one by one. Each file has its own buttons too.
+- When several files of a conflict are in the same folder, they share one row: the folder, their versions and dates, and “18 files” to show them one by one. Each file has its own buttons too.
 - **Reveal** shows the files in the Finder.
 - Buttons that move files to the Trash ask first, and you can put the files back from the Trash.
 

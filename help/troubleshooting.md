@@ -11,7 +11,7 @@ Go through these in order:
 3. **Was it on just for a while?** Fonts turned on temporarily go off when Cicero quits. Fonts from an [application set](activating.md#turn-fonts-on-with-an-app) are only on while one of the set’s apps is open and Cicero is running.
 4. **Is it Microsoft Office?** Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, not fonts used where they are, and only from the second time they open after the font went on. See [Fonts in Microsoft Office](activating.md#fonts-in-microsoft-office).
 5. **Restart the app.** Most apps see a font as soon as Cicero turns it on, but some only read the font list when they open.
-6. **Look in Problems.** A font used from a disk that’s unplugged, a file that’s gone, or an older copy of the same font on twice can all keep the right font from showing. See [Problems](problems.md).
+6. **Look in Conflicts.** A font used from a disk that’s unplugged, a file that’s gone, or an older copy of the same font on twice can all keep the right font from showing. See [Conflicts](problems.md).
 7. **Clear the font caches**, as below, and restart your Mac.
 
 ## Clear the font caches
@@ -35,7 +35,7 @@ Cicero follows changes by itself: it looks again when fonts are turned on or off
 - **Fonts → Rescan Library** (⌘R) looks through your fonts again. It’s quick, because Cicero remembers what it read from each file.
 - **Fonts → Rebuild Font List**, or **Rebuild** next to **Library** in **Settings → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
 
-In **Problems**, **Check Again** in the toolbar rescans too.
+In **Conflicts**, **Check Again** in the toolbar rescans too.
 
 ## A font won’t turn off
 

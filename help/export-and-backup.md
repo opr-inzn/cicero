@@ -19,7 +19,7 @@ With no family selected, **File → Export Fonts** exports every family in the b
 
 Right-click a set, smart set, tag, folder, foundry, classification or set under Coverage in the sidebar and choose **Export Fonts**. The export is named after it.
 
-For **All Fonts**, **Active**, **Inactive** or **System Fonts**, select the item, make sure no family is selected, and choose **File → Export Fonts**
+For **All Fonts**, **Active**, **Inactive**, **Temporary**, **Recents** or **System Fonts**, select the item, make sure no family is selected, and choose **File → Export Fonts**
 
 ### What’s in an export
 

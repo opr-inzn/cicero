@@ -43,7 +43,9 @@ Cicero remembers the columns you show and their widths. When the window gets nar
 
 ### Grid
 
-One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, with the family’s stars at the right if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it. Tiles grow and shrink with the preview size.
+One tile per family, with a large sample (“Aa Gg 123”, or your own preview text), the name, with the family’s stars at the right if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), what the family’s styles span, like “9 Weights · 3 Widths” or “8 Weights · 16 Styles”, and, at the bottom right, what kind of files it comes in, like “OTF” or “TTF”. A variable family has a **Variable** tag at the top left (see [Status tags](#status-tags)). Hold the pointer over the caption to read all of it.
+
+The tiles fit the type: **Size** in [Preview Options](#change-the-preview-text-and-size) makes it bigger or smaller, and the tiles grow and shrink around it. Small type gives low tiles, up to five in a row; bigger type gives fewer, bigger tiles, down to one in a row, as wide as your preview text needs. The letters sit on one line across all the tiles, centred in them. However many tiles are in a row, they fill the window’s width. Opening the Info panel makes them narrower, not fewer.
 
 The grid is the view Cicero starts with.
 
@@ -200,7 +202,7 @@ Like features, the axes apply to that family wherever Cicero previews it, in the
 Click **Preview Options** in the toolbar:
 
 - **Preview Text:** type your own text, or pick one from **Presets**. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”). A font with none of the text’s letters, like an Arabic or a Thai font for Latin text, shows text in its own script instead: the names of languages written in it, in their own letters, like العربية, or its first letters. Otherwise macOS would set the text in another font, and you wouldn’t see the font’s own letters, weights or axes.
-- **Size:** 24 to 160 pt.
+- **Size:** 24 to 200 pt.
 - **Weight:** 100 to 900. Cicero shows the style nearest to it, and the exact weight in a variable font.
 - **Tracking:** the space added between letters, from −10 to 40 % of the em, on top of the font’s kerning.
 - **Leading:** the distance from one line to the next, from 80 to 250 % of the size; 120 % at first. It applies wherever a sample runs over several lines: on font pages and in Quick Look.

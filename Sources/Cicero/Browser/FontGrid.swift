@@ -13,6 +13,38 @@ struct FontGrid: View {
 
     /// Between tiles, and between the last column and the Info panel.
     static let spacing: CGFloat = 12
+    /// Around a tile's contents: little, so the sample can be big.
+    static let padding: CGFloat = 10
+    /// Above and below a tile's contents: a little more, so the tiles don't feel cramped.
+    static let verticalPadding: CGFloat = 14
+    static let mostColumns = 5
+
+    /// The sample text in the system font at the preview size: how far its letters reach above the baseline and below it,
+    /// and how wide it is. Every tile sets its sample by these, whatever its own font, so they all share one baseline.
+    struct Measure {
+        var above: CGFloat
+        var below: CGFloat
+        var width: CGFloat
+
+        init(_ sample: String, size: Double, kerning: Double) {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: size), .kern: kerning]))
+            let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+            // Text with no letters, spaces say: a capital's height.
+            above = ink.isEmpty ? size * 0.7 : max(ink.maxY, 0)
+            below = ink.isEmpty ? 0 : max(-ink.minY, 0)
+            width = CTLineGetTypographicBounds(line, nil, nil, nil)
+        }
+
+        /// The sample's height: its letters and room above and below them, which small type gets more of.
+        func height(size: Double) -> CGFloat { above + below + size * 0.25 + 44 }
+
+        /// How far below the middle of the sample the baseline is, so that its letters are centred in it.
+        var baselineBelowCentre: CGFloat { (above - below) / 2 }
+
+        /// How narrow a tile can be: the size and 186 pt more, and as wide as the sample text with a little to spare, so it
+        /// isn't made smaller to fit.
+        func minimumWidth(size: Double) -> CGFloat { max(size + 186, width * 1.1 + padding * 2 + 8) }
+    }
 
     /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
     /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
@@ -20,13 +52,14 @@ struct FontGrid: View {
         + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
 
     var body: some View {
-        let tile = tileWidth(minimum: max(240, preview.size * 8))
-        let count = columns(tile: tile)
+        let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
+        let measure = Measure(sample, size: preview.size, kerning: preview.kerning(at: preview.size))
+        let (count, tile) = layout(minimum: measure.minimumWidth(size: preview.size))
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
                     ForEach(families) { family in
-                        Tile(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
+                        Tile(family: family, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
@@ -49,27 +82,22 @@ struct FontGrid: View {
         }
     }
 
-    /// As wide as fills the rows, and up to 1.6 times the narrowest a tile goes. The Info panel keeps the columns
-    /// the rows have without it, the tiles narrowing instead, as far as 0.6 times that (their sample shrinks to fit),
-    /// and never below 240 points; past that it takes a column away.
-    private func tileWidth(minimum: CGFloat) -> CGFloat {
-        guard gridWidth > 0 else { return minimum }
+    /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows without the Info panel,
+    /// from one to five, as wide as fills them, however many families there are. The panel makes the tiles narrower, never
+    /// fewer.
+    private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat) {
+        guard gridWidth > 0 else { return (1, minimum) }
         let closed = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
-        var count = max(1, ((closed + Self.spacing) / (minimum + Self.spacing)).rounded(.down))
-        func filling(_ count: CGFloat) -> CGFloat { (gridWidth - Self.spacing * (count - 1)) / count }
-        while count > 1 && filling(count) < max(240, minimum * 0.6) { count -= 1 }
-        return min(filling(count), minimum * 1.6, gridWidth)
-    }
-
-    /// Tiles in a row, also for ↑/↓: as many as fit, with half a point to spare for rounding where they fill it.
-    private func columns(tile width: CGFloat) -> Int {
-        max(1, Int((gridWidth + Self.spacing + 0.5) / (width + Self.spacing)))
+        let count = min(Self.mostColumns, max(1, Int((closed + Self.spacing) / (minimum + Self.spacing))))
+        return (count, (gridWidth - Self.spacing * CGFloat(count - 1)) / CGFloat(count))
     }
 }
 
 private struct Tile: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
+    let sampleHeight: CGFloat
+    let baselineBelowCentre: CGFloat
     let isSelected: Bool
     let model: AppModel
 
@@ -83,17 +111,27 @@ private struct Tile: View {
                     .accessibilityHidden(true)
             }
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
-            FontText(
-                text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: style.face),
-                face: style.face,
-                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
-                kerning: preview.kerning(at: preview.size)
-            )
-            .minimumScaleFactor(0.4)
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity)
-            .frame(height: preview.size * 3.4)
-            .clipped()
+            // On one baseline in every tile, whatever each font's ascent and descent, where the sample's letters are centred
+            // (see `Measure`). Not clipped: what reaches past it runs into the padding.
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: sampleHeight)
+                .alignmentGuide(.firstTextBaseline) { $0.height / 2 + baselineBelowCentre }
+                .overlay(alignment: Alignment(horizontal: .center, vertical: .firstTextBaseline)) {
+                    FontText(
+                        text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: style.face),
+                        face: style.face,
+                        size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
+                        kerning: preview.kerning(at: preview.size)
+                    )
+                    // Only where a tile can't be wide enough: a font far wider than the system font, text longer than a row,
+                    // or the Info panel narrowing the tiles.
+                    .minimumScaleFactor(0.4)
+                    // Its whole line, though that's higher than the sample: proposed less, it shrank to fit, drawn below the
+                    // baseline it reported.
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
+                }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(family.name)
@@ -121,7 +159,8 @@ private struct Tile: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(14)
+        .padding(.horizontal, FontGrid.padding)
+        .padding(.vertical, FontGrid.verticalPadding)
         .modifier(FamilyCard(isSelected: isSelected))
     }
 }

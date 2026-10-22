@@ -5,7 +5,8 @@ import SwiftUI
 /// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar, its
 /// top level with the first fonts. Not SwiftUI's inspector, which runs the full window height under the search
 /// field. Over the split view rather than in its detail column, whose stack swaps the whole column for a pushed
-/// font page; each page makes room for it with `InfoPanelInset`.
+/// font page; each page makes room for it with `InfoPanelInset`. It appears and goes at once, as the room for it does: sliding
+/// in, it was cut off by the window's edge as it came into an empty strip, and sliding out it uncovered fonts already in place.
 struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
     static let width: CGFloat = 300
@@ -14,26 +15,21 @@ struct InfoPanelOverlay: ViewModifier {
     static let top: CGFloat = 16
 
     func body(content: Content) -> some View {
-        let isPresented = model.isInfoPresented
         content.overlay(alignment: .trailing) {
-            ZStack {
-                if isPresented {
-                    let shape = Self.shape
-                    InfoPanel()
-                        .frame(width: Self.width)
-                        .frame(maxHeight: .infinity)
-                        .background {
-                            // Opaque, as it slides out over the page; the tint matches the sidebar.
-                            shape.fill(Color.canvas)
-                            shape.fill(.quaternary.opacity(0.5))
-                        }
-                        .clipShape(shape)
-                        .padding([.horizontal, .bottom], Self.gap)
-                        .padding(.top, Self.top)
-                        .transition(.move(edge: .trailing))
-                }
+            if model.isInfoPresented {
+                let shape = Self.shape
+                InfoPanel()
+                    .frame(width: Self.width)
+                    .frame(maxHeight: .infinity)
+                    .background {
+                        // Opaque, over the page; the tint matches the sidebar.
+                        shape.fill(Color.canvas)
+                        shape.fill(.quaternary.opacity(0.5))
+                    }
+                    .clipShape(shape)
+                    .padding([.horizontal, .bottom], Self.gap)
+                    .padding(.top, Self.top)
             }
-            .animation(.snappy, value: isPresented)
         }
     }
 
@@ -53,7 +49,7 @@ struct InfoPanelInset: ViewModifier {
     @Environment(AppModel.self) private var model
 
     func body(content: Content) -> some View {
-        // Makes room in one step, so a grid reflows once rather than on every frame of the slide. An inset
+        // Makes room in one step, so a grid reflows once, as the panel appears. An inset
         // rather than padding, so the page still runs under the toolbar from edge to edge and the search
         // field keeps the look it has over the page instead of turning flat above the panel.
         content
