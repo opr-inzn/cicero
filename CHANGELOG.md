@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - The sidebar has **Recents**, under **Inactive**: the families with a font that arrived on your Mac in the last week, however it came, the latest first. Fonts you add together stay together, in alphabetical order, so the ones you just added are at the top. Fonts that come with macOS or an app don’t count.
+- While fonts are on until Cicero quits, the sidebar has **Temporary**, under **Inactive**, with the families they’re in. Right-click it to **Activate Permanently** or **Deactivate** them all at once. It goes away when none are on any more.
 - **Problems** in the sidebar is now called **Conflicts**.
 - Turning a font off and on again keeps its **Date Added**. Before, Cicero moved the file to its Deactivated folder and back, which gave it the date of the move.
 - Cicero has an icon in the menu bar. Click it to open Cicero. Right-click it, or click it with two fingers, for a menu with the fonts that are on for open apps and until Cicero quits, your sets to turn on and off, **Add Fonts**, **Find Fonts in Current Document** (the one open in the app you’re in, like a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop), **Preferences** and **Quit Cicero**. Drop font files on it to add them, or a document to see the fonts it uses. Turn it off with **Show Cicero in the menu bar** in **Settings → General**.

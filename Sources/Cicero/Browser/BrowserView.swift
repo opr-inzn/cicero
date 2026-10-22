@@ -317,6 +317,9 @@ private struct EmptyBrowser: View {
         case .active:
             ContentUnavailableView("Nothing Active", systemImage: "circle.dashed",
                                    description: Text("Turn a font on and it shows up here."))
+        case .temporary:
+            ContentUnavailableView("No Temporary Fonts", systemImage: "clock",
+                                   description: Text("Fonts you activate temporarily show up here until Cicero quits."))
         case .recent:
             ContentUnavailableView("No Recent Fonts", systemImage: "tray.and.arrow.down",
                                    description: Text("Fonts that arrive on your Mac show up here for a week."))

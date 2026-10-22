@@ -490,9 +490,11 @@ extension AppModel {
         }
     }
 
-    /// The styles a sidebar row has: a set's own, which can be only some of a family's, else every style of its families.
+    /// The styles a sidebar row has: a set's own, which can be only some of a family's, and Temporary's, the ones on until
+    /// Cicero quits; else every style of its families.
     func faces(in item: SidebarItem) -> [LibraryFace] {
         let families = families(in: item)
+        if item == .temporary { return families.flatMap { $0.faces.filter(\.isOnUntilQuit) } }
         guard case .set(let id) = item, let set = data.sets.first(where: { $0.id == id }) else { return families.flatMap(\.faces) }
         return families.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }
     }
@@ -626,6 +628,10 @@ extension AppModel {
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
             SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", item: .active),
             SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", item: .inactive),
+            // Only while a font is on until Cicero quits, and while it's selected, so turning the last one off there doesn't
+            // take the row away under the pointer. The symbol of Activate Temporarily and the Temporary tag.
+            hasTemporaryFonts || selectedItems.contains(.temporary)
+                ? SidebarRow(key: "library.temporary", title: "Temporary", icon: "clock", item: .temporary) : nil,
             // Not a clock, which stands for fonts on until Cicero quits.
             SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
             // With system fonts off in Settings, they're nowhere, this item included.
@@ -633,6 +639,11 @@ extension AppModel {
             SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
         ].compactMap { $0 }
         return data.sidebar.ordered(rows, in: "library", key: \.key)
+    }
+
+    /// Whether any font is on until Cicero quits.
+    var hasTemporaryFonts: Bool {
+        library.families.contains { $0.faces.contains(where: \.isOnUntilQuit) }
     }
 
     /// A section's rows in the user's order. Character sets are in groups, ordered in `characterSetGroups`.
@@ -746,7 +757,7 @@ extension AppModel {
     /// The list of the sidebar an item is in, named as in `SidebarPreferences.order`.
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
-        case .all, .active, .inactive, .system, .recent, .problems: "library"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "library"
         case .folder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .tag: SidebarSection.tags.rawValue

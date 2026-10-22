@@ -35,10 +35,15 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   section header; unchecked items are dimmed, and disappear when you click Done. Sections and character set
   groups stay open or closed as outside it, and open and close the same way (one state for both). Switching
   isn't animated: hundreds of rows animating in and out ran into each other.
-- Fixed rows: All Fonts (books.vertical), Active (checkmark.circle), Inactive (circle.dashed),
-  Recents (tray.and.arrow.down; not a clock, which is Active until Cicero quits), System Fonts (apple.logo, only while
-  system fonts are shown), Conflicts (exclamationmark.triangle, count badge). A saved order of these rows from before
-  Recents puts it last.
+- Fixed rows: All Fonts (books.vertical), Active (checkmark.circle), Inactive (circle.dashed), Temporary (clock, only
+  while a font is on until Cicero quits or while it's selected), Recents (tray.and.arrow.down; not a clock, which is
+  Temporary's), System Fonts (apple.logo, only while system fonts are shown), Conflicts (exclamationmark.triangle, count
+  badge). A saved order of these rows from before Temporary or Recents puts them last.
+- Temporary (`SidebarItem.temporary`): the families with a style on until Cicero quits (Activate Temporarily, the
+  Temporary tag), not application sets' fonts. It appears as soon as one is on, and goes when none is, unless it's
+  selected: turning the last one off there leaves it, empty ("No Temporary Fonts", "Fonts you activate temporarily show
+  up here until Cicero quits."), until another row is chosen. Its menu: Activate Permanently and Deactivate, for only the
+  styles on until Cicero quits (`faces(in:)`), so the families' other styles stay as they are; no Export Fonts.
 - Recents (`SidebarItem.recent`): the families with a style that arrived in the last 7 days
   (`AppModel.recentDays`), by `Family.lastAdded`: the latest Date Added of its styles (Finder's, else the file's creation
   date; see Library), leaving out styles that come with macOS or an app, whose files are as new as the last update of

@@ -115,6 +115,8 @@ Fonts for Adobe apps can be turned on temporarily too: they’re on in every app
 
 To keep a temporary font, right-click it and choose **Activate Permanently**.
 
+While fonts are on until Cicero quits, the sidebar has **Temporary**, under **Inactive**, with the families they’re in. Right-click it and choose **Activate Permanently** to keep them all, or **Deactivate** to turn them all off. Only the styles that are on until Cicero quits change; the families’ other styles stay as they are. When none are on any more, **Temporary** goes away.
+
 ## Turn fonts off
 
 Any of these work:

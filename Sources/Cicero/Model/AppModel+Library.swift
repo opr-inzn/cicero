@@ -5,6 +5,8 @@ enum SidebarItem: Hashable {
     case all, active, inactive, system, problems
     /// Families with a style that arrived on the Mac in the last `AppModel.recentDays` days.
     case recent
+    /// Families with a style on until Cicero quits (Activate Temporarily); not application sets'.
+    case temporary
     case folder(UUID)
     case set(UUID)
     case smartSet(UUID)
@@ -88,6 +90,11 @@ struct FontRowsKey: Equatable {
     var visible: VisibleKey
     var order: [KeyPathComparator<FontRow>]
     var columns: [FontListColumn]
+}
+
+extension LibraryFace {
+    /// On until Cicero quits, from Activate Temporarily.
+    var isOnUntilQuit: Bool { state == .active(.temporary(.untilQuit)) }
 }
 
 extension Classification {
@@ -298,6 +305,7 @@ extension AppModel {
         case .active: return { $0.hasActive }
         case .inactive: return { family in family.faces.contains { $0.state == .inactive } }
         case .system: return { $0.state == .system }
+        case .temporary: return { $0.faces.contains(where: \.isOnUntilQuit) }
         case .recent:
             let cutoff = Date.now.addingTimeInterval(-Double(Self.recentDays) * 86_400)
             return { $0.lastAdded.map { $0 > cutoff } ?? false }

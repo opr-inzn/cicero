@@ -4,13 +4,14 @@
 
 ## The sidebar
 
-At the top of the sidebar are six items that are always there:
+At the top of the sidebar are these items:
 
 | Item | Shows |
 | --- | --- |
 | All Fonts | Every family in your library |
 | Active | Families with at least one style on |
 | Inactive | Families with at least one style off |
+| Temporary | Families with a style on until Cicero quits, while there are any (see [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now)) |
 | Recents | Families with a style that arrived on your Mac in the last week, the latest first (see [Recents](#recents)) |
 | System Fonts | The fonts that come with macOS, while **Show system fonts** is on (see [System Fonts](#system-fonts)) |
 | Conflicts | Things worth fixing, with a count. See [Conflicts](problems.md) |
