@@ -221,7 +221,7 @@ struct FontList: View {
     @Environment(AppModel.self) private var model
     @State private var sortColumn = FontListColumn.name
     @State private var ascending = true
-    /// Similar fonts come the closest first, and Recently Added the latest first, until a column's header is clicked.
+    /// Similar fonts come the closest first, and Recents the latest first, until a column's header is clicked.
     @State private var keepsOwnOrder = true
     /// Standard columns turned off.
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"

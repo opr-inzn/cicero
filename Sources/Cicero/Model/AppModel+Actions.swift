@@ -627,7 +627,7 @@ extension AppModel {
             SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", item: .active),
             SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", item: .inactive),
             // Not a clock, which stands for fonts on until Cicero quits.
-            SidebarRow(key: "library.recent", title: "Recently Added", icon: "tray.and.arrow.down", item: .recent),
+            SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
             // With system fonts off in Settings, they're nowhere, this item included.
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),

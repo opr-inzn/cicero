@@ -230,11 +230,11 @@ extension AppModel {
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 
-    /// How many days a family stays in Recently Added.
+    /// How many days a family stays in Recents.
     static let recentDays = 7
 
     /// Whether the browser lists its families in an order of its own, which the list keeps until a column's header is
-    /// clicked: similar fonts, the closest first, and Recently Added, the latest first.
+    /// clicked: similar fonts, the closest first, and Recents, the latest first.
     var hasOwnOrder: Bool { similarFamilyID != nil || selectedItems == [.recent] }
 
     /// What the search field suggests for what's typed: up to eight of the families the browser would list whose names
