@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.0
 
 - In the sidebar, **Folders** is now called **Locations**, for the places on your Mac Cicero lists fonts from, and sets are now folders: **Sets** is called **Folders**, with a folder icon, smart sets are smart folders and application sets app folders. The menus say so too, like **File → New Folder** (⇧⌘N), **New Smart Folder**, **New App Folder** and **Add Location** (⇧⌘O), **Add to Folder** in a family’s menu, and **Settings → Locations**. In a smart folder’s rules, **Set** is now **Folder** and **Folder** is **Location**.
 - Search for a style, like **italic**, **bold** or **condensed**, and the previews show each family in that style, or the nearest one it has. Before, they showed the regular style. **bold italic** shows the bold italics, and a font page shows the style too while its **Style** is **Automatic**.
@@ -25,7 +25,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - In a smart folder’s **Kind** rule, the kinds are in alphabetical order: **Italic**, **Monospaced**, **Variable**.
 - **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
 
-## 1.9.4
+## 0.9.4
 
 - The Compare window is in the **Window** menu, and opens with nothing selected, from there or from **Fonts → Compare**. Click **+** in its toolbar to add families from anywhere in your library: type a name and click one, or press Return. Families already there have a checkmark; click one again to take it out.
 - With one family selected, **Fonts → Compare** adds it to the fonts already in the Compare window, so families far apart in your library can go there one by one. A family’s menu says **Add to Compare** for it. With several, Compare starts over with them, as before.
@@ -44,14 +44,14 @@ Each version’s notes here become its release notes on the [releases page](http
 - A smart set’s **Tag** rule shows each tag with its color, as the **Tags** menu of a family does.
 - A smart set’s **Status** rule says **Active in Adobe Apps Only** in place of **Active in Apps Only**, and only while **Show test fonts installed for Adobe apps** is on.
 
-## 1.9.3
+## 0.9.3
 
 - A font page’s text and name, and the Compare window, are set with the font’s kerning. With **Tracking** at 0, they were set without it, so pairs like V and a stood apart. Tracking is added to the kerning, as in the grid, the list and specimens.
 - In Preview Options, **Letter Spacing** is now called **Tracking**, as in layout apps.
 - A font page’s text no longer stays empty: delete it all and click somewhere else, and “Sphinx of black quartz, judge my vow.” is back, or text in the font’s own script for a font without Latin letters. A page that opens with the text left empty shows it too.
 - The Info panel’s **Features** no longer lists **Text Spacing** with **Default** and **No Kerning**, as fonts are made to be kerned. Japanese, Chinese and Korean fonts still have **Text Spacing**, for their widths, like **Half Width**.
 
-## 1.9.2
+## 0.9.2
 
 - In **Preview Options**, the preview text field spans the whole width, with “Preview Text” in it while it’s empty, in place of a label beside it. **Presets** no longer lists **Font Name**, as clearing the field shows each family’s name, nor the accented letters.
 - A font page has room for a script font’s swashes, like Zapfino’s: the family’s name is set smaller where its swashes would run into the line under it, so the header is as tall as any other font’s, the text no longer leaves an empty gap below it, and swashes reaching past the ends of its lines show in the page’s margins rather than being cut off.
@@ -65,7 +65,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Marks that take no room of their own, like the shifted Thai tone marks fonts keep in private use, show in **Glyphs** and their popover. Their cells were empty.
 - Cicero comes with four license tags: **Licensed**, **Unlicensed**, **Open Source** and **Trial**. **Licensed + Non-Commercial**, **Partially Licensed** and **Public Domain** go from your library, once, if you never gave them to a family or used them in a smart set and they still have their colors; the ones you used stay.
 
-## 1.9.1
+## 0.9.1
 
 - The first time Cicero opens, the sidebar’s **Coverage** starts closed, like **Foundries**, so its many character sets don’t fill a new sidebar, and **Classifications** starts open. Click a section’s title to open or close it.
 - Dragging one of several selected families onto a set, a tag, a foundry or a classification in the sidebar, or into the Compare window, takes all of them there, as their right-click menu acts on all of them. It used to take only the family you dragged. The same goes for families selected in the Character Toolbox.
@@ -76,7 +76,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The **Rating** menu starts with **No Rating**, then lists the stars from five down to one.
 - Right-click a group under **Coverage**, like **Unicode Blocks**, and choose **Hide from Sidebar** to hide the whole group. It used to offer only **Edit Sidebar**.
 
-## 1.9
+## 0.9
 
 - Cicero runs on macOS 15 Sequoia as well as macOS 26. On macOS 15 it looks like the other apps there, with the system’s toolbar controls and without Liquid Glass. Recognizing classifications from fonts’ names with Apple Intelligence needs macOS 26, so on macOS 15 Cicero recognizes them from the shapes of their letters only.
 - Right-click a family and choose **Show Similar Fonts** to see the 12 families in your library that look most like it, the closest first, in place of the sidebar item’s; **Done** goes back. A font page shows the six closest under **Similar**, and **Show All** lists all 12. Cicero measures the letters of each family on your Mac, the first time in a few seconds for a thousand families: how tall the lowercase is, how heavy and how contrasted the strokes are and at what angle, how wide, spaced, slanted and open the letters are, the serifs, the o’s roundness, and the a’s and g’s stories, and looks at them with a model that has learned what letters of a kind look like. A text cut lists other text cuts before display ones, its own display cut among them, and a display cut the other way round. Copies of one design, like a trial, a variable font or a family for each weight, are listed once, the closest of them.
@@ -93,20 +93,20 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Settings → General** says that Microsoft Office can’t use fonts left where they are or kept in the Font Library. Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, and only from the second time they open after a font went on. [Fonts in Microsoft Office](help/activating.md#fonts-in-microsoft-office) has the details.
 - When you type to jump to a family, a space waits longer for the next letter of the name, as in Times New Roman, before it opens Quick Look. It used to open Quick Look a fifth of a second after the space, before many a next letter came. Where no family’s name goes on with a space, the space opens Quick Look at once.
 
-## 1.8.2
+## 0.8.2
 
 - Cicero checks for updates each time it opens, as well as once a day while it stays open. It used to check only once a day, counted from its last check, so a new version could take up to a day to show up.
 - Moving **Optical Size** in the Axes tab changes the text again once **Weight** has been moved as well. The letters could stay at the font’s default optical size, whatever the slider said.
 - A variable font’s styles that have an optical size of their own, like Text or Display styles, are drawn at it in previews and on the font page. They were drawn at the font’s default optical size.
 - The Axes tab lists **Weight**, **Width**, **Italic**, **Slant** and **Optical Size** first, in that order, then the font’s other axes, so they no longer move around from one family to the next. The **Variable** tag lists them the same way when you hold the pointer over it.
 
-## 1.8.1
+## 0.8.1
 
 - Turning on a font Cicero had moved to its Deactivated folder moves its file back into your Fonts folder, also when Cicero copies fonts or uses them where they are. It used to copy the file there and keep it in the Deactivated folder as well, so the font still showed up there while it was on. Fonts left like that leave the Deactivated folder the next time Cicero opens.
 - The Deactivated folder is no longer in the sidebar. Its fonts are off, so they’re under **Inactive**.
 - Clicking a family’s switch in the grid, the list or specimens turns it on or off without selecting it.
 
-## 1.8
+## 0.8
 
 - A font page’s **Glyphs** can give you a glyph’s shape, not only its character. **Copy as Vector**, in a glyph’s popover and its right-click menu, copies its outline in the style, weight and axes the page shows, to paste into a design app as a shape you can edit, or as SVG code. Drag a glyph out of the page to put it into a design app, or into the Finder as an SVG file. That works for alternates, the glyphs features draw and ligatures too, whose shapes **Copy Character** can’t take along.
 - Copying from a glyph’s popover closes it and says what was copied at the bottom of the window, as turning fonts on does: **“g” copied to clipboard**. So do the copy commands in a glyph’s right-click menu. The popover’s buttons no longer darken when clicked.
@@ -119,15 +119,15 @@ Each version’s notes here become its release notes on the [releases page](http
 - In Settings → General, **Guess classifications from names** is off and greyed out while Apple Intelligence is off or still getting ready, and on a Mac that can’t have it. It used to show as on.
 - A family’s note in the Info panel can have more than one line: Return starts a new one. It used to end the editing and select the whole note, so the next key typed over it.
 
-## 1.7.3
+## 0.7.3
 
 - In Settings → General, **Show test fonts installed for Adobe apps** no longer has a **Glyphs** tag next to it. The fonts it shows are tagged **Testing**, and the link below it goes to Glyphs’ guide.
 
-## 1.7.2
+## 0.7.2
 
 - In Settings → General, the **Glyphs** tag next to **Show test fonts installed for Adobe apps** is in Glyphs’ own colors, dark green on lime, rather than lime on dark green.
 
-## 1.7.1
+## 0.7.1
 
 - A font page’s text no longer cuts off its last line at some sizes: the page makes room for the lines as they’re set, rather than as a copy of the text broke them.
 - A family’s styles are listed lightest first, those of one weight along the designer’s own axes, then narrowest first, each followed by its italic: a family with Sans and Serif styles in three widths lists its Thin ones as Sans Compressed, Sans Condensed, Sans, then Serif Compressed and so on. Families with several widths used to list each width’s weights in turn.
@@ -143,7 +143,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Clicking a glyph no longer shows a keystroke for it: it was only right for the keyboard layout your Mac was set to, so the Unicode code and HTML entities are what’s left.
 - In the sidebar, a section title’s **+** stays where it is when the pointer comes over the title and its chevron shows; it moved aside to make room. The chevron turns at once when the section opens or closes.
 
-## 1.7
+## 0.7
 
 - The Info panel has an **Axes** tab for a variable family: a slider for each of its axes, like Weight, Width, Optical Size or the designer’s own, with its tag, to move the family’s previews along them, in the browser and on its font page, text and glyphs alike, or type a value. Axes the font hides, like parametric ones, come last, under **Hidden Axes**, which opens and closes. On a font page, **Axes**, after the alignment buttons, opens the tab, and once an axis has moved, the Style menu says **Custom**.
 - Variable families stand out in the list, grid and specimens: a teal **Variable** tag next to the name (at the top of a tile), which lists the family’s axes when you hold the pointer over it. A tile’s caption names the kind of file, like TTF, as it does for other fonts.
@@ -157,7 +157,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font page’s glyphs and ligatures are those of the style its text is set in: choose another in the **Style** menu, or move its axes, and they follow.
 - On a font page, ligatures and glyphs like tabular figures are as dark as the characters beside them; they were drawn a little lighter.
 
-## 1.6
+## 0.6
 
 - Coming from FontExplorer X? Choose **File → Import from FontExplorer X** to bring over its Font Library, sets (named after the folders they were in, like “Clients / Acme”), application sets with their apps, smart sets, labels as tags in their colors, ratings and how often each family was turned on, and to turn on again the fonts that were on. Cicero finds FontExplorer X’s library on your Mac by itself, or opens a backup of it (`.fexconfig` or `.fexbackup`, from **File → Local Backup**), also when you drop one on the window; a `.fexbackup`’s fonts go back where the Font Library was. A sheet shows what it found, to pick what comes over, and what stays behind, like smart sets with rules Cicero doesn’t have. FontExplorer X’s database is read from a copy, so it can stay open, and nothing of it changes.
 - **File → Import from Font Book** brings Font Book’s collections over as sets, with their families and styles; or collection files from another Mac. Font Book’s own collections, like Fun and Web, start unchecked.
@@ -189,22 +189,22 @@ Each version’s notes here become its release notes on the [releases page](http
 - If macOS takes very long to turn fonts on, those it turned on count as activated, and the rest are kept off, rather than all of them counting as failed.
 - A backup, restore or clearing of font caches no longer stalls when the tool doing it reports many problems.
 
-## 1.5.2
+## 0.5.2
 
 - Cicero has a new icon: C, 1 and 6 from AM Gaonkar Display Medium, cut into the faces of its cube.
 - A font you put in a folder Cicero watches, or in the Fonts folder in your Library, shows almost at once, rather than after two or three seconds, also when your Mac is busy. One put in a Fonts folder shows as active straight away, as macOS turns it on a moment later.
 
-## 1.5.1
+## 0.5.1
 
 - **Show fonts from Creative Cloud**, in Settings → General, keeps Adobe Fonts out of your lists, like **Show system fonts** for the fonts that come with macOS. With it off, they’re left out of every list, smart sets and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours.
 - **Type Designer Mode** comes after **Maintenance** in Settings → General.
 - In Compare, the plus next to **Compare Another Style** is the color of the text, also when you hold the pointer over it. Before, it was gray.
 - The About panel links to Cicero’s website.
 
-## 1.5
+## 0.5
 
 - Tags are now license statuses, to keep track of what you may do with each family. Cicero comes with **Licensed**, **Licensed + Non-Commercial**, **Unlicensed**, **Partially Licensed**, **Public Domain**, **Open Source** and **Trial**, each with its color, and you can make your own. A family has one status at a time, shown as a colored dot next to its name; give it one from its right-click menu, the Info panel, or by dropping it on a status under **License** in the sidebar. Smart sets have a **License Status** rule.
-- Your tags become license statuses, once, and families keep them. A family that had several tags keeps them all until you give it a status. The Red, Yellow and Green tags a library started with go if you never used them. A backup from before 1.5 gets the statuses as it’s restored.
+- Your tags become license statuses, once, and families keep them. A family that had several tags keeps them all until you give it a status. The Red, Yellow and Green tags a library started with go if you never used them. A backup from before 0.5 gets the statuses as it’s restored.
 - A set can have single styles of a family, like just the Regular and Bold: drag a style’s row from a font page onto the set, or right-click the style and choose **Add Style to Set**. Activating, deactivating and exporting the set, and an application set, then take only those styles.
 - Folders in the sidebar can be renamed, Cicero’s own Testing, Adobe Fonts, Added Fonts and Deactivated too: right-click one and choose **Rename Folder**. The name shows in the sidebar, Settings, smart set rules and Problems; the folder on disk keeps its own, so apps still find it.
 - A font page’s glyphs are grouped by kind, in the order a type designer would list them, rather than by Unicode block: **Uppercase** and **Lowercase** from A to Z, their accented letters with Æ, Þ, ß and the like, **Ligatures**, figures, **Currency**, **Mathematical Operators**, **Superscript**, **Subscript**, **Fractions**, **Numerators**, **Denominators**, **Ordinals**, **Punctuation and Symbols**, marks, **Case Sensitive Forms**, **Arrows**, and **Global** for other scripts.
@@ -217,7 +217,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The sidebar’s top section is called **Library**. The selected item is in the accent color, and so is the item you drag fonts over. **View → Hide Sidebar** (⌃⌘S) hides it, and **Edit Sidebar** has moved from the View menu to the sidebar’s right-click menu, beside the **Edit** button.
 - The toolbar’s pickers have an even inset and a glass lens on the chosen item, the Character Toolbox’s lists fade out under their bars, and cards you drag stay opaque.
 
-## 1.4.9
+## 0.4.9
 
 - Adobe Fonts from Creative Cloud are told apart from the fonts you install to test in Adobe apps. They have a purple **Adobe Fonts** tag, and an **Adobe Fonts** item under **Folders** while Creative Cloud has fonts on your Mac.
 - Cicero lists the Adobe Fonts an Adobe app turned on by itself, for instance for a document that uses them. They’re on in Adobe apps only, so they show as **Active in Adobe apps**, with their switch halfway.
@@ -235,21 +235,21 @@ Each version’s notes here become its release notes on the [releases page](http
 - Switching to specimens is up to a second faster, a first scan reads font files about twice as fast, and scrolling through specimens no longer waits on the disk for fonts not read since the Mac started.
 - VoiceOver names each segment of the toolbar’s view and layout pickers, rather than all of them after the first.
 
-## 1.4.8
+## 0.4.8
 
 - **Remove All Extra Copies**, at the top of Installed Twice in Problems, deals with every font there at once, after asking: it keeps the newest copy of each font and moves the others to the Trash. Of copies with the same version, it keeps one that comes with macOS or an app, then one in your own folders, then one installed for all users, before one in your Fonts folder. Duplicates has **Move All Extra Copies to Trash** too.
 - Moving fonts to the Trash works when they’re in a folder only an administrator can change, like an Adobe Fonts folder an installer made: macOS asks for your password, as when you drag them to the Trash in the Finder. Before, Cicero said it couldn’t move them, for instance when moving the extra copies of a font to the Trash in Problems.
 
-## 1.4.7
+## 0.4.7
 
 - Fonts that are on are called active, and those that are off inactive, as on font pages and in Settings → Folders: the sidebar’s **Active** and **Inactive** rather than Activated and Not Activated, “1,298 families · 716 active” under the title, **Active only** in the Character Toolbox, and **Inactive** for a style that’s off, in Quick Look, on font pages, in Problems and as a smart set’s Status.
 
-## 1.4.6
+## 0.4.6
 
 - Font files you added that have since been deleted, or whose folder was moved or renamed, leave your library, rather than staying there unseen. Cicero no longer looks for them every time it opens, which could have macOS ask again about the folder they were in. Files on a disk that isn’t connected stay.
 - When macOS asks whether Cicero may read your Documents, Desktop or Downloads folder, its message says why: to read fonts in your library that are kept there, like files you added from a download, and for **Find on This Mac**. Before, it only mentioned Find on This Mac.
 
-## 1.4.5
+## 0.4.5
 
 - ⌫ turns the selected fonts off and ⌘⌫ moves them to the Trash, asking first, as in the Finder. Before, ⌘⌫ turned them off. While you type in a text field, both edit the text, and in the Compare window, the Character Toolbox and Settings they leave the main window’s fonts alone.
 - ⇧-click keeps the fonts you ⌘-clicked before and adds the range from the last one you clicked, as in the Finder, rather than selecting only that range.
@@ -265,12 +265,12 @@ Each version’s notes here become its release notes on the [releases page](http
 - The Info panel no longer flashes as you go from one font to the next.
 - When a message comes up at the bottom of the window, like after moving fonts to the Trash, the Info panel and the browser no longer slide into place with it, and font pages always appear at once.
 
-## 1.4.4
+## 0.4.4
 
 - You can change the order of the fonts in the Compare window by dragging a row in Stacked, or a name below the fonts in Overlay, where the last one is drawn on top.
 - Each font in the Compare window keeps its color when you move or remove the others.
 
-## 1.4.3
+## 0.4.3
 
 - A folder can be **Active**: Cicero turns on every font in it, where it is, and fonts you put in it later go on by themselves. Choose it next to the folder in Settings → Folders or under **Fonts in This Folder** in its menu in the sidebar, which now offers **Inactive**, **Active**, **Active in Adobe apps** and **Active in Specific App**. Choosing Inactive again, or removing the folder, turns its fonts off.
 - Settings → General is more compact: four groups instead of nine, with Appearance on its own, the settings for activation, opening at login, system fonts, Adobe fonts and classification under **Fonts**, **Library** with Rebuild, Back Up and Restore, and Clear for the font caches, under **Maintenance**, the switches for updates and usage statistics under **Updates**, and short explanations inside the rows that need them.
@@ -282,18 +282,18 @@ Each version’s notes here become its release notes on the [releases page](http
 - Cicero asks before deleting a coverage set, from its editor, the sidebar or Settings → Coverage.
 - Creating a coverage set or a smart set no longer flashes the editor’s Edit title, Delete button or Save button as the sheet closes.
 
-## 1.4.2
+## 0.4.2
 
 - The coverage set editor explains that spaces and line breaks don’t count, so you can use them to lay out your characters.
 - The characters a coverage set will check for appear under **Preview** in its editor, with their count next to the heading.
 
-## 1.4.1
+## 0.4.1
 
 - **Use the files where they are** in Settings → General is now **Leave the files where they are**, and Cicero’s question when you turn fonts on offers **Leave Files Where They Are**.
 - **Your Coverage Sets** come first in Settings → Coverage and scroll with the built-in sets. Each has an **Edit** button and a right-click menu, **+** next to the heading makes a new one, and the coverage set editor has a **Delete** button.
 - Shorter explanations in Settings → General, Folders, Sidebar and Coverage.
 
-## 1.4
+## 0.4
 
 - With **Copy into ~/Library/Fonts** chosen in Settings → General, font files you open in Cicero, drop on its window or choose with File → Add Fonts are copied into your Fonts folder and turned on, and show up in All Fonts, rather than being listed where they are under Added Fonts without being installed. Reveal in Finder shows the copy in your Fonts folder. Cicero then selects the first font it installed in the browser and scrolls to it.
 - **Move into ~/Library/Fonts**, a new way to activate fonts in Settings → General: font files you open, drop or add are moved into your Fonts folder and turned on, and a folder they leave empty, like a font download’s folder, goes to the Trash. A folder with anything else in it stays, and fonts in your folders are still copied. With Ask each time, Cicero offers Move Into Fonts Folder for fonts you added one at a time.
@@ -304,12 +304,12 @@ Each version’s notes here become its release notes on the [releases page](http
 - Typing the start of a name in the list now shows the family it jumps to below the column headers, rather than under them.
 - The messages at the bottom of the window no longer end with a full stop: “Activated 8 files” rather than “Activated 8 files.”
 
-## 1.3.1
+## 0.3.1
 
 - Typing a letter in the font list, grid or specimens jumps straight to the first family starting with it, rather than scrolling there.
 - You can type more than one letter, as in Finder: E goes to the first family starting with E, and Ed then to the first starting with Ed.
 
-## 1.3
+## 0.3
 
 - Far more fonts get a classification. When a font doesn’t say what it is, Cicero looks at its letters: an I and an l with feet are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing. After that, Cicero reads the font’s PANOSE numbers, another way fonts can say what they are. In a library of 1,415 families, mostly from small foundries, Unclassified went from 934 families to 231.
 - With Apple Intelligence on, Cicero guesses the classification of the fonts still left over from their names, on your Mac. Nothing is sent. The Info panel says when a classification is a guess. Turn it off in Settings → General → Guess classifications from names.
@@ -325,16 +325,16 @@ Each version’s notes here become its release notes on the [releases page](http
 - Opening a font page no longer puts the cursor in the type tester’s size.
 - Cicero also counts how many people start using it: the first time it sends the usage statistics from your Mac, which for anyone already using it is the first time they open this version, it adds a note that your Mac is new, with that day’s date. Nothing else is sent, and Share usage statistics still turns it all off. [Privacy](help/privacy.md#usage-statistics) has the details.
 
-## 1.2.1
+## 0.2.1
 
 - Your fonts are there as soon as Cicero opens, as it last found them, rather than appearing a moment later. Anything that changed since follows right after.
 - The app icon’s background is the same as on the icons of the apps that come with macOS: white in light mode rather than light grey, and dark grey in dark mode rather than nearly black.
 
-## 1.2
+## 0.2
 
 - The sidebar’s folders, foundries and classifications are there as soon as Cicero opens, rather than appearing a moment later.
 
-## 1.1.1
+## 0.1.1
 
 I haven’t tested this version on macOS 27 yet, so you may find UI bugs there. Please report them with Help → Report an Issue.
 
@@ -359,27 +359,7 @@ I haven’t tested this version on macOS 27 yet, so you may find UI bugs there. 
 - The Show fonts installed for Adobe apps switch in Settings → Folders is as small as the other switches in Settings.
 - Built for macOS 27: there, the Info panel’s corners follow the window’s, sliders are the system’s, tag colors still show in menus, and the Info panel’s Info and Features tabs look like tabs.
 
-## 1.1
-
-- Add font files without adding their folder: open them from the Finder (Open With → Cicero), drop them on the window, or choose File → Add Fonts… (⌘O). They’re listed where they are, under Added Fonts in the sidebar, without being installed, and read again when they change. Right-click to remove them from the library; the files stay. Dropping fonts while a set is shown adds them to the set, and dropping a folder adds the folder.
-- Tags: label families with tags of your own, each with a Finder color, from their right-click menu, the Info panel, or by dropping them on a tag. Tags have their own sidebar section, show as colored dots next to family names, and work in smart set rules.
-- Activate Set: right-click a set or smart set to turn every font in it on, temporarily on, or off.
-- Font pages list the ligatures each style makes, grouped by feature (standard, discretionary, historical, contextual and required), each drawn from its glyph with the characters it stands for.
-- Font pages align their text right, too, and Preview Options have Line Spacing, for font pages and Quick Look, and Alignment, for specimens and Quick Look. Spacing is now called Letter Spacing.
-- The Info panel shows each font’s vendor ID, and search finds fonts by their designer and vendor ID as well. The first launch reads every font file again to learn them, so it takes a little longer.
-- Fonts in a document: choose File → Find Fonts in Document…, or drop a PDF, IDML, InDesign or Illustrator file on the window, to see which fonts it uses, which of them are on, off or missing, and turn them on, make a set of them, or find a missing font’s file on your Mac with Spotlight.
-- The fonts that come with macOS that CoreText doesn’t list, like Times, Courier, Iowan Old Style and Seravek, are in your library now, and fonts like them that Cicero turns on show as on.
-- The Info panel stays open on font pages.
-- Preview Options call the sample text Preview Text.
-- Backups hold your tags and added fonts.
-- Folders on a server or an external disk: while the disk isn’t connected, the folder has a question mark in the sidebar and says so, its fonts keep their tags and places in sets, Problems no longer lists them as missing, and they aren’t read again when it’s back.
-- Folders in iCloud Drive, Dropbox or Google Drive say how many of their fonts are online only, and **Download** brings them down. A cloud folder macOS hasn’t let Cicero read says so, with a way to System Settings.
-- **Use Copy From**: when a font is in more than one folder, like a copy from each client, right-click it to choose which folder’s copy is on. The others Cicero turned on go off.
-- Duplicates in Problems only lists copies in the same place, like twice in one client’s folder, not one copy in each client’s.
-- Character set groups in the sidebar have an icon, and titles as strong as the rows around them.
-- Help → Privacy Policy opens Cicero’s privacy policy on its website.
-
-## 1.0
+## 0.1
 
 First release.
 
@@ -408,3 +388,20 @@ First release.
 - Opened from the disk image or your Downloads folder, Cicero offers to move itself to the Applications folder.
 - A user guide, opened from Help → Cicero Help, with Release Notes and Report an Issue in the Help menu.
 - No tracking and no analytics: nothing about you or your fonts leaves your Mac.
+- Add font files without adding their folder: open them from the Finder (Open With → Cicero), drop them on the window, or choose File → Add Fonts… (⌘O). They’re listed where they are, under Added Fonts in the sidebar, without being installed, and read again when they change. Right-click to remove them from the library; the files stay. Dropping fonts while a set is shown adds them to the set, and dropping a folder adds the folder.
+- Tags: label families with tags of your own, each with a Finder color, from their right-click menu, the Info panel, or by dropping them on a tag. Tags have their own sidebar section, show as colored dots next to family names, and work in smart set rules.
+- Activate Set: right-click a set or smart set to turn every font in it on, temporarily on, or off.
+- Font pages list the ligatures each style makes, grouped by feature (standard, discretionary, historical, contextual and required), each drawn from its glyph with the characters it stands for.
+- Font pages align their text right, too, and Preview Options have Line Spacing, for font pages and Quick Look, and Alignment, for specimens and Quick Look. Spacing is now called Letter Spacing.
+- The Info panel shows each font’s vendor ID, and search finds fonts by their designer and vendor ID as well. The first launch reads every font file again to learn them, so it takes a little longer.
+- Fonts in a document: choose File → Find Fonts in Document…, or drop a PDF, IDML, InDesign or Illustrator file on the window, to see which fonts it uses, which of them are on, off or missing, and turn them on, make a set of them, or find a missing font’s file on your Mac with Spotlight.
+- The fonts that come with macOS that CoreText doesn’t list, like Times, Courier, Iowan Old Style and Seravek, are in your library now, and fonts like them that Cicero turns on show as on.
+- The Info panel stays open on font pages.
+- Preview Options call the sample text Preview Text.
+- Backups hold your tags and added fonts.
+- Folders on a server or an external disk: while the disk isn’t connected, the folder has a question mark in the sidebar and says so, its fonts keep their tags and places in sets, Problems no longer lists them as missing, and they aren’t read again when it’s back.
+- Folders in iCloud Drive, Dropbox or Google Drive say how many of their fonts are online only, and **Download** brings them down. A cloud folder macOS hasn’t let Cicero read says so, with a way to System Settings.
+- **Use Copy From**: when a font is in more than one folder, like a copy from each client, right-click it to choose which folder’s copy is on. The others Cicero turned on go off.
+- Duplicates in Problems only lists copies in the same place, like twice in one client’s folder, not one copy in each client’s.
+- Character set groups in the sidebar have an icon, and titles as strong as the rows around them.
+- Help → Privacy Policy opens Cicero’s privacy policy on its website.
