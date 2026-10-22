@@ -243,8 +243,10 @@ extension DocumentFontWatcher {
         // Codes from each app's dictionary.
         func file(_ path: String, of document: NSAppleEventDescriptor) throws -> FrontDocument? {
             let result = try get(property(path, of: document), from: pid)
-            guard let url = result.fileURLValue ?? result.stringValue.map({ URL(fileURLWithPath: $0) }),
-                  DocumentFonts.fileExtensions.contains(url.pathExtension.lowercased()),
+            // Illustrator's file URL has no scheme, so it isn't one: the path, made into one again.
+            guard let path = result.fileURLValue?.path ?? result.stringValue else { return nil }
+            let url = URL(fileURLWithPath: path)
+            guard DocumentFonts.fileExtensions.contains(url.pathExtension.lowercased()),
                   FileManager.default.fileExists(atPath: url.path)
             else { return nil }
             return .file(url)
