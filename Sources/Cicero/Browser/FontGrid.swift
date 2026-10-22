@@ -20,16 +20,14 @@ struct FontGrid: View {
     /// The narrowest a tile goes, for its name and caption.
     static let narrowest: CGFloat = 160
     static let mostColumns = 5
-    /// What a tile has besides its sample: the padding, the tags and switch above it, and the name and caption below.
-    static let chrome: CGFloat = 80
-
     /// How narrow a tile can be for its sample: the sample's width at the preview size in the system font, with a little to
-    /// spare, so the type fills the tile without being made smaller; never narrower than it's high, as for a single letter.
+    /// spare, so the type fills the tile without being made smaller; never narrower than the sample is high, so a single
+    /// letter gets a square of its own.
     static func minimumWidth(sample: String, size: Double, kerning: Double) -> CGFloat {
         let font = NSFont.systemFont(ofSize: size)
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: font, .kern: kerning]))
         let text = CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8
-        return max(narrowest, text, chrome + sampleHeight(size: size))
+        return max(narrowest, text, sampleHeight(size: size))
     }
 
     /// The sample's height at a preview size: its line and some room above and below, so the tiles follow the type at

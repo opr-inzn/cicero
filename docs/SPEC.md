@@ -151,8 +151,8 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   the tooltip. 10 pt beside a tile's contents, 14 pt above and below. The tiles hug the type, which is always the preview size
   (`FontGrid.layout`): the sample is the size × 1.6 + 16 pt high, unclipped, so rows are as tall as the
   type and short at small sizes; as many columns fit as tiles that are as wide as the sample (the preview text, else
-  "Aa Gg 123") in the system font at that size, × 1.1 + 28 pt, never narrower than they're high (a single letter gets
-  square tiles) and at least 160 pt, from one column to five, as wide as fills the rows, however many families there
+  "Aa Gg 123") in the system font at that size, × 1.1 + 28 pt, never narrower than the sample is high (a single letter
+  gets a square sample) and at least 160 pt, from one column to five, as wide as fills the rows, however many families there
   are. Bigger type, fewer and bigger tiles. The Info panel keeps the columns the rows have without it, the tiles
   narrowing instead, as far as 0.6 times that width and 160 pt, then takes a column away; only then, and for a font much
   wider than the system font or text longer than a row, the type shrinks to fit, to 0.4 of the size at most.
