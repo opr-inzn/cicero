@@ -198,17 +198,16 @@ extension Family {
         return terms
     }
 
-    /// The style to preview the family in for a search, and the weight to draw it at: the one the search names (see
-    /// `SearchQuery.Style`), else the one for `weight`, at that weight. A weight the search names is where a variable
-    /// style of that name sits on the weight axis, as not every font's axis is on the OS/2 scale (one has its Light at
-    /// 450), else that weight.
-    public func previewStyle(for query: SearchQuery, weight: Double) -> (face: LibraryFace, weight: Double) {
-        guard !query.isEmpty, let style = query.style(forFamilyNamed: [id.lowercased(), name.lowercased()]) else {
-            return (face(nearestWeight: weight), weight)
-        }
+    /// The style to preview the family in for a search, and the weight to draw it at: the one its tokens and typed words
+    /// name (see `SearchToken.style(of:over:)` and `SearchQuery.Style`), else the one for `weight`, at that weight. A
+    /// weight they name is where a variable style of that weight sits on the weight axis, as not every font's axis is on
+    /// the OS/2 scale (one has its Light at 450), else that weight.
+    public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double) -> (face: LibraryFace, weight: Double) {
+        let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
+        guard let style = SearchToken.style(of: tokens, over: typed) else { return (face(nearestWeight: weight), weight) }
         guard let named = style.weight else { return (face(for: style, weight: weight), weight) }
         let face = face(for: style, weight: Double(named))
-        let isNamed = face.face.weightAxis != nil && StyleName(face.face.styleName).weight == named
+        let isNamed = face.face.weightAxis != nil && FontFace.hundreds(face.face.namedWeight) == FontFace.hundreds(Double(named))
         return (face, isNamed ? face.face.styleWeight : Double(named))
     }
 
@@ -226,18 +225,10 @@ extension Family {
             if !kept.isEmpty { candidates = kept }
         }
         keep { $0.face.isItalic == style.isItalic }
-        // As the name spells it out, else on a width axis against the regular's place on it, as not every font's is in
-        // percent, else by the OS/2 width class.
-        let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
-        func width(_ face: FontFace) -> Int {
-            if let named = StyleName(face.styleName).width { return named }
-            if let value = face.axes.first(where: { $0.tag == "wdth" })?.value { return value < normal ? 3 : value > normal ? 7 : 5 }
-            return face.width
-        }
         if let wanted = style.width {
-            keep { (width($0.face) - 5).signum() == (wanted - 5).signum() }
-            let nearest = candidates.map { abs(width($0.face) - wanted) }.min()
-            keep { abs(width($0.face) - wanted) == nearest }
+            keep { (widthClass(of: $0.face) - 5).signum() == (wanted - 5).signum() }
+            let nearest = candidates.map { abs(widthClass(of: $0.face) - wanted) }.min()
+            keep { abs(widthClass(of: $0.face) - wanted) == nearest }
         }
         let variables = candidates.filter { $0.face.weightAxis != nil }
         if !variables.isEmpty {
@@ -249,10 +240,35 @@ extension Family {
             let least = variables.map { moved($0.face) }.min()
             candidates = variables.filter { moved($0.face) == least }
         }
-        func distance(_ face: FontFace) -> Double { abs((StyleName(face.styleName).weight.map(Double.init) ?? face.styleWeight) - weight) }
         return candidates.min { a, b in
-            let (first, second) = (distance(a.face), distance(b.face))
-            return first != second ? first < second : abs(width(a.face) - 5) < abs(width(b.face) - 5)
+            let (first, second) = (abs(a.face.namedWeight - weight), abs(b.face.namedWeight - weight))
+            return first != second ? first < second : abs(widthClass(of: a.face) - 5) < abs(widthClass(of: b.face) - 5)
         }!
+    }
+
+    /// How wide a style is on the OS/2 scale, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded): as its name spells
+    /// it out, else on a width axis against the regular's place on it, as not every font's is in percent (narrower is 3,
+    /// wider 7), else by its OS/2 width class.
+    func widthClass(of face: FontFace) -> Int {
+        if let named = StyleName(face.styleName).width { return named }
+        if let value = face.axes.first(where: { $0.tag == "wdth" })?.value {
+            let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
+            return value < normal ? 3 : value > normal ? 7 : 5
+        }
+        return face.width
+    }
+}
+
+extension FontFace {
+    /// Its weight as its name spells it out, as a Bold the file classes at 400 is still Bold; the regular weight for a
+    /// name of only widths and slopes ("Italic", "Condensed"); else its place on the weight axis or its OS/2 class.
+    var namedWeight: Double {
+        let name = StyleName(styleName)
+        return name.weight.map(Double.init) ?? (name.isRegular ? 400 : styleWeight)
+    }
+
+    /// A weight to the nearest hundred, from 100 to 900: Book (350) is a Regular, Heavy (850) a Black.
+    static func hundreds(_ weight: Double) -> Int {
+        min(max(Int((weight / 100).rounded()) * 100, 100), 900)
     }
 }

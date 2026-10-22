@@ -75,7 +75,7 @@ private struct Specimen: View {
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             FontText(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
-                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id),
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
                 kerning: preview.kerning(at: preview.size)
             )
             .frame(maxWidth: .infinity, alignment: preview.alignment.frame)

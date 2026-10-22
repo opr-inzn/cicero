@@ -90,6 +90,12 @@ Words find the families that match each of them, so **variable sans** shows the 
 
 Search for a style, like **italic**, **bold**, **light** or **condensed bold**, and the previews show it: each family in its italic, bold, light or condensed bold style, or the nearest one it has. A font page whose **Style** is **Automatic** shows it too. A word that’s part of a family’s name stays its name: **avenir next condensed** shows Avenir Next Condensed as usual. Spell the word out: **it** or **bd** don’t change the previews.
 
+### Filter by style and figures
+
+To narrow the search to a style or to figures, choose a filter from the suggestions as you type. Type **ital**, **bold**, **cond** or **fig**, say, and choose **Italic**, **Bold**, **Condensed**, **Tabular Figures** or **Old-Style Figures** under **Filters**. Type **weight** for all the weights, from **Thin** to **Black**, and **width** for **Condensed** and **Extended**. A filter goes into the search field as a token, next to what you type, and you can add more: **Italic** and **Bold** show the families that have a bold italic, in their bold italic. A second weight takes the place of the first. Delete a token to take its filter away.
+
+Tabular figures are all as wide, for columns of numbers; old-style figures sit like lowercase letters, for numbers in text. A family has them when its figures are made like that, or when one of its features turns them on. With the filter, the previews show them.
+
 ## Find similar fonts
 
 Right-click a family and choose **Show Similar Fonts**, or select it and choose **Fonts → Show Similar Fonts**. The browser shows the family and the 12 families in your library that look most like it, the closest first, in the view you’re using. A bar above them says whose they are. To go back to what you were looking at, a font page too, click **Done** in the bar, or choose an item in the sidebar. Search works within them, and in the list they stay closest first until you click a column’s title to sort by it.

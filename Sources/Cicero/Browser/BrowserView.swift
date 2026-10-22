@@ -273,6 +273,8 @@ private struct EmptyBrowser: View {
         let query = model.appliedSearch.trimmingCharacters(in: .whitespaces)
         if !query.isEmpty {
             ContentUnavailableView.search(text: query)
+        } else if !model.searchTokens.isEmpty {
+            ContentUnavailableView.search
         } else {
             content
         }

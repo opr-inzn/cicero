@@ -195,6 +195,21 @@ public struct OpenTypeFeatures: OptionSet, Hashable, Codable, Sendable {
     }
 }
 
+/// The kinds of figure a face can set besides lining, proportional ones, as its plain figures are or a feature makes
+/// them (see `FontFileReader.figures(of:features:)`).
+public struct Figures: OptionSet, Hashable, Codable, Sendable {
+    public let rawValue: UInt8
+
+    public init(rawValue: UInt8) {
+        self.rawValue = rawValue
+    }
+
+    /// All as wide, for columns of numbers.
+    public static let tabular = Figures(rawValue: 1)
+    /// Of the height of the lowercase, some reaching above it and some below the baseline, for figures in text.
+    public static let oldStyle = Figures(rawValue: 2)
+}
+
 /// What a font file says about one of its faces. Read once and cached by file stamp.
 public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public let id: FaceID
@@ -235,6 +250,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var embedding: Embedding?
     /// The OpenType features its GSUB table has, of those smart sets ask for.
     public var features: OpenTypeFeatures
+    public var figures: Figures
     /// Language → the family's name in it, for the languages besides English the font names its family in, where that
     /// differs from `familyName` (see `LocalizedNames`).
     public var localizedFamilyNames: [String: String]
@@ -244,7 +260,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         weight: Int, isItalic: Bool, isMonospaced: Bool, familyClass: Int, panose: Classification? = nil, letterShape: Classification? = nil,
         manufacturer: String?, version: String?, designer: String? = nil, vendorID: String? = nil,
         weightAxis: WeightAxis?, width: Int = 5, axes: [VariationAxis] = [], isAtOrigin: Bool = false, year: Int? = nil,
-        embedding: Embedding? = nil, features: OpenTypeFeatures = [], localizedFamilyNames: [String: String] = [:]
+        embedding: Embedding? = nil, features: OpenTypeFeatures = [], figures: Figures = [], localizedFamilyNames: [String: String] = [:]
     ) {
         self.id = id
         self.postScriptName = postScriptName
@@ -268,6 +284,7 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.year = year
         self.embedding = embedding
         self.features = features
+        self.figures = figures
         self.localizedFamilyNames = localizedFamilyNames
     }
 

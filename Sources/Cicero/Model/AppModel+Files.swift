@@ -278,10 +278,10 @@ extension AppModel {
         // in All Fonts.
         let added = families.allSatisfy { $0.folderIDs.contains(WatchedFolder.addedFilesID) }
         if added && opened.set == nil {
-            searchText = ""
+            clearSearch()
             selection = .folder(WatchedFolder.addedFilesID)
         } else if !ids.isSubset(of: Set(visibleFamilies.map(\.id))) {
-            searchText = ""
+            clearSearch()
             selection = .all
         }
         selectedIDs = [families[0].id]

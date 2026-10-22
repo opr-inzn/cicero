@@ -62,7 +62,7 @@ extension AppModel {
             listReturn = selectedItems
             listReturnPage = openFamilyID
         }
-        searchText = ""
+        clearSearch()
         selection = nil
         similarFamilyID = nil
         documentList = DocumentList(name: report.name, families: libraryFamilies(of: report))

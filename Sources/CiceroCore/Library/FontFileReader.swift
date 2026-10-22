@@ -87,6 +87,7 @@ enum FontFileReader {
         let head = CTFontCopyTable(font, CTFontTableTag(kCTFontTableHead), CTFontTableOptions(rawValue: 0)) as Data?
         let familyClass = Int((symbolic.rawValue >> 28) & 0xF)
         let isMonospaced = symbolic.contains(.monoSpaceTrait)
+        let features = OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?))
         let face = FontFace(
             id: id, postScriptName: postScriptName, familyName: familyName, styleName: styleName, fullName: fullName,
             weight: weightClass(of: font, os2: os2),
@@ -106,13 +107,54 @@ enum FontFileReader {
             isAtOrigin: isAtOrigin && !entries.isEmpty,
             year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head)),
             embedding: embedding(os2),
-            features: OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?)),
+            features: features,
+            figures: figures(of: font, features: features),
             localizedFamilyNames: LocalizedNames.familyNames(
                 CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), CTFontTableOptions(rawValue: 0)) as Data?, besides: familyName
             )
         )
         return ReadFace(face: face, fvar: fvar, isAddedDefault: instance.isEmpty && fvar.map(leavesDefaultUnnamed) == true)
     }
+
+    /// The kinds of figure the face can set besides lining, proportional ones. Tabular when its plain figures are all as
+    /// wide; old-style when they are, 0, 1 and 2 no taller than four fifths of 6 and 8 and three of 3, 4, 5, 7 and 9
+    /// reaching below the baseline; and either when a feature makes them so: OpenType's tnum and onum, or in a font
+    /// with Apple's own morx table, which has no GSUB features, its Number Spacing and Number Case as CoreText lists
+    /// them. None for a font without all ten figures.
+    static func figures(of font: CTFont, features: OpenTypeFeatures) -> Figures {
+        let characters = Array("0123456789".utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        guard CTFontGetGlyphsForCharacters(font, characters, &glyphs, glyphs.count), !glyphs.contains(0) else { return [] }
+        var figures: Figures = []
+        var advances = [CGSize](repeating: .zero, count: glyphs.count)
+        CTFontGetAdvancesForGlyphs(font, .horizontal, glyphs, &advances, glyphs.count)
+        let width = advances[0].width
+        if features.contains(.tabularFigures) || width > 0 && advances.allSatisfy({ abs($0.width - width) < width * 0.01 }) {
+            figures.insert(.tabular)
+        }
+        var boxes = [CGRect](repeating: .zero, count: glyphs.count)
+        CTFontGetBoundingRectsForGlyphs(font, .horizontal, glyphs, &boxes, glyphs.count)
+        let tall = max(boxes[6].maxY, boxes[8].maxY)
+        let small = [0, 1, 2].map { boxes[$0].maxY }.max() ?? 0
+        let descending = [3, 4, 5, 7, 9].count { boxes[$0].minY < -0.08 * tall }
+        if features.contains(.oldStyleFigures) || tall > 0 && small < 0.8 * tall && descending >= 3 {
+            figures.insert(.oldStyle)
+        }
+        guard CTFontCopyTable(font, CTFontTableTag(morxTag), CTFontTableOptions(rawValue: 0)) != nil else { return figures }
+        for type in CTFontCopyFeatures(font) as? [[String: Any]] ?? [] {
+            let selectors = (type[kCTFontFeatureTypeSelectorsKey as String] as? [[String: Any]] ?? [])
+                .compactMap { $0[kCTFontFeatureSelectorIdentifierKey as String] as? Int }
+            switch type[kCTFontFeatureTypeIdentifierKey as String] as? Int {
+            case kNumberSpacingType where selectors.contains(kMonospacedNumbersSelector): figures.insert(.tabular)
+            case kNumberCaseType where selectors.contains(kLowerCaseNumbersSelector): figures.insert(.oldStyle)
+            default: break
+            }
+        }
+        return figures
+    }
+
+    /// Apple's extended glyph metamorphosis table, 'morx'.
+    private static let morxTag: UInt32 = 0x6D6F_7278
 
     /// The OS/2 fsType's usage permissions; nil without an OS/2 table.
     static func embedding(_ table: Data?) -> Embedding? {

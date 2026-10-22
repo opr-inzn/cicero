@@ -158,10 +158,17 @@ final class AppModel {
     /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
     var searchText = "" {
-        didSet { scheduleSearch() }
+        didSet {
+            scheduleSearch()
+            if !searchText.isEmpty { lastTyped = searchText }
+        }
     }
     /// The search lists filter by: follows `searchText` after a short pause.
     private(set) var appliedSearch = ""
+    /// The filters beside the search's text, which lists filter by at once (see `SearchToken` and `setSearchTokens`).
+    private(set) var searchTokens: [SearchToken] = []
+    /// What was last typed in the search field, for the words a token chosen from the suggestions takes the place of.
+    @ObservationIgnored var lastTyped = ""
     var isEditingSidebar = false
     var isInfoPresented = false
     var infoTab: InfoTab = .info
@@ -581,6 +588,23 @@ final class AppModel {
     }
 
     // MARK: Search
+
+    /// Sets the search field's tokens, only the last of each kind (see `SearchToken.normalized`). A token chosen from the
+    /// suggestions takes the place of the words typed for it, and the words before them stay ("sans ital" and Italic
+    /// leave "sans"), though the field empties itself.
+    func setSearchTokens(_ tokens: [SearchToken]) {
+        let added = tokens.last { !searchTokens.contains($0) }
+        searchTokens = SearchToken.normalized(tokens)
+        guard let added, let rest = SearchToken.suggestions(for: lastTyped, besides: []).first(where: { $0.token == added })?.typed else { return }
+        lastTyped = rest
+        Task { @MainActor in self.searchText = rest }
+    }
+
+    /// Takes the text and the tokens out of the search field.
+    func clearSearch() {
+        searchText = ""
+        searchTokens = []
+    }
 
     private func scheduleSearch() {
         searchTask?.cancel()

@@ -86,7 +86,7 @@ private struct Tile: View {
             FontText(
                 text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: style.face),
                 face: style.face,
-                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id),
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
                 kerning: preview.kerning(at: preview.size)
             )
             .minimumScaleFactor(0.4)

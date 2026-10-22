@@ -99,7 +99,7 @@ extension AppModel {
             listReturn = selectedItems
             listReturnPage = openFamilyID
         }
-        searchText = ""
+        clearSearch()
         selection = nil
         documentList = nil
         similarFamilyID = family.id
