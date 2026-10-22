@@ -282,7 +282,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 - Matching: the library's face with the PostScript name, else the family and style names (case, spaces, hyphens
   and underscores ignored); a font the library hasn't but `CTFontCreateWithName` gives back by that exact name is on.
   Cached until the library changes, so the rows follow activations and added files.
-- Buttons: Show in Library (disabled when none of the fonts are in the library; closes the sheet and has the browser
+- Buttons: Show in Library (only when some of the fonts are in the library; closes the sheet and has the browser
   list those families instead of a sidebar item's, as Show Similar Fonts does: `AppModel.documentList`, the title
   "Fonts in “Brochure.indd”", a bar above the list saying "The fonts “Brochure.indd” uses that are in your library."
   with Done, which goes back to the sidebar's selection and font page from before, as does selecting a sidebar item;
