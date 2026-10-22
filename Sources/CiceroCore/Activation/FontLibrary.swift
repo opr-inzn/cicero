@@ -92,7 +92,7 @@ extension ActivationEngine {
             do {
                 try fm.createDirectory(at: folder, withIntermediateDirectories: true)
                 let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: folder)
-                try fm.moveItem(at: Self.url(path), to: destination)
+                try Self.move(Self.url(path), to: destination)
                 records.installedCopies[destination.path] = records.installedCopies.removeValue(forKey: path)
                 moved[path] = destination.path
             } catch {
