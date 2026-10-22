@@ -210,7 +210,7 @@ struct CiceroCommands: Commands {
 
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
 /// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
+/// Makes the Dock icon's menu, with Cicero's windows and Add Fonts, and counts the launch for the usage statistics.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
     var model: AppModel? {
@@ -228,13 +228,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flush()
     }
 
-    /// Above the system's items: Add Fonts, as in the File menu.
+    /// Above the system's items: Cicero's open windows, as the Dock lists other apps' (SwiftUI leaves its windows out of
+    /// the Window menu, where the Dock looks for them), the frontmost checked, then Add Fonts, as in the File menu.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
+        let windows = NSApp.orderedWindows.filter { window in
+            window.styleMask.contains(.titled) && !(window is NSPanel) && window.sheetParent == nil
+                && (window.isVisible || window.isMiniaturized) && !window.title.isEmpty
+        }
+        for window in windows {
+            let item = NSMenuItem(title: window.title, action: #selector(showWindow), keyEquivalent: "")
+            item.target = self
+            item.representedObject = window
+            item.state = window == windows.first && !window.isMiniaturized ? .on : .off
+            // As the Dock draws other apps' windows on macOS 26.
+            if #available(macOS 26, *) { item.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) }
+            menu.addItem(item)
+        }
+        if !windows.isEmpty { menu.addItem(.separator()) }
         let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
         addFonts.target = self
         menu.addItem(addFonts)
         return menu
+    }
+
+    @objc private func showWindow(_ sender: NSMenuItem) {
+        guard let window = sender.representedObject as? NSWindow else { return }
+        NSApp.bringForward {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 
     /// Brings Cicero forward, which opens the main window when none shows, so the fonts added show there, and asks
