@@ -216,9 +216,12 @@ struct Tag: View {
         }
         .font(Self.font)
         .padding(.horizontal, 5)
-        // The capitals in the middle of the capsule.
-        .padding(.top, 1.5 - Self.capitalsDrop)
-        .padding(.bottom, 1.5 + Self.capitalsDrop)
+        // The capitals in the middle of the capsule, measured at 1x and 2x. They sit on whole pixels, so the capsule is
+        // 14.5 pt high: at 2x that leaves 16 pixels around the 13 of the capitals, 8 above and 8 below, and at 1x it's 15
+        // pixels, within an eighth of one. At 14 pt they were half a pixel high at 2x and a third at 1x. Any top from 1.5
+        // to 1.7 pt does it; 1.6 keeps away from both ends.
+        .padding(.top, 1.6)
+        .padding(.bottom, 1.9)
         .background(tint.opacity(isFilled ? 1 : 0.14), in: .capsule)
         .foregroundStyle(isFilled ? Color.black : tint.opacity(0.9))
         .fixedSize()
