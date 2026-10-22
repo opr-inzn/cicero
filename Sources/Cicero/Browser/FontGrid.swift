@@ -25,6 +25,10 @@ struct FontGrid: View {
     /// line reaches past it at big sizes, into space its letters don't use, which is why it's drawn unclipped.
     static func sampleHeight(size: Double) -> CGFloat { size * 0.75 + 50 }
 
+    /// How far below the middle of the sample its baseline is, in ems: half of the span from a capital's top, about 0.7 em
+    /// above the baseline, to a descender's end, about 0.25 em below it, so that span is centred.
+    static let baselineBelowCentre = 0.225
+
     /// How narrow a tile can be: at least 1.4 times as wide as it's high, so tiles stay landscape, and as wide as the sample
     /// text at the preview size in the system font, with a little to spare, so it isn't made smaller to fit.
     static func minimumWidth(sample: String, size: Double, kerning: Double) -> CGFloat {
@@ -97,18 +101,24 @@ private struct Tile: View {
                     .accessibilityHidden(true)
             }
             let face = family.face(nearestWeight: preview.weight).face
-            FontText(
-                text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: face),
-                face: face,
-                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
-                kerning: preview.kerning(at: preview.size)
-            )
-            // Only where a tile can't be wide enough: a font far wider than the system font, text longer than a row, or the
-            // Info panel narrowing the tiles.
-            .minimumScaleFactor(0.4)
-            .frame(maxWidth: .infinity)
-            // Not clipped: what reaches past the font's ascent and descent runs into the padding rather than being cut off.
-            .frame(height: sampleHeight)
+            // On one baseline in every tile, whatever each font's ascent and descent, where the span from a capital's top to
+            // a descender's end is centred. Not clipped: what reaches past it runs into the padding.
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: sampleHeight)
+                .alignmentGuide(.firstTextBaseline) { $0.height / 2 + preview.size * FontGrid.baselineBelowCentre }
+                .overlay(alignment: Alignment(horizontal: .center, vertical: .firstTextBaseline)) {
+                    FontText(
+                        text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: face),
+                        face: face,
+                        size: preview.size, weight: preview.weight, variations: model.variations(for: family),
+                        kerning: preview.kerning(at: preview.size)
+                    )
+                    // Only where a tile can't be wide enough: a font far wider than the system font, text longer than a row,
+                    // or the Info panel narrowing the tiles.
+                    .minimumScaleFactor(0.4)
+                    .frame(maxWidth: .infinity)
+                }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(family.name)
