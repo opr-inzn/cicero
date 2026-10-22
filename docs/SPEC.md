@@ -149,15 +149,16 @@ Closing every window leaves Cicero running, so application sets and Adobe docume
   it's normal, then the name. A family with more styles than weight and width tell apart (italics,
   optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
   the tooltip. 10 pt beside a tile's contents, 14 pt above and below. Tiles fit the type, which is always the preview
-  size (`FontGrid`), on one baseline in every tile whatever each font's ascent and descent, 0.225 em below the middle of
-  the sample, where the span from a capital's top (about 0.7 em) to a descender's end (about 0.25 em) is centred; by three rules: the sample is three quarters of the size + 50 pt high, so small type has room around
-  it and big type doesn't make tiles tall (unclipped: the type's line reaches past it at big sizes, into room its letters
-  don't use); a tile is at least 1.4 times as wide as it's high, so tiles stay landscape, and as wide as the sample (the
-  preview text, else "Aa Gg 123") in the system font at that size × 1.1 + 28 pt; as many tiles fit in a row as can be
-  that wide in the rows without the Info panel, from one to five, as wide as fills the row, however many families there
-  are. Bigger type, fewer and bigger tiles. The Info panel makes them narrower, never fewer. The type shrinks to fit, to
-  0.4 of the size at most, only for a font much wider than the system font, text longer than a row, or tiles narrowed by
-  the Info panel.
+  size (`FontGrid.Measure`, from the sample — the preview text, else "Aa Gg 123" — in the system font at that size, so
+  every tile gets the same): the sample is as high as its letters reach above and below the baseline, plus a quarter of
+  the size + 44 pt; every font's sample sits on one baseline, where those letters are centred ("H" centres the capital,
+  "g" the x-height and descender), whatever the font's own ascent and descent; it's drawn unclipped and at its whole
+  line's height, never shrunk to the sample's (proposed less, SwiftUI shrank it and drew it below the baseline it
+  reported). A tile is at least the size + 186 pt wide, and as wide as the sample × 1.1 + 28 pt; as many tiles fit in a
+  row as can be that wide in the rows without the Info panel, from one to five, as wide as fills the row, however many
+  families there are. Bigger type, fewer and bigger tiles. The Info panel makes them narrower, never fewer. The type
+  shrinks to fit, to 0.4 of the size at most, only for a font much wider than the system font, text longer than a row,
+  or tiles narrowed by the Info panel.
 - **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, "Foundry · N styles", switch; the sample at preview size, lined up as Preview Options' alignment says; up to 14 style names set in themselves (+N more), each line of them on one baseline (`FlowLayout` lines its children up by their first text's baseline, not their tops, which sit as high as each face's ascent puts them).
 - Tag dot: an 8 pt circle in the tag's colour, with no ring (side by side, 2 pt apart, for a family tagged
   several ways before 1.5). Cards are opaque (the card's grey on the window's background), so the

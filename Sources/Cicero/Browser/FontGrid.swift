@@ -18,24 +18,32 @@ struct FontGrid: View {
     /// Above and below a tile's contents: a little more, so the tiles don't feel cramped.
     static let verticalPadding: CGFloat = 14
     static let mostColumns = 5
-    /// How much higher the tags above a tile's sample and the name and caption below it make it.
-    static let labels: CGFloat = 51
 
-    /// The sample's height: three quarters of the size, with room above and below, which small type gets more of. The type's
-    /// line reaches past it at big sizes, into space its letters don't use, which is why it's drawn unclipped.
-    static func sampleHeight(size: Double) -> CGFloat { size * 0.75 + 50 }
+    /// The sample text in the system font at the preview size: how far its letters reach above the baseline and below it,
+    /// and how wide it is. Every tile sets its sample by these, whatever its own font, so they all share one baseline.
+    struct Measure {
+        var above: CGFloat
+        var below: CGFloat
+        var width: CGFloat
 
-    /// How far below the middle of the sample its baseline is, in ems: half of the span from a capital's top, about 0.7 em
-    /// above the baseline, to a descender's end, about 0.25 em below it, so that span is centred.
-    static let baselineBelowCentre = 0.225
+        init(_ sample: String, size: Double, kerning: Double) {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: size), .kern: kerning]))
+            let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+            // Text with no letters, spaces say: a capital's height.
+            above = ink.isEmpty ? size * 0.7 : max(ink.maxY, 0)
+            below = ink.isEmpty ? 0 : max(-ink.minY, 0)
+            width = CTLineGetTypographicBounds(line, nil, nil, nil)
+        }
 
-    /// How narrow a tile can be: at least 1.4 times as wide as it's high, so tiles stay landscape, and as wide as the sample
-    /// text at the preview size in the system font, with a little to spare, so it isn't made smaller to fit.
-    static func minimumWidth(sample: String, size: Double, kerning: Double) -> CGFloat {
-        let height = sampleHeight(size: size) + labels + verticalPadding * 2
-        let font = NSFont.systemFont(ofSize: size)
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: font, .kern: kerning]))
-        return max(height * 1.4, CTLineGetTypographicBounds(line, nil, nil, nil) * 1.1 + padding * 2 + 8)
+        /// The sample's height: its letters and room above and below them, which small type gets more of.
+        func height(size: Double) -> CGFloat { above + below + size * 0.25 + 44 }
+
+        /// How far below the middle of the sample the baseline is, so that its letters are centred in it.
+        var baselineBelowCentre: CGFloat { (above - below) / 2 }
+
+        /// How narrow a tile can be: the size and 186 pt more, and as wide as the sample text with a little to spare, so it
+        /// isn't made smaller to fit.
+        func minimumWidth(size: Double) -> CGFloat { max(size + 186, width * 1.1 + padding * 2 + 8) }
     }
 
     /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
@@ -45,12 +53,13 @@ struct FontGrid: View {
 
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
-        let (count, tile) = layout(minimum: Self.minimumWidth(sample: sample, size: preview.size, kerning: preview.kerning(at: preview.size)))
+        let measure = Measure(sample, size: preview.size, kerning: preview.kerning(at: preview.size))
+        let (count, tile) = layout(minimum: measure.minimumWidth(size: preview.size))
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
                     ForEach(families) { family in
-                        Tile(family: family, sampleHeight: Self.sampleHeight(size: preview.size), isSelected: model.selectedIDs.contains(family.id), model: model)
+                        Tile(family: family, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
@@ -88,6 +97,7 @@ private struct Tile: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
     let sampleHeight: CGFloat
+    let baselineBelowCentre: CGFloat
     let isSelected: Bool
     let model: AppModel
 
@@ -101,12 +111,12 @@ private struct Tile: View {
                     .accessibilityHidden(true)
             }
             let face = family.face(nearestWeight: preview.weight).face
-            // On one baseline in every tile, whatever each font's ascent and descent, where the span from a capital's top to
-            // a descender's end is centred. Not clipped: what reaches past it runs into the padding.
+            // On one baseline in every tile, whatever each font's ascent and descent, where the sample's letters are centred
+            // (see `Measure`). Not clipped: what reaches past it runs into the padding.
             Color.clear
                 .frame(maxWidth: .infinity)
                 .frame(height: sampleHeight)
-                .alignmentGuide(.firstTextBaseline) { $0.height / 2 + preview.size * FontGrid.baselineBelowCentre }
+                .alignmentGuide(.firstTextBaseline) { $0.height / 2 + baselineBelowCentre }
                 .overlay(alignment: Alignment(horizontal: .center, vertical: .firstTextBaseline)) {
                     FontText(
                         text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: face),
@@ -117,6 +127,9 @@ private struct Tile: View {
                     // Only where a tile can't be wide enough: a font far wider than the system font, text longer than a row,
                     // or the Info panel narrowing the tiles.
                     .minimumScaleFactor(0.4)
+                    // Its whole line, though that's higher than the sample: proposed less, it shrank to fit, drawn below the
+                    // baseline it reported.
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
                 }
             VStack(alignment: .leading, spacing: 2) {
