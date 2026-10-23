@@ -388,39 +388,54 @@ struct ValueField: View {
     var step: Double = 1
     /// After the number: " pt", "%".
     var unit = ""
+    /// Where the number sits in the field's width: trailing lines values up in a column, leading keeps it as
+    /// close to the slider as a label is on the other side.
+    var alignment = HorizontalAlignment.trailing
     @State private var text = ""
     @FocusState private var isFocused: Bool
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") {
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "", alignment: HorizontalAlignment = .trailing) {
         self.title = title
         _value = value
         self.range = range
         self.step = step
         self.unit = unit
+        self.alignment = alignment
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            TextField(title, text: $text)
-                .labelsHidden()
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.trailing)
-                .focused($isFocused)
-                .onSubmit(commit)
-                .onKeyPress(keys: [.upArrow, .downArrow]) { press in
-                    let steps = press.modifiers.contains(.shift) ? 10.0 : 1
-                    set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
-                    return .handled
-                }
+            number
             // In the number's colour: forms grey a row's value text.
             Text(unit).foregroundStyle(.primary)
         }
         .monospacedDigit()
-        .frame(width: 52, alignment: .trailing)
+        .frame(width: 52, alignment: Alignment(horizontal: alignment, vertical: .center))
         .onAppear { text = formatted(value) }
         // The slider moved; typing leaves the value alone until it's committed.
         .onChange(of: value) { text = formatted($1) }
         .onChange(of: isFocused) { if !$1 { commit() } }
+    }
+
+    @ViewBuilder
+    private var number: some View {
+        let field = TextField(title, text: $text)
+            .labelsHidden()
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .onSubmit(commit)
+            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                let steps = press.modifiers.contains(.shift) ? 10.0 : 1
+                set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
+                return .handled
+            }
+        if alignment == .leading {
+            // As wide as the number, growing as it's typed, so the unit follows it; the field keeps 4 pt for
+            // the caret after the number, which the unit takes back to sit as close as after a right-aligned one.
+            field.fixedSize().padding(.trailing, -4)
+        } else {
+            field.multilineTextAlignment(.trailing)
+        }
     }
 
     /// What's typed, with a decimal comma or point.

@@ -302,7 +302,7 @@ private struct TypeTester: View {
         HStack(spacing: 8) {
             Text(title).foregroundStyle(.secondary).fixedSize()
             ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
-            ValueField(title, value: value, range: range, step: step, unit: unit)
+            ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
         }
         .layoutPriority(1)
     }

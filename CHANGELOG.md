@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- On a font page, the **Size** and **Leading** values sit right after their sliders, as close as the labels before them.
+
 ## 0.10.1
 
 - In the grid, tiles are taller when they’re wide, two or three in a row, so they don’t look flat. Narrow tiles keep their height, and opening the Info panel doesn’t make tiles lower.
