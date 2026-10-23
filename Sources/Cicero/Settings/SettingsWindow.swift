@@ -8,6 +8,6 @@ struct SettingsWindow: View {
             Tab("Sidebar", systemImage: "sidebar.leading") { SidebarSettings() }
             Tab("Coverage", systemImage: "character.textbox") { CharacterSetsSettings() }
         }
-        .frame(width: 560, height: 580)
+        .frame(width: 600, height: 580)
     }
 }

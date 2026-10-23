@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- The Settings window is a little wider, and in **Settings → General** the menus for **Activate fonts by** and **When an added font is already in your library** are the same width.
+
 ## 0.10.2
 
 - **Preview Options** no longer have **Tracking** or **Alignment**. The list, grid, specimens, Quick Look and Compare show every font with its own spacing, lined up on the left. Font pages have **Tracking** now, next to **Size** and **Leading**, starting from what you had set in Preview Options.

@@ -58,15 +58,17 @@ struct GeneralSettings: View {
                         Text(misplacedNote(misplaced))
                     }
                 }
+                // The two pop-up menus are as wide as each other.
+                let installMethods = InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) }
+                let duplicateHandlings = DuplicateHandling.allCases.map { (title: $0.title, value: $0) }
                 LabeledContent {
-                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
-                                selection: $model.data.installMethod)
+                    PopUpPicker(options: installMethods, selection: $model.data.installMethod, widthFitting: duplicateHandlings.map(\.title))
                 } label: {
                     Text("Activate fonts by")
                     Text(activationExplanation)
                 }
                 LabeledContent {
-                    PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
+                    PopUpPicker(options: duplicateHandlings, selection: $model.data.duplicateHandling, widthFitting: installMethods.map(\.title))
                 } label: {
                     Text("When an added font is already in your library")
                     Text(duplicateExplanation)

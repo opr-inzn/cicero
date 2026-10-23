@@ -593,6 +593,8 @@ struct FolderActivationPicker: View {
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value
+    /// Titles of the pop-up menus next to this one: it's as wide as the widest of them would make it, so they line up.
+    var widthFitting: [String] = []
 
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -613,7 +615,10 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
-        nsView.intrinsicContentSize
+        let size = nsView.intrinsicContentSize
+        guard !widthFitting.isEmpty, let font = nsView.font else { return size }
+        let widest = { (titles: [String]) in titles.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0 }
+        return CGSize(width: size.width + max(0, widest(widthFitting) - widest(nsView.itemTitles)).rounded(.up), height: size.height)
     }
 
     func makeCoordinator() -> PopUpTarget { PopUpTarget() }
