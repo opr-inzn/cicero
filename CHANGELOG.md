@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.2
 
 - The fonts Adobe apps load from their own folders, where type designers put fonts to test them, are now called **Proofing**, in the sidebar and on their red tag. **Testing** read like trial fonts. The switch in **Settings → General** is now **Show fonts installed for proofing in Adobe apps**. A name you gave the item yourself stays.
 
