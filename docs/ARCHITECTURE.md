@@ -169,7 +169,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   the starts and ends of drags to `SidebarDrag`, which learns a drag's rows from each row's `itemProvider`
   (asked for as the drag starts, an empty item) and hides them when they're let go of outside the list, and
   puts `draggedImage:movedTo:` into the outline view's class, so each move sets Finder's × outside the list
-  (a timer doesn't run during a drag on macOS 26).
+  (a timer doesn't run during a drag on macOS 26), and `draggingSession:endedAtPoint:operation:`, which closes
+  the gap without animating after a drop in the list. Dragged rows get pictures drawn by `SidebarDrag`.
   Everything else (selection, moves, menus, headers) stays SwiftUI's.
 - The deployment target is macOS 15. What Cicero uses of macOS 26 (glass, bars over scroll views, exact line
   heights, drop sessions and configurations, the on-device language model) is behind `#available(macOS 26, *)`,

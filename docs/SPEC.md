@@ -97,7 +97,10 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   (`hideFromSidebar`), as Finder's sidebar removes them, with a toast,
   "Recents hidden from the sidebar" ("4 items" for more than three), with Undo. While they're outside, the pointer
   has Finder's × (`NSCursor.disappearingItem`, set at each move from the outline view's `draggedImage:movedTo:`)
-  and they don't slide back. Escape, or letting go back in the list, keeps them. Character set
+  and they don't slide back. Escape, or letting go back in the list, keeps them. A dragged row is drawn by Cicero,
+  its symbol and title in the label colour at the row's size (`SidebarDrag.picture`), which macOS fades as Finder's
+  rows; the list's own picture had a white symbol beside black text on macOS 26. Rows dropped in a new place land at
+  once: the gap closes without animating (AppKit's closing slid the rows below up, cut off at their edges). Character set
   group titles don't hide this way.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
   together: they land side by side in the gap, in their order. The browser then shows the fonts in any of them. Selecting in another section starts over there.
