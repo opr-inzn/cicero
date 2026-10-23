@@ -29,19 +29,21 @@ struct FontText: View {
     /// Axes moved in the Info panel, by tag.
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
-    var kerning: Double = 0
     var lineLimit: Int? = 1
     /// For text that runs over several lines, the distance from one line's baseline to the next in points; nil for the
     /// font's own line spacing.
     var lineHeight: Double?
+    /// What to multiply the size by, for the font at the size: the grid draws fonts too wide for its tiles smaller.
+    var scale: ((CTFont) -> CGFloat)?
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let atSize = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let scale = scale?(atSize) ?? 1
+            let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations, features: features)
             Text(text.isEmpty ? " " : text)
                 .font(Font(font))
-                .kerning(kerning)
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))

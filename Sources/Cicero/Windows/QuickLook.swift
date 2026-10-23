@@ -377,14 +377,13 @@ private struct QuickLookText: View {
     let size: Double
     var weight: Double = 400
     var variations: [String: Double] = [:]
-    var kerning: Double = 0
     var lineLimit: Int? = 1
     var lineHeight: Double?
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
-            FontText(text: text, face: face, size: size, weight: weight, variations: variations, kerning: kerning,
+            FontText(text: text, face: face, size: size, weight: weight, variations: variations,
                      lineLimit: lineLimit, lineHeight: lineHeight)
         } else {
             Text(text)
