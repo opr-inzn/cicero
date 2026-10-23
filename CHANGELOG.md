@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - On a font page, the **Size** and **Leading** values sit right after their sliders, as close as the labels before them.
+- When a font page is too narrow for **Size** and **Leading** beside the **Style** menu, they go on a row of their own at the left, under the menu. Before, they were at the right.
 
 ## 0.10.1
 

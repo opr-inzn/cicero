@@ -235,8 +235,8 @@ private struct TypeTester: View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            // On one row where there's room, else the sliders on a row of their own: with the Info panel open, a narrow
-            // window has too little for all of them, and squeezed, the labels would wrap and the row grow.
+            // On one row where there's room, else the sliders on a row of their own, at the left: with the Info panel
+            // open, a narrow window has too little for all of them, and squeezed, the labels would wrap and the row grow.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) {
                     stylePicker(isAdjusted: !variations.isEmpty)
@@ -251,8 +251,8 @@ private struct TypeTester: View {
                         buttons(hasAxes: !face.face.axes.isEmpty)
                     }
                     HStack(spacing: 16) {
-                        Spacer(minLength: 0)
                         sliders
+                        Spacer(minLength: 0)
                     }
                 }
             }
