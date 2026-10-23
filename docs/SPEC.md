@@ -96,7 +96,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
 - Rows dragged out of the list and let go of there, where nothing takes them, go as their menus would (`dragOutOfSidebar`),
   as Finder's sidebar removes them: locations leave the library (Remove Location from Library), folders, smart and
   app folders and tags are deleted (Delete Folder, Delete Tag), and Cicero's own locations, which can't be removed, and
-  every other row are hidden; with a toast, "Recents hidden from the sidebar", "Trial deleted", "ABCAreal removed
+  every other row are hidden; with a toast, "Recents hidden from the sidebar", "Trial deleted", "Downloads removed
   from the library" ("4 items", "4 tags", "4 locations" for more than three; joined with "and" when a drag does two),
   with Undo, which puts back the lists they changed as they were (fonts a removed location had on stay off). While they're outside, the pointer
   has Finder's × (`NSCursor.disappearingItem`, set at each move from the outline view's `draggedImage:movedTo:`)
