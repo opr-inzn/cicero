@@ -47,9 +47,10 @@ public final class FontLoader: Sendable {
     /// `weight` sets the weight axis of variable faces (clamped to its range); ignored otherwise. `variations` sets
     /// any of their axes, by tag, the weight axis over `weight`; the slider that sets one keeps it in range. A variable
     /// face is otherwise drawn exactly where it sits on its axes, optical size included: CoreText would match that to
-    /// the point size, and drops a setting of the default to do so.
+    /// the point size, and drops a setting of the default to do so. `cached` false makes the font without keeping it, for
+    /// measuring many faces once: kept, they'd push the fonts on screen out of the cache.
     public func font(_ face: FontFace, size: CGFloat, weight: Double? = nil, variations: [String: Double] = [:],
-                     features: [FeatureSetting] = []) -> CTFont {
+                     features: [FeatureSetting] = [], cached: Bool = true) -> CTFont {
         let weight = face.weightAxis.flatMap { axis in weight.map { min(max($0, axis.minimum), axis.maximum) } }
         let variations = face.axes.isEmpty ? [] : variations.sorted { $0.key < $1.key }
         let features = features.sorted { ($0.type, $0.selector) < ($1.type, $1.selector) }
@@ -68,8 +69,13 @@ public final class FontLoader: Sendable {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
         }
         let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
-        fonts[key] = font
+        if cached { fonts[key] = font }
         return font
+    }
+
+    /// How many times the file changed while Cicero ran, for caches of what's measured from its faces.
+    public func generation(of path: String) -> Int {
+        state.withLock { $0.generations[path] ?? 0 }
     }
 
     /// A variable face where `weight` and `variations` put it, its other axes where it sits, at that optical size
