@@ -152,7 +152,9 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   size (`FontGrid.Measure`, from the sample — the preview text, else "Aa Gg 123" — in the system font at that size, so
   every tile gets the same): the sample is as high as its letters reach above and below the baseline, plus a quarter of
   the size + 44 pt; every font's sample sits on one baseline, where those letters are centred ("H" centres the capital,
-  "g" the x-height and descender), whatever the font's own ascent and descent; it's drawn unclipped and at its whole
+  "g" the x-height and descender), whatever the font's own ascent and descent; and at least 0.36 times as high as the
+  tile is wide without the Info panel (`sampleHeightPerWidth`), so wide tiles, two or three in a row, aren't flat, and the
+  panel doesn't make them lower; it's drawn unclipped and at its whole
   line's height, never shrunk to the sample's (proposed less, SwiftUI shrank it and drew it below the baseline it
   reported). A tile is at least the size + 186 pt wide, and as wide as the sample × 1.1 + 28 pt; as many tiles fit in a
   row as can be that wide in the rows without the Info panel, from one to five, as wide as fills the row, however many

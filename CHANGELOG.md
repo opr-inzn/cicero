@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- In the grid, tiles are taller when they’re wide, two or three in a row, so they don’t look flat. Narrow tiles keep their height, and opening the Info panel doesn’t make tiles lower.
+
 ## 0.10.0
 
 - In the sidebar, **Folders** is now called **Locations**, for the places on your Mac Cicero lists fonts from, and sets are now folders: **Sets** is called **Folders**, with a folder icon, smart sets are smart folders and application sets app folders. The menus say so too, like **File → New Folder** (⇧⌘N), **New Smart Folder**, **New App Folder** and **Add Location** (⇧⌘O), **Add to Folder** in a family’s menu, and **Settings → Locations**. In a smart folder’s rules, **Set** is now **Folder** and **Folder** is **Location**.
