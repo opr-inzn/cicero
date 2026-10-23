@@ -29,19 +29,21 @@ struct FontText: View {
     /// Axes moved in the Info panel, by tag.
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
-    var kerning: Double = 0
     var lineLimit: Int? = 1
     /// For text that runs over several lines, the distance from one line's baseline to the next in points; nil for the
     /// font's own line spacing.
     var lineHeight: Double?
+    /// What to multiply the size by, for the font at the size: the grid draws fonts too wide for its tiles smaller.
+    var scale: ((CTFont) -> CGFloat)?
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let atSize = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let scale = scale?(atSize) ?? 1
+            let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations, features: features)
             Text(text.isEmpty ? " " : text)
                 .font(Font(font))
-                .kerning(kerning)
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))
@@ -779,7 +781,7 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help("Preview text, size, weight, spacing and alignment")
+        .help("Preview text, size, weight and leading")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(size: size, sizeRange: sizeRange) }
     }
 }
@@ -807,20 +809,8 @@ private struct PreviewOptions: View {
             Section {
                 row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
                 row("Weight", $preview.weight, range: 100...900)
-                row("Tracking", $preview.tracking, range: -10...40, step: 0.5, unit: "%")
-                    .help("The space added between letters, in percent of the em, on top of the font’s kerning")
                 row("Leading", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
-                LabeledContent("Alignment") {
-                    Picker("Alignment", selection: $preview.alignment) {
-                        ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelStyle(.iconOnly)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                .help("How samples line up in specimens and Quick Look; font pages have their own alignment")
             }
         }
         .formStyle(.grouped)

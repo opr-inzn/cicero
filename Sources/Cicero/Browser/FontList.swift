@@ -570,7 +570,7 @@ private struct FontListRow: View {
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             FontText(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face,
-                size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures, kerning: preview.kerning(at: 17)
+                size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures
             )
             // Every row the same height, however tall the font's glyphs, which may run over its edges rather
             // than be cut off.

@@ -75,10 +75,9 @@ private struct Specimen: View {
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             FontText(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
-                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
-                kerning: preview.kerning(at: preview.size)
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures
             )
-            .frame(maxWidth: .infinity, alignment: preview.alignment.frame)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if family.faces.count > 1 {
                 FlowLayout(spacing: 14, lineSpacing: 4) {
                     ForEach(family.faces.prefix(Self.styleLimit)) { face in

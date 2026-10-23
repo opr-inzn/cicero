@@ -301,28 +301,25 @@ private struct FamilyQuickLook: View {
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
 
-    /// Lined up and spaced as Preview Options say.
+    /// On the left, with Preview Options' leading.
     private func sample() -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
-        let alignment = preview.alignment
         return Group {
             if preview.sampleText.isEmpty {
-                VStack(alignment: alignment.horizontal, spacing: 14) {
+                VStack(alignment: .leading, spacing: 14) {
                     QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96,
-                                  variations: variations, kerning: preview.kerning(at: 96))
+                                  variations: variations)
                         .minimumScaleFactor(0.4)
                     QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
-                                  kerning: preview.kerning(at: 24), lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
+                                  lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
                 }
             } else {
                 QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
-                              variations: variations, kerning: preview.kerning(at: 56),
-                              lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
+                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
             }
         }
-        .multilineTextAlignment(alignment.text)
-        .frame(maxWidth: .infinity, alignment: alignment.frame)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var footer: some View {
@@ -380,14 +377,13 @@ private struct QuickLookText: View {
     let size: Double
     var weight: Double = 400
     var variations: [String: Double] = [:]
-    var kerning: Double = 0
     var lineLimit: Int? = 1
     var lineHeight: Double?
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
-            FontText(text: text, face: face, size: size, weight: weight, variations: variations, kerning: kerning,
+            FontText(text: text, face: face, size: size, weight: weight, variations: variations,
                      lineLimit: lineLimit, lineHeight: lineHeight)
         } else {
             Text(text)
