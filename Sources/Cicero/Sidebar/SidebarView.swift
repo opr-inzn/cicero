@@ -737,9 +737,12 @@ final class SidebarDrag {
     private var lastAsked: ContinuousClock.Instant?
     private var session: NSDraggingSession?
     private var listFrame = NSRect.zero
+    /// The rows' pictures, made as the drag starts (see `picture(of:size:in:)`).
+    private var pictures: [NSImage?] = []
 
     /// The list asks each row it starts dragging for an item, one after another, so rows asked for at once are one
-    /// drag's. An empty item: the list's own moves the rows.
+    /// drag's; on macOS 26 also as the mouse goes down on them, to see whether they drag, so a drag's rows are the last
+    /// ones asked for (see `began`). An empty item: the list's own moves the rows.
     func provider(for row: SidebarRow) -> NSItemProvider {
         let now = ContinuousClock.now
         if lastAsked.map({ now - $0 > .milliseconds(500) }) ?? true { rows = [] }
@@ -748,28 +751,45 @@ final class SidebarDrag {
         return NSItemProvider()
     }
 
-    /// The drag has started, with `count` rows: unless they're the ones asked for, it's left alone. Each row is
+    /// The drag has started, with `count` rows, the last `count` asked for: unless that many were, it's left alone. Each row is
     /// dragged as its own picture (see `picture(of:size:in:)`).
     func began(_ session: NSDraggingSession, count: Int, in outline: NSOutlineView) {
-        guard count == rows.count, let frame = Self.frame(of: outline) else { return rows = [] }
+        guard count <= rows.count, let frame = Self.frame(of: outline) else { return rows = [] }
+        rows = Array(rows.suffix(count))
         self.session = session
         listFrame = frame
-        var pictures = rows.makeIterator()
-        session.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, _, _ in
-            guard let row = pictures.next() else { return }
-            let size = item.draggingFrame.size
-            guard let picture = Self.picture(of: row, size: size, in: outline) else { return }
-            item.imageComponentsProvider = {
-                let component = NSDraggingImageComponent(key: .icon)
-                component.contents = picture
-                component.frame = NSRect(origin: .zero, size: size)
-                return [component]
-            }
+        pictures = []
+        session.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
+            self.dress(item, at: index, in: outline)
+        }
+    }
+
+    /// SwiftUI draws the dragged rows again as the drag comes over the list (its `updateDraggingItemsForDrag`), with
+    /// the white symbol: they get their pictures back.
+    func redraw(_ info: NSDraggingInfo, in outline: NSOutlineView) {
+        guard session != nil, info.draggingSource as AnyObject? === outline else { return }
+        info.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
+            self.dress(item, at: index, in: outline)
+        }
+    }
+
+    /// Gives the dragged row at `index` its picture.
+    private func dress(_ item: NSDraggingItem, at index: Int, in outline: NSOutlineView) {
+        guard rows.indices.contains(index) else { return }
+        let size = item.draggingFrame.size
+        while pictures.count <= index { pictures.append(nil) }
+        if pictures[index]?.size != size { pictures[index] = Self.picture(of: rows[index], size: size, in: outline) }
+        guard let picture = pictures[index] else { return }
+        item.imageComponentsProvider = {
+            let component = NSDraggingImageComponent(key: .icon)
+            component.contents = picture
+            component.frame = NSRect(origin: .zero, size: size)
+            return [component]
         }
     }
 
     /// A row's symbol and title, in the label colour, where the list draws them in a row `size` big: what's dragged,
-    /// faded by macOS as Finder's sidebar rows are. The list's own picture of the row had a white symbol beside black
+    /// as faded as Finder's sidebar rows are. The list's own picture of the row had a white symbol beside black
     /// text on macOS 26. The sizes are a sidebar row's, measured: 11, 13 and 15 pt type for small, medium and large
     /// rows, the symbol starting a few points in.
     private static func picture(of row: SidebarRow, size: NSSize, in outline: NSOutlineView) -> NSImage? {
@@ -784,6 +804,8 @@ final class SidebarDrag {
             .foregroundStyle(.primary)
             .padding(.leading, leading)
             .frame(width: size.width, height: size.height, alignment: .leading)
+            // As light as Finder's sidebar rows are dragged: measured against them on macOS 26.
+            .opacity(0.88)
             .environment(\.colorScheme, isDark ? .dark : .light))
         renderer.scale = outline.window?.backingScaleFactor ?? 2
         return renderer.nsImage
@@ -840,6 +862,8 @@ private enum SidebarDataSource {
     private typealias Ended = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void
     private typealias Moved = @convention(c) (NSOutlineView, Selector, AnyObject?, NSPoint) -> Void
     private typealias SessionEnded = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint, NSDragOperation) -> Void
+    private typealias Update = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject) -> Void
+    private typealias SessionMoved = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint) -> Void
     /// The classes answering already, so a second sidebar doesn't wrap the answers in more.
     private static var answering: Set<ObjectIdentifier> = []
     /// Where an outline view keeps its sidebar's `SidebarDrag`.
@@ -859,6 +883,16 @@ private enum SidebarDataSource {
             index == -2 ? [] : swiftUIValidate(source, validate, outline, info, item, index)
         }
         method_setImplementation(validateMethod, imp_implementationWithBlock(validateAnswer))
+
+        let update = #selector(NSOutlineViewDataSource.outlineView(_:updateDraggingItemsForDrag:))
+        if let updateMethod = class_getInstanceMethod(type, update) {
+            let swiftUIUpdate = unsafeBitCast(method_getImplementation(updateMethod), to: Update.self)
+            let updateAnswer: @convention(block) (AnyObject, NSOutlineView, AnyObject) -> Void = { source, outline, info in
+                swiftUIUpdate(source, update, outline, info)
+                if let info = info as? NSDraggingInfo { sidebarDrag(of: outline)?.redraw(info, in: outline) }
+            }
+            method_setImplementation(updateMethod, imp_implementationWithBlock(updateAnswer))
+        }
 
         let begin = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:willBeginAt:forItems:))
         let end = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:endedAt:operation:))
@@ -895,6 +929,21 @@ private enum SidebarDataSource {
         let implementation = imp_implementationWithBlock(moved)
         if !class_addMethod(type, move, implementation, method_getTypeEncoding(inherited)) {
             method_setImplementation(inherited, implementation)
+        }
+        // macOS 26 tells a drag's source of its moves this way, and there SwiftUI's outline view has the method itself.
+        let movedTo = #selector(NSDraggingSource.draggingSession(_:movedTo:))
+        if let own = class_getInstanceMethod(type, movedTo) {
+            let swiftUIMoved = unsafeBitCast(method_getImplementation(own), to: SessionMoved.self)
+            let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
+                swiftUIMoved(outline, movedTo, session, point)
+                sidebarDrag(of: outline)?.moved(to: point)
+            }
+            method_setImplementation(own, imp_implementationWithBlock(sessionMoved))
+        } else {
+            let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
+                sidebarDrag(of: outline)?.moved(to: point)
+            }
+            class_addMethod(type, movedTo, imp_implementationWithBlock(sessionMoved), "v@:@{CGPoint=dd}")
         }
         let end = #selector(NSDraggingSource.draggingSession(_:endedAt:operation:))
         if let inheritedEnd = class_getInstanceMethod(type, end) {
