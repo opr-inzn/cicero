@@ -78,12 +78,13 @@ public struct SimilarFonts: Sendable {
 
     /// The words at the end of a name that make another copy of a design rather than another design: a trial's, a
     /// variable font's, an OpenType one's, one for another region's characters (PingFang SC and HK, Hiragino's ProN) or
-    /// another script's (Serif Pro Cyr, or SerifC with its C for Cyrillic), and the fonts older families cut for their
+    /// another script's, whose Latin is the design's (Serif Pro Cyr, Sans Arabic, or SerifC with its C for Cyrillic), and the fonts older families cut for their
     /// figures, small capitals, expert set, alternates, ligatures or ornaments. Not a foundry's: two foundries' fonts
     /// of one name are often different drawings.
     static let copyWords: Set<String> = [
         "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn", "ot",
-        "sc", "tc", "hk", "mo", "cyr", "cyrillic", "grk", "greek", "ce", "w1g", "c",
+        "sc", "tc", "hk", "mo", "cyr", "cyrillic", "grk", "greek", "ce", "w1g", "c", "arabic", "hebrew", "armenian", "georgian",
+        "thai", "devanagari",
         "lf", "tf", "osf", "scosf", "caps", "smallcaps", "expert", "exp", "alt", "alts", "alternate", "alternates", "swash",
         "swashes", "lig", "ligatures", "fractions", "pi", "ornaments", "initials",
     ]
