@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- In the grid, fonts much wider than the Mac’s own grow and shrink with the rest as you change the size. Before, they stopped growing while the rest went on, until the tiles got fewer and bigger. They’re still drawn a little smaller so they fit their tiles, also with the Info panel open; every other font is at the size you chose.
+
 ## 0.10.1
 
 - In the grid, tiles are taller when they’re wide, two or three in a row, so they don’t look flat. Narrow tiles keep their height, and opening the Info panel doesn’t make tiles lower.
