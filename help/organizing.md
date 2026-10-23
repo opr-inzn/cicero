@@ -38,7 +38,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 2. Uncheck what you don’t want. Unchecked items are dimmed.
 3. Click **Done**. The unchecked items disappear.
 
-To hide one item quickly, right-click it and choose **Hide from Sidebar**, or drag it out of the sidebar and let go: it disappears in a puff of smoke, as in the Finder’s sidebar. Changed your mind? Click **Undo** in the note at the bottom of the window. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
+To hide one item quickly, right-click it and choose **Hide from Sidebar**, or drag it out of the sidebar and let go, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. Changed your mind? Click **Undo** in the note at the bottom of the window. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
 
 The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
 
