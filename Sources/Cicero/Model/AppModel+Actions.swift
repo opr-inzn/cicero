@@ -757,6 +757,18 @@ extension AppModel {
         return rows.isEmpty ? [row] : rows
     }
 
+    /// Hides rows dragged out of the sidebar, as Hide from Sidebar does, with Undo in the toast: a drag out is easily
+    /// made by mistake.
+    func hideFromSidebar(_ rows: [SidebarRow]) {
+        let rows = rows.filter { isVisible($0.key) }
+        guard !rows.isEmpty else { return }
+        hide(rows.map(\.key))
+        let names = rows.count > 3 ? "\(rows.count) items" : rows.map(\.title).formatted(.list(type: .and))
+        showToast("\(names) hidden from the sidebar") { [weak self] in
+            for row in rows { self?.setVisible(row.key, true) }
+        }
+    }
+
     /// What the sidebar list selects. Several items only within one list (a section, or a group of
     /// character sets), so they can move together: Command-clicking in another list starts over there.
     func selectSidebarItems(_ items: Set<SidebarItem>) {

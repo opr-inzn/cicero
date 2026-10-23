@@ -93,6 +93,11 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   drag in the list). Sections don't move: a click on a title opens or closes it, and a drag does nothing (an
   order saved when sections could be dragged is kept; Reset Order puts them back). Items that are gone for now (System Fonts while
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
+- Rows dragged out of the list and let go of there, where nothing takes them, are hidden from the sidebar
+  (`hideFromSidebar`), as Finder's sidebar removes them: a puff of smoke where they're let go, and a toast,
+  "Recents hidden from the sidebar" ("4 items" for more than three), with Undo. While they're outside, the pointer
+  shows the puff and they don't slide back. Escape, or letting go back in the list, keeps them. Character set
+  group titles don't hide this way.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
   together: they land side by side in the gap, in their order. The browser then shows the fonts in any of them. Selecting in another section starts over there.
 - The menu of one of several selected rows, which the list rings together, is for all of them (`AppModel.menuTargets`,
