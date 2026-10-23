@@ -69,7 +69,7 @@ public enum LibraryImport {
             // A backup's are those it has, which `placeBundledFonts` put there.
             count += imported.bundledFonts?.files.count ?? imported.fontFolderCount
             if !isRead(folder) {
-                // Adobe's folders come with the Testing switch, as when the user adds one.
+                // Adobe's folders come with the Proofing switch, as when the user adds one.
                 if WatchedFolder.detectAppName(forPath: folder) != nil {
                     data.showAdobeAppFolders = true
                 } else {

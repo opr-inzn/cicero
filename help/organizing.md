@@ -81,19 +81,19 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a location in the sidebar:
 
-- **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Testing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
+- **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Location from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Locations** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
-### Testing
+### Proofing
 
-The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Testing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Testing** isn’t one of your locations: you turn it on or off with **Show test fonts installed for Adobe apps** under **Library** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Testing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
+The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Proofing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Proofing** isn’t one of your locations: you turn it on or off with **Show fonts installed for proofing in Adobe apps** under **Library** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Proofing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
 
 ### Adobe Fonts
 
-The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show test fonts installed for Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Settings → General**: they’re then left out of every list, smart folders and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
+The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show fonts installed for proofing in Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Settings → General**: they’re then left out of every list, smart folders and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
 
 ### Font Library
 
@@ -210,8 +210,8 @@ To change it later, right-click it and choose **Edit Smart Folder**. To remove i
 | Note | contains, doesn’t contain | Text in the family’s [note](#notes) |
 | Has Note | Yes, No | Whether the family has a [note](#notes) |
 | Folder | is in, isn’t in | One of your folders |
-| Location | is in, isn’t in | One of your locations, Testing, Adobe Fonts, or Added Fonts |
-| Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is there while **Show test fonts installed for Adobe apps** is on, for the fonts only Adobe apps load (see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders)) |
+| Location | is in, isn’t in | One of your locations, Proofing, Adobe Fonts, or Added Fonts |
+| Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is there while **Show fonts installed for proofing in Adobe apps** is on, for the fonts only Adobe apps load (see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders)) |
 | Kind | is, is not | Italic, for a family with italic styles, Monospaced or Variable |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType and others |
 | Number of Styles | is, is more than, is less than | A number |

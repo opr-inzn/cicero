@@ -6,7 +6,7 @@ public struct UserData: Codable, Equatable, Sendable {
     public var version = 2
     public var folders: [WatchedFolder] = []
     /// Folder ID → the name the user gave it in the sidebar, in place of its own (`WatchedFolder.displayName`); the
-    /// folder on disk keeps its name. Cicero's own items (Testing, Adobe Fonts, Added Fonts, Deactivated) take one too.
+    /// folder on disk keeps its name. Cicero's own items (Proofing, Adobe Fonts, Added Fonts, Deactivated) take one too.
     public var folderNames: [String: String] = [:]
     /// Font files added one at a time (Add Fonts…, dropped on the window, or opened from the Finder), listed
     /// where they are, like the fonts in a folder.
@@ -65,7 +65,7 @@ public struct UserData: Codable, Equatable, Sendable {
     public static let manyFamilies = 100
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
-    /// as one Testing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
+    /// as one Proofing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
     public var showAdobeAppFolders = true
     /// List the Adobe Fonts Creative Cloud turned on, as Adobe Fonts: those on in every app and those Adobe apps turned
     /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
@@ -327,14 +327,14 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Deactivated", "Font Library", "Testing" (Adobe's folders, where type designers
+    /// The name the user gave it; else "Deactivated", "Font Library", "Proofing" (Adobe's folders, where type designers
     /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
     /// else the name.
     public var displayName: String {
         if let customName { return customName }
         if id == Self.deactivatedID { return "Deactivated" }
         if id == Self.fontLibraryID { return "Font Library" }
-        if id == Self.adobeAppsID { return "Testing" }
+        if id == Self.adobeAppsID { return "Proofing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
         if id == Self.addedFilesID { return "Added Fonts" }
         let last = url.lastPathComponent
