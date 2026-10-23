@@ -271,7 +271,7 @@ private struct SidebarContent: View {
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
-            if model.isEditingSidebar { checkbox(row.key, row.title) }
+            if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
             SidebarLabel(row: row, highlight: highlight)
         }
         .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
@@ -366,7 +366,7 @@ private struct SidebarRowMenu: View {
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: exported) }
         }
         Divider()
-        let shown = rows.filter { model.isVisible($0.key) }
+        let shown = rows.filter { $0.canHide && model.isVisible($0.key) }
         if !shown.isEmpty {
             Button("Hide from Sidebar", systemImage: "eye.slash") { model.hide(shown.map(\.key)) }
         }
@@ -814,7 +814,8 @@ final class SidebarDrag {
     /// The pointer has moved to `point`, on the screen: outside the list it has the ×, set at each move as Finder's
     /// sidebar does, and the rows won't slide back.
     func moved(to point: NSPoint) {
-        guard let session else { return }
+        // All Fonts, Active and Inactive don't go: nothing to show for them.
+        guard let session, rows.contains(where: \.canHide) else { return }
         let isOutside = !listFrame.contains(point)
         session.animatesToStartingPositionsOnCancelOrFail = !isOutside
         if isOutside {
@@ -824,9 +825,10 @@ final class SidebarDrag {
         }
     }
 
-    /// The drag has ended at `point`, on the screen. Rows nothing took, let go of outside the list, are hidden.
+    /// The drag has ended at `point`, on the screen. Rows nothing took, let go of outside the list, are hidden, but All
+    /// Fonts, Active and Inactive.
     func ended(at point: NSPoint, operation: NSDragOperation) {
-        let rows = session == nil ? [] : rows
+        let rows = session == nil ? [] : rows.filter(\.canHide)
         session = nil
         self.rows = []
         lastAsked = nil

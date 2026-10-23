@@ -83,7 +83,7 @@ struct SidebarSettings: View {
         Text(text).foregroundStyle(.secondary)
     }
 
-    /// Off while its section is: the row can't show then either way.
+    /// Off while its section is: the row can't show then either way. All Fonts, Active and Inactive's stay on.
     private func checkbox(_ row: SidebarRow, in section: SidebarSection? = nil) -> some View {
         Toggle(isOn: visibility(row.key)) {
             HStack(spacing: 6) {
@@ -95,7 +95,7 @@ struct SidebarSettings: View {
             }
         }
         .toggleStyle(.checkbox)
-        .disabled(section.map { !model.isVisible($0.key) } ?? false)
+        .disabled(!row.canHide || (section.map { !model.isVisible($0.key) } ?? false))
     }
 
     private func visibility(_ key: String) -> Binding<Bool> {

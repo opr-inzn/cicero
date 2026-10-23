@@ -70,6 +70,12 @@ struct SidebarRow: Identifiable, Hashable {
     var color: TagColor?
 
     var id: String { key }
+
+    /// All Fonts, Active and Inactive: the library itself, always in the sidebar.
+    static let alwaysShown: Set<String> = ["library.all", "library.active", "library.inactive"]
+
+    /// Whether the row can be hidden from the sidebar: every row but All Fonts, Active and Inactive.
+    var canHide: Bool { !Self.alwaysShown.contains(key) }
 }
 
 /// What a cached `visibleFamilies` was computed from.

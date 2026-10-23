@@ -737,15 +737,17 @@ extension AppModel {
         return "Fonts"
     }
 
-    func isVisible(_ key: String) -> Bool { !data.sidebar.hidden.contains(key) }
+    /// All Fonts, Active and Inactive always are, even where an earlier version hid them.
+    func isVisible(_ key: String) -> Bool { SidebarRow.alwaysShown.contains(key) || !data.sidebar.hidden.contains(key) }
 
     func setVisible(_ key: String, _ visible: Bool) {
         if visible { data.sidebar.hidden.remove(key) } else { hide([key]) }
     }
 
     /// Hides rows: Hide from Sidebar on a row's menu (on every selected row's, see `menuTargets`) or a group's title.
+    /// All Fonts, Active and Inactive stay.
     func hide(_ keys: [String]) {
-        data.sidebar.hidden.formUnion(keys)
+        data.sidebar.hidden.formUnion(keys.filter { !SidebarRow.alwaysShown.contains($0) })
         deselect { !isShown($0) }
     }
 
@@ -760,7 +762,7 @@ extension AppModel {
     /// Hides rows dragged out of the sidebar, as Hide from Sidebar does, with Undo in the toast: a drag out is easily
     /// made by mistake.
     func hideFromSidebar(_ rows: [SidebarRow]) {
-        let rows = rows.filter { isVisible($0.key) }
+        let rows = rows.filter { $0.canHide && isVisible($0.key) }
         guard !rows.isEmpty else { return }
         hide(rows.map(\.key))
         let names = rows.count > 3 ? "\(rows.count) items" : rows.map(\.title).formatted(.list(type: .and))
