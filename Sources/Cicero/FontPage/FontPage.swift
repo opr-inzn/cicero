@@ -238,12 +238,12 @@ private struct TypeTester: View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            // On one row where there's room, else the sliders on a row of their own, at the left: with the Info panel
+            // On one row where there's room, else the sliders on a row of their own, under the menu: with the Info panel
             // open, a narrow window has too little for all of them, and squeezed, the labels would wrap and the row grow.
+            // Either way the sliders take all the width their row leaves.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) {
                     stylePicker(isAdjusted: !variations.isEmpty)
-                    Spacer()
                     sliders
                     buttons(hasAxes: !face.face.axes.isEmpty)
                 }
@@ -253,10 +253,7 @@ private struct TypeTester: View {
                         Spacer()
                         buttons(hasAxes: !face.face.axes.isEmpty)
                     }
-                    HStack(spacing: 16) {
-                        sliders
-                        Spacer(minLength: 0)
-                    }
+                    sliders
                 }
             }
             .padding(.top, 12)
@@ -291,25 +288,28 @@ private struct TypeTester: View {
         }
     }
 
-    /// The text's size and tracking, and its leading, which is Preview Options' too.
+    /// The text's size and tracking, and its leading, which is Preview Options' too. The labels and values side by side
+    /// with the sliders in one row, so the sliders share what it leaves equally: all of it, and as long as each other,
+    /// however long their labels.
     private var sliders: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 8) {
             slider("Size", $size, range: 12...240, unit: " pt")
-            slider("Tracking", $tracking, range: -10...40, step: 0.5, unit: "%")
+            slider("Tracking", $tracking, range: -10...40, step: 0.5, unit: "%", isFirst: false)
                 .help("The space added between letters, in percent of the em, on top of the font’s kerning")
-            slider("Leading", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
+            slider("Leading", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%", isFirst: false)
                 .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
         }
     }
 
-    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too.
-    private func slider(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String) -> some View {
-        HStack(spacing: 8) {
-            Text(title).foregroundStyle(.secondary).fixedSize()
-            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
+    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too:
+    /// three views of the row, the label 16 pt after the value before it.
+    private func slider(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String,
+                        isFirst: Bool = true) -> some View {
+        Group {
+            Text(title).foregroundStyle(.secondary).fixedSize().padding(.leading, isFirst ? 0 : 8)
+            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: .infinity)
             ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
         }
-        .layoutPriority(1)
     }
 
     @ViewBuilder
