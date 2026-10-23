@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Writes Sources/Cicero/App/MenuBarIcon.swift: the app icon's cube (see make-icon.py), with C, 1 and 6 from AM
-Gaonkar Display Medium cut out of its faces, as the outline of Cicero's icon in the menu bar. The menu bar draws it
+"""Writes Sources/Cicero/App/MenuBarIcon.swift: the app icon's cube (see make-icon.py), with C, 1 and 6 from
+Mischief cut out of its faces, as the outline of Cicero's icon in the menu bar. The menu bar draws it
 in one colour, black or white, and the faces meet without a gap: the cube is a solid hexagon with the letters in it.
 
-    scripts/make-menu-bar-icon.py path/to/AMGaonkar-Display-Medium.otf
+    scripts/make-menu-bar-icon.py path/to/Mischief-Regular.woff2
 
 Needs fontTools and pyclipper, as make-icon.py does.
 """

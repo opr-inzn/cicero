@@ -6,7 +6,7 @@
 //
 //     scripts/make-dmg-background.mjs path/to/cicero-website
 //
-// Takes Diplomat and ABC Areal from the website and renders the page in headless Chrome (CHROME
+// Takes Mischief and ABC Areal from the website and renders the page in headless Chrome (CHROME
 // overrides its path). Needs Node 22 or newer and nothing else.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const [website] = process.argv.slice(2);
 const fonts = website && join(website, "src", "assets", "fonts");
-if (!fonts || !existsSync(join(fonts, "Diplomat-Regular.woff2"))) {
+if (!fonts || !existsSync(join(fonts, "Mischief-Regular.woff2"))) {
   console.error("Usage: scripts/make-dmg-background.mjs path/to/cicero-website");
   process.exit(1);
 }
@@ -32,14 +32,14 @@ const WIDTH = 660, LAYOUT = 400, HEIGHT = 68 + LAYOUT + 56;
 const page = `<!doctype html>
 <meta charset="utf-8">
 <style>
-  @font-face { font-family: Diplomat; src: ${font("Diplomat-Regular.woff2")}; }
+  @font-face { font-family: Mischief; src: ${font("Mischief-Regular.woff2")}; }
   @font-face { font-family: Areal; src: ${font("ABCAreal-Regular.woff2")}; }
   html, body { margin: 0; width: ${WIDTH}px; height: ${HEIGHT}px; overflow: hidden; }
   body {
     position: relative; background: #fafaf8; color: #141413; text-align: center;
     -webkit-font-smoothing: antialiased; font-feature-settings: "liga" 1;
   }
-  h1 { position: absolute; top: 40px; left: 0; right: 0; margin: 0; font: 32px/1.12 Diplomat; letter-spacing: -.02em; }
+  h1 { position: absolute; top: 40px; left: 0; right: 0; margin: 0; font: 32px/1.12 Mischief; letter-spacing: -.02em; }
   .lede { position: absolute; top: 88px; left: 0; right: 0; margin: 0; font: 14px/1.3 Areal; color: #6b6a66; }
   .well {
     position: absolute; top: 132px; width: 200px; height: 184px; border-radius: 24px;

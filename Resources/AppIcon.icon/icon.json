@@ -13,8 +13,8 @@
       "name": "Top",
       "layers": [
         {
-          "name": "Edges",
-          "image-name": "edges.svg",
+          "name": "Top Lip",
+          "image-name": "top-lip.svg",
           "glass": false
         },
         {
@@ -31,16 +31,16 @@
               "value": {
                 "linear-gradient": [
                   "srgb:1.00000,0.54118,0.43922,1.00000",
-                  "srgb:0.90980,0.26275,0.17255,1.00000"
+                  "srgb:0.94902,0.18824,0.08235,1.00000"
                 ],
                 "orientation": {
                   "start": {
                     "x": 0.5,
-                    "y": 0.15625
+                    "y": 0.109375
                   },
                   "stop": {
                     "x": 0.5,
-                    "y": 0.4931640625
+                    "y": 0.5
                   }
                 }
               }
@@ -49,17 +49,17 @@
               "appearance": "dark",
               "value": {
                 "linear-gradient": [
-                  "srgb:0.94118,0.39216,0.29804,1.00000",
-                  "srgb:0.69412,0.16471,0.10588,1.00000"
+                  "srgb:1.00000,0.56078,0.47843,1.00000",
+                  "srgb:0.87059,0.20392,0.13333,1.00000"
                 ],
                 "orientation": {
                   "start": {
                     "x": 0.5,
-                    "y": 0.15625
+                    "y": 0.109375
                   },
                   "stop": {
                     "x": 0.5,
-                    "y": 0.4931640625
+                    "y": 0.5
                   }
                 }
               }
@@ -81,10 +81,10 @@
         }
       ],
       "shadow": {
-        "kind": "neutral",
+        "kind": "none",
         "opacity": 0.5
       },
-      "specular": true,
+      "specular": false,
       "translucency": {
         "enabled": false,
         "value": 0.5
@@ -93,6 +93,11 @@
     {
       "name": "Left",
       "layers": [
+        {
+          "name": "Left Lip",
+          "image-name": "left-lip.svg",
+          "glass": false
+        },
         {
           "name": "Left Gloss",
           "image-name": "left-gloss.svg",
@@ -107,16 +112,16 @@
               "value": {
                 "linear-gradient": [
                   "srgb:0.35686,0.50196,1.00000,1.00000",
-                  "srgb:0.11373,0.21176,0.85490,1.00000"
+                  "srgb:0.10588,0.15294,0.91765,1.00000"
                 ],
                 "orientation": {
                   "start": {
                     "x": 0.5,
-                    "y": 0.32470703125
+                    "y": 0.3046875
                   },
                   "stop": {
                     "x": 0.5,
-                    "y": 0.830078125
+                    "y": 0.890625
                   }
                 }
               }
@@ -125,17 +130,17 @@
               "appearance": "dark",
               "value": {
                 "linear-gradient": [
-                  "srgb:0.25098,0.37647,0.94118,1.00000",
-                  "srgb:0.08627,0.13333,0.56078,1.00000"
+                  "srgb:0.37255,0.51373,0.99216,1.00000",
+                  "srgb:0.14118,0.21569,0.74902,1.00000"
                 ],
                 "orientation": {
                   "start": {
                     "x": 0.5,
-                    "y": 0.32470703125
+                    "y": 0.3046875
                   },
                   "stop": {
                     "x": 0.5,
-                    "y": 0.830078125
+                    "y": 0.890625
                   }
                 }
               }
@@ -157,10 +162,10 @@
         }
       ],
       "shadow": {
-        "kind": "neutral",
+        "kind": "none",
         "opacity": 0.5
       },
-      "specular": true,
+      "specular": false,
       "translucency": {
         "enabled": false,
         "value": 0.5
@@ -169,6 +174,11 @@
     {
       "name": "Right",
       "layers": [
+        {
+          "name": "Right Lip",
+          "image-name": "right-lip.svg",
+          "glass": false
+        },
         {
           "name": "Right Gloss",
           "image-name": "right-gloss.svg",
@@ -182,17 +192,17 @@
             {
               "value": {
                 "linear-gradient": [
-                  "srgb:0.52549,0.94902,0.44314,1.00000",
-                  "srgb:0.18824,0.69412,0.25882,1.00000"
+                  "srgb:0.47451,0.96078,0.37647,1.00000",
+                  "srgb:0.06275,0.70196,0.20784,1.00000"
                 ],
                 "orientation": {
                   "start": {
                     "x": 0.5,
-                    "y": 0.32470703125
+                    "y": 0.3046875
                   },
                   "stop": {
                     "x": 0.5,
-                    "y": 0.830078125
+                    "y": 0.890625
                   }
                 }
               }
@@ -201,17 +211,17 @@
               "appearance": "dark",
               "value": {
                 "linear-gradient": [
-                  "srgb:0.32157,0.81176,0.28235,1.00000",
-                  "srgb:0.11373,0.45490,0.14118,1.00000"
+                  "srgb:0.32157,0.94902,0.27451,1.00000",
+                  "srgb:0.14118,0.57647,0.18039,1.00000"
                 ],
                 "orientation": {
                   "start": {
                     "x": 0.5,
-                    "y": 0.32470703125
+                    "y": 0.3046875
                   },
                   "stop": {
                     "x": 0.5,
-                    "y": 0.830078125
+                    "y": 0.890625
                   }
                 }
               }
@@ -230,18 +240,13 @@
           "fill": {
             "solid": "srgb:0.02353,0.18824,0.04314,1.00000"
           }
-        },
-        {
-          "name": "Shadow",
-          "image-name": "shadow.svg",
-          "glass": false
         }
       ],
       "shadow": {
-        "kind": "neutral",
+        "kind": "none",
         "opacity": 0.5
       },
-      "specular": true,
+      "specular": false,
       "translucency": {
         "enabled": false,
         "value": 0.5
