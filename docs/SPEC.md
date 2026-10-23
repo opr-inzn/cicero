@@ -169,7 +169,10 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   tiles, so they grow and shrink with the size like the rest. (Shrunk to fit its tile, a font stopped growing while the
   rest went on, until the tiles got fewer, as tiles stay as wide as they are until a row has room for one fewer or one
   more.) With the Info panel open, every sample is smaller by as much as the tiles are narrower, one share for all, so
-  they keep their sizes to one another: held to the narrower tiles' room instead, most fonts were drawn the same width.
+  they keep their sizes to one another (held to the narrower tiles' room instead, most fonts were drawn the same width):
+  at the size times that share, rounded down to a whole point (`GridPanelSize`), which Preview Options' Size shows while
+  the grid does, with the size chosen in its tooltip; a size picked then sets the smallest whole size chosen that the
+  grid draws at that size, and the panel shut shows the size chosen again. The list and specimens keep the size chosen.
   Every font's sample sits on one baseline, where the system font's letters are centred ("H"
   centres the capital, "g" the x-height and descender), whatever the font's own ascent and descent; it's drawn unclipped
   and at its whole line's height, never shrunk to the sample's (proposed less, SwiftUI shrank it and drew it below the

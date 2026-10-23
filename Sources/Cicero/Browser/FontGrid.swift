@@ -43,10 +43,10 @@ struct FontGrid: View {
 
         /// The widest a font's sample is drawn with the Info panel shut: as wide as a tile as narrow as it can be has room
         /// for, in tiles `closedTile` wide, which goes up with the size, not with the tiles, as they stay as wide as they
-        /// are until a row has room for one fewer or one more. With the panel open, every sample smaller alike.
-        func fit(size: Double, ratio: CGFloat?, tile: CGFloat, closedTile: CGFloat) -> SampleFit {
+        /// are until a row has room for one fewer or one more. With the panel open, every sample at `drawn` alike.
+        func fit(size: Double, ratio: CGFloat?, closedTile: CGFloat, drawn: Double) -> SampleFit {
             let room = minimumWidth(size: size, ratio: ratio) - padding * 2 - 8
-            return SampleFit(width: min(room, closedTile - padding * 2 - 8), share: tile / closedTile)
+            return SampleFit(width: min(room, closedTile - padding * 2 - 8), share: drawn / size)
         }
 
         /// How far below the middle of the sample the baseline is, so that its letters are centred in it.
@@ -71,7 +71,10 @@ struct FontGrid: View {
         let ratio = SampleWidths.shared.listRatio
         let (count, tile, closedTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
         let sampleHeight = max(measure.height(size: preview.size), closedTile * Self.sampleHeightPerWidth)
-        let fit = measure.fit(size: preview.size, ratio: ratio, tile: tile, closedTile: closedTile)
+        // Smaller by as much as the Info panel narrows the tiles, while it does.
+        let share = model.isInfoPresented && tile < closedTile ? tile / closedTile : nil
+        let fit = measure.fit(size: preview.size, ratio: ratio, closedTile: closedTile,
+                              drawn: share.map { GridPanelSize.drawn(preview.size, share: $0) } ?? preview.size)
         let inputs = sampleInputs
         ScrollViewReader { proxy in
             ScrollView {
@@ -92,6 +95,8 @@ struct FontGrid: View {
             }
             .visibleHeight($visibleHeight)
             .task(id: inputs) { measureSamples(inputs) }
+            .onChange(of: share, initial: true) { GridPanelSize.shared.share = share }
+            .onDisappear { GridPanelSize.shared.share = nil }
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
@@ -144,11 +149,30 @@ struct FontGrid: View {
     }
 }
 
+/// The size the grid draws at while the Info panel narrows its tiles, which Preview Options' Size shows then: the size
+/// chosen, smaller by as much as the tiles are narrower, rounded down to a whole point so it's never too big for them.
+/// The size chosen is kept for the list, specimens and the grid with the panel shut; a size picked while the panel is
+/// open sets the smallest whole size chosen that the grid draws at that size.
+@Observable
+final class GridPanelSize {
+    static let shared = GridPanelSize()
+    /// How much narrower the panel makes the tiles; nil while it's shut or the grid isn't showing.
+    var share: CGFloat?
+
+    static func drawn(_ size: Double, share: CGFloat) -> Double {
+        (size * share + 1e-6).rounded(.down)
+    }
+
+    static func chosen(drawing drawn: Double, share: CGFloat) -> Double {
+        (drawn / share - 1e-6).rounded(.up)
+    }
+}
+
 /// How big a font's sample is drawn in the grid: at the preview size, or, for one of the few fonts too wide for the tiles
 /// (see `Measure.minimumWidth`), smaller, until it's `width` wide. `width` goes up with the size, so such a font grows and
 /// shrinks with it like the rest; shrunk to fit its tile instead, it stopped growing while the rest went on, until the tiles
-/// got fewer. While the Info panel narrows the tiles, every sample is smaller by as much, so all of them keep their sizes
-/// to one another, rather than the wider ones being held at their tiles' edges.
+/// got fewer. While the Info panel narrows the tiles, every sample is smaller by as much (see `GridPanelSize`), so all of
+/// them keep their sizes to one another, rather than the wider ones being held at their tiles' edges.
 struct SampleFit {
     var width: CGFloat
     var share: CGFloat

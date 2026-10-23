@@ -822,7 +822,17 @@ private struct PreviewOptions: View {
                 .fixedSize()
             }
             Section {
-                row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
+                if size == nil, let share = GridPanelSize.shared.share {
+                    // The size the grid draws at while the Info panel narrows it (see `GridPanelSize`).
+                    row("Size", Binding {
+                        GridPanelSize.drawn(preview.size, share: share)
+                    } set: {
+                        preview.size = min(max(GridPanelSize.chosen(drawing: $0, share: share), sizeRange.lowerBound), sizeRange.upperBound)
+                    }, range: GridPanelSize.drawn(sizeRange.lowerBound, share: share)...GridPanelSize.drawn(sizeRange.upperBound, share: share), unit: " pt")
+                    .help("The grid’s size while the Info panel narrows it: \(Int(preview.size)) pt with the panel closed")
+                } else {
+                    row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
+                }
                 row("Weight", $preview.weight, range: 100...900)
                 row("Leading", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
