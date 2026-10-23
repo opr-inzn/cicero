@@ -817,7 +817,8 @@ private struct PreviewOptions: View {
             Section {
                 TextField("Preview Text", text: $preview.sampleText, prompt: Text("Preview Text"))
                     .labelsHidden()
-                Menu("Presets") {
+                // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
+                Menu("Presets\u{200A}") {
                     ForEach(PreviewSettings.presets, id: \.self) { sample in
                         Button(sample) { preview.sampleText = sample }
                     }
