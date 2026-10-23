@@ -35,10 +35,10 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 ### Hide items you don’t use
 
 1. Click **Edit** next to **Library** at the top of the sidebar, or right-click the sidebar and choose **Edit Sidebar**. Every item and section gets a checkbox. Sections stay open or closed as they were: click a section’s title to open or close it, for example to close **Foundries** and get to **Coverage** faster.
-2. Uncheck what you don’t want. Unchecked items are dimmed.
+2. Uncheck what you don’t want. Unchecked items are dimmed. **All Fonts**, **Active** and **Inactive** always stay: their checkboxes can’t be unchecked.
 3. Click **Done**. The unchecked items disappear.
 
-To hide one item quickly, right-click it and choose **Hide from Sidebar**. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
+To hide one item quickly, right-click it and choose **Hide from Sidebar**, or drag it out of the sidebar and let go, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. Changed your mind? Click **Undo** in the note at the bottom of the window. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
 
 The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
 

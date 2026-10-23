@@ -85,7 +85,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
     ones too; their own name back undoes it; a name that's taken says so; overrides, smart folder rules and the sidebar
     follow), Delete Classification for the user's own (its families go back to Automatic, its smart folder rules go).
   - **Coverage** (titled like the Settings tab; + new custom set). Collapsible groups — Latin S–XL, Adobe Latin, Google Fonts, Unicode Blocks, Your Coverage Sets — with every set shown unless hidden (Edit, Settings). The section starts collapsed, as Foundries does (Classifications starts open), and within it Unicode Blocks and Google Fonts. Menu for custom: Edit Coverage Set, Delete Coverage Set.
-- The menus of folders, smart folders, tags, locations, foundries, classifications and character sets also have Export Fonts (that row's families, see Export and backup). Every row menu also has Hide from Sidebar and Edit Sidebar, and so does a character set group's title, where Hide from Sidebar hides every set in the group (`hideGroup`), and with them the group.
+- The menus of folders, smart folders, tags, locations, foundries, classifications and character sets also have Export Fonts (that row's families, see Export and backup). Every row menu also has Hide from Sidebar (but All Fonts', Active's and Inactive's, which always show: `SidebarRow.alwaysShown`, their checkboxes in Edit and Settings → Sidebar on and disabled, a drag out of the list leaving them, an earlier version's hiding of them ignored) and Edit Sidebar, and so does a character set group's title, where Hide from Sidebar hides every set in the group (`hideGroup`), and with them the group.
 - Order: rows drag to a new place within their own section (character sets within their group), never
   into another one; as in Finder's sidebar, the rows around the place they'd land slide apart to open a gap
   for them. Character set groups move by dragging a group's title onto another's, which is highlighted: the
@@ -93,6 +93,15 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   drag in the list). Sections don't move: a click on a title opens or closes it, and a drag does nothing (an
   order saved when sections could be dragged is kept; Reset Order puts them back). Items that are gone for now (System Fonts while
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
+- Rows dragged out of the list and let go of there, where nothing takes them, are hidden from the sidebar
+  (`hideFromSidebar`), as Finder's sidebar removes them, with a toast,
+  "Recents hidden from the sidebar" ("4 items" for more than three), with Undo. While they're outside, the pointer
+  has Finder's × (`NSCursor.disappearingItem`, set at each move from the outline view's `draggedImage:movedTo:`)
+  and they don't slide back. Escape, or letting go back in the list, keeps them; the picture never slides back to where the rows were (`animatesToStartingPositionsOnCancelOrFail` off), so rows let go where nothing changes, as in their own place, are there again at once rather than after half a second of the picture sliding back and fading. A dragged row is drawn by Cicero,
+  its symbol and title in the label colour at the row's size (`SidebarDrag.picture`), at 88 % as Finder's rows
+  are (measured on macOS 26); the list's own picture had a white symbol beside black text on macOS 26. Rows dropped in a new place land at
+  once: the gap closes without animating (AppKit's closing slid the rows below up, cut off at their edges). Character set
+  group titles don't hide this way.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
   together: they land side by side in the gap, in their order. The browser then shows the fonts in any of them. Selecting in another section starts over there.
 - The menu of one of several selected rows, which the list rings together, is for all of them (`AppModel.menuTargets`,

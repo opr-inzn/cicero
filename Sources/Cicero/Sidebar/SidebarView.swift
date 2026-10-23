@@ -8,20 +8,22 @@ import UniformTypeIdentifiers
 /// the same way while editing, so a long one like Foundries can be closed to get past it. Edit and Done switch
 /// at once: animated, hundreds of rows coming and going ran into each other. Rows drag to a new place within their section (or character set
 /// group), several at once when they're selected together, and the rows they pass slide apart to open a
-/// gap where they'll land. Group titles drag onto each other; sections stay in their order.
+/// gap where they'll land; dropped outside the sidebar, they're hidden, as Finder's sidebar removes them.
+/// Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     /// What the list shows selected while the browser hasn't taken it yet (see `select`).
     @State private var pendingSelection: Set<SidebarItem>?
     @State private var pace = SelectionPace()
     @State private var highlight = SidebarHighlight()
+    @State private var drag = SidebarDrag()
 
     var body: some View {
         let shown = pendingSelection ?? model.selectedItems
         // The rows are a view of their own: a list's selection updates whatever makes the list, and this
         // way that's just this, not every section and row. Each row's title reads the selection it draws.
         List(selection: Binding(get: { shown }, set: select)) {
-            SidebarContent(highlight: highlight)
+            SidebarContent(highlight: highlight, drag: drag)
         }
         .listStyle(.sidebar)
         .onChange(of: shown, initial: true) { highlight.selected = shown }
@@ -68,6 +70,7 @@ private struct SidebarContent: View {
     @Environment(AppModel.self) private var model
     /// Passed in rather than through the environment, which a row's background doesn't get.
     let highlight: SidebarHighlight
+    let drag: SidebarDrag
     /// The character set group whose title is being dragged, and the one whose title it's over.
     @State private var draggedGroup: String?
     @State private var groupDropTarget: String?
@@ -110,7 +113,14 @@ private struct SidebarContent: View {
     private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
         let shownRows = shown(rows)
         return ForEach(shownRows) { row($0, section: section) }
-            .onMove { model.moveSidebarItems($0, to: $1, shown: shownRows.map(\.key), all: rows.map(\.key), in: list) }
+            .onMove { source, destination in
+                // Without the list's animation: the gap already shows where the rows land (see `SidebarDataSource`).
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    model.moveSidebarItems(source, to: destination, shown: shownRows.map(\.key), all: rows.map(\.key), in: list)
+                }
+            }
     }
 
     /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Sets move within
@@ -197,7 +207,7 @@ private struct SidebarContent: View {
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
         }
         .padding(.trailing, 10)
-        .background(OutlineViewSetup())
+        .background(OutlineViewSetup(drag: drag) { model.hideFromSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -261,7 +271,7 @@ private struct SidebarContent: View {
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
-            if model.isEditingSidebar { checkbox(row.key, row.title) }
+            if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
             SidebarLabel(row: row, highlight: highlight)
         }
         .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
@@ -269,6 +279,8 @@ private struct SidebarContent: View {
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
+        // Asked for as the list starts dragging the row, which tells which rows a drag has.
+        .itemProvider { drag.provider(for: row) }
         // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear,
         // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
@@ -354,7 +366,7 @@ private struct SidebarRowMenu: View {
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: exported) }
         }
         Divider()
-        let shown = rows.filter { model.isVisible($0.key) }
+        let shown = rows.filter { $0.canHide && model.isVisible($0.key) }
         if !shown.isEmpty {
             Button("Hide from Sidebar", systemImage: "eye.slash") { model.hide(shown.map(\.key)) }
         }
@@ -676,13 +688,31 @@ private struct GroupDrop: ViewModifier {
 /// sidebar, instead of drawing an insertion line, and leaves drawing the selection to the rows (see
 /// `SidebarHighlight`). SwiftUI has no setting for either: a List on macOS 26 is an NSOutlineView, whose
 /// `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves the styles alone once
-/// they're set. This sits behind a header inside the list, so the outline view is among its superviews; it takes
-/// no clicks and draws nothing.
+/// they're set; the gap needs one answer SwiftUI can't give, and rows dropped outside need two more (see
+/// `SidebarDataSource`). This sits behind a header inside the list, so the outline view is among its superviews;
+/// it takes no clicks and draws nothing.
 private struct OutlineViewSetup: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { Marker() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    let drag: SidebarDrag
+    /// Hides rows dropped outside the sidebar.
+    let hide: ([SidebarRow]) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        drag.hide = hide
+        return Marker(drag: drag)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) { drag.hide = hide }
 
     private final class Marker: NSView {
+        let drag: SidebarDrag
+
+        init(drag: SidebarDrag) {
+            self.drag = drag
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
         override func viewDidMoveToWindow() {
@@ -690,8 +720,267 @@ private struct OutlineViewSetup: NSViewRepresentable {
             var view = superview
             while let current = view, !(current is NSOutlineView) { view = current.superview }
             guard let outline = view as? NSOutlineView else { return }
-            outline.draggingDestinationFeedbackStyle = .gap
             outline.selectionHighlightStyle = .none
+            // Without the answers, a row dragged out of the list stops Cicero.
+            if SidebarDataSource.answer(for: outline, drag: drag) { outline.draggingDestinationFeedbackStyle = .gap }
+            SidebarDrag.prepare(in: outline)
         }
+    }
+}
+
+/// The rows a drag in the sidebar has, and what dropping them outside it does: they're hidden from the sidebar, as
+/// Finder's sidebar removes them. While the pointer is outside, it has Finder's ×, the disappearing-item cursor. Escape,
+/// or a drop back in the list, keeps them. Their picture never slides back to where they were.
+final class SidebarDrag {
+    /// Hides rows dropped outside the sidebar (`AppModel.hideFromSidebar`).
+    var hide: ([SidebarRow]) -> Void = { _ in }
+    private var rows: [SidebarRow] = []
+    private var lastAsked: ContinuousClock.Instant?
+    private var session: NSDraggingSession?
+    private var listFrame = NSRect.zero
+    /// The rows' pictures, made as the drag starts (see `picture(of:size:in:)`).
+    private var pictures: [NSImage?] = []
+
+    /// The list asks each row it starts dragging for an item, one after another, so rows asked for at once are one
+    /// drag's; on macOS 26 also as the mouse goes down on them, to see whether they drag, so a drag's rows are the last
+    /// ones asked for (see `began`). An empty item: the list's own moves the rows.
+    func provider(for row: SidebarRow) -> NSItemProvider {
+        let now = ContinuousClock.now
+        if lastAsked.map({ now - $0 > .milliseconds(500) }) ?? true { rows = [] }
+        lastAsked = now
+        rows.append(row)
+        return NSItemProvider()
+    }
+
+    /// The drag has started, with `count` rows, the last `count` asked for: unless that many were, it's left alone. Each row is
+    /// dragged as its own picture (see `picture(of:size:in:)`).
+    func began(_ session: NSDraggingSession, count: Int, in outline: NSOutlineView) {
+        guard count <= rows.count, let frame = Self.frame(of: outline) else { return rows = [] }
+        rows = Array(rows.suffix(count))
+        self.session = session
+        listFrame = frame
+        // Let go where nothing changes, as back in their own place, the rows are there again at once: AppKit slid the
+        // picture back there and faded it out first, with the place empty.
+        session.animatesToStartingPositionsOnCancelOrFail = false
+        pictures = []
+        session.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
+            self.dress(item, at: index, in: outline)
+        }
+    }
+
+    /// SwiftUI draws the dragged rows again as the drag comes over the list (its `updateDraggingItemsForDrag`), with
+    /// the white symbol: they get their pictures back.
+    func redraw(_ info: NSDraggingInfo, in outline: NSOutlineView) {
+        guard session != nil, info.draggingSource as AnyObject? === outline else { return }
+        info.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
+            self.dress(item, at: index, in: outline)
+        }
+    }
+
+    /// Gives the dragged row at `index` its picture.
+    private func dress(_ item: NSDraggingItem, at index: Int, in outline: NSOutlineView) {
+        guard rows.indices.contains(index) else { return }
+        let size = item.draggingFrame.size
+        while pictures.count <= index { pictures.append(nil) }
+        if pictures[index]?.size != size { pictures[index] = Self.picture(of: rows[index], size: size, in: outline) }
+        guard let picture = pictures[index] else { return }
+        item.imageComponentsProvider = {
+            let component = NSDraggingImageComponent(key: .icon)
+            component.contents = picture
+            component.frame = NSRect(origin: .zero, size: size)
+            return [component]
+        }
+    }
+
+    /// A row's symbol and title, in the label colour, where the list draws them in a row `size` big: what's dragged,
+    /// as faded as Finder's sidebar rows are. The list's own picture of the row had a white symbol beside black
+    /// text on macOS 26. The sizes are a sidebar row's, measured: 11, 13 and 15 pt type for small, medium and large
+    /// rows, the symbol starting a few points in.
+    /// Draws a picture once, a second after the sidebar appears: the first one SwiftUI draws takes 80 ms, which,
+    /// on a row's first drag, left its place empty a frame before the picture came, as the second's doesn't.
+    static func prepare(in outline: NSOutlineView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak outline] in
+            guard let outline else { return }
+            _ = picture(of: SidebarRow(key: "", title: "Aa", icon: "folder", item: .all), size: NSSize(width: 120, height: 28), in: outline)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+    }
+
+    private static func picture(of row: SidebarRow, size: NSSize, in outline: NSOutlineView) -> NSImage? {
+        let (fontSize, leading): (CGFloat, CGFloat) = switch outline.effectiveRowSizeStyle {
+        case .small: (11, 3.5)
+        case .large: (15, 3.5)
+        default: (13, 4.5)
+        }
+        let isDark = outline.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let renderer = ImageRenderer(content: Label { Text(row.title).lineLimit(1) } icon: { SidebarIcon(row: row) }
+            .font(.system(size: fontSize))
+            .foregroundStyle(.primary)
+            .padding(.leading, leading)
+            .frame(width: size.width, height: size.height, alignment: .leading)
+            // As light as Finder's sidebar rows are dragged: measured against them on macOS 26.
+            .opacity(0.88)
+            .environment(\.colorScheme, isDark ? .dark : .light))
+        renderer.scale = outline.window?.backingScaleFactor ?? 2
+        return renderer.nsImage
+    }
+
+    /// The pointer has moved to `point`, on the screen: outside the list it has the ×, set at each move as Finder's
+    /// sidebar does.
+    func moved(to point: NSPoint) {
+        // All Fonts, Active and Inactive don't go: nothing to show for them.
+        guard session != nil, rows.contains(where: \.canHide) else { return }
+        let isOutside = !listFrame.contains(point)
+        if isOutside {
+            if NSCursor.current != NSCursor.disappearingItem { NSCursor.disappearingItem.set() }
+        } else if NSCursor.current == NSCursor.disappearingItem {
+            NSCursor.arrow.set()
+        }
+    }
+
+    /// The drag has ended at `point`, on the screen. Rows nothing took, let go of outside the list, are hidden, but All
+    /// Fonts, Active and Inactive.
+    func ended(at point: NSPoint, operation: NSDragOperation) {
+        let rows = session == nil ? [] : rows.filter(\.canHide)
+        session = nil
+        self.rows = []
+        lastAsked = nil
+        // With the button still down, Escape ended the drag.
+        guard !rows.isEmpty, operation.isEmpty, NSEvent.pressedMouseButtons & 1 == 0, !listFrame.contains(point) else { return }
+        hide(rows)
+    }
+
+    /// The part of the screen the list shows.
+    private static func frame(of outline: NSOutlineView) -> NSRect? {
+        let list = outline.enclosingScrollView ?? outline
+        return list.window?.convertToScreen(list.convert(list.bounds, to: nil))
+    }
+}
+
+/// What SwiftUI's list leaves out, put into its data source's class (SwiftUI's own) in place of three of its methods,
+/// each handing on to SwiftUI's, and into its outline view's class.
+/// - As a drag leaves an outline view whose drop feedback is `.gap`, AppKit asks the data source whether it takes a
+///   drop at child index -2, AppKit's nowhere, to close the gap. SwiftUI's data source looks up row -2 and Cicero
+///   stops (seen on macOS 27.0.1, checked on 26.6.2), so every row dragged out of the sidebar was a crash. That one
+///   question is answered here, with no drop, which closes the gap. When the method isn't there to replace, the
+///   sidebar keeps the list's own drop feedback.
+/// - Rows dropped in the list land at once. As the drag ends, AppKit closes its gap, after SwiftUI has put the rows in
+///   their places, so another gap opened and the rows below slid up into it, cut off at their edges. The outline view's
+///   `draggingSession:endedAtPoint:operation:` closes it without animating when the rows were dropped in the list.
+/// - As a drag starts, moves and ends, the sidebar's `SidebarDrag` hears of it, to show the × outside the list and
+///   hide rows dropped there. The moves come from the outline view's `draggedImage:movedTo:`, which AppKit calls at
+///   each one, also on macOS 26, where a timer doesn't run while a drag does; the outline view hands them to a data
+///   source only if it had the method when it was set.
+private enum SidebarDataSource {
+    private typealias Validate = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject, AnyObject?, Int) -> NSDragOperation
+    private typealias Began = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingSession, NSPoint, NSArray) -> Void
+    private typealias Ended = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void
+    private typealias Moved = @convention(c) (NSOutlineView, Selector, AnyObject?, NSPoint) -> Void
+    private typealias SessionEnded = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint, NSDragOperation) -> Void
+    private typealias Update = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject) -> Void
+    private typealias SessionMoved = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint) -> Void
+    /// The classes answering already, so a second sidebar doesn't wrap the answers in more.
+    private static var answering: Set<ObjectIdentifier> = []
+    /// Where an outline view keeps its sidebar's `SidebarDrag`.
+    private static let dragKey = UnsafeMutableRawPointer.allocate(byteCount: 1, alignment: 1)
+
+    /// Whether `outline`'s data source answers the question about -2 now.
+    static func answer(for outline: NSOutlineView, drag: SidebarDrag) -> Bool {
+        objc_setAssociatedObject(outline, dragKey, drag, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        followMoves(of: outline)
+        guard let source = outline.dataSource, let type = object_getClass(source) else { return false }
+        if answering.contains(ObjectIdentifier(type)) { return true }
+
+        let validate = #selector(NSOutlineViewDataSource.outlineView(_:validateDrop:proposedItem:proposedChildIndex:))
+        guard let validateMethod = class_getInstanceMethod(type, validate) else { return false }
+        let swiftUIValidate = unsafeBitCast(method_getImplementation(validateMethod), to: Validate.self)
+        let validateAnswer: @convention(block) (AnyObject, NSOutlineView, AnyObject, AnyObject?, Int) -> NSDragOperation = { source, outline, info, item, index in
+            index == -2 ? [] : swiftUIValidate(source, validate, outline, info, item, index)
+        }
+        method_setImplementation(validateMethod, imp_implementationWithBlock(validateAnswer))
+
+        let update = #selector(NSOutlineViewDataSource.outlineView(_:updateDraggingItemsForDrag:))
+        if let updateMethod = class_getInstanceMethod(type, update) {
+            let swiftUIUpdate = unsafeBitCast(method_getImplementation(updateMethod), to: Update.self)
+            let updateAnswer: @convention(block) (AnyObject, NSOutlineView, AnyObject) -> Void = { source, outline, info in
+                swiftUIUpdate(source, update, outline, info)
+                if let info = info as? NSDraggingInfo { sidebarDrag(of: outline)?.redraw(info, in: outline) }
+            }
+            method_setImplementation(updateMethod, imp_implementationWithBlock(updateAnswer))
+        }
+
+        let begin = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:willBeginAt:forItems:))
+        let end = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:endedAt:operation:))
+        if let beginMethod = class_getInstanceMethod(type, begin), let endMethod = class_getInstanceMethod(type, end) {
+            let swiftUIBegin = unsafeBitCast(method_getImplementation(beginMethod), to: Began.self)
+            let beginAnswer: @convention(block) (AnyObject, NSOutlineView, NSDraggingSession, NSPoint, NSArray) -> Void = { source, outline, session, point, items in
+                swiftUIBegin(source, begin, outline, session, point, items)
+                sidebarDrag(of: outline)?.began(session, count: items.count, in: outline)
+            }
+            method_setImplementation(beginMethod, imp_implementationWithBlock(beginAnswer))
+            let swiftUIEnd = unsafeBitCast(method_getImplementation(endMethod), to: Ended.self)
+            let endAnswer: @convention(block) (AnyObject, NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void = { source, outline, session, point, operation in
+                swiftUIEnd(source, end, outline, session, point, operation)
+                sidebarDrag(of: outline)?.ended(at: point, operation: operation)
+            }
+            method_setImplementation(endMethod, imp_implementationWithBlock(endAnswer))
+        }
+        answering.insert(ObjectIdentifier(type))
+        return true
+    }
+
+    /// Puts `draggedImage:movedTo:` in the outline view's class, SwiftUI's own, calling NSOutlineView's and then
+    /// telling the sidebar's `SidebarDrag`, and `draggingSession:endedAtPoint:operation:`, calling NSOutlineView's
+    /// without animations after a drop in the list.
+    private static func followMoves(of outline: NSOutlineView) {
+        guard let type = object_getClass(outline), !answering.contains(ObjectIdentifier(type)) else { return }
+        let move = NSSelectorFromString("draggedImage:movedTo:")
+        guard let inherited = class_getInstanceMethod(type, move) else { return }
+        let appKit = unsafeBitCast(method_getImplementation(inherited), to: Moved.self)
+        let moved: @convention(block) (NSOutlineView, AnyObject?, NSPoint) -> Void = { outline, image, point in
+            appKit(outline, move, image, point)
+            sidebarDrag(of: outline)?.moved(to: point)
+        }
+        let implementation = imp_implementationWithBlock(moved)
+        if !class_addMethod(type, move, implementation, method_getTypeEncoding(inherited)) {
+            method_setImplementation(inherited, implementation)
+        }
+        // macOS 26 tells a drag's source of its moves this way, and there SwiftUI's outline view has the method itself.
+        let movedTo = #selector(NSDraggingSource.draggingSession(_:movedTo:))
+        if let own = class_getInstanceMethod(type, movedTo) {
+            let swiftUIMoved = unsafeBitCast(method_getImplementation(own), to: SessionMoved.self)
+            let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
+                swiftUIMoved(outline, movedTo, session, point)
+                sidebarDrag(of: outline)?.moved(to: point)
+            }
+            method_setImplementation(own, imp_implementationWithBlock(sessionMoved))
+        } else {
+            let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
+                sidebarDrag(of: outline)?.moved(to: point)
+            }
+            class_addMethod(type, movedTo, imp_implementationWithBlock(sessionMoved), "v@:@{CGPoint=dd}")
+        }
+        let end = #selector(NSDraggingSource.draggingSession(_:endedAt:operation:))
+        if let inheritedEnd = class_getInstanceMethod(type, end) {
+            let appKitEnd = unsafeBitCast(method_getImplementation(inheritedEnd), to: SessionEnded.self)
+            let ended: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void = { outline, session, point, operation in
+                guard !operation.isEmpty else { return appKitEnd(outline, end, session, point, operation) }
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0
+                    context.allowsImplicitAnimation = false
+                    CATransaction.setDisableActions(true)
+                    appKitEnd(outline, end, session, point, operation)
+                }
+            }
+            let endImplementation = imp_implementationWithBlock(ended)
+            if !class_addMethod(type, end, endImplementation, method_getTypeEncoding(inheritedEnd)) {
+                method_setImplementation(inheritedEnd, endImplementation)
+            }
+        }
+        answering.insert(ObjectIdentifier(type))
+    }
+
+    private static func sidebarDrag(of outline: NSOutlineView) -> SidebarDrag? {
+        objc_getAssociatedObject(outline, dragKey) as? SidebarDrag
     }
 }
