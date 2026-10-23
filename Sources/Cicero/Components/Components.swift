@@ -801,7 +801,7 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help("Preview text, size, weight and leading")
+        .help("Preview text, size and leading")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(size: size, sizeRange: sizeRange) }
     }
 }
