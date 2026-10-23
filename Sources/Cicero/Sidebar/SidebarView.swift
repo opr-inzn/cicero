@@ -25,10 +25,7 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .onChange(of: shown, initial: true) { highlight.selected = shown }
-        .contextMenu {
-            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
-                   systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
-        }
+        .contextMenu { EditSidebarButton(model: model) }
         .onChange(of: model.selectedItems) {
             // Selected some other way (a new set, say) while the browser was catching up: that wins.
             guard pendingSelection != nil else { return }
@@ -161,7 +158,7 @@ private struct SidebarContent: View {
                         if group.rows.contains(where: { model.isVisible($0.key) }) {
                             Button("Hide from Sidebar", systemImage: "eye.slash") { model.hideGroup(group.id) }
                         }
-                        editSidebarButton
+                        EditSidebarButton(model: model)
                     }
             }
         }
@@ -260,15 +257,6 @@ private struct SidebarContent: View {
 
     // MARK: Rows
 
-    /// Activate, Activate Temporarily and Deactivate for every font in a set or smart set.
-    @ViewBuilder
-    private func activation(for row: SidebarRow, kind: String) -> some View {
-        // The symbols of the sidebar's Active and Inactive.
-        Button("Activate \(kind)", systemImage: "checkmark.circle") { model.activateFonts(in: row.item, named: row.title) }
-        Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: row.item) }
-        Button("Deactivate \(kind)", systemImage: "circle.dashed") { model.deactivateFonts(in: row.item) }
-    }
-
     @ViewBuilder
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
@@ -280,7 +268,7 @@ private struct SidebarContent: View {
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
-        .contextMenu { menu(for: row) }
+        .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
         // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear,
         // which shows when a section opens or a long one scrolls. The one families are over lights up.
         if model.takesFamilies(row.item) {
@@ -299,100 +287,199 @@ private struct SidebarContent: View {
             content
         }
     }
+}
 
-    /// Shows the folder under another name in Cicero; the folder on disk keeps its own. Left empty, it goes back to that.
-    private func renameFolder(_ id: UUID) -> some View {
-        Button("Rename Location", systemImage: "pencil") {
-            model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+/// A row's right-click menu. On one of several selected rows, which the list rings together, it's for all of them, as a
+/// family's menu is for the selected families: what works on several (activating, Reveal in Finder, removing and
+/// deleting, Color, Export Fonts, Hide from Sidebar) takes them all, and what's one row's (renaming, editing, a location's
+/// Fonts in This Location) is left out. Its own view, so the menu reads the selection rather than every row.
+private struct SidebarRowMenu: View {
+    let row: SidebarRow
+    let model: AppModel
+    let highlight: SidebarHighlight
+
+    var body: some View {
+        let rows = model.menuTargets(of: row, selected: highlight.selected)
+        if rows.count > 1 {
+            Text("\(rows.count) \(noun)")
         }
-    }
-
-    @ViewBuilder
-    private func menu(for row: SidebarRow) -> some View {
         switch row.item {
         case .temporary:
-            // Only the styles on until Cicero quits: the families' other styles stay as they are.
-            Button("Activate Permanently", systemImage: "checkmark.circle") { model.activateFonts(in: row.item, named: row.title) }
-            Button("Deactivate", systemImage: "circle.dashed") { model.deactivateFonts(in: row.item) }
-        case .folder(WatchedFolder.adobeAppsID):
-            renameFolder(WatchedFolder.adobeAppsID)
-            Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }
-        case .folder(WatchedFolder.adobeFontsID):
-            renameFolder(WatchedFolder.adobeFontsID)
-            Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
-        case .folder(WatchedFolder.addedFilesID):
-            renameFolder(WatchedFolder.addedFilesID)
-            Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(model.addedFileURLs) }
-        case .folder(let id):
-            if let folder = model.folder(id) {
-                renameFolder(id)
-                Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
-                if id != WatchedFolder.fontLibraryID {
-                    Divider()
-                    FolderActivationPicker(folder: folder) {
-                        model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
-                    }
-                    Button("Remove Location from Library", systemImage: "folder.badge.minus") { model.removeFolder(id) }
-                }
+            if rows.count == 1 {
+                // Only the styles on until Cicero quits: the families' other styles stay as they are.
+                Button("Activate Permanently", systemImage: "checkmark.circle") { model.activateFonts(in: rows) }
+                Button("Deactivate", systemImage: "circle.dashed") { model.deactivateFonts(in: [row.item]) }
             }
-        case .set(let id):
-            if let set = model.data.sets.first(where: { $0.id == id }) {
-                activation(for: row, kind: "Folder")
-                Divider()
-                Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
-                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.editingAppsForSet = id }
-                Button("Delete Folder", systemImage: "trash") { model.deleteSet(id) }
-            }
-        case .smartSet(let id):
-            if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                activation(for: row, kind: "Smart Folder")
-                Divider()
-                Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.editingSmartSet = smartSet }
-                Button("Delete Smart Folder", systemImage: "trash") { model.deleteSmartSet(id) }
-            }
-        case .tag(let name):
-            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
-            Picker(selection: Binding(get: { model.data.tagColors[name] }, set: { model.setColor($0, forTag: name) })) {
-                Text("None").tag(TagColor?.none)
-                Divider()
-                ForEach(TagColor.allCases, id: \.self) { color in
-                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }
-                        .labelStyle(.titleAndIcon)
-                        .tag(Optional(color))
-                }
-            } label: {
-                Label("Color", systemImage: "paintpalette")
-            }
-            Button("Delete Tag", systemImage: "trash") { model.deleteTag(name) }
+        case .folder:
+            locationItems(rows.compactMap { if case .folder(let id) = $0.item { id } else { nil } })
+        case .set, .smartSet:
+            folderItems(rows)
+        case .tag:
+            tagItems(rows.compactMap { if case .tag(let name) = $0.item { name } else { nil } })
         case .foundry(let name):
-            Button("Rename Foundry", systemImage: "pencil") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
+            if rows.count == 1 {
+                Button("Rename Foundry", systemImage: "pencil") {
+                    model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) }
+                }
+            }
         case .classification(let name):
-            Button("Rename Classification", systemImage: "pencil") {
-                model.prompt("Rename Classification", text: name, confirm: "Rename") { model.renameClassification(name, to: $0) }
+            if rows.count == 1 {
+                Button("Rename Classification", systemImage: "pencil") {
+                    model.prompt("Rename Classification", text: name, confirm: "Rename") { model.renameClassification(name, to: $0) }
+                }
             }
-            if model.isUserClassification(name) {
-                Button("Delete Classification", systemImage: "trash") { model.deleteClassification(name) }
+            let own = rows.compactMap { if case .classification(let name) = $0.item { name } else { nil } }.filter(model.isUserClassification)
+            if !own.isEmpty {
+                Button(own.count == 1 ? "Delete Classification" : "Delete Classifications", systemImage: "trash") {
+                    model.deleteClassifications(Set(own))
+                }
             }
-        case .characterSet(let id):
-            if let custom = model.data.customCharacterSets.first(where: { $0.setID == id }) {
-                Button("Edit Coverage Set", systemImage: "pencil") { model.editingCharacterSet = custom }
-                Button("Delete Coverage Set", systemImage: "trash") { model.deletingCharacterSet = custom }
+        case .characterSet:
+            let ids = Set(rows.compactMap { if case .characterSet(let id) = $0.item { id } else { nil } })
+            let custom = model.data.customCharacterSets.filter { ids.contains($0.setID) }
+            if rows.count == 1, let set = custom.first {
+                Button("Edit Coverage Set", systemImage: "pencil") { model.editingCharacterSet = set }
+            }
+            if !custom.isEmpty {
+                Button(custom.count == 1 ? "Delete Coverage Set" : "Delete Coverage Sets", systemImage: "trash") {
+                    model.deletingCharacterSets = custom
+                }
             }
         default:
             EmptyView()
         }
-        if model.canExport(row.item) {
+        let exported = rows.filter { model.canExport($0.item) }
+        if !exported.isEmpty {
             Divider()
-            Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: row.item, named: row.title) }
+            Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: exported) }
         }
         Divider()
-        if model.isVisible(row.key) {
-            Button("Hide from Sidebar", systemImage: "eye.slash") { model.setVisible(row.key, false) }
+        let shown = rows.filter { model.isVisible($0.key) }
+        if !shown.isEmpty {
+            Button("Hide from Sidebar", systemImage: "eye.slash") { model.hide(shown.map(\.key)) }
         }
-        editSidebarButton
+        EditSidebarButton(model: model)
     }
 
-    private var editSidebarButton: some View {
+    /// What the rows of the clicked row's list are, for the menu's first line: "3 Tags".
+    private var noun: String {
+        switch row.item {
+        case .folder: "Locations"
+        case .set, .smartSet: "Folders"
+        case .tag: "Tags"
+        case .foundry: "Foundries"
+        case .classification: "Classifications"
+        case .characterSet: "Coverage Sets"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "Items"
+        }
+    }
+
+    @ViewBuilder
+    private func locationItems(_ ids: [UUID]) -> some View {
+        if ids.count == 1, let id = ids.first {
+            // Shows the folder under another name in Cicero; the folder on disk keeps its own. Left empty, it goes back to that.
+            Button("Rename Location", systemImage: "pencil") {
+                model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+            }
+            switch id {
+            case WatchedFolder.adobeFontsID:
+                Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
+            case WatchedFolder.adobeAppsID, WatchedFolder.addedFilesID:
+                revealButton(ids)
+            default:
+                if let folder = model.folder(id) {
+                    revealButton(ids)
+                    if id != WatchedFolder.fontLibraryID {
+                        Divider()
+                        FolderActivationPicker(folder: folder) {
+                            model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
+                        }
+                    }
+                }
+            }
+        } else {
+            revealButton(ids.filter { $0 != WatchedFolder.adobeFontsID })
+        }
+        let removable = ids.filter(model.isRemovableFolder)
+        if !removable.isEmpty {
+            if ids.count > 1 { Divider() }
+            Button(removable.count == 1 ? "Remove Location from Library" : "Remove Locations from Library", systemImage: "folder.badge.minus") {
+                model.removeFolders(Set(removable))
+            }
+        }
+    }
+
+    /// The locations' folders, or the files of Added Fonts, selected in the Finder.
+    @ViewBuilder
+    private func revealButton(_ ids: [UUID]) -> some View {
+        if !ids.isEmpty {
+            Button("Reveal in Finder", systemImage: "finder") {
+                NSWorkspace.shared.activateFileViewerSelecting(ids.flatMap(model.finderURLs))
+            }
+        }
+    }
+
+    /// Activate, Activate Temporarily and Deactivate for every font in the folders and smart folders, then what's one
+    /// folder's, then Delete.
+    @ViewBuilder
+    private func folderItems(_ rows: [SidebarRow]) -> some View {
+        let sets = Set(rows.compactMap { if case .set(let id) = $0.item { id } else { nil } })
+        let smartSets = Set(rows.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
+        // Folders when there are any among them, smart ones being folders too.
+        let kind = sets.isEmpty ? "Smart Folder" : "Folder"
+        let kinds = rows.count == 1 ? kind : kind + "s"
+        // The symbols of the sidebar's Active and Inactive.
+        Button("Activate \(kinds)", systemImage: "checkmark.circle") { model.activateFonts(in: rows) }
+        Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: rows.map(\.item)) }
+        Button("Deactivate \(kinds)", systemImage: "circle.dashed") { model.deactivateFonts(in: rows.map(\.item)) }
+        Divider()
+        if rows.count == 1 {
+            if let id = sets.first, let set = model.data.sets.first(where: { $0.id == id }) {
+                Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
+                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.editingAppsForSet = id }
+            } else if let id = smartSets.first, let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
+                Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.editingSmartSet = smartSet }
+            }
+        }
+        Button("Delete \(kinds)", systemImage: "trash") {
+            if !sets.isEmpty { model.deleteSets(sets) }
+            if !smartSets.isEmpty { model.deleteSmartSets(smartSets) }
+        }
+    }
+
+    @ViewBuilder
+    private func tagItems(_ names: [String]) -> some View {
+        if names.count == 1, let name = names.first {
+            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
+        }
+        // Checked when every tag has the colour.
+        Menu {
+            Toggle("None", isOn: Binding(
+                get: { names.allSatisfy { model.data.tagColors[$0] == nil } },
+                set: { if $0 { model.setColor(nil, forTags: names) } }
+            ))
+            Divider()
+            ForEach(TagColor.allCases, id: \.self) { color in
+                Toggle(isOn: Binding(
+                    get: { names.allSatisfy { model.data.tagColors[$0] == color } },
+                    set: { if $0 { model.setColor(color, forTags: names) } }
+                )) {
+                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+        } label: {
+            Label("Color", systemImage: "paintpalette")
+        }
+        Button(names.count == 1 ? "Delete Tag" : "Delete Tags", systemImage: "trash") { model.deleteTags(Set(names)) }
+    }
+}
+
+/// Edit Sidebar, or Done Editing Sidebar while editing, at the end of the sidebar's menus.
+private struct EditSidebarButton: View {
+    let model: AppModel
+
+    var body: some View {
         Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
                systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
     }

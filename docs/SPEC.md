@@ -95,6 +95,15 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
 - Several rows of one section (or character set group) can be selected with ⌘- and ⇧-click and dragged
   together: they land side by side in the gap, in their order. The browser then shows the fonts in any of them. Selecting in another section starts over there.
+- The menu of one of several selected rows, which the list rings together, is for all of them (`AppModel.menuTargets`,
+  `SidebarRowMenu`), as a family's menu is for the selected families; a row that isn't selected gets its own. It starts
+  with how many ("3 Tags") and has what works on several: Activate Folders, Activate Temporarily and Deactivate Folders
+  (Smart Folders when they're all smart ones), every font of them once; Reveal in Finder (not Adobe Fonts); Remove
+  Locations from Library (the user's own locations among them); Delete Folders (smart ones too); Color, checked when
+  every tag has it, and Delete Tags; Delete Classifications (the user's own among them); Delete Coverage Sets (the
+  custom ones, one question for all: "Delete 3 coverage sets?"); Export Fonts (every family of them once, as "N
+  Families"); Hide from Sidebar. What's one row's is left out: renaming, Edit Smart Folder, Activate with Apps,
+  Edit Coverage Set, Fonts in This Location, Manage in Creative Cloud, and Temporary's Activate Permanently and Deactivate.
 - Moving through the sidebar quickly (holding an arrow key, clicking from row to row) moves the selection at
   every step; the browser shows the last one once the selection rests for a moment.
 - Dropping family names (drag from the browser or the Character Toolbox; dragging one of several selected families drags them

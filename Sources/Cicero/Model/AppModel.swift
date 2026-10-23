@@ -194,8 +194,8 @@ final class AppModel {
     /// The set whose apps the application set sheet shows.
     var editingAppsForSet: UUID?
     var editingCharacterSet: CustomCharacterSet?
-    /// The coverage set the sidebar asks about deleting.
-    var deletingCharacterSet: CustomCharacterSet?
+    /// The coverage sets the sidebar asks about deleting.
+    var deletingCharacterSets: [CustomCharacterSet] = []
     var isClearingCaches = false
     /// The document whose fonts the Fonts in Document sheet shows.
     var documentFonts: DocumentFontsReport?

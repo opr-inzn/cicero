@@ -45,25 +45,27 @@ extension AppModel {
         }
     }
 
-    /// Takes the tag off every family, and out of smart set rules.
-    func deleteTag(_ name: String) {
+    /// Takes the tags off every family, and out of smart set rules.
+    func deleteTags(_ names: Set<String>) {
         var data = data
-        data.tags.removeAll { $0 == name }
-        data.tagColors[name] = nil
-        for (family, tags) in data.familyTags where tags.contains(name) {
-            let left = tags.filter { $0 != name }
+        data.tags.removeAll(where: names.contains)
+        for (family, tags) in data.familyTags where tags.contains(where: names.contains) {
+            let left = tags.filter { !names.contains($0) }
             data.familyTags[family] = left.isEmpty ? nil : left
         }
         for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .tag && $0.value == name }
+            data.smartSets[index].rules.removeAll { $0.field == .tag && names.contains($0.value) }
         }
-        data.sidebar.forget("tag.\(name)")
+        for name in names {
+            data.tagColors[name] = nil
+            data.sidebar.forget("tag.\(name)")
+        }
         self.data = data
-        deselect { $0 == .tag(name) }
+        deselect { if case .tag(let name) = $0 { names.contains(name) } else { false } }
     }
 
-    func setColor(_ color: TagColor?, forTag name: String) {
-        data.tagColors[name] = color
+    func setColor(_ color: TagColor?, forTags names: [String]) {
+        for name in names { data.tagColors[name] = color }
     }
 
     func hasTag(_ tag: String, _ family: Family) -> Bool {

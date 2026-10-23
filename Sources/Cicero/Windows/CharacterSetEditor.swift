@@ -86,23 +86,29 @@ struct CharacterSetEditor: View {
 extension View {
     /// Asks before deleting the coverage set, then calls `deleted`.
     func confirmsCoverageSetDeletion(_ set: Binding<CustomCharacterSet?>, deleted: @escaping () -> Void = {}) -> some View {
-        modifier(CoverageSetDeletion(set: set, deleted: deleted))
+        confirmsCoverageSetDeletion(Binding(get: { set.wrappedValue.map { [$0] } ?? [] }, set: { set.wrappedValue = $0.first }),
+                                    deleted: deleted)
+    }
+
+    /// Asks before deleting the coverage sets, all at once, then calls `deleted`.
+    func confirmsCoverageSetDeletion(_ sets: Binding<[CustomCharacterSet]>, deleted: @escaping () -> Void = {}) -> some View {
+        modifier(CoverageSetDeletion(sets: sets, deleted: deleted))
     }
 }
 
 private struct CoverageSetDeletion: ViewModifier {
-    @Binding var set: CustomCharacterSet?
+    @Binding var sets: [CustomCharacterSet]
     let deleted: () -> Void
     @Environment(AppModel.self) private var model
 
     func body(content: Content) -> some View {
         content.alert(
-            set.map { "Delete the coverage set “\($0.name)”?" } ?? "",
-            isPresented: Binding(get: { set != nil }, set: { if !$0 { set = nil } }),
-            presenting: set
-        ) { set in
+            sets.count == 1 ? "Delete the coverage set “\(sets[0].name)”?" : "Delete \(sets.count) coverage sets?",
+            isPresented: Binding(get: { !sets.isEmpty }, set: { if !$0 { sets = [] } }),
+            presenting: sets
+        ) { sets in
             Button("Delete", role: .destructive) {
-                model.deleteCharacterSet(set.id)
+                model.deleteCharacterSets(Set(sets.map(\.id)))
                 deleted()
             }
             Button("Cancel", role: .cancel) {}
