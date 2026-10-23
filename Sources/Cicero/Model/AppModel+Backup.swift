@@ -39,10 +39,13 @@ extension AppModel {
         }
     }
 
-    /// Exports the fonts a sidebar row has, named after the row: of a set, only the styles it has.
-    func exportFonts(in item: SidebarItem, named name: String) {
-        let faces = Set(faces(in: item).map(\.id))
-        exportFonts(families(in: item), named: name) { faces.contains($1.id) }
+    /// Exports the fonts sidebar rows have, named after the row when it's one: of a set, only the styles it has.
+    func exportFonts(in rows: [SidebarRow]) {
+        let items = rows.map(\.item)
+        let faces = Set(faces(in: items).map(\.id))
+        var seen = Set<String>()
+        let families = items.flatMap { families(in: $0) }.filter { seen.insert($0.id).inserted }
+        exportFonts(families, named: rows.count == 1 ? rows[0].title : nil) { faces.contains($1.id) }
     }
 
     /// Asks where to put the files (and whether as a folder or a ZIP archive), copies them off the

@@ -122,18 +122,19 @@ extension AppModel {
         }
     }
 
-    /// Deletes one of the user's classifications: its families go back to the ones their fonts suggest, and
-    /// smart set rules for it go.
-    func deleteClassification(_ name: String) {
-        guard isUserClassification(name) else { return }
+    /// Deletes the user's own classifications among these: their families go back to the ones their fonts suggest, and
+    /// smart set rules for them go.
+    func deleteClassifications(_ names: Set<String>) {
+        let names = names.filter(isUserClassification)
+        guard !names.isEmpty else { return }
         var data = data
-        data.classifications.removeAll { $0 == name }
-        data.classificationOverrides = data.classificationOverrides.filter { $0.value != name }
+        data.classifications.removeAll(where: names.contains)
+        data.classificationOverrides = data.classificationOverrides.filter { !names.contains($0.value) }
         for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .classification && $0.value == name }
+            data.smartSets[index].rules.removeAll { $0.field == .classification && names.contains($0.value) }
         }
-        data.sidebar.forget("classification.\(name)")
+        for name in names { data.sidebar.forget("classification.\(name)") }
         self.data = data
-        deselect { $0 == .classification(name) }
+        deselect { if case .classification(let name) = $0 { names.contains(name) } else { false } }
     }
 }

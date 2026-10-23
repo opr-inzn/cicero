@@ -54,6 +54,8 @@ Items that are gone for now, like **System Fonts** while system fonts are hidden
 
 ⌘-click or ⇧-click items in the same section to select several. The browser then shows the fonts in any of them, and the window title names them, like “Serif and Script”. Drag them to move them together.
 
+Right-click one of the selected items for a menu that acts on all of them: delete several folders, tags or coverage sets at once, remove several locations, activate or deactivate several folders, give tags a color, export their fonts or hide them from the sidebar. Renaming and editing are for one item at a time, so they aren’t in that menu. Right-clicking an item that isn’t selected acts on that item alone.
+
 Selected items have to be in one section, or in one group under **Coverage**. ⌘-clicking an item somewhere else starts a new selection there.
 
 ### Drop fonts onto the sidebar
@@ -84,7 +86,7 @@ Right-click a location in the sidebar:
 - **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
-- **Remove Location from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in **Settings → Locations** and click **−**.
+- **Remove Location from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Settings → Locations** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
 ### Proofing

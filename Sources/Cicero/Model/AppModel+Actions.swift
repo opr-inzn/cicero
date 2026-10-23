@@ -415,6 +415,21 @@ extension AppModel {
         data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
+    /// What Reveal in Finder selects for a location: its folder; for Proofing, every folder Adobe apps load fonts from by
+    /// themselves; for Added Fonts, the files. Nothing for Adobe Fonts, whose files Creative Cloud keeps.
+    func finderURLs(ofFolder id: UUID) -> [URL] {
+        switch id {
+        case WatchedFolder.adobeAppsID: WatchedFolder.appFontFolders().map(\.url)
+        case WatchedFolder.addedFilesID: addedFileURLs
+        default: folder(id).map { [$0.url] } ?? []
+        }
+    }
+
+    /// Whether a location is one of the user's own, which Remove Location from Library takes out of the library.
+    func isRemovableFolder(_ id: UUID) -> Bool {
+        data.folders.contains { $0.id == id }
+    }
+
     /// The user's folder, or Cicero's Font Library, with the name the user gave it.
     func folder(_ id: UUID) -> WatchedFolder? {
         if id == WatchedFolder.fontLibraryID { return data.fontLibrary.map(data.named) }
@@ -451,13 +466,15 @@ extension AppModel {
         data.sets[index].name = trimmed
     }
 
-    func deleteSet(_ id: UUID) {
-        data.sets.removeAll { $0.id == id }
-        data.sidebar.forget("set.\(id)")
+    /// Several at once, as the sidebar deletes the selected ones.
+    func deleteSets(_ ids: Set<UUID>) {
+        let values = Set(ids.map(\.uuidString))
+        data.sets.removeAll { ids.contains($0.id) }
+        for id in ids { data.sidebar.forget("set.\(id)") }
         for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .set && $0.value == id.uuidString }
+            data.smartSets[index].rules.removeAll { $0.field == .set && values.contains($0.value) }
         }
-        deselect { $0 == .set(id) }
+        deselect { if case .set(let id) = $0 { ids.contains(id) } else { false } }
     }
 
     /// Whether the set has the whole family.
@@ -505,21 +522,30 @@ extension AppModel {
         return library.families.filter { data.lists($0) && test($0) }
     }
 
-    /// Activate Folder on a folder's or smart folder's menu: every font in it, asking how when the install method is Ask.
-    func activateFonts(in item: SidebarItem, named name: String) {
-        let faces = faces(in: item)
-        guard !faces.isEmpty else { return showToast("There are no fonts in “\(name)”") }
-        activate(faces, title: "“\(name)”")
+    /// The styles sidebar rows have between them, each once.
+    func faces(in items: [SidebarItem]) -> [LibraryFace] {
+        guard items.count > 1 else { return items.first.map { faces(in: $0) } ?? [] }
+        var seen = Set<FaceID>()
+        return items.flatMap { faces(in: $0) }.filter { seen.insert($0.id).inserted }
     }
 
-    func activateFontsTemporarily(in item: SidebarItem) {
-        let faces = faces(in: item)
+    /// Activate Folder on a folder's or smart folder's menu, or on several selected: every font in them, asking how when
+    /// the install method is Ask.
+    func activateFonts(in rows: [SidebarRow]) {
+        let faces = faces(in: rows.map(\.item))
+        let names = rows.map { "“\($0.title)”" }.formatted(.list(type: .and))
+        guard !faces.isEmpty else { return showToast("There are no fonts in \(names)") }
+        activate(faces, title: names)
+    }
+
+    func activateFontsTemporarily(in items: [SidebarItem]) {
+        let faces = faces(in: items)
         guard !faces.isEmpty else { return showToast("Nothing to activate") }
         activateTemporarily(faces)
     }
 
-    func deactivateFonts(in item: SidebarItem) {
-        let faces = faces(in: item)
+    func deactivateFonts(in items: [SidebarItem]) {
+        let faces = faces(in: items)
         guard !faces.isEmpty else { return showToast("Nothing to deactivate") }
         deactivate(faces)
     }
@@ -536,10 +562,10 @@ extension AppModel {
         }
     }
 
-    func deleteSmartSet(_ id: UUID) {
-        data.smartSets.removeAll { $0.id == id }
-        data.sidebar.forget("smartset.\(id)")
-        deselect { $0 == .smartSet(id) }
+    func deleteSmartSets(_ ids: Set<UUID>) {
+        data.smartSets.removeAll { ids.contains($0.id) }
+        for id in ids { data.sidebar.forget("smartset.\(id)") }
+        deselect { if case .smartSet(let id) = $0 { ids.contains(id) } else { false } }
     }
 
     // MARK: Foundries
@@ -574,11 +600,11 @@ extension AppModel {
         }
     }
 
-    func deleteCharacterSet(_ id: UUID) {
-        let setID = "custom.\(id.uuidString)"
-        data.customCharacterSets.removeAll { $0.id == id }
-        data.sidebar.forget("charset.\(setID)")
-        deselect { $0 == .characterSet(setID) }
+    func deleteCharacterSets(_ ids: Set<UUID>) {
+        let setIDs = Set(ids.map { "custom.\($0.uuidString)" })
+        data.customCharacterSets.removeAll { ids.contains($0.id) }
+        for setID in setIDs { data.sidebar.forget("charset.\(setID)") }
+        deselect { if case .characterSet(let id) = $0 { setIDs.contains(id) } else { false } }
     }
 
     // MARK: Drag and drop
@@ -714,8 +740,21 @@ extension AppModel {
     func isVisible(_ key: String) -> Bool { !data.sidebar.hidden.contains(key) }
 
     func setVisible(_ key: String, _ visible: Bool) {
-        if visible { data.sidebar.hidden.remove(key) } else { data.sidebar.hidden.insert(key) }
-        if !visible { deselect { !isShown($0) } }
+        if visible { data.sidebar.hidden.remove(key) } else { hide([key]) }
+    }
+
+    /// Hides rows: Hide from Sidebar on a row's menu (on every selected row's, see `menuTargets`) or a group's title.
+    func hide(_ keys: [String]) {
+        data.sidebar.hidden.formUnion(keys)
+        deselect { !isShown($0) }
+    }
+
+    /// What a sidebar row's menu acts on: the selected rows of its list, in their order, when it's one of several selected,
+    /// as the list rings them all and a family's menu takes the selected families; else the row alone.
+    func menuTargets(of row: SidebarRow, selected: Set<SidebarItem>) -> [SidebarRow] {
+        guard selected.count > 1, selected.contains(row.item) else { return [row] }
+        let rows = rows(inList: sidebarList(of: row.item)).filter { selected.contains($0.item) }
+        return rows.isEmpty ? [row] : rows
     }
 
     /// What the sidebar list selects. Several items only within one list (a section, or a group of
@@ -791,8 +830,7 @@ extension AppModel {
     /// Hides every set in a character set group, which takes the group out of the sidebar.
     func hideGroup(_ id: String) {
         guard let group = characterSetGroups.first(where: { $0.id == id }) else { return }
-        data.sidebar.hidden.formUnion(group.rows.map(\.key))
-        deselect { !isShown($0) }
+        hide(group.rows.map(\.key))
     }
 
     func isGroupExpanded(_ id: String) -> Bool { !data.sidebar.collapsed.contains("charsetgroup.\(id)") }

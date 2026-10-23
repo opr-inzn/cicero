@@ -204,9 +204,9 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
     @objc private func toggleSet(_ sender: NSMenuItem) {
         guard let row = sender.representedObject as? SidebarRow else { return }
         if sender.state == .on {
-            model.deactivateFonts(in: row.item)
+            model.deactivateFonts(in: [row.item])
         } else {
-            model.activateFonts(in: row.item, named: row.title)
+            model.activateFonts(in: [row])
         }
         // Asking how to activate, or whether to turn on so many, happens in the main window.
         if model.activationPrompt != nil || model.manyActivationPrompt != nil {
