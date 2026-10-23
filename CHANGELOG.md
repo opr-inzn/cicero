@@ -2,16 +2,16 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.3
 
-- Right-clicking one of several items selected in the sidebar now acts on all of them. **Delete Folders**, **Delete Tags**, **Delete Classifications**, **Delete Coverage Sets**, **Remove Locations from Library**, **Hide from Sidebar**, **Export Fonts**, a tag’s **Color** and a folder’s **Activate** and **Deactivate** take every selected item. Before, only the item you right-clicked was deleted or removed. Renaming and editing are for one item at a time, so they’re left out then.
-- **Preview Options** no longer have **Weight**. Previews show each family in its regular style, or the style you search for, like **bold** or **light**, which is how to see other weights now. A weight you had set is forgotten.
-- On a font page, the **Size**, **Tracking** and **Leading** sliders take all the width beside the **Style** menu, and are as long as each other. Before, they stayed short, with empty space beside them. They stay beside the menu until they're at their narrowest, with symbols in place of their names when the names don't fit, as in a layout app's character panel, and only then go on a row of their own, which they fill to the right edge of the alignment buttons above.
-- The Settings window is a little wider, and in **Settings → General** the menus for **Activate fonts by** and **When an added font is already in your library** are the same width.
-- **All Fonts**, **Active** and **Inactive** can no longer be hidden from the sidebar: their checkboxes in **Edit** and **Settings → Sidebar** stay on, and their menus have no **Hide from Sidebar**. One you had hidden is back.
 - Drag an item out of the sidebar to hide it, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×, and **Undo** at the bottom of the window brings it back. Before, dragging an item out of the sidebar made Cicero quit unexpectedly.
 - An item you drag in the sidebar looks as it does in the Finder, its symbol in the same grey as its name. On macOS 26 the symbol was white.
 - Items you drag to a new place in the sidebar land at once. Before, the items below them slid up into place afterwards, cut off at their edges.
+- **All Fonts**, **Active** and **Inactive** can no longer be hidden from the sidebar: their checkboxes in **Edit** and **Settings → Sidebar** stay on, and their menus have no **Hide from Sidebar**. One you had hidden is back.
+- Right-clicking one of several items selected in the sidebar now acts on all of them. **Delete Folders**, **Delete Tags**, **Delete Classifications**, **Delete Coverage Sets**, **Remove Locations from Library**, **Hide from Sidebar**, **Export Fonts**, a tag’s **Color** and a folder’s **Activate** and **Deactivate** take every selected item. Before, only the item you right-clicked was deleted or removed. Renaming and editing are for one item at a time, so they’re left out then.
+- On a font page, the **Size**, **Tracking** and **Leading** sliders take all the width beside the **Style** menu, and are as long as each other. Before, they stayed short, with empty space beside them. They stay beside the menu until they're at their narrowest, with symbols in place of their names when the names don't fit, as in a layout app's character panel, and only then go on a row of their own, which they fill to the right edge of the alignment buttons above.
+- **Preview Options** no longer have **Weight**. Previews show each family in its regular style, or the style you search for, like **bold** or **light**, which is how to see other weights now. A weight you had set is forgotten.
+- The Settings window is a little wider, and in **Settings → General** the menus for **Activate fonts by** and **When an added font is already in your library** are the same width.
 
 ## 0.10.2
 
