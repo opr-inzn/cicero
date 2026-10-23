@@ -390,8 +390,8 @@ struct ValueField: View {
     var step: Double = 1
     /// After the number: " pt", "%".
     var unit = ""
-    /// Where the number sits in the field's width: trailing lines values up in a column, leading keeps it as
-    /// close to the slider as a label is on the other side.
+    /// Where the number sits in the field's width: trailing lines values up in a column, 52 pt wide; leading keeps it
+    /// as close to the slider as a label is on the other side, in a field as wide as the widest value the range allows.
     var alignment = HorizontalAlignment.trailing
     @State private var text = ""
     @FocusState private var isFocused: Bool
@@ -403,16 +403,30 @@ struct ValueField: View {
         self.step = step
         self.unit = unit
         self.alignment = alignment
+        // The number from the start, not once it appears: a field in a layout `ViewThatFits` is still weighing, as the
+        // font page's row on one line, would measure as wide as its title, which it shows while empty.
+        _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        let content = HStack(spacing: 0) {
             number
             // In the number's colour: forms grey a row's value text.
             Text(unit).foregroundStyle(.primary)
         }
+        Group {
+            if alignment == .leading {
+                // Nothing after it moves as the value changes, and a row's last value ends where the row does.
+                ZStack(alignment: .leading) {
+                    Text(formatted(range.lowerBound) + unit).hidden()
+                    Text(formatted(range.upperBound) + unit).hidden()
+                    content
+                }
+            } else {
+                content.frame(width: 52, alignment: .trailing)
+            }
+        }
         .monospacedDigit()
-        .frame(width: 52, alignment: Alignment(horizontal: alignment, vertical: .center))
         .onAppear { text = formatted(value) }
         // The slider moved; typing leaves the value alone until it's committed.
         .onChange(of: value) { text = formatted($1) }
@@ -455,6 +469,10 @@ struct ValueField: View {
     }
 
     private func formatted(_ value: Double) -> String {
+        Self.formatted(value, step: step)
+    }
+
+    private static func formatted(_ value: Double, step: Double) -> String {
         String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
     }
 }

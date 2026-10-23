@@ -238,9 +238,10 @@ private struct TypeTester: View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            // On one row where there's room, else the sliders on a row of their own, under the menu: with the Info panel
-            // open, a narrow window has too little for all of them, and squeezed, the labels would wrap and the row grow.
-            // Either way the sliders take all the width their row leaves.
+            // On one row wherever the sliders fit at their narrowest, else on a row of their own, under the menu: with the
+            // Info panel open, a narrow window has too little for all of them, and squeezed further, the labels would wrap
+            // and the row grow. Either way the sliders take all the width their row leaves, and the last value ends where
+            // the row does.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) {
                     stylePicker(isAdjusted: !variations.isEmpty)
@@ -307,7 +308,8 @@ private struct TypeTester: View {
                         isFirst: Bool = true) -> some View {
         Group {
             Text(title).foregroundStyle(.secondary).fixedSize().padding(.leading, isFirst ? 0 : 8)
-            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: .infinity)
+            // Ideally as narrow as at the least: the row they fit in is the menu's, while they fit at all.
+            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
             ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
         }
     }
