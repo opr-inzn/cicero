@@ -41,20 +41,23 @@ struct FontGrid: View {
         /// The sample's height: its letters and room above and below them, which small type gets more of.
         func height(size: Double) -> CGFloat { above + below + size * 0.25 + 44 }
 
-        /// The widest a font's sample is drawn: as wide as a tile as narrow as it can be has room for, in tiles `closedTile`
-        /// wide with the Info panel shut, and narrower alike with it open. It goes up with the size, not with the tiles,
-        /// which stay as wide as they are until a row has room for one fewer or one more.
-        func fit(size: Double, tile: CGFloat, closedTile: CGFloat) -> SampleFit {
-            let room = minimumWidth(size: size) - padding * 2 - 8
-            return SampleFit(width: min(room, closedTile - padding * 2 - 8) * tile / closedTile)
+        /// The widest a font's sample is drawn with the Info panel shut: as wide as a tile as narrow as it can be has room
+        /// for, in tiles `closedTile` wide, which goes up with the size, not with the tiles, as they stay as wide as they
+        /// are until a row has room for one fewer or one more. With the panel open, every sample smaller alike.
+        func fit(size: Double, ratio: CGFloat?, tile: CGFloat, closedTile: CGFloat) -> SampleFit {
+            let room = minimumWidth(size: size, ratio: ratio) - padding * 2 - 8
+            return SampleFit(width: min(room, closedTile - padding * 2 - 8), share: tile / closedTile)
         }
 
         /// How far below the middle of the sample the baseline is, so that its letters are centred in it.
         var baselineBelowCentre: CGFloat { (above - below) / 2 }
 
-        /// How narrow a tile can be: the size and 186 pt more, and as wide as the sample text with a little to spare, so it
-        /// isn't made smaller to fit.
-        func minimumWidth(size: Double) -> CGFloat { max(size + 186, width * 1.1 + padding * 2 + 8) }
+        /// How narrow a tile can be: the size and 186 pt more, as wide as the sample text in the system font with a little
+        /// to spare, and as wide as the families listed need for all but the widest twentieth of them to be drawn at the
+        /// size (`SampleWidths.listRatio`, per point of the size) with 28 pt to spare.
+        func minimumWidth(size: Double, ratio: CGFloat?) -> CGFloat {
+            max(size + 186, width * 1.1 + padding * 2 + 8, (ratio ?? 0) * size + padding * 2 + 8)
+        }
     }
 
     /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
@@ -65,9 +68,11 @@ struct FontGrid: View {
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
         let measure = Measure(sample, size: preview.size)
-        let (count, tile, closedTile) = layout(minimum: measure.minimumWidth(size: preview.size))
+        let ratio = SampleWidths.shared.listRatio
+        let (count, tile, closedTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
         let sampleHeight = max(measure.height(size: preview.size), closedTile * Self.sampleHeightPerWidth)
-        let fit = measure.fit(size: preview.size, tile: tile, closedTile: closedTile)
+        let fit = measure.fit(size: preview.size, ratio: ratio, tile: tile, closedTile: closedTile)
+        let inputs = sampleInputs
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
@@ -86,6 +91,7 @@ struct FontGrid: View {
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .visibleHeight($visibleHeight)
+            .task(id: inputs) { measureSamples(inputs) }
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
@@ -93,6 +99,37 @@ struct FontGrid: View {
             .focusEffectDisabled()
             .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .grid(columns: count)))
         }
+    }
+
+    /// Whether the search narrows the sidebar selection's families.
+    private var isSearching: Bool { !model.appliedSearch.isEmpty || !model.searchTokens.isEmpty }
+
+    /// What the tiles' width is measured from: the families the sidebar selection lists, those the search found, the
+    /// text, and the weight, words and tokens that choose the styles shown.
+    private var sampleInputs: Int {
+        var hasher = Hasher()
+        hasher.combine(model.unsearchedFamilies.map(\.id))
+        if isSearching { hasher.combine(families.map(\.id)) }
+        hasher.combine(preview.sampleText)
+        hasher.combine(preview.weight)
+        hasher.combine(model.appliedSearch)
+        hasher.combine(model.searchTokens)
+        return hasher.finalize()
+    }
+
+    /// Has the samples of the families the sidebar selection lists measured, and of those the search found, so the tiles
+    /// are wide enough for them (see `SampleWidths`): in the styles the tiles show, before the text in a font's own script.
+    private func measureSamples(_ inputs: Int) {
+        let query = SearchQuery(model.appliedSearch), tokens = model.searchTokens, features = model.searchFeatures
+        let text = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
+        func samples(_ families: [Family]) -> [SampleWidths.Sample] {
+            families.map { family in
+                let (style, weight) = family.previewStyle(for: query, tokens: tokens, weight: preview.weight)
+                return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: model.variations(for: family, face: style.id), features: features)
+            }
+        }
+        SampleWidths.shared.update(inputs, listed: samples(model.unsearchedFamilies), found: isSearching ? samples(families) : nil,
+                                   scriptSamples: model.scriptSamples)
     }
 
     /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows without the Info panel,
@@ -107,18 +144,19 @@ struct FontGrid: View {
     }
 }
 
-/// How big a font's sample is drawn in the grid: at the preview size, or, for a font whose letters would be wider than
-/// `width`, smaller, until they're that wide. `width` goes up with the size, so such a font grows and shrinks with it like
-/// the rest; shrunk to fit its tile instead, it stopped growing while the rest went on, until the tiles got fewer.
+/// How big a font's sample is drawn in the grid: at the preview size, or, for one of the few fonts too wide for the tiles
+/// (see `Measure.minimumWidth`), smaller, until it's `width` wide. `width` goes up with the size, so such a font grows and
+/// shrinks with it like the rest; shrunk to fit its tile instead, it stopped growing while the rest went on, until the tiles
+/// got fewer. While the Info panel narrows the tiles, every sample is smaller by as much, so all of them keep their sizes
+/// to one another, rather than the wider ones being held at their tiles' edges.
 struct SampleFit {
     var width: CGFloat
+    var share: CGFloat
 
-    /// What to multiply the size by, for `text` in `font` at that size.
-    func scale(_ text: String, in font: CTFont) -> CGFloat {
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
-        let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-        guard !ink.isEmpty, ink.width > width else { return 1 }
-        return width / ink.width
+    /// What to multiply the size by, for `sample`, drawn as `text` in `font` at that size.
+    func scale(_ sample: SampleWidths.Sample, text: String, in font: CTFont) -> CGFloat {
+        let wide = SampleWidths.ratio(of: sample, text: text, in: font) * CTFontGetSize(font)
+        return (wide > width ? width / wide : 1) * share
     }
 }
 
@@ -142,9 +180,11 @@ private struct Tile: View {
             }
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             // On one baseline in every tile, whatever each font's ascent and descent, where the sample's letters are centred
-            // (see `Measure`), at the preview size unless it's wider than a tile has room for (see `SampleFit`). Not clipped:
-            // what reaches past it runs into the padding.
-            let text = model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: style.face)
+            // (see `Measure`), at the preview size unless it's wider than the tiles have room for (see `SampleFit`). Not
+            // clipped: what reaches past it runs into the padding.
+            let sample = SampleWidths.Sample(face: style.face, text: preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText,
+                                             weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures)
+            let text = model.scriptSamples.text(sample.text, for: style.face)
             Color.clear
                 .frame(maxWidth: .infinity)
                 .frame(height: sampleHeight)
@@ -152,8 +192,8 @@ private struct Tile: View {
                 .overlay(alignment: Alignment(horizontal: .center, vertical: .firstTextBaseline)) {
                     FontText(
                         text: text, face: style.face,
-                        size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
-                        scale: { fit.scale(text, in: $0) }
+                        size: preview.size, weight: weight, variations: sample.variations, features: sample.features,
+                        scale: { fit.scale(sample, text: text, in: $0) }
                     )
                     // Only where its letters fit but its line doesn't: a font whose first or last letter leaves a lot of room
                     // beside it.

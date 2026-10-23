@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- In the grid, fonts much wider than the Mac’s own grow and shrink with the rest as you change the size. Before, they stopped growing while the rest went on, until the tiles got fewer and bigger. They’re still drawn a little smaller so they fit their tiles, also with the Info panel open; every other font is at the size you chose.
+- In the grid, every font is at the size you chose, also monospaced and other wide fonts: the tiles are as wide as the families listed need. Only the widest few are drawn a little smaller, and they grow and shrink with the rest as you change the size. Before, fonts wider than the Mac’s own stopped growing while the rest went on, until the tiles got fewer and bigger. With the Info panel open, every sample is a little smaller, all alike, rather than wide fonts being squeezed to the width of the rest.
 - **Preview Options** no longer have **Tracking** or **Alignment**. The list, grid, specimens, Quick Look and Compare show every font with its own spacing, lined up on the left. Font pages have **Tracking** now, next to **Size** and **Leading**, starting from what you had set in Preview Options.
 
 ## 0.10.1

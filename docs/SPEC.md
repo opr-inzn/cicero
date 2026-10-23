@@ -153,15 +153,28 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   every tile gets the same): the sample is as high as those letters reach above and below the baseline, plus a quarter
   of the size + 44 pt, and at least 0.36 times as high as the tile is wide without the Info panel
   (`sampleHeightPerWidth`), so wide tiles, two or three in a row, aren't flat, and the panel doesn't make them lower.
-  Every font's sample is at the preview size, unless its letters, from the first one's left edge to the last one's right,
-  would be wider than a tile at its narrowest has room for (`SampleFit`: the tile's least width less 28 pt, so the size
-  + 158 pt or the system font's sample × 1.1); then it's drawn smaller, until they're that wide. That room goes up with
-  the size, not with the tiles, so a wide font grows and shrinks with the size like the rest. (Shrunk to fit its tile, it
-  stopped growing while the rest went on, until the tiles got fewer, as tiles stay as wide as they are until a row has
-  room for one fewer or one more.) With the Info panel open, the room is smaller by as much as the tiles are narrower. Every font's sample sits on one baseline, where the system font's letters are centred ("H"
+  Tiles are as wide as the families listed need, so all but the widest of them are drawn at the preview size, whatever
+  their own width (a monospaced font is about 1.2 times as wide as the system font): `SampleWidths` measures each
+  family's sample — in the style its tile shows, the text it draws (in the font's own script where it has to), with the
+  axes and features it's drawn with — once, off the main thread, as a width per point of the size (from the leftmost of
+  its first glyph's outline and its line's start to the rightmost of its last glyph's outline and its line's end; outlines
+  scale with the size, so dragging Size measures nothing, and a font is drawn at its size, never a smaller one, in
+  proportion to its true width). Of the families the sidebar selection lists (Show Similar Fonts, Show in Library), the
+  width that all but the widest twentieth stay within (all of them in a list of fewer than twenty) sets the tiles' least
+  width; while searching, that of the families found too, where it's wider, so typing never narrows the tiles and a
+  search for wide fonts widens them. Files a reading would wait for (on a server, or kept online only) count once read.
+  Until a list is measured the tiles keep the width they had; the last width is kept for the next launch. The widest
+  twentieth (Zapfino's swashes, dingbats, the most extended faces), wider than the tiles' room (`SampleFit`: the tile's
+  least width less 28 pt), are drawn smaller, until they're that wide. That room goes up with the size, not with the
+  tiles, so they grow and shrink with the size like the rest. (Shrunk to fit its tile, a font stopped growing while the
+  rest went on, until the tiles got fewer, as tiles stay as wide as they are until a row has room for one fewer or one
+  more.) With the Info panel open, every sample is smaller by as much as the tiles are narrower, one share for all, so
+  they keep their sizes to one another: held to the narrower tiles' room instead, most fonts were drawn the same width.
+  Every font's sample sits on one baseline, where the system font's letters are centred ("H"
   centres the capital, "g" the x-height and descender), whatever the font's own ascent and descent; it's drawn unclipped
   and at its whole line's height, never shrunk to the sample's (proposed less, SwiftUI shrank it and drew it below the
-  baseline it reported). A tile is at least the size + 186 pt wide, and as wide as the sample × 1.1 + 28 pt; as many
+  baseline it reported). A tile is at least the size + 186 pt wide, as wide as the sample in the system font × 1.1 +
+  28 pt, and as wide as the listed families' samples need (above) + 28 pt; as many
   tiles fit in a row as can be that wide in the rows without the Info panel, from one to five, as wide as fills the row,
   however many families there are. Bigger type, fewer and bigger tiles. The Info panel makes them narrower, never fewer.
   The type shrinks further, to 0.4 at most, only where its letters fit but its line doesn't: a first or last letter
