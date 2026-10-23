@@ -723,6 +723,7 @@ private struct OutlineViewSetup: NSViewRepresentable {
             outline.selectionHighlightStyle = .none
             // Without the answers, a row dragged out of the list stops Cicero.
             if SidebarDataSource.answer(for: outline, drag: drag) { outline.draggingDestinationFeedbackStyle = .gap }
+            SidebarDrag.prepare(in: outline)
         }
     }
 }
@@ -795,6 +796,16 @@ final class SidebarDrag {
     /// as faded as Finder's sidebar rows are. The list's own picture of the row had a white symbol beside black
     /// text on macOS 26. The sizes are a sidebar row's, measured: 11, 13 and 15 pt type for small, medium and large
     /// rows, the symbol starting a few points in.
+    /// Draws a picture once, a second after the sidebar appears: the first one SwiftUI draws takes 80 ms, which,
+    /// on a row's first drag, left its place empty a frame before the picture came, as the second's doesn't.
+    static func prepare(in outline: NSOutlineView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak outline] in
+            guard let outline else { return }
+            _ = picture(of: SidebarRow(key: "", title: "Aa", icon: "folder", item: .all), size: NSSize(width: 120, height: 28), in: outline)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+    }
+
     private static func picture(of row: SidebarRow, size: NSSize, in outline: NSOutlineView) -> NSImage? {
         let (fontSize, leading): (CGFloat, CGFloat) = switch outline.effectiveRowSizeStyle {
         case .small: (11, 3.5)
