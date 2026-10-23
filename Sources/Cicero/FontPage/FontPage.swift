@@ -228,6 +228,9 @@ private struct TypeTester: View {
     @AppStorage("typeTester.text") private var text = Self.defaultText
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
+    /// The space added between letters, in percent of the em, on top of the font's kerning: the page's own, not the
+    /// overview's, which sets every font with its own spacing.
+    @AppStorage("typeTester.tracking") private var tracking = Self.savedTracking
     /// What's typed over the text in a font's own script, on this family's page only (see `shownText`).
     @State private var ownScript: (family: String, text: String)?
 
@@ -288,10 +291,12 @@ private struct TypeTester: View {
         }
     }
 
-    /// The text's size, and its leading, which is Preview Options' too.
+    /// The text's size and tracking, and its leading, which is Preview Options' too.
     private var sliders: some View {
         HStack(spacing: 16) {
             slider("Size", $size, range: 12...240, unit: " pt")
+            slider("Tracking", $tracking, range: -10...40, step: 0.5, unit: "%")
+                .help("The space added between letters, in percent of the em, on top of the font’s kerning")
             slider("Leading", Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
                 .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
         }
@@ -357,7 +362,7 @@ private extension TypeTester {
     @ViewBuilder
     func editor(_ face: FontFace, _ ctFont: CTFont) -> some View {
         let (text, defaultText) = shownText(face)
-        let kerning = preview.kerning(at: size)
+        let kerning = size * tracking / 100
         let lineHeightPoints = size * preview.lineSpacing / 100
         let room = Self.room(for: text.wrappedValue, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
@@ -401,6 +406,11 @@ private extension TypeTester {
     }
 
     static let defaultText = "Sphinx of black quartz, judge my vow."
+
+    /// What Preview Options' Tracking was set to, before it moved here.
+    static var savedTracking: Double {
+        UserDefaults.standard.object(forKey: "preview.tracking") as? Double ?? 0
+    }
 
     /// Centered, unless the left alignment was chosen when there were only those two.
     static var savedAlignment: SampleAlignment {

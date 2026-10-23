@@ -130,7 +130,7 @@ private struct TextTab: View {
                     .frame(width: 220, alignment: .leading)
                     FontText(
                         text: sample, face: family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
-                        variations: model.variations(for: family), kerning: preview.kerning(at: 17)
+                        variations: model.variations(for: family)
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                     // Glyphs taller than the row run over its edges rather than be cut off.

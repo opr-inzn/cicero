@@ -779,7 +779,7 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help("Preview text, size, weight, spacing and alignment")
+        .help("Preview text, size, weight and leading")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(size: size, sizeRange: sizeRange) }
     }
 }
@@ -807,20 +807,8 @@ private struct PreviewOptions: View {
             Section {
                 row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
                 row("Weight", $preview.weight, range: 100...900)
-                row("Tracking", $preview.tracking, range: -10...40, step: 0.5, unit: "%")
-                    .help("The space added between letters, in percent of the em, on top of the font’s kerning")
                 row("Leading", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
-                LabeledContent("Alignment") {
-                    Picker("Alignment", selection: $preview.alignment) {
-                        ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelStyle(.iconOnly)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                .help("How samples line up in specimens and Quick Look; font pages have their own alignment")
             }
         }
         .formStyle(.grouped)

@@ -29,8 +29,8 @@ struct FontGrid: View {
         var below: CGFloat
         var width: CGFloat
 
-        init(_ sample: String, size: Double, kerning: Double) {
-            let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: size), .kern: kerning]))
+        init(_ sample: String, size: Double) {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: size)]))
             let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
             // Text with no letters, spaces say: a capital's height.
             above = ink.isEmpty ? size * 0.7 : max(ink.maxY, 0)
@@ -56,7 +56,7 @@ struct FontGrid: View {
 
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
-        let measure = Measure(sample, size: preview.size, kerning: preview.kerning(at: preview.size))
+        let measure = Measure(sample, size: preview.size)
         let (count, tile, closedTile) = layout(minimum: measure.minimumWidth(size: preview.size))
         let sampleHeight = max(measure.height(size: preview.size), closedTile * Self.sampleHeightPerWidth)
         ScrollViewReader { proxy in
@@ -126,8 +126,7 @@ private struct Tile: View {
                     FontText(
                         text: model.scriptSamples.text(preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText, for: style.face),
                         face: style.face,
-                        size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
-                        kerning: preview.kerning(at: preview.size)
+                        size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures
                     )
                     // Only where a tile can't be wide enough: a font far wider than the system font, text longer than a row,
                     // or the Info panel narrowing the tiles.

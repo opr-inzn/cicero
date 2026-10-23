@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- **Preview Options** no longer have **Tracking** or **Alignment**. The list, grid, specimens, Quick Look and Compare show every font with its own spacing, lined up on the left. Font pages have **Tracking** now, next to **Size** and **Leading**, starting from what you had set in Preview Options.
+
 ## 0.10.1
 
 - In the grid, tiles are taller when they’re wide, two or three in a row, so they don’t look flat. Narrow tiles keep their height, and opening the Info panel doesn’t make tiles lower.
