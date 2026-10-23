@@ -302,12 +302,12 @@ struct StatusTag: View {
         // With the symbols of New App Folder and Activate Temporarily.
         if family.temporaryScope == .whileAppsRun { return ("App Folder", .appSet, "app.badge.checkmark") }
         if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
-        // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
+        // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Proofing.
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
         case .system: return ("System", .secondary, nil)
         case .partial: return ("Partly active", .orange, nil)
-        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red, nil)
+        case .appOnly(let app): return (app == "Adobe" ? "Proofing" : app, .red, nil)
         case .active, .inactive: return nil
         }
     }

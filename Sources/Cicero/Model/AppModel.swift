@@ -62,7 +62,7 @@ final class AppModel {
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
-    /// Cicero's own folder items that have fonts now (Testing, Adobe Fonts while shown, Added Fonts, Deactivated): the sidebar
+    /// Cicero's own folder items that have fonts now (Proofing, Adobe Fonts while shown, Added Fonts, Deactivated): the sidebar
     /// lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
@@ -353,7 +353,7 @@ final class AppModel {
         FontLoader.shared.prefetch((visibleFamilies + saved.families).map(\.regular.face))
     }
 
-    /// Adobe's font folders used to be added to the user's folders; the Testing switch covers them now.
+    /// Adobe's font folders used to be added to the user's folders; the Proofing switch covers them now.
     private func dropAdobeFolders() {
         data.folders.removeAll { WatchedFolder.detectAppName(forPath: $0.path) != nil }
     }
