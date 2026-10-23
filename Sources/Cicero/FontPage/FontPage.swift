@@ -284,7 +284,7 @@ private struct TypeTester: View {
                 }
             }
             .fixedSize()
-            .help("Which style to show; Automatic follows the preview weight, or a style the search names, like Italic")
+            .help("Which style to show; Automatic shows the regular style, or a style the search names, like Italic")
         }
     }
 

@@ -3,7 +3,7 @@ import Observation
 import CiceroCore
 import SwiftUI
 
-/// How previews look everywhere: sample text, size, weight and line spacing. Saved in user defaults. Tracking and
+/// How previews look everywhere: sample text, size and line spacing, and the weight they're in. Saved in user defaults. Tracking and
 /// alignment are the font page's own (see `TypeTester`): the overview sets every font with its own spacing, lined up
 /// on the left.
 @Observable
@@ -17,7 +17,9 @@ final class PreviewSettings {
     /// Empty means each family's own name.
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
     var size: Double { didSet { defaults.set(size, forKey: Keys.size) } }
-    var weight: Double { didSet { defaults.set(weight, forKey: Keys.weight) } }
+    /// What previews show a family in, where a search names no style: its regular style, the one nearest 400. Preview
+    /// Options had a Weight slider up to 0.10.2; what it saved is forgotten.
+    let weight = 400.0
     /// Line height in percent of the size, wherever a sample runs over several lines; 120 is what layout apps
     /// call automatic leading.
     var lineSpacing: Double { didSet { defaults.set(lineSpacing, forKey: Keys.lineSpacing) } }
@@ -34,7 +36,7 @@ final class PreviewSettings {
     init() {
         sampleText = defaults.string(forKey: Keys.sampleText) ?? ""
         size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
-        weight = defaults.object(forKey: Keys.weight) as? Double ?? 400
+        defaults.removeObject(forKey: Keys.weight)
         lineSpacing = defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120
     }
 

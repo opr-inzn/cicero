@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Right-clicking one of several items selected in the sidebar now acts on all of them. **Delete Folders**, **Delete Tags**, **Delete Classifications**, **Delete Coverage Sets**, **Remove Locations from Library**, **Hide from Sidebar**, **Export Fonts**, a tag’s **Color** and a folder’s **Activate** and **Deactivate** take every selected item. Before, only the item you right-clicked was deleted or removed. Renaming and editing are for one item at a time, so they’re left out then.
+- **Preview Options** no longer have **Weight**. Previews show each family in its regular style, or the style you search for, like **bold** or **light**, which is how to see other weights now. A weight you had set is forgotten.
 - On a font page, the **Size**, **Tracking** and **Leading** sliders take all the width beside the **Style** menu, or the whole row under it, and are as long as each other. Before, they stayed short, with empty space beside them.
 - The Settings window is a little wider, and in **Settings → General** the menus for **Activate fonts by** and **When an added font is already in your library** are the same width.
 
