@@ -676,8 +676,8 @@ private struct GroupDrop: ViewModifier {
 /// sidebar, instead of drawing an insertion line, and leaves drawing the selection to the rows (see
 /// `SidebarHighlight`). SwiftUI has no setting for either: a List on macOS 26 is an NSOutlineView, whose
 /// `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves the styles alone once
-/// they're set. This sits behind a header inside the list, so the outline view is among its superviews; it takes
-/// no clicks and draws nothing.
+/// they're set; the gap needs one answer SwiftUI can't give (see `DropExitAnswer`). This sits behind a header
+/// inside the list, so the outline view is among its superviews; it takes no clicks and draws nothing.
 private struct OutlineViewSetup: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { Marker() }
     func updateNSView(_ nsView: NSView, context: Context) {}
@@ -690,8 +690,36 @@ private struct OutlineViewSetup: NSViewRepresentable {
             var view = superview
             while let current = view, !(current is NSOutlineView) { view = current.superview }
             guard let outline = view as? NSOutlineView else { return }
-            outline.draggingDestinationFeedbackStyle = .gap
             outline.selectionHighlightStyle = .none
+            // Without the answer, a row dragged out of the list stops Cicero.
+            if DropExitAnswer.give(for: outline) { outline.draggingDestinationFeedbackStyle = .gap }
         }
+    }
+}
+
+/// As a drag leaves an outline view whose drop feedback is `.gap`, AppKit asks the data source whether it takes a drop at
+/// child index -2, AppKit's nowhere, to close the gap (or, answered with a delete, let the rows go in a puff). SwiftUI's
+/// data source looks up row -2 and Cicero stops (seen on macOS 27.0.1, checked on 26.6.2), so every row dragged out of
+/// the sidebar was a crash. This answers that one question itself, with no drop, which closes the gap, and leaves
+/// every other one to SwiftUI. It replaces the method in the data source's class, SwiftUI's own: when that isn't
+/// there to replace, the sidebar keeps the list's own drop feedback.
+private enum DropExitAnswer {
+    private typealias Validate = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject, AnyObject?, Int) -> NSDragOperation
+    /// The classes answering already, so a second sidebar doesn't wrap the answer in another.
+    private static var answering: Set<ObjectIdentifier> = []
+
+    /// Whether `outline`'s data source answers now.
+    static func give(for outline: NSOutlineView) -> Bool {
+        guard let source = outline.dataSource, let type = object_getClass(source) else { return false }
+        if answering.contains(ObjectIdentifier(type)) { return true }
+        let selector = #selector(NSOutlineViewDataSource.outlineView(_:validateDrop:proposedItem:proposedChildIndex:))
+        guard let method = class_getInstanceMethod(type, selector) else { return false }
+        let swiftUI = unsafeBitCast(method_getImplementation(method), to: Validate.self)
+        let answer: @convention(block) (AnyObject, NSOutlineView, AnyObject, AnyObject?, Int) -> NSDragOperation = { source, outline, info, item, index in
+            index == -2 ? [] : swiftUI(source, selector, outline, info, item, index)
+        }
+        method_setImplementation(method, imp_implementationWithBlock(answer))
+        answering.insert(ObjectIdentifier(type))
+        return true
     }
 }

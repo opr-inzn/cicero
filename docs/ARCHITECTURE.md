@@ -162,8 +162,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   doesn't remake them, only sets (the Folders section) and foundries are drop targets (that alone makes a row a third slower to
   appear), and while the selection changes quickly the browser takes it only once it rests. SwiftUI's List
   is an NSOutlineView; a marker view behind the "Fonts" header finds it and sets its drop feedback to
-  `.gap`, the one AppKit setting the sidebar changes. Everything else (selection, moves, menus, headers)
-  stays SwiftUI's.
+  `.gap`, the one AppKit setting the sidebar changes. The gap comes with one question SwiftUI can't answer:
+  as a drag leaves the list, AppKit asks its data source about a drop at child index -2, and SwiftUI looks up
+  row -2 and crashes, so `DropExitAnswer` replaces that method in the data source's class and answers it
+  with no drop, handing every other question on; without the method to replace, no gap. Everything else
+  (selection, moves, menus, headers) stays SwiftUI's.
 - The deployment target is macOS 15. What Cicero uses of macOS 26 (glass, bars over scroll views, exact line
   heights, drop sessions and configurations, the on-device language model) is behind `#available(macOS 26, *)`,
   mostly in small modifiers in `Components/Compatibility.swift` (`glass(in:)`, `topBar`, `drops(of:)`, …) that
