@@ -544,6 +544,8 @@ public struct Family: Identifiable, Hashable, Sendable {
     public let position: SwitchPosition
     /// The regular upright face, which stands for the family in previews and coverage.
     public let regular: LibraryFace
+    /// What `nearest` goes by, for each face.
+    private let picks: [StylePick]
     public let activeCount: Int
     public let hasActive: Bool
     public let hasActivatable: Bool
@@ -579,7 +581,8 @@ public struct Family: Identifiable, Hashable, Sendable {
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         precondition(!faces.isEmpty, "A family has at least one face")
         id = name
-        let regular = Self.nearest(400, in: faces)
+        let picks = faces.map { StylePick($0.face) }
+        let regular = Self.nearest(400, in: faces, picks: picks)
         // The regular style's, else any style's: a family's styles name it alike.
         self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
             ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
@@ -602,6 +605,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         classification = Classification.of(name: name, faces: faces)
         mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
         self.regular = regular
+        self.picks = picks
         activeCount = faces.count { $0.state.isActive }
         hasActive = activeCount > 0
         hasActivatable = faces.contains(where: \.canActivate)
@@ -621,16 +625,24 @@ public struct Family: Identifiable, Hashable, Sendable {
     /// The face to preview at a weight: a variable face when there is one, which draws any weight, else the closest
     /// upright weight.
     public func face(nearestWeight weight: Double) -> LibraryFace {
-        weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
+        weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces, picks: picks)
     }
 
-    /// The upright style of the nearest weight, and of those the one nearest the normal width (Futura's Medium
-    /// rather than its Condensed Medium).
-    private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
+    /// The upright style of the nearest weight (see `StylePick`), in steps of 100, so that a Book is as near Regular
+    /// as a Regular is; of those the one whose names give a weight, then the one nearest the normal width (Futura's
+    /// Medium rather than its Condensed Medium, a Book rather than a Condensed of class 400), then the nearest weight,
+    /// then the nearest class. A companion only when the family has nothing else, so that a family is its Regular
+    /// rather than the Alternates or Small Caps cut at the same weight.
+    private static func nearest(_ weight: Double, in faces: [LibraryFace], picks: [StylePick]) -> LibraryFace {
         let hasUpright = faces.contains { !$0.face.isItalic }
-        var best: LibraryFace?
+        var best: Int?
         var variable: LibraryFace?
-        for candidate in faces where !hasUpright || !candidate.face.isItalic {
+        func rank(_ index: Int) -> (Int, Int, Int, Int, Double, Double) {
+            let pick = picks[index], distance = abs(pick.weight - weight)
+            return (pick.isCompanion ? 1 : 0, Int(distance / 100), pick.weightIsNamed ? 0 : 1, abs(pick.width - 5), distance,
+                    abs(Double(faces[index].face.weight) - weight))
+        }
+        for (index, candidate) in faces.enumerated() where !hasUpright || !candidate.face.isItalic {
             if candidate.face.weightAxis != nil {
                 // The instance at the font's origin, the regular weight of those there, rather than the first
                 // one, which in SF Pro is Compressed.
@@ -639,16 +651,11 @@ public struct Family: Identifiable, Hashable, Sendable {
                     || abs(candidate.face.styleWeight - 400) < abs(found.face.styleWeight - 400)) {
                     variable = candidate
                 }
-            } else if let current = best {
-                let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
-                if distance < bestDistance || distance == bestDistance && abs(candidate.face.width - 5) < abs(current.face.width - 5) {
-                    best = candidate
-                }
-            } else {
-                best = candidate
+            } else if best == nil || rank(index) < rank(best!) {
+                best = index
             }
         }
-        return variable ?? best ?? faces[0]
+        return variable ?? best.map { faces[$0] } ?? faces[0]
     }
 
     /// Counts the weights and widths. A variable font's styles are its named instances, placed by their axis
@@ -714,6 +721,54 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
 }
 
+/// What a family goes by to pick a static style for a weight (see `Family.face(nearestWeight:)`), read once from the
+/// style's names and classes.
+struct StylePick: Hashable, Sendable {
+    /// As the names say, else the class. The style part of the PostScript name first, which in older families is often
+    /// the only one to tell (a Bold styled Regular, a Bold of class 400), and a weight in one name over a Regular in
+    /// the other (a Thin whose PostScript name is SansThin-Regular). A style name's Regular often only
+    /// places the style in a group of four with an Italic, a Bold and a Bold Italic, so it says nothing when the
+    /// PostScript name has words of its own (Sans-Compact, styled Regular). A name with only a width
+    /// ("Wide", "Extended") keeps the class: Marker Felt's Wide is its heavier style.
+    var weight: Double
+    var weightIsNamed: Bool
+    /// As the names say, else the class.
+    var width: Int
+    /// Cut as a font of its own for what the family's text styles leave out, or a decorated version of them, as its
+    /// names say: small capitals, an expert set, alternates, swashes, ligatures, ornaments, a euro, an outline, inline,
+    /// shadow or stencil. Or an upright whose names say it's italic.
+    var isCompanion: Bool
+
+    init(_ face: FontFace) {
+        let postScript = Self.postScriptStyle(of: face)
+        let names = [postScript.map(StyleName.init), StyleName(face.styleName)].compactMap { $0 }
+        var weights = names.compactMap(\.weight)
+        if let own = postScript.map(StyleName.init), own.weight == nil, own.hasOther { weights.removeAll { $0 == 400 } }
+        let named = weights.first { $0 != 400 } ?? weights.first
+        weight = Double(named ?? face.weight)
+        weightIsNamed = named != nil
+        width = names.lazy.compactMap(\.width).first ?? face.width
+        let words = [face.styleName, postScript ?? ""].flatMap { name in
+            StyleName.spaced(name).lowercased().split { !$0.isLetter }.map(String.init)
+        }
+        isCompanion = !Self.companionWords.isDisjoint(with: words) || !face.isItalic && names.contains(where: \.hasSlope)
+    }
+
+    /// Lig is also short for Light, so ligatures only in full.
+    private static let companionWords: Set<String> = [
+        "sc", "caps", "smallcaps", "expert", "exp", "alt", "alts", "alternate", "alternates", "alternative", "swash",
+        "swashes", "ligatures", "ornaments", "orn", "pi", "euro", "fractions", "initials", "dingbats", "symbols",
+        "outline", "inline", "shadow", "shaded", "stencil", "hollow",
+    ]
+
+    /// What follows the family in a PostScript name ("Sans-Bold" → Bold), nil when nothing does.
+    private static func postScriptStyle(of face: FontFace) -> String? {
+        guard let hyphen = face.postScriptName.firstIndex(of: "-") else { return nil }
+        let style = face.postScriptName[face.postScriptName.index(after: hyphen)...]
+        return style.isEmpty ? nil : String(style)
+    }
+}
+
 /// The weight and width a style name spells out ("SemiBold Condensed", "U Lt", "Cn Bd"), on the OS/2 scales.
 /// Many files give every style the same classes, Bold and Light at 400 or Extended at normal width,
 /// so the name tells styles apart more reliably. Only abbreviations share a value: a family that uses
@@ -723,8 +778,9 @@ struct StyleName {
     var width: Int?
     /// The width words as written, with a run of X's kept on ("XXX Compressed" → xxxcompressed).
     var widthWords: [String] = []
-    private var hasSlope = false
-    private var hasOther = false
+    private(set) var hasSlope = false
+    /// A word that's neither a weight, a width nor a slope ("Compact", "Display", "Caps").
+    private(set) var hasOther = false
     /// Nothing but width and slope words ("Extended", "X Compressed Italic"): the regular weight. A word Cicero
     /// doesn't know may be a weight ("Buch Kursiv").
     var isRegular: Bool { weight == nil && !hasOther && (width != nil || hasSlope) }
@@ -780,6 +836,22 @@ struct StyleName {
     }
 
     private static let prefixes: Set<String> = ["extra", "ultra", "semi", "demi", "x", "xx", "u"]
+
+    /// The name with a space at each step from a small letter to a capital, and before the capital that starts a word
+    /// after a run of them: "SansBlack" → Sans Black, "XYZSerifSTMedium" → XYZ Serif ST Medium. Old-style
+    /// figures' OsF stays a word: "RegularSCOsF" → Regular SC Osf.
+    static func spaced(_ name: String) -> String {
+        let characters = Array(name.replacingOccurrences(of: "OsF", with: "Osf"))
+        var spaced = ""
+        for (index, character) in characters.enumerated() {
+            if index > 0, character.isUppercase {
+                let previous = characters[index - 1], next = index + 1 < characters.count ? characters[index + 1] : nil
+                if previous.isLowercase || previous.isUppercase && next?.isLowercase == true { spaced.append(" ") }
+            }
+            spaced.append(character)
+        }
+        return spaced
+    }
 
     private static let weights: [String: Int] = [
         "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "lazer": 85, "lz": 85, "thin": 100, "th": 100,

@@ -77,10 +77,15 @@ public struct SimilarFonts: Sendable {
     }
 
     /// The words at the end of a name that make another copy of a design rather than another design: a trial's, a
-    /// variable font's, an OpenType one's or one for another region's characters (PingFang SC and HK, Hiragino's ProN).
+    /// variable font's, an OpenType one's, one for another region's characters (PingFang SC and HK, Hiragino's ProN) or
+    /// another script's (Serif Pro Cyr, or SerifC with its C for Cyrillic), and the fonts older families cut for their
+    /// figures, small capitals, expert set, alternates, ligatures or ornaments. Not a foundry's: two foundries' fonts
+    /// of one name are often different drawings.
     static let copyWords: Set<String> = [
-        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn",
-        "sc", "tc", "hk", "mo",
+        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn", "ot",
+        "sc", "tc", "hk", "mo", "cyr", "cyrillic", "grk", "greek", "ce", "w1g", "c",
+        "lf", "tf", "osf", "scosf", "caps", "smallcaps", "expert", "exp", "alt", "alts", "alternate", "alternates", "swash",
+        "swashes", "lig", "ligatures", "fractions", "pi", "ornaments", "initials",
     ]
     /// The weights at the end of a name, for a family cut into one for each weight.
     static let weightWords: Set<String> = [
@@ -88,18 +93,19 @@ public struct SimilarFonts: Sendable {
         "extrabold", "ultrabold", "heavy", "black", "extrablack",
     ]
 
-    /// The design a family's name says: the name without the words at its end that make another copy of it
-    /// (`copyWords`, `weightWords` with the Semi of a Semi Bold, also before an Italic), a version or a date (v0.2,
-    /// 2.001, 260417), and without the Test some foundries start a trial's name with, so that Inter Variable, Inter Light
-    /// and Test Inter are Inter's, and Inter Bold Italic Inter Italic's, while Roboto Mono and DM Serif Display are
-    /// designs of their own.
+    /// The design a family's name says: the name, its words apart where they're run together (SansBlack), without the
+    /// words at its end that make another copy of it (`copyWords`, `weightWords` with the Semi of a Semi Bold or the
+    /// Small of Small Caps, also before an Italic), a version or a date (v0.2, 2.001, 260417), and without the Test some
+    /// foundries start a trial's name with, so that Inter Variable, Inter Light and Test Inter are Inter's, and Inter Bold
+    /// Italic Inter Italic's, while Roboto Mono and DM Serif Display are designs of their own.
     static func design(of name: String) -> String {
-        var words = name.lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
+        var words = StyleName.spaced(name).lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
         if words.count > 1, words[0] == "test" { words.removeFirst() }
         func stripCopies() {
             while words.count > 1, let last = words.last, copyWords.contains(last) || weightWords.contains(last) || isVersion(last) {
                 words.removeLast()
                 if weightWords.contains(last), words.count > 1, ["semi", "demi", "extra", "ultra"].contains(words.last!) { words.removeLast() }
+                if last == "caps", words.count > 1, ["small", "petite", "all"].contains(words.last!) { words.removeLast() }
             }
         }
         stripCopies()
