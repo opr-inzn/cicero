@@ -390,8 +390,8 @@ struct ValueField: View {
     var step: Double = 1
     /// After the number: " pt", "%".
     var unit = ""
-    /// Where the number sits in the field's width: trailing lines values up in a column, leading keeps it as
-    /// close to the slider as a label is on the other side.
+    /// Where the number sits in the field's width: trailing lines values up in a column, 52 pt wide; leading keeps it
+    /// as close to the slider as a label is on the other side, in a field as wide as the widest value the range allows.
     var alignment = HorizontalAlignment.trailing
     @State private var text = ""
     @FocusState private var isFocused: Bool
@@ -403,16 +403,30 @@ struct ValueField: View {
         self.step = step
         self.unit = unit
         self.alignment = alignment
+        // The number from the start, not once it appears: a field in a layout `ViewThatFits` is still weighing, as the
+        // font page's row on one line, would measure as wide as its title, which it shows while empty.
+        _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        let content = HStack(spacing: 0) {
             number
             // In the number's colour: forms grey a row's value text.
             Text(unit).foregroundStyle(.primary)
         }
+        Group {
+            if alignment == .leading {
+                // Nothing after it moves as the value changes, and a row's last value ends where the row does.
+                ZStack(alignment: .leading) {
+                    Text(formatted(range.lowerBound) + unit).hidden()
+                    Text(formatted(range.upperBound) + unit).hidden()
+                    content
+                }
+            } else {
+                content.frame(width: 52, alignment: .trailing)
+            }
+        }
         .monospacedDigit()
-        .frame(width: 52, alignment: Alignment(horizontal: alignment, vertical: .center))
         .onAppear { text = formatted(value) }
         // The slider moved; typing leaves the value alone until it's committed.
         .onChange(of: value) { text = formatted($1) }
@@ -455,6 +469,10 @@ struct ValueField: View {
     }
 
     private func formatted(_ value: Double) -> String {
+        Self.formatted(value, step: step)
+    }
+
+    private static func formatted(_ value: Double, step: Double) -> String {
         String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
     }
 }
@@ -801,7 +819,7 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help("Preview text, size, weight and leading")
+        .help("Preview text, size and leading")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(size: size, sizeRange: sizeRange) }
     }
 }
@@ -817,7 +835,8 @@ private struct PreviewOptions: View {
             Section {
                 TextField("Preview Text", text: $preview.sampleText, prompt: Text("Preview Text"))
                     .labelsHidden()
-                Menu("Presets") {
+                // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
+                Menu("Presets\u{200A}") {
                     ForEach(PreviewSettings.presets, id: \.self) { sample in
                         Button(sample) { preview.sampleText = sample }
                     }
@@ -838,7 +857,6 @@ private struct PreviewOptions: View {
                 } else {
                     row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
                 }
-                row("Weight", $preview.weight, range: 100...900)
                 row("Leading", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
             }
