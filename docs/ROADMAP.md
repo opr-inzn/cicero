@@ -34,6 +34,23 @@ style with the others of its slant. Families' lists stay as they are.
 - How to show a style's list: the browser lists families, so styles would need a list of their own.
 - A family's own other styles: whether they belong in the list.
 
+### Subfolders in Locations and Folders (M)
+
+**What.** Show the folders inside a location under its row, and let folders hold other folders. A location is one row
+now, with the fonts of every folder inside it, and folders are one flat list: FontExplorer X's nested sets come in as
+"Folder / Sub / Set".
+
+**How.** A location's row opens to the folders inside it that have fonts, named as on disk, each listing its fonts and
+those of the folders inside it, with Reveal in Finder and Export Fonts. A folder gets a parent: drag one onto another,
+or New Folder in a folder's menu. A folder lists its own families and those of the folders inside it, so Activate
+Folder turns them all on. Backups from before load as a flat list; FontExplorer X imports keep their nesting.
+
+**Open.**
+- Whether a location's subfolder can be on in another way than the location (Fonts in This Location), and whether the
+  Font Library, with a folder per family, shows its subfolders at all.
+- What can go inside a folder: smart folders and app folders too, or folders only; and whether deleting a folder
+  deletes the ones inside it or moves them up.
+
 ## Not planned
 
 Buying fonts inside Cicero, font subscription and rental services, and team servers with accounts: Cicero has no
