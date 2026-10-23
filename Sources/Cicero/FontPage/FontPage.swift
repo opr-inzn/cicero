@@ -238,8 +238,8 @@ private struct TypeTester: View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            // On one row where there's room, else the sliders on a row of their own: with the Info panel open, a narrow
-            // window has too little for all of them, and squeezed, the labels would wrap and the row grow.
+            // On one row where there's room, else the sliders on a row of their own, at the left: with the Info panel
+            // open, a narrow window has too little for all of them, and squeezed, the labels would wrap and the row grow.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) {
                     stylePicker(isAdjusted: !variations.isEmpty)
@@ -254,8 +254,8 @@ private struct TypeTester: View {
                         buttons(hasAxes: !face.face.axes.isEmpty)
                     }
                     HStack(spacing: 16) {
-                        Spacer(minLength: 0)
                         sliders
+                        Spacer(minLength: 0)
                     }
                 }
             }
@@ -307,7 +307,7 @@ private struct TypeTester: View {
         HStack(spacing: 8) {
             Text(title).foregroundStyle(.secondary).fixedSize()
             ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
-            ValueField(title, value: value, range: range, step: step, unit: unit)
+            ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
         }
         .layoutPriority(1)
     }

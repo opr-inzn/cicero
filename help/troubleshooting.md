@@ -7,7 +7,7 @@
 Go through these in order:
 
 1. **Is the font on?** Find it in Cicero and look at its switch. A family tagged **Partly active** has some styles off; open its font page to see which.
-2. **Is it on in every app?** A font tagged **Testing** or with an app’s name is on in that app only. Click its switch to turn it on everywhere. One tagged **Adobe Fonts** with its switch halfway is on in Adobe apps only: turn it on in Creative Cloud to use it everywhere (see [Adobe Fonts](activating.md#adobe-fonts)). See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
+2. **Is it on in every app?** A font tagged **Proofing** or with an app’s name is on in that app only. Click its switch to turn it on everywhere. One tagged **Adobe Fonts** with its switch halfway is on in Adobe apps only: turn it on in Creative Cloud to use it everywhere (see [Adobe Fonts](activating.md#adobe-fonts)). See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
 3. **Was it on just for a while?** Fonts turned on temporarily go off when Cicero quits. Fonts from an [app folder](activating.md#turn-fonts-on-with-an-app) are only on while one of the folder’s apps is open and Cicero is running.
 4. **Is it Microsoft Office?** Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, not fonts used where they are, and only from the second time they open after the font went on. See [Fonts in Microsoft Office](activating.md#fonts-in-microsoft-office).
 5. **Restart the app.** Most apps see a font as soon as Cicero turns it on, but some only read the font list when they open.

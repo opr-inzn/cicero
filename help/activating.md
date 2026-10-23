@@ -177,7 +177,7 @@ Type designers export fonts there to test them: an Adobe app picks up a new vers
 
 These folders have nothing to do with Adobe Fonts, the fonts you turn on in Creative Cloud (see [Adobe Fonts](#adobe-fonts)).
 
-Cicero lists the fonts in all of them together as **Testing** under **Locations**, while there are any. They show as active in those apps, with a red tag, **Testing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show test fonts installed for Adobe apps** under **Library** in **Settings → General**. Adobe Fonts have a switch of their own, **Show fonts from Creative Cloud**.
+Cicero lists the fonts in all of them together as **Proofing** under **Locations**, while there are any. They show as active in those apps, with a red tag, **Proofing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for proofing in Adobe apps** under **Library** in **Settings → General**. Adobe Fonts have a switch of their own, **Show fonts from Creative Cloud**.
 
 ### The three-position switch
 

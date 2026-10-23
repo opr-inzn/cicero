@@ -308,7 +308,7 @@ extension AppModel {
         let new = urls.map(\.standardizedFileURL.path).filter { !existing.contains($0) }
         guard !new.isEmpty else { return }
         for path in new {
-            // Adobe's folders come with the Testing switch rather than one by one.
+            // Adobe's folders come with the Proofing switch rather than one by one.
             if WatchedFolder.detectAppName(forPath: path) != nil {
                 data.showAdobeAppFolders = true
             } else {
@@ -421,7 +421,7 @@ extension AppModel {
         return data.folders.first { $0.id == id }.map(data.named)
     }
 
-    /// What the sidebar calls a folder or one of Cicero's own items (Testing, Adobe Fonts, Added Fonts): the name the
+    /// What the sidebar calls a folder or one of Cicero's own items (Proofing, Adobe Fonts, Added Fonts): the name the
     /// user gave it, else its own.
     func folderName(_ id: UUID) -> String {
         (folder(id) ?? data.named(WatchedFolder(id: id, path: ""))).displayName

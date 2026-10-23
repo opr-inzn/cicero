@@ -100,7 +100,7 @@ struct GeneralSettings: View {
                 Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
                 // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    Text("Show test fonts installed for Adobe apps")
+                    Text("Show fonts installed for proofing in Adobe apps")
                     Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
                 Toggle(isOn: $model.guessesClassifications) {

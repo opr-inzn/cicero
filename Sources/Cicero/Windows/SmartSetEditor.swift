@@ -99,7 +99,7 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
-    /// The user's folders, then Testing when its fonts are shown, Adobe Fonts when there are some and they're shown,
+    /// The user's folders, then Proofing when its fonts are shown, Adobe Fonts when there are some and they're shown,
     /// Added Fonts when there are some, and the Font Library when it has fonts.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
@@ -175,7 +175,7 @@ private struct RuleRow: View {
         case .folder:
             options(folderOptions, empty: "No locations yet")
         case .status:
-            // Active in Adobe Apps Only while Adobe apps' test fonts are shown, or for a rule that has it.
+            // Active in Adobe Apps Only while Proofing is shown, or for a rule that has it.
             let statuses = SmartRuleValue.statuses.filter { $0 != "appOnly" || model.data.showAdobeAppFolders || rule.value == $0 }
             options(statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:

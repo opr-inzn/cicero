@@ -50,7 +50,7 @@ A bar shows how it’s going, and **Cancel** stops it. When it’s done, Cicero 
 - the font files you added one at a time, as **Added Fonts**
 - foundry names you changed, and the families you moved to another foundry
 - the sidebar: what’s hidden, the order, and which sections are open
-- the settings for how Cicero activates fonts and whether it asks before activating many, **Show system fonts**, **Show fonts from Creative Cloud** and **Show test fonts installed for Adobe apps**
+- the settings for how Cicero activates fonts and whether it asks before activating many, **Show system fonts**, **Show fonts from Creative Cloud** and **Show fonts installed for proofing in Adobe apps**
 - which fonts Cicero turned on, and how
 - with **Include font files**: every font file in your library, other copies included, except the ones that come with macOS or an app, and Adobe Fonts
 
