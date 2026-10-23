@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## 0.10.3
 
-- Drag an item out of the sidebar to hide it, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×, and **Undo** at the bottom of the window brings it back. Before, dragging an item out of the sidebar made Cicero quit unexpectedly.
+- Drag an item out of the sidebar to take it away, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. A location leaves your library, as with **Remove Location from Library**, a folder or tag is deleted, as with **Delete Folder** and **Delete Tag**, and any other item is hidden. **Undo** at the bottom of the window brings it back. Before, dragging an item out of the sidebar made Cicero quit unexpectedly.
 - An item you drag in the sidebar looks as it does in the Finder, its symbol in the same grey as its name. On macOS 26 the symbol was white.
 - Items you drag to a new place in the sidebar land at once. Before, the items below them slid up into place afterwards, cut off at their edges.
 - **All Fonts**, **Active** and **Inactive** can no longer be hidden from the sidebar: their checkboxes in **Edit** and **Settings → Sidebar** stay on, and their menus have no **Hide from Sidebar**. One you had hidden is back.

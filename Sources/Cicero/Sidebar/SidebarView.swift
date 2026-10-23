@@ -8,7 +8,8 @@ import UniformTypeIdentifiers
 /// the same way while editing, so a long one like Foundries can be closed to get past it. Edit and Done switch
 /// at once: animated, hundreds of rows coming and going ran into each other. Rows drag to a new place within their section (or character set
 /// group), several at once when they're selected together, and the rows they pass slide apart to open a
-/// gap where they'll land; dropped outside the sidebar, they're hidden, as Finder's sidebar removes them.
+/// gap where they'll land; dropped outside the sidebar, locations, folders and tags are removed and other rows hidden,
+/// as Finder's sidebar removes them.
 /// Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
@@ -207,7 +208,7 @@ private struct SidebarContent: View {
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
         }
         .padding(.trailing, 10)
-        .background(OutlineViewSetup(drag: drag) { model.hideFromSidebar($0) })
+        .background(OutlineViewSetup(drag: drag) { model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -693,7 +694,7 @@ private struct GroupDrop: ViewModifier {
 /// it takes no clicks and draws nothing.
 private struct OutlineViewSetup: NSViewRepresentable {
     let drag: SidebarDrag
-    /// Hides rows dropped outside the sidebar.
+    /// Removes or hides rows dropped outside the sidebar.
     let hide: ([SidebarRow]) -> Void
 
     func makeNSView(context: Context) -> NSView {
@@ -728,11 +729,11 @@ private struct OutlineViewSetup: NSViewRepresentable {
     }
 }
 
-/// The rows a drag in the sidebar has, and what dropping them outside it does: they're hidden from the sidebar, as
-/// Finder's sidebar removes them. While the pointer is outside, it has Finder's ×, the disappearing-item cursor. Escape,
+/// The rows a drag in the sidebar has, and what dropping them outside it does: locations, folders and tags are removed,
+/// other rows hidden (`AppModel.dragOutOfSidebar`), as Finder's sidebar removes them. While the pointer is outside, it has Finder's ×, the disappearing-item cursor. Escape,
 /// or a drop back in the list, keeps them. Their picture never slides back to where they were.
 final class SidebarDrag {
-    /// Hides rows dropped outside the sidebar (`AppModel.hideFromSidebar`).
+    /// Removes or hides rows dropped outside the sidebar (`AppModel.dragOutOfSidebar`).
     var hide: ([SidebarRow]) -> Void = { _ in }
     private var rows: [SidebarRow] = []
     private var lastAsked: ContinuousClock.Instant?
@@ -838,8 +839,8 @@ final class SidebarDrag {
         }
     }
 
-    /// The drag has ended at `point`, on the screen. Rows nothing took, let go of outside the list, are hidden, but All
-    /// Fonts, Active and Inactive.
+    /// The drag has ended at `point`, on the screen. Rows nothing took, let go of outside the list, are removed or hidden,
+    /// but All Fonts, Active and Inactive.
     func ended(at point: NSPoint, operation: NSDragOperation) {
         let rows = session == nil ? [] : rows.filter(\.canHide)
         session = nil

@@ -759,15 +759,56 @@ extension AppModel {
         return rows.isEmpty ? [row] : rows
     }
 
-    /// Hides rows dragged out of the sidebar, as Hide from Sidebar does, with Undo in the toast: a drag out is easily
-    /// made by mistake.
-    func hideFromSidebar(_ rows: [SidebarRow]) {
+    /// What dragging rows out of the sidebar does, as their menus would: locations leave the library (Remove Location
+    /// from Library), folders and tags are deleted (Delete Folder, Delete Tag); Cicero's own locations, which can't be
+    /// removed, and every other row are hidden (Hide from Sidebar). All Fonts, Active and Inactive stay. Undo in the toast,
+    /// as a drag out is easily made by mistake, puts back the lists these change as they were, so what was changed in
+    /// them meanwhile goes too; fonts a removed location had on stay off.
+    func dragOutOfSidebar(_ rows: [SidebarRow]) {
         let rows = rows.filter { $0.canHide && isVisible($0.key) }
         guard !rows.isEmpty else { return }
-        hide(rows.map(\.key))
-        let names = rows.count > 3 ? "\(rows.count) items" : rows.map(\.title).formatted(.list(type: .and))
-        showToast("\(names) hidden from the sidebar") { [weak self] in
-            for row in rows { self?.setVisible(row.key, true) }
+        let before = data
+        var locations: [SidebarRow] = [], deleted: [SidebarRow] = [], hidden: [SidebarRow] = []
+        for row in rows {
+            switch row.item {
+            case .folder(let id) where isRemovableFolder(id): locations.append(row)
+            case .set, .smartSet, .tag: deleted.append(row)
+            default: hidden.append(row)
+            }
+        }
+        if !locations.isEmpty {
+            removeFolders(Set(locations.compactMap { if case .folder(let id) = $0.item { id } else { nil } }))
+        }
+        let sets = Set(deleted.compactMap { if case .set(let id) = $0.item { id } else { nil } })
+        if !sets.isEmpty { deleteSets(sets) }
+        let smartSets = Set(deleted.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
+        if !smartSets.isEmpty { deleteSmartSets(smartSets) }
+        let tags = Set(deleted.compactMap { if case .tag(let name) = $0.item { name } else { nil } })
+        if !tags.isEmpty { deleteTags(tags) }
+        if !hidden.isEmpty { hide(hidden.map(\.key)) }
+
+        func names(_ rows: [SidebarRow], _ noun: String) -> String {
+            rows.count > 3 ? "\(rows.count) \(noun)" : rows.map(\.title).formatted(.list(type: .and))
+        }
+        let deletedNoun = deleted.allSatisfy { if case .tag = $0.item { true } else { false } } ? "tags" : "folders"
+        let message = [
+            locations.isEmpty ? nil : "\(names(locations, "locations")) removed from the library",
+            deleted.isEmpty ? nil : "\(names(deleted, deletedNoun)) deleted",
+            hidden.isEmpty ? nil : "\(names(hidden, "items")) hidden from the sidebar",
+        ].compactMap { $0 }.joined(separator: " and ")
+        showToast(message) { [weak self] in
+            guard let self else { return }
+            var data = self.data
+            data.folders = before.folders
+            data.folderNames = before.folderNames
+            data.sets = before.sets
+            data.smartSets = before.smartSets
+            data.tags = before.tags
+            data.familyTags = before.familyTags
+            data.tagColors = before.tagColors
+            data.sidebar = before.sidebar
+            self.data = data
+            if !locations.isEmpty { rescan() }
         }
     }
 

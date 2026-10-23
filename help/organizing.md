@@ -38,7 +38,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 2. Uncheck what you don’t want. Unchecked items are dimmed. **All Fonts**, **Active** and **Inactive** always stay: their checkboxes can’t be unchecked.
 3. Click **Done**. The unchecked items disappear.
 
-To hide one item quickly, right-click it and choose **Hide from Sidebar**, or drag it out of the sidebar and let go, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. Changed your mind? Click **Undo** in the note at the bottom of the window. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
+To hide one item quickly, right-click it and choose **Hide from Sidebar**, or drag it out of the sidebar and let go, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. Dragged out, a location, folder or tag is removed rather than hidden, as below. Changed your mind? Click **Undo** in the note at the bottom of the window. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
 
 The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
 
@@ -86,7 +86,7 @@ Right-click a location in the sidebar:
 - **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
-- **Remove Location from Library**: Cicero stops listing it. The files stay where they are. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Settings → Locations** and click **−**.
+- **Remove Location from Library**: Cicero stops listing it. The files stay where they are. Dragging the location out of the sidebar does the same, with **Undo** in the note at the bottom of the window. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Settings → Locations** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
 ### Proofing
@@ -177,7 +177,7 @@ A folder is a list of families you put together by hand, like the fonts for one 
 
 ### Rename or delete a folder
 
-Right-click the folder and choose **Rename Folder** or **Delete Folder**. Deleting a folder keeps its fonts in your library. Smart folder rules that use the folder are removed.
+Right-click the folder and choose **Rename Folder** or **Delete Folder**, or drag the folder out of the sidebar to delete it, with **Undo** in the note at the bottom of the window. Deleting a folder keeps its fonts in your library. Smart folder rules that use the folder are removed.
 
 ### Turn a folder’s fonts on or off
 
@@ -250,7 +250,7 @@ They’re tags like any other: rename them, delete them, or make your own. Libra
 ### Make, change and delete tags
 
 - Click **+** next to **Tags** in the sidebar to make a tag. Type a name and click a color under it, or the struck-through circle for none. The color starts on the first one no other tag has.
-- Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**. Deleting a tag takes it off every family, and smart folder rules that use it are removed.
+- Right-click a tag and choose **Rename Tag**, a color under **Color** (or **None**), or **Delete Tag**, or drag the tag out of the sidebar to delete it, with **Undo** in the note at the bottom of the window. Deleting a tag takes it off every family, and smart folder rules that use it are removed.
 
 Select a tag in the sidebar to see the families that have it. To find families with several tags, any of several, or without one, make a [smart folder](#smart-folders) with **Tag** rules: **Tag** **is** a tag picks the families that have it, among their others.
 

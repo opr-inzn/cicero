@@ -93,9 +93,12 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   drag in the list). Sections don't move: a click on a title opens or closes it, and a drag does nothing (an
   order saved when sections could be dragged is kept; Reset Order puts them back). Items that are gone for now (System Fonts while
   system fonts are off, an empty Deactivated folder) keep their place; new items go last.
-- Rows dragged out of the list and let go of there, where nothing takes them, are hidden from the sidebar
-  (`hideFromSidebar`), as Finder's sidebar removes them, with a toast,
-  "Recents hidden from the sidebar" ("4 items" for more than three), with Undo. While they're outside, the pointer
+- Rows dragged out of the list and let go of there, where nothing takes them, go as their menus would (`dragOutOfSidebar`),
+  as Finder's sidebar removes them: locations leave the library (Remove Location from Library), folders, smart and
+  app folders and tags are deleted (Delete Folder, Delete Tag), and Cicero's own locations, which can't be removed, and
+  every other row are hidden; with a toast, "Recents hidden from the sidebar", "Trial deleted", "ABCAreal removed
+  from the library" ("4 items", "4 tags", "4 locations" for more than three; joined with "and" when a drag does two),
+  with Undo, which puts back the lists they changed as they were (fonts a removed location had on stay off). While they're outside, the pointer
   has Finder's × (`NSCursor.disappearingItem`, set at each move from the outline view's `draggedImage:movedTo:`)
   and they don't slide back. Escape, or letting go back in the list, keeps them; the picture never slides back to where the rows were (`animatesToStartingPositionsOnCancelOrFail` off), so rows let go where nothing changes, as in their own place, are there again at once rather than after half a second of the picture sliding back and fading. A dragged row is drawn by Cicero,
   its symbol and title in the label colour at the row's size (`SidebarDrag.picture`), at 88 % as Finder's rows
