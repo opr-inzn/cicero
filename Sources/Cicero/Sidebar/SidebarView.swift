@@ -728,8 +728,8 @@ private struct OutlineViewSetup: NSViewRepresentable {
 }
 
 /// The rows a drag in the sidebar has, and what dropping them outside it does: they're hidden from the sidebar, as
-/// Finder's sidebar removes them. While the pointer is outside, it has Finder's ×, the disappearing-item cursor, and rows
-/// let go there don't slide back. Escape, or a drop back in the list, keeps them.
+/// Finder's sidebar removes them. While the pointer is outside, it has Finder's ×, the disappearing-item cursor. Escape,
+/// or a drop back in the list, keeps them. Their picture never slides back to where they were.
 final class SidebarDrag {
     /// Hides rows dropped outside the sidebar (`AppModel.hideFromSidebar`).
     var hide: ([SidebarRow]) -> Void = { _ in }
@@ -758,6 +758,9 @@ final class SidebarDrag {
         rows = Array(rows.suffix(count))
         self.session = session
         listFrame = frame
+        // Let go where nothing changes, as back in their own place, the rows are there again at once: AppKit slid the
+        // picture back there and faded it out first, with the place empty.
+        session.animatesToStartingPositionsOnCancelOrFail = false
         pictures = []
         session.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
             self.dress(item, at: index, in: outline)
@@ -812,12 +815,11 @@ final class SidebarDrag {
     }
 
     /// The pointer has moved to `point`, on the screen: outside the list it has the ×, set at each move as Finder's
-    /// sidebar does, and the rows won't slide back.
+    /// sidebar does.
     func moved(to point: NSPoint) {
         // All Fonts, Active and Inactive don't go: nothing to show for them.
-        guard let session, rows.contains(where: \.canHide) else { return }
+        guard session != nil, rows.contains(where: \.canHide) else { return }
         let isOutside = !listFrame.contains(point)
-        session.animatesToStartingPositionsOnCancelOrFail = !isOutside
         if isOutside {
             if NSCursor.current != NSCursor.disappearingItem { NSCursor.disappearingItem.set() }
         } else if NSCursor.current == NSCursor.disappearingItem {
