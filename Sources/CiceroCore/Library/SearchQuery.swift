@@ -214,9 +214,10 @@ extension Family {
     /// The style nearest one a search names: of the italics when it's italic, else of the uprights; of those, the ones
     /// nearest its width, on the narrower or wider side when there are any; then the one nearest the weight, by its name
     /// when that says one (a Bold the file classes at 400 is still Bold), the normal width first among the same weight. A
-    /// variable style comes first, as it draws every weight, and of those the ones where the regular is on the axes the
-    /// search says nothing about. Not one of ornaments, unless that's all there is. When the family has none of a kind,
-    /// the next step chooses among them all, so a family without italics shows its upright.
+    /// variable style with a weight axis comes first, as it draws every weight, and of the variable styles, with a weight
+    /// axis or not, the ones where the regular is on the axes the search says nothing about. Not one of ornaments, unless
+    /// that's all there is. When the family has none of a kind, the next step chooses among them all, so a family without
+    /// italics shows its upright.
     func face(for style: SearchQuery.Style, weight: Double) -> LibraryFace {
         let letters = faces.filter { !$0.face.isOrnaments }
         var candidates = letters.isEmpty ? faces : letters
@@ -230,16 +231,15 @@ extension Family {
             let nearest = candidates.map { abs(widthClass(of: $0.face) - wanted) }.min()
             keep { abs(widthClass(of: $0.face) - wanted) == nearest }
         }
-        let variables = candidates.filter { $0.face.weightAxis != nil }
-        if !variables.isEmpty {
-            let named = ["wght"] + (style.isItalic ? ["ital", "slnt"] : []) + (style.width == nil ? [] : ["wdth"])
-            let origin = Dictionary(regular.face.axes.map { ($0.tag, $0.value) }) { first, _ in first }
-            func moved(_ face: FontFace) -> Int {
-                face.axes.count { axis in !named.contains(axis.tag) && origin[axis.tag].map { abs($0 - axis.value) > 0.01 } == true }
-            }
-            let least = variables.map { moved($0.face) }.min()
-            candidates = variables.filter { moved($0.face) == least }
+        keep { $0.face.weightAxis != nil }
+        // A static style has no axes to be moved on, so it stays beside them.
+        let named = ["wght"] + (style.isItalic ? ["ital", "slnt"] : []) + (style.width == nil ? [] : ["wdth"])
+        let origin = Dictionary(regular.face.axes.map { ($0.tag, $0.value) }) { first, _ in first }
+        func moved(_ face: FontFace) -> Int {
+            face.axes.count { axis in !named.contains(axis.tag) && origin[axis.tag].map { abs($0 - axis.value) > 0.01 } == true }
         }
+        let least = candidates.map { moved($0.face) }.min()
+        keep { moved($0.face) == least }
         return candidates.min { a, b in
             let (first, second) = (abs(a.face.namedWeight - weight), abs(b.face.namedWeight - weight))
             return first != second ? first < second : abs(widthClass(of: a.face) - 5) < abs(widthClass(of: b.face) - 5)

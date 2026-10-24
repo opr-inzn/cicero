@@ -280,13 +280,13 @@ struct VariableTag: View {
         }
     }
 
-    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in `AxisOrder`.
+    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in the font's order.
     private var help: String {
         var axes: [VariationAxis] = []
         for face in family.faces {
             for axis in face.face.axes where !axes.contains(where: { $0.name == axis.name }) { axes.append(axis) }
         }
-        return axes.isEmpty ? "Variable" : "Variable: " + AxisOrder.sorted(axes, by: \.tag).map(\.name).joined(separator: ", ")
+        return axes.isEmpty ? "Variable" : "Variable: " + axes.map(\.name).joined(separator: ", ")
     }
 }
 
