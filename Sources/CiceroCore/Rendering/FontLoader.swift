@@ -99,14 +99,14 @@ public final class FontLoader: Sendable {
             atDefaults, [kCTFontOpticalSizeAttribute: "none", kCTFontVariationAttribute: values] as CFDictionary)
     }
 
-    /// A variable face's axes and how far each goes, those the font hides too, in `AxisOrder`; none for a static face.
+    /// A variable face's axes and how far each goes, those the font hides too, in the font's order; none for a static face.
     /// Read once per face, as CoreText looks up the axes' names each time it's asked.
     public func axes(of face: FontFace) -> [AxisRange] {
         guard !face.axes.isEmpty else { return [] }
         let key = state.withLock { "\(face.id)|\($0.generations[face.path] ?? 0)" }
         if let axes = state.withLock({ $0.axes[key] }) { return axes }
         let entries = CTFontCopyVariationAxes(font(face, size: 12)) as? [[String: Any]] ?? []
-        let read = entries.compactMap { entry -> AxisRange? in
+        let axes = entries.compactMap { entry -> AxisRange? in
             guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
                   let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double,
@@ -119,7 +119,6 @@ public final class FontLoader: Sendable {
                              minimum: minimum, maximum: maximum, defaultValue: defaultValue,
                              isHidden: entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true)
         }
-        let axes = AxisOrder.sorted(read, by: \.tag)
         state.withLock { $0.axes[key] = axes }
         return axes
     }

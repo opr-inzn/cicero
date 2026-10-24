@@ -2,6 +2,12 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- A variable family without a weight axis shows at its font’s default, the origin its styles are drawn from, as other variable families do: in the list, grid, specimens and on its font page, where the Axes tab starts there too. Before, it showed its first style, which can be at the far end of every axis. Searching for **italic** shows its italic at the origin’s place on the other axes.
+- The Axes tab lists a variable font’s axes in the order the font gives them, and so does the **Variable** tag when you hold the pointer over it. Before, Weight, Width, Italic, Slant and Optical Size came first.
+- On a font page, **Styles** has a **Weight** column only when the styles aren’t all of one weight.
+
 ## 0.10.3
 
 - Drag an item out of the sidebar to take it away, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. A location leaves your library, as with **Remove Location from Library**, a folder or tag is deleted, as with **Delete Folder** and **Delete Tag**, and any other item is hidden. **Undo** at the bottom of the window brings it back. Before, dragging an item out of the sidebar made Cicero quit unexpectedly.

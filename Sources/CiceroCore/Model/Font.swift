@@ -45,17 +45,6 @@ public struct VariationAxis: Hashable, Codable, Sendable {
 }
 
 /// How far one of a variable font's axes goes, for a slider: Weight from 100 to 900, 400 by default.
-/// The order axes are listed in: weight, width, italic, slant and optical size first, then the others in the order the
-/// font gives them, the designer's own among them.
-public enum AxisOrder {
-    static let registered = ["wght", "wdth", "ital", "slnt", "opsz"]
-
-    public static func sorted<Axis>(_ axes: [Axis], by tag: (Axis) -> String) -> [Axis] {
-        func rank(_ axis: Axis) -> Int { registered.firstIndex(of: tag(axis)) ?? registered.count }
-        return axes.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
-    }
-}
-
 public struct AxisRange: Hashable, Sendable, Identifiable {
     /// As `VariationAxis.tag`.
     public var tag: String
@@ -593,6 +582,9 @@ public struct Family: Identifiable, Hashable, Sendable {
             .filter { tag in Set(faces.map { $0.face.styleValue(on: tag) }).count > 1 }
             .map { (tag: $0, name: names[$0] ?? $0) }
     }
+    /// Whether its styles are of more than one weight, to the whole number the Styles table gives them in (see
+    /// `FontFace.styleWeight`). A weight they all have tells them no more apart than an axis they're all at one place on.
+    public var stylesDifferInWeight: Bool { Set(faces.map { Int($0.face.styleWeight.rounded()) }).count > 1 }
     /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
     /// When its latest style arrived on the Mac, of those that didn't come with macOS or an app: their files are as new
@@ -665,8 +657,8 @@ public struct Family: Identifiable, Hashable, Sendable {
         weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
     }
 
-    /// The upright style of the nearest weight, and of those the one nearest the normal width (Futura's Medium
-    /// rather than its Condensed Medium), and not one of ornaments.
+    /// The upright style of the nearest weight, and of those the one at a variable font's origin, else the one nearest
+    /// the normal width (Futura's Medium rather than its Condensed Medium), and not one of ornaments.
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
         // Not a style of ornaments, which ties with the Regular in Hoefler Text, unless that's all there is.
         let letters = faces.filter { !$0.face.isOrnaments }
@@ -684,8 +676,11 @@ public struct Family: Identifiable, Hashable, Sendable {
                     variable = candidate
                 }
             } else if let current = best {
+                // A variable font without a weight axis has all its instances at one weight: the one at its origin,
+                // rather than the first one listed, which can be at the end of every axis.
                 let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
-                if distance < bestDistance || distance == bestDistance && abs(candidate.face.width - 5) < abs(current.face.width - 5) {
+                if distance < bestDistance || distance == bestDistance && (candidate.face.isAtOrigin && !current.face.isAtOrigin
+                    || candidate.face.isAtOrigin == current.face.isAtOrigin && abs(candidate.face.width - 5) < abs(current.face.width - 5)) {
                     best = candidate
                 }
             } else {

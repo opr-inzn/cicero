@@ -434,8 +434,9 @@ private extension TypeTester {
 
 /// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
 /// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above.
-/// After Weight, a column for each other axis the styles sit apart on, like Width or one of the designer's own, in
-/// the order the styles are listed by (see `Family.styleAxes`).
+/// Weight when the styles are of more than one (see `Family.stylesDifferInWeight`), then a column for each other axis
+/// the styles sit apart on, like Width or one of the designer's own, in the order the styles are listed by (see
+/// `Family.styleAxes`).
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -453,8 +454,9 @@ private struct StyleRows: View {
             [style.state.label, "Active", "Inactive"] + (style.app.map { [FaceState.appOnly($0).label] } ?? [])
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
+        let showsWeight = family.stylesDifferInWeight
         VStack(spacing: 0) {
-            row(styleWidth: styleWidth, statusWidth: statusWidth) {
+            row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
                 Text("Styles")
             } style: {
                 Text("Style")
@@ -470,7 +472,7 @@ private struct StyleRows: View {
             .padding(.vertical, 6)
             ForEach(family.faces) { style in
                 Divider()
-                row(styleWidth: styleWidth, statusWidth: statusWidth) {
+                row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
                     FontText(text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face, size: 20,
                              weight: style.face.styleWeight)
                 } style: {
@@ -515,13 +517,14 @@ private struct StyleRows: View {
         return min(max(minimum, widest.rounded(.up)), maximum)
     }
 
-    private func row(styleWidth: CGFloat, statusWidth: CGFloat, @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
+    private func row(styleWidth: CGFloat, statusWidth: CGFloat, showsWeight: Bool,
+                     @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
                      @ViewBuilder weight: () -> some View, @ViewBuilder axes: () -> some View,
                      @ViewBuilder status: () -> some View) -> some View {
         HStack(spacing: 12) {
             preview().frame(maxWidth: .infinity, alignment: .leading)
             style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
-            weight().frame(width: 56, alignment: .leading)
+            if showsWeight { weight().frame(width: 56, alignment: .leading) }
             axes().lineLimit(1)
             status().frame(width: statusWidth, alignment: .leading)
         }
