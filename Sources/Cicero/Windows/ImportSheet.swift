@@ -205,7 +205,7 @@ struct ImportSheet: View {
                 Spacer()
                 if let keyPath, ids.count > 1 {
                     let all = ids.allSatisfy(choices[keyPath: keyPath].contains)
-                    Button(all ? "Select None" : "Select All") {
+                    Button(all ? "Deselect All" : "Select All") {
                         if all { choices[keyPath: keyPath].subtract(ids) } else { choices[keyPath: keyPath].formUnion(ids) }
                     }
                     .buttonStyle(.link)

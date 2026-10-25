@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- In the sheet that **File → Import from FontExplorer X** and **Import from Font Book** show, the button that unchecks every item in a list now says **Deselect All**, as in the Finder and other Mac apps. It said **Select None**.
+
 ## 0.10.4
 
 - A variable family without a weight axis shows at its font’s default, the origin its styles are drawn from, as other variable families do: in the list, grid, specimens and on its font page, where the Axes tab starts there too. Before, it showed its first style, which can be at the far end of every axis. Searching for **italic** shows its italic at the origin’s place on the other axes.
