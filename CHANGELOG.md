@@ -2,10 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.6
 
-- In the import sheet, the line under **Font Library** gives only where it is and, in brackets, how many font files it has, and the one under **Fonts in other folders** which folders those are, with how many font files.
-- Grid tiles no longer say **1 Weight**. A family of one style says **1 Style**, and one with a regular and an italic **2 Styles**.
+- Grid tiles no longer say **1 Weight**. A family of one style says **1 Style**, and one with a regular and an italic **2 Styles**, rather than **1 Weight · 2 Styles**.
+- In the sheet that **File → Import from FontExplorer X** shows, the line under **Font Library** gives just where it is and, in brackets, how many font files it has. The line under **Fonts in other folders** names the folders those fonts are in.
 - **Show fonts from Creative Cloud** in **Settings → General** says that Creative Cloud activates and deactivates Adobe Fonts, and Cicero can’t manage them.
 
 ## 0.10.5
