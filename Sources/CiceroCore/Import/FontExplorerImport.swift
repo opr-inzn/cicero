@@ -242,7 +242,7 @@ public enum FontExplorerImport {
         }
     }
 
-    /// Font files Cicero can't read, by what they are, for the sheet to say which don't come over.
+    /// Font files Cicero can't use, by what they are, for the sheet to say which don't come over.
     enum UnreadableKind: CaseIterable {
         case type1, web, other
 
@@ -258,10 +258,10 @@ public enum FontExplorerImport {
         func describe(_ count: Int) -> String {
             let number = count.formatted()
             return switch self {
-            case .type1: count == 1 ? "1 PostScript Type 1 font or font suitcase, which Cicero can’t read"
-                : "\(number) PostScript Type 1 fonts and font suitcases, which Cicero can’t read"
-            case .web: count == 1 ? "1 web font, which Cicero can’t read" : "\(number) web fonts, which Cicero can’t read"
-            case .other: count == 1 ? "1 other file Cicero can’t read" : "\(number) other files Cicero can’t read"
+            case .type1: count == 1 ? "1 PostScript Type 1 font or font suitcase, which Cicero can’t use"
+                : "\(number) PostScript Type 1 fonts and font suitcases, which Cicero can’t use"
+            case .web: count == 1 ? "1 web font, which Cicero can’t use" : "\(number) web fonts, which Cicero can’t use"
+            case .other: count == 1 ? "1 other file Cicero can’t use" : "\(number) other files Cicero can’t use"
             }
         }
     }
@@ -358,7 +358,7 @@ private struct Reader {
             order.append(id)
         }
 
-        // Files Cicero can't read (PostScript Type 1, suitcases, web fonts) don't come over, nor do the sets, labels and
+        // Files Cicero can't use (PostScript Type 1, suitcases, web fonts) don't come over, nor do the sets, labels and
         // the rest given to them; the sheet says how many there are.
         var unreadable: [FontExplorerImport.UnreadableKind: Int] = [:]
         for id in order {
@@ -467,7 +467,7 @@ private struct Reader {
         // Autoactivate item's.
         var setIDs: [Int: String] = [:]
         var deactivating = 0
-        // Sets that had only files Cicero can't read, which would come over empty.
+        // Sets that had only files Cicero can't use, which would come over empty.
         var unreadableSets: [String] = []
         for item in items {
             let serial = item.int("serialID")
@@ -537,7 +537,7 @@ private struct Reader {
         }
         if !unreadableSets.isEmpty {
             let names = unreadableSets.map { "“\($0)”" }.formatted(.list(type: .and))
-            library.notes.append("the \(unreadableSets.count == 1 ? "set" : "sets") \(names), whose fonts Cicero can’t read")
+            library.notes.append("the \(unreadableSets.count == 1 ? "set" : "sets") \(names), whose fonts Cicero can’t use")
         }
         // The Font Library by where it was looked for, so it can be put there and imported again.
         if let absentLibrary {
