@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - In the sheet that **File → Import from FontExplorer X** and **Import from Font Book** show, the button that unchecks every item in a list now says **Deselect All**, as in the Finder and other Mac apps. It said **Select None**.
+- When **Import from Font Book** meets a `.collection` file it can’t read, the sheet names it as a file Cicero can’t read. It called it a smart collection.
 
 ## 0.10.4
 
