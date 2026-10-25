@@ -168,7 +168,8 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   OS/2 class. Widths: a variable instance's wdth value, with instances whose names write the same
   width words (Condensed, not XXX Condensed) counted once; a static font's OS/2 width class unless
   it's normal, then the name. A family with more styles than weight and width tell apart (italics,
-  optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". The full caption is
+  optical sizes, other axes, small caps cut as fonts of their own) adds "N Styles". One weight goes unsaid
+  ("2 Styles", "2 Widths"), and a family with one style says "1 Style". The full caption is
   the tooltip. 10 pt beside a tile's contents, 14 pt above and below. Tiles fit the type
   (`FontGrid.Measure`, from the sample — the preview text, else "Aa Gg 123" — in the system font at the preview size, so
   every tile gets the same): the sample is as high as those letters reach above and below the baseline, plus a quarter
