@@ -33,6 +33,12 @@ extension View {
         if #available(macOS 26, *) { scrollEdgeEffectStyle(.hard, for: .top) } else { self }
     }
 
+    /// The toolbar's glass in light or dark as the window is, after the appearance changes too (see
+    /// `FreshScrollEdges`); macOS 15 has no glass.
+    func toolbarGlassFollowsAppearance() -> some View {
+        modifier(FreshScrollEdges())
+    }
+
     /// The distance from one line's baseline to the next, in points; nil for the font's own. macOS 15 can only add
     /// space between lines, so there lines set tighter than the font's own spacing keep it.
     @ViewBuilder func lineHeight(_ points: Double?, natural: Double) -> some View {
@@ -40,6 +46,29 @@ extension View {
             lineHeight(points.map { .exact(points: $0) })
         } else {
             lineSpacing(points.map { max(0, $0 - natural) } ?? 0)
+        }
+    }
+}
+
+/// A scroll view's soft top edge makes the toolbar's glass over it light or dark from what it sees under it, and on
+/// macOS 26 it could keep the old appearance's: switched to Dark in Settings, the search field turned dark, went
+/// light again half a second later and stayed so until something scrolled. As the appearance changes, the top edges
+/// turn hard for a tenth of a second, which has macOS set them up afresh, in the new appearance. Scroll views with an
+/// edge style of their own, like the list's hard one, keep it.
+private struct FreshScrollEdges: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHard = false
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top)
+                .onChange(of: colorScheme) {
+                    isHard = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isHard = false }
+                }
+        } else {
+            content
         }
     }
 }
