@@ -3,17 +3,17 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// How wide the families' grid samples are, per point of the size, and so how wide a list's tiles need to be for all but
-/// its widest fonts to be drawn at the size chosen (see `FontGrid`). Each sample is measured once, off the main thread,
+/// How wide the families' grid samples are, per point of the size, and so how wide the tiles need to be for all but the
+/// library's widest fonts to be drawn at the size chosen (see `FontGrid`). One width for every list, so the tiles and the
+/// rows don't change from one sidebar item, or search, to the next. Each sample is measured once, off the main thread,
 /// for its style, text and settings: its glyphs' outlines scale with the size, so dragging Size measures nothing.
 @Observable
 final class SampleWidths {
     static let shared = SampleWidths()
 
-    /// Per point of the preview size, as wide as the samples of all but the widest twentieth of the families the sidebar
-    /// selection lists (of all of them, in a list of fewer than twenty), or of those a search finds where theirs are
-    /// wider: nil until they're measured. Kept for the next launch, where the same selection most often needs the same,
-    /// so the tiles don't change once it's measured again.
+    /// Per point of the preview size, as wide as the samples of all but the widest twentieth of the families All Fonts
+    /// lists (of all of them, in a library of fewer than twenty): nil until they're measured. Kept for the next launch,
+    /// where the library most often needs the same, so the tiles don't change once it's measured again.
     private(set) var listRatio: CGFloat?
 
     @ObservationIgnored private var measuredInputs: Int?
@@ -45,14 +45,14 @@ final class SampleWidths {
         }
     }
 
-    /// Measures the samples of the families the sidebar selection lists and of those the search found, unless `inputs`
-    /// says they're those measured last. The tiles keep the width they have until it's done.
-    func update(_ inputs: Int, listed: [Sample], found: [Sample]?, scriptSamples: ScriptSamples) {
+    /// Measures the library's samples, unless `inputs` says they're those measured last. The tiles keep the width they
+    /// have until it's done.
+    func update(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) {
         guard inputs != measuredInputs else { return }
         measuredInputs = inputs
         task?.cancel()
         task = Task {
-            guard let ratio = await Self.listRatio(listed, found, scriptSamples: scriptSamples), !Task.isCancelled else { return }
+            guard let ratio = await Self.listRatio(samples, scriptSamples: scriptSamples), !Task.isCancelled else { return }
             if listRatio != ratio { listRatio = ratio }
             UserDefaults.standard.set(Double(ratio), forKey: Self.savedKey)
         }
@@ -78,14 +78,9 @@ final class SampleWidths {
     }
 
     @concurrent
-    nonisolated private static func listRatio(_ listed: [Sample], _ found: [Sample]?, scriptSamples: ScriptSamples) async -> CGFloat? {
-        guard let listedWidths = widths(of: listed, scriptSamples: scriptSamples) else { return nil }
-        var result = widest(listedWidths)
-        if let found {
-            guard let foundWidths = widths(of: found, scriptSamples: scriptSamples) else { return nil }
-            if let foundWidest = widest(foundWidths) { result = max(result ?? 0, foundWidest) }
-        }
-        return result
+    nonisolated private static func listRatio(_ samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
+        guard let widths = widths(of: samples, scriptSamples: scriptSamples) else { return nil }
+        return widest(widths)
     }
 
     /// Each sample's width per point of the size; nil once the task is cancelled.

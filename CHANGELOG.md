@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- Grid tiles keep their width and number in a row from one list to the next. Each list in the sidebar set its own width, so a list with a few more wide fonts than another, like **Active** next to **All Fonts**, could have one fewer tile in a row, each half as wide again and taller. The tiles are now as wide as the fonts in your whole library need, and searching doesn’t change them either.
+- On the **Conflicts** page, **Shared Style Names** is open at first. It was closed.
 - **File → Import from FontExplorer X** brings over the fonts in a `.fexbackup`. FontExplorer X writes their paths in its own way inside the backup, which Cicero didn’t read, so it said they weren’t on this Mac and put none of them in place.
 - With FontExplorer X installed, its `.fexconfig` backups can be chosen in the import’s open panel. They were greyed out.
 - Smart sets with a **Comment** rule come over, as smart folders with a **Note** rule, and so do ones asking whether a font is a system font. A smart set that can’t come over names each of its rules Cicero has no counterpart for, like **PostScript Name** or **Vendor**, rather than “a rule of another kind”.

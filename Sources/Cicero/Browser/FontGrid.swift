@@ -106,35 +106,27 @@ struct FontGrid: View {
         }
     }
 
-    /// Whether the search narrows the sidebar selection's families.
-    private var isSearching: Bool { !model.appliedSearch.isEmpty || !model.searchTokens.isEmpty }
-
-    /// What the tiles' width is measured from: the families the sidebar selection lists, those the search found, the
-    /// text, and the weight, words and tokens that choose the styles shown.
+    /// What the tiles' width is measured from: the families All Fonts lists, the text and the weight. Not the sidebar
+    /// selection or the search, so the tiles keep their width and the rows their number from one list to the next.
     private var sampleInputs: Int {
         var hasher = Hasher()
-        hasher.combine(model.unsearchedFamilies.map(\.id))
-        if isSearching { hasher.combine(families.map(\.id)) }
+        hasher.combine(model.library.fingerprint)
+        hasher.combine(model.data.showSystemFonts)
+        hasher.combine(model.data.showCreativeCloudFonts)
         hasher.combine(preview.sampleText)
         hasher.combine(preview.weight)
-        hasher.combine(model.appliedSearch)
-        hasher.combine(model.searchTokens)
         return hasher.finalize()
     }
 
-    /// Has the samples of the families the sidebar selection lists measured, and of those the search found, so the tiles
-    /// are wide enough for them (see `SampleWidths`): in the styles the tiles show, before the text in a font's own script.
+    /// Has the samples of the families All Fonts lists measured, so the tiles are wide enough for them (see
+    /// `SampleWidths`): in the styles the tiles show without a search, before the text in a font's own script.
     private func measureSamples(_ inputs: Int) {
-        let query = SearchQuery(model.appliedSearch), tokens = model.searchTokens, features = model.searchFeatures
         let text = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
-        func samples(_ families: [Family]) -> [SampleWidths.Sample] {
-            families.map { family in
-                let (style, weight) = family.previewStyle(for: query, tokens: tokens, weight: preview.weight)
-                return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: model.variations(for: family, face: style.id), features: features)
-            }
+        let samples = model.library.families.filter(model.data.lists).map { family in
+            let (style, weight) = family.previewStyle(for: SearchQuery(""), weight: preview.weight)
+            return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: model.variations(for: family, face: style.id), features: [])
         }
-        SampleWidths.shared.update(inputs, listed: samples(model.unsearchedFamilies), found: isSearching ? samples(families) : nil,
-                                   scriptSamples: model.scriptSamples)
+        SampleWidths.shared.update(inputs, samples: samples, scriptSamples: model.scriptSamples)
     }
 
     /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows without the Info panel,
