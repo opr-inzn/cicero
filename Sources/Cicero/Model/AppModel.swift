@@ -241,6 +241,8 @@ final class AppModel {
     @ObservationIgnored private var revealProgress: Task<Void, Never>?
     /// The last progress a scan reported, shown once the scan has taken long enough to mention.
     @ObservationIgnored private var latestProgress: ScanProgress?
+    /// Whether the running scan has taken long enough for the capsule to mention it.
+    @ObservationIgnored private var progressDue = false
     @ObservationIgnored private var runningOperations = 0
     /// The scan that was the latest when a font change came in during an operation; the change is left to a
     /// scan that starts after it, which the operation usually starts itself.
@@ -253,8 +255,8 @@ final class AppModel {
     /// The files that changed since the last scan started, for the next one to look at instead of every folder;
     /// nil when it has to look at everything.
     @ObservationIgnored private var pendingChanges: Set<String>? = []
-    /// The running scan's number and the files it looks at, nil for all of them.
-    @ObservationIgnored private var runningScan: (id: Int, changes: Set<String>?)?
+    /// The running scan's number, the files it looks at (nil for all of them), and whether it's a check (see `rescan`).
+    @ObservationIgnored private var runningScan: (id: Int, changes: Set<String>?, check: Bool)?
     /// Files a watched folder said changed while a scan of everything was running, looked at again once it's done
     /// (see `rescan`).
     @ObservationIgnored private var changedDuringScan: Set<String> = []
@@ -314,7 +316,7 @@ final class AppModel {
             MainActor.assumeIsolated {
                 // Not while a scan of everything is running, which would start over (a long one never finishing).
                 guard let self, Date().timeIntervalSince(self.lastScan) > 60, self.runningScan.map({ $0.changes != nil }) ?? true else { return }
-                self.rescan()
+                self.rescan(check: true)
             }
         }
         center.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
@@ -331,10 +333,10 @@ final class AppModel {
             let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
             model.data.records = tidied.records
             // The first scan may have listed the files before they went.
-            if tidied.removed > 0 { model.rescan() }
+            if tidied.removed > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
-        rescan()
+        rescan(check: true)
     }
 
     /// Once the main window is there: files opened before it are added now.
@@ -361,13 +363,17 @@ final class AppModel {
     private func prepareToQuit() {
         data.records = engine.endUntilQuit(data.records)
         store.flush()
+        scanner.flush()
     }
 
     // MARK: Scanning
 
     /// Returns the scan's number. With `changes`, only those files are looked at again (see `LibraryScanner.scan`).
+    /// A `check` is a scan Cicero starts by itself to see whether anything changed: at launch, when it becomes active,
+    /// when fonts change. While the window lists fonts, its capsule doesn't say it's finding them, only that it reads
+    /// files, as nothing on screen changes otherwise.
     @discardableResult
-    func rescan(changes: Set<String>? = nil) -> Int {
+    func rescan(changes: Set<String>? = nil, check: Bool = false) -> Int {
         // Files that change while a scan of everything runs are looked at once it's done, rather than starting it over:
         // a long one would never finish while a folder kept changing, and it may not have got to them yet.
         if let changes, let running = runningScan, running.changes == nil {
@@ -379,23 +385,26 @@ final class AppModel {
         var changes = changes.map { $0.union(changedDuringScan) }
         changedDuringScan = []
         if let running = runningScan { changes = running.changes.flatMap { looked in changes?.union(looked) } }
+        let check = check && runningScan?.check != false
         pendingChanges = []
         scanTask?.cancel()
         if changes == nil { lastScan = Date() }
         scanCount += 1
         let id = scanCount
-        runningScan = (id, changes)
+        runningScan = (id, changes, check)
         let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
         // The Fonts folders too, so a font dropped into one shows without waiting for macOS to register it.
         let fontsFolders = [locations.userFonts.path, locations.allUsersFonts.path]
         folderWatcher.watch(fontsFolders + input.folders.map(\.path), files: input.files, hidden: [locations.adobeFontsInAdobeApps?.path].compactMap { $0 })
         // Most scans take a fraction of a second; the capsule only shows for one that takes longer.
         latestProgress = .finding
+        progressDue = false
         revealProgress?.cancel()
         revealProgress = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled, let self, self.scanCount == id else { return }
-            self.scanProgress = self.latestProgress
+            self.progressDue = true
+            self.showProgress(check: check)
         }
         let scanner = scanner
         let report: @Sendable (ScanProgress) -> Void = { [weak self] progress in
@@ -403,7 +412,7 @@ final class AppModel {
             Task { @MainActor in
                 guard self.scanCount == id else { return }
                 self.latestProgress = progress
-                if self.scanProgress != nil { self.scanProgress = progress }
+                self.showProgress(check: check)
             }
         }
         scanTask = Task { [weak self] in
@@ -422,6 +431,15 @@ final class AppModel {
         return id
     }
 
+    /// Puts the scan's latest progress in the capsule once the scan has taken long enough to mention, or at once while
+    /// the capsule is up for the scan it replaced. A `check` finding the fonts while the window lists them leaves the
+    /// capsule as it is (see `rescan`).
+    private func showProgress(check: Bool) {
+        guard progressDue || scanProgress != nil, let progress = latestProgress else { return }
+        if check, progress == .finding, !library.families.isEmpty { return }
+        scanProgress = progress
+    }
+
     private func finishScan(_ id: Int) {
         guard runningScan?.id == id else { return }
         runningScan = nil
@@ -431,6 +449,7 @@ final class AppModel {
     private func endScan(_ id: Int) {
         if scanCount == id {
             revealProgress?.cancel()
+            progressDue = false
             scanProgress = nil
         }
         dropExpectations(confirmedBy: id)
@@ -470,7 +489,7 @@ final class AppModel {
         rescanTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled, let self else { return }
-            self.rescan(changes: self.pendingChanges)
+            self.rescan(changes: self.pendingChanges, check: true)
         }
     }
 

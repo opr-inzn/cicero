@@ -129,7 +129,10 @@ extension AppModel {
             // The library with the other app's fonts in it, to match against.
             let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
             let scanned = try? await model.scanner.scan(input) { progress in
-                if case .identifying(let done, let total) = progress { stage(.reading(done: done, total: total)) }
+                switch progress {
+                case .identifying(let done, let total), .updating(let done, let total): stage(.reading(done: done, total: total))
+                case .finding: break
+                }
             }
             var updated = model.data
             var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library)

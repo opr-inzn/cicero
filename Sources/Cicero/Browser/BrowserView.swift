@@ -118,6 +118,7 @@ private struct ScanCapsule: View {
         switch progress {
         case .finding: "Finding fonts"
         case .identifying(let done, let total): "Identifying fonts, \(done.formatted()) of \(total.formatted())"
+        case .updating(let done, let total): "Updating font details, \(done.formatted()) of \(total.formatted())"
         }
     }
 }
