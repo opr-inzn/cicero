@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- The Character Toolbox’s text field keeps the focus as you type. It lost it whenever the list of fonts came or went: with the first letter typed, the last one deleted, and each letter while no font had every character.
+
 ## 0.10.6
 
 - Grid tiles no longer say **1 Weight**. A family of one style says **1 Style**, and one with a regular and an italic **2 Styles**, rather than **1 Weight · 2 Styles**.

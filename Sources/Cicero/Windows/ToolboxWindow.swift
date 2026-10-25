@@ -70,15 +70,16 @@ private struct TextTab: View {
     }
 
     var body: some View {
-        Group {
+        // The rows stay, empty, under the messages rather than make way for them: the bar is rebuilt when the
+        // scroll view under it comes or goes, and the text field in it lost focus with the first letter typed.
+        ZStack {
+            table
             if query.text.isEmpty {
                 ContentUnavailableView("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
                                        description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
             } else if matches.isEmpty && !isSearching {
                 ContentUnavailableView("No Fonts Have Every Character", systemImage: "character.textbox",
                                        description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
-            } else {
-                table
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -120,6 +121,8 @@ private struct TextTab: View {
         let model = self.model
         let preview = self.preview
         let sample = query.text
+        // Clearing the text leaves the last matches until the search catches up.
+        let matches = sample.isEmpty ? [] : self.matches
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
         return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
                 HStack(spacing: 12) {
