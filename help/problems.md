@@ -54,7 +54,7 @@ Copies in different places, like one in each client’s folder, aren’t duplica
 
 ## Shared Style Names
 
-A minor note, shown closed at the bottom. Open it to see the cards.
+A minor note, at the bottom. Click the arrow next to its title to close it, and again to open it.
 
 Every font has its own main PostScript name, but variable fonts also give each named style a PostScript name, and some use just “Bold” or “Light”. When fonts that are on share one of these names, macOS gives it to only one of them, and a document set in the other may open in the wrong font.
 

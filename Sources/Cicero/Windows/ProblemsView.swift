@@ -80,11 +80,11 @@ private struct ProblemGroup: View {
     }
 }
 
-/// Minor problems, collapsed until opened.
+/// Minor problems, at the bottom, open at first and closed with the arrow beside their title.
 private struct MinorProblemGroup: View {
     let kind: ProblemKind
     let problems: [Problem]
-    @State private var isExpanded = false
+    @State private var isExpanded = true
 
     var body: some View {
         // DisclosureGroup animates opening but not closing; open instantly too.

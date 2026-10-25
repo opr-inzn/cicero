@@ -204,19 +204,6 @@ extension AppModel {
         return families
     }
 
-    /// The families the sidebar selection lists, or Show Similar Fonts, or Show in Library, before the search finds some
-    /// of them: what the grid makes its tiles wide enough for, so they don't change with every letter typed. Cached.
-    var unsearchedFamilies: [Family] {
-        guard !appliedSearch.isEmpty || !searchTokens.isEmpty else { return visibleFamilies }
-        var key = visibleKey
-        key.search = ""
-        key.tokens = []
-        if let cached = unsearchedCache, cached.key == key { return cached.families }
-        let families = listedFamilies { _ in true }
-        unsearchedCache = (key, families)
-        return families
-    }
-
     private var visibleKey: VisibleKey {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
