@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.5
 
 - Grid tiles keep their width and number in a row from one list to the next. Each list in the sidebar set its own width, so a list with a few more wide fonts than another, like **Active** next to **All Fonts**, could have one fewer tile in a row, each half as wide again and taller. The tiles are now as wide as the fonts in your whole library need, and searching doesn’t change them either.
 - On the **Conflicts** page, **Shared Style Names** is open at first. It was closed.
@@ -12,7 +12,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - macOS’s own fonts that FontExplorer X lists as if they were yours, like PingFang UI, stay out: they were added to your library, counted among the fonts “not in your library” and, with the dates FontExplorer X gives them, put in **Last Activated** smart folders.
 - Fonts Cicero can’t use, like PostScript Type 1 fonts, font suitcases and web fonts, are named in the import sheet, with how many there are, and stay behind with the sets that have only those. Before, the sheet counted them with the others, and their sets came over empty.
 - A comment FontExplorer X keeps on a file and on its styles counts once in the import sheet.
-- The import sheet says **Activate the fonts that were active**, as Cicero says activate elsewhere, rather than **Turn on the fonts that were on**, and “39 styles activated” when it’s done.
+- The import sheet says **Activate the fonts that were active**, as Cicero says activate elsewhere, rather than **Turn on the fonts that were on**, and when it’s done, how many styles it activated.
 - Importing again says “Nothing new” when Cicero has everything already, rather than listing the folders and tags as if they had just been made. A set none of whose fonts are in your library is left out, and named, rather than made as an empty folder.
 - In the sheet that **File → Import from FontExplorer X** and **Import from Font Book** show, the button that unchecks every item in a list now says **Deselect All**, as in the Finder and other Mac apps. It said **Select None**.
 - When **Import from Font Book** meets a `.collection` file it can’t read, the sheet names it as a file Cicero can’t read. It called it a smart collection.
