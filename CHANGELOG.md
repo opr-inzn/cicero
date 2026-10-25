@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- In the import sheet, the line under **Font Library** gives only where it is and how many font files it has.
+- In the import sheet, the line under **Font Library** gives only where it is and, in brackets, how many font files it has.
 
 ## 0.10.5
 

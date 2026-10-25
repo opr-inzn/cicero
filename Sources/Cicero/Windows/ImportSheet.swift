@@ -274,9 +274,9 @@ struct ImportSheet: View {
     private func fontLibraryDetail(_ folder: String) -> String {
         let place = (folder as NSString).abbreviatingWithTildeInPath
         if let bundled = library.bundledFonts {
-            return "\(place), \(count(bundled.files.count, "font file")) from the backup"
+            return "\(place) (\(count(bundled.files.count, "font file")) from the backup)"
         }
-        return "\(place), \(count(library.fontFolderCount, "font file"))"
+        return "\(place) (\(count(library.fontFolderCount, "font file")))"
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".
