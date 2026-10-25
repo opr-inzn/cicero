@@ -2,6 +2,12 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Opening Cicero no longer shows **Finding fonts** while it checks your fonts against the ones it remembered. Your fonts are in the window from the start, and the check changes nothing there unless it finds fonts to read. The same goes for the checks when you come back to Cicero and when fonts change.
+- When an update has Cicero read every font again, to learn something new from them, the capsule says **Updating font details** rather than **Identifying fonts**. Your fonts stay in the window meanwhile.
+- If you quit Cicero while it reads fonts, it remembers the ones it has read, and the next time it opens it reads only the rest. It started over.
+
 ## 0.10.7
 
 - The Character Toolbox’s text field keeps the focus as you type. It lost it whenever the list of fonts came or went: with the first letter typed, the last one deleted, and each letter while no font had every character.

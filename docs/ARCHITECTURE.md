@@ -22,7 +22,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   one it shows, its `id` the fonts' own, which the user's data keys by.
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
   which CoreText's lists don't cover entirely, the Fonts folders, watched folders (the sidebar's Locations), files added one at a time, the Deactivated folder), reads new or changed files
-  with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
+  with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. Each file read goes into
+  the cache at once, which is written every 2 s while reading goes on and by `flush` as the app quits, so neither a
+  scan that's replaced nor quitting loses what was read; its progress says it updates rather than identifies when most
+  of the files it reads are in the library on screen (the last one built, else the one restored at launch). A `fingerprint`
   lets the app skip rescans that changed nothing. `LibraryCache` saves each library a scan builds that differs from the
   last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window. `FolderWatcher` (FSEvents) says when font files come or go
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks

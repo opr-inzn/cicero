@@ -160,7 +160,11 @@ public struct Library: Sendable {
 
 public enum ScanProgress: Sendable, Equatable {
     case finding
+    /// Reading files, new ones for the most part.
     case identifying(done: Int, total: Int)
+    /// Reading files again that the library on screen has already, most of them: changed ones, or every file after an
+    /// update that learns more from each, or after Rebuild Font List.
+    case updating(done: Int, total: Int)
 }
 
 /// What a scan needs to know besides the disk.
@@ -203,6 +207,8 @@ public final class LibraryScanner: Sendable {
         var last: (inputs: Int, library: Library)?
         /// The stamps of the files the last library was built from.
         var lastStamps: [String: FaceStamp] = [:]
+        /// The library restored at launch (see `savedLibrary`), which the window shows until a scan builds one.
+        var restored: Library?
         /// The fingerprint of the library last saved for the next launch.
         var savedFingerprint: Int?
         /// Set by `clearCache`: the next scan reads every file it finds again, but keeps what it knows of the
@@ -243,14 +249,22 @@ public final class LibraryScanner: Sendable {
         Signposts.library.withIntervalSignpost("Restore library") {
             guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
             let session = ActivationEngine.currentSession()
-            return LibraryCache.decode(data) { state, path, app in
+            let library = LibraryCache.decode(data) { state, path, app in
                 guard case .active(.temporary) = state else { return state }
                 if let record = records.temporary[path], record.scope == .whileAppsRun, record.session == session { return state }
                 // What `faceState` says of a file that isn't active.
                 if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
                 return .inactive
             }
+            state.withLock { $0.restored = library }
+            return library
         }
+    }
+
+    /// Writes what was read from files and not saved yet, by a scan still reading too, and waits for the caches being
+    /// written: as Cicero quits, so the next launch reads only the files left.
+    public func flush() {
+        saving.sync { saveCacheIfNeeded() }
     }
 
     /// With `changes`, the files FSEvents says changed since the last scan (as `FolderWatcher` reports them),
@@ -297,17 +311,20 @@ public final class LibraryScanner: Sendable {
         let stale = rereadAll ? found : found.filter { known[$0.key]?.stamp != $0.value.stamp }
         var parsed: [String: CachedFile] = [:]
         if !stale.isEmpty {
-            progress(.identifying(done: 0, total: stale.count))
+            let total = stale.count
+            let updating = listsAlready(stale)
+            let report: @Sendable (Int) -> Void = { done in
+                progress(updating ? .updating(done: done, total: total) : .identifying(done: done, total: total))
+            }
+            report(0)
             let parsing = signposter.beginInterval("Parse", "\(stale.count) files")
-            parsed = await Self.parse(stale, progress: progress)
+            parsed = await parse(stale, progress: report)
             signposter.endInterval("Parse", parsing)
         }
-        if Task.isCancelled {
-            // What was read is kept, so the scan that replaced this one reads only the rest: one of everything, after an
-            // update that reads every file again, would otherwise never finish while fonts kept changing.
-            keep(parsed)
-            throw CancellationError()
-        }
+        // What was read is in the cache already (see `parse`), so the scan that replaced this one reads only the rest:
+        // one of everything, after an update that reads every file again, would otherwise never finish while fonts
+        // kept changing.
+        try Task.checkCancellation()
 
         let files = updateCache(found: found, parsed: parsed, keeping: reach)
         if rereadAll { state.withLock { $0.rereadAll = false } }
@@ -674,11 +691,15 @@ public final class LibraryScanner: Sendable {
 
     // MARK: Reading
 
-    /// Stops starting files when the task is cancelled, and returns those it read.
-    private static func parse(_ files: [String: FoundFile], progress: @escaping @Sendable (ScanProgress) -> Void) async -> [String: CachedFile] {
+    /// Stops starting files when the task is cancelled, and returns those it read. Each goes into the cache as it's
+    /// read, which is written every few seconds while reading takes longer, so neither a scan that's replaced nor
+    /// Cicero quitting (see `flush`) loses what was read: after an update that has every file read again, the next
+    /// scan, or the next launch, reads only the rest. `progress` gets the number of files read.
+    private func parse(_ files: [String: FoundFile], progress: @escaping @Sendable (Int) -> Void) async -> [String: CachedFile] {
         let total = files.count
         var results: [String: CachedFile] = [:]
         results.reserveCapacity(total)
+        var saved = ContinuousClock.now
         await withTaskGroup(of: (String, CachedFile).self) { group in
             var pending = files.map { ($0.key, $0.value.stamp) }[...]
             func addNext() {
@@ -693,13 +714,32 @@ public final class LibraryScanner: Sendable {
             for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
             while let (path, file) = await group.next() {
                 results[path] = file
+                keep(path, file)
                 if results.count % 200 == 0 || results.count == total {
-                    progress(.identifying(done: results.count, total: total))
+                    progress(results.count)
+                    if results.count < total, ContinuousClock.now - saved > .seconds(2) {
+                        saved = .now
+                        saving.async { [self] in saveCacheIfNeeded() }
+                    }
                 }
                 if !Task.isCancelled { addNext() }
             }
         }
         return results
+    }
+
+    /// Whether most of these files are ones the library on screen has already, the last one built or else the one
+    /// restored at launch, so that reading them is updating it rather than identifying fonts.
+    private func listsAlready(_ files: [String: FoundFile]) -> Bool {
+        let (stamps, restored) = state.withLock { ($0.lastStamps, $0.restored) }
+        if !stamps.isEmpty { return files.keys.count { stamps[$0] != nil } * 2 >= files.count }
+        guard let restored else { return false }
+        var paths = Set(restored.unreadableFiles)
+        for face in restored.families.lazy.flatMap(\.faces) {
+            paths.insert(face.face.path)
+            for copy in face.copies { paths.insert(copy.face.path) }
+        }
+        return files.keys.count(where: paths.contains) * 2 >= files.count
     }
 
     // MARK: Cache
@@ -716,11 +756,10 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Adds what a scan that was cancelled read, for the next one.
-    private func keep(_ parsed: [String: CachedFile]) {
-        guard !parsed.isEmpty else { return }
+    /// Adds a file a scan read, for the next one too if this one is replaced.
+    private func keep(_ path: String, _ file: CachedFile) {
         state.withLock { state in
-            state.files.merge(parsed) { _, new in new }
+            state.files[path] = file
             state.dirty = true
         }
     }
@@ -865,6 +904,7 @@ public final class LibraryScanner: Sendable {
         let changed: Set<String> = state.withLock { state in
             let changed = state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys
             state.lastStamps = found.mapValues(\.stamp)
+            state.restored = nil
             return Set(changed)
         }
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
