@@ -693,6 +693,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     /// Counts the weights and widths. A variable font's styles are its named instances, placed by their axis
     /// values; a static font's by its style names and classes. Families with more styles than weight and width
     /// tell apart (italics, optical sizes, other axes, small caps cut as fonts of their own) also get the style count.
+    /// One weight goes unsaid, and a family with nothing else to tell gets its style count: "1 Style", "2 Styles".
     static func rangeLabel(of faces: [FontFace]) -> String {
         let styleNames = faces.map { StyleName($0.styleName) }
         func value(_ face: FontFace, _ tag: String) -> Double? { face.axes.first { $0.tag == tag }?.value }
@@ -720,10 +721,10 @@ public struct Family: Identifiable, Hashable, Sendable {
         })
         var parts: [String] = []
         let weightCount = Set(weights).count, widthCount = Set(widthGroups).count
-        parts.append(weightCount == 1 ? "1 Weight" : "\(weightCount) Weights")
+        if weightCount > 1 { parts.append("\(weightCount) Weights") }
         if widthCount > 1 { parts.append("\(widthCount) Widths") }
         let told = Set(faces.indices.map { [weights[$0], Double(widthGroups[$0])] })
-        if told.count < faces.count { parts.append("\(faces.count) Styles") }
+        if told.count < faces.count || parts.isEmpty { parts.append(faces.count == 1 ? "1 Style" : "\(faces.count) Styles") }
         return parts.joined(separator: " · ")
     }
 

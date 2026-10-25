@@ -65,8 +65,7 @@ struct ImportSheet: View {
                     checkbox("Font Library", detail: fontLibraryDetail(folder), isOn: $choices.fontFolder)
                 }
                 if !library.otherFiles.isEmpty {
-                    checkbox("Fonts in other folders", detail: "\(count(library.otherFiles.count, "font file")) \(appName) used from elsewhere, listed where they are.",
-                             isOn: $choices.otherFiles)
+                    checkbox("Fonts in other folders", detail: otherFilesDetail, isOn: $choices.otherFiles)
                 }
             }
         }
@@ -274,9 +273,19 @@ struct ImportSheet: View {
     private func fontLibraryDetail(_ folder: String) -> String {
         let place = (folder as NSString).abbreviatingWithTildeInPath
         if let bundled = library.bundledFonts {
-            return "\(count(bundled.files.count, "font file")) from the backup, put in \(place) and listed there, without activating them."
+            return "\(place) (\(count(bundled.files.count, "font file")) from the backup)"
         }
-        return "\(place), \(count(library.fontFolderCount, "font file")), listed where they are, without activating them."
+        return "\(place) (\(count(library.fontFolderCount, "font file")))"
+    }
+
+    /// The folders the other files are in, those with the most first, then how many there are: "~/Desktop/Client and
+    /// ~/Documents/Fonts (3 font files)", "~/Desktop/Client, ~/Documents/Fonts and 4 other folders (40 font files)".
+    private var otherFilesDetail: String {
+        let folders = Dictionary(grouping: library.otherFiles) { ($0 as NSString).deletingLastPathComponent }
+            .sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }
+            .map { ($0.key as NSString).abbreviatingWithTildeInPath }
+        let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
+        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file")))"
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".

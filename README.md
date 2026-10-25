@@ -70,6 +70,7 @@ Classifications Cicero recognizes, from the shapes of the letters or, on macOS 2
 - Language data: [Hyperglot](https://github.com/rosettatype/hyperglot) by Rosetta, Apache License 2.0.
 - Character sets: [Latin S–XL](https://github.com/koeberlin/Latin-Character-Sets) by Christoph Koeberlin (MIT), [Adobe Latin](https://github.com/adobe-type-tools/adobe-latin-charsets) by Adobe (MIT), the [Google Fonts glyph sets](https://github.com/googlefonts/glyphsets) (Apache License 2.0), and Unicode block data from the [Unicode Character Database](https://www.unicode.org/ucd/) (Unicode License V3).
 - Updates: [Sparkle](https://sparkle-project.org).
+- Typefaces: [Mischief](https://www.lucasportron.com) by Lucas Portron and [ABC Areal](https://abcdinamo.com/typefaces/areal) by Dinamo.
 - Design and functionality inspired by [Typecase](https://typecase.app/) and [Pica](https://pica.joshpuckett.me/).
 
 Cicero is released under the [MIT License](LICENSE). The bundled data keeps its own licenses, included in the app: Hyperglot’s in [Languages-LICENSE.txt](Resources/Languages-LICENSE.txt), and the character set sources’ (MIT, Apache License 2.0 and Unicode License V3) in [CharacterSets-LICENSES.txt](Resources/CharacterSets-LICENSES.txt). Sparkle comes with its own license.
