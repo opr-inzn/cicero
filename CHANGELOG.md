@@ -4,6 +4,14 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **File → Import from FontExplorer X** brings over the fonts in a `.fexbackup`. FontExplorer X writes their paths in its own way inside the backup, which Cicero didn’t read, so it said they weren’t on this Mac and put none of them in place.
+- With FontExplorer X installed, its `.fexconfig` backups can be chosen in the import’s open panel. They were greyed out.
+- Smart sets with a **Comment** rule come over, as smart folders with a **Note** rule, and so do ones asking whether a font is a system font. A smart set that can’t come over names each of its rules Cicero has no counterpart for, like **PostScript Name** or **Vendor**, rather than “a rule of another kind”.
+- macOS’s own fonts that FontExplorer X lists as if they were yours, like PingFang UI, stay out: they were added to your library, counted among the fonts “not in your library” and, with the dates FontExplorer X gives them, put in **Last Activated** smart folders.
+- Fonts Cicero can’t use, like PostScript Type 1 fonts, font suitcases and web fonts, are named in the import sheet, with how many there are, and stay behind with the sets that have only those. Before, the sheet counted them with the others, and their sets came over empty.
+- A comment FontExplorer X keeps on a file and on its styles counts once in the import sheet.
+- The import sheet says **Activate the fonts that were active**, as Cicero says activate elsewhere, rather than **Turn on the fonts that were on**, and “39 styles activated” when it’s done.
+- Importing again says “Nothing new” when Cicero has everything already, rather than listing the folders and tags as if they had just been made. A set none of whose fonts are in your library is left out, and named, rather than made as an empty folder.
 - In the sheet that **File → Import from FontExplorer X** and **Import from Font Book** show, the button that unchecks every item in a list now says **Deselect All**, as in the Finder and other Mac apps. It said **Select None**.
 - When **Import from Font Book** meets a `.collection` file it can’t read, the sheet names it as a file Cicero can’t read. It called it a smart collection.
 

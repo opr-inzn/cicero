@@ -41,7 +41,10 @@ extension AppModel {
         panel.prompt = "Import"
         switch source {
         case .fontExplorer:
-            panel.allowedContentTypes = FontExplorerImport.fileExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
+            // With FontExplorer X installed, a .fexconfig is a package rather than a file.
+            panel.allowedContentTypes = FontExplorerImport.fileExtensions.sorted().flatMap { ext in
+                [UTType(filenameExtension: ext), UTType(filenameExtension: ext, conformingTo: .package)].compactMap { $0 }
+            }
             panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false
             panel.message = "Choose FontExplorer X’s library (FontExplorer X.fexdb), or a backup made with File → Local Backup (.fexconfig or .fexbackup)."
@@ -112,15 +115,16 @@ extension AppModel {
             showToast("Couldn’t save the current setup first, so nothing was imported")
             return nil
         }
+        var placed = 0
         if choices.fontFolder, imported.bundledFonts != nil {
-            _ = await LibraryImport.placeBundledFonts(imported) { done, total in stage(.copying(done: done, total: total)) }
+            placed = await LibraryImport.placeBundledFonts(imported) { done, total in stage(.copying(done: done, total: total)) }
             if Task.isCancelled { return nil }
         }
         stage(.starting)
         var summary: ImportSummary?
-        await enqueued { model in
+        await enqueued { [placed] model in
             var data = model.data
-            let fonts = LibraryImport.addFonts(imported, choices: choices, to: &data, locations: model.locations)
+            let fonts = LibraryImport.addFonts(imported, choices: choices, placed: placed, to: &data, locations: model.locations)
             model.data = data
             // The library with the other app's fonts in it, to match against.
             let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)

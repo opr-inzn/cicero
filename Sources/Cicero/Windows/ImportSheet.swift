@@ -114,11 +114,11 @@ struct ImportSheet: View {
                              isOn: $choices.comments)
                 }
                 if !library.history.isEmpty {
-                    checkbox("Activation history", detail: "How often each family was turned on, and when last, for the Times Activated and Last Activated rules.",
+                    checkbox("Activation history", detail: "How often each family was activated, and when last, for the Times Activated and Last Activated rules.",
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {
-                    checkbox("Turn on the fonts that were on", detail: "\(count(library.active.count, "style")), turned on where they are. Quit \(appName) first, so it doesn’t turn them off again.",
+                    checkbox("Activate the fonts that were active", detail: "\(count(library.active.count, "style")), activated where they are. Quit \(appName) first, so it doesn’t deactivate them again.",
                              isOn: $choices.activate)
                 }
             }
@@ -274,9 +274,9 @@ struct ImportSheet: View {
     private func fontLibraryDetail(_ folder: String) -> String {
         let place = (folder as NSString).abbreviatingWithTildeInPath
         if let bundled = library.bundledFonts {
-            return "\(count(bundled.files.count, "font file")) from the backup, put in \(place) and listed there, without turning them on."
+            return "\(count(bundled.files.count, "font file")) from the backup, put in \(place) and listed there, without activating them."
         }
-        return "\(place), \(count(library.fontFolderCount, "font file")), listed where they are, without turning them on."
+        return "\(place), \(count(library.fontFolderCount, "font file")), listed where they are, without activating them."
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".
@@ -333,16 +333,21 @@ struct ImportSheet: View {
             (summary.smartSets, "smart folder"), (summary.tags, "tag"),
         ]
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1) }
-        lines.append(made.isEmpty ? "No folders." : made.formatted(.list(type: .and)) + ".")
+        if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
-        if summary.activated > 0 { lines.append("\(count(summary.activated, "style")) turned on, as they were in \(appName).") }
+        if summary.activated > 0 { lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).") }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
         if summary.classifiedFamilies > 0 { lines.append("\(count(summary.classifiedFamilies, "family", "families")) classified.") }
         if summary.notedFamilies > 0 {
             lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.formatted()) families with notes from their comments.")
         }
+        // Before what didn't come over: with nothing new, importing again says so first.
+        if lines.isEmpty { lines.append("Nothing new: Cicero has all of it from before.") }
         if summary.notFound > 0 {
             lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(prompt.source == .fontBook ? "collections" : "sets, tags, classifications and ratings") \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
+        }
+        if !summary.emptySets.isEmpty {
+            lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.formatted(.list(type: .and))), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")
         }
         if !summary.skippedSmartSets.isEmpty {
             lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.formatted(.list(type: .and))), whose rules name sets or labels that didn’t come along.")
