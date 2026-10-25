@@ -135,6 +135,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   focus, it hands ⌫, ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Move to Trash, Open) can
   take them. In any window but the main one (its `mainWindow`, set by a `WindowReader` in `MainWindow`), it
   hands ⌫ and ⌘⌫ to that window, since the menus would act on the main window's selection.
+- `SearchTokenTint` (`Browser/`) tints the search field's tokens with the highlight colour. SwiftUI's token cell
+  is a subclass of AppKit's private `NSTokenAttachmentCell` that fills tokens grey in its own
+  `drawTokenWithFrame:inView:`; AppKit's `drawWithFrame:inView:`, replaced at launch, gives that class AppKit's
+  method back and a `tokenTintColor` the first time it draws one of its tokens. Without those classes and
+  methods, the tokens stay SwiftUI's.
 - `QuickLook` (`Windows/QuickLook.swift`, owned by `AppModel` like `AppSetWatcher`) runs the Quick Look
   panel: a `QuickLookPanel`, an NSPanel that can't become key, hosting SwiftUI in an NSHostingView with the
   model and preview settings in its environment. The main window keeps the keyboard, so the browser's keys

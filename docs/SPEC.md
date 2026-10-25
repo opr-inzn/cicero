@@ -138,7 +138,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
 - Title = selected item's name (several: "Serif and Script"); subtitle "1.298 families · 716 active" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right, each in a glass capsule of its own, 8 pt apart like the Info button and the search field
   (ToolbarCapsule: AppKit merges neighbouring items into one capsule, and ToolbarSpacer(.fixed) leaves 16 pt): view switcher
-  [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field, with tokens (`SearchToken`).
+  [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field, with tokens (`SearchToken`), tinted with the highlight colour as AppKit draws a tinted token, lighter than selected text, rather than SwiftUI's grey (`SearchTokenTint`).
 - **List** (rows under column headers in a lazy stack, like the grid: not a SwiftUI Table, which makes every
   row's cells whenever an accessibility client — a password manager's autofill, say — walks the window, and
   with a thousand families kept the app busy for minutes each time it came to the front): Status (switch) ·

@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - The Character Toolbox’s text field keeps the focus as you type. It lost it whenever the list of fonts came or went: with the first letter typed, the last one deleted, and each letter while no font had every character.
+- Filters in the search field, like **Italic** or **Bold**, are in your highlight color, the one selected text has, rather than grey. Choose it in System Settings → Appearance.
 
 ## 0.10.6
 
