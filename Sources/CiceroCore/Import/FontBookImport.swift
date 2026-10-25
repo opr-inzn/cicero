@@ -22,27 +22,33 @@ public enum FontBookImport {
         .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
-    /// The collections as sets; ones that pick fonts by rules, or can't be read, are named in the notes.
+    /// The collections as sets; ones that pick fonts by rules, and files that can't be read, are named in the notes.
     public static func read(_ urls: [URL]) -> ImportedLibrary {
         var library = ImportedLibrary(source: .fontBook)
-        var skipped: [String] = []
+        var smart: [String] = []
+        var unreadable: [String] = []
         for url in urls {
             let fileName = url.deletingPathExtension().lastPathComponent
             guard let collection = try? collection(at: url) else {
-                skipped.append(fileName)
+                unreadable.append(url.lastPathComponent)
                 continue
             }
             // Font Book shows a collection by its file's name; the one inside can be another, as Fixed Width's is.
             let name = fileName == "com.apple.Favorites" ? "Favorites" : fileName
             guard let set = collection.set(id: url.lastPathComponent, name: name, isBuiltIn: builtInNames.contains(fileName)) else {
-                skipped.append(name)
+                smart.append(name)
                 continue
             }
             library.sets.append(set)
         }
-        if !skipped.isEmpty {
-            library.notes.append(skipped.count == 1 ? "the smart collection “\(skipped[0])”"
-                : "the smart collections " + skipped.map { "“\($0)”" }.formatted(.list(type: .and)))
+        if !smart.isEmpty {
+            library.notes.append(smart.count == 1 ? "the smart collection “\(smart[0])”"
+                : "the smart collections " + smart.map { "“\($0)”" }.formatted(.list(type: .and)))
+        }
+        // Last, as the sheet lists the notes, so "which Cicero can't read" ends the line.
+        if !unreadable.isEmpty {
+            library.notes.append((unreadable.count == 1 ? "the file " : "the files ")
+                + unreadable.map { "“\($0)”" }.formatted(.list(type: .and)) + ", which Cicero can’t read")
         }
         return library
     }
