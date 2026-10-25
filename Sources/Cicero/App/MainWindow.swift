@@ -36,6 +36,8 @@ struct MainWindow: View {
         // it, or changing its tokens, on one goes back to the matches.
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
+        // On the split view, so the browser and font pages both have it.
+        .toolbarGlassFollowsAppearance()
         // Over the split view, so the panel stays put when a font page opens or closes.
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }

@@ -181,6 +181,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   heights, drop sessions and configurations, the on-device language model) is behind `#available(macOS 26, *)`,
   mostly in small modifiers in `Components/Compatibility.swift` (`glass(in:)`, `topBar`, `drops(of:)`, …) that
   give macOS 15 what it has instead, so call sites read the same for both. The SPEC's "macOS 15" lists them.
+- A soft top scroll edge on macOS 26 (AppKit's private `NSScrollPocket`, which samples the brightness under it)
+  makes the toolbar's glass over it light or dark from what it sees. After a switch to Dark, AppKit set the
+  toolbar view's appearance to VibrantDark and, half a second later, back to VibrantLight, and kept it until
+  something scrolled; under a hard edge it never did. `toolbarGlassFollowsAppearance()` on the main
+  window's split view turns the top edges hard for a tenth of a second as the colour scheme changes, which has
+  AppKit make them afresh in the new appearance.
 
 ## Rules of thumb
 
