@@ -333,7 +333,7 @@ struct ImportSheet: View {
             (summary.smartSets, "smart folder"), (summary.tags, "tag"),
         ]
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1) }
-        lines.append(made.isEmpty ? "No folders." : made.formatted(.list(type: .and)) + ".")
+        if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
         if summary.activated > 0 { lines.append("\(count(summary.activated, "style")) turned on, as they were in \(appName).") }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
@@ -341,8 +341,13 @@ struct ImportSheet: View {
         if summary.notedFamilies > 0 {
             lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.formatted()) families with notes from their comments.")
         }
+        // Before what didn't come over: with nothing new, importing again says so first.
+        if lines.isEmpty { lines.append("Nothing new: Cicero has all of it from before.") }
         if summary.notFound > 0 {
             lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(prompt.source == .fontBook ? "collections" : "sets, tags, classifications and ratings") \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
+        }
+        if !summary.emptySets.isEmpty {
+            lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.formatted(.list(type: .and))), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")
         }
         if !summary.skippedSmartSets.isEmpty {
             lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.formatted(.list(type: .and))), whose rules name sets or labels that didn’t come along.")

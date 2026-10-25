@@ -32,6 +32,10 @@ public enum FontExplorerImport {
     /// The name of the database in a backup, next to the app's settings.
     static let backupDatabase = "FontDatabase.db"
     static let backupPreferences = "com.linotype.FontExplorerX.plist"
+    /// How a `.fexbackup` with fonts writes their paths: under the Font Library, which the backup has at its top, as
+    /// "CLIENT_PATH/N/New York Medium/NewYorkMedium-Regular.otf". Files it used from elsewhere are put
+    /// there too.
+    static let backupLibraryPrefix = "CLIENT_PATH/"
 
     /// Reads the database at `url`, or the backup. Paths in another account's home folder are taken as being in
     /// `home`. Call off the main thread; a `.fexbackup` is unzipped into a temporary folder that the result's
@@ -159,6 +163,12 @@ public enum FontExplorerImport {
             guard let days = [1007: 7, 1030: 30][comparison] else { return .failure(unsupported) }
             return .success(SmartRule(field: field, comparison: .inLast, value: String(days)))
         }
+        /// Is Activated, Is System Font and the like: 1 for yes, compared with "is" or "is not".
+        func yesOrNo(_ status: String) -> Result<SmartRule, UnsupportedRule> {
+            guard comparison == 0 || comparison == 1 else { return .failure(unsupported) }
+            let yes = (Int(value) ?? 1) != 0
+            return .success(SmartRule(field: .status, comparison: yes == (comparison == 0) ? .is : .isNot, value: status))
+        }
         switch code {
         // The full name, style and all: only "begins with" picks the same families by their names.
         case 0: return text(.name, [4: .beginsWith])
@@ -166,12 +176,11 @@ public enum FontExplorerImport {
         case 9:
             // A foundry is as Cicero tidies the files' names, "Rasmus Andersson" for "Rasmus Andersson Inc.".
             return text(.foundry, [0: .is, 1: .isNot, 6: .contains], value: comparison == 6 ? value : Foundry.normalized(value) ?? value)
+        // Comments come over as notes.
+        case 10: return text(.note, [6: .contains, 7: .doesNotContain])
         case 11: return text(.designer, [0: .is, 6: .contains, 7: .doesNotContain])
-        case 100:
-            // Is Activated, 1 for yes.
-            guard comparison == 0 || comparison == 1 else { return .failure(unsupported) }
-            let yes = (Int(value) ?? 1) != 0
-            return .success(SmartRule(field: .status, comparison: yes == (comparison == 0) ? .is : .isNot, value: "active"))
+        case 100: return yesOrNo("active")
+        case 102, 105: return yesOrNo("system")
         case 400: return number(.rating)
         case 500:
             guard comparison == 0, let serial = Int(value), let set = sets[serial] else { return .failure(unsupported) }
@@ -191,25 +200,69 @@ public enum FontExplorerImport {
         "is", "is not", "ends with", "doesn’t end with", "begins with", "doesn’t begin with", "contains", "doesn’t contain",
     ]
 
-    /// The name FontExplorer X shows for a rule's field.
+    /// The name FontExplorer X shows for a rule's field, as its Smart Set sheet has them (7.3).
     static func fieldName(field: Int) -> String {
         switch field {
         case 0: "Name"
+        case 1: "PostScript Name"
+        case 3: "Path"
         case 4: "Family Name"
+        case 5: "Style"
+        case 6: "Copyright"
+        case 7: "Version"
+        case 8: "Trademark"
         case 9: "Manufacturer"
+        case 10: "Comment"
         case 11: "Designer"
+        case 12: "Description"
         case 100: "Is Activated"
+        case 101: "Is in Conflict"
+        case 102: "Is in System Folder"
+        case 105: "Is System Font"
         case 200: "Format"
+        case 300: "Vendor"
         case 400: "Rating"
         case 500: "Contained In"
+        case 501: "Not Contained In"
         case 600: "Label"
         case 700: "Number of Activations"
         case 701: "Last Activated"
+        case 702: "Number of Last Activated Fonts"
         case 800: "Import Date"
+        case 801: "Number of Last Imported Fonts"
+        case 900: "Embedding Rights"
         case 1100: "Language"
         case 1200: "OpenType Features"
+        case 1300: "SkyFonts"
+        case 1301: "Monotype"
+        case 1302: "Adobe Fonts"
+        case 1500: "Classification"
         case 1600: "Last Deactivated"
-        default: "a rule of another kind"
+        default: "a kind of rule from another version of FontExplorer X"
+        }
+    }
+
+    /// Font files Cicero can't read, by what they are, for the sheet to say which don't come over.
+    enum UnreadableKind: CaseIterable {
+        case type1, web, other
+
+        init(extension ext: String) {
+            switch ext.lowercased() {
+            // Classic Mac fonts have no extension: PostScript Type 1 outlines (LWFN) and suitcases.
+            case "", "pfb", "pfa", "pfm", "afm", "lwfn", "suit": self = .type1
+            case "woff", "woff2", "eot", "svg": self = .web
+            default: self = .other
+            }
+        }
+
+        func describe(_ count: Int) -> String {
+            let number = count.formatted()
+            return switch self {
+            case .type1: count == 1 ? "1 PostScript Type 1 font or font suitcase, which Cicero can’t read"
+                : "\(number) PostScript Type 1 fonts and font suitcases, which Cicero can’t read"
+            case .web: count == 1 ? "1 web font, which Cicero can’t read" : "\(number) web fonts, which Cicero can’t read"
+            case .other: count == 1 ? "1 other file Cicero can’t read" : "\(number) other files Cicero can’t read"
+            }
         }
     }
 
@@ -268,16 +321,24 @@ private struct Reader {
         let appRows = try select(["serialID", "path"], from: "applicationSetPaths", orderedBy: "rowid")
 
         // Where the files are: FontExplorer X's Font Library, and the home folder of the account the database was made
-        // in, which stand for this Mac's.
+        // in, which stand for this Mac's. A backup's paths are under the Font Library already.
+        let prefix = FontExplorerImport.backupLibraryPrefix
         let paths = containerRows.compactMap { $0.text("path") }
         let oldHome = Self.home(of: setting("fontFolderLocation") ?? "") ?? Self.mostCommonHome(paths)
         let oldLibrary = libraryFolder(oldHome: oldHome, paths: paths)
         let newLibrary = oldLibrary.map { place(library: $0, oldHome: oldHome) }
+            ?? (paths.contains { $0.hasPrefix(prefix) } ? home + "/FontExplorer X/Font Library" : nil)
         func local(_ path: String) -> String {
+            if let newLibrary, path.hasPrefix(prefix) { return newLibrary + "/" + path.dropFirst(prefix.count) }
             if let oldLibrary, let newLibrary, path.hasPrefix(oldLibrary + "/") { return newLibrary + path.dropFirst(oldLibrary.count) }
             if let oldHome, oldHome != home, path.hasPrefix(oldHome + "/") { return home + path.dropFirst(oldHome.count) }
             return path
         }
+
+        // Files of macOS's own with hidden faces, whose PostScript names start with a dot, like PingFangUI.ttc, which
+        // FontExplorer X lists from a private framework without calling it a system font, and puts in a backup.
+        var hidden = Set<Int>()
+        for row in fontRows where row.text("psName")?.hasPrefix(".") == true { hidden.insert(row.int("containerID")) }
 
         var containers: [Int: Container] = [:]
         var order: [Int] = []
@@ -287,7 +348,7 @@ private struct Reader {
             let last = row.double("lastActivated")
             containers[id] = Container(
                 id: id, path: local(path),
-                isSystem: row.int("isSystemFont") != 0 || row.int("isInSystemFolder") != 0,
+                isSystem: row.int("isSystemFont") != 0 || row.int("isInSystemFolder") != 0 || path.hasPrefix("/System/") || hidden.contains(id),
                 isCloud: row.int("isSkyFont") != 0 || row.int("isTypekit") != 0 || row.int("isMLSFont") != 0,
                 isActive: row.int("activate") == 1, count: max(row.int("count"), 0),
                 lastActivated: last > 0 ? Date(timeIntervalSinceReferenceDate: last) : nil,
@@ -297,9 +358,23 @@ private struct Reader {
             order.append(id)
         }
 
+        // Files Cicero can't read (PostScript Type 1, suitcases, web fonts) don't come over, nor do the sets, labels and
+        // the rest given to them; the sheet says how many there are.
+        var unreadable: [FontExplorerImport.UnreadableKind: Int] = [:]
+        for id in order {
+            guard let container = containers[id], !container.isSystem, !container.isCloud else { continue }
+            let ext = (container.path as NSString).pathExtension
+            guard !FontFormat.fileExtensions.contains(ext.lowercased()) else { continue }
+            unreadable[FontExplorerImport.UnreadableKind(extension: ext), default: 0] += 1
+            containers[id] = nil
+        }
+        order.removeAll { containers[$0] == nil }
+
         // Each file's faces, as fonts; a file without any (FontExplorer X couldn't read it) by its path alone.
         var faces: [Int: [ImportedFont]] = [:]
         var labelled: [Int: [ImportedFont]] = [:]
+        // Each file's faces' comments, which FontExplorer X keeps on the file too when it's given to all of them.
+        var faceComments: [Int: Set<String>] = [:]
         var library = ImportedLibrary(source: .fontExplorer)
         for row in fontRows {
             guard let container = containers[row.int("containerID")] else { continue }
@@ -312,7 +387,10 @@ private struct Reader {
             if let ids = row.text("fontClassificationIds"), let classification = FontExplorerImport.classification(ids, of: font, custom: custom) {
                 library.classifications.append(classification)
             }
-            if let comment = row.text("comment") { library.comments.append(ImportedComment(fonts: [font], text: comment)) }
+            if let comment = row.text("comment") {
+                library.comments.append(ImportedComment(fonts: [font], text: comment))
+                faceComments[container.id, default: []].insert(comment)
+            }
         }
         func fonts(_ id: Int) -> [ImportedFont] {
             guard let container = containers[id] else { return [] }
@@ -323,8 +401,11 @@ private struct Reader {
             if FontExplorerImport.labels[container.label] != nil {
                 labelled[container.label, default: []] += fonts(id).filter { !(labelled[container.label] ?? []).contains($0) }
             }
-            if let comment = container.comment { library.comments.append(ImportedComment(fonts: fonts(id), text: comment)) }
-            if container.count > 0 || container.lastActivated != nil {
+            if let comment = container.comment, !(faceComments[id] ?? []).contains(comment) {
+                library.comments.append(ImportedComment(fonts: fonts(id), text: comment))
+            }
+            // macOS's fonts are on all the time: FontExplorer X counts them as turned on when it first lists them.
+            if !container.isSystem, container.count > 0 || container.lastActivated != nil {
                 library.history.append(ImportedHistory(fonts: fonts(id), count: container.count, last: container.lastActivated))
             }
             if container.isActive, !container.isSystem, !container.isCloud { library.active += fonts(id) }
@@ -334,12 +415,14 @@ private struct Reader {
         // Fonts folders Cicero reads anyway, and from SkyFonts, Adobe Fonts or Monotype's cloud, aren't added.
         let fm = FileManager.default
         var missing = 0
+        var inLibrary: [String] = []
         // A Font Library that isn't on this Mac, and how many of the files were in it.
         var absentLibrary: (path: String, files: Int)?
         for id in order {
             guard let container = containers[id], !container.isSystem, !container.isCloud else { continue }
             if let newLibrary, container.path.hasPrefix(newLibrary + "/") {
                 library.fontFolderCount += 1
+                inLibrary.append(String(container.path.dropFirst(newLibrary.count + 1)))
             } else if fm.fileExists(atPath: container.path) {
                 if !library.otherFiles.contains(container.path) { library.otherFiles.append(container.path) }
             } else {
@@ -347,9 +430,8 @@ private struct Reader {
             }
         }
         library.fontFolder = newLibrary
-        if let backupFolder, let newLibrary {
-            library.bundledFonts = bundled(in: backupFolder, files: order.compactMap { containers[$0]?.path }
-                .filter { $0.hasPrefix(newLibrary + "/") }.map { String($0.dropFirst(newLibrary.count + 1)) })
+        if let backupFolder, newLibrary != nil {
+            library.bundledFonts = bundled(in: backupFolder, files: inLibrary)
         } else if let newLibrary, !fm.fileExists(atPath: newLibrary), library.fontFolderCount > 0 {
             // A database from another Mac, its Font Library not here (yet), or on a disk that isn't connected: the
             // fonts in it can't be listed.
@@ -385,26 +467,39 @@ private struct Reader {
         // Autoactivate item's.
         var setIDs: [Int: String] = [:]
         var deactivating = 0
+        // Sets that had only files Cicero can't read, which would come over empty.
+        var unreadableSets: [String] = []
         for item in items {
             let serial = item.int("serialID")
             switch item.int("type") {
             case 7:
+                let fonts = setFonts(serial)
+                if fonts.isEmpty, !(members[serial] ?? []).isEmpty {
+                    unreadableSets.append(name(item))
+                    continue
+                }
                 setIDs[serial] = String(serial)
-                library.sets.append(ImportedSet(id: String(serial), name: name(item), fonts: setFonts(serial)))
+                library.sets.append(ImportedSet(id: String(serial), name: name(item), fonts: fonts))
             case 31:
-                setIDs[serial] = String(serial)
                 let children = items.filter { $0.int("parentSerialID") == serial }
                 var fonts: [ImportedFont] = []
+                var hadFonts = false
                 for child in children {
                     switch child.int("type") {
                     case 32:
                         setIDs[child.int("serialID")] = String(serial)
+                        hadFonts = hadFonts || !(members[child.int("serialID")] ?? []).isEmpty
                         fonts += setFonts(child.int("serialID")).filter { !fonts.contains($0) }
                     case 33:
                         if !(members[child.int("serialID")] ?? []).isEmpty { deactivating += 1 }
                     default: break
                     }
                 }
+                if fonts.isEmpty, hadFonts {
+                    unreadableSets.append(name(item))
+                    continue
+                }
+                setIDs[serial] = String(serial)
                 library.sets.append(ImportedSet(id: String(serial), name: name(item), fonts: fonts, apps: apps[serial] ?? [], isApplicationSet: true))
             default: break
             }
@@ -437,6 +532,13 @@ private struct Reader {
             library.tags.append(ImportedTag(name: FontExplorerImport.labelName(color), color: color, fonts: labelled[number] ?? []))
         }
 
+        for kind in FontExplorerImport.UnreadableKind.allCases {
+            if let count = unreadable[kind] { library.notes.append(kind.describe(count)) }
+        }
+        if !unreadableSets.isEmpty {
+            let names = unreadableSets.map { "“\($0)”" }.formatted(.list(type: .and))
+            library.notes.append("the \(unreadableSets.count == 1 ? "set" : "sets") \(names), whose fonts Cicero can’t read")
+        }
         // The Font Library by where it was looked for, so it can be put there and imported again.
         if let absentLibrary {
             let place = absentLibrary.path.hasPrefix(home + "/") ? "~" + absentLibrary.path.dropFirst(home.count) : absentLibrary.path

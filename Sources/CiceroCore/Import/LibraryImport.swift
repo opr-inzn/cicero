@@ -32,7 +32,8 @@ public struct ImportChoices: Equatable, Sendable {
 public struct ImportSummary: Equatable, Sendable {
     /// Font files listed: the Font Library's and the others.
     public var fonts = 0
-    /// Sets made, or that had the name of one and got its fonts.
+    /// Sets made, or that had the name of one and got fonts or apps from it. What a set had already isn't counted, so
+    /// importing again counts nothing.
     public var sets = 0
     public var applicationSets = 0
     public var smartSets = 0
@@ -47,6 +48,8 @@ public struct ImportSummary: Equatable, Sendable {
     public var activated = 0
     /// Fonts the sets, tags or ratings name that aren't in the library.
     public var notFound = 0
+    /// Sets left out as none of their fonts are in the library: they would be empty.
+    public var emptySets: [String] = []
     /// Smart sets with rules Cicero can't take, or naming a set that wasn't brought in.
     public var skippedSmartSets: [String] = []
     /// Apps of application sets that aren't on this Mac.
@@ -60,14 +63,15 @@ public struct ImportSummary: Equatable, Sendable {
 /// that's there already gets its fonts, so importing again changes nothing.
 public enum LibraryImport {
     /// Lists the other app's fonts: its Font Library as a folder, and the files it used from elsewhere one by one,
-    /// where they are. Returns how many files that is.
-    public static func addFonts(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, locations: Locations) -> Int {
+    /// where they are. Returns how many files weren't in the library before: the Font Library's when it wasn't, else
+    /// those `placed` from a backup.
+    public static func addFonts(_ imported: ImportedLibrary, choices: ImportChoices, placed: Int = 0, to data: inout UserData, locations: Locations) -> Int {
         var count = 0
         var folders = [locations.userFonts.path, locations.allUsersFonts.path, locations.deactivated.path] + data.scannedFolders().map(\.path)
         func isRead(_ path: String) -> Bool { folders.contains { path == $0 || path.hasPrefix($0 + "/") } }
         if choices.fontFolder, let folder = imported.fontFolder {
             // A backup's are those it has, which `placeBundledFonts` put there.
-            count += imported.bundledFonts?.files.count ?? imported.fontFolderCount
+            count += isRead(folder) ? placed : imported.bundledFonts?.files.count ?? imported.fontFolderCount
             if !isRead(folder) {
                 // Adobe's folders come with the Proofing switch, as when the user adds one.
                 if WatchedFolder.detectAppName(forPath: folder) != nil {
@@ -186,34 +190,47 @@ public enum LibraryImport {
                     if !summary.missingApps.contains(name) { summary.missingApps.append(name) }
                 }
             }
+            let changed: Bool
             if let index = data.sets.firstIndex(where: { $0.name == set.name }) {
+                let before = data.sets[index]
                 data.sets[index].add(families: whole)
                 for (family, names) in styles { for name in names { data.sets[index].add(style: name, of: family) } }
                 for app in linked where !data.sets[index].apps.contains(where: { $0.bundleID == app.bundleID }) {
                     data.sets[index].apps.append(app)
                 }
                 setIDs[set.id] = data.sets[index].id
+                changed = data.sets[index] != before
+            } else if whole.isEmpty, styles.isEmpty, set.count > 0 {
+                // None of its fonts are here: it would come over empty.
+                summary.emptySets.append(set.name)
+                continue
             } else {
                 let new = FontSet(name: set.name, families: whole, styles: styles, apps: linked)
                 data.sets.append(new)
                 setIDs[set.id] = new.id
+                changed = true
             }
+            guard changed else { continue }
             if set.isApplicationSet { summary.applicationSets += 1 } else { summary.sets += 1 }
         }
 
         // Tags before smart sets, whose rules may name them.
         if choices.tags {
             for tag in imported.tags {
+                var changed = false
                 if !data.tags.contains(tag.name) {
                     data.tags.append(tag.name)
                     data.tagColors[tag.name] = tag.color
+                    changed = true
                 }
                 for family in families(tag.fonts) {
                     var names = data.familyTags[family.id] ?? []
-                    if !names.contains(tag.name) { names.append(tag.name) }
+                    guard !names.contains(tag.name) else { continue }
+                    names.append(tag.name)
                     data.familyTags[family.id] = names
+                    changed = true
                 }
-                summary.tags += 1
+                if changed { summary.tags += 1 }
             }
         }
 
