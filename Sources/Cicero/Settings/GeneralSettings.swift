@@ -99,7 +99,10 @@ struct GeneralSettings: View {
             }
             Section("Library") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
-                Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
+                Toggle(isOn: $model.data.showCreativeCloudFonts) {
+                    Text("Show fonts from Creative Cloud")
+                    Text("Creative Cloud activates and deactivates Adobe Fonts. Cicero lists them but can’t manage them.")
+                }
                 // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     Text("Show fonts installed for proofing in Adobe apps")
