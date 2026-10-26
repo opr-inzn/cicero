@@ -174,6 +174,25 @@ extension AppModel {
 
     // MARK: Font Library
 
+    /// Where a file is, as Cicero says it: "in your Fonts folder", "in Clients", "in “Downloads”".
+    func placeName(of path: String) -> String {
+        if path.hasPrefix(locations.userFonts.path + "/") { return "in your Fonts folder" }
+        if path.hasPrefix(locations.deactivated.path + "/") { return "in the Deactivated folder" }
+        if let library = data.fontLibrary, path.hasPrefix(library.path + "/") { return "in \(folderName(WatchedFolder.fontLibraryID))" }
+        if data.fontFiles.contains(path) { return "in \(folderName(WatchedFolder.addedFilesID))" }
+        if let folder = data.namedFolders.filter({ path.hasPrefix($0.path + "/") }).max(by: { $0.path.count < $1.path.count }) {
+            return "in \(folder.displayName)"
+        }
+        return "in “\(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent)”"
+    }
+
+    /// The places Replace puts an added family: "in your Fonts folder and in Clients".
+    func replacedPlaces(_ duplicate: AddedDuplicate) -> String {
+        let places = duplicate.replacements.map { placeName(of: $0.old) }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        guard places.count > 1 else { return places.first ?? "" }
+        return places.dropLast().joined(separator: ", ") + " and " + places.last!
+    }
+
     /// Installing into the Font Library on or off. Off, its folder becomes one of the user's locations while it has fonts,
     /// so they stay listed, each on or off as it is; on again, that location is the library again. Neither moves a file
     /// or turns a font on or off.

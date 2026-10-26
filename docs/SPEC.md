@@ -392,20 +392,33 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   library's family; versions compared with `FontVersion`: Newer, Older, Same Version, or Same File when the files are
   the library's byte for byte). Ask (the default) shows a sheet with a row per family: name, a Newer/Older/Same
   Version/Same File tag, "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000", and a picker:
-  Skip It / Add as Another Copy / Replace, starting at Replace when the added one is newer, else
-  Skip It; Choose for All; Cancel adds nothing of the batch, Add adds everything else as usual. The setting can
-  instead always Add it as another copy (as before), Skip it, Replace, or Replace if it’s newer (replace
-  when its version number is higher, else skip). Skipped: a file only of skipped families stays out, the browser shows the library's
-  copies, and the toast says "Skipped Helvetica, already in your library" / "Skipped 3 families already in your
-  library". Replace (`AddedDuplicates.replacement`): for each style whose library copy is on, the copies
-  Cicero can turn off (from a Fonts folder, in place, until quit, by another app; not macOS's, an app's, Adobe Fonts'
-  or an app folder's) go off through `switchCopies`, as deactivating does (a copy Cicero installed to the Trash
-  when its original is in the library, any other Fonts-folder file to the Deactivated folder), then the added face
-  goes on: installed (copied, or moved with Move) when fonts are activated by copying or moving, which installs the
-  whole file once it takes over any style; else in place, or copied when Ask and the old copy was in a Fonts folder.
-  Old copies under Added Fonts whose every face is taken over stop being listed. Toast: "Using the added copy of
-  Helvetica" / "Using the added copies of 3 families", plus ". Another copy Cicero can’t turn off is still on, so
-  apps may use that one" when one stays. Not for folders, nor files Find on This Mac turns up.
+  Skip It / Add as Another Copy / Replace Your Copy (left out of the picker for a family it can't be done for, with
+  the reason under it: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently." or
+  "…your copy comes with macOS or an app, or from Adobe Fonts."), starting at Replace Your Copy when the added one is
+  newer (Add as Another Copy when replacing can't be done), else Skip It; with Replace Your Copy chosen for a family
+  replaced in more than one place, an orange warning under it: "Replaces 2 files: in your Fonts folder and in Clients"
+  (`AppModel.placeName`); Choose for All (Replace Your Copy only where it can be done); "Replace Your Copy moves your
+  files to the Trash and puts the added ones in their place."; Cancel adds nothing of the batch, Add adds everything
+  else as usual. The setting can instead always Add it as another copy (as before), Skip it, or Replace your copy;
+  with Replace, a batch with a family it can't be done for shows the sheet, and one with a family replaced in more
+  than one place first an alert (`replacePrompt`): "Replace Helvetica in 2 Places?" / "Replace Fonts in More Than One
+  Place?", "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one
+  takes its place.", Replace (default), Choose for Each… (the sheet), Cancel. Saved choices from before ("useAdded",
+  which turned the library's copy off, and "keepNewer") read as Ask, so nothing goes to the Trash unchosen. Skipped: a
+  file only of skipped families stays out, the browser shows the library's copies, and the toast says "Skipped
+  Helvetica, already in your library" / "Skipped 3 families already in your library". Replace
+  (`AddedDuplicate.replacements`, `ActivationEngine.replace`) is file for file: each of the library's files with the
+  family's styles is matched to the added file with exactly its fonts (by PostScript name, every face in the file, a
+  collection's other families too); copies Cicero doesn't change stay beside it (macOS's, an app's, Adobe Fonts', one
+  in an app's own folder, one on for all users or for an app folder while its app is open), and a file with no match
+  makes it impossible (`ReplaceBlock.differentFiles`; `.unchangeable` when no copy may change). As one queued
+  operation, the old files that are on are unregistered (persistently, in place or in a Fonts folder; for the session,
+  until quit), each added file is copied into Cicero's staging folder, the old file goes to the Trash, and the copy
+  moves into its place under its name; then those that were on are registered again as they were. A copy that can't be
+  made, or an old file that can't go to the Trash, leaves that file as it was. Paths stay, so records, locations, Added
+  Fonts, and folders, tags and everything else kept by family or PostScript name stay too. The added file isn't listed;
+  with Move, it's deleted once every place it was meant for has an identical copy. Toast: "Replaced Helvetica. The old
+  file is in the Trash" ("…old files are…"). Not for folders, nor files Find on This Mac turns up.
 - After the scan that reads them, the browser shows their families selected: added files in Added Fonts (a short
   list, so they're in view: the browser doesn't scroll to a selection), others in the sidebar item shown when it has
   them all, else in All Fonts (the search cleared). One family opened from the Finder opens on its font page.
@@ -489,7 +502,7 @@ may be needed afterwards): checkboxes macOS (my account) [`atsutil databases -re
 
 ## Settings
 
-- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance; as the main window's appearance changes, its top scroll edges turn hard for a tenth of a second, `toolbarGlassFollowsAppearance()`, since on macOS 26 a soft edge could keep the toolbar's glass in the old appearance: the search field went light again half a second after switching to Dark, until something scrolled); Menu Bar and Dock: "Show Cicero in the menu bar" (on by default, `menuBar.showsIcon`, + how to open the icon's menu) and "Show Cicero in the Dock" (on by default, `menuBar.showsDockIcon`; disabled and shown on while the icon is off, with "Cicero can leave the Dock only while it’s in the menu bar."). With it off, Cicero is an accessory app (no Dock icon, not in the app switcher) while none of its titled windows is open or minimized, and a regular one with its menus while one is; menus closing don't count, and neither does hiding with ⌘H. The last window closing hides Cicero, so the app in front before gets the keyboard back; Cicero's icon or reopening it from the Finder brings it back with its main window. Both settings stay with each Mac, like the appearance; Activation ("Activate fonts by" + explanation incl. app-only folders); "Install fonts into Cicero’s Font Library" (+ explanation, ending "When you turn this off, the folder becomes one of your locations."), "Cicero’s Font Library" with its path and Change (see Activation; the install method's choices say "Copy into Cicero’s Font Library" and "Move into Cicero’s Font Library" while it's on, and so do the explanations); "Ask before activating more than 100 families at once" (+ why); "When an added font is already in your library" (Ask each time / Add it as another copy / Skip it / Replace / Replace if it’s newer, + explanation; its menu and Activate fonts by's are as wide as the wider of the two, `PopUpPicker.widthFitting`, in a 600 pt window); "Open at login" (for app folders: "App folders activate fonts only while Cicero is open."); "Show system fonts" (+ explanation); "Show fonts from Creative Cloud" ("Creative Cloud activates and deactivates Adobe Fonts. Cicero lists them but can’t manage them."); "Classify fonts automatically" (+ explanation following Apple Intelligence's availability: from the letters alone on Macs without it); Font Caches (Rebuild, a red Clear); Backup (Back Up, Restore, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends); Usage Statistics ("Share usage statistics", on by default, + what it sends, the not-similar reports included).
+- General: Appearance (System / Light / Dark, applied app-wide via NSApp.appearance; as the main window's appearance changes, its top scroll edges turn hard for a tenth of a second, `toolbarGlassFollowsAppearance()`, since on macOS 26 a soft edge could keep the toolbar's glass in the old appearance: the search field went light again half a second after switching to Dark, until something scrolled); Menu Bar and Dock: "Show Cicero in the menu bar" (on by default, `menuBar.showsIcon`, + how to open the icon's menu) and "Show Cicero in the Dock" (on by default, `menuBar.showsDockIcon`; disabled and shown on while the icon is off, with "Cicero can leave the Dock only while it’s in the menu bar."). With it off, Cicero is an accessory app (no Dock icon, not in the app switcher) while none of its titled windows is open or minimized, and a regular one with its menus while one is; menus closing don't count, and neither does hiding with ⌘H. The last window closing hides Cicero, so the app in front before gets the keyboard back; Cicero's icon or reopening it from the Finder brings it back with its main window. Both settings stay with each Mac, like the appearance; Activation ("Activate fonts by" + explanation incl. app-only folders); "Install fonts into Cicero’s Font Library" (+ explanation, ending "When you turn this off, the folder becomes one of your locations."), "Cicero’s Font Library" with its path and Change (see Activation; the install method's choices say "Copy into Cicero’s Font Library" and "Move into Cicero’s Font Library" while it's on, and so do the explanations); "Ask before activating more than 100 families at once" (+ why); "When an added font is already in your library" (Ask each time / Add it as another copy / Skip it / Replace your copy, + explanation; its menu and Activate fonts by's are as wide as the wider of the two, `PopUpPicker.widthFitting`, in a 600 pt window); "Open at login" (for app folders: "App folders activate fonts only while Cicero is open."); "Show system fonts" (+ explanation); "Show fonts from Creative Cloud" ("Creative Cloud activates and deactivates Adobe Fonts. Cicero lists them but can’t manage them."); "Classify fonts automatically" (+ explanation following Apple Intelligence's availability: from the letters alone on Macs without it); Font Caches (Rebuild, a red Clear); Backup (Back Up, Restore, one sentence on what a backup holds); Updates ("Check for updates automatically", on by default, + what it sends); Usage Statistics ("Share usage statistics", on by default, + what it sends, the not-similar reports included).
 - Locations (`FoldersSettings`; the tab was called Folders): the watched folders' list (+ Add Location, "Add a folder of fonts"; − Remove Locations, "Remove the selected locations from the library; their files stay where they are"), each with a menu to mark it as loaded by an app.
 - Sidebar: Finder-style checkboxes in the sidebar's order, Reset Order, Show All. Foundries only as a whole section; single foundries are hidden from the sidebar's Edit mode.
 - Coverage: the character sets, as above.

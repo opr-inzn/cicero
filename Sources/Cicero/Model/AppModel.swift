@@ -187,6 +187,8 @@ final class AppModel {
     var copySwitchPrompt: CopySwitchRequest?
     /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
     var duplicatePrompt: DuplicatePrompt?
+    /// Added fonts that would replace the library's copies in more than one place, waiting for the user's yes.
+    var replacePrompt: DuplicatePrompt?
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
     var newTagRequest: NewTagRequest?

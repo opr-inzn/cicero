@@ -849,7 +849,7 @@ public struct ActivationEngine: Sendable {
         return faces.filter { seen.insert($0.face.path).inserted }
     }
 
-    private func isInsideUserFonts(_ path: String) -> Bool {
+    func isInsideUserFonts(_ path: String) -> Bool {
         path.hasPrefix(locations.userFonts.path + "/")
     }
 
