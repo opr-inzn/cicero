@@ -183,11 +183,18 @@ extension AppModel {
         if on {
             if let location = changed.takeBackFontLibrary() { deselect { $0 == .folder(location.id) } }
         } else {
-            changed.keepFontLibraryAsLocation(hasFonts: changed.fontLibrary.map { ActivationEngine.hasFontFiles(in: $0.url) } ?? false)
+            changed.keepFontLibraryAsLocation(hasFonts: changed.fontLibrary.map { fontLibraryHasFonts($0.url) } ?? false)
         }
         changed.installsIntoFontLibrary = on
         data = changed
         rescan()
+    }
+
+    /// Whether the Font Library's folder has fonts to keep listed: font files in it, or, on a disk that isn't connected,
+    /// fonts Cicero turned on there.
+    func fontLibraryHasFonts(_ folder: URL) -> Bool {
+        let prefix = folder.path + "/"
+        return ActivationEngine.hasFontFiles(in: folder) || data.records.inPlace.contains { $0.hasPrefix(prefix) }
     }
 
     /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;

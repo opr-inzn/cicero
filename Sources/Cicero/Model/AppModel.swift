@@ -363,7 +363,7 @@ final class AppModel {
             data.fontLibraryPath = locations.defaultFontLibrary.path
         }
         var checked = data
-        checked.keepFormerFontLibraryAsLocation(hasFonts: ActivationEngine.hasFontFiles(in:))
+        checked.keepFormerFontLibraryAsLocation(hasFonts: fontLibraryHasFonts)
         data = checked
     }
 
