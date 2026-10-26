@@ -225,12 +225,12 @@ extension AppModel {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
-        panel.message = "Choose an empty folder for Cicero’s Font Library, or make a new one. Its fonts move there."
+        panel.message = "Choose an empty folder for Cicero’s Library, or make a new one. Its fonts move there."
         panel.directoryURL = data.fontLibrary?.url.deletingLastPathComponent()
         guard panel.runModal() == .OK, let url = panel.url?.standardizedFileURL else { return }
         if let reason = ActivationEngine.refusal(forFontLibraryAt: url, current: data.fontLibrary?.url, folders: data.scannedFolders(), locations: locations) {
             let alert = NSAlert()
-            alert.messageText = "The Font Library can’t go into “\(url.lastPathComponent)”."
+            alert.messageText = "Cicero’s Library can’t go into “\(url.lastPathComponent)”."
             alert.informativeText = reason
             alert.runModal()
             return

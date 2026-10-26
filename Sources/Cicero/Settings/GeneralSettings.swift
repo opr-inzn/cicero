@@ -41,13 +41,13 @@ struct GeneralSettings: View {
             }
             Section("Installation") {
                 Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
-                    Text("Install fonts into Cicero’s Font Library")
+                    Text("Install fonts into Cicero’s Library")
                     Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
                 } label: {
-                    Text("Cicero’s Font Library")
+                    Text("Cicero’s Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
                 // Each pop-up menu as wide as its own choices.
@@ -160,7 +160,7 @@ struct GeneralSettings: View {
     }
 
     private var activationExplanation: String {
-        let place = model.data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your user Fonts folder"
+        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
         return switch model.data.installMethod {
         case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
         case .copy: "Copying puts font files into \(place) and leaves the originals where they are."
@@ -185,8 +185,8 @@ private extension InstallMethod {
     func title(intoFontLibrary: Bool) -> String {
         switch self {
         case .ask: "Ask each time"
-        case .copy: intoFontLibrary ? "Copy into Cicero’s Font Library" : "Copy into ~/Library/Fonts"
-        case .move: intoFontLibrary ? "Move into Cicero’s Font Library" : "Move into ~/Library/Fonts"
+        case .copy: intoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move into Cicero’s Library" : "Move into ~/Library/Fonts"
         case .inPlace: "Leave the files where they are"
         }
     }

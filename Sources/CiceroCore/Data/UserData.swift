@@ -374,13 +374,13 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Deactivated", "Cicero’s Font Library", "Proofing" (Adobe's folders, where type designers
+    /// The name the user gave it; else "Deactivated", "Cicero’s Library", "Proofing" (Adobe's folders, where type designers
     /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
     /// else the name.
     public var displayName: String {
         if let customName { return customName }
         if id == Self.deactivatedID { return "Deactivated" }
-        if id == Self.fontLibraryID { return "Cicero’s Font Library" }
+        if id == Self.fontLibraryID { return "Cicero’s Library" }
         if id == Self.adobeAppsID { return "Proofing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
         if id == Self.addedFilesID { return "Added Fonts" }

@@ -142,8 +142,8 @@ extension AppModel {
     /// copying or moving.
     var installsAddedFiles: Bool { data.installMethod == .copy || data.installMethod == .move }
 
-    /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Font Library".
-    var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your Fonts folder" }
+    /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Library".
+    var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder" }
 
     /// Brings in the font files the library doesn't have yet: lists them where they are, under Added Fonts, or with
     /// fonts activated by copying or moving, copies or moves them into ~/Library/Fonts, where they're on and in All
