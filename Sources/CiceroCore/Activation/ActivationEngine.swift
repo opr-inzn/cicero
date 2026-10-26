@@ -104,12 +104,16 @@ public struct CoreTextRegistrar: FontRegistrar {
 
     /// Every font in the files (all faces of a collection, all named instances of a variable font) and no other: each by
     /// its file and PostScript name. The descriptors CoreText makes from a file would turn off every file with fonts of
-    /// those names in the Fonts folders too, another copy of the font the user has on (tested in a macOS 26 VM).
+    /// those names in the Fonts folders too, another copy of the font the user has on (tested in a macOS 26 VM). A file
+    /// reached through a symlink goes by its real path too, the one fontd has it by.
     private static func setEnabledNow(_ urls: [URL], _ enabled: Bool) {
         let descriptors = urls.flatMap { url in
-            (CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []).compactMap { font -> CTFontDescriptor? in
-                guard let name = CTFontDescriptorCopyAttribute(font, kCTFontNameAttribute) as? String else { return nil }
-                return CTFontDescriptorCreateWithAttributes([kCTFontURLAttribute: url, kCTFontNameAttribute: name] as CFDictionary)
+            let paths = [url.path(percentEncoded: false)] + LibraryScanner.linkedPaths(url.path(percentEncoded: false)).sorted()
+            return (CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []).flatMap { font -> [CTFontDescriptor] in
+                guard let name = CTFontDescriptorCopyAttribute(font, kCTFontNameAttribute) as? String else { return [] }
+                return paths.map { path in
+                    CTFontDescriptorCreateWithAttributes([kCTFontURLAttribute: URL(fileURLWithPath: path), kCTFontNameAttribute: name] as CFDictionary)
+                }
             }
         }
         guard !descriptors.isEmpty else { return }
