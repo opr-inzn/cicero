@@ -189,6 +189,8 @@ final class AppModel {
     var duplicatePrompt: DuplicatePrompt?
     /// Added fonts that would replace the library's copies in more than one place, waiting for the user's yes.
     var replacePrompt: DuplicatePrompt?
+    /// Fonts about to be replaced while apps that keep their old version are open, waiting for the user's yes.
+    var openAppsReplacePrompt: OpenAppsReplacePrompt?
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
     var newTagRequest: NewTagRequest?
@@ -935,6 +937,14 @@ struct CopySwitchRequest: Identifiable {
 }
 
 /// Font files being added, some of them with fonts the library has already (see `AppModel.addCheckingDuplicates`).
+/// Replacing fonts while InDesign, Illustrator or Photoshop is open (see `AppModel.openAppsKeepingFonts`): the apps, and
+/// what Replace goes on with.
+struct OpenAppsReplacePrompt: Identifiable {
+    let id = UUID()
+    var apps: [String]
+    var replace: (AppModel) -> Void
+}
+
 struct DuplicatePrompt: Identifiable {
     let id = UUID()
     var paths: [String]
