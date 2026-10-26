@@ -65,7 +65,7 @@ struct DuplicatesSheet: View {
             }
             .padding(16)
         }
-        .frame(width: 720, height: min(540, 190 + prompt.duplicates.map(Self.rowHeight).reduce(0, +)))
+        .frame(width: 720, height: min(540, 146 + prompt.duplicates.map(Self.rowHeight).reduce(0, +)))
     }
 
     private func row(_ duplicate: AddedDuplicate) -> some View {
@@ -101,9 +101,10 @@ struct DuplicatesSheet: View {
         .padding(.vertical, 10)
     }
 
-    /// A row's height: a line more for one that can't be replaced, or that warns it replaces more than one file.
+    /// A row's height: a line more for one that can't be replaced, or that warns it replaces more than one file. With
+    /// the title and the bar below (146), the sheet is as tall as its rows, up to 540.
     private static func rowHeight(_ duplicate: AddedDuplicate) -> CGFloat {
-        duplicate.replaceBlock != nil || duplicate.replacesSeveralCopies ? 80 : 58
+        duplicate.replaceBlock != nil || duplicate.replacesSeveralCopies ? 73 : 54
     }
 
     /// "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000".
