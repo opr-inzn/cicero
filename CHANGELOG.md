@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Typing on a font page, and dragging its **Size**, **Tracking** and **Leading** sliders, no longer lags.
+- In **Preview Options**, **Save as Preset** adds the preview text to **Presets**. **Remove Preset** takes it out again.
 
 ## 0.10.8
 

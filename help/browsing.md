@@ -201,9 +201,8 @@ Like features, the axes apply to that family wherever Cicero previews it, in the
 
 Click **Preview Options** in the toolbar:
 
-- **Preview Text:** type your own text, or pick one from **Presets**. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”). A font with none of the text’s letters, like an Arabic or a Thai font for Latin text, shows text in its own script instead: the names of languages written in it, in their own letters, like العربية, or its first letters. Otherwise macOS would set the text in another font, and you wouldn’t see the font’s own letters, weights or axes.
+- **Preview Text:** type your own text, or pick one from **Presets**. **Save as Preset** adds the text you typed to **Presets**, and **Remove Preset** takes it out again. Leave it empty to show each family’s name (the grid then shows “Aa Gg 123”). A font with none of the text’s letters, like an Arabic or a Thai font for Latin text, shows text in its own script instead: the names of languages written in it, in their own letters, like العربية, or its first letters. Otherwise macOS would set the text in another font, and you wouldn’t see the font’s own letters, weights or axes.
 - **Size:** 24 to 200 pt.
-- **Weight:** 100 to 900. Cicero shows the style nearest to it, and the exact weight in a variable font.
 - **Leading:** the distance from one line to the next, from 80 to 250 % of the size; 120 % at first. It applies wherever a sample runs over several lines: on font pages and in Quick Look.
 
 The same options apply to every view, font pages and the Compare window, but the size: font pages and the Compare window have their own. Samples in the list, grid, specimens, Quick Look and Compare keep each font’s own spacing and line up on the left; font pages have their own [tracking and alignment](#open-a-font-page). Cicero remembers them.

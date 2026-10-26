@@ -16,6 +16,8 @@ final class PreviewSettings {
 
     /// Empty means each family's own name.
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
+    /// Preview texts saved with Save as Preset, in the order saved: Presets lists them before `presets`.
+    var savedPresets: [String] { didSet { defaults.set(savedPresets, forKey: Keys.savedPresets) } }
     var size: Double { didSet { defaults.set(size, forKey: Keys.size) } }
     /// What previews show a family in, where a search names no style: its regular style, the one nearest 400. Preview
     /// Options had a Weight slider up to 0.10.2; what it saved is forgotten.
@@ -28,6 +30,7 @@ final class PreviewSettings {
 
     private enum Keys {
         static let sampleText = "preview.sampleText"
+        static let savedPresets = "preview.savedPresets"
         static let size = "preview.size"
         static let weight = "preview.weight"
         static let lineSpacing = "preview.lineSpacing"
@@ -35,9 +38,18 @@ final class PreviewSettings {
 
     init() {
         sampleText = defaults.string(forKey: Keys.sampleText) ?? ""
+        savedPresets = defaults.stringArray(forKey: Keys.savedPresets) ?? []
         size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
         defaults.removeObject(forKey: Keys.weight)
         lineSpacing = defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120
+    }
+
+    /// Whether the preview text is one of the presets saved with Save as Preset.
+    var isSavedPreset: Bool { savedPresets.contains(sampleText) }
+
+    /// Whether Save as Preset can save the preview text: it has something to see, and isn't a preset already.
+    var canSavePreset: Bool {
+        !sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !Self.presets.contains(sampleText) && !isSavedPreset
     }
 
     func text(for family: Family) -> String {
