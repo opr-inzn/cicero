@@ -169,6 +169,11 @@ public struct UserData: Codable, Equatable, Sendable {
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
         installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
         fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
+        // Test builds saved the library's name with the location its folder becomes ("Font Library", then "Cicero’s Font
+        // Library"); it's called as the library is now (see `named`), whatever the library is called.
+        if let location = fontLibraryLocation, let name = folderNames[location.id.uuidString], Self.formerFontLibraryNames.contains(name) {
+            folderNames[location.id.uuidString] = nil
+        }
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
@@ -237,6 +242,9 @@ public struct UserData: Codable, Equatable, Sendable {
         guard installsIntoFontLibrary, !fontLibraryPath.isEmpty else { return nil }
         return WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
     }
+
+    /// What the library's location was saved as before it was called as the library is.
+    static let formerFontLibraryNames: Set<String> = ["Font Library", "Cicero’s Font Library"]
 
     /// The user's location that is the Font Library's folder, as it is while fonts aren't installed into it.
     public var fontLibraryLocation: WatchedFolder? {
