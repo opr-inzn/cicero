@@ -23,8 +23,14 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(text: $text, defaultText: defaultText) }
 
     func makeNSView(context: Context) -> NSTextView {
-        let view = SampleTextView(usingTextLayoutManager: true)
-        view.textLayoutManager?.delegate = context.coordinator
+        // TextKit 2, with a layout manager of its own for the insertion point (see `SampleLayoutManager`).
+        let content = NSTextContentStorage()
+        let manager = SampleLayoutManager()
+        content.addTextLayoutManager(manager)
+        manager.textContainer = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        let view = SampleTextView(frame: .zero, textContainer: manager.textContainer)
+        view.content = content
+        manager.delegate = context.coordinator
         view.delegate = context.coordinator
         view.textStorage?.delegate = context.coordinator
         view.drawsBackground = false
@@ -80,6 +86,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         let style = Style(font: font, kerning: kerning, lineHeight: lineHeight, alignment: alignment)
         guard style != context.coordinator.style || view.textStorage?.length != context.coordinator.styledLength else { return }
         context.coordinator.style = style
+        (view.textLayoutManager as? SampleLayoutManager)?.font = font
         let attributes = style.attributes
         view.typingAttributes = attributes
         view.defaultParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
@@ -157,6 +164,8 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
 /// Esc goes back from the font page, as everywhere else on it, rather than offering completions. A right-click
 /// shows the page's menu, not the text view's.
 private final class SampleTextView: NSTextView {
+    /// The text, which the text view only points to.
+    var content: NSTextContentStorage?
     var makeMenu: (() -> NSMenu)?
     /// Where the lines start: below the room for glyphs reaching above them. Not a container inset, which would
     /// leave as much room below.
@@ -197,6 +206,24 @@ private struct SampleMenu<Content: View>: View {
         Button("Paste", systemImage: "doc.on.clipboard") { view?.paste(nil) }
         Divider()
         content
+    }
+}
+
+/// Sets the insertion point on the font rather than on the line: from the font's ascent above the baseline to its
+/// descent below, as far apart as the lines may be. TextKit made it as tall as the line, so with the lines closer
+/// than the font is tall it started halfway up the capitals and reached below the descenders, and with them farther
+/// apart it reached high above the letters.
+nonisolated private final class SampleLayoutManager: NSTextLayoutManager {
+    var font: CTFont?
+
+    override func enumerateTextSegments(in textRange: NSTextRange, type: SegmentType, options: SegmentOptions = [],
+                                        using block: (NSTextRange?, CGRect, CGFloat, NSTextContainer) -> Bool) {
+        guard textRange.isEmpty, let font else { return super.enumerateTextSegments(in: textRange, type: type, options: options, using: block) }
+        let ascent = CTFontGetAscent(font).rounded(), descent = CTFontGetDescent(font).rounded()
+        super.enumerateTextSegments(in: textRange, type: type, options: options) { range, frame, baseline, container in
+            let caret = CGRect(x: frame.minX, y: frame.minY + baseline - ascent, width: frame.width, height: ascent + descent)
+            return block(range, caret, ascent, container)
+        }
     }
 }
 
