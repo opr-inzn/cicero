@@ -394,7 +394,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   Version/Same File tag, "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000", and a picker:
   Skip it / Add as a copy / Replace your copy (as in Settings; "Replace your copies" for a family it replaces more than one file of) (left out of the picker for a family it can't be done for, with
   the reason under it: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently." or
-  "…your copy comes with macOS or an app, or from Adobe Fonts."), starting, with Replace your copy chosen in Settings, at Replace your copy for every family it can be done for (`AddedDuplicate.startingChoice`), else at Replace your copy when the added one is
+  "Can’t be replaced: macOS, an app or Adobe Fonts keeps your copy."), starting, with Replace your copy chosen in Settings, at Replace your copy for every family it can be done for (`AddedDuplicate.startingChoice`), else at Replace your copy when the added one is
   newer (Add as a copy when replacing can't be done), else Skip it; with Replace your copy chosen for a family
   replaced in more than one place, an orange warning under it: "Replaces 2 files: in your Fonts folder and in Clients"
   (`AppModel.placeName`); Choose for All (Replace your copy only where it can be done); Cancel adds nothing of the batch, Add adds everything
@@ -409,7 +409,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   (`AddedDuplicate.replacements`, `ActivationEngine.replace`) is file for file: each of the library's files with the
   family's styles is matched to the added file with exactly its fonts (by PostScript name, every face in the file, a
   collection's other families too); copies Cicero doesn't change stay beside it (macOS's, an app's, Adobe Fonts', one
-  in an app's own folder, one on for all users or for an app folder while its app is open), and a file with no match
+  in an app's own folder, one on for all users; one on until quit or for an app folder goes on again the same way), and a file with no match
   makes it impossible (`ReplaceBlock.differentFiles`; `.unchangeable` when no copy may change). As one queued
   operation, the old files that are on are unregistered (persistently, in place or in a Fonts folder; for the session,
   until quit), each added file is copied into Cicero's staging folder, the old file goes to the Trash, and the copy
@@ -417,7 +417,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   made, or an old file that can't go to the Trash, leaves that file as it was. Paths stay, so records, locations, Added
   Fonts, and folders, tags and everything else kept by family or PostScript name stay too. The added file isn't listed;
   with Move, it's deleted once every place it was meant for has an identical copy. Toast: "Replaced Helvetica. The old
-  file is in the Trash" ("…old files are…"). Not for folders, nor files Find on This Mac turns up.
+  file is in the Trash" ("…old files are…"), then ". Couldn’t replace Roboto" for files that stayed, by name. Not for folders, nor files Find on This Mac turns up.
 - After the scan that reads them, the browser shows their families selected: added files in Added Fonts (a short
   list, so they're in view: the browser doesn't scroll to a selection), others in the sidebar item shown when it has
   them all, else in All Fonts (the search cleared). One family opened from the Finder opens on its font page.

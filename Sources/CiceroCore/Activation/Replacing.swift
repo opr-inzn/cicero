@@ -62,13 +62,18 @@ extension ActivationEngine {
             }
         }
 
-        let names = FontNames.describe(FontNames.fonts(inFiles: done.map(\.old)))
-        let message: String
-        if failed.isEmpty, let names {
-            message = "Replaced \(names). " + (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
-        } else {
-            message = Self.message("Replaced", "replace", succeeded: done.count, failed: failed.count,
+        // "Replaced Inter. The old file is in the Trash", and what couldn't be, by name: ". Couldn’t replace Roboto".
+        var message: String
+        if done.isEmpty {
+            message = Self.message("Replaced", "replace", succeeded: 0, failed: failed.count,
                                    undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
+        } else {
+            let names = FontNames.describe(FontNames.fonts(inFiles: done.map(\.old))) ?? (done.count == 1 ? "1 file" : "\(done.count) files")
+            message = "Replaced \(names). " + (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
+            if !failed.isEmpty {
+                let undone = FontNames.describe(FontNames.fonts(inFiles: failed.filter { fm.fileExists(atPath: $0) }))
+                message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
+            }
         }
         return ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
     }
