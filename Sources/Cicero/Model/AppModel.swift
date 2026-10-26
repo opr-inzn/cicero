@@ -336,11 +336,15 @@ final class AppModel {
         let migrating = needsFontLibraryMigration
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
+            await model.engine.finishTurningOff()
             let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
             model.data.records = tidied.records
             if migrating { await model.migrateFontLibrary() }
+            // Fonts earlier versions turned off by moving them out of the Fonts folder, now that they're turned off there.
+            let emptied = await model.engine.emptyDeactivatedFolder(model.data.records)
+            model.data.records = emptied.records
             // The first scan may have listed the files before they went.
-            if migrating || tidied.removed > 0 { model.rescan(check: true) }
+            if migrating || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
         if !migrating { rescan(check: true) }

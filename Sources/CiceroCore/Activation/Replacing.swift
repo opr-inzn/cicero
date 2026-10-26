@@ -5,18 +5,17 @@ extension ActivationEngine {
     /// Replace (see `AddedDuplicate.replacements`): each of the library's files goes to the Trash and a copy of the added
     /// file takes its place, under its name, in its folder, on or off as it was. One that's on goes off for the moment
     /// that takes and on again the way it was: in place, until Cicero quits, or from a Fonts folder. One that's off in a
-    /// Fonts folder has its copy go into Cicero's Deactivated folder instead (`placed` says where), as macOS turns on
-    /// whatever arrives in a Fonts folder. The copy is made in Cicero's staging folder first, so a file whose copy can't
-    /// be made, or that can't go to the Trash, stays as it was. Its paths stay, so the records and everything the user
-    /// put it in do too. `moving`, an added file that took every place it was meant for goes, as activating by moving does.
+    /// Fonts folder has its copy turned off as it goes in (see `moveIntoFontsFolderOff`), as macOS turns on whatever
+    /// arrives there. The copy is made in Cicero's staging folder first, so a file whose copy can't be made, or that can't
+    /// go to the Trash, stays as it was. Its paths stay, so the records and everything the user put it in do too.
+    /// `moving`, an added file that took every place it was meant for goes, as activating by moving does.
     @concurrent
     public func replace(_ replacements: [FileReplacement], moving: Bool, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
         let olds = replacements.map(\.old)
         let persistent = olds.filter { records.inPlace.contains($0) || isInsideUserFonts($0) && registrar.isActive(Self.url($0)) }
         let session = olds.filter { records.temporary[$0] != nil }
-        let parked = Set(olds.filter { isInsideFontsFolder($0) && records.temporary[$0] == nil && !registrar.isActive(Self.url($0)) })
-        var records = records
+        let off = Set(olds.filter { isInsideFontsFolder($0) && records.temporary[$0] == nil && !registrar.isActive(Self.url($0)) })
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
 
@@ -24,12 +23,13 @@ extension ActivationEngine {
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
+        // Staged copy → the replacement it's for, of those that go in off.
+        var goingInOff: [String: FileReplacement] = [:]
         for replacement in replacements {
             let old = Self.url(replacement.old)
             let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
             do {
                 try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                if parked.contains(replacement.old) { try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true) }
                 try fm.copyItem(at: Self.url(replacement.added), to: staged)
             } catch {
                 try? fm.removeItem(at: staged)
@@ -43,18 +43,31 @@ extension ActivationEngine {
                 failed.append(replacement.old)
                 continue
             }
-            let destination = parked.contains(replacement.old) ? Self.uniqueURL(for: old.lastPathComponent, in: locations.deactivated) : old
+            if off.contains(replacement.old) {
+                goingInOff[staged.path] = replacement
+                continue
+            }
             do {
-                try fm.moveItem(at: staged, to: destination)
+                try fm.moveItem(at: staged, to: old)
                 done.append(replacement)
-                if destination != old {
-                    placed[replacement.old] = destination.path
-                    records.installedCopies[replacement.old] = nil
-                }
             } catch {
                 // The old file is in the Trash, to put back from there.
                 try? fm.removeItem(at: staged)
                 failed.append(replacement.old)
+            }
+        }
+
+        if !goingInOff.isEmpty {
+            let moved = await moveIntoFontsFolderOff(goingInOff.mapValues(\.old))
+            for (staged, replacement) in goingInOff.sorted(by: { $0.key < $1.key }) {
+                if let path = moved.placed[staged] {
+                    done.append(replacement)
+                    if path != replacement.old { placed[replacement.old] = path }
+                } else {
+                    // Back in the staging folder; the old file is in the Trash, to put back from there.
+                    try? fm.removeItem(atPath: staged)
+                    failed.append(replacement.old)
+                }
             }
         }
 

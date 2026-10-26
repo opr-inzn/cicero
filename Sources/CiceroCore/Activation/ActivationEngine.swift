@@ -102,9 +102,16 @@ public struct CoreTextRegistrar: FontRegistrar {
         _ = finished.wait(timeout: .now() + 3)
     }
 
-    /// Every font in the files: all faces of a collection, all named instances of a variable font.
+    /// Every font in the files (all faces of a collection, all named instances of a variable font) and no other: each by
+    /// its file and PostScript name. The descriptors CoreText makes from a file would turn off every file with fonts of
+    /// those names in the Fonts folders too, another copy of the font the user has on (tested in a macOS 26 VM).
     private static func setEnabledNow(_ urls: [URL], _ enabled: Bool) {
-        let descriptors = urls.flatMap { CTFontManagerCreateFontDescriptorsFromURL($0 as CFURL) as? [CTFontDescriptor] ?? [] }
+        let descriptors = urls.flatMap { url in
+            (CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []).compactMap { font -> CTFontDescriptor? in
+                guard let name = CTFontDescriptorCopyAttribute(font, kCTFontNameAttribute) as? String else { return nil }
+                return CTFontDescriptorCreateWithAttributes([kCTFontURLAttribute: url, kCTFontNameAttribute: name] as CFDictionary)
+            }
+        }
         guard !descriptors.isEmpty else { return }
         CTFontManagerEnableFontDescriptors(descriptors as CFArray, enabled)
     }

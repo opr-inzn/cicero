@@ -35,7 +35,8 @@ public struct BackupFont: Codable, Equatable, Sendable {
     /// For an installed copy, the file it was copied from (with "~").
     public var origin: String?
     /// True for a file that was off in ~/Library/Fonts (turned off there, see `ActivationEngine.deactivate`), else nil.
-    /// Put back, it goes into Cicero's Deactivated folder instead, as macOS turns on whatever arrives in a Fonts folder.
+    /// Put back, it goes into Cicero's Deactivated folder first, as macOS turns on whatever arrives in a Fonts folder
+    /// (see `FontRestoreResult.turningOff`).
     public var isOff: Bool?
 
     public init(path: String, archivePath: String? = nil, size: Int64, activation: BackupActivation, origin: String? = nil, isOff: Bool? = nil) {
@@ -104,6 +105,9 @@ public struct FontRestoreResult: Sendable, Equatable {
     public var failed = 0
     /// Where files were put back, for taking over the backup's records about them.
     public var restoredPaths: Set<String> = []
+    /// Files that were off in ~/Library/Fonts, in Cicero's Deactivated folder → where they go, off (see
+    /// `ActivationEngine.moveIntoFontsFolderOff`). Among `restoredPaths` by their place in the Deactivated folder.
+    public var turningOff: [String: String] = [:]
     /// The task was cancelled; the counts are what was done until then.
     public var cancelled = false
 
@@ -366,19 +370,13 @@ public struct LibraryBackup: Sendable {
                 result.skipped += 1
                 continue
             }
-            // Off in the Fonts folder, it stays off in the Deactivated folder, unless it's there already.
+            // Off in the Fonts folder: off in the Deactivated folder until it goes in, off.
             if font.isOff == true, Self.isFontLocation(target, in: roots), target.hasPrefix(locations.userFonts.path + "/") {
-                let name = (target as NSString).lastPathComponent
-                let parked = locations.deactivated.appendingPathComponent(name, isDirectory: false)
-                if fm.fileExists(atPath: parked.path), let size = try? fm.attributesOfItem(atPath: parked.path)[.size] as? Int64,
-                   size == font.size, fm.contentsEqual(atPath: parked.path, andPath: source.path) {
-                    result.skipped += 1
-                    continue
-                }
-                let destination = ActivationEngine.uniqueURL(for: name, in: locations.deactivated).path
-                if (try? Self.place(source, at: destination)) != nil {
+                let parked = ActivationEngine.uniqueURL(for: (target as NSString).lastPathComponent, in: locations.deactivated).path
+                if (try? Self.place(source, at: parked)) != nil {
                     result.restored += 1
-                    result.restoredPaths.insert(destination)
+                    result.restoredPaths.insert(parked)
+                    result.turningOff[parked] = target
                     continue
                 }
             }

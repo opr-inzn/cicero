@@ -43,7 +43,7 @@ Cicero follows changes by itself: it looks again when fonts are turned on or off
 
 ## Where did my font file go?
 
-Turning a font off leaves a file in your Fonts folder where it is. Files that were in an app’s font folder, and those earlier versions of Cicero turned off in your Fonts folder, are in Cicero’s **Deactivated** folder, `~/Library/Application Support/Cicero/Deactivated`. To find a font’s file, right-click the family and choose **Reveal in Finder**.
+Turning a font off leaves a file in your Fonts folder where it is. Files that were in an app’s font folder are in Cicero’s **Deactivated** folder, `~/Library/Application Support/Cicero/Deactivated`. To find a font’s file, right-click the family and choose **Reveal in Finder**.
 
 When you choose another copy with **Use Copy From**, a copy Cicero had installed goes to the Trash if the original is still there. The original stays where it was.
 
