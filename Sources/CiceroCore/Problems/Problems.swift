@@ -73,7 +73,7 @@ public struct ProblemFile: Hashable, Sendable {
 /// Something the user can do about a problem. The app carries these out.
 public enum ProblemFix: Hashable, Sendable {
     case reveal([String])
-    /// Deactivate these active copies (installed copies go to the Trash or the Deactivated folder).
+    /// Deactivate these active copies (those in a Fonts folder are turned off there).
     case deactivate([FaceID])
     /// Move these files to the Trash: never protected paths, and only spare copies (every face in them,
     /// of every family, has a copy in another file), or files nothing can read.
@@ -236,7 +236,7 @@ public enum ProblemDetector {
                 }
             }
             if ActiveSource.isAdobeFonts(path) { return "Active in Adobe apps" }
-            if path.hasPrefix(locations.deactivated.path + "/") { return "In Cicero’s Deactivated folder" }
+            if locations.isInInactiveFolder(path) { return "In Cicero’s Inactive folder" }
             if let folder = folders.first(where: { path.hasPrefix($0.path + "/") }) {
                 return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
             }
@@ -254,7 +254,7 @@ public enum ProblemDetector {
         }
 
         func isInWatchedFolder(_ path: String) -> Bool {
-            path.hasPrefix(locations.deactivated.path + "/") || folders.contains { path.hasPrefix($0.path + "/") }
+            locations.isInInactiveFolder(path) || folders.contains { path.hasPrefix($0.path + "/") }
         }
 
         /// "Version 2.001" → [2.001], "Version 5.01.2" → [5.01, 2], for picking the newest copy: compare with

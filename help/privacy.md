@@ -49,7 +49,7 @@ To stop it, open **Settings → General** and, under **Updates**, turn off **Sha
 
 | Where | What |
 | --- | --- |
-| `~/Library/Application Support/Cicero` | Your folders, smart folders, tags, coverage sets, locations, added fonts and settings, the families you marked not similar, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Deactivated** folder, and the setup saved before a restore, in **Backups**. |
+| `~/Library/Application Support/Cicero` | Your folders, smart folders, tags, coverage sets, locations, added fonts and settings, the families you marked not similar, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Inactive** folder, and the setup saved before a restore, in **Backups**. |
 | `~/Cicero/Library` | The fonts Cicero installs, when you keep them in [Cicero’s Library](activating.md#ciceros-library), unless you moved it. |
 | `~/Library/Caches/Cicero` | What Cicero read from your font files, like names, characters and the shapes of their letters, so it doesn’t have to read them again, your font list as Cicero last found it, to show as soon as it opens, and the classifications Apple Intelligence recognized. **Fonts → Rebuild Font List** reads everything again. |
 

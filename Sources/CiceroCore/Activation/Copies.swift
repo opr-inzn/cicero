@@ -76,7 +76,7 @@ public struct CopySwitchPlan: Sendable {
 }
 
 /// Finds the places a font's styles can be used from, and what switching to one takes. Only copies Cicero
-/// turns on and off count: those in the user's folders, Cicero's Deactivated folder or added one at a time,
+/// turns on and off count: those in the user's folders, Cicero's Inactive folder or added one at a time,
 /// and those it installed (which count as being where they were copied from). macOS's, apps', Adobe's and
 /// files the user put in a Fonts folder are left alone.
 public enum CopyChooser {
@@ -198,8 +198,9 @@ public enum CopyChooser {
         case .active(.fontsFolder): return origin != nil
         case .active(.inPlace), .active(.temporary): return true
         case .inactive:
-            // One macOS has off in a Fonts folder isn't Cicero's to turn on from there.
-            return !path.hasPrefix(locations.userFonts.path + "/") && !path.hasPrefix(locations.allUsersFonts.path + "/")
+            if path.hasPrefix(locations.userFonts.path + "/") { return origin != nil }
+            // One off in /Library/Fonts, for every user, isn't Cicero's to turn on from there.
+            return !path.hasPrefix(locations.allUsersFonts.path + "/")
         default: return false
         }
     }
@@ -243,7 +244,7 @@ public enum CopyChooser {
     }
 
     /// A folder by the outermost watched folder it's in and the folders below that, down to it; Cicero's
-    /// Deactivated folder; else the folder itself.
+    /// Inactive folder; else the folder itself.
     struct Location {
         /// The watched folder's path.
         var root: String
@@ -253,8 +254,7 @@ public enum CopyChooser {
     }
 
     static func location(of folder: String, folders: [WatchedFolder], locations: Locations) -> Location {
-        let deactivated = locations.deactivated.path
-        if folder == deactivated || folder.hasPrefix(deactivated + "/") { return Location(root: deactivated, name: "Deactivated", below: []) }
+        if locations.isInInactiveFolder(folder + "/") { return Location(root: locations.inactiveFolder.path, name: "Inactive", below: []) }
         let root = folders.filter { folder == $0.path || folder.hasPrefix($0.path + "/") }.min { $0.path.count < $1.path.count }
         guard let root else { return Location(root: folder, name: (folder as NSString).lastPathComponent, below: []) }
         return Location(root: root.path, name: root.displayName, below: folder.dropFirst(root.path.count).split(separator: "/").map(String.init))

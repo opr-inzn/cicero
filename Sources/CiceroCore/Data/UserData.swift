@@ -6,7 +6,7 @@ public struct UserData: Codable, Equatable, Sendable {
     public var version = 2
     public var folders: [WatchedFolder] = []
     /// Folder ID → the name the user gave it in the sidebar, in place of its own (`WatchedFolder.displayName`); the
-    /// folder on disk keeps its name. Cicero's own items (Proofing, Adobe Fonts, Added Fonts, Deactivated) take one too.
+    /// folder on disk keeps its name. Cicero's own items (Proofing, Adobe Fonts, Added Fonts, Inactive) take one too.
     public var folderNames: [String: String] = [:]
     /// Font files added one at a time (Add Fonts…, dropped on the window, or opened from the Finder), listed
     /// where they are, like the fonts in a folder.
@@ -355,7 +355,7 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     public var customName: String?
 
     /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
-    public static let deactivatedID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
+    public static let inactiveFolderID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
     /// Cicero's Font Library (see `UserData.fontLibraryPath`).
     public static let fontLibraryID = UUID(uuidString: "00000000-0000-0000-0000-000000F0711B")!
     /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
@@ -386,12 +386,12 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Deactivated", "Cicero’s Library", "Proofing" (Adobe's folders, where type designers
+    /// The name the user gave it; else "Inactive", "Cicero’s Library", "Proofing" (Adobe's folders, where type designers
     /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
     /// else the name.
     public var displayName: String {
         if let customName { return customName }
-        if id == Self.deactivatedID { return "Deactivated" }
+        if id == Self.inactiveFolderID { return "Inactive" }
         if id == Self.fontLibraryID { return "Cicero’s Library" }
         if id == Self.adobeAppsID { return "Proofing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
@@ -713,7 +713,7 @@ public struct ActivationRecords: Codable, Equatable, Sendable {
     public var inPlace: Set<String> = []
     /// Files registered for this session.
     public var temporary: [String: TemporaryRecord] = [:]
-    /// File in Cicero's Deactivated folder → where it was in an app's own folder (Adobe's), which it
+    /// File in Cicero's Inactive folder → where it was in an app's own folder (Adobe's), which it
     /// left so the app stops loading it.
     public var appFolderOrigins: [String: String] = [:]
 

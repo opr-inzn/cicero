@@ -106,10 +106,10 @@ public struct FontExporter: Sendable {
     }
 
     /// What an export or backup must never move to the Trash to make room: every font file in the library
-    /// and every file Cicero's records name, the Fonts folders, Cicero's own folder and its Deactivated folder,
+    /// and every file Cicero's records name, the Fonts folders, Cicero's own folder and its Inactive folder,
     /// and the scanned folders.
     public static func keptPaths(in library: Library, data: UserData, locations: Locations) -> [String] {
-        var paths = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.deactivated.path]
+        var paths = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path]
             + data.scannedFolders().map(\.path)
         for family in library.families {
             for face in family.faces { paths += [face.face.path] + face.otherCopies }

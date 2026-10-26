@@ -21,7 +21,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   table, all of them, cached with the face, and picks the one for the Mac's languages: a `Family`'s `name` is the
   one it shows, its `id` the fonts' own, which the user's data keys by.
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
-  which CoreText's lists don't cover entirely, the Fonts folders, watched folders (the sidebar's Locations), files added one at a time, the Deactivated folder), reads new or changed files
+  which CoreText's lists don't cover entirely, the Fonts folders, watched folders (the sidebar's Locations), files added one at a time, the Inactive folder), reads new or changed files
   with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. Each file read goes into
   the cache at once, which is written every 2 s while reading goes on and by `flush` as the app quits, so neither a
   scan that's replaced nor quitting loses what was read; its progress says it updates rather than identifies when most
@@ -36,8 +36,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
   state and the engine stays testable; `FontRegistrar` hides CoreText so tests never touch the system.
-  Every change goes through fontd and waits for it (copies are registered too, files are unregistered
-  before they move), and a file only counts once fontd reports it active: when an operation returns,
+  Every change goes through fontd and waits for it (copies are registered too; files in a Fonts folder
+  are turned off there with `CTFontManagerEnableFontDescriptors`, as Font Book does, and others
+  unregistered, also before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
   The app's `engine` carries the Font Library (`fontLibrary`, from `UserData.fontLibraryPath`) and whether to install
   into it (`installsIntoFontLibrary`): copies then go into a folder for each family there and are registered where

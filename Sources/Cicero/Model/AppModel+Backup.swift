@@ -150,8 +150,10 @@ extension AppModel {
                 model.selection = .all
             }
             if let fallbackFolder { model.addFallbackFolder(fallbackFolder) }
+            // Fonts that were off in the Fonts folder go back there, off.
+            let off = await model.engine.moveIntoFontsFolderOff(fontResult?.turningOff ?? [:])
             let current = model.data.records
-            let written = fontResult?.restoredPaths ?? []
+            let written = Set((fontResult?.restoredPaths ?? []).map { off.placed[$0] ?? $0 })
             let merged = await Task.detached(priority: .userInitiated) {
                 LibraryBackup.mergedRecords(current: current, backup: restored.records, written: written) { FileManager.default.fileExists(atPath: $0) }
             }.value
