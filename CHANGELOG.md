@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - **Leave the files where they are** in **Settings → General** is now **Leave files where they are**.
+- Turning off a font in your Fonts folder no longer moves its file. Cicero turns it off where it is, as Font Book does, and that goes for copies Cicero installed there too.
 
 ## 0.10.10
 

@@ -983,10 +983,11 @@ public final class LibraryScanner: Sendable {
     static func activeSource(of path: String, locations: Locations, records: ActivationRecords) -> ActiveSource {
         if path.hasPrefix("/System/") || path.hasPrefix("/Library/Application Support/Apple/") { return .macOS }
         if locations.systemFonts.contains(where: { path.hasPrefix($0.path + "/") }) { return .macOS }
+        // Also one in a Fonts folder, which is turned off there, on for a while.
+        if let temporary = records.temporary[path], !ActiveSource.isAdobeFonts(path) { return .temporary(temporary.scope) }
         if path.hasPrefix(locations.allUsersFonts.path + "/") { return .allUsers }
         if path.hasPrefix(locations.userFonts.path + "/") { return .fontsFolder }
         if ActiveSource.isAdobeFonts(path) { return .adobeFonts }
-        if let temporary = records.temporary[path] { return .temporary(temporary.scope) }
         if records.inPlace.contains(path) { return .inPlace }
         if path.contains(".app/") { return .app }
         return .otherApp

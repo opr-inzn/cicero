@@ -43,10 +43,9 @@ Cicero follows changes by itself: it looks again when fonts are turned on or off
 
 ## Where did my font file go?
 
-When you turn a font off, its file may have moved:
+Turning a font off leaves a file in your Fonts folder where it is. Files that were in an app’s font folder, and those earlier versions of Cicero turned off in your Fonts folder, are in Cicero’s **Deactivated** folder, `~/Library/Application Support/Cicero/Deactivated`. To find a font’s file, right-click the family and choose **Reveal in Finder**.
 
-- Files that were in your Fonts folder, or in an app’s font folder, are in Cicero’s **Deactivated** folder, `~/Library/Application Support/Cicero/Deactivated`. To find a font’s file, right-click the family and choose **Reveal in Finder**.
-- A copy Cicero had installed goes to the Trash when the original is still there. The original stays where it was.
+When you choose another copy with **Use Copy From**, a copy Cicero had installed goes to the Trash if the original is still there. The original stays where it was.
 
 See [Turn fonts off](activating.md#turn-fonts-off).
 
@@ -54,7 +53,7 @@ See [Turn fonts off](activating.md#turn-fonts-off).
 
 ### Does Cicero change my font files?
 
-No. Cicero never edits a font file. It copies files into your Fonts folder, or Cicero’s Library, when you install a copy, moves files into its Deactivated folder when you turn them off, and moves files to the Trash only when you ask, or when a copy it installed is no longer needed.
+No. Cicero never edits a font file. It copies files into your Fonts folder, or Cicero’s Library, when you install a copy, moves files out of an app’s font folder into its Deactivated folder when you turn them off, and moves files to the Trash only when you ask, or when a copy it installed is no longer needed.
 
 ### What happens to my fonts when I quit Cicero?
 
@@ -62,7 +61,7 @@ Fonts you turned on stay on, whether Cicero copied them or uses them where they 
 
 ### A font in my Fonts folder shows as Inactive
 
-That’s right: its file is still in a Fonts folder, but it’s turned off in macOS. Turn it on in Cicero and Cicero turns it on where it is.
+That’s right: its file is still in a Fonts folder, but it’s turned off in macOS, by Cicero or by Font Book. Turn it on in Cicero and Cicero turns it on where it is.
 
 ### Why are some fonts tagged System?
 

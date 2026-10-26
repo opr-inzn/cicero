@@ -27,7 +27,7 @@ extension ActivationEngine {
 
         if !release.isEmpty {
             // One that won't unregister keeps its record, so the next sync tries again.
-            let stuck = await registrar.unregister(release.map { URL(fileURLWithPath: $0) }, scope: .session)
+            let stuck = await endSessionRegistrations(release)
             for path in release where !stuck.contains(path) { records.temporary[path] = nil }
         }
         var failed: [String] = []

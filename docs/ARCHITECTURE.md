@@ -36,8 +36,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
   state and the engine stays testable; `FontRegistrar` hides CoreText so tests never touch the system.
-  Every change goes through fontd and waits for it (copies are registered too, files are unregistered
-  before they move), and a file only counts once fontd reports it active: when an operation returns,
+  Every change goes through fontd and waits for it (copies are registered too; files in a Fonts folder
+  are turned off there with `CTFontManagerEnableFontDescriptors`, as Font Book does, and others
+  unregistered, also before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
   The app's `engine` carries the Font Library (`fontLibrary`, from `UserData.fontLibraryPath`) and whether to install
   into it (`installsIntoFontLibrary`): copies then go into a folder for each family there and are registered where

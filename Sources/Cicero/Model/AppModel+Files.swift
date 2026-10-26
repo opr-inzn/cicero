@@ -203,6 +203,7 @@ extension AppModel {
         let shown = Set(paths).subtracting(installing)
         enqueue { model in
             var messages: [String] = []
+            var replaced = replacements.map(\.old)
             if !installing.isEmpty {
                 let result = await model.engine.install(installing, moving: moving, records: model.data.records)
                 model.data.records = result.records
@@ -212,12 +213,13 @@ extension AppModel {
                 let result = await model.engine.replace(replacements, moving: moving, records: model.data.records)
                 model.data.records = result.records
                 messages.append(result.message)
+                replaced = replaced.map { result.placed[$0] ?? $0 }
             }
             model.forgetInstalledAddedFiles()
             model.showToast((messages + [skipNote]).filter { !$0.isEmpty }.joined(separator: ". "))
             let originals = Set(installing)
             let copies = Set(model.data.records.installedCopies.filter { originals.contains($0.value) }.keys)
-            let found = shown.union(copies).union(existing).union(replacements.map(\.old))
+            let found = shown.union(copies).union(existing).union(replaced)
             // Nothing to show when nothing went in: the toast says so.
             if let then, !found.isEmpty { then(model, found) } else { model.rescan() }
         }

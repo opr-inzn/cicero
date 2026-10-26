@@ -73,7 +73,7 @@ public struct ProblemFile: Hashable, Sendable {
 /// Something the user can do about a problem. The app carries these out.
 public enum ProblemFix: Hashable, Sendable {
     case reveal([String])
-    /// Deactivate these active copies (installed copies go to the Trash or the Deactivated folder).
+    /// Deactivate these active copies (those in a Fonts folder are turned off there).
     case deactivate([FaceID])
     /// Move these files to the Trash: never protected paths, and only spare copies (every face in them,
     /// of every family, has a copy in another file), or files nothing can read.

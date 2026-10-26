@@ -34,13 +34,17 @@ public struct BackupFont: Codable, Equatable, Sendable {
     public var activation: BackupActivation
     /// For an installed copy, the file it was copied from (with "~").
     public var origin: String?
+    /// True for a file that was off in ~/Library/Fonts (turned off there, see `ActivationEngine.deactivate`), else nil.
+    /// Put back, it goes into Cicero's Deactivated folder instead, as macOS turns on whatever arrives in a Fonts folder.
+    public var isOff: Bool?
 
-    public init(path: String, archivePath: String? = nil, size: Int64, activation: BackupActivation, origin: String? = nil) {
+    public init(path: String, archivePath: String? = nil, size: Int64, activation: BackupActivation, origin: String? = nil, isOff: Bool? = nil) {
         self.path = path
         self.archivePath = archivePath
         self.size = size
         self.activation = activation
         self.origin = origin
+        self.isOff = isOff
     }
 }
 
@@ -190,9 +194,10 @@ public struct LibraryBackup: Sendable {
         func add(_ path: String, state: FaceState?) {
             guard seen.insert(path).inserted, !ActivationEngine.isProtected(path) else { return }
             let (activation, origin) = activation(of: path, state: state, records: records)
+            let isOff = path.hasPrefix(locations.userFonts.path + "/") && !(state?.isActive ?? library.activePaths.contains(path))
             fonts.append(BackupFont(
                 path: Self.abbreviate(path, home: home.path), size: Self.size(of: path), activation: activation,
-                origin: origin.map { Self.abbreviate($0, home: home.path) }
+                origin: origin.map { Self.abbreviate($0, home: home.path) }, isOff: isOff ? true : nil
             ))
         }
         for family in library.families {
@@ -360,6 +365,22 @@ public struct LibraryBackup: Sendable {
             if Self.isPlainPath(target), fm.fileExists(atPath: target) {
                 result.skipped += 1
                 continue
+            }
+            // Off in the Fonts folder, it stays off in the Deactivated folder, unless it's there already.
+            if font.isOff == true, Self.isFontLocation(target, in: roots), target.hasPrefix(locations.userFonts.path + "/") {
+                let name = (target as NSString).lastPathComponent
+                let parked = locations.deactivated.appendingPathComponent(name, isDirectory: false)
+                if fm.fileExists(atPath: parked.path), let size = try? fm.attributesOfItem(atPath: parked.path)[.size] as? Int64,
+                   size == font.size, fm.contentsEqual(atPath: parked.path, andPath: source.path) {
+                    result.skipped += 1
+                    continue
+                }
+                let destination = ActivationEngine.uniqueURL(for: name, in: locations.deactivated).path
+                if (try? Self.place(source, at: destination)) != nil {
+                    result.restored += 1
+                    result.restoredPaths.insert(destination)
+                    continue
+                }
             }
             if Self.isFontLocation(target, in: roots), canGoBack(target), (try? Self.place(source, at: target)) != nil {
                 result.restored += 1
