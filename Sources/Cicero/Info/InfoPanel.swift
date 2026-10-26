@@ -42,6 +42,9 @@ struct InfoPanelOverlay: ViewModifier {
                 if shown > 0 {
                     let shape = InfoPanelOverlay.shape
                     InfoPanel()
+                        // What changes in the panel shows at once. Under the slide, the rows filled in as it opened
+                        // faded in with it, and took as long.
+                        .transaction { if $0.animation == InfoPanelOverlay.slide { $0.animation = nil } }
                         .frame(width: InfoPanelOverlay.width)
                         .frame(maxHeight: .infinity)
                         .background {
@@ -54,6 +57,8 @@ struct InfoPanelOverlay: ViewModifier {
                         .padding(.top, InfoPanelOverlay.top)
                         .offset(x: (1 - shown) * (InfoPanelOverlay.width + InfoPanelOverlay.gap))
                         .transition(.identity)
+                } else {
+                    InfoPrefetch()
                 }
             }
         }
@@ -125,6 +130,23 @@ struct KeepsTopOnResize: ViewModifier {
             // Reported before the visible families update, so `topID` is still the one from before.
             .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, _ in
                 if !isAtTop, let topID { position.scrollTo(id: topID, anchor: .top) }
+            }
+    }
+}
+
+/// While the panel is shut, reads the info of the font it would show, so that it opens with it.
+private struct InfoPrefetch: View {
+    @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
+
+    var body: some View {
+        let face = model.inspectedFamily?.face(nearestWeight: preview.weight).face
+        Color.clear
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+            .task(id: face?.id) {
+                guard let face, CiceroCore.FontInfo.cached(face) == nil else { return }
+                _ = await Task.detached(priority: .utility) { CiceroCore.FontInfo.read(face) }.value
             }
     }
 }
@@ -227,7 +249,7 @@ private struct InfoRows: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .loading($info, for: face.id) { [face = face.face] in
+        .loading($info, for: face.id, cached: { [face = face.face] in CiceroCore.FontInfo.cached(face) }) { [face = face.face] in
             await Task.detached(priority: .userInitiated) { CiceroCore.FontInfo.read(face) }.value
         }
     }
@@ -491,16 +513,25 @@ struct Loaded<Value> {
 extension View {
     /// Works out `state` for the font `id` without clearing it first: going to another font keeps the last
     /// one's on screen until the new one is ready, a moment later, so the panel doesn't flash its spinners.
-    /// One that takes longer than that clears it, for the row's spinner.
-    func loading<ID: Hashable, Value>(_ state: Binding<Loaded<Value>?>, for id: ID, _ work: @escaping @MainActor () async -> Value) -> some View {
-        task(id: id) {
-            let value = await work()
-            if !Task.isCancelled { state.wrappedValue = Loaded(id: id, value: value) }
+    /// One that takes longer than that clears it, for the row's spinner. What `cached` has for the font is there
+    /// from the first frame, as the panel opens or goes to the font, while `work` makes sure of it: otherwise the
+    /// panel opened with spinners, and the work waited for its slide.
+    func loading<ID: Hashable, Value>(_ state: Binding<Loaded<Value>?>, for id: ID, cached: @escaping @MainActor () -> Value? = { nil },
+                                      _ work: @escaping @MainActor () async -> Value) -> some View {
+        // Both run before the frame they change is drawn.
+        let useCached = {
+            if state.wrappedValue?.id != AnyHashable(id), let value = cached() { state.wrappedValue = Loaded(id: id, value: value) }
         }
-        .task(id: id) {
-            try? await Task.sleep(for: .milliseconds(250))
-            if !Task.isCancelled, state.wrappedValue?.id != AnyHashable(id) { state.wrappedValue = nil }
-        }
+        return onAppear(perform: useCached)
+            .onChange(of: id) { useCached() }
+            .task(id: id) {
+                let value = await work()
+                if !Task.isCancelled { state.wrappedValue = Loaded(id: id, value: value) }
+            }
+            .task(id: id) {
+                try? await Task.sleep(for: .milliseconds(250))
+                if !Task.isCancelled, state.wrappedValue?.id != AnyHashable(id) { state.wrappedValue = nil }
+            }
     }
 }
 
