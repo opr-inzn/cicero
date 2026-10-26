@@ -50,17 +50,16 @@ struct GeneralSettings: View {
                     Text("Cicero’s Font Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
-                // The two pop-up menus are as wide as each other.
-                let installMethods = InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) }
-                let duplicateHandlings = DuplicateHandling.allCases.map { (title: $0.title, value: $0) }
+                // Each pop-up menu as wide as its own choices.
                 LabeledContent {
-                    PopUpPicker(options: installMethods, selection: $model.data.installMethod, widthFitting: duplicateHandlings.map(\.title))
+                    PopUpPicker(options: InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) },
+                                selection: $model.data.installMethod)
                 } label: {
                     Text("Activate fonts by")
                     Text(activationExplanation)
                 }
                 LabeledContent {
-                    PopUpPicker(options: duplicateHandlings, selection: $model.data.duplicateHandling, widthFitting: installMethods.map(\.title))
+                    PopUpPicker(options: DuplicateHandling.allCases.map { (title: $0.title, value: $0) }, selection: $model.data.duplicateHandling)
                 } label: {
                     Text("When an added font is already in your library")
                     Text(duplicateExplanation)
