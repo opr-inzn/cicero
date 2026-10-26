@@ -248,9 +248,9 @@ extension AppModel {
         return library.families.contains { $0.faces.contains { $0.face.path == path || $0.otherCopies.contains(path) } }
     }
 
-    /// In a Fonts folder, the Deactivated folder or a watched folder.
+    /// In a Fonts folder, the Inactive folder or a watched folder.
     private func isInReadFolder(_ path: String) -> Bool {
-        let folders = [locations.userFonts.path, locations.allUsersFonts.path, locations.deactivated.path] + data.scannedFolders().map(\.path)
+        let folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
         return folders.contains { path.hasPrefix($0 + "/") }
     }
 

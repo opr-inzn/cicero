@@ -528,7 +528,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     /// Sorted by weight, then upright before italic, then style name.
     public let faces: [LibraryFace]
     public let state: FamilyState
-    /// Watched folders (and Cicero's Deactivated folder) that contain the family.
+    /// Watched folders (and Cicero's Inactive folder) that contain the family.
     public let folderIDs: Set<UUID>
     /// The foundry the files name, tidied (no "Inc.", URLs or copyright lines). User renames are applied by the app.
     public let manufacturer: String?

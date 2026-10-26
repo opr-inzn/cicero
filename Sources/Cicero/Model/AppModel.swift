@@ -62,7 +62,7 @@ final class AppModel {
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
-    /// Cicero's own folder items that have fonts now (Proofing, Adobe Fonts while shown, Added Fonts, Deactivated): the sidebar
+    /// Cicero's own folder items that have fonts now (Proofing, Adobe Fonts while shown, Added Fonts, Inactive): the sidebar
     /// lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
@@ -334,20 +334,23 @@ final class AppModel {
         }
         // The first scan waits for the Font Library to be where it is now, so the window doesn't drop its fonts for a moment.
         let migrating = needsFontLibraryMigration
+        // And for the Inactive folder's new name, so its fonts don't drop out of the window for a moment either.
+        let renaming = FileManager.default.fileExists(atPath: locations.formerInactiveFolder.path)
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
+            if renaming { model.data.records = model.engine.moveFormerInactiveFolder(model.data.records).records }
             await model.engine.finishTurningOff()
-            let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
+            let tidied = await model.engine.tidyInactiveFolder(model.data.records)
             model.data.records = tidied.records
             if migrating { await model.migrateFontLibrary() }
             // Fonts earlier versions turned off by moving them out of the Fonts folder, now that they're turned off there.
-            let emptied = await model.engine.emptyDeactivatedFolder(model.data.records)
+            let emptied = await model.engine.emptyInactiveFolder(model.data.records)
             model.data.records = emptied.records
             // The first scan may have listed the files before they went.
-            if migrating || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
+            if migrating || renaming || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
-        if !migrating { rescan(check: true) }
+        if !migrating && !renaming { rescan(check: true) }
     }
 
     /// Whether the Font Library is still in its former place, ~/Cicero/Font Library, or a library saved before one that

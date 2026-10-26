@@ -68,16 +68,18 @@ extension ActivationEngine {
         try? fm.removeItem(at: turningOffList)
     }
 
-    /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Deactivated folder go
+    /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Inactive folder (or the
+    /// former one, while it's waiting to be renamed) go
     /// where turning them on would put them, and stay off: into their family's folder in Cicero's Library when fonts are
     /// installed there, else back into ~/Library/Fonts (see `moveIntoFontsFolderOff`). Not one from an app's own folder,
     /// which goes back there when it's turned on, nor one that's on for now. Records naming a moved file as the original
     /// of a copy follow it. Returns how many files moved.
-    public func emptyDeactivatedFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, moved: Int) {
+    public func emptyInactiveFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, moved: Int) {
         let fm = FileManager.default
-        let folder = locations.deactivated
-        let names = (try? fm.contentsOfDirectory(atPath: folder.path)) ?? []
-        let files = names.sorted().map { folder.appendingPathComponent($0, isDirectory: false).path }.filter { path in
+        let all = locations.inactiveFolders.flatMap { folder in
+            ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? []).sorted().map { folder.appendingPathComponent($0, isDirectory: false).path }
+        }
+        let files = all.filter { path in
             var info = stat()
             return !(path as NSString).lastPathComponent.hasPrefix(".")
                 && FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
@@ -110,5 +112,42 @@ extension ActivationEngine {
             if let moved = placed[original] { records.installedCopies[copy] = moved }
         }
         return (records, placed.count)
+    }
+
+    /// At launch: the Inactive folder was called Deactivated up to 0.10.10. The former folder is renamed or, when the
+    /// Inactive folder has anything in it already, what's in it moves in beside that, under names of its own; the records
+    /// follow. Not while a font in it is on for an app folder's open app (one on until Cicero quit is off by now): macOS
+    /// has it from where it is, so the folder waits for a later launch, and meanwhile counts as the Inactive folder too
+    /// (`Locations.inactiveFolders`). Returns whether anything moved.
+    public func moveFormerInactiveFolder(_ records: ActivationRecords) -> (records: ActivationRecords, moved: Bool) {
+        let fm = FileManager.default
+        let former = locations.formerInactiveFolder
+        let folder = locations.inactiveFolder
+        guard fm.fileExists(atPath: former.path) else { return (records, false) }
+        let prefix = former.path + "/"
+        guard !records.temporary.keys.contains(where: { $0.hasPrefix(prefix) }) else { return (records, false) }
+        var moves: [String: String] = [:]
+        var renamed = false
+        if !fm.fileExists(atPath: folder.path) || Self.removeIfEmpty(folder.path) {
+            guard (try? fm.moveItem(at: former, to: folder)) != nil else { return (records, false) }
+            renamed = true
+        } else {
+            for name in ((try? fm.contentsOfDirectory(atPath: former.path)) ?? []).sorted() where name != ".DS_Store" {
+                let destination = Self.uniqueURL(for: name, in: folder)
+                if (try? Self.move(former.appendingPathComponent(name), to: destination)) != nil {
+                    moves[former.appendingPathComponent(name).path] = destination.path
+                }
+            }
+            _ = Self.removeIfEmpty(former.path)
+        }
+        func moved(_ path: String) -> String {
+            if renamed, path.hasPrefix(prefix) { return folder.path + "/" + path.dropFirst(prefix.count) }
+            return moves[path] ?? path
+        }
+        var records = records
+        records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), moved($0.value)) }, uniquingKeysWith: { first, _ in first })
+        records.inPlace = Set(records.inPlace.map(moved))
+        records.appFolderOrigins = Dictionary(records.appFolderOrigins.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
+        return (records, renamed || !moves.isEmpty)
     }
 }

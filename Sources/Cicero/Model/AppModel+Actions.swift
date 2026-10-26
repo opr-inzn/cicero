@@ -177,7 +177,7 @@ extension AppModel {
     /// Where a file is, as Cicero says it: "in your Fonts folder", "in Clients", "in “Downloads”".
     func placeName(of path: String) -> String {
         if path.hasPrefix(locations.userFonts.path + "/") { return "in your Fonts folder" }
-        if path.hasPrefix(locations.deactivated.path + "/") { return "in the Deactivated folder" }
+        if locations.isInInactiveFolder(path) { return "in the Inactive folder" }
         if let library = data.fontLibrary, path.hasPrefix(library.path + "/") { return "in \(folderName(WatchedFolder.fontLibraryID))" }
         if data.fontFiles.contains(path) { return "in \(folderName(WatchedFolder.addedFilesID))" }
         if let folder = data.namedFolders.filter({ path.hasPrefix($0.path + "/") }).max(by: { $0.path.count < $1.path.count }) {
@@ -708,7 +708,7 @@ extension AppModel {
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
             }
-            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those. Nor the
+            // Never Cicero's Inactive folder: it only keeps fonts while they're off, and Inactive lists those. Nor the
             // Font Library: it takes the place of ~/Library/Fonts, whose fonts are in All Fonts like the rest.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"

@@ -10,8 +10,8 @@ extension ActivationEngine {
         return path.hasPrefix(fontLibrary.path + "/")
     }
 
-    func isInDeactivatedFolder(_ path: String) -> Bool {
-        path.hasPrefix(locations.deactivated.path + "/")
+    func isInInactiveFolder(_ path: String) -> Bool {
+        locations.isInInactiveFolder(path)
     }
 
     /// Where a copy of a file goes: right into ~/Library/Fonts, or into the folder of `family` in the Font Library (see

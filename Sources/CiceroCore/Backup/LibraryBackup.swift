@@ -35,7 +35,7 @@ public struct BackupFont: Codable, Equatable, Sendable {
     /// For an installed copy, the file it was copied from (with "~").
     public var origin: String?
     /// True for a file that was off in ~/Library/Fonts (turned off there, see `ActivationEngine.deactivate`), else nil.
-    /// Put back, it goes into Cicero's Deactivated folder first, as macOS turns on whatever arrives in a Fonts folder
+    /// Put back, it goes into Cicero's Inactive folder first, as macOS turns on whatever arrives in a Fonts folder
     /// (see `FontRestoreResult.turningOff`).
     public var isOff: Bool?
 
@@ -105,8 +105,8 @@ public struct FontRestoreResult: Sendable, Equatable {
     public var failed = 0
     /// Where files were put back, for taking over the backup's records about them.
     public var restoredPaths: Set<String> = []
-    /// Files that were off in ~/Library/Fonts, in Cicero's Deactivated folder → where they go, off (see
-    /// `ActivationEngine.moveIntoFontsFolderOff`). Among `restoredPaths` by their place in the Deactivated folder.
+    /// Files that were off in ~/Library/Fonts, in Cicero's Inactive folder → where they go, off (see
+    /// `ActivationEngine.moveIntoFontsFolderOff`). Among `restoredPaths` by their place in the Inactive folder.
     public var turningOff: [String: String] = [:]
     /// The task was cancelled; the counts are what was done until then.
     public var cancelled = false
@@ -240,7 +240,7 @@ public struct LibraryBackup: Sendable {
         appVersion: String, progress: @escaping @Sendable (BackupProgress) -> Void
     ) async throws {
         let fm = FileManager.default
-        let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.deactivated.path]
+        let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path]
             + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) } + kept
         let replacement = try ItemReplacement(for: destination, keeping: kept)
         defer { replacement.discard() }
@@ -361,7 +361,7 @@ public struct LibraryBackup: Sendable {
                 break
             }
             progress(index, fonts.count)
-            let target = Self.move(expand(font.path), from: libraries.backup, to: libraries.restored)
+            let target = restoredPath(Self.move(expand(font.path), from: libraries.backup, to: libraries.restored))
             guard Self.isFontFile(target), let source = Self.archivedFile(font.archivePath!, in: contents.folder) else {
                 result.failed += 1
                 continue
@@ -370,9 +370,9 @@ public struct LibraryBackup: Sendable {
                 result.skipped += 1
                 continue
             }
-            // Off in the Fonts folder: off in the Deactivated folder until it goes in, off.
+            // Off in the Fonts folder: off in the Inactive folder until it goes in, off.
             if font.isOff == true, Self.isFontLocation(target, in: roots), target.hasPrefix(locations.userFonts.path + "/") {
-                let parked = ActivationEngine.uniqueURL(for: (target as NSString).lastPathComponent, in: locations.deactivated).path
+                let parked = ActivationEngine.uniqueURL(for: (target as NSString).lastPathComponent, in: locations.inactiveFolder).path
                 if (try? Self.place(source, at: parked)) != nil {
                     result.restored += 1
                     result.restoredPaths.insert(parked)
@@ -420,15 +420,20 @@ public struct LibraryBackup: Sendable {
     }
 
     /// Where a restore puts fonts back and which paths it takes records about: ~/Library/Fonts,
-    /// /Library/Fonts, Cicero's Deactivated folder, the backup's watched folders, the Font Library and Adobe's shared
+    /// /Library/Fonts, Cicero's Inactive folder, the backup's watched folders, the Font Library and Adobe's shared
     /// font folders (and the Fonts folder next to an Adobe app, see `isFontLocation`). Only plain absolute
     /// paths, never macOS's folders.
     private func fontLocations(watching folders: [WatchedFolder], fontLibrary: String) -> [String] {
         let paths = [
-            locations.userFonts.path, locations.allUsersFonts.path, locations.deactivated.path,
+            locations.userFonts.path, locations.allUsersFonts.path, locations.inactiveFolder.path,
             "/Library/Application Support/Adobe/Fonts", home.appendingPathComponent("Library/Application Support/Adobe/Fonts").path,
         ] + folders.map(\.path) + (fontLibrary.isEmpty ? [] : [fontLibrary])
         return paths.filter { Self.isPlainPath($0) && !ActivationEngine.isProtected($0 + "/") }
+    }
+
+    /// A path in the Inactive folder by the name it had up to 0.10.10, Deactivated, in the Inactive folder; any other as it is.
+    func restoredPath(_ path: String) -> String {
+        Self.move(path, from: locations.formerInactiveFolder.path, to: locations.inactiveFolder.path)
     }
 
     /// The backup's Font Library on this Mac (its path moved to this home folder) and the one its fonts go back into:
@@ -486,14 +491,14 @@ public struct LibraryBackup: Sendable {
     /// The backup's user data with every path moved from the home folder it was made in to this
     /// one. Temporary activations are over. Records are kept only about font files in font locations
     /// (`fontLocations`), installed copies only in ~/Library/Fonts and files kept out of an app's folder
-    /// only in Cicero's Deactivated folder: activating moves such a file back to the folder its record
+    /// only in Cicero's Inactive folder: activating moves such a file back to the folder its record
     /// names. The rest are merged by `mergedRecords`. The Font Library is the backup's unless `fontLibrary` says where
     /// it's to be, as this Mac's when only fonts are restored: the paths in the backup's move there.
     public func userData(from contents: BackupContents, fontLibrary: String? = nil) -> UserData {
         let oldHome = contents.manifest.home
         let libraries = fontLibraries(of: contents, restoringInto: fontLibrary)
         func map(_ path: String) -> String {
-            Self.move(Self.move(path, from: oldHome, to: home.path), from: libraries.backup, to: libraries.restored)
+            restoredPath(Self.move(Self.move(path, from: oldHome, to: home.path), from: libraries.backup, to: libraries.restored))
         }
         func map(_ dictionary: [String: String]) -> [String: String] {
             Dictionary(dictionary.map { (map($0.key), map($0.value)) }, uniquingKeysWith: { first, _ in first })
@@ -512,7 +517,7 @@ public struct LibraryBackup: Sendable {
         }
         data.records.inPlace = Set(data.records.inPlace.map(map).filter(isFont))
         data.records.temporary = [:]
-        data.records.appFolderOrigins = map(data.records.appFolderOrigins).filter { isFont($0.key, in: locations.deactivated) && isFont($0.value) }
+        data.records.appFolderOrigins = map(data.records.appFolderOrigins).filter { isFont($0.key, in: locations.inactiveFolder) && isFont($0.value) }
         return data
     }
 

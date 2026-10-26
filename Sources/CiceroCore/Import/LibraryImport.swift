@@ -67,7 +67,7 @@ public enum LibraryImport {
     /// those `placed` from a backup.
     public static func addFonts(_ imported: ImportedLibrary, choices: ImportChoices, placed: Int = 0, to data: inout UserData, locations: Locations) -> Int {
         var count = 0
-        var folders = [locations.userFonts.path, locations.allUsersFonts.path, locations.deactivated.path] + data.scannedFolders().map(\.path)
+        var folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
         func isRead(_ path: String) -> Bool { folders.contains { path == $0 || path.hasPrefix($0 + "/") } }
         if choices.fontFolder, let folder = imported.fontFolder {
             // A backup's are those it has, which `placeBundledFonts` put there.

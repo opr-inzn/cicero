@@ -236,7 +236,7 @@ public enum ProblemDetector {
                 }
             }
             if ActiveSource.isAdobeFonts(path) { return "Active in Adobe apps" }
-            if path.hasPrefix(locations.deactivated.path + "/") { return "In Cicero’s Deactivated folder" }
+            if locations.isInInactiveFolder(path) { return "In Cicero’s Inactive folder" }
             if let folder = folders.first(where: { path.hasPrefix($0.path + "/") }) {
                 return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
             }
@@ -254,7 +254,7 @@ public enum ProblemDetector {
         }
 
         func isInWatchedFolder(_ path: String) -> Bool {
-            path.hasPrefix(locations.deactivated.path + "/") || folders.contains { path.hasPrefix($0.path + "/") }
+            locations.isInInactiveFolder(path) || folders.contains { path.hasPrefix($0.path + "/") }
         }
 
         /// "Version 2.001" → [2.001], "Version 5.01.2" → [5.01, 2], for picking the newest copy: compare with

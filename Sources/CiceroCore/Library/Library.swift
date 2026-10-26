@@ -69,8 +69,21 @@ public struct Locations: Sendable {
         return URL(fileURLWithPath: String(cString: directory), isDirectory: true)
     }
 
-    /// Fonts Cicero moved out of ~/Library/Fonts because it had no other copy.
-    public var deactivated: URL { support.appendingPathComponent("Deactivated", isDirectory: true) }
+    /// Fonts Cicero keeps while they're off: those it moved out of an app's own folder, so the app stops loading them, and
+    /// those earlier versions moved out of ~/Library/Fonts, until they go back (see `ActivationEngine.emptyInactiveFolder`).
+    public var inactiveFolder: URL { support.appendingPathComponent("Inactive", isDirectory: true) }
+    /// What the Inactive folder was called up to 0.10.10, until it's renamed (see `ActivationEngine.moveFormerInactiveFolder`).
+    public var formerInactiveFolder: URL { support.appendingPathComponent("Deactivated", isDirectory: true) }
+
+    /// The Inactive folder, and the former one while it's there.
+    public var inactiveFolders: [URL] {
+        FileManager.default.fileExists(atPath: formerInactiveFolder.path) ? [inactiveFolder, formerInactiveFolder] : [inactiveFolder]
+    }
+
+    /// In the Inactive folder, or the former one.
+    public func isInInactiveFolder(_ path: String) -> Bool {
+        [inactiveFolder, formerInactiveFolder].contains { path.hasPrefix($0.path + "/") }
+    }
 }
 
 /// An immutable snapshot of every font Cicero knows about, built off the main thread by
@@ -189,7 +202,7 @@ public struct ScanInput: Equatable, Sendable {
 
 
 /// Finds every font file (CoreText's active fonts, macOS's font folders, ~/Library/Fonts, /Library/Fonts, the
-/// watched folders, the files added one at a time and Cicero's Deactivated folder), reads new or changed files,
+/// watched folders, the files added one at a time and Cicero's Inactive folder), reads new or changed files,
 /// and builds a `Library`.
 /// Parsed faces and Date Added are cached in `Locations.caches` by path, modification date and size;
 /// the decoded cache stays in memory between scans. Cancellation stops it between phases.
@@ -364,7 +377,7 @@ public final class LibraryScanner: Sendable {
                 return nil
             }
             func isIn(_ folder: URL) -> Bool { path.hasPrefix(folder.path + "/") }
-            if locations.systemFonts.contains(where: isIn) || isIn(locations.deactivated) { return nil }
+            if locations.systemFonts.contains(where: isIn) || locations.isInInactiveFolder(path) { return nil }
             let fontsFolder = [locations.userFonts, locations.allUsersFonts].first(where: isIn)
             let folders = input.folders.filter { path.hasPrefix($0.path + "/") }
             let adobe = locations.adobeFontsInAdobeApps.flatMap { isIn($0) ? $0 : nil }
@@ -544,11 +557,11 @@ public final class LibraryScanner: Sendable {
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }
-        let deactivated = WatchedFolder(id: WatchedFolder.deactivatedID, path: locations.deactivated.path)
-        for folder in input.folders + [deactivated] {
+        let inactive = locations.inactiveFolders.map { WatchedFolder(id: WatchedFolder.inactiveFolderID, path: $0.path) }
+        for folder in input.folders + inactive {
             // Adobe's folders and Cicero's own are listed only when they're there; the Font Library counts as away when
             // it's on a disk that isn't connected, or one Cicero may not read, like the user's folders.
-            if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.deactivatedID,
+            if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.inactiveFolderID,
                let availability = FolderAvailability.of(folder.path) {
                 if folder.id == WatchedFolder.fontLibraryID && availability == .notFound { continue }
                 reach.folders[folder.id] = availability

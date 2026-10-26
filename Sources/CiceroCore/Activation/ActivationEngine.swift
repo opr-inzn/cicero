@@ -290,7 +290,7 @@ public struct ActivationEngine: Sendable {
     /// Copies into ~/Library/Fonts, or into the family's folder in the Font Library (see `installsIntoFontLibrary`), or
     /// registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`, files in `movable` (ones the user
     /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. Files from Cicero's
-    /// Deactivated folder, which only keeps fonts while they're off, are always moved, whatever `method` is. Faces from
+    /// Inactive folder, which only keeps fonts while they're off, are always moved, whatever `method` is. Faces from
     /// app-only folders and from the Font Library are always registered in place, the former after going back into
     /// the folder if Cicero moved them out; faces in a Fonts folder that are off (turned off there, by Cicero or Font
     /// Book) are turned on there, and so is a copy installed before and turned off since. Temporarily active faces are
@@ -326,7 +326,7 @@ public struct ActivationEngine: Sendable {
                 }
             } else if isInsideFontsFolder(path) {
                 toRegister.append((path, false))
-            } else if face.app != nil || method == .inPlace && !isInDeactivatedFolder(path) || isInFontLibrary(path) {
+            } else if face.app != nil || method == .inPlace && !isInInactiveFolder(path) || isInFontLibrary(path) {
                 toRegister.append((path, true))
             } else {
                 toCopy.append((path, face.face.familyName))
@@ -364,11 +364,11 @@ public struct ActivationEngine: Sendable {
                                    done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed)))
         let removed = removeOriginals(of: installed.filter { copy in
             method == .move && movable.contains(copy.source)
-                || isInDeactivatedFolder(copy.source)
+                || isInInactiveFolder(copy.source)
                     && !records.installedCopies.contains { $0.key != copy.destination && $0.value == copy.source }
         })
-        // Back in ~/Library/Fonts, a file from the Deactivated folder is the user's own again, no copy of anything.
-        for copy in removed where isInDeactivatedFolder(copy.source) && !isInFontLibrary(copy.destination) {
+        // Back in ~/Library/Fonts, a file from the Inactive folder is the user's own again, no copy of anything.
+        for copy in removed where isInInactiveFolder(copy.source) && !isInFontLibrary(copy.destination) {
             records.installedCopies[copy.destination] = nil
         }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
@@ -534,7 +534,7 @@ public struct ActivationEngine: Sendable {
 
     /// Files in a Fonts folder are turned off where they are, as Font Book does it: apps drop them at once, and macOS keeps
     /// them off until they're turned on again. Faces an app loads from its own folder leave that folder for Cicero's
-    /// Deactivated folder, so they're off in the app too.
+    /// Inactive folder, so they're off in the app too.
     @concurrent
     public func deactivate(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var moved: [String: String] = [:]
@@ -879,16 +879,16 @@ public struct ActivationEngine: Sendable {
         return stillOn
     }
 
-    /// At launch: turning a font on used to leave its file in the Deactivated folder, as the original of the copy that
+    /// At launch: turning a font on used to leave its file in the Inactive folder, as the original of the copy that
     /// went into ~/Library/Fonts or the Font Library. The copy is the font now, so the file goes, once the copy has the
     /// same contents and it's the original of no other copy, as `activate` does it now; in ~/Library/Fonts, the copy
     /// is the user's own again. Returns how many files went.
     @concurrent
-    public func tidyDeactivatedFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, removed: Int) {
+    public func tidyInactiveFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, removed: Int) {
         var records = records
         var removed = 0
         let copiesOf = Dictionary(grouping: records.installedCopies.values, by: { $0 }).mapValues(\.count)
-        for (copy, original) in records.installedCopies where isInDeactivatedFolder(original) && copiesOf[original] == 1 {
+        for (copy, original) in records.installedCopies where isInInactiveFolder(original) && copiesOf[original] == 1 {
             guard isInsideUserFonts(copy) || isInFontLibrary(copy), Self.isIdenticalCopy(copy, of: original),
                   (try? FileManager.default.removeItem(atPath: original)) != nil
             else { continue }
@@ -1009,17 +1009,17 @@ public struct ActivationEngine: Sendable {
             removeEmptyFolders(around: destination.path)
             throw error
         }
-        // A font back from the Deactivated folder, which it only left the Fonts folder for, arrives no more than then.
-        if isInDeactivatedFolder(path), let added = Self.dateAdded(of: source) { Self.setDateAdded(added, of: destination) }
+        // A font back from the Inactive folder, which it only left the Fonts folder for, arrives no more than then.
+        if isInInactiveFolder(path), let added = Self.dateAdded(of: source) { Self.setDateAdded(added, of: destination) }
         return PlacedCopy(destination: destination.path, source: path, isNew: true)
     }
 
-    /// Moves a file out of an app's folder into Cicero's Deactivated folder, so the app stops loading it,
+    /// Moves a file out of an app's folder into Cicero's Inactive folder, so the app stops loading it,
     /// and remembers where it was.
     private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
         let fm = FileManager.default
-        try fm.createDirectory(at: locations.deactivated, withIntermediateDirectories: true)
-        let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: locations.deactivated)
+        try fm.createDirectory(at: locations.inactiveFolder, withIntermediateDirectories: true)
+        let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: locations.inactiveFolder)
         try Self.move(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
