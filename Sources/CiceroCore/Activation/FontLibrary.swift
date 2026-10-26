@@ -89,7 +89,7 @@ extension ActivationEngine {
         let place = (destination.path as NSString).abbreviatingWithTildeInPath
         guard let fontLibrary, fm.fileExists(atPath: fontLibrary.path) else {
             // Nothing in it yet: it's just somewhere else from now on.
-            return ActivationResult(records: records, succeeded: 0, failed: [], message: "Font Library moved to \(place)")
+            return ActivationResult(records: records, succeeded: 0, failed: [], message: "Cicero’s Library moved to \(place)")
         }
         let old = fontLibrary.path, new = destination.path
         func moved(_ path: String) -> String { path.hasPrefix(old + "/") ? new + path.dropFirst(old.count) : path }
@@ -99,7 +99,7 @@ extension ActivationEngine {
             if !persistent.isEmpty { _ = await registrar.register(persistent.map { Self.url(paths($0)) }, scope: .persistent) }
             if !session.isEmpty { _ = await registrar.register(session.map { Self.url(paths($0)) }, scope: .session) }
         }
-        let failure = ActivationResult(records: records, succeeded: 0, failed: [old], message: "Couldn’t move the Font Library to \(place)")
+        let failure = ActivationResult(records: records, succeeded: 0, failed: [old], message: "Couldn’t move Cicero’s Library to \(place)")
         // The folder chosen goes, for the library to take its place, only when there's nothing in it.
         guard !fm.fileExists(atPath: new) || Self.removeIfEmpty(new) else { return failure }
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
@@ -123,7 +123,7 @@ extension ActivationEngine {
         if firstPlaces.contains(fontLibrary.standardizedFileURL.path) {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
         }
-        return ActivationResult(records: records, succeeded: 1, failed: [], message: "Font Library moved to \(place)")
+        return ActivationResult(records: records, succeeded: 1, failed: [], message: "Cicero’s Library moved to \(place)")
     }
 
     /// Moves a Font Library still in its former first place, ~/Cicero/Font Library, to today's, ~/Cicero/Library, as
@@ -166,8 +166,8 @@ extension ActivationEngine {
             return "macOS or an app keeps that folder for itself."
         }
         if let current {
-            if path == current.standardizedFileURL.path || resolved == current.resolvingSymlinksInPath().path { return "The Font Library is there already." }
-            if isIn(current.standardizedFileURL.path) || isIn(current.resolvingSymlinksInPath().path) { return "That folder is in the Font Library." }
+            if path == current.standardizedFileURL.path || resolved == current.resolvingSymlinksInPath().path { return "Cicero’s Library is there already." }
+            if isIn(current.standardizedFileURL.path) || isIn(current.resolvingSymlinksInPath().path) { return "That folder is in Cicero’s Library." }
         }
         if let watched = folders.first(where: { $0.id != WatchedFolder.fontLibraryID && isIn($0.path) }) {
             return "That folder is in \(watched.displayName), which your library reads already. Choose one outside your locations."
@@ -178,7 +178,7 @@ extension ActivationEngine {
         }
         guard let items = try? fm.contentsOfDirectory(atPath: path) else { return "Cicero can’t read that folder." }
         guard items.allSatisfy({ $0 == ".DS_Store" }) else {
-            return "Choose an empty folder, or make a new one: the Font Library holds only the fonts Cicero puts in it."
+            return "Choose an empty folder, or make a new one: Cicero’s Library holds only the fonts Cicero puts in it."
         }
         guard fm.isWritableFile(atPath: path) else { return "Cicero can’t make changes in that folder." }
         return nil

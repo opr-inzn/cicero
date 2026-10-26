@@ -9,15 +9,15 @@ public enum DuplicateHandling: String, Codable, CaseIterable, Sendable {
     case addCopy
     /// Leave it out.
     case skip
-    /// Use it in place of the library's copy, which goes off.
-    case useAdded
-    /// Use it in place of the library's copy when its version is newer, else leave it out.
-    case keepNewer
+    /// Put it in place of the library's copy, which goes to the Trash (see `AddedDuplicate.replacements`); asking first
+    /// when that's more than one file, or can't be done. The choices there were before, which turned the library's copy
+    /// off ("useAdded", and "keepNewer" for a newer one), are read as Ask, so nothing goes to the Trash unchosen.
+    case replace
 }
 
 /// What's done with one added family the library has already.
 public enum DuplicateChoice: String, CaseIterable, Sendable {
-    case skip, addCopy, useAdded
+    case skip, addCopy, replace
 }
 
 /// How an added family's version compares with the library's copy of it.
@@ -25,6 +25,26 @@ public enum DuplicateVersion: Sendable {
     case newer, older, sameVersion
     /// The added files are the library's, byte for byte.
     case sameFile
+}
+
+/// One of the library's files an added one takes the place of: the old one goes to the Trash, and a copy of the added
+/// one goes where it was, under its name.
+public struct FileReplacement: Hashable, Sendable {
+    public let old: String
+    public let added: String
+
+    public init(old: String, added: String) {
+        self.old = old
+        self.added = added
+    }
+}
+
+/// Why an added family can't take the place of the library's copy.
+public enum ReplaceBlock: Sendable {
+    /// The library's files and the added ones hold the fonts differently, as one collection against a file each.
+    case differentFiles
+    /// Every copy is one Cicero doesn't change: macOS's, an app's, Adobe Fonts' or one in an app's own folder.
+    case unchangeable
 }
 
 /// An added family the library has already, from other files: some of its styles, or all of them.
@@ -38,20 +58,41 @@ public struct AddedDuplicate: Identifiable, Hashable, Sendable {
     /// The added files' faces of those styles.
     public let addedFaces: [FontFace]
     public let version: DuplicateVersion
+    /// What Replace does: each of the library's files with these styles that Cicero may change, and the added file with
+    /// exactly its fonts. Empty when it can't be done (`replaceBlock`).
+    public let replacements: [FileReplacement]
+    public let replaceBlock: ReplaceBlock?
 
     public var id: String { family }
 
-    /// What the sheet starts with: the added copy when it's newer, else leaving it out.
-    public var suggestion: DuplicateChoice { version == .newer ? .useAdded : .skip }
+    public var canReplace: Bool { replaceBlock == nil }
 
-    /// What `handling` does with it; nil for Ask, which leaves it to the user.
+    /// Whether Replace puts an added file in more than one place, as when the library has a font in a client's folder
+    /// and a copy of it in ~/Library/Fonts: the user is warned first.
+    public var replacesSeveralCopies: Bool {
+        Dictionary(grouping: replacements, by: \.added).values.contains { $0.count > 1 }
+    }
+
+    /// What the sheet starts with: a newer one in place of the library's copy, or beside it when that can't be done;
+    /// else leaving it out.
+    public var suggestion: DuplicateChoice {
+        guard version == .newer else { return .skip }
+        return canReplace ? .replace : .addCopy
+    }
+
+    /// What the sheet starts with when it asks under `handling`: what that does, where it can; else the suggestion. With
+    /// Replace, every family that can be replaced starts there, whatever its version.
+    public func startingChoice(for handling: DuplicateHandling) -> DuplicateChoice {
+        choice(for: handling) ?? suggestion
+    }
+
+    /// What `handling` does with it; nil for Ask, and for Replace when it can't be done, which leave it to the user.
     public func choice(for handling: DuplicateHandling) -> DuplicateChoice? {
         switch handling {
         case .ask: nil
         case .addCopy: .addCopy
         case .skip: .skip
-        case .useAdded: .useAdded
-        case .keepNewer: version == .newer ? .useAdded : .skip
+        case .replace: canReplace ? .replace : nil
         }
     }
 
@@ -63,25 +104,6 @@ public struct AddedDuplicate: Identifiable, Hashable, Sendable {
     private static func versions(_ faces: [FontFace]) -> [String] {
         Set(faces.compactMap(\.version).map(FontFace.displayVersion)).sorted { FontVersion.precedes($0, $1) }
     }
-}
-
-/// Turning the library's copies of styles off for the added files to take over (Use the Added One).
-public struct DuplicateReplacement: Sendable {
-    /// Per style of an added file that takes over a copy that's on: the added face to turn on and the library's copies
-    /// to turn off. Added files that take over none are added as any other.
-    public var switches: [CopySwitch]
-    /// The families whose copies go off, in the order of the library's.
-    public var families: [String]
-    /// Files under Added Fonts whose every face an added file takes over: they stop being listed.
-    public var forgotten: [String]
-    /// The library's copy of a style stays on as well, being one Cicero can't turn off (macOS's, an app's or Adobe
-    /// Fonts'), so apps may get that one.
-    public var leavesOtherCopiesOn: Bool
-    /// The library's copy of a style was in a Fonts folder, so the added one goes there too when Cicero asks each
-    /// time how to activate.
-    public var replacesInstalledCopy: Bool
-
-    public var isEmpty: Bool { switches.allSatisfy { $0.target == nil && $0.others.isEmpty } }
 }
 
 /// Finds the fonts added files have that the library has already, from other files, and what using the added ones in
@@ -115,10 +137,52 @@ public enum AddedDuplicates {
                 matched[family] = entry
             }
         }
+        guard !matched.isEmpty else { return [] }
+        // Every file the library has: the fonts in it, and one of its copies, to tell whether Cicero may change it.
+        var namesIn: [String: Set<String>] = [:]
+        var copyAt: [String: FaceCopy] = [:]
+        for family in library.families {
+            for face in family.faces {
+                for copy in [FaceCopy(face)] + face.copies {
+                    namesIn[copy.face.path, default: []].insert(copy.face.postScriptName)
+                    if copyAt[copy.face.path] == nil { copyAt[copy.face.path] = copy }
+                }
+            }
+        }
         return matched.keys.sorted().map { index in
             let entry = matched[index]!
+            let (replacements, block) = replacements(of: entry.styles, by: entry.paths, added: added, namesIn: namesIn, copyAt: copyAt)
             return AddedDuplicate(family: library.families[index].name, paths: entry.paths, styles: entry.styles, addedFaces: entry.faces,
-                                  version: compare(entry.faces, with: entry.styles))
+                                  version: compare(entry.faces, with: entry.styles), replacements: replacements, replaceBlock: block)
+        }
+    }
+
+    /// Replace, one to one: each of the library's files with these styles goes to the Trash for the added file with
+    /// exactly its fonts, by PostScript name. Files Cicero doesn't change stay, beside it; when a file has no such match,
+    /// it can't be done at all.
+    private static func replacements(of styles: [LibraryFace], by paths: [String], added: [String: [FontFace]],
+                                     namesIn: [String: Set<String>], copyAt: [String: FaceCopy]) -> ([FileReplacement], ReplaceBlock?) {
+        let addedNames = Dictionary(uniqueKeysWithValues: paths.map { ($0, Set((added[$0] ?? []).map(\.postScriptName))) })
+        var olds: [String] = []
+        for path in styles.flatMap({ [$0.face.path] + $0.otherCopies }) where !olds.contains(path) && addedNames[path] == nil {
+            olds.append(path)
+        }
+        var replacements: [FileReplacement] = []
+        for old in olds {
+            guard let copy = copyAt[old], mayReplace(copy) else { continue }
+            guard let match = paths.first(where: { addedNames[$0] == namesIn[old] }) else { return ([], .differentFiles) }
+            replacements.append(FileReplacement(old: old, added: match))
+        }
+        return replacements.isEmpty ? ([], .unchangeable) : (replacements, nil)
+    }
+
+    /// Whether Cicero may put another file in a copy's place: not macOS's, an app's, Adobe Fonts', one in an app's own
+    /// folder, one on for all users, nor one an application set has on while its app is open.
+    static func mayReplace(_ copy: FaceCopy) -> Bool {
+        guard copy.app == nil, !ActivationEngine.isProtected(copy.face.path) else { return false }
+        switch copy.state.source {
+        case .macOS?, .allUsers?, .app?, .adobeFonts?, .temporary(.whileAppsRun)?: return false
+        default: return true
         }
     }
 
@@ -144,70 +208,5 @@ public enum AddedDuplicates {
               sizeA == sizeB
         else { return false }
         return fm.contentsEqual(atPath: a, andPath: b)
-    }
-
-    /// What using the added files of `duplicates` in place of the library's copies takes. Where the library has a style
-    /// on, its copies Cicero can turn off go off (as deactivating does: a copy Cicero installed goes to the Trash when
-    /// its original is in the library, any other in a Fonts folder to the Deactivated folder, one used where it is just
-    /// goes off) and the added face goes on. `installing`, as when fonts are activated by copying or moving, an added
-    /// file that takes over some style goes on whole; else only its styles that take over go on. Files under Added
-    /// Fonts (`fontFiles`) that the added ones take over stop being listed. A copy in the Font Library (`fontLibrary`)
-    /// counts as installed, like one in ~/Library/Fonts, and just goes off.
-    public static func replacement(of duplicates: [AddedDuplicate], installing: Bool, library: Library, fontFiles: [String],
-                                   fontLibrary: String = "") -> DuplicateReplacement {
-        guard !duplicates.isEmpty else {
-            return DuplicateReplacement(switches: [], families: [], forgotten: [], leavesOtherCopiesOn: false, replacesInstalledCopy: false)
-        }
-        struct Style {
-            var family: String
-            var face: FontFace
-            var all: [FaceCopy]
-            var off: [FaceCopy]
-        }
-        var styles: [Style] = []
-        var leavesOtherCopiesOn = false
-        var replaced = Set<String>()
-        var candidates = Set<String>()
-        let added = Set(duplicates.flatMap(\.paths))
-        for duplicate in duplicates {
-            for style in duplicate.styles {
-                guard let face = duplicate.addedFaces.first(where: { $0.postScriptName == style.face.postScriptName }) else { continue }
-                replaced.insert(style.face.postScriptName)
-                let all = [FaceCopy(style)] + style.copies
-                let on = all.filter(\.state.isActive)
-                let off = on.filter(canTurnOff)
-                if off.count < on.count { leavesOtherCopiesOn = true }
-                styles.append(Style(family: duplicate.family, face: face, all: all, off: off))
-                candidates.formUnion(all.map(\.face.path).filter { !added.contains($0) })
-            }
-        }
-        let switching = Set(styles.filter { !$0.off.isEmpty }.map(\.face.path))
-        let switches = styles.filter { !$0.off.isEmpty || installing && switching.contains($0.face.path) }.map { style in
-            CopySwitch(target: LibraryFace(face: style.face, state: .inactive), others: style.off.map { $0.libraryFace(among: style.all) })
-        }
-        var families: [String] = []
-        for style in styles where !style.off.isEmpty && !families.contains(style.family) { families.append(style.family) }
-        let replacesInstalledCopy = styles.contains { style in
-            style.off.contains { $0.state.source == .fontsFolder || !fontLibrary.isEmpty && $0.face.path.hasPrefix(fontLibrary + "/") }
-        }
-        // A file under Added Fonts goes only when every face in it is taken over, not a collection with others too.
-        var names: [String: Set<String>] = [:]
-        for face in library.families.flatMap(\.faces) {
-            for copy in [FaceCopy(face)] + face.copies where candidates.contains(copy.face.path) {
-                names[copy.face.path, default: []].insert(copy.face.postScriptName)
-            }
-        }
-        let listed = Set(fontFiles)
-        let forgotten = candidates.filter { listed.contains($0) && names[$0, default: []].isSubset(of: replaced) }.sorted()
-        return DuplicateReplacement(switches: switches, families: families, forgotten: forgotten, leavesOtherCopiesOn: leavesOtherCopiesOn,
-                                    replacesInstalledCopy: replacesInstalledCopy)
-    }
-
-    /// Copies Cicero turns off for an added one: on from a Fonts folder, where they are, for a while or by another app.
-    /// Not macOS's, an app's, Adobe Fonts', nor one an application set has on while its app is open, which the set
-    /// would turn on again.
-    static func canTurnOff(_ copy: FaceCopy) -> Bool {
-        guard copy.app == nil, !ActiveSource.isAdobeFonts(copy.face.path), let source = copy.state.source else { return false }
-        return source.canDeactivate && source != .temporary(.whileAppsRun)
     }
 }

@@ -2,8 +2,9 @@ import CiceroCore
 import SwiftUI
 
 /// Asks what to do with added fonts the library has already, from other files, family by family: leave them out, add
-/// them as other copies, or use them in place of the library's copies. Each starts at using the added one when it's
-/// newer, else leaving it out. Files with no such fonts are added either way.
+/// them as other copies, or put them in place of the library's copies, which go to the Trash. Each starts at replacing
+/// when the added one is newer (adding it as another copy when that can't be done), else leaving it out. Files with no
+/// such fonts are added either way.
 struct DuplicatesSheet: View {
     let prompt: DuplicatePrompt
     @Environment(AppModel.self) private var model
@@ -12,7 +13,7 @@ struct DuplicatesSheet: View {
 
     init(prompt: DuplicatePrompt) {
         self.prompt = prompt
-        _choices = State(initialValue: Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.suggestion) }))
+        _choices = State(initialValue: Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.startingChoice(for: prompt.handling)) }))
     }
 
     var body: some View {
@@ -33,7 +34,8 @@ struct DuplicatesSheet: View {
                 LazyVStack(spacing: 0) {
                     ForEach(prompt.duplicates) { duplicate in
                         row(duplicate)
-                        Divider().padding(.leading, 20)
+                        // Between rows only: the bar below has its own line.
+                        if duplicate.id != prompt.duplicates.last?.id { Divider().padding(.leading, 20) }
                     }
                 }
             }
@@ -42,15 +44,13 @@ struct DuplicatesSheet: View {
                 if prompt.duplicates.count > 1 {
                     Menu("Choose for All") {
                         ForEach(DuplicateChoice.allCases, id: \.self) { choice in
-                            Button(choice.title) { for duplicate in prompt.duplicates { choices[duplicate.id] = choice } }
+                            Button(choice.title) {
+                                for duplicate in prompt.duplicates where choice != .replace || duplicate.canReplace { choices[duplicate.id] = choice }
+                            }
                         }
                     }
                     .fixedSize()
                 }
-                Text("Using the added one turns the library’s copy off as deactivating does, so no font is lost.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Add") {
@@ -61,7 +61,7 @@ struct DuplicatesSheet: View {
             }
             .padding(16)
         }
-        .frame(width: 720, height: min(540, 190 + CGFloat(prompt.duplicates.count) * 58))
+        .frame(width: 720, height: min(540, 146 + prompt.duplicates.map(Self.rowHeight).reduce(0, +)))
     }
 
     private func row(_ duplicate: AddedDuplicate) -> some View {
@@ -76,16 +76,34 @@ struct DuplicatesSheet: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .truncationMode(.middle)
+                if let block = duplicate.replaceBlock {
+                    Text(block.explanation)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else if choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) == .replace, duplicate.replacesSeveralCopies {
+                    Label("Replaces \(duplicate.replacements.count) files: \(model.replacedPlaces(duplicate))", systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
             }
             Spacer(minLength: 12)
-            Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.suggestion }, set: { choices[duplicate.id] = $0 })) {
-                ForEach(DuplicateChoice.allCases, id: \.self) { Text($0.title).tag($0) }
+            Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) }, set: { choices[duplicate.id] = $0 })) {
+                ForEach(DuplicateChoice.allCases.filter { $0 != .replace || duplicate.canReplace }, id: \.self) { choice in
+                    // "Replace your copies" when it's more than one file.
+                    Text(choice == .replace && duplicate.replacements.count > 1 ? "Replace your copies" : choice.title).tag(choice)
+                }
             }
             .labelsHidden()
             .fixedSize()
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+    }
+
+    /// A row's height: a line more for one that can't be replaced, or that warns it replaces more than one file. With
+    /// the title and the bar below (146), the sheet is as tall as its rows, up to 540.
+    private static func rowHeight(_ duplicate: AddedDuplicate) -> CGFloat {
+        duplicate.replaceBlock != nil || duplicate.replacesSeveralCopies ? 73 : 54
     }
 
     /// "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000".
@@ -111,24 +129,25 @@ struct DuplicatesSheet: View {
         case .appOnly(let app): return "on in \(FaceState.appDescription(app))"
         default: break
         }
-        let state = style.state.isActive ? "on" : "off"
-        if path.hasPrefix(model.locations.userFonts.path + "/") { return "\(state) in your Fonts folder" }
-        if path.hasPrefix(model.locations.deactivated.path + "/") { return "\(state) in the Deactivated folder" }
-        if let library = model.data.fontLibrary, path.hasPrefix(library.path + "/") { return "\(state) in \(model.folderName(WatchedFolder.fontLibraryID))" }
-        if model.data.fontFiles.contains(path) { return "\(state) in \(model.folderName(WatchedFolder.addedFilesID))" }
-        if let folder = model.data.namedFolders.filter({ path.hasPrefix($0.path + "/") }).max(by: { $0.path.count < $1.path.count }) {
-            return "\(state) in \(folder.displayName)"
-        }
-        return "\(state) in “\(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent)”"
+        return (style.state.isActive ? "on " : "off ") + model.placeName(of: path)
     }
 }
 
 extension DuplicateChoice {
     var title: String {
         switch self {
-        case .skip: "Skip It"
-        case .addCopy: "Add as Another Copy"
-        case .useAdded: "Use the Added One"
+        case .skip: "Skip it"
+        case .addCopy: "Add as a copy"
+        case .replace: "Replace your copy"
+        }
+    }
+}
+
+private extension ReplaceBlock {
+    var explanation: String {
+        switch self {
+        case .differentFiles: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently."
+        case .unchangeable: "Can’t be replaced: your copy comes with macOS or an app, or from Adobe Fonts."
         }
     }
 }

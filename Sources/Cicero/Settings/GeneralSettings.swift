@@ -41,26 +41,25 @@ struct GeneralSettings: View {
             }
             Section("Installation") {
                 Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
-                    Text("Install fonts into Cicero’s Font Library")
+                    Text("Install fonts into Cicero’s Library")
                     Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
                 } label: {
-                    Text("Cicero’s Font Library")
+                    Text("Cicero’s Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
-                // The two pop-up menus are as wide as each other.
-                let installMethods = InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) }
-                let duplicateHandlings = DuplicateHandling.allCases.map { (title: $0.title, value: $0) }
+                // Each pop-up menu as wide as its own choices.
                 LabeledContent {
-                    PopUpPicker(options: installMethods, selection: $model.data.installMethod, widthFitting: duplicateHandlings.map(\.title))
+                    PopUpPicker(options: InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) },
+                                selection: $model.data.installMethod)
                 } label: {
                     Text("Activate fonts by")
                     Text(activationExplanation)
                 }
                 LabeledContent {
-                    PopUpPicker(options: duplicateHandlings, selection: $model.data.duplicateHandling, widthFitting: installMethods.map(\.title))
+                    PopUpPicker(options: DuplicateHandling.allCases.map { (title: $0.title, value: $0) }, selection: $model.data.duplicateHandling)
                 } label: {
                     Text("When an added font is already in your library")
                     Text(duplicateExplanation)
@@ -153,16 +152,15 @@ struct GeneralSettings: View {
 
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
-        case .ask: "When a font file you add has fonts your library has from another file, Cicero asks what to do with each family."
-        case .addCopy: "The added file is listed or installed next to the library’s copy, which stays in use."
-        case .skip: "The added file is left out, and the library’s copy stays in use."
-        case .useAdded: "The added file takes over: where the library’s copy is on, it goes off as deactivating does, and the added one goes on."
-        case .keepNewer: "The added file takes over when its version is newer than the library’s copy, and is left out otherwise."
+        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as a copy or replace your copy with it."
+        case .addCopy: "Both stay in your library, and your copy stays in use."
+        case .skip: "The added file is left out, and your copy stays in use."
+        case .replace: "Your copy goes to the Trash, and the added file takes its place, under its name and in its folder. If your library has it more than once, or in files that don’t match, Cicero asks first."
         }
     }
 
     private var activationExplanation: String {
-        let place = model.data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your user Fonts folder"
+        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
         return switch model.data.installMethod {
         case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
         case .copy: "Copying puts font files into \(place) and leaves the originals where they are."
@@ -176,10 +174,9 @@ private extension DuplicateHandling {
     var title: String {
         switch self {
         case .ask: "Ask each time"
-        case .addCopy: "Add it as another copy"
+        case .addCopy: "Add as a copy"
         case .skip: "Skip it"
-        case .useAdded: "Use the added one"
-        case .keepNewer: "Keep the newer version"
+        case .replace: "Replace your copy"
         }
     }
 }
@@ -188,8 +185,8 @@ private extension InstallMethod {
     func title(intoFontLibrary: Bool) -> String {
         switch self {
         case .ask: "Ask each time"
-        case .copy: intoFontLibrary ? "Copy into Cicero’s Font Library" : "Copy into ~/Library/Fonts"
-        case .move: intoFontLibrary ? "Move into Cicero’s Font Library" : "Move into ~/Library/Fonts"
+        case .copy: intoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move into Cicero’s Library" : "Move into ~/Library/Fonts"
         case .inPlace: "Leave the files where they are"
         }
     }

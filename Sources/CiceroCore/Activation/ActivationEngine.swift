@@ -745,8 +745,8 @@ public struct ActivationEngine: Sendable {
         var records = records
         let path = face.face.path
         let name = FontNames.describe([face])
-        guard !isInFontLibrary(path) else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "\(name ?? "The font") is in your Font Library") }
-        let place = installsIntoFontLibrary && fontLibrary != nil ? "your Font Library" : "your Fonts folder"
+        guard !isInFontLibrary(path) else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "\(name ?? "The font") is in Cicero’s Library") }
+        let place = installsIntoFontLibrary && fontLibrary != nil ? "Cicero’s Library" : "your Fonts folder"
         let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy \(name ?? "the font") into \(place)")
         guard let copy = try? placeCopy(of: path, family: face.face.familyName) else { return failure }
         guard await registerAndConfirm([copy.destination], scope: .persistent).isEmpty else {
@@ -849,7 +849,7 @@ public struct ActivationEngine: Sendable {
         return faces.filter { seen.insert($0.face.path).inserted }
     }
 
-    private func isInsideUserFonts(_ path: String) -> Bool {
+    func isInsideUserFonts(_ path: String) -> Bool {
         path.hasPrefix(locations.userFonts.path + "/")
     }
 

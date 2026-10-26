@@ -56,6 +56,19 @@ struct MainWindow: View {
         // A sheet of its own for each library, rather than the last one's with its choices.
         .sheet(item: $model.importing) { ImportSheet(prompt: $0).id($0.id) }
         .sheet(item: $model.duplicatePrompt) { DuplicatesSheet(prompt: $0) }
+        .alert(
+            model.replacePrompt.map(Self.replaceTitle) ?? "",
+            isPresented: Binding(get: { model.replacePrompt != nil }, set: { if !$0 { model.replacePrompt = nil } }),
+            presenting: model.replacePrompt
+        ) { prompt in
+            Button("Replace") { model.replaceEverywhere(prompt) }
+                .keyboardShortcut(.defaultAction)
+            // Once the alert has gone, so the sheet isn't lost on its way out.
+            Button("Choose for Each…") { Task { model.duplicatePrompt = prompt } }
+            Button("Cancel", role: .cancel) {}
+        } message: { prompt in
+            Text(replaceMessage(prompt))
+        }
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }
@@ -157,6 +170,21 @@ struct MainWindow: View {
 
     private func tokenLabel(_ token: SearchToken) -> Text {
         Text(token.title)
+    }
+
+    /// "Replace Helvetica in 2 Places?", or for several families "Replace Fonts in More Than One Place?".
+    static func replaceTitle(_ prompt: DuplicatePrompt) -> String {
+        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
+        guard several.count == 1 else { return "Replace Fonts in More Than One Place?" }
+        return "Replace \(several[0].family) in \(several[0].replacements.count) Places?"
+    }
+
+    /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
+    private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
+        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
+        var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
+        if several.count > 3 { lines.append("And \(several.count - 3) more.") }
+        return (lines + ["Each of these files goes to the Trash, and the added one takes its place."]).joined(separator: " ")
     }
 
     static func trashMessage(_ plan: TrashPlan) -> String {

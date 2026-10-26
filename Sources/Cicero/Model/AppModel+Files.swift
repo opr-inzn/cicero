@@ -104,7 +104,9 @@ extension AppModel {
 
     /// Adds font files the user picked (see `addFontFiles`), first looking for fonts in them the library has already
     /// from other files, and doing with those as Settings → General says: asking family by family, adding them as
-    /// other copies, leaving them out, or using them in place of the library's copies (see `DuplicateHandling`).
+    /// other copies, leaving them out, or putting them in place of the library's copies (see `DuplicateHandling`).
+    /// Replace asks family by family too where it can't be done, and first warns when it would put a file in more than
+    /// one place (`replacePrompt`).
     func addCheckingDuplicates(_ paths: [String], then: @escaping (AppModel, Set<String>) -> Void) {
         let new = paths.filter { !isListed($0) }
         guard !new.isEmpty, data.duplicateHandling != .addCopy else { return addFontFiles(paths, then: then) }
@@ -114,22 +116,34 @@ extension AppModel {
                 AddedDuplicates.find(in: AddedDuplicates.faces(of: new), library: library)
             }.value
             guard !duplicates.isEmpty else { return addFontFiles(paths, then: then) }
+            let prompt = DuplicatePrompt(paths: paths, duplicates: duplicates, handling: data.duplicateHandling, then: then)
             let handling = data.duplicateHandling
-            guard handling != .ask else {
-                duplicatePrompt = DuplicatePrompt(paths: paths, duplicates: duplicates, then: then)
+            let chosen = duplicates.map { $0.choice(for: handling) }
+            guard !chosen.contains(nil) else {
+                duplicatePrompt = prompt
                 return
             }
-            let choices = Dictionary(uniqueKeysWithValues: duplicates.map { ($0.id, $0.choice(for: handling) ?? $0.suggestion) })
-            addFontFiles(paths, resolving: duplicates, choices: choices, then: then)
+            if handling == .replace, duplicates.contains(where: \.replacesSeveralCopies) {
+                replacePrompt = prompt
+                return
+            }
+            addFontFiles(paths, resolving: duplicates, choices: Dictionary(uniqueKeysWithValues: zip(duplicates.map(\.id), chosen.compactMap(\.self))),
+                         then: then)
         }
+    }
+
+    /// Replace, in every place the warning named (see `replacePrompt`).
+    func replaceEverywhere(_ prompt: DuplicatePrompt) {
+        let choices = Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.choice(for: .replace) ?? $0.suggestion) })
+        addFontFiles(prompt.paths, resolving: prompt.duplicates, choices: choices, then: prompt.then)
     }
 
     /// Whether font files the user adds are installed rather than listed where they are: with fonts activated by
     /// copying or moving.
     var installsAddedFiles: Bool { data.installMethod == .copy || data.installMethod == .move }
 
-    /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Font Library".
-    var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your Fonts folder" }
+    /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Library".
+    var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder" }
 
     /// Brings in the font files the library doesn't have yet: lists them where they are, under Added Fonts, or with
     /// fonts activated by copying or moving, copies or moves them into ~/Library/Fonts, where they're on and in All
@@ -138,22 +152,21 @@ extension AppModel {
     /// the paths the library has the files at: the copies' for files it installed.
     ///
     /// `duplicates` are families the library has already, from other files, and `choices` what to do with each: a file
-    /// only of families left out stays out (`then` gets the library's copies of them instead, to show), and one of
-    /// families the added files take over is used in place of the library's copies (see `AddedDuplicates.replacement`).
+    /// only of families left out stays out (`then` gets the library's copies of them instead, to show), and one that
+    /// replaces the library's copies goes in their places, which `then` gets (see `ActivationEngine.replace`).
     func addFontFiles(_ paths: [String], resolving duplicates: [AddedDuplicate] = [], choices: [String: DuplicateChoice] = [:],
                       mayMove: Bool = true, then: ((AppModel, Set<String>) -> Void)? = nil) {
         let skipped = duplicates.filter { choices[$0.id] == .skip }
-        let using = duplicates.filter { choices[$0.id] == .useAdded }
+        let replacements = duplicates.filter { choices[$0.id] == .replace && $0.canReplace }.flatMap(\.replacements)
+        // A file only of skipped families stays out, and one that takes the library's copies' places is in as those.
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
+            .union(replacements.map(\.added))
         let paths = paths.filter { !left.contains($0) }
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
-        let replacement = AddedDuplicates.replacement(of: using, installing: installsAddedFiles, library: library, fontFiles: data.fontFiles,
-                                                      fontLibrary: data.fontLibrary?.path ?? "")
-        let switching = Set(replacement.switches.compactMap(\.target?.face.path))
         let movable = movableFiles(among: paths)
         let installing = !installsAddedFiles ? [] : paths.filter { path in
-            !switching.contains(path) && (!isListed(path) || movable.contains(path) && !library.activePaths.contains(path))
+            !isListed(path) || movable.contains(path) && !library.activePaths.contains(path)
         }
         let moving = mayMove && data.installMethod == .move
         // Copied or moved, files the library doesn't list are installed, or take over the library's copies.
@@ -163,21 +176,13 @@ extension AppModel {
             data.sidebar.hidden.remove(SidebarSection.folders.key)
             data.sidebar.hidden.remove("folder.\(WatchedFolder.addedFilesID)")
         }
-        guard !installing.isEmpty || !replacement.isEmpty else {
-            let forgotten = Set(replacement.forgotten)
-            data.fontFiles.removeAll(where: forgotten.contains)
+        guard !installing.isEmpty || !replacements.isEmpty else {
             if !skipNote.isEmpty { showToast(skipNote) }
             let shown = Set(paths).union(existing)
-            if let then, !shown.isEmpty { then(self, shown) } else if !new.isEmpty || !forgotten.isEmpty { rescan() }
+            if let then, !shown.isEmpty { then(self, shown) } else if !new.isEmpty { rescan() }
             return
         }
-        let shown = Set(paths).subtracting(installing).subtracting(installsAddedFiles ? switching : [])
-        // Asked each time how to activate, an added font goes where the library's copy was: copied into the Fonts
-        // folder in place of one Cicero installed there, else used where it is.
-        let method: InstallMethod = switch data.installMethod {
-        case .ask: replacement.replacesInstalledCopy ? .copy : .inPlace
-        case let method: method
-        }
+        let shown = Set(paths).subtracting(installing)
         enqueue { model in
             var messages: [String] = []
             if !installing.isEmpty {
@@ -185,19 +190,16 @@ extension AppModel {
                 model.data.records = result.records
                 messages.append(result.message)
             }
-            if !replacement.isEmpty {
-                let result = await model.engine.switchCopies(replacement.switches, method: method, records: model.data.records,
-                                                             movable: moving ? switching : [])
+            if !replacements.isEmpty {
+                let result = await model.engine.replace(replacements, moving: moving, records: model.data.records)
                 model.data.records = result.records
-                let failed = Set(result.failed)
-                model.data.fontFiles.removeAll { replacement.forgotten.contains($0) && !failed.contains($0) }
-                messages.append(failed.isEmpty ? Self.replacementMessage(replacement) : result.message)
+                messages.append(result.message)
             }
             model.forgetInstalledAddedFiles()
             model.showToast((messages + [skipNote]).filter { !$0.isEmpty }.joined(separator: ". "))
-            let originals = Set(installing).union(switching)
+            let originals = Set(installing)
             let copies = Set(model.data.records.installedCopies.filter { originals.contains($0.value) }.keys)
-            let found = shown.union(copies).union(existing)
+            let found = shown.union(copies).union(existing).union(replacements.map(\.old))
             // Nothing to show when nothing went in: the toast says so.
             if let then, !found.isEmpty { then(model, found) } else { model.rescan() }
         }
@@ -208,15 +210,6 @@ extension AppModel {
     private static func skipNote(_ skipped: [AddedDuplicate]) -> String {
         guard let names = FontNames.describe(families: skipped.map(\.family)) else { return "" }
         return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
-    }
-
-    /// "Using the added copy of Helvetica", once the library's copies of it went off.
-    private static func replacementMessage(_ replacement: DuplicateReplacement) -> String {
-        let families = replacement.families
-        guard !families.isEmpty else { return "" }
-        let using = (families.count == 1 ? "Using the added copy of " : "Using the added copies of ")
-            + (FontNames.describe(families: families) ?? "")
-        return using + (replacement.leavesOtherCopiesOn ? ". Another copy Cicero can’t turn off is still on, so apps may use that one" : "")
     }
 
     /// Added files Cicero installed a copy of leave Added Fonts: the copy in ~/Library/Fonts is the font in the

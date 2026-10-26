@@ -20,7 +20,7 @@ struct ActivationSheet: View {
                 option("Install a Copy", icon: "doc.on.doc",
                        detail: "Copies the files into \(model.installPlace). The originals stay where they are.") { choose(.copy) }
                 if offersMove {
-                    option(model.data.installsIntoFontLibrary ? "Move Into Font Library" : "Move Into Fonts Folder", icon: "folder",
+                    option(model.data.installsIntoFontLibrary ? "Move Into Cicero’s Library" : "Move Into Fonts Folder", icon: "folder",
                            detail: "Moves the files you added into \(model.installPlace). The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",

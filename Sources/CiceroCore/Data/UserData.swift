@@ -169,6 +169,11 @@ public struct UserData: Codable, Equatable, Sendable {
         installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
         installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
         fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
+        // Test builds saved the library's name with the location its folder becomes ("Font Library", then "Cicero’s Font
+        // Library"); it's called as the library is now (see `named`), whatever the library is called.
+        if let location = fontLibraryLocation, let name = folderNames[location.id.uuidString], Self.formerFontLibraryNames.contains(name) {
+            folderNames[location.id.uuidString] = nil
+        }
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
@@ -238,6 +243,9 @@ public struct UserData: Codable, Equatable, Sendable {
         return WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
     }
 
+    /// What the library's location was saved as before it was called as the library is.
+    static let formerFontLibraryNames: Set<String> = ["Font Library", "Cicero’s Font Library"]
+
     /// The user's location that is the Font Library's folder, as it is while fonts aren't installed into it.
     public var fontLibraryLocation: WatchedFolder? {
         guard !fontLibraryPath.isEmpty else { return nil }
@@ -252,9 +260,9 @@ public struct UserData: Codable, Equatable, Sendable {
     public mutating func keepFontLibraryAsLocation(hasFonts: Bool) -> WatchedFolder? {
         guard hasFonts, !fontLibraryPath.isEmpty, fontLibraryLocation == nil else { return nil }
         let location = WatchedFolder(path: fontLibraryPath)
-        let name = named(WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)).displayName
         folders.append(location)
-        if name != location.displayName { folderNames[location.id.uuidString] = name }
+        // A name the user gave the library goes with it; else it's called as the library is (see `named`).
+        if let given = folderNames[WatchedFolder.fontLibraryID.uuidString] { folderNames[location.id.uuidString] = given }
         return location
     }
 
@@ -278,10 +286,14 @@ public struct UserData: Codable, Equatable, Sendable {
         keepFontLibraryAsLocation(hasFonts: hasFonts(URL(fileURLWithPath: fontLibraryPath, isDirectory: true)))
     }
 
-    /// A folder with the name the user gave it, if any, as its `displayName`.
+    /// A folder with the name the user gave it, if any, as its `displayName`; the location that's the Font Library's
+    /// folder is called as the library is ("Cicero’s Library") unless the user named it.
     public func named(_ folder: WatchedFolder) -> WatchedFolder {
         var folder = folder
         folder.customName = folderNames[folder.id.uuidString]
+        if folder.customName == nil, folder.id != WatchedFolder.fontLibraryID, folder.id == fontLibraryLocation?.id {
+            folder.customName = WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath).displayName
+        }
         return folder
     }
 
@@ -374,13 +386,13 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Deactivated", "Font Library", "Proofing" (Adobe's folders, where type designers
+    /// The name the user gave it; else "Deactivated", "Cicero’s Library", "Proofing" (Adobe's folders, where type designers
     /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
     /// else the name.
     public var displayName: String {
         if let customName { return customName }
         if id == Self.deactivatedID { return "Deactivated" }
-        if id == Self.fontLibraryID { return "Font Library" }
+        if id == Self.fontLibraryID { return "Cicero’s Library" }
         if id == Self.adobeAppsID { return "Proofing" }
         if id == Self.adobeFontsID { return "Adobe Fonts" }
         if id == Self.addedFilesID { return "Added Fonts" }
