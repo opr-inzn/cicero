@@ -806,7 +806,6 @@ final class AppModel {
         for family in library.families {
             if family.folderIDs.contains(WatchedFolder.adobeAppsID) { ownFolders.insert(WatchedFolder.adobeAppsID) }
             if data.showCreativeCloudFonts, family.folderIDs.contains(WatchedFolder.adobeFontsID) { ownFolders.insert(WatchedFolder.adobeFontsID) }
-            if family.folderIDs.contains(WatchedFolder.fontLibraryID) { ownFolders.insert(WatchedFolder.fontLibraryID) }
             if family.folderIDs.contains(WatchedFolder.addedFilesID) { ownFolders.insert(WatchedFolder.addedFilesID) }
             guard data.lists(family) else { continue }
             if let name = foundryName(family) { names.insert(name) }

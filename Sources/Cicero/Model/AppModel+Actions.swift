@@ -693,10 +693,8 @@ extension AppModel {
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
             }
-            if ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID), let fontLibrary = data.fontLibrary {
-                folders.append(fontLibrary)
-            }
-            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those.
+            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those. Nor the
+            // Font Library: it takes the place of ~/Library/Fonts, whose fonts are in All Fonts like the rest.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
