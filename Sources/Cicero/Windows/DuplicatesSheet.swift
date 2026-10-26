@@ -51,10 +51,6 @@ struct DuplicatesSheet: View {
                     }
                     .fixedSize()
                 }
-                Text("Replace your copy moves your files to the Trash and puts the added ones in their place.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Add") {

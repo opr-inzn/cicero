@@ -397,8 +397,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   "…your copy comes with macOS or an app, or from Adobe Fonts."), starting at Replace your copy when the added one is
   newer (Add as a copy when replacing can't be done), else Skip it; with Replace your copy chosen for a family
   replaced in more than one place, an orange warning under it: "Replaces 2 files: in your Fonts folder and in Clients"
-  (`AppModel.placeName`); Choose for All (Replace your copy only where it can be done); "Replace your copy moves your
-  files to the Trash and puts the added ones in their place."; Cancel adds nothing of the batch, Add adds everything
+  (`AppModel.placeName`); Choose for All (Replace your copy only where it can be done); Cancel adds nothing of the batch, Add adds everything
   else as usual. The setting can instead always Add as a copy (as before), Skip it, or Replace your copy;
   with Replace, a batch with a family it can't be done for shows the sheet, and one with a family replaced in more
   than one place first an alert (`replacePrompt`): "Replace Helvetica in 2 Places?" / "Replace Fonts in More Than One
