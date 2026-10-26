@@ -92,7 +92,10 @@ struct DuplicatesSheet: View {
             }
             Spacer(minLength: 12)
             Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.suggestion }, set: { choices[duplicate.id] = $0 })) {
-                ForEach(DuplicateChoice.allCases.filter { $0 != .replace || duplicate.canReplace }, id: \.self) { Text($0.title).tag($0) }
+                ForEach(DuplicateChoice.allCases.filter { $0 != .replace || duplicate.canReplace }, id: \.self) { choice in
+                    // "Replace your copies" when it's more than one file.
+                    Text(choice == .replace && duplicate.replacements.count > 1 ? "Replace your copies" : choice.title).tag(choice)
+                }
             }
             .labelsHidden()
             .fixedSize()

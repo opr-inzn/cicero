@@ -392,7 +392,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   library's family; versions compared with `FontVersion`: Newer, Older, Same Version, or Same File when the files are
   the library's byte for byte). Ask (the default) shows a sheet with a row per family: name, a Newer/Older/Same
   Version/Same File tag, "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000", and a picker:
-  Skip it / Add as a copy / Replace your copy (as in Settings) (left out of the picker for a family it can't be done for, with
+  Skip it / Add as a copy / Replace your copy (as in Settings; "Replace your copies" for a family it replaces more than one file of) (left out of the picker for a family it can't be done for, with
   the reason under it: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently." or
   "…your copy comes with macOS or an app, or from Adobe Fonts."), starting at Replace your copy when the added one is
   newer (Add as a copy when replacing can't be done), else Skip it; with Replace your copy chosen for a family
