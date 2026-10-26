@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.9
 
 - Typing on a font page, and dragging its **Size**, **Tracking** and **Leading** sliders, no longer lags.
 - In **Preview Options**, **Save as Preset** adds the preview text to **Presets**. **Remove Preset** takes it out again.
