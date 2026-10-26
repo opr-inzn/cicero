@@ -52,10 +52,12 @@ struct GeneralSettings: View {
                 }
                 let misplaced = model.misplacedInstalledFonts()
                 if !misplaced.paths.isEmpty {
+                    let note = misplacedNote(misplaced)
                     LabeledContent {
                         Button("Move Them") { model.moveInstalledFonts() }
                     } label: {
-                        Text(misplacedNote(misplaced))
+                        Text(note.title)
+                        Text(note.detail)
                     }
                 }
                 // The two pop-up menus are as wide as each other.
@@ -159,11 +161,17 @@ struct GeneralSettings: View {
         }
     }
 
-    /// "Cicero installed Inter and Roboto before, in ~/Library/Fonts."
-    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> String {
+    /// "Inter and Roboto are still in ~/Library/Fonts", and what Move Them does with them. The copies Cicero installed
+    /// there are always on: turning one off takes it out.
+    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> (title: String, detail: String) {
         let count = misplaced.paths.count
-        let names = FontNames.describe(families: Array(Set(misplaced.families.values))) ?? (count == 1 ? "a font" : "\(count) fonts")
-        return "Cicero installed \(names) before, in ~/Library/Fonts."
+        let families = Array(Set(misplaced.families.values))
+        let one = families.count == 1 || families.isEmpty && count == 1
+        let names = FontNames.describe(families: families) ?? (count == 1 ? "A font" : "\(count) fonts")
+        let detail = one
+            ? "Cicero installed it there before. Move Them puts it into the Font Library, and it stays on."
+            : "Cicero installed them there before. Move Them puts them into the Font Library, and they stay on."
+        return ("\(names) \(one ? "is" : "are") still in ~/Library/Fonts", detail)
     }
 
     private var duplicateExplanation: String {
