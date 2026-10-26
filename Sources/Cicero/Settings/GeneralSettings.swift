@@ -153,11 +153,11 @@ struct GeneralSettings: View {
 
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
-        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as another copy or use it instead."
+        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as another copy or replace the one you had."
         case .addCopy: "Both files stay in your library. The one you had stays in use."
         case .skip: "The added file is left out. The one you had stays in use."
-        case .useAdded: "The added file is used instead, and the one you had is turned off. No font is lost."
-        case .keepNewer: "The added file is used instead when its version is newer, and left out otherwise."
+        case .useAdded: "The added file replaces the one you had, even an older version or one with the same version number. The one you had is turned off, so no font is lost."
+        case .keepNewer: "The added file replaces the one you had only when its version number is higher. Otherwise it’s left out."
         }
     }
 
@@ -178,8 +178,8 @@ private extension DuplicateHandling {
         case .ask: "Ask each time"
         case .addCopy: "Add it as another copy"
         case .skip: "Skip it"
-        case .useAdded: "Use the added one"
-        case .keepNewer: "Keep the newer version"
+        case .useAdded: "Replace"
+        case .keepNewer: "Replace if it’s newer"
         }
     }
 }

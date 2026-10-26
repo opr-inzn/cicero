@@ -47,7 +47,7 @@ struct DuplicatesSheet: View {
                     }
                     .fixedSize()
                 }
-                Text("Using the added one turns the library’s copy off as deactivating does, so no font is lost.")
+                Text("Replace turns off the one you had, the way turning a font off does, so no font is lost.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -128,7 +128,7 @@ extension DuplicateChoice {
         switch self {
         case .skip: "Skip It"
         case .addCopy: "Add as Another Copy"
-        case .useAdded: "Use the Added One"
+        case .useAdded: "Replace"
         }
     }
 }

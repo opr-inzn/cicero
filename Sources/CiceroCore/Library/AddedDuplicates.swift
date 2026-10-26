@@ -65,7 +65,7 @@ public struct AddedDuplicate: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Turning the library's copies of styles off for the added files to take over (Use the Added One).
+/// Turning the library's copies of styles off for the added files to take over (Replace).
 public struct DuplicateReplacement: Sendable {
     /// Per style of an added file that takes over a copy that's on: the added face to turn on and the library's copies
     /// to turn off. Added files that take over none are added as any other.
