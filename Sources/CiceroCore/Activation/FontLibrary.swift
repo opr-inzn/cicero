@@ -64,53 +64,6 @@ extension ActivationEngine {
         return rmdir(folder) == 0
     }
 
-    // MARK: Fonts installed before
-
-    /// The copies Cicero installed right in ~/Library/Fonts, while fonts go into the Font Library: they can move there.
-    /// Never a file the user put in ~/Library/Fonts; none while fonts go into ~/Library/Fonts.
-    public func misplacedCopies(in records: ActivationRecords) -> [String] {
-        guard installsIntoFontLibrary, fontLibrary != nil else { return [] }
-        let fonts = locations.userFonts.path + "/"
-        return records.installedCopies.keys.filter { $0.hasPrefix(fonts) }.sorted()
-    }
-
-    /// Moves copies Cicero installed in ~/Library/Fonts into the Font Library (see `misplacedCopies`), each into the folder
-    /// of the family `families` gives it, else of its first font. One that's on goes off while it moves, as macOS would see
-    /// it go anyway, and is registered where it is now; one that can't move stays where it was, as it was.
-    @concurrent
-    public func moveInstalledCopies(_ paths: [String], families: [String: String], records: ActivationRecords) async -> ActivationResult {
-        let fm = FileManager.default
-        var records = records
-        guard installsIntoFontLibrary, fontLibrary != nil else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "") }
-        let paths = paths.filter { records.installedCopies[$0] != nil && fm.fileExists(atPath: $0) }
-        let wasActive = paths.filter { registrar.isActive(Self.url($0)) }
-        if !wasActive.isEmpty { _ = await registrar.unregister(wasActive.map(Self.url), scope: .persistent) }
-        var moved: [String: String] = [:]
-        var failed: [String] = []
-        for path in paths {
-            let folder = installFolder(for: path, family: families[path])
-            do {
-                try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-                let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: folder)
-                try Self.move(Self.url(path), to: destination)
-                records.installedCopies[destination.path] = records.installedCopies.removeValue(forKey: path)
-                moved[path] = destination.path
-            } catch {
-                // The family's folder, if it was made for nothing.
-                removeEmptyFolders(around: folder.appendingPathComponent(Self.url(path).lastPathComponent).path)
-                failed.append(path)
-            }
-        }
-        if !wasActive.isEmpty { _ = await registrar.register(wasActive.map { Self.url(moved[$0] ?? $0) }, scope: .persistent) }
-        for path in wasActive { if let new = moved[path] { records.inPlace.insert(new) } }
-        let message = if failed.isEmpty, let names = FontNames.describe(FontNames.fonts(inFiles: moved.values.sorted())) {
-            "\(names) moved into your Font Library"
-        } else {
-            Self.message("Moved", "move", succeeded: moved.count, failed: failed.count)
-        }
-        return ActivationResult(records: records, succeeded: moved.count, failed: failed, message: message)
-    }
-
     // MARK: Moving the library
 
     /// Moves the Font Library into `destination`, an empty folder (see `refusal`), which it takes the place of: the whole

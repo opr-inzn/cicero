@@ -78,7 +78,7 @@ Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it in
 - **Turning a font off** only turns it off: the file stays in the library, listed and off, ready to turn on again. It never goes to the Trash or the Deactivated folder. **Move to Trash** removes it from the library, and its family’s folder goes once nothing is left in it.
 - **Its fonts are in your library** like the ones in your Fonts folder: under **All Fonts**, and **Active** or **Inactive**, whether or not the setting is on. The Font Library itself isn’t in the sidebar.
 - **A font from one of your locations** has two files once it’s in the library: the one in its folder and the library’s copy. That’s not a duplicate: Conflicts leaves it alone, and **Use Copy From** counts the copy as being where its original is.
-- **Fonts Cicero installed before** stay in your Fonts folder until you click **Move Them**, next to the setting, which shows while there are any. Cicero moves each into its family’s folder in the library, turning it off for the moment that takes and on again there. Fonts you put in your Fonts folder yourself stay where they are.
+- **Fonts already in your Fonts folder** stay there, on, whether Cicero installed them before or you did. Only fonts you turn on from now on go into the library.
 - **Turning the setting off** moves nothing: the library stays, its fonts stay on or off as they are, and fonts you install from then on go into your Fonts folder again.
 - **Microsoft Office** can’t use the library’s fonts, because they aren’t in your Fonts folder. See [Fonts in Microsoft Office](#fonts-in-microsoft-office).
 

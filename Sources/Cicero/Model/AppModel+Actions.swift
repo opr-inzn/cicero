@@ -174,33 +174,6 @@ extension AppModel {
 
     // MARK: Font Library
 
-    /// The fonts Cicero installed right in ~/Library/Fonts while it installs into the Font Library, with the family each
-    /// file is in, for its folder there (see `ActivationEngine.misplacedCopies`).
-    func misplacedInstalledFonts() -> (paths: [String], families: [String: String]) {
-        let paths = engine.misplacedCopies(in: data.records)
-        guard !paths.isEmpty else { return ([], [:]) }
-        let wanted = Set(paths)
-        var families: [String: String] = [:]
-        for family in library.families {
-            for face in family.faces {
-                for path in [face.face.path] + face.otherCopies where wanted.contains(path) && families[path] == nil {
-                    families[path] = family.id
-                }
-            }
-        }
-        return (paths, families)
-    }
-
-    /// Moves the fonts Cicero installed right in ~/Library/Fonts into the Font Library (see `misplacedInstalledFonts`).
-    func moveInstalledFonts() {
-        let (paths, families) = misplacedInstalledFonts()
-        guard !paths.isEmpty else { return }
-        enqueue { model in
-            let result = await model.engine.moveInstalledCopies(paths, families: families, records: model.data.records)
-            model.finish(result)
-        }
-    }
-
     /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;
     /// a folder it can't go into is refused, saying why (see `ActivationEngine.refusal`).
     func changeFontLibrary() {

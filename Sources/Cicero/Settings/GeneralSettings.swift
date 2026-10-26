@@ -50,16 +50,6 @@ struct GeneralSettings: View {
                     Text("Cicero’s Font Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
-                let misplaced = model.misplacedInstalledFonts()
-                if !misplaced.paths.isEmpty {
-                    let note = misplacedNote(misplaced)
-                    LabeledContent {
-                        Button("Move Them") { model.moveInstalledFonts() }
-                    } label: {
-                        Text(note.title)
-                        Text(note.detail)
-                    }
-                }
                 // The two pop-up menus are as wide as each other.
                 let installMethods = InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) }
                 let duplicateHandlings = DuplicateHandling.allCases.map { (title: $0.title, value: $0) }
@@ -159,19 +149,6 @@ struct GeneralSettings: View {
         case .notReady: what + " Apple Intelligence is getting ready."
         case .unavailable: "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes. Everything stays on this Mac."
         }
-    }
-
-    /// "Inter and Roboto are still in ~/Library/Fonts", and what Move Them does with them. The copies Cicero installed
-    /// there are always on: turning one off takes it out.
-    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> (title: String, detail: String) {
-        let count = misplaced.paths.count
-        let families = Array(Set(misplaced.families.values))
-        let one = families.count == 1 || families.isEmpty && count == 1
-        let names = FontNames.describe(families: families) ?? (count == 1 ? "A font" : "\(count) fonts")
-        let detail = one
-            ? "Cicero installed it there before. Move Them puts it into Cicero’s Font Library, and it stays on."
-            : "Cicero installed them there before. Move Them puts them into Cicero’s Font Library, and they stay on."
-        return ("\(names) \(one ? "is" : "are") still in ~/Library/Fonts", detail)
     }
 
     private var duplicateExplanation: String {
