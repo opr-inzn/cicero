@@ -1020,6 +1020,15 @@ extension AppModel {
                 showToast("Couldn’t clear the macOS font caches")
             }
         }
+        // Clearing them makes macOS forget the fonts Cicero uses where they are, for good or for a while: on again.
+        if clearedSystem {
+            await enqueued { model in
+                let result = await model.engine.registerAgain(model.data.records)
+                if !result.failed.isEmpty {
+                    model.showToast(result.failed.count == 1 ? "Couldn’t turn 1 file on again" : "Couldn’t turn \(result.failed.count) files on again")
+                }
+            }
+        }
         if failures > 0 {
             showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures) cache items to the Trash")
         } else if !trashed.isEmpty && !clearedSystem {

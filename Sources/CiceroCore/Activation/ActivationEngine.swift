@@ -868,6 +868,18 @@ public struct ActivationEngine: Sendable {
         return records
     }
 
+    /// Turns on again what macOS has let go of, as clearing its font caches does: files Cicero registered where they are,
+    /// for good or for the session, that are there but off now. The records stay as they are; one that won't go on is among
+    /// `failed`.
+    @concurrent
+    public func registerAgain(_ records: ActivationRecords) async -> ActivationResult {
+        func lost(_ path: String) -> Bool { FileManager.default.fileExists(atPath: path) && !registrar.isActive(Self.url(path)) }
+        let persistent = records.inPlace.filter(lost).sorted()
+        let session = records.temporary.keys.filter(lost).sorted()
+        let failed = await registerAndConfirm(persistent, scope: .persistent).union(await registerAndConfirm(session, scope: .session))
+        return ActivationResult(records: records, succeeded: persistent.count + session.count - failed.count, failed: failed.sorted(), message: "")
+    }
+
     /// Ends session registrations ("until Cicero quits", application sets) and returns the paths still on. A file in a
     /// Fonts folder is turned off there instead: unregistering it would take it off macOS's list of fonts it has off,
     /// leaving it to be turned on again later.
