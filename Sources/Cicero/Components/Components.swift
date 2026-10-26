@@ -403,8 +403,9 @@ struct ValueField: View {
         self.step = step
         self.unit = unit
         self.alignment = alignment
-        // The number from the start, not once it appears: a field in a layout `ViewThatFits` is still weighing, as the
-        // font page's row on one line, would measure as wide as its title, which it shows while empty.
+        // The number from the start, not once it appears: a field measured before it's on screen, as the font page's
+        // controls measure theirs to choose a layout (see `TesterControls`), would measure as wide as its title, which it
+        // shows while empty.
         _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
@@ -835,15 +836,34 @@ private struct PreviewOptions: View {
             Section {
                 TextField("Preview Text", text: $preview.sampleText, prompt: Text("Preview Text"))
                     .labelsHidden()
-                // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
-                Menu("Presets\u{200A}") {
-                    ForEach(PreviewSettings.presets, id: \.self) { sample in
-                        Button(sample) { preview.sampleText = sample }
+                HStack {
+                    // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
+                    Menu("Presets\u{200A}") {
+                        // Yours first, in the order saved, then Cicero's.
+                        ForEach(preview.savedPresets, id: \.self) { sample in
+                            Button(Self.title(of: sample)) { preview.sampleText = sample }
+                        }
+                        if !preview.savedPresets.isEmpty {
+                            Divider()
+                        }
+                        ForEach(PreviewSettings.presets, id: \.self) { sample in
+                            Button(sample) { preview.sampleText = sample }
+                        }
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .fixedSize()
+                    Spacer()
+                    // Once the text is one of yours, the button takes it out again.
+                    if preview.isSavedPreset {
+                        Button("Remove Preset") { preview.savedPresets.removeAll { $0 == preview.sampleText } }
+                            .help("Takes the preview text out of Presets")
+                    } else {
+                        Button("Save as Preset") { preview.savedPresets.append(preview.sampleText) }
+                            .disabled(!preview.canSavePreset)
+                            .help("Adds the preview text to Presets")
                     }
                 }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .fixedSize()
             }
             Section {
                 if size == nil, let share = GridPanelSize.shared.share {
@@ -864,6 +884,11 @@ private struct PreviewOptions: View {
         .formStyle(.grouped)
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// A preset as its menu item shows it: a long one cut short, so the menu isn't as wide as the text.
+    private static func title(of preset: String) -> String {
+        preset.count > 48 ? String(preset.prefix(47)) + "…" : preset
     }
 
     private func row(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") -> some View {

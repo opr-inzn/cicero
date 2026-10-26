@@ -225,53 +225,34 @@ private struct TypeTester: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    @AppStorage("typeTester.text") private var text = Self.defaultText
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
     /// The space added between letters, in percent of the em, on top of the font's kerning: the page's own, not the
     /// overview's, which sets every font with its own spacing.
     @AppStorage("typeTester.tracking") private var tracking = Self.savedTracking
-    /// What's typed over the text in a font's own script, on this family's page only (see `shownText`).
+    /// What's typed over the text in a font's own script, on this family's page only (see `TesterText.shownText`).
     @State private var ownScript: (family: String, text: String)?
 
     var body: some View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
-            // On one row wherever the sliders fit at their narrowest, with symbols for labels where the words don't fit,
-            // else on a row of their own under the menu, with their words again: with the Info panel open, a narrow window
-            // has too little for all of them, and squeezed further, the labels would wrap and the row grow. Either way the
-            // sliders take all the width their row leaves, and the last value ends where the row does.
-            ViewThatFits(in: .horizontal) {
-                ForEach([false, true], id: \.self) { symbols in
-                    HStack(spacing: 16) {
-                        stylePicker(isAdjusted: !variations.isEmpty)
-                        sliders(symbols: symbols)
-                        buttons(hasAxes: !face.face.axes.isEmpty)
-                    }
-                }
-                VStack(spacing: 10) {
-                    HStack(spacing: 16) {
-                        stylePicker(isAdjusted: !variations.isEmpty)
-                        Spacer()
-                        buttons(hasAxes: !face.face.axes.isEmpty)
-                    }
-                    sliders(symbols: false)
-                }
+            TesterControls {
+                stylePicker(isAdjusted: !variations.isEmpty)
+                sliders
+                buttons(hasAxes: !face.face.axes.isEmpty)
             }
             .padding(.top, 12)
             // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
-                editor(face.face, FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
-                                              features: model.features(for: family)))
+                TesterText(family: family, face: face.face,
+                           font: FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
+                                                        features: model.features(for: family)),
+                           size: size, tracking: tracking, alignment: alignment, ownScript: $ownScript)
             }
             .frame(minHeight: 320)
         }
         .padding(.horizontal, 24)
-        // Text left empty as the last page closed, which the editor doesn't hear about.
-        .onAppear {
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = Self.defaultText }
-        }
     }
 
     @ViewBuilder
@@ -288,41 +269,37 @@ private struct TypeTester: View {
             }
             .fixedSize()
             .help("Which style to show; Automatic shows the regular style, or a style the search names, like Italic")
+            .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
         }
     }
 
-    /// The text's size and tracking, and its leading, which is Preview Options' too. The labels and values side by side
-    /// with the sliders in one row, so the sliders share what it leaves equally: all of it, and as long as each other,
-    /// however long their labels. With `symbols`, a symbol stands for each word, as in a layout app's character panel.
-    private func sliders(symbols: Bool) -> some View {
-        HStack(spacing: 8) {
-            slider("Size", symbol: symbols ? "textformat.size.larger" : nil, $size, range: 12...240, unit: " pt")
-            slider("Tracking", symbol: symbols ? "arrow.left.and.right.text.vertical" : nil, $tracking, range: -10...40, step: 0.5,
-                   unit: "%", isFirst: false)
-                .help("The space added between letters, in percent of the em, on top of the font’s kerning")
-            slider("Leading", symbol: symbols ? "arrow.up.and.down.text.horizontal" : nil,
-                   Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%", isFirst: false)
-                .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
-        }
+    /// The text's size and tracking, and its leading, which is Preview Options' too.
+    @ViewBuilder
+    private var sliders: some View {
+        slider("Size", symbol: "textformat.size.larger", $size, range: 12...240, unit: " pt")
+        slider("Tracking", symbol: "arrow.left.and.right.text.vertical", $tracking, range: -10...40, step: 0.5, unit: "%")
+            .help("The space added between letters, in percent of the em, on top of the font’s kerning")
+        slider("Leading", symbol: "arrow.up.and.down.text.horizontal",
+               Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
+            .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
     }
 
-    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too:
-    /// three views of the row, the label 16 pt after the value before it. A `symbol` takes the label's place, with the
-    /// word as its tooltip (Preview Options' symbol is `textformat.size`, so Size's is the larger A alone).
-    private func slider(_ title: String, symbol: String? = nil, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1,
-                        unit: String, isFirst: Bool = true) -> some View {
+    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too.
+    /// The label is there as a word and as a symbol, as in a layout app's character panel, with the word as its tooltip
+    /// (Preview Options' symbol is `textformat.size`, so Size's is the larger A alone); `TesterControls` shows one of them.
+    private func slider(_ title: String, symbol: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1,
+                        unit: String) -> some View {
         Group {
-            Group {
-                if let symbol {
-                    Image(systemName: symbol).help(title).accessibilityLabel(title)
-                } else {
-                    Text(title)
-                }
-            }
-            .foregroundStyle(.secondary).fixedSize().padding(.leading, isFirst ? 0 : 8)
+            Text(title)
+                .controlLabel(.word)
+            // The word stands for it to VoiceOver, whichever is shown.
+            Image(systemName: symbol).help(title).accessibilityHidden(true)
+                .controlLabel(.symbol)
             // Ideally as narrow as at the least: the row they fit in is the menu's, while they fit at all.
             ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
+                .layoutValue(key: TesterControls.RoleKey.self, value: .slider)
             ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
+                .layoutValue(key: TesterControls.RoleKey.self, value: .value)
         }
     }
 
@@ -372,15 +349,165 @@ private struct AxesButton: View {
     }
 }
 
-private extension TypeTester {
-    @ViewBuilder
-    func editor(_ face: FontFace, _ ctFont: CTFont) -> some View {
-        let (text, defaultText) = shownText(face)
+/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment and Axes buttons.
+/// On one row wherever the sliders fit at their narrowest, with symbols for labels where the words don't fit, else the
+/// sliders on a row of their own under the menu, with their words again: with the Info panel open, a narrow window has
+/// too little for all of them, and squeezed further, the labels would wrap and the row grow. Either way the sliders share
+/// all the width their row leaves, as long as each other, and the last value ends where the row does. Each slider's
+/// label, slider and value are 8 pt apart, everything else 16. A layout of its own, not `ViewThatFits` over the three
+/// ways, which made each of them afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed
+/// and each step of a slider, a third of a second.
+private struct TesterControls: Layout {
+    enum Role {
+        case menu, word, symbol, slider, value, button
+    }
+
+    struct RoleKey: LayoutValueKey {
+        static let defaultValue = Role.button
+    }
+
+    struct Cache {
+        var roles: [Role]
+        /// Each one's ideal size: the sliders' is their narrowest.
+        var sizes: [CGSize]
+    }
+
+    private enum Arrangement {
+        case words, symbols, twoRows
+    }
+
+    func makeCache(subviews: Subviews) -> Cache {
+        Cache(roles: subviews.map { $0[RoleKey.self] }, sizes: subviews.map { $0.sizeThatFits(.unspecified) })
+    }
+
+    func updateCache(_ cache: inout Cache, subviews: Subviews) {
+        cache = makeCache(subviews: subviews)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
+        let proposed = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let arrangement = arrangement(width: proposed, cache)
+        guard arrangement == .twoRows else {
+            let row = oneRow(symbols: arrangement == .symbols, cache)
+            return CGSize(width: proposed ?? width(of: row, cache), height: height(of: row, cache))
+        }
+        let (top, bottom) = twoRows(cache)
+        return CGSize(width: max(proposed ?? 0, width(of: top, cache), width(of: bottom, cache)),
+                      height: height(of: top, cache) + 10 + height(of: bottom, cache))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
+        let arrangement = arrangement(width: bounds.width, cache)
+        guard arrangement == .twoRows else {
+            place(oneRow(symbols: arrangement == .symbols, cache), in: bounds, subviews, cache)
+            return
+        }
+        let (top, bottom) = twoRows(cache)
+        let topHeight = height(of: top, cache)
+        // The menu at the left, the buttons at the right.
+        let buttons = top.filter { cache.roles[$0] == .button }
+        var x = bounds.minX
+        for index in top {
+            if index == buttons.first { x = bounds.maxX - width(of: buttons, cache) }
+            subviews[index].place(at: CGPoint(x: x, y: bounds.minY + topHeight / 2), anchor: .leading,
+                                  proposal: ProposedViewSize(cache.sizes[index]))
+            x += cache.sizes[index].width + 16
+        }
+        let rest = CGRect(x: bounds.minX, y: bounds.minY + topHeight + 10, width: bounds.width, height: height(of: bottom, cache))
+        place(bottom, in: rest, subviews, cache)
+    }
+
+    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave; the labels
+    /// not in it at no width, where they'd be, with nothing to see.
+    private func place(_ row: [Int], in bounds: CGRect, _ subviews: Subviews, _ cache: Cache) {
+        let sliders = row.filter { cache.roles[$0] == .slider }
+        let extra = max(0, bounds.width - width(of: row, cache)) / CGFloat(max(1, sliders.count))
+        var x = bounds.minX
+        for index in subviews.indices {
+            let size = cache.sizes[index]
+            guard row.contains(index) else {
+                if cache.roles[index] == .word || cache.roles[index] == .symbol {
+                    subviews[index].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                                          proposal: ProposedViewSize(width: 0, height: size.height))
+                }
+                continue
+            }
+            if index != row.first { x += gap(before: index, cache) }
+            let width = cache.roles[index] == .slider ? size.width + extra : size.width
+            subviews[index].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                                  proposal: ProposedViewSize(width: width, height: size.height))
+            x += width
+        }
+    }
+
+    private func arrangement(width: CGFloat?, _ cache: Cache) -> Arrangement {
+        guard let width else { return .words }
+        if self.width(of: oneRow(symbols: false, cache), cache) <= width { return .words }
+        if self.width(of: oneRow(symbols: true, cache), cache) <= width { return .symbols }
+        return .twoRows
+    }
+
+    /// Everything, with the labels' words or their symbols.
+    private func oneRow(symbols: Bool, _ cache: Cache) -> [Int] {
+        cache.roles.indices.filter { cache.roles[$0] != (symbols ? .word : .symbol) }
+    }
+
+    /// The menu and buttons, then the sliders with their words.
+    private func twoRows(_ cache: Cache) -> (top: [Int], bottom: [Int]) {
+        let top = cache.roles.indices.filter { cache.roles[$0] == .menu || cache.roles[$0] == .button }
+        return (top, cache.roles.indices.filter { [.word, .slider, .value].contains(cache.roles[$0]) })
+    }
+
+    private func gap(before index: Int, _ cache: Cache) -> CGFloat {
+        cache.roles[index] == .slider || cache.roles[index] == .value ? 8 : 16
+    }
+
+    private func width(of row: [Int], _ cache: Cache) -> CGFloat {
+        row.reduce(0) { width, index in width + (index == row.first ? 0 : gap(before: index, cache)) + cache.sizes[index].width }
+    }
+
+    private func height(of row: [Int], _ cache: Cache) -> CGFloat {
+        row.map { cache.sizes[$0].height }.max() ?? 0
+    }
+}
+
+private extension View {
+    /// A slider's label in `TesterControls`, as a word or as a symbol: grey, and at no width, with nothing to see, when
+    /// the controls show the other one.
+    func controlLabel(_ role: TesterControls.Role) -> some View {
+        foregroundStyle(.secondary)
+            .fixedSize()
+            .frame(minWidth: 0, alignment: .leading)
+            .clipped()
+            .layoutValue(key: TesterControls.RoleKey.self, value: role)
+    }
+}
+
+/// The type tester's text, a view of its own so that typing updates it alone, not the controls above it.
+private struct TesterText: View {
+    @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
+    let family: Family
+    let face: FontFace
+    let font: CTFont
+    let size: Double
+    let tracking: Double
+    let alignment: SampleAlignment
+    @Binding var ownScript: (family: String, text: String)?
+    @Bindable private var store = TesterTextStore.shared
+
+    private var text: String {
+        get { store.text }
+        nonmutating set { store.text = newValue }
+    }
+
+    var body: some View {
+        let (text, defaultText) = shownText
         let kerning = size * tracking / 100
         let lineHeightPoints = size * preview.lineSpacing / 100
-        let room = Self.room(for: text.wrappedValue, in: ctFont, kerning: kerning, lineHeight: lineHeightPoints)
+        let room = Self.room(for: text.wrappedValue, in: font, kerning: kerning, lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
-        SampleEditor(text: text, defaultText: defaultText, font: ctFont, kerning: kerning, lineHeight: lineHeightPoints,
+        SampleEditor(text: text, defaultText: defaultText, font: font, kerning: kerning, lineHeight: lineHeightPoints,
                      alignment: alignment.paragraph, margin: 24, roomAbove: room.above, roomBelow: room.below) {
             FamilyMenu(families: [family], model: model)
         }
@@ -391,14 +518,18 @@ private extension TypeTester {
             // Around the text too, which has it in its own menu (see `SampleEditor`).
             .contentShape(.rect)
             .contextMenu { FamilyMenu(families: [family], model: model) }
+            // Text left empty as the last page closed, which the editor doesn't hear about.
+            .onAppear {
+                if self.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.text = Self.defaultText }
+            }
     }
 
     /// The text to show and type into: what's been typed, kept from one page to the next, or, for a font with none of its
     /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only. And
     /// what it goes back to when it's left empty.
-    func shownText(_ face: FontFace) -> (text: Binding<String>, defaultText: String) {
+    private var shownText: (text: Binding<String>, defaultText: String) {
         let sample = model.scriptSamples.text(text, for: face, long: true)
-        guard sample != text else { return ($text, Self.defaultText) }
+        guard sample != text else { return ($store.text, Self.defaultText) }
         let family = family.id
         let text = Binding {
             ownScript.flatMap { $0.family == family ? $0.text : nil } ?? sample
@@ -420,7 +551,47 @@ private extension TypeTester {
     }
 
     static let defaultText = "Sphinx of black quartz, judge my vow."
+}
 
+/// The type tester's text, kept from one page to the next and for the next launch: saved a second after typing stops, and
+/// as Cicero quits, rather than with each letter. SwiftUI draws every view with an `@AppStorage` again whenever anything
+/// is saved to the defaults, whatever the key, so with each letter typed the browser behind the page was drawn again too,
+/// and Settings and the Compare window where they were open.
+@Observable
+private final class TesterTextStore {
+    static let shared = TesterTextStore()
+    private static let key = "typeTester.text"
+
+    var text: String {
+        didSet { saveSoon() }
+    }
+
+    @ObservationIgnored private var pendingSave: Task<Void, Never>?
+
+    private init() {
+        text = UserDefaults.standard.string(forKey: Self.key) ?? TesterText.defaultText
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { TesterTextStore.shared.save() }
+        }
+    }
+
+    private func saveSoon() {
+        pendingSave?.cancel()
+        pendingSave = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            save()
+        }
+    }
+
+    private func save() {
+        pendingSave?.cancel()
+        pendingSave = nil
+        UserDefaults.standard.set(text, forKey: Self.key)
+    }
+}
+
+private extension TypeTester {
     /// What Preview Options' Tracking was set to, before it moved here.
     static var savedTracking: Double {
         UserDefaults.standard.object(forKey: "preview.tracking") as? Double ?? 0
