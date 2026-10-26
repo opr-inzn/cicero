@@ -4,7 +4,7 @@
 
 Click **Conflicts** in the sidebar to see what Cicero found wrong with your fonts. The number next to it counts the conflicts, not counting [Shared Style Names](#shared-style-names). When there’s nothing to fix, it says “No Conflicts”.
 
-Conflicts are in groups. Each group starts with a short explanation, then shows a card per font, with its files and buttons to fix it. To look again after you’ve changed something outside Cicero, click **Check Again** in the toolbar.
+Conflicts are in groups. Each group starts with a short explanation, then shows a card per font, with its files and buttons to fix it. The list follows changes by itself, also ones made outside Cicero.
 
 ## How files are shown
 

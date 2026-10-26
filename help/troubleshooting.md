@@ -35,8 +35,6 @@ Cicero follows changes by itself: it looks again when fonts are turned on or off
 - **Fonts → Rescan Library** (⌘R) looks through your fonts again. It’s quick, because Cicero remembers what it read from each file.
 - **Fonts → Rebuild Font List**, or **Rebuild** next to **Library** in **Settings → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
 
-In **Conflicts**, **Check Again** in the toolbar rescans too.
-
 ## A font won’t turn off
 
 - Fonts that come with macOS, fonts installed for all users, fonts that come with an app, and Adobe Fonts from Creative Cloud can’t be turned off in Cicero. See [Fonts Cicero can’t turn off](activating.md#fonts-cicero-cant-turn-off).

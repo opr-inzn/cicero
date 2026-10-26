@@ -34,14 +34,6 @@ struct ProblemsView: View {
         .background(Color.canvas)
         .navigationTitle("Conflicts")
         .navigationSubtitle(subtitle)
-        .toolbar {
-            ToolbarItem {
-                Button("Check Again", systemImage: "arrow.clockwise") { model.rescan() }
-                    .toolbarButtonStyle()
-                    .disabled(model.scanProgress != nil)
-                    .help("Look through the library again")
-            }
-        }
     }
 
     private var subtitle: String {
