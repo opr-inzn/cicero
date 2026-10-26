@@ -5,10 +5,14 @@ import SwiftUI
 struct FontGrid: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    @Environment(\.infoPanelShown) private var infoShown
+    @Environment(\.displayScale) private var scale
     let families: [Family]
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
-    @State private var gridWidth: CGFloat = 0
+    /// The rows' width, with how far the Info panel was in when it was measured, which the rows' width is narrower by: the
+    /// two together, rather than the width measured with how far in the panel is by now, a frame further on its way.
+    @State private var gridRoom = GridRoom(width: 0, infoShown: 0)
     @State private var visibleHeight: CGFloat = 0
 
     /// Between tiles, and between the last column and the Info panel.
@@ -41,12 +45,13 @@ struct FontGrid: View {
         /// The sample's height: its letters and room above and below them, which small type gets more of.
         func height(size: Double) -> CGFloat { above + below + size * 0.25 + 44 }
 
-        /// The widest a font's sample is drawn with the Info panel shut: as wide as a tile as narrow as it can be has room
-        /// for, in tiles `closedTile` wide, which goes up with the size, not with the tiles, as they stay as wide as they
-        /// are until a row has room for one fewer or one more. With the panel open, every sample at `drawn` alike.
-        func fit(size: Double, ratio: CGFloat?, closedTile: CGFloat, drawn: Double) -> SampleFit {
+        /// The widest a font's sample is drawn with the sidebar shown and the Info panel shut: as wide as a tile as narrow as
+        /// it can be has room for, in tiles `restingTile` wide, which goes up with the size, not with the tiles, as they stay
+        /// as wide as they are until a row has room for one fewer or one more. With the sidebar hidden or the panel open,
+        /// every sample at `drawn` alike.
+        func fit(size: Double, ratio: CGFloat?, restingTile: CGFloat, drawn: Double) -> SampleFit {
             let room = minimumWidth(size: size, ratio: ratio) - padding * 2 - 8
-            return SampleFit(width: min(room, closedTile - padding * 2 - 8), share: drawn / size)
+            return SampleFit(width: min(room, restingTile - padding * 2 - 8), factor: drawn / size)
         }
 
         /// How far below the middle of the sample the baseline is, so that its letters are centred in it.
@@ -60,21 +65,29 @@ struct FontGrid: View {
         }
     }
 
-    /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
-    /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
-    private static let infoPanelRoom = InfoPanelOverlay.width + InfoPanelOverlay.gap * 2
-        + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
+    /// How much narrower the rows are with the Info panel `shown` of the way in: the room `InfoPanelInset` makes for it,
+    /// and `cardsPadding`'s gap beside it in place of the margin at the window's edge, on whole pixels as they're laid out.
+    static func infoPanelNarrowing(shown: CGFloat, scale: CGFloat) -> CGFloat {
+        InfoPanelOverlay.room(shown: shown, scale: scale) + cardsTrailing(infoShown: shown, scale: scale) - InfoPanelOverlay.top
+    }
+
+    /// Beside the last tile or card: the margin at the window's edge, or one gap between cards from the Info panel, whose own
+    /// margin makes up the rest, in between while it slides; on whole pixels.
+    static func cardsTrailing(infoShown: CGFloat, scale: CGFloat) -> CGFloat {
+        let beside = spacing - InfoPanelOverlay.gap
+        return ((InfoPanelOverlay.top + (beside - InfoPanelOverlay.top) * infoShown) * scale).rounded() / scale
+    }
 
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
         let measure = Measure(sample, size: preview.size)
         let ratio = SampleWidths.shared.listRatio
-        let (count, tile, closedTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
-        let sampleHeight = max(measure.height(size: preview.size), closedTile * Self.sampleHeightPerWidth)
-        // Smaller by as much as the Info panel narrows the tiles, while it does.
-        let share = model.isInfoPresented && tile < closedTile ? tile / closedTile : nil
-        let fit = measure.fit(size: preview.size, ratio: ratio, closedTile: closedTile,
-                              drawn: share.map { GridPanelSize.drawn(preview.size, share: $0) } ?? preview.size)
+        let (count, tile, restingTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
+        let sampleHeight = max(measure.height(size: preview.size), restingTile * Self.sampleHeightPerWidth)
+        // Bigger or smaller by as much as the sidebar hidden or the Info panel open makes the tiles wider or narrower.
+        let factor = tile != restingTile ? tile / restingTile : nil
+        let fit = measure.fit(size: preview.size, ratio: ratio, restingTile: restingTile,
+                              drawn: factor.map { GridScale.drawn(preview.size, factor: $0) } ?? preview.size)
         let inputs = sampleInputs
         ScrollViewReader { proxy in
             ScrollView {
@@ -89,14 +102,14 @@ struct FontGrid: View {
                 // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as
                 // before the Info panel opened kept its columns and pushed the window's panes aside.
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
-                .cardsPadding(infoPresented: model.isInfoPresented)
+                .onGeometryChange(for: GridRoom.self) { [infoShown] in GridRoom(width: $0.size.width, infoShown: infoShown) } action: { gridRoom = $0 }
+                .cardsPadding(infoShown: infoShown, scale: scale)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .visibleHeight($visibleHeight)
             .task(id: inputs) { measureSamples(inputs) }
-            .onChange(of: share, initial: true) { GridPanelSize.shared.share = share }
-            .onDisappear { GridPanelSize.shared.share = nil }
+            .onChange(of: factor, initial: true) { GridScale.shared.factor = factor }
+            .onDisappear { GridScale.shared.factor = nil }
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
             .focusable()
@@ -129,50 +142,166 @@ struct FontGrid: View {
         SampleWidths.shared.update(inputs, samples: samples, scriptSamples: model.scriptSamples)
     }
 
-    /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows without the Info panel,
-    /// from one to five, as wide as fills them, however many families there are. The panel makes the tiles narrower, never
-    /// fewer, and not lower: `closedWidth`, the width they have without it, sets their height.
-    private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat, closedWidth: CGFloat) {
-        guard gridWidth > 0 else { return (1, minimum, minimum) }
-        let closed = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0)
-        let count = min(Self.mostColumns, max(1, Int((closed + Self.spacing) / (minimum + Self.spacing))))
+    /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows the grid has with the
+    /// sidebar shown and the Info panel shut, from one to five, as wide as fills them, however many families there are.
+    /// Hiding the sidebar makes the tiles wider and opening the panel narrower, never more or fewer, and not higher or
+    /// lower: `restingWidth`, the width they have with the sidebar shown and the panel shut, sets their height.
+    private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat, restingWidth: CGFloat) {
+        let gridWidth = gridRoom.width
+        let resting = gridWidth + Self.infoPanelNarrowing(shown: gridRoom.infoShown, scale: scale) - SidebarRoom.shared.hiddenWidth
+        guard gridWidth > 0, resting > 0 else { return (1, minimum, minimum) }
+        let count = min(Self.mostColumns, max(1, Int((resting + Self.spacing) / (minimum + Self.spacing))))
         let width = { (row: CGFloat) in (row - Self.spacing * CGFloat(count - 1)) / CGFloat(count) }
-        return (count, width(gridWidth), width(closed))
+        return (count, width(gridWidth), width(resting))
+    }
+
+    nonisolated struct GridRoom: Equatable {
+        var width: CGFloat
+        var infoShown: CGFloat
     }
 }
 
-/// The size the grid draws at while the Info panel narrows its tiles, which Preview Options' Size shows then: the size
-/// chosen, smaller by as much as the tiles are narrower, rounded down to a whole point so it's never too big for them.
-/// The size chosen is kept for the list, specimens and the grid with the panel shut; a size picked while the panel is
-/// open sets the smallest whole size chosen that the grid draws at that size.
+/// The size the grid draws at while the sidebar hidden or the Info panel open makes its tiles wider or narrower, which
+/// Preview Options' Size shows then: the size chosen, bigger or smaller by as much as the tiles are, rounded down to a
+/// whole point so it's never too big for them. The size chosen is kept for the list, specimens and the grid with the
+/// sidebar shown and the panel shut; a size picked meanwhile sets the smallest whole size chosen that the grid draws at
+/// that size.
 @Observable
-final class GridPanelSize {
-    static let shared = GridPanelSize()
-    /// How much narrower the panel makes the tiles; nil while it's shut or the grid isn't showing.
-    var share: CGFloat?
+final class GridScale {
+    static let shared = GridScale()
+    /// How much wider or narrower the tiles are; nil while the sidebar is shown and the panel shut, or the grid isn't showing.
+    var factor: CGFloat?
 
-    static func drawn(_ size: Double, share: CGFloat) -> Double {
-        (size * share + 1e-6).rounded(.down)
+    static func drawn(_ size: Double, factor: CGFloat) -> Double {
+        (size * factor + 1e-6).rounded(.down)
     }
 
-    static func chosen(drawing drawn: Double, share: CGFloat) -> Double {
-        (drawn / share - 1e-6).rounded(.up)
+    static func chosen(drawing drawn: Double, factor: CGFloat) -> Double {
+        (drawn / factor - 1e-6).rounded(.up)
+    }
+}
+
+/// How much of the sidebar's room the browser has: none while the sidebar is shown, all of it while it's hidden, and more
+/// and more as it slides out. The grid keeps the rows it has with the sidebar shown and draws them wider and bigger by as
+/// much (see `FontGrid.layout`), as the Info panel draws them narrower and smaller, so the sidebar sliding in and out
+/// zooms the grid rather than rearranging it. Dragging the sidebar wider or narrower rearranges it, as resizing the
+/// window does.
+@Observable
+final class SidebarRoom {
+    static let shared = SidebarRoom()
+    /// Where the browser starts in the window: beside the sidebar while it's shown or slides, at 0 while it's hidden.
+    var detailStart: CGFloat? {
+        didSet { moved() }
+    }
+    /// Where the sidebar is in the window. As wide as it is shown, also while it slides and while it's hidden.
+    var sidebar: CGRect? {
+        didSet {
+            if let sidebar, sidebar.minX > inset { inset = sidebar.minX }
+            moved()
+        }
+    }
+    /// Set by AppKit the moment the sidebar starts to slide out or in; SwiftUI's own column visibility changes only
+    /// once it has. While it slides, the browser's edge is the only sign of how far: on macOS 15, SwiftUI's sidebar
+    /// stays put while AppKit's view around it narrows.
+    private var isCollapsed = false
+    /// From the moment the sidebar starts to slide in until the browser is beside it.
+    private var isShowing = false
+    /// How much further from the window's edge the browser starts than the sidebar is wide while it's shown: 8 pt on
+    /// macOS 26, where the sidebar floats 8 pt in, 1 pt on macOS 15, for its divider. Taken while it's shown and still.
+    private var beside: CGFloat?
+    /// The furthest in the sidebar has been from the window's edge: `beside`, but for macOS 15's divider, until there's one.
+    private var inset: CGFloat = 0
+    @ObservationIgnored private var observation: NSKeyValueObservation?
+    @ObservationIgnored private var settling: Task<Void, Never>?
+
+    /// How much wider the browser is than with the sidebar shown; less than a point is none.
+    var hiddenWidth: CGFloat {
+        // Shown: none, also while it's dragged wider or narrower and the browser's edge moves a step before it.
+        guard isCollapsed || isShowing, let room, let detailStart else { return 0 }
+        let hidden = room - detailStart
+        return hidden >= 1 ? hidden : 0
+    }
+
+    /// Where the browser starts with the sidebar shown at the width it has.
+    private var room: CGFloat? {
+        sidebar.map { $0.width + (beside ?? inset) }
+    }
+
+    /// Watches the split view item the sidebar is in, which says when it starts to slide.
+    func watch(_ item: NSSplitViewItem) {
+        isCollapsed = item.isCollapsed
+        observation = item.observe(\.isCollapsed, options: [.new]) { [weak self] _, change in
+            guard let collapsed = change.newValue else { return }
+            // At once, before the browser has moved, so it's still beside the sidebar when that starts to slide out.
+            MainActor.assumeIsolated { self?.collapsedChanged(collapsed) }
+        }
+    }
+
+    private func collapsedChanged(_ collapsed: Bool) {
+        guard collapsed != isCollapsed else { return }
+        if collapsed, !isShowing { measureBeside() }
+        isCollapsed = collapsed
+        isShowing = !collapsed
+        if isShowing { settleSoon() }
+    }
+
+    private func moved() {
+        if isShowing {
+            if let room, let detailStart, detailStart >= room - 0.5 { isShowing = false } else { settleSoon() }
+        }
+        if !isCollapsed, !isShowing { measureBeside() }
+    }
+
+    private func measureBeside() {
+        guard let sidebar, let detailStart, detailStart >= 1 else { return }
+        beside = detailStart - sidebar.width
+    }
+
+    /// Ends sliding in once the browser's edge has been still for a moment, should it stop short of `room`.
+    private func settleSoon() {
+        settling?.cancel()
+        settling = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, let self, isShowing else { return }
+            isShowing = false
+            moved()
+        }
+    }
+}
+
+/// Finds the split view item the sidebar is in, from a view inside it, for `SidebarRoom` to watch.
+struct SidebarItemReader: NSViewRepresentable {
+    func makeNSView(context: Context) -> ReaderView { ReaderView() }
+    func updateNSView(_ view: ReaderView, context: Context) {}
+
+    final class ReaderView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            var view = superview
+            while let current = view, !(current is NSSplitView) { view = current.superview }
+            guard let controller = (view as? NSSplitView)?.delegate as? NSSplitViewController,
+                  let item = controller.splitViewItems.first(where: { $0.behavior == .sidebar }) else { return }
+            SidebarRoom.shared.watch(item)
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 
 /// How big a font's sample is drawn in the grid: at the preview size, or, for one of the few fonts too wide for the tiles
 /// (see `Measure.minimumWidth`), smaller, until it's `width` wide. `width` goes up with the size, so such a font grows and
 /// shrinks with it like the rest; shrunk to fit its tile instead, it stopped growing while the rest went on, until the tiles
-/// got fewer. While the Info panel narrows the tiles, every sample is smaller by as much (see `GridPanelSize`), so all of
-/// them keep their sizes to one another, rather than the wider ones being held at their tiles' edges.
+/// got fewer. While the sidebar hidden or the Info panel open makes the tiles wider or narrower, every sample is bigger or
+/// smaller by as much (see `GridScale`), so all of them keep their sizes to one another, rather than the wider ones being
+/// held at their tiles' edges.
 struct SampleFit {
     var width: CGFloat
-    var share: CGFloat
+    var factor: CGFloat
 
     /// What to multiply the size by, for `sample`, drawn as `text` in `font` at that size.
     func scale(_ sample: SampleWidths.Sample, text: String, in font: CTFont) -> CGFloat {
         let wide = SampleWidths.ratio(of: sample, text: text, in: font) * CTFontGetSize(font)
-        return (wide > width ? width / wide : 1) * share
+        return (wide > width ? width / wide : 1) * factor
     }
 }
 
@@ -268,10 +397,10 @@ struct FamilyCard: ViewModifier {
 }
 
 extension View {
-    /// Around the grid's tiles and the specimens' cards: 16 pt, and one gap between cards from the Info panel,
-    /// whose margin makes up the rest.
-    func cardsPadding(infoPresented: Bool) -> some View {
+    /// Around the grid's tiles and the specimens' cards: 16 pt, and beside the Info panel one gap between cards, whose
+    /// margin makes up the rest (see `FontGrid.cardsTrailing`; `infoShown`, see `infoPanelShown`).
+    func cardsPadding(infoShown: CGFloat, scale: CGFloat) -> some View {
         padding([.leading, .vertical], InfoPanelOverlay.top)
-            .padding(.trailing, infoPresented ? FontGrid.spacing - InfoPanelOverlay.gap : InfoPanelOverlay.top)
+            .padding(.trailing, FontGrid.cardsTrailing(infoShown: infoShown, scale: scale))
     }
 }

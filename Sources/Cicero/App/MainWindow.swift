@@ -13,6 +13,9 @@ struct MainWindow: View {
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 340)
+                // When it slides out and in, and where it is, for how much room hiding it gives the grid (see `SidebarRoom`).
+                .background { SidebarItemReader() }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { SidebarRoom.shared.sidebar = $0 }
         } detail: {
             // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping
             // whatever is around the stack: each page makes room for the Info panel and takes dropped files.
@@ -31,6 +34,8 @@ struct MainWindow: View {
                 transaction.animation = nil
                 transaction.disablesAnimations = true
             }
+            // At the sidebar's edge, also while it slides in and out, which the grid follows (see `SidebarRoom`).
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { SidebarRoom.shared.detailStart = $0 }
         }
         // On the split view, so font pages keep the field too (on the stack it doesn't show at all); typing in
         // it, or changing its tokens, on one goes back to the matches.

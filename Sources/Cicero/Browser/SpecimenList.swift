@@ -5,6 +5,8 @@ import SwiftUI
 /// in themselves.
 struct SpecimenList: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.infoPanelShown) private var infoShown
+    @Environment(\.displayScale) private var scale
     let families: [Family]
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
@@ -21,7 +23,7 @@ struct SpecimenList: View {
                     }
                 }
                 .scrollTargetLayout()
-                .cardsPadding(infoPresented: model.isInfoPresented)
+                .cardsPadding(infoShown: infoShown, scale: scale)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .visibleHeight($visibleHeight)
