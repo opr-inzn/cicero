@@ -33,7 +33,7 @@ struct LanguagesRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: face.id) { [face] in
+        .loading($loaded, for: face.id, cached: { [face] in model.coverage.coverage(of: face.id) }) { [face] in
             await model.coverage.coverage(computing: face)
         }
     }
@@ -115,7 +115,7 @@ struct CharacterSetsRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: face.id) { [face] in
+        .loading($loaded, for: face.id, cached: { [face] in model.coverage.coverage(of: face.id)?.scalars }) { [face] in
             await model.coverage.coverage(computing: face).scalars
         }
     }
@@ -175,11 +175,16 @@ struct UnicodeBlocksRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: face.id) { [face] in
+        .loading($loaded, for: face.id, cached: { [face] in model.coverage.coverage(of: face.id).map { blocks(covered: $0.scalars) } }) { [face] in
             let ranges = await model.coverage.coverage(computing: face).scalars
-            let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
-            return blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
+            return blocks(covered: ranges)
         }
+    }
+
+    /// Every block, with how many of its characters `ranges` has.
+    private func blocks(covered ranges: ScalarRanges) -> [(block: CharacterSetDefinition, has: Int)] {
+        let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
+        return blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
     }
 
     private func list(_ coverage: [(block: CharacterSetDefinition, has: Int)]) -> some View {

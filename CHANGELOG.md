@@ -11,6 +11,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Fonts that earlier versions moved to Cicero’s Deactivated folder go back as Cicero opens, still off: into your Fonts folder, or into Cicero’s Library if Cicero installs fonts there.
 - **Clear Font Caches** no longer turns off the fonts Cicero uses where they are, like those in your locations, in Cicero’s Library or on in every app from Adobe’s folders.
 - Cicero’s Deactivated folder is now called Inactive, `~/Library/Application Support/Cicero/Inactive`. Cicero renames it as it opens.
+- The Info panel opens with the font’s details already in it. Before, it slid in with spinners, and the details faded in only after it had stopped.
 
 ## 0.10.10
 
