@@ -939,6 +939,8 @@ struct DuplicatePrompt: Identifiable {
     let id = UUID()
     var paths: [String]
     var duplicates: [AddedDuplicate]
+    /// The choice in Settings when the sheet asks, which each family starts at where it can.
+    var handling: DuplicateHandling = .ask
     /// What adding them does once they're in.
     var then: (AppModel, Set<String>) -> Void
 }

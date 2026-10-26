@@ -80,6 +80,12 @@ public struct AddedDuplicate: Identifiable, Hashable, Sendable {
         return canReplace ? .replace : .addCopy
     }
 
+    /// What the sheet starts with when it asks under `handling`: what that does, where it can; else the suggestion. With
+    /// Replace, every family that can be replaced starts there, whatever its version.
+    public func startingChoice(for handling: DuplicateHandling) -> DuplicateChoice {
+        choice(for: handling) ?? suggestion
+    }
+
     /// What `handling` does with it; nil for Ask, and for Replace when it can't be done, which leave it to the user.
     public func choice(for handling: DuplicateHandling) -> DuplicateChoice? {
         switch handling {

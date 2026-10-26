@@ -116,7 +116,7 @@ extension AppModel {
                 AddedDuplicates.find(in: AddedDuplicates.faces(of: new), library: library)
             }.value
             guard !duplicates.isEmpty else { return addFontFiles(paths, then: then) }
-            let prompt = DuplicatePrompt(paths: paths, duplicates: duplicates, then: then)
+            let prompt = DuplicatePrompt(paths: paths, duplicates: duplicates, handling: data.duplicateHandling, then: then)
             let handling = data.duplicateHandling
             let chosen = duplicates.map { $0.choice(for: handling) }
             guard !chosen.contains(nil) else {

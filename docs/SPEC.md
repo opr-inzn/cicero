@@ -394,7 +394,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   Version/Same File tag, "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000", and a picker:
   Skip it / Add as a copy / Replace your copy (as in Settings; "Replace your copies" for a family it replaces more than one file of) (left out of the picker for a family it can't be done for, with
   the reason under it: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently." or
-  "…your copy comes with macOS or an app, or from Adobe Fonts."), starting at Replace your copy when the added one is
+  "…your copy comes with macOS or an app, or from Adobe Fonts."), starting, with Replace your copy chosen in Settings, at Replace your copy for every family it can be done for (`AddedDuplicate.startingChoice`), else at Replace your copy when the added one is
   newer (Add as a copy when replacing can't be done), else Skip it; with Replace your copy chosen for a family
   replaced in more than one place, an orange warning under it: "Replaces 2 files: in your Fonts folder and in Clients"
   (`AppModel.placeName`); Choose for All (Replace your copy only where it can be done); Cancel adds nothing of the batch, Add adds everything

@@ -13,7 +13,7 @@ struct DuplicatesSheet: View {
 
     init(prompt: DuplicatePrompt) {
         self.prompt = prompt
-        _choices = State(initialValue: Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.suggestion) }))
+        _choices = State(initialValue: Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.startingChoice(for: prompt.handling)) }))
     }
 
     var body: some View {
@@ -80,14 +80,14 @@ struct DuplicatesSheet: View {
                     Text(block.explanation)
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                } else if choices[duplicate.id] ?? duplicate.suggestion == .replace, duplicate.replacesSeveralCopies {
+                } else if choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) == .replace, duplicate.replacesSeveralCopies {
                     Label("Replaces \(duplicate.replacements.count) files: \(model.replacedPlaces(duplicate))", systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
                         .foregroundStyle(.orange)
                 }
             }
             Spacer(minLength: 12)
-            Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.suggestion }, set: { choices[duplicate.id] = $0 })) {
+            Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) }, set: { choices[duplicate.id] = $0 })) {
                 ForEach(DuplicateChoice.allCases.filter { $0 != .replace || duplicate.canReplace }, id: \.self) { choice in
                     // "Replace your copies" when it's more than one file.
                     Text(choice == .replace && duplicate.replacements.count > 1 ? "Replace your copies" : choice.title).tag(choice)
