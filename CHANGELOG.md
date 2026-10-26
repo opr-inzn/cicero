@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- **Leave the files where they are** in **Settings → General** is now **Leave files where they are**.
+
 ## 0.10.10
 
 - **Check Again** is gone from the Conflicts toolbar. The list updates by itself, and **Fonts → Rescan Library** (⌘R) is still there.

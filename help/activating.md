@@ -35,7 +35,7 @@ Choose **Active** for one of your locations, next to it in **Settings → Locati
 
 There are two ways to turn on a font that isn’t in a Fonts folder:
 
-| | Install a copy | Leave the files where they are |
+| | Install a copy | Leave files where they are |
 | --- | --- | --- |
 | What happens | Cicero copies the files into your Fonts folder, `~/Library/Fonts`. The originals stay where they are. | Cicero tells macOS to use the files from where they are. Nothing is copied. |
 | Good for | Fonts you always need, or fonts on a disk you unplug | Large libraries you keep in one place |
@@ -46,7 +46,7 @@ Choose which one in **Settings → General**, next to **Activate fonts by**:
 - **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Check **Remember this choice** to stop being asked; you can change it again in Settings.
 - **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
 - **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. Fonts in your [locations](organizing.md#locations) are copied, so their folders stay as they are, and so is a file **Find on This Mac** finds for a document.
-- **Leave the files where they are**
+- **Leave files where they are**
 
 A few things happen either way:
 
@@ -58,7 +58,7 @@ A few things happen either way:
 
 Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are in a Fonts folder, like yours at `~/Library/Fonts`. They read font files themselves, and macOS doesn’t let them read font files anywhere else, so they set text in any other font in a font of their own instead. That’s every font Cicero turns on where it is:
 
-- fonts turned on with **Leave the files where they are**
+- fonts turned on with **Leave files where they are**
 - fonts in [Cicero’s Library](#ciceros-library)
 - fonts in a location you chose **Active** for
 - fonts turned on temporarily, or by an [app folder](#turn-fonts-on-with-an-app)

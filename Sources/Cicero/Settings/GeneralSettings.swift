@@ -187,7 +187,7 @@ private extension InstallMethod {
         case .ask: "Ask each time"
         case .copy: intoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts"
         case .move: intoFontLibrary ? "Move into Cicero’s Library" : "Move into ~/Library/Fonts"
-        case .inPlace: "Leave the files where they are"
+        case .inPlace: "Leave files where they are"
         }
     }
 }
