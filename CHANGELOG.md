@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Check Again** is gone from the Conflicts toolbar. The list updates by itself, and **Fonts → Rescan Library** (⌘R) is still there.
 - Hiding or showing the sidebar no longer rearranges the grid. The tiles keep their number and height, grow wider or narrower, and every font in them grows or shrinks with them, as when you open the Info panel. **Size** in Preview Options shows the size they’re drawn at.
 - The Info panel slides in and out like the sidebar, and the grid narrows and widens along with it. Before, it appeared and disappeared at once.
 - Cicero’s Library is no longer listed under **Locations**. Its fonts are in **All Fonts**, like those in your Fonts folder.
