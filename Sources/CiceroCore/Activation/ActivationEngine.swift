@@ -18,6 +18,9 @@ public protocol FontRegistrar: Sendable {
     func setEnabled(_ urls: [URL], _ enabled: Bool) async -> Set<String>
     /// Synchronous turning off, for when the app is about to quit.
     func disableNow(_ urls: [URL])
+    /// Waits, up to `timeout`, until macOS's list of fonts it has off no longer names these paths, as it stops doing a
+    /// moment after a file there has gone. Returns the paths it still names.
+    func waitUntilForgotten(_ paths: [String], timeout: Duration) async -> Set<String>
     /// Every font file the system has active.
     func activeFontURLs() -> [URL]
     /// Whether the system has the file active, in any scope. Also true for files `activeFontURLs` leaves
@@ -124,6 +127,29 @@ public struct CoreTextRegistrar: FontRegistrar {
         }
         guard !descriptors.isEmpty else { return }
         CTFontManagerEnableFontDescriptors(descriptors as CFArray, enabled)
+    }
+
+    public func waitUntilForgotten(_ paths: [String], timeout: Duration) async -> Set<String> {
+        var left = Set(paths)
+        let deadline = ContinuousClock.now + timeout
+        while true {
+            // Asked about the files, fontd runs, and it lets go of gone files only while it does (seen after a restart).
+            for path in left { _ = CTFontManagerGetScopeForURL(URL(fileURLWithPath: path) as CFURL) }
+            left.formIntersection(Self.offListPaths())
+            if left.isEmpty || ContinuousClock.now >= deadline { return left }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    /// The files macOS's list of fonts it has off names. It keeps the list in the user's com.apple.FontRegistry.user
+    /// preferences, `DisabledFonts`: "file:///…/Name.otf#postscript-name=Name-Regular" for each font (Font Book's too).
+    static func offListPaths() -> Set<String> {
+        let domain = "com.apple.FontRegistry.user" as CFString
+        CFPreferencesAppSynchronize(domain)
+        let entries = CFPreferencesCopyAppValue("DisabledFonts" as CFString, domain) as? [String] ?? []
+        return Set(entries.compactMap { entry in
+            URL(string: entry.components(separatedBy: "#postscript-name=")[0])?.path(percentEncoded: false)
+        })
     }
 
     public func activeFontURLs() -> [URL] {
@@ -294,6 +320,9 @@ public struct ActivationEngine: Sendable {
     /// How long a file macOS took without an error may take to show as on (see `registerAndConfirm`). Tests that have
     /// files stay off on purpose make it shorter.
     public var confirmationWait: Duration = .seconds(2)
+    /// How long Replace waits for macOS to let go of an off file before the new one takes its path (see `replaceOff`).
+    /// Idle, macOS lets go within a second; busy with fonts that just arrived, it took up to 8.4 s (macOS 26 VM).
+    public var forgetWait: Duration = .seconds(10)
 
     public init(locations: Locations, registrar: any FontRegistrar = CoreTextRegistrar()) {
         self.locations = locations
