@@ -149,7 +149,7 @@ extension AppModel {
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
         let replacement = AddedDuplicates.replacement(of: using, installing: installsAddedFiles, library: library, fontFiles: data.fontFiles,
-                                                      fontLibrary: data.fontLibraryPath)
+                                                      fontLibrary: data.fontLibrary?.path ?? "")
         let switching = Set(replacement.switches.compactMap(\.target?.face.path))
         let movable = movableFiles(among: paths)
         let installing = !installsAddedFiles ? [] : paths.filter { path in

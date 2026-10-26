@@ -530,7 +530,7 @@ public enum ProblemDetector {
         var problems: [Problem] = []
         let records = context.data.records
         let origins = Set(records.installedCopies.values)
-        let fontLibrary = context.data.fontLibraryPath.isEmpty ? nil : context.data.fontLibraryPath + "/"
+        let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
         for family in context.library.families {
             // The family's copies Use Copy From would list, each in its place.
             var copies: [(style: FaceID, folder: String)] = []
@@ -647,7 +647,7 @@ public enum ProblemDetector {
     /// user chose where it is.
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
-        let fontLibrary = context.data.fontLibraryPath.isEmpty ? nil : context.data.fontLibraryPath + "/"
+        let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
         for path in context.data.records.inPlace.sorted() where !(fontLibrary.map(path.hasPrefix) ?? false) {
             if !FileManager.default.fileExists(atPath: path), let place = context.unreachable(path) {
                 problems.append(Problem(

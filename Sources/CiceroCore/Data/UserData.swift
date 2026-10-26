@@ -38,6 +38,9 @@ public struct UserData: Codable, Equatable, Sendable {
     /// False only for libraries saved by 1.9.1 or before, which started with `formerLicenseTags` too, and lose them once
     /// as they load (see `updateLicenseTags`).
     public var formerLicenseTagsRemoved = true
+    /// False only for libraries saved before a Font Library that fonts aren't installed into became one of the user's
+    /// locations: one with fonts becomes one once (see `keepFormerFontLibraryAsLocation`).
+    public var fontLibraryLocationChecked = true
     /// Family name → foundry, overriding the files' manufacturer.
     public var foundryOverrides: [String: String] = [:]
     /// Manufacturer as the files name it → the name to show.
@@ -154,6 +157,7 @@ public struct UserData: Codable, Equatable, Sendable {
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
         // Missing in files from 1.9.1 and before, which are yet to lose the former license tags.
         formerLicenseTagsRemoved = try value(.formerLicenseTagsRemoved, false)
+        fontLibraryLocationChecked = try value(.fontLibraryLocationChecked, false)
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
         foundryRenames = try value(.foundryRenames, d.foundryRenames)
         classifications = try value(.classifications, d.classifications)
@@ -220,15 +224,58 @@ public struct UserData: Codable, Equatable, Sendable {
         (showSystemFonts || family.state != .system) && (showCreativeCloudFonts || !family.isAdobeFonts)
     }
 
-    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown, and the Font Library.
+    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown, and the Font Library
+    /// while fonts are installed into it.
     public func scannedFolders() -> [WatchedFolder] {
         folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : []) + [fontLibrary].compactMap(\.self)
     }
 
-    /// Cicero's Font Library as a folder the scan reads, whether or not fonts are installed into it now: the fonts in it
-    /// stay in the library. nil until it has a place.
+    /// Cicero's Font Library as a folder the scan reads, while fonts are installed into it. Otherwise its folder is a
+    /// folder like any, one of the user's locations while it has fonts (see `keepFontLibraryAsLocation`). nil until it
+    /// has a place.
     public var fontLibrary: WatchedFolder? {
-        fontLibraryPath.isEmpty ? nil : WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
+        guard installsIntoFontLibrary, !fontLibraryPath.isEmpty else { return nil }
+        return WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
+    }
+
+    /// The user's location that is the Font Library's folder, as it is while fonts aren't installed into it.
+    public var fontLibraryLocation: WatchedFolder? {
+        guard !fontLibraryPath.isEmpty else { return nil }
+        let path = URL(fileURLWithPath: fontLibraryPath).standardizedFileURL.path
+        return folders.first { URL(fileURLWithPath: $0.path).standardizedFileURL.path == path }
+    }
+
+    /// As installing into the Font Library goes off: its folder becomes one of the user's locations, named as the library
+    /// was, when it has fonts (`hasFonts`) and isn't one already, so they stay listed, each on or off as it is. Nothing
+    /// moves and nothing turns on or off. Returns the location.
+    @discardableResult
+    public mutating func keepFontLibraryAsLocation(hasFonts: Bool) -> WatchedFolder? {
+        guard hasFonts, !fontLibraryPath.isEmpty, fontLibraryLocation == nil else { return nil }
+        let location = WatchedFolder(path: fontLibraryPath)
+        let name = named(WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)).displayName
+        folders.append(location)
+        if name != location.displayName { folderNames[location.id.uuidString] = name }
+        return location
+    }
+
+    /// As installing into the Font Library goes on again: the location that's its folder is the library again, its fonts
+    /// each on or off as they are. Returns the location taken.
+    @discardableResult
+    public mutating func takeBackFontLibrary() -> WatchedFolder? {
+        guard let location = fontLibraryLocation else { return nil }
+        folders.removeAll { $0.id == location.id }
+        folderNames[location.id.uuidString] = nil
+        sidebar.forget("folder.\(location.id)")
+        return location
+    }
+
+    /// Once, for a library saved before a Font Library that fonts aren't installed into became a location: makes it one
+    /// while it has fonts (`hasFonts` asks of its folder), as turning installing off does now. It was listed apart before.
+    public mutating func keepFormerFontLibraryAsLocation(hasFonts: (URL) -> Bool) {
+        guard !fontLibraryLocationChecked else { return }
+        fontLibraryLocationChecked = true
+        guard !installsIntoFontLibrary, !fontLibraryPath.isEmpty else { return }
+        keepFontLibraryAsLocation(hasFonts: hasFonts(URL(fileURLWithPath: fontLibraryPath, isDirectory: true)))
     }
 
     /// A folder with the name the user gave it, if any, as its `displayName`.

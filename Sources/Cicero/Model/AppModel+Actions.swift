@@ -174,6 +174,22 @@ extension AppModel {
 
     // MARK: Font Library
 
+    /// Installing into the Font Library on or off. Off, its folder becomes one of the user's locations while it has fonts,
+    /// so they stay listed, each on or off as it is; on again, that location is the library again. Neither moves a file
+    /// or turns a font on or off.
+    func setInstallsIntoFontLibrary(_ on: Bool) {
+        guard on != data.installsIntoFontLibrary else { return }
+        var changed = data
+        if on {
+            if let location = changed.takeBackFontLibrary() { deselect { $0 == .folder(location.id) } }
+        } else {
+            changed.keepFontLibraryAsLocation(hasFonts: changed.fontLibrary.map { ActivationEngine.hasFontFiles(in: $0.url) } ?? false)
+        }
+        changed.installsIntoFontLibrary = on
+        data = changed
+        rescan()
+    }
+
     /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;
     /// a folder it can't go into is refused, saying why (see `ActivationEngine.refusal`).
     func changeFontLibrary() {

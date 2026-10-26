@@ -64,6 +64,18 @@ extension ActivationEngine {
         return rmdir(folder) == 0
     }
 
+    /// Whether a folder has a font file in it, at any depth, not counting hidden ones or what's inside packages, as the
+    /// scan reads it: whether the Font Library has fonts to keep listed.
+    public static func hasFontFiles(in folder: URL) -> Bool {
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return false }
+        for case let url as URL in enumerator where FontFileReader.fontExtensions.contains(url.pathExtension.lowercased()) {
+            if (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true { return true }
+        }
+        return false
+    }
+
     // MARK: Moving the library
 
     /// Moves the Font Library into `destination`, an empty folder (see `refusal`), which it takes the place of: the whole

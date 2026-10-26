@@ -328,22 +328,43 @@ final class AppModel {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.fontsChanged() }
         }
+        // The first scan waits for the Font Library to be where it is now, so the window doesn't drop its fonts for a moment.
+        let migrating = needsFontLibraryMigration
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
             let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
             model.data.records = tidied.records
-            // A Font Library still in ~/Cicero/Font Library moves to ~/Cicero/Library, without a word; one that can't
-            // stays where it is until the next launch.
-            let moved = await model.engine.moveFromFormerPlace(records: model.data.records)
-            if let moved {
-                model.data.records = moved.records
-                model.data.fontLibraryPath = model.locations.defaultFontLibrary.path
-            }
-            // The first scan may have listed the files before they went, or the library where it was.
-            if tidied.removed > 0 || (moved?.succeeded ?? 0) > 0 { model.rescan(check: true) }
+            if migrating { await model.migrateFontLibrary() }
+            // The first scan may have listed the files before they went.
+            if migrating || tidied.removed > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
-        rescan(check: true)
+        if !migrating { rescan(check: true) }
+    }
+
+    /// Whether the Font Library is still in its former place, ~/Cicero/Font Library, or a library saved before one that
+    /// fonts aren't installed into became a location is yet to be looked at (see `migrateFontLibrary`).
+    private var needsFontLibraryMigration: Bool {
+        guard !data.fontLibraryPath.isEmpty else { return false }
+        let path = URL(fileURLWithPath: data.fontLibraryPath).standardizedFileURL.path
+        let former = path == locations.formerDefaultFontLibrary.standardizedFileURL.path && FileManager.default.fileExists(atPath: path)
+        return former || !data.fontLibraryLocationChecked
+    }
+
+    /// At launch, without a word: a Font Library still in ~/Cicero/Font Library moves to ~/Cicero/Library, fonts installed
+    /// into it or not, unless it's one of the user's locations (one that can't move stays where it is until the next
+    /// launch). Then, once, one that fonts aren't installed into becomes a location while it has fonts, as turning
+    /// installing off makes it now; it was listed apart before. Nothing turns on or off.
+    private func migrateFontLibrary() async {
+        var engine = self.engine
+        engine.fontLibrary = data.fontLibraryLocation == nil ? URL(fileURLWithPath: data.fontLibraryPath, isDirectory: true) : nil
+        if let moved = await engine.moveFromFormerPlace(records: data.records) {
+            data.records = moved.records
+            data.fontLibraryPath = locations.defaultFontLibrary.path
+        }
+        var checked = data
+        checked.keepFormerFontLibraryAsLocation(hasFonts: ActivationEngine.hasFontFiles(in:))
+        data = checked
     }
 
     /// Once the main window is there: files opened before it are added now.

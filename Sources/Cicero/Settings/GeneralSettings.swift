@@ -40,9 +40,9 @@ struct GeneralSettings: View {
                 .disabled(!showsMenuBarIcon)
             }
             Section("Installation") {
-                Toggle(isOn: $model.data.installsIntoFontLibrary) {
+                Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
                     Text("Install fonts into Cicero’s Font Library")
-                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts.")
+                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
