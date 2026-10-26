@@ -280,7 +280,7 @@ private struct TypeTester: View {
         slider("Tracking", symbol: "arrow.left.and.right.text.vertical", $tracking, range: -10...40, step: 0.5, unit: "%")
             .help("The space added between letters, in percent of the em, on top of the font’s kerning")
         slider("Leading", symbol: "arrow.up.and.down.text.horizontal",
-               Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: 80...250, step: 5, unit: "%")
+               Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
             .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
     }
 

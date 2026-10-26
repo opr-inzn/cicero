@@ -873,7 +873,7 @@ private struct PreviewOptions: View {
                 } else {
                     row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
                 }
-                row("Leading", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
+                row("Leading", $preview.lineSpacing, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
                     .help("The distance between lines, in percent of the size, where a sample runs over several lines")
             }
         }
