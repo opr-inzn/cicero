@@ -51,7 +51,7 @@ struct DuplicatesSheet: View {
                     }
                     .fixedSize()
                 }
-                Text("Replace Your Copy moves your files to the Trash and puts the added ones in their place.")
+                Text("Replace your copy moves your files to the Trash and puts the added ones in their place.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -137,9 +137,9 @@ struct DuplicatesSheet: View {
 extension DuplicateChoice {
     var title: String {
         switch self {
-        case .skip: "Skip It"
-        case .addCopy: "Add as Another Copy"
-        case .replace: "Replace Your Copy"
+        case .skip: "Skip it"
+        case .addCopy: "Add it as another copy"
+        case .replace: "Replace your copy"
         }
     }
 }
