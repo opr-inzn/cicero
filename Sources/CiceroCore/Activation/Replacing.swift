@@ -6,7 +6,8 @@ extension ActivationEngine {
     /// file takes its place, under its name, in its folder, on or off as it was. One that's on goes off for the moment
     /// that takes and on again the way it was: in place, until Cicero quits, or from a Fonts folder. One that's off in a
     /// Fonts folder has its copy go in off (see `moveIntoFontsFolderOff`), as macOS turns on whatever arrives there; see
-    /// `replaceOff`. The copy is made in Cicero's staging folder first, so a file whose copy can't be made or go in, or
+    /// `replaceOff`. With fonts installed into Cicero's Library, its copy goes there instead, off, as FontExplorer X
+    /// does it; see `replaceIntoLibrary`. The copy is made in Cicero's staging folder first, so a file whose copy can't be made or go in, or
     /// that can't go to the Trash, stays as it was. Its paths stay, so the records and everything the user put it in do
     /// too, but for an off one that went in under another name (`placed` says where). `moving`, an added file that took
     /// every place it was meant for goes, as activating by moving does.
@@ -26,8 +27,9 @@ extension ActivationEngine {
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
-        // Staged copy → the replacement it's for, of those that go in off.
+        // Staged copy → the replacement it's for, of those that go in off, into a Fonts folder or Cicero's Library.
         var goingInOff: [String: FileReplacement] = [:]
+        var intoLibrary: [String: FileReplacement] = [:]
         for replacement in replacements {
             let old = Self.url(replacement.old)
             let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
@@ -40,7 +42,7 @@ extension ActivationEngine {
                 continue
             }
             if off.contains(replacement.old) {
-                goingInOff[staged.path] = replacement
+                if installsIntoFontLibrary, fontLibrary != nil { intoLibrary[staged.path] = replacement } else { goingInOff[staged.path] = replacement }
                 continue
             }
             do {
@@ -67,6 +69,13 @@ extension ActivationEngine {
             placed.merge(off.placed) { first, _ in first }
             renameLater = off.renameLater
             for old in off.placed.keys { records.installedCopies[old] = nil }
+        }
+        if !intoLibrary.isEmpty {
+            let library = replaceIntoLibrary(intoLibrary)
+            done += library.done
+            failed += library.failed
+            placed.merge(library.placed) { first, _ in first }
+            for old in library.placed.keys { records.installedCopies[old] = nil }
         }
 
         // On again, as it was: the new file where it went in, the old one where it stayed.
@@ -174,6 +183,42 @@ extension ActivationEngine {
             }
         }
         return (done, failed, placed, renameLater)
+    }
+
+    /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement) when Cicero
+    /// installs fonts into its library: each copy goes into its family's folder there, under the old file's name, where
+    /// macOS turns nothing on by itself, so it's off without being turned off, and the old file goes to the Trash. Nothing
+    /// goes into the Fonts folder, so nothing waits for macOS to let go of the old file, or goes in as "Name 2". One whose
+    /// copy can't go in, or whose old file can't go to the Trash, stays as it was.
+    func replaceIntoLibrary(_ staged: [String: FileReplacement]) -> (done: [FileReplacement], failed: [String], placed: [String: String]) {
+        let fm = FileManager.default
+        var done: [FileReplacement] = []
+        var failed: [String] = []
+        var placed: [String: String] = [:]
+        for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
+            let old = Self.url(replacement.old)
+            let folder = installFolder(for: replacement.added, family: nil)
+            let new = Self.uniqueURL(for: old.lastPathComponent, in: folder)
+            do {
+                try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+                try fm.moveItem(at: Self.url(path), to: new)
+            } catch {
+                try? fm.removeItem(atPath: path)
+                removeEmptyFolders(around: new.path)
+                failed.append(replacement.old)
+                continue
+            }
+            do {
+                try trash(old)
+                done.append(replacement)
+                placed[replacement.old] = new.path
+            } catch {
+                try? fm.removeItem(at: new)
+                removeEmptyFolders(around: new.path)
+                failed.append(replacement.old)
+            }
+        }
+        return (done, failed, placed)
     }
 
     /// Waits, off the operation queue, until macOS no longer names these paths as fonts it has off (see
