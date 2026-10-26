@@ -66,7 +66,7 @@ Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are 
 
 To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Settings → General**, with **Install fonts into Cicero’s Library** off. A font that’s on where it is already has to be turned off and on again that way.
 
-Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too.
+Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too, and for turning a font off: Office still lists it the next time it opens, and lets go of it the time after.
 
 Other apps, like Pages and Adobe’s, use fonts from anywhere.
 
