@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Leading** now goes up to 200 %, down from 250 %.
+- The text cursor on a font page now fits the letters at any **Leading**. Before, it started halfway up the capitals when the lines were tight and reached far above them when they were loose.
 - **Leave the files where they are** in **Settings → General** is now **Leave files where they are**.
 
 ## 0.10.10

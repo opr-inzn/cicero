@@ -13,6 +13,8 @@ final class PreviewSettings {
     static let tileSample = "Aa Gg 123"
     /// Preview Options' Size; a smaller size saved before 24 pt was the least goes up to it.
     static let sizes: ClosedRange<Double> = 24...200
+    /// Leading, in percent of the size, wherever it's set; a larger leading saved before 200 % was the most comes down to it.
+    static let lineSpacings: ClosedRange<Double> = 80...200
 
     /// Empty means each family's own name.
     var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
@@ -41,7 +43,8 @@ final class PreviewSettings {
         savedPresets = defaults.stringArray(forKey: Keys.savedPresets) ?? []
         size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
         defaults.removeObject(forKey: Keys.weight)
-        lineSpacing = defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120
+        lineSpacing = min(max(defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120, Self.lineSpacings.lowerBound),
+                          Self.lineSpacings.upperBound)
     }
 
     /// Whether the preview text is one of the presets saved with Save as Preset.
