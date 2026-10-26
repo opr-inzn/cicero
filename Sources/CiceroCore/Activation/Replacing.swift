@@ -25,6 +25,7 @@ extension ActivationEngine {
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
+        var renameLater: [String: String] = [:]
         // Staged copy → the replacement it's for, of those that go in off.
         var goingInOff: [String: FileReplacement] = [:]
         for replacement in replacements {
@@ -64,6 +65,7 @@ extension ActivationEngine {
             done += off.done
             failed += off.failed
             placed.merge(off.placed) { first, _ in first }
+            renameLater = off.renameLater
             for old in off.placed.keys { records.installedCopies[old] = nil }
         }
 
@@ -97,6 +99,7 @@ extension ActivationEngine {
         }
         var result = ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
         result.placed = placed
+        result.renameLater = renameLater
         return result
     }
 
@@ -105,13 +108,15 @@ extension ActivationEngine {
     /// that path with those font names would come on with it (tested in a macOS 26 VM). So the new file takes the old
     /// one's path only once macOS has let go of the old one: the old file waits in Cicero's Inactive folder meanwhile, where
     /// it stays in the library, off, should Cicero stop, then goes to the Trash. One macOS hasn't let go of within
-    /// `forgetWait` gets "Name 2.otf" instead, as does an added file of another name its own. Any that can't go in leave
-    /// the old one as it was.
-    func replaceOff(_ staged: [String: FileReplacement]) async -> (done: [FileReplacement], failed: [String], placed: [String: String]) {
+    /// `forgetWait` gets "Name 2.otf" instead (`renameLater` says what for), as does an added file of another name its
+    /// own. Any that can't go in leave the old one as it was.
+    func replaceOff(_ staged: [String: FileReplacement]) async
+        -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String]) {
         let fm = FileManager.default
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
+        var renameLater: [String: String] = [:]
         func sameName(_ replacement: FileReplacement) -> Bool {
             Self.url(replacement.added).lastPathComponent.compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
         }
@@ -135,7 +140,7 @@ extension ActivationEngine {
                 failed.append(replacement.old)
             }
         }
-        let remembered = await registrar.waitUntilForgotten(waiting.keys.sorted(), timeout: forgetWait)
+        let remembered = await registrar.waitUntilForgotten(waiting.keys.sorted(), timeout: forgetWait, every: .milliseconds(100))
         for (path, replacement) in staged where waiting[replacement.old] != nil {
             let old = Self.url(replacement.old)
             if remembered.contains(replacement.old) {
@@ -158,6 +163,7 @@ extension ActivationEngine {
             if (try? trash(Self.url(aside ?? replacement.old))) != nil {
                 done.append(replacement)
                 if new != replacement.old { placed[replacement.old] = new }
+                if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
             } else if aside != nil {
                 // In the Inactive folder, the old one stays in the library, off, beside the new one.
                 done.append(replacement)
@@ -167,7 +173,48 @@ extension ActivationEngine {
                 failed.append(replacement.old)
             }
         }
-        return (done, failed, placed)
+        return (done, failed, placed, renameLater)
+    }
+
+    /// Waits, off the operation queue, until macOS no longer names these paths as fonts it has off (see
+    /// `FontRegistrar.waitUntilForgotten`). Returns the paths it still names.
+    @concurrent
+    public func waitUntilForgotten(_ paths: [String], timeout: Duration, every: Duration) async -> Set<String> {
+        await registrar.waitUntilForgotten(paths, timeout: timeout, every: every)
+    }
+
+    /// Files Replace put in as "Name 2.otf" (`ActivationResult.renameLater`: their path → the one meant for them) take
+    /// their name, once macOS has let go of the old file there: renamed, they'd lose being off, so each leaves for the
+    /// Inactive folder and goes in again the way `moveIntoFontsFolderOff` does it, on for a few hundredths of a second.
+    /// Only while nothing changed: the name is free, macOS no longer names it, and the file is still there in the Fonts
+    /// folder, off, and not on for a while; otherwise it stays as it is. One that won't go in stays in the Inactive
+    /// folder, off: put back as "Name 2", macOS would turn it on. Returns the files renamed, from → to.
+    @concurrent
+    public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> [String: String] {
+        let fm = FileManager.default
+        let ready = pending.filter { interim, original in
+            !fm.fileExists(atPath: original) && fm.fileExists(atPath: interim) && isInsideFontsFolder(interim)
+                && Self.url(interim).deletingLastPathComponent() == Self.url(original).deletingLastPathComponent()
+                && records.temporary[interim] == nil && !registrar.isActive(Self.url(interim))
+        }
+        guard !ready.isEmpty else { return [:] }
+        let remembered = await registrar.waitUntilForgotten(ready.values.sorted(), timeout: .zero, every: .zero)
+        // Where each waits → (its "Name 2" path, the path meant for it).
+        var waiting: [String: (interim: String, original: String)] = [:]
+        for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
+            let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: locations.inactiveFolder)
+            guard (try? fm.createDirectory(at: locations.inactiveFolder, withIntermediateDirectories: true)) != nil,
+                  (try? Self.move(Self.url(interim), to: aside)) != nil
+            else { continue }
+            waiting[aside.path] = (interim, original)
+        }
+        guard !waiting.isEmpty else { return [:] }
+        let moved = await moveIntoFontsFolderOff(waiting.mapValues(\.original), exactly: true)
+        var renamed: [String: String] = [:]
+        for (aside, file) in waiting {
+            if let path = moved.placed[aside] { renamed[file.interim] = path }
+        }
+        return renamed
     }
 
     /// An old file that waited in the Inactive folder goes back where it was, off; one macOS still remembers there stays in

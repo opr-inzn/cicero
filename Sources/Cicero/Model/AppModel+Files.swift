@@ -214,6 +214,7 @@ extension AppModel {
                 model.data.records = result.records
                 messages.append(result.message)
                 replaced = replaced.map { result.placed[$0] ?? $0 }
+                if !result.renameLater.isEmpty { model.renameBackLater(result.renameLater) }
             }
             model.forgetInstalledAddedFiles()
             model.showToast((messages + [skipNote]).filter { !$0.isEmpty }.joined(separator: ". "))
@@ -222,6 +223,22 @@ extension AppModel {
             let found = shown.union(copies).union(existing).union(replaced)
             // Nothing to show when nothing went in: the toast says so.
             if let then, !found.isEmpty { then(model, found) } else { model.rescan() }
+        }
+    }
+
+    /// Files Replace put in as "Name 2.otf", as macOS hadn't let go of the old file yet, take their name once it has, within
+    /// `ActivationEngine.renameBackWait` (see `ActivationEngine.renameBack`). Other operations go on meanwhile; one that
+    /// comes too late, after Cicero quits say, leaves the file as it is.
+    func renameBackLater(_ pending: [String: String]) {
+        let engine = engine
+        Task { [weak self] in
+            let remembered = await engine.waitUntilForgotten(Array(pending.values), timeout: engine.renameBackWait, every: .seconds(1))
+            let ready = pending.filter { !remembered.contains($0.value) }
+            guard !ready.isEmpty, let self else { return }
+            self.enqueue { model in
+                let renamed = await model.engine.renameBack(ready, records: model.data.records)
+                if !renamed.isEmpty { model.rescan() }
+            }
         }
     }
 

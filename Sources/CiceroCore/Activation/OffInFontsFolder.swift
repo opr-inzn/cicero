@@ -13,9 +13,9 @@ extension ActivationEngine {
     /// (about 20 ms for 1 file or 20, in a macOS 26 VM), and macOS keeps them off from then on. Turning a file off before
     /// macOS has it doesn't stick. `moves` is each file → where it goes; one whose place is taken goes beside it, as
     /// "Name 2.otf". The files on their way in are written down first (see `finishTurningOff`), so stopping halfway leaves
-    /// none on. One macOS won't take or won't turn off goes back where it was. Returns where each file went, and the
-    /// files that stayed.
-    public func moveIntoFontsFolderOff(_ moves: [String: String]) async -> (placed: [String: String], failed: [String]) {
+    /// none on. One macOS won't take or won't turn off goes back where it was. `exactly`, one whose place is taken stays
+    /// where it is instead. Returns where each file went, and the files that stayed.
+    public func moveIntoFontsFolderOff(_ moves: [String: String], exactly: Bool = false) async -> (placed: [String: String], failed: [String]) {
         let fm = FileManager.default
         var placed: [String: String] = [:]
         var failed: [String] = []
@@ -25,6 +25,10 @@ extension ActivationEngine {
             for (from, to) in all[start..<min(start + Self.offBatchSize, all.count)] {
                 let target = Self.url(to)
                 let destination = Self.uniqueURL(for: target.lastPathComponent, in: target.deletingLastPathComponent())
+                guard !exactly || destination.path == target.path else {
+                    failed.append(from)
+                    continue
+                }
                 do {
                     try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try noteTurningOff(moved.map(\.to) + [destination.path])
