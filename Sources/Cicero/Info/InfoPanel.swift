@@ -5,30 +5,56 @@ import SwiftUI
 /// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar, its
 /// top level with the first fonts. Not SwiftUI's inspector, which runs the full window height under the search
 /// field. Over the split view rather than in its detail column, whose stack swaps the whole column for a pushed
-/// font page; each page makes room for it with `InfoPanelInset`. It appears and goes at once, as the room for it does: sliding
-/// in, it was cut off by the window's edge as it came into an empty strip, and sliding out it uncovered fonts already in place.
+/// font page; each page makes room for it with `InfoPanelInset`. It slides in from the window's edge and out again as the
+/// sidebar does, and the room for it opens and closes along with it, so the page narrows as the panel comes: with the room
+/// made at once, the panel slid into an empty strip, and sliding out it uncovered fonts already in place.
 struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
     static let width: CGFloat = 300
     static let gap: CGFloat = 8
     /// Level with the first row of the grid and of specimens, which start this far below the toolbar.
     static let top: CGFloat = 16
+    /// As long as the sidebar takes to slide out or in, at its pace.
+    static let slide = Animation.easeInOut(duration: 0.25)
+
+    /// The room a page makes for the panel `shown` of the way in, on whole pixels, so the grid can tell exactly how much
+    /// narrower its rows are (see `FontGrid.infoPanelNarrowing`).
+    static func room(shown: CGFloat, scale: CGFloat) -> CGFloat {
+        ((width + gap * 2) * shown * scale).rounded() / scale
+    }
 
     func body(content: Content) -> some View {
-        content.overlay(alignment: .trailing) {
-            if model.isInfoPresented {
-                let shape = Self.shape
-                InfoPanel()
-                    .frame(width: Self.width)
-                    .frame(maxHeight: .infinity)
-                    .background {
-                        // Opaque, over the page; the tint matches the sidebar.
-                        shape.fill(Color.canvas)
-                        shape.fill(.quaternary.opacity(0.5))
-                    }
-                    .clipShape(shape)
-                    .padding([.horizontal, .bottom], Self.gap)
-                    .padding(.top, Self.top)
+        // Only the panel's way in and out, not what changes inside it or under it.
+        content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoPresented ? 1 : 0)) }
+    }
+
+    /// The panel, `shown` of the way in from the window's edge: there while it slides out, too.
+    private struct Panel: ViewModifier, Animatable {
+        var shown: CGFloat
+
+        var animatableData: CGFloat {
+            get { shown }
+            set { shown = newValue }
+        }
+
+        func body(content: Content) -> some View {
+            content.overlay(alignment: .trailing) {
+                if shown > 0 {
+                    let shape = InfoPanelOverlay.shape
+                    InfoPanel()
+                        .frame(width: InfoPanelOverlay.width)
+                        .frame(maxHeight: .infinity)
+                        .background {
+                            // Opaque, over the page; the tint matches the sidebar.
+                            shape.fill(Color.canvas)
+                            shape.fill(.quaternary.opacity(0.5))
+                        }
+                        .clipShape(shape)
+                        .padding([.horizontal, .bottom], InfoPanelOverlay.gap)
+                        .padding(.top, InfoPanelOverlay.top)
+                        .offset(x: (1 - shown) * (InfoPanelOverlay.width + InfoPanelOverlay.gap))
+                        .transition(.identity)
+                }
             }
         }
     }
@@ -44,20 +70,42 @@ struct InfoPanelOverlay: ViewModifier {
     }
 }
 
-/// Makes room on a page of the detail column for the Info panel while it's open.
+/// Makes room on a page of the detail column for the Info panel while it's open, opening and closing as the panel slides
+/// in and out (see `InfoPanelOverlay`), and tells the page how far it is in (`infoPanelShown`).
 struct InfoPanelInset: ViewModifier {
     @Environment(AppModel.self) private var model
 
     func body(content: Content) -> some View {
-        // Makes room in one step, so a grid reflows once, as the panel appears. An inset
-        // rather than padding, so the page still runs under the toolbar from edge to edge and the search
-        // field keeps the look it has over the page instead of turning flat above the panel.
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaPadding(.trailing, model.isInfoPresented ? InfoPanelOverlay.width + InfoPanelOverlay.gap * 2 : 0)
+            .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: model.isInfoPresented ? 1 : 0)) }
             // The toolbar and the gap around the panel show the page's colour from edge to edge.
             .background(Color.canvas)
     }
+
+    /// The room, `shown` of the panel's width and gaps. An inset rather than padding, so the page still runs under the
+    /// toolbar from edge to edge and the search field keeps the look it has over the page instead of turning flat above
+    /// the panel.
+    private struct Room: ViewModifier, Animatable {
+        @Environment(\.displayScale) private var scale
+        var shown: CGFloat
+
+        var animatableData: CGFloat {
+            get { shown }
+            set { shown = newValue }
+        }
+
+        func body(content: Content) -> some View {
+            content
+                .safeAreaPadding(.trailing, InfoPanelOverlay.room(shown: shown, scale: scale))
+                .environment(\.infoPanelShown, shown)
+        }
+    }
+}
+
+extension EnvironmentValues {
+    /// How far the Info panel is in: 0 while it's shut, 1 while it's open, and in between while it slides.
+    @Entry var infoPanelShown: CGFloat = 0
 }
 
 /// Keeps the family at the top of a grid or list there when its width changes, as when the Info panel

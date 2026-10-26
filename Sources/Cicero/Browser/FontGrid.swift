@@ -5,10 +5,14 @@ import SwiftUI
 struct FontGrid: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    @Environment(\.infoPanelShown) private var infoShown
+    @Environment(\.displayScale) private var scale
     let families: [Family]
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
-    @State private var gridWidth: CGFloat = 0
+    /// The rows' width, with how far the Info panel was in when it was measured, which the rows' width is narrower by: the
+    /// two together, rather than the width measured with how far in the panel is by now, a frame further on its way.
+    @State private var gridRoom = GridRoom(width: 0, infoShown: 0)
     @State private var visibleHeight: CGFloat = 0
 
     /// Between tiles, and between the last column and the Info panel.
@@ -61,10 +65,18 @@ struct FontGrid: View {
         }
     }
 
-    /// How much narrower the rows are while the Info panel is open: the room `InfoPanelInset` makes for it, and
-    /// `cardsPadding`'s gap beside it in place of the margin at the window's edge.
-    private static let infoPanelRoom = InfoPanelOverlay.width + InfoPanelOverlay.gap * 2
-        + (spacing - InfoPanelOverlay.gap) - InfoPanelOverlay.top
+    /// How much narrower the rows are with the Info panel `shown` of the way in: the room `InfoPanelInset` makes for it,
+    /// and `cardsPadding`'s gap beside it in place of the margin at the window's edge, on whole pixels as they're laid out.
+    static func infoPanelNarrowing(shown: CGFloat, scale: CGFloat) -> CGFloat {
+        InfoPanelOverlay.room(shown: shown, scale: scale) + cardsTrailing(infoShown: shown, scale: scale) - InfoPanelOverlay.top
+    }
+
+    /// Beside the last tile or card: the margin at the window's edge, or one gap between cards from the Info panel, whose own
+    /// margin makes up the rest, in between while it slides; on whole pixels.
+    static func cardsTrailing(infoShown: CGFloat, scale: CGFloat) -> CGFloat {
+        let beside = spacing - InfoPanelOverlay.gap
+        return ((InfoPanelOverlay.top + (beside - InfoPanelOverlay.top) * infoShown) * scale).rounded() / scale
+    }
 
     var body: some View {
         let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
@@ -90,8 +102,8 @@ struct FontGrid: View {
                 // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as
                 // before the Info panel opened kept its columns and pushed the window's panes aside.
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
-                .cardsPadding(infoPresented: model.isInfoPresented)
+                .onGeometryChange(for: GridRoom.self) { [infoShown] in GridRoom(width: $0.size.width, infoShown: infoShown) } action: { gridRoom = $0 }
+                .cardsPadding(infoShown: infoShown, scale: scale)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .visibleHeight($visibleHeight)
@@ -135,11 +147,17 @@ struct FontGrid: View {
     /// Hiding the sidebar makes the tiles wider and opening the panel narrower, never more or fewer, and not higher or
     /// lower: `restingWidth`, the width they have with the sidebar shown and the panel shut, sets their height.
     private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat, restingWidth: CGFloat) {
-        let resting = gridWidth + (model.isInfoPresented ? Self.infoPanelRoom : 0) - SidebarRoom.shared.hiddenWidth
+        let gridWidth = gridRoom.width
+        let resting = gridWidth + Self.infoPanelNarrowing(shown: gridRoom.infoShown, scale: scale) - SidebarRoom.shared.hiddenWidth
         guard gridWidth > 0, resting > 0 else { return (1, minimum, minimum) }
         let count = min(Self.mostColumns, max(1, Int((resting + Self.spacing) / (minimum + Self.spacing))))
         let width = { (row: CGFloat) in (row - Self.spacing * CGFloat(count - 1)) / CGFloat(count) }
         return (count, width(gridWidth), width(resting))
+    }
+
+    nonisolated struct GridRoom: Equatable {
+        var width: CGFloat
+        var infoShown: CGFloat
     }
 }
 
@@ -379,10 +397,10 @@ struct FamilyCard: ViewModifier {
 }
 
 extension View {
-    /// Around the grid's tiles and the specimens' cards: 16 pt, and one gap between cards from the Info panel,
-    /// whose margin makes up the rest.
-    func cardsPadding(infoPresented: Bool) -> some View {
+    /// Around the grid's tiles and the specimens' cards: 16 pt, and beside the Info panel one gap between cards, whose
+    /// margin makes up the rest (see `FontGrid.cardsTrailing`; `infoShown`, see `infoPanelShown`).
+    func cardsPadding(infoShown: CGFloat, scale: CGFloat) -> some View {
         padding([.leading, .vertical], InfoPanelOverlay.top)
-            .padding(.trailing, infoPresented ? FontGrid.spacing - InfoPanelOverlay.gap : InfoPanelOverlay.top)
+            .padding(.trailing, FontGrid.cardsTrailing(infoShown: infoShown, scale: scale))
     }
 }
