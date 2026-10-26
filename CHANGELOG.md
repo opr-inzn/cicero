@@ -10,6 +10,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Move Them** is gone from **Settings → General**. Fonts Cicero installed in your Fonts folder before stay there, and keep working.
 - In **Settings → General**, the Font Library’s row and the choices under **Activate fonts by** say **Cicero’s Font Library**.
 - When you turn off **Install fonts into Cicero’s Font Library**, its folder becomes one of your locations, called **Cicero’s Font Library**, so its fonts stay listed, on or off as they were. Turn the setting back on, and it’s the library again. If you had turned it off before, the folder becomes a location the first time Cicero opens.
+- In **Settings → General**, the choices for **When an added font is already in your library** say more plainly what each one does.
 - The Font Library’s folder is now `~/Cicero/Library`. Cicero moves it there from `~/Cicero/Font Library` as it opens, fonts and all, unless you put it somewhere else.
 
 ## 0.10.9

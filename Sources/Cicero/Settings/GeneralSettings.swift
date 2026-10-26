@@ -153,11 +153,11 @@ struct GeneralSettings: View {
 
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
-        case .ask: "When a font file you add has fonts your library has from another file, Cicero asks what to do with each family."
-        case .addCopy: "The added file is listed or installed next to the library’s copy, which stays in use."
-        case .skip: "The added file is left out, and the library’s copy stays in use."
-        case .useAdded: "The added file takes over: where the library’s copy is on, it goes off as deactivating does, and the added one goes on."
-        case .keepNewer: "The added file takes over when its version is newer than the library’s copy, and is left out otherwise."
+        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as another copy or use it instead."
+        case .addCopy: "Both files stay in your library. The one you had stays in use."
+        case .skip: "The added file is left out. The one you had stays in use."
+        case .useAdded: "The added file is used instead, and the one you had is turned off. No font is lost."
+        case .keepNewer: "The added file is used instead when its version is newer, and left out otherwise."
         }
     }
 
