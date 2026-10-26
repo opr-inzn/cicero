@@ -252,9 +252,9 @@ public struct UserData: Codable, Equatable, Sendable {
     public mutating func keepFontLibraryAsLocation(hasFonts: Bool) -> WatchedFolder? {
         guard hasFonts, !fontLibraryPath.isEmpty, fontLibraryLocation == nil else { return nil }
         let location = WatchedFolder(path: fontLibraryPath)
-        let name = named(WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)).displayName
         folders.append(location)
-        if name != location.displayName { folderNames[location.id.uuidString] = name }
+        // A name the user gave the library goes with it; else it's called as the library is (see `named`).
+        if let given = folderNames[WatchedFolder.fontLibraryID.uuidString] { folderNames[location.id.uuidString] = given }
         return location
     }
 
@@ -278,10 +278,14 @@ public struct UserData: Codable, Equatable, Sendable {
         keepFontLibraryAsLocation(hasFonts: hasFonts(URL(fileURLWithPath: fontLibraryPath, isDirectory: true)))
     }
 
-    /// A folder with the name the user gave it, if any, as its `displayName`.
+    /// A folder with the name the user gave it, if any, as its `displayName`; the location that's the Font Library's
+    /// folder is called as the library is ("Cicero’s Library") unless the user named it.
     public func named(_ folder: WatchedFolder) -> WatchedFolder {
         var folder = folder
         folder.customName = folderNames[folder.id.uuidString]
+        if folder.customName == nil, folder.id != WatchedFolder.fontLibraryID, folder.id == fontLibraryLocation?.id {
+            folder.customName = WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath).displayName
+        }
         return folder
     }
 
