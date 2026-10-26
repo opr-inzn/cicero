@@ -138,7 +138,7 @@ extension DuplicateChoice {
     var title: String {
         switch self {
         case .skip: "Skip it"
-        case .addCopy: "Add it as another copy"
+        case .addCopy: "Add as a copy"
         case .replace: "Replace your copy"
         }
     }

@@ -153,7 +153,7 @@ struct GeneralSettings: View {
 
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
-        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as another copy or replace your copy with it."
+        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as a copy or replace your copy with it."
         case .addCopy: "Both stay in your library, and your copy stays in use."
         case .skip: "The added file is left out, and your copy stays in use."
         case .replace: "Your copy goes to the Trash, and the added file takes its place, under its name and in its folder. If your library has it more than once, or in files that don’t match, Cicero asks first."
@@ -175,7 +175,7 @@ private extension DuplicateHandling {
     var title: String {
         switch self {
         case .ask: "Ask each time"
-        case .addCopy: "Add it as another copy"
+        case .addCopy: "Add as a copy"
         case .skip: "Skip it"
         case .replace: "Replace your copy"
         }
