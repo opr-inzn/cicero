@@ -89,7 +89,13 @@ public struct CoreTextRegistrar: FontRegistrar {
             }
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 15 + 0.05 * Double(urls.count), execute: resume)
         }
-        return Set(urls.filter { Self.isActive($0) != enabled }.map { $0.path(percentEncoded: false) })
+        var pending = urls.filter { Self.isActive($0) != enabled }
+        let deadline = ContinuousClock.now + .seconds(1)
+        while !pending.isEmpty, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
+            pending = pending.filter { Self.isActive($0) != enabled }
+        }
+        return Set(pending.map { $0.path(percentEncoded: false) })
     }
 
     public func disableNow(_ urls: [URL]) {
@@ -285,6 +291,9 @@ public struct ActivationEngine: Sendable {
     /// Fonts Cicero installs go into `fontLibrary`, a folder for each family, and are registered there, rather than copied
     /// into ~/Library/Fonts.
     public var installsIntoFontLibrary = false
+    /// How long a file macOS took without an error may take to show as on (see `registerAndConfirm`). Tests that have
+    /// files stay off on purpose make it shorter.
+    public var confirmationWait: Duration = .seconds(2)
 
     public init(locations: Locations, registrar: any FontRegistrar = CoreTextRegistrar()) {
         self.locations = locations
@@ -314,8 +323,9 @@ public struct ActivationEngine: Sendable {
         // Files to register where they are; `record` for those Cicero must remember to unregister.
         var toRegister: [(path: String, record: Bool)] = []
         let targets = Self.uniqueByPath(faces).filter(\.canActivate)
-        // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder stays:
-        // ending it would take the file off macOS's list of fonts it has off, and turning the file on there takes over.
+        // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder ends
+        // only once the file is on there (below): ending it first would take the file off macOS's list of fonts it has
+        // off, and leave it off.
         let temporary = targets.map(\.face.path).filter { records.temporary[$0] != nil }
         let sessionOnly = temporary.filter { !isInsideFontsFolder($0) }
         let stuckInSession = sessionOnly.isEmpty ? [] : await registrar.unregister(sessionOnly.map(Self.url), scope: .session)
@@ -348,7 +358,13 @@ public struct ActivationEngine: Sendable {
         }
         // Files in a Fonts folder go on where they are; registering takes care of any macOS hasn't noticed yet.
         let inFontsFolders = (toRegister.map(\.path) + copies.filter { !$0.isNew }.map(\.destination)).filter(isInsideFontsFolder)
-        let stillOff = inFontsFolders.isEmpty ? [] : await registrar.setEnabled(inFontsFolders.map(Self.url), true)
+        var stillOff = inFontsFolders.isEmpty ? [] : await registrar.setEnabled(inFontsFolders.map(Self.url), true)
+        // One that was on for a while seems on either way; with its session registration ended, it's on only if it went on.
+        let wereTemporary = temporary.filter { isInsideFontsFolder($0) && !stillOff.contains($0) }
+        if !wereTemporary.isEmpty {
+            _ = await registrar.unregister(wereTemporary.map(Self.url), scope: .session)
+            stillOff.formUnion(wereTemporary.filter { !registrar.isActive(Self.url($0)) })
+        }
         let enabled = Set(inFontsFolders).subtracting(stillOff)
         let registering = (toRegister.map(\.path) + copies.map(\.destination)).filter { !enabled.contains($0) }
         let stuck = await registerAndConfirm(registering, scope: .persistent)
@@ -859,16 +875,22 @@ public struct ActivationEngine: Sendable {
         var records = records
         let session = Self.currentSession()
         var leftovers: [String] = []
+        var earlier: [String] = []
         for (path, record) in records.temporary {
             switch record.scope {
             case .untilQuit: leftovers.append(path)
-            case .whileAppsRun: if record.session != session { records.temporary[path] = nil }
+            case .whileAppsRun: if record.session != session { earlier.append(path) }
             }
         }
         if !leftovers.isEmpty {
             _ = await endSessionRegistrations(leftovers)
             for path in leftovers { records.temporary[path] = nil }
         }
+        // An application set's registration from before a logout ended with it. One in a Fonts folder is off there again;
+        // one that's on was turned on for good along the way, and goes off.
+        let stillOn = earlier.filter { isInsideFontsFolder($0) && registrar.isActive(Self.url($0)) }
+        if !stillOn.isEmpty { _ = await registrar.setEnabled(stillOn.map(Self.url), false) }
+        for path in earlier { records.temporary[path] = nil }
         return records
     }
 
@@ -973,17 +995,22 @@ public struct ActivationEngine: Sendable {
     }
 
     /// Registers files and returns the ones that aren't active afterwards: those CoreText rejects and
-    /// any it accepts but doesn't turn on.
+    /// any it accepts but doesn't turn on. One it took without an error can show as on a moment after, ~0.3 s in a
+    /// macOS 26 VM, so those are given `confirmationWait`.
     func registerAndConfirm(_ paths: [String], scope: CTFontManagerScope) async -> Set<String> {
         guard !paths.isEmpty else { return [] }
         let signpost = Signposts.activation.beginInterval("Register", "\(paths.count) files")
         var stuck = await registrar.register(paths.map(Self.url), scope: scope)
         Signposts.activation.endInterval("Register", signpost)
-        Signposts.activation.withIntervalSignpost("Confirm") {
-            for path in paths where !stuck.contains(path) && !registrar.isActive(Self.url(path)) {
-                stuck.insert(path)
-            }
+        let confirming = Signposts.activation.beginInterval("Confirm")
+        var pending = paths.filter { !stuck.contains($0) && !registrar.isActive(Self.url($0)) }
+        let deadline = ContinuousClock.now + confirmationWait
+        while !pending.isEmpty, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
+            pending = pending.filter { !registrar.isActive(Self.url($0)) }
         }
+        stuck.formUnion(pending)
+        Signposts.activation.endInterval("Confirm", confirming)
         return stuck
     }
 

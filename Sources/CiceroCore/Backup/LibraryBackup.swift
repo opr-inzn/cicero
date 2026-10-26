@@ -198,7 +198,9 @@ public struct LibraryBackup: Sendable {
         func add(_ path: String, state: FaceState?) {
             guard seen.insert(path).inserted, !ActivationEngine.isProtected(path) else { return }
             let (activation, origin) = activation(of: path, state: state, records: records)
-            let isOff = path.hasPrefix(locations.userFonts.path + "/") && !(state?.isActive ?? library.activePaths.contains(path))
+            // One on for now is off underneath: only fonts that are off go on for a while.
+            let isOff = path.hasPrefix(locations.userFonts.path + "/")
+                && (!(state?.isActive ?? library.activePaths.contains(path)) || records.temporary[path] != nil)
             fonts.append(BackupFont(
                 path: Self.abbreviate(path, home: home.path), size: Self.size(of: path), activation: activation,
                 origin: origin.map { Self.abbreviate($0, home: home.path) }, isOff: isOff ? true : nil

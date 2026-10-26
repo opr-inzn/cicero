@@ -9,11 +9,12 @@ extension ActivationEngine {
     var turningOffList: URL { locations.support.appendingPathComponent("turning-off.json", isDirectory: false) }
 
     /// Moves files into a Fonts folder, off. macOS turns on whatever arrives in one, a second or so later, so each batch is
-    /// registered at once and turned off right after: its fonts are on for a few hundredths of a second (about 20 ms for 1
-    /// file or 20, in a macOS 26 VM), and macOS keeps them off from then on. Turning a file off before macOS has it doesn't
-    /// stick. `moves` is each file → where it goes; one whose place is taken goes beside it, as "Name 2.otf". The files on
-    /// their way in are written down first (see `finishTurningOff`), so stopping halfway leaves none on. One macOS won't
-    /// take or won't turn off goes back where it was. Returns where each file went, and the files that stayed.
+    /// registered at once and turned off as soon as macOS shows it on: its fonts are on for a few hundredths of a second
+    /// (about 20 ms for 1 file or 20, in a macOS 26 VM), and macOS keeps them off from then on. Turning a file off before
+    /// macOS has it doesn't stick. `moves` is each file → where it goes; one whose place is taken goes beside it, as
+    /// "Name 2.otf". The files on their way in are written down first (see `finishTurningOff`), so stopping halfway leaves
+    /// none on. One macOS won't take or won't turn off goes back where it was. Returns where each file went, and the
+    /// files that stayed.
     public func moveIntoFontsFolderOff(_ moves: [String: String]) async -> (placed: [String: String], failed: [String]) {
         let fm = FileManager.default
         var placed: [String: String] = [:]
@@ -35,7 +36,8 @@ extension ActivationEngine {
             }
             guard !moved.isEmpty else { continue }
             let paths = moved.map(\.to)
-            let untaken = await registrar.register(paths.map(Self.url), scope: .persistent)
+            // Turned off only once macOS shows it on: before that, turning it off wouldn't stick.
+            let untaken = await registerAndConfirm(paths, scope: .persistent)
             let stillOn = await registrar.setEnabled(paths.filter { !untaken.contains($0) }.map(Self.url), false)
             for (from, to) in moved {
                 guard untaken.contains(to) || stillOn.contains(to) else {
@@ -72,8 +74,10 @@ extension ActivationEngine {
     /// former one, while it's waiting to be renamed) go
     /// where turning them on would put them, and stay off: into their family's folder in Cicero's Library when fonts are
     /// installed there, else back into ~/Library/Fonts (see `moveIntoFontsFolderOff`). Not one from an app's own folder,
-    /// which goes back there when it's turned on, nor one that's on for now. Records naming a moved file as the original
-    /// of a copy follow it. Returns how many files moved.
+    /// which goes back there when it's turned on, nor one that's on for now, nor one CoreText can't read (it would go in and
+    /// come out again at every launch). One with the same name and contents as a file already where it goes is a spare
+    /// and goes, as turning it on did. Records naming a moved file as the original of a copy follow it. Returns how many
+    /// files moved or went.
     public func emptyInactiveFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, moved: Int) {
         let fm = FileManager.default
         let all = locations.inactiveFolders.flatMap { folder in
@@ -85,13 +89,18 @@ extension ActivationEngine {
                 && FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
                 && lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG
                 && records.appFolderOrigins[path] == nil && records.temporary[path] == nil
-                && !registrar.isActive(Self.url(path))
+                && !registrar.isActive(Self.url(path)) && !FontFileReader.faces(atPath: path).isEmpty
         }
         guard !files.isEmpty else { return (records, 0) }
         var placed: [String: String] = [:]
         var intoFontsFolder: [String: String] = [:]
         for path in files {
             let destination = installFolder(for: path, family: nil)
+            let same = destination.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
+            if Self.isIdenticalCopy(same, of: path), (try? fm.removeItem(atPath: path)) != nil {
+                placed[path] = same
+                continue
+            }
             if destination == locations.userFonts {
                 intoFontsFolder[path] = destination.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
                 continue
@@ -109,7 +118,8 @@ extension ActivationEngine {
         placed.merge(await moveIntoFontsFolderOff(intoFontsFolder).placed) { first, _ in first }
         var records = records
         for (copy, original) in records.installedCopies {
-            if let moved = placed[original] { records.installedCopies[copy] = moved }
+            // A copy whose original was a spare of it is the user's own again.
+            if let moved = placed[original] { records.installedCopies[copy] = moved == copy ? nil : moved }
         }
         return (records, placed.count)
     }

@@ -190,7 +190,7 @@ public enum CopyChooser {
     }
 
     /// Copies Cicero can turn on and off for a place: not macOS's, an app's or Adobe's, and in a Fonts folder
-    /// only when Cicero installed it there or it's off in ~/Library/Fonts.
+    /// only when Cicero installed it there.
     static func isChoosable(_ copy: FaceCopy, installedFrom origin: String?, locations: Locations) -> Bool {
         let path = copy.face.path
         guard copy.app == nil, !ActivationEngine.isProtected(path) else { return false }
@@ -198,6 +198,7 @@ public enum CopyChooser {
         case .active(.fontsFolder): return origin != nil
         case .active(.inPlace), .active(.temporary): return true
         case .inactive:
+            if path.hasPrefix(locations.userFonts.path + "/") { return origin != nil }
             // One off in /Library/Fonts, for every user, isn't Cicero's to turn on from there.
             return !path.hasPrefix(locations.allUsersFonts.path + "/")
         default: return false

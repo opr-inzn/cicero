@@ -5,10 +5,12 @@ extension ActivationEngine {
     /// Replace (see `AddedDuplicate.replacements`): each of the library's files goes to the Trash and a copy of the added
     /// file takes its place, under its name, in its folder, on or off as it was. One that's on goes off for the moment
     /// that takes and on again the way it was: in place, until Cicero quits, or from a Fonts folder. One that's off in a
-    /// Fonts folder has its copy turned off as it goes in (see `moveIntoFontsFolderOff`), as macOS turns on whatever
-    /// arrives there. The copy is made in Cicero's staging folder first, so a file whose copy can't be made, or that can't
-    /// go to the Trash, stays as it was. Its paths stay, so the records and everything the user put it in do too.
-    /// `moving`, an added file that took every place it was meant for goes, as activating by moving does.
+    /// Fonts folder has its copy go in off first (see `moveIntoFontsFolderOff`), as macOS turns on whatever arrives there,
+    /// beside it under the added file's name, or "Name 2.otf" (`placed` says where): macOS letting go of the old file a
+    /// moment later would turn on a new one of that path and font names. The old one goes to the Trash after that. The copy
+    /// is made in Cicero's staging folder first, so a file whose copy can't be made or go in, or that can't go to the
+    /// Trash, stays as it was. Other paths stay, so the records and everything the user put it in do too. `moving`, an
+    /// added file that took every place it was meant for goes, as activating by moving does.
     @concurrent
     public func replace(_ replacements: [FileReplacement], moving: Bool, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
@@ -16,6 +18,7 @@ extension ActivationEngine {
         let persistent = olds.filter { records.inPlace.contains($0) || isInsideUserFonts($0) && registrar.isActive(Self.url($0)) }
         let session = olds.filter { records.temporary[$0] != nil }
         let off = Set(olds.filter { isInsideFontsFolder($0) && records.temporary[$0] == nil && !registrar.isActive(Self.url($0)) })
+        var records = records
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
 
@@ -36,15 +39,15 @@ extension ActivationEngine {
                 failed.append(replacement.old)
                 continue
             }
+            if off.contains(replacement.old) {
+                goingInOff[staged.path] = replacement
+                continue
+            }
             do {
                 try trash(old)
             } catch {
                 try? fm.removeItem(at: staged)
                 failed.append(replacement.old)
-                continue
-            }
-            if off.contains(replacement.old) {
-                goingInOff[staged.path] = replacement
                 continue
             }
             do {
@@ -58,14 +61,26 @@ extension ActivationEngine {
         }
 
         if !goingInOff.isEmpty {
-            let moved = await moveIntoFontsFolderOff(goingInOff.mapValues(\.old))
+            // The old file is still there, so the new one never takes its path.
+            let moves = goingInOff.mapValues { replacement in
+                Self.uniqueURL(for: Self.url(replacement.added).lastPathComponent, in: Self.url(replacement.old).deletingLastPathComponent()).path
+            }
+            let moved = await moveIntoFontsFolderOff(moves)
             for (staged, replacement) in goingInOff.sorted(by: { $0.key < $1.key }) {
-                if let path = moved.placed[staged] {
-                    done.append(replacement)
-                    if path != replacement.old { placed[replacement.old] = path }
-                } else {
-                    // Back in the staging folder; the old file is in the Trash, to put back from there.
+                guard let path = moved.placed[staged] else {
+                    // Back in the staging folder; the old file is as it was.
                     try? fm.removeItem(atPath: staged)
+                    failed.append(replacement.old)
+                    continue
+                }
+                do {
+                    try trash(Self.url(replacement.old))
+                    done.append(replacement)
+                    placed[replacement.old] = path
+                    records.installedCopies[replacement.old] = nil
+                } catch {
+                    // The old one stays, off; the new one goes again, before macOS has it for long.
+                    try? fm.removeItem(atPath: path)
                     failed.append(replacement.old)
                 }
             }
