@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Leave the files where they are** in **Settings → General** is now **Leave files where they are**.
 - Turning off a font in your Fonts folder no longer moves its file. Cicero turns it off where it is, as Font Book does, and that goes for copies Cicero installed there too.
 - Fonts that earlier versions moved to Cicero’s Deactivated folder go back as Cicero opens, still off: into your Fonts folder, or into Cicero’s Library if Cicero installs fonts there.
+- **Clear Font Caches** no longer turns off the fonts Cicero uses where they are, like those in your locations, in Cicero’s Library or on in every app from Adobe’s folders.
 - Cicero’s Deactivated folder is now called Inactive, `~/Library/Application Support/Cicero/Inactive`. Cicero renames it as it opens.
 
 ## 0.10.10

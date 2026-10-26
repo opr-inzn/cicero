@@ -26,7 +26,7 @@ macOS and some apps keep lists of fonts that can go stale after fonts change. Fo
    - **Microsoft Office:** moves Office’s font caches to the Trash. macOS asks for your permission before Cicero looks inside Office’s folders. Quit Office apps first.
 3. Click **Clear**.
 
-The apps rebuild their caches the next time they open. Afterwards, Cicero rebuilds its own font list. When you cleared the macOS caches, Cicero offers **Restart Now**, because apps that are open keep using the old caches until you restart your Mac.
+The apps rebuild their caches the next time they open. Clearing the macOS caches makes macOS forget the fonts Cicero uses where they are, so Cicero turns them on again right away, as they were. Afterwards, Cicero rebuilds its own font list. When you cleared the macOS caches, Cicero offers **Restart Now**, because apps that are open keep using the old caches until you restart your Mac.
 
 ## Rescan or rebuild the font list
 
