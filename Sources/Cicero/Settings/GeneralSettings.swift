@@ -47,7 +47,7 @@ struct GeneralSettings: View {
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
                 } label: {
-                    Text("Font Library")
+                    Text("Cicero’s Font Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
                 let misplaced = model.misplacedInstalledFonts()
@@ -169,8 +169,8 @@ struct GeneralSettings: View {
         let one = families.count == 1 || families.isEmpty && count == 1
         let names = FontNames.describe(families: families) ?? (count == 1 ? "A font" : "\(count) fonts")
         let detail = one
-            ? "Cicero installed it there before. Move Them puts it into the Font Library, and it stays on."
-            : "Cicero installed them there before. Move Them puts them into the Font Library, and they stay on."
+            ? "Cicero installed it there before. Move Them puts it into Cicero’s Font Library, and it stays on."
+            : "Cicero installed them there before. Move Them puts them into Cicero’s Font Library, and they stay on."
         return ("\(names) \(one ? "is" : "are") still in ~/Library/Fonts", detail)
     }
 
@@ -211,8 +211,8 @@ private extension InstallMethod {
     func title(intoFontLibrary: Bool) -> String {
         switch self {
         case .ask: "Ask each time"
-        case .copy: intoFontLibrary ? "Copy into the Font Library" : "Copy into ~/Library/Fonts"
-        case .move: intoFontLibrary ? "Move into the Font Library" : "Move into ~/Library/Fonts"
+        case .copy: intoFontLibrary ? "Copy into Cicero’s Font Library" : "Copy into ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move into Cicero’s Font Library" : "Move into ~/Library/Fonts"
         case .inPlace: "Leave the files where they are"
         }
     }
