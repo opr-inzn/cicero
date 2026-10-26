@@ -132,6 +132,15 @@ extension AppModel {
         }
     }
 
+    /// The apps open now that keep a font's old version once its file is replaced, until they restart, in this order. Tested
+    /// with InDesign 2026, which drew the new file with the old one's glyphs: "Hamburg" came out as "Ibncvsh". Neither
+    /// recomposing nor a new modification date helps; a restart does.
+    var openAppsKeepingFonts: [String] {
+        let open = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        return [("com.adobe.InDesign", "InDesign"), ("com.adobe.illustrator", "Illustrator"), ("com.adobe.Photoshop", "Photoshop")]
+            .filter { open.contains($0.0) }.map(\.1)
+    }
+
     /// Replace, in every place the warning named (see `replacePrompt`).
     func replaceEverywhere(_ prompt: DuplicatePrompt) {
         let choices = Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.choice(for: .replace) ?? $0.suggestion) })
@@ -155,9 +164,18 @@ extension AppModel {
     /// only of families left out stays out (`then` gets the library's copies of them instead, to show), and one that
     /// replaces the library's copies goes in their places, which `then` gets (see `ActivationEngine.replace`).
     func addFontFiles(_ paths: [String], resolving duplicates: [AddedDuplicate] = [], choices: [String: DuplicateChoice] = [:],
-                      mayMove: Bool = true, then: ((AppModel, Set<String>) -> Void)? = nil) {
+                      mayMove: Bool = true, then: ((AppModel, Set<String>) -> Void)? = nil, askedAboutOpenApps: Bool = false) {
         let skipped = duplicates.filter { choices[$0.id] == .skip }
         let replacements = duplicates.filter { choices[$0.id] == .replace && $0.canReplace }.flatMap(\.replacements)
+        // InDesign, Illustrator and Photoshop keep a font's old version until they restart, so open documents can show
+        // wrong letters once its file is replaced: the user says first. Once the alert or sheet before has gone.
+        if !replacements.isEmpty, !askedAboutOpenApps, case let apps = openAppsKeepingFonts, !apps.isEmpty {
+            let prompt = OpenAppsReplacePrompt(apps: apps) { model in
+                model.addFontFiles(paths, resolving: duplicates, choices: choices, mayMove: mayMove, then: then, askedAboutOpenApps: true)
+            }
+            Task { openAppsReplacePrompt = prompt }
+            return
+        }
         // A file only of skipped families stays out, and one that takes the library's copies' places is in as those.
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
             .union(replacements.map(\.added))

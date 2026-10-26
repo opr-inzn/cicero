@@ -56,19 +56,7 @@ struct MainWindow: View {
         // A sheet of its own for each library, rather than the last one's with its choices.
         .sheet(item: $model.importing) { ImportSheet(prompt: $0).id($0.id) }
         .sheet(item: $model.duplicatePrompt) { DuplicatesSheet(prompt: $0) }
-        .alert(
-            model.replacePrompt.map(Self.replaceTitle) ?? "",
-            isPresented: Binding(get: { model.replacePrompt != nil }, set: { if !$0 { model.replacePrompt = nil } }),
-            presenting: model.replacePrompt
-        ) { prompt in
-            Button("Replace") { model.replaceEverywhere(prompt) }
-                .keyboardShortcut(.defaultAction)
-            // Once the alert has gone, so the sheet isn't lost on its way out.
-            Button("Choose for Each…") { Task { model.duplicatePrompt = prompt } }
-            Button("Cancel", role: .cancel) {}
-        } message: { prompt in
-            Text(replaceMessage(prompt))
-        }
+        .modifier(ReplaceAlerts())
         .fontCacheSheet(isPresented: $model.isClearingCaches)
         .sheet(item: $model.editingSmartSet) { SmartSetEditor(original: $0) }
         .sheet(item: $model.editingCharacterSet) { CharacterSetEditor(original: $0) }
@@ -172,21 +160,6 @@ struct MainWindow: View {
         Text(token.title)
     }
 
-    /// "Replace Helvetica in 2 Places?", or for several families "Replace Fonts in More Than One Place?".
-    static func replaceTitle(_ prompt: DuplicatePrompt) -> String {
-        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
-        guard several.count == 1 else { return "Replace Fonts in More Than One Place?" }
-        return "Replace \(several[0].family) in \(several[0].replacements.count) Places?"
-    }
-
-    /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
-    private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
-        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
-        var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
-        if several.count > 3 { lines.append("And \(several.count - 3) more.") }
-        return (lines + ["Each of these files goes to the Trash, and the added one takes its place."]).joined(separator: " ")
-    }
-
     static func trashMessage(_ plan: TrashPlan) -> String {
         var parts = [plan.paths.count == 1
             ? "1 font file will be removed from your Mac and turned off in every app."
@@ -209,6 +182,71 @@ struct MainWindow: View {
 }
 
 /// A page of the detail column: room for the Info panel, and files dropped on it.
+/// The questions before fonts are replaced: in more than one place (`replacePrompt`), and while apps that keep a font's
+/// old version are open (`openAppsReplacePrompt`).
+private struct ReplaceAlerts: ViewModifier {
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                model.replacePrompt.map(Self.replaceTitle) ?? "",
+                isPresented: Binding(get: { model.replacePrompt != nil }, set: { if !$0 { model.replacePrompt = nil } }),
+                presenting: model.replacePrompt
+            ) { prompt in
+                Button("Replace") { model.replaceEverywhere(prompt) }
+                    .keyboardShortcut(.defaultAction)
+                // Once the alert has gone, so the sheet isn't lost on its way out.
+                Button("Choose for Each…") { Task { model.duplicatePrompt = prompt } }
+                Button("Cancel", role: .cancel) {}
+            } message: { prompt in
+                Text(replaceMessage(prompt))
+            }
+            .alert(
+                model.openAppsReplacePrompt.map(Self.openAppsTitle) ?? "",
+                isPresented: Binding(get: { model.openAppsReplacePrompt != nil }, set: { if !$0 { model.openAppsReplacePrompt = nil } }),
+                presenting: model.openAppsReplacePrompt
+            ) { prompt in
+                Button("Replace") { prompt.replace(model) }
+                    .keyboardShortcut(.defaultAction)
+                Button("Cancel", role: .cancel) {}
+            } message: { prompt in
+                Text(Self.openAppsMessage(prompt))
+            }
+    }
+
+    /// "Replace Fonts While InDesign Is Open?", "…While InDesign and Photoshop Are Open?".
+    static func openAppsTitle(_ prompt: OpenAppsReplacePrompt) -> String {
+        "Replace Fonts While \(list(prompt.apps)) \(prompt.apps.count == 1 ? "Is" : "Are") Open?"
+    }
+
+    static func openAppsMessage(_ prompt: OpenAppsReplacePrompt) -> String {
+        prompt.apps.count == 1
+            ? "\(prompt.apps[0]) keeps the old version until it restarts, and documents open in it can show wrong letters. Quit it first, or restart it afterwards."
+            : "\(list(prompt.apps)) keep the old version until they restart, and documents open in them can show wrong letters. Quit them first, or restart them afterwards."
+    }
+
+    /// "InDesign", "InDesign and Photoshop", "InDesign, Illustrator and Photoshop".
+    static func list(_ names: [String]) -> String {
+        names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.joined()
+    }
+
+    /// "Replace Helvetica in 2 Places?", or for several families "Replace Fonts in More Than One Place?".
+    static func replaceTitle(_ prompt: DuplicatePrompt) -> String {
+        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
+        guard several.count == 1 else { return "Replace Fonts in More Than One Place?" }
+        return "Replace \(several[0].family) in \(several[0].replacements.count) Places?"
+    }
+
+    /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
+    private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
+        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
+        var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
+        if several.count > 3 { lines.append("And \(several.count - 3) more.") }
+        return (lines + ["Each of these files goes to the Trash, and the added one takes its place."]).joined(separator: " ")
+    }
+}
+
 private struct DetailPage: ViewModifier {
     func body(content: Content) -> some View {
         content
