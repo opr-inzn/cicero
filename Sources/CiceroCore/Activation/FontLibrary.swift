@@ -1,7 +1,7 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// Cicero's Font Library (see `UserData.fontLibraryPath`): a folder of its own, ~/Cicero/Font Library unless the user
+/// Cicero's Font Library (see `UserData.fontLibraryPath`): a folder of its own, ~/Cicero/Library unless the user
 /// moves it, where the fonts it installs go, a folder for each family, when the user chooses so. Fonts in it are
 /// registered where they are, so it's anywhere but a Fonts folder, and turning one off leaves it there.
 extension ActivationEngine {
@@ -64,51 +64,16 @@ extension ActivationEngine {
         return rmdir(folder) == 0
     }
 
-    // MARK: Fonts installed before
-
-    /// The copies Cicero installed right in ~/Library/Fonts, while fonts go into the Font Library: they can move there.
-    /// Never a file the user put in ~/Library/Fonts; none while fonts go into ~/Library/Fonts.
-    public func misplacedCopies(in records: ActivationRecords) -> [String] {
-        guard installsIntoFontLibrary, fontLibrary != nil else { return [] }
-        let fonts = locations.userFonts.path + "/"
-        return records.installedCopies.keys.filter { $0.hasPrefix(fonts) }.sorted()
-    }
-
-    /// Moves copies Cicero installed in ~/Library/Fonts into the Font Library (see `misplacedCopies`), each into the folder
-    /// of the family `families` gives it, else of its first font. One that's on goes off while it moves, as macOS would see
-    /// it go anyway, and is registered where it is now; one that can't move stays where it was, as it was.
-    @concurrent
-    public func moveInstalledCopies(_ paths: [String], families: [String: String], records: ActivationRecords) async -> ActivationResult {
-        let fm = FileManager.default
-        var records = records
-        guard installsIntoFontLibrary, fontLibrary != nil else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "") }
-        let paths = paths.filter { records.installedCopies[$0] != nil && fm.fileExists(atPath: $0) }
-        let wasActive = paths.filter { registrar.isActive(Self.url($0)) }
-        if !wasActive.isEmpty { _ = await registrar.unregister(wasActive.map(Self.url), scope: .persistent) }
-        var moved: [String: String] = [:]
-        var failed: [String] = []
-        for path in paths {
-            let folder = installFolder(for: path, family: families[path])
-            do {
-                try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-                let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: folder)
-                try Self.move(Self.url(path), to: destination)
-                records.installedCopies[destination.path] = records.installedCopies.removeValue(forKey: path)
-                moved[path] = destination.path
-            } catch {
-                // The family's folder, if it was made for nothing.
-                removeEmptyFolders(around: folder.appendingPathComponent(Self.url(path).lastPathComponent).path)
-                failed.append(path)
-            }
+    /// Whether a folder has a font file in it, at any depth, not counting hidden ones or what's inside packages, as the
+    /// scan reads it: whether the Font Library has fonts to keep listed.
+    public static func hasFontFiles(in folder: URL) -> Bool {
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return false }
+        for case let url as URL in enumerator where FontFileReader.fontExtensions.contains(url.pathExtension.lowercased()) {
+            if (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true { return true }
         }
-        if !wasActive.isEmpty { _ = await registrar.register(wasActive.map { Self.url(moved[$0] ?? $0) }, scope: .persistent) }
-        for path in wasActive { if let new = moved[path] { records.inPlace.insert(new) } }
-        let message = if failed.isEmpty, let names = FontNames.describe(FontNames.fonts(inFiles: moved.values.sorted())) {
-            "\(names) moved into your Font Library"
-        } else {
-            Self.message("Moved", "move", succeeded: moved.count, failed: failed.count)
-        }
-        return ActivationResult(records: records, succeeded: moved.count, failed: failed, message: message)
+        return false
     }
 
     // MARK: Moving the library
@@ -154,10 +119,27 @@ extension ActivationEngine {
         records.inPlace = Set(records.inPlace.map(moved))
         records.temporary = Dictionary(records.temporary.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
         await register(moved)
-        if fontLibrary.standardizedFileURL.path == locations.defaultFontLibrary.standardizedFileURL.path {
+        let firstPlaces = [locations.defaultFontLibrary, locations.formerDefaultFontLibrary].map(\.standardizedFileURL.path)
+        if firstPlaces.contains(fontLibrary.standardizedFileURL.path) {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
         }
         return ActivationResult(records: records, succeeded: 1, failed: [], message: "Font Library moved to \(place)")
+    }
+
+    /// Moves a Font Library still in its former first place, ~/Cicero/Font Library, to today's, ~/Cicero/Library, as
+    /// `moveFontLibrary` does: the whole folder, so the old one is gone, with its fonts' registrations and the records.
+    /// nil, with nothing changed, for a library somewhere else (the user moved it), when something is in ~/Cicero/Library
+    /// already, or when the move fails. With no library folder yet, only its place changes (`succeeded` 0).
+    @concurrent
+    public func moveFromFormerPlace(records: ActivationRecords) async -> ActivationResult? {
+        let former = locations.formerDefaultFontLibrary.standardizedFileURL, new = locations.defaultFontLibrary.standardizedFileURL
+        guard let fontLibrary, fontLibrary.standardizedFileURL.path == former.path, former.path != new.path else { return nil }
+        let fm = FileManager.default
+        if fm.fileExists(atPath: new.path) {
+            guard let items = try? fm.contentsOfDirectory(atPath: new.path), items.allSatisfy({ $0 == ".DS_Store" }) else { return nil }
+        }
+        let result = await moveFontLibrary(to: new, records: records)
+        return result.failed.isEmpty ? result : nil
     }
 
     /// Why the Font Library can't go into a folder, said to the user; nil when it can. Not a Fonts folder, where macOS

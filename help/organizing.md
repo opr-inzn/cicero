@@ -83,7 +83,7 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a location in the sidebar:
 
-- **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts**, **Added Fonts**, **Font Library** and **Deactivated** can be renamed too. Leave the name empty to go back to the folder’s own.
+- **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts** and **Added Fonts** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Location from Library**: Cicero stops listing it. The files stay where they are. Dragging the location out of the sidebar does the same, with **Undo** in the note at the bottom of the window. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Settings → Locations** and click **−**.
@@ -96,14 +96,6 @@ The fonts that Adobe apps load from their own folders, where type designers put 
 ### Adobe Fonts
 
 The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show fonts installed for proofing in Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Settings → General**: they’re then left out of every list, smart folders and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
-
-### Font Library
-
-Cicero’s own folder for the fonts it installs, when you keep them there. It shows while it has fonts. See [The Font Library](activating.md#the-font-library).
-
-### Deactivated
-
-Cicero’s own folder for fonts it moved out of your Fonts folder or an app’s folder. It shows while it has fonts. See [The Deactivated folder](activating.md#the-deactivated-folder).
 
 ### Folders in the cloud: iCloud Drive, Dropbox, Google Drive
 

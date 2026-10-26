@@ -40,23 +40,15 @@ struct GeneralSettings: View {
                 .disabled(!showsMenuBarIcon)
             }
             Section("Installation") {
-                Toggle(isOn: $model.data.installsIntoFontLibrary) {
+                Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
                     Text("Install fonts into Cicero’s Font Library")
-                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts.")
+                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
                 } label: {
-                    Text("Font Library")
+                    Text("Cicero’s Font Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
-                }
-                let misplaced = model.misplacedInstalledFonts()
-                if !misplaced.paths.isEmpty {
-                    LabeledContent {
-                        Button("Move Them") { model.moveInstalledFonts() }
-                    } label: {
-                        Text(misplacedNote(misplaced))
-                    }
                 }
                 // The two pop-up menus are as wide as each other.
                 let installMethods = InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) }
@@ -159,13 +151,6 @@ struct GeneralSettings: View {
         }
     }
 
-    /// "Cicero installed Inter and Roboto before, in ~/Library/Fonts."
-    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> String {
-        let count = misplaced.paths.count
-        let names = FontNames.describe(families: Array(Set(misplaced.families.values))) ?? (count == 1 ? "a font" : "\(count) fonts")
-        return "Cicero installed \(names) before, in ~/Library/Fonts."
-    }
-
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
         case .ask: "When a font file you add has fonts your library has from another file, Cicero asks what to do with each family."
@@ -203,8 +188,8 @@ private extension InstallMethod {
     func title(intoFontLibrary: Bool) -> String {
         switch self {
         case .ask: "Ask each time"
-        case .copy: intoFontLibrary ? "Copy into the Font Library" : "Copy into ~/Library/Fonts"
-        case .move: intoFontLibrary ? "Move into the Font Library" : "Move into ~/Library/Fonts"
+        case .copy: intoFontLibrary ? "Copy into Cicero’s Font Library" : "Copy into ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move into Cicero’s Font Library" : "Move into ~/Library/Fonts"
         case .inPlace: "Leave the files where they are"
         }
     }

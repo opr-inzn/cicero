@@ -402,11 +402,9 @@ private struct SidebarRowMenu: View {
             default:
                 if let folder = model.folder(id) {
                     revealButton(ids)
-                    if id != WatchedFolder.fontLibraryID {
-                        Divider()
-                        FolderActivationPicker(folder: folder) {
-                            model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
-                        }
+                    Divider()
+                    FolderActivationPicker(folder: folder) {
+                        model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
                     }
                 }
             }

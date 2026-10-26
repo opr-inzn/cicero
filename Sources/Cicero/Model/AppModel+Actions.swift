@@ -174,31 +174,27 @@ extension AppModel {
 
     // MARK: Font Library
 
-    /// The fonts Cicero installed right in ~/Library/Fonts while it installs into the Font Library, with the family each
-    /// file is in, for its folder there (see `ActivationEngine.misplacedCopies`).
-    func misplacedInstalledFonts() -> (paths: [String], families: [String: String]) {
-        let paths = engine.misplacedCopies(in: data.records)
-        guard !paths.isEmpty else { return ([], [:]) }
-        let wanted = Set(paths)
-        var families: [String: String] = [:]
-        for family in library.families {
-            for face in family.faces {
-                for path in [face.face.path] + face.otherCopies where wanted.contains(path) && families[path] == nil {
-                    families[path] = family.id
-                }
-            }
+    /// Installing into the Font Library on or off. Off, its folder becomes one of the user's locations while it has fonts,
+    /// so they stay listed, each on or off as it is; on again, that location is the library again. Neither moves a file
+    /// or turns a font on or off.
+    func setInstallsIntoFontLibrary(_ on: Bool) {
+        guard on != data.installsIntoFontLibrary else { return }
+        var changed = data
+        if on {
+            if let location = changed.takeBackFontLibrary() { deselect { $0 == .folder(location.id) } }
+        } else {
+            changed.keepFontLibraryAsLocation(hasFonts: changed.fontLibrary.map { fontLibraryHasFonts($0.url) } ?? false)
         }
-        return (paths, families)
+        changed.installsIntoFontLibrary = on
+        data = changed
+        rescan()
     }
 
-    /// Moves the fonts Cicero installed right in ~/Library/Fonts into the Font Library (see `misplacedInstalledFonts`).
-    func moveInstalledFonts() {
-        let (paths, families) = misplacedInstalledFonts()
-        guard !paths.isEmpty else { return }
-        enqueue { model in
-            let result = await model.engine.moveInstalledCopies(paths, families: families, records: model.data.records)
-            model.finish(result)
-        }
+    /// Whether the Font Library's folder has fonts to keep listed: font files in it, or, on a disk that isn't connected,
+    /// fonts Cicero turned on there.
+    func fontLibraryHasFonts(_ folder: URL) -> Bool {
+        let prefix = folder.path + "/"
+        return ActivationEngine.hasFontFiles(in: folder) || data.records.inPlace.contains { $0.hasPrefix(prefix) }
     }
 
     /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;
@@ -693,10 +689,8 @@ extension AppModel {
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
             }
-            if ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID), let fontLibrary = data.fontLibrary {
-                folders.append(fontLibrary)
-            }
-            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those.
+            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those. Nor the
+            // Font Library: it takes the place of ~/Library/Fonts, whose fonts are in All Fonts like the rest.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"

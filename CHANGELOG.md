@@ -6,6 +6,11 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - Hiding or showing the sidebar no longer rearranges the grid. The tiles keep their number and height, grow wider or narrower, and every font in them grows or shrinks with them, as when you open the Info panel. **Size** in Preview Options shows the size they’re drawn at.
 - The Info panel slides in and out like the sidebar, and the grid narrows and widens along with it. Before, it appeared and disappeared at once.
+- Cicero’s Font Library is no longer listed under **Locations**. Its fonts are in **All Fonts**, like those in your Fonts folder.
+- **Move Them** is gone from **Settings → General**. Fonts Cicero installed in your Fonts folder before stay there, and keep working.
+- In **Settings → General**, the Font Library’s row and the choices under **Activate fonts by** say **Cicero’s Font Library**.
+- When you turn off **Install fonts into Cicero’s Font Library**, its folder becomes one of your locations, so its fonts stay listed, on or off as they were. Turn the setting back on, and it’s the library again. If you had turned it off before, the folder becomes a location the first time Cicero opens.
+- The Font Library’s folder is now `~/Cicero/Library`. Cicero moves it there from `~/Cicero/Font Library` as it opens, fonts and all, unless you put it somewhere else.
 
 ## 0.10.9
 
