@@ -173,8 +173,9 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   the tooltip. 10 pt beside a tile's contents, 14 pt above and below. Tiles fit the type
   (`FontGrid.Measure`, from the sample — the preview text, else "Aa Gg 123" — in the system font at the preview size, so
   every tile gets the same): the sample is as high as those letters reach above and below the baseline, plus a quarter
-  of the size + 44 pt, and at least 0.36 times as high as the tile is wide without the Info panel
-  (`sampleHeightPerWidth`), so wide tiles, two or three in a row, aren't flat, and the panel doesn't make them lower.
+  of the size + 44 pt, and at least 0.36 times as high as the tile is wide with the sidebar shown and the Info panel
+  shut (`sampleHeightPerWidth`), so wide tiles, two or three in a row, aren't flat, and hiding the sidebar or opening the
+  panel doesn't make them higher or lower.
   Tiles are as wide as the library's families need, so all but the widest of them are drawn at the preview size, whatever
   their own width (a monospaced font is about 1.2 times as wide as the system font): `SampleWidths` measures each
   family's sample — in the style its tile shows, the text it draws (in the font's own script where it has to), with the
@@ -193,18 +194,24 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   least width less 28 pt), are drawn smaller, until they're that wide. That room goes up with the size, not with the
   tiles, so they grow and shrink with the size like the rest. (Shrunk to fit its tile, a font stopped growing while the
   rest went on, until the tiles got fewer, as tiles stay as wide as they are until a row has room for one fewer or one
-  more.) With the Info panel open, every sample is smaller by as much as the tiles are narrower, one share for all, so
-  they keep their sizes to one another (held to the narrower tiles' room instead, most fonts were drawn the same width):
-  at the size times that share, rounded down to a whole point (`GridPanelSize`), which Preview Options' Size shows while
-  the grid does, with the size chosen in its tooltip; a size picked then sets the smallest whole size chosen that the
-  grid draws at that size, and the panel shut shows the size chosen again. The list and specimens keep the size chosen.
+  more.) With the sidebar hidden or the Info panel open, every sample is bigger or smaller by as much as the tiles are
+  wider or narrower, one factor for all, so they keep their sizes to one another (held to the narrower tiles' room
+  instead, most fonts were drawn the same width): at the size times that factor, rounded down to a whole point
+  (`GridScale`), which Preview Options' Size shows while the grid does, with the size chosen in its tooltip; a size
+  picked then sets the smallest whole size chosen that the grid draws at that size, and the sidebar shown with the panel
+  shut shows the size chosen again. The sidebar's room follows it as it slides in and out (`SidebarRoom`: where the
+  browser starts in the window, against where the sidebar rests, 8 pt in on macOS 26, the furthest in its frame has
+  been, as it's further out only while sliding and keeps its frame while hidden), so the grid zooms along with the slide
+  rather than rearranging; dragging the sidebar wider or narrower rearranges it, as resizing the window does. The list
+  and specimens keep the size chosen.
   Every font's sample sits on one baseline, where the system font's letters are centred ("H"
   centres the capital, "g" the x-height and descender), whatever the font's own ascent and descent; it's drawn unclipped
   and at its whole line's height, never shrunk to the sample's (proposed less, SwiftUI shrank it and drew it below the
   baseline it reported). A tile is at least the size + 186 pt wide, as wide as the sample in the system font × 1.1 +
   28 pt, and as wide as the listed families' samples need (above) + 28 pt; as many
-  tiles fit in a row as can be that wide in the rows without the Info panel, from one to five, as wide as fills the row,
-  however many families there are. Bigger type, fewer and bigger tiles. The Info panel makes them narrower, never fewer.
+  tiles fit in a row as can be that wide in the rows with the sidebar shown and the Info panel shut, from one to five, as
+  wide as fills the row, however many families there are. Bigger type, fewer and bigger tiles. Hiding the sidebar makes
+  them wider and the Info panel narrower, never more or fewer.
   The type shrinks further, to 0.4 at most, only where its letters fit but its line doesn't: a first or last letter
   with a lot of room beside it.
 - **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, "Foundry · N styles", switch; the sample at preview size, on the left; up to 14 style names set in themselves (+N more), each line of them on one baseline (`FlowLayout` lines its children up by their first text's baseline, not their tops, which sit as high as each face's ascent puts them).

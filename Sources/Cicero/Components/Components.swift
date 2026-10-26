@@ -866,14 +866,14 @@ private struct PreviewOptions: View {
                 }
             }
             Section {
-                if size == nil, let share = GridPanelSize.shared.share {
-                    // The size the grid draws at while the Info panel narrows it (see `GridPanelSize`).
+                if size == nil, let factor = GridScale.shared.factor {
+                    // The size the grid draws at while the sidebar is hidden or the Info panel open (see `GridScale`).
                     row("Size", Binding {
-                        GridPanelSize.drawn(preview.size, share: share)
+                        GridScale.drawn(preview.size, factor: factor)
                     } set: {
-                        preview.size = min(max(GridPanelSize.chosen(drawing: $0, share: share), sizeRange.lowerBound), sizeRange.upperBound)
-                    }, range: GridPanelSize.drawn(sizeRange.lowerBound, share: share)...GridPanelSize.drawn(sizeRange.upperBound, share: share), unit: " pt")
-                    .help("The grid’s size while the Info panel narrows it: \(Int(preview.size)) pt with the panel closed")
+                        preview.size = min(max(GridScale.chosen(drawing: $0, factor: factor), sizeRange.lowerBound), sizeRange.upperBound)
+                    }, range: GridScale.drawn(sizeRange.lowerBound, factor: factor)...GridScale.drawn(sizeRange.upperBound, factor: factor), unit: " pt")
+                    .help("The grid’s size while the sidebar is hidden or the Info panel open: \(Int(preview.size)) pt with the sidebar shown and the panel closed")
                 } else {
                     row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
                 }

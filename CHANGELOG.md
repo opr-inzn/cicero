@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Hiding or showing the sidebar no longer rearranges the grid. The tiles keep their number and height, grow wider or narrower, and every font in them grows or shrinks with them, as when you open the Info panel. **Size** in Preview Options shows the size they’re drawn at.
+
 ## 0.10.9
 
 - Typing on a font page, and dragging its **Size**, **Tracking** and **Leading** sliders, no longer lags.
