@@ -2,16 +2,13 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.10
 
 - **Check Again** is gone from the Conflicts toolbar. The list updates by itself, and **Fonts → Rescan Library** (⌘R) is still there.
 - Hiding or showing the sidebar no longer rearranges the grid. The tiles keep their number and height, grow wider or narrower, and every font in them grows or shrinks with them, as when you open the Info panel. **Size** in Preview Options shows the size they’re drawn at.
 - The Info panel slides in and out like the sidebar, and the grid narrows and widens along with it. Before, it appeared and disappeared at once.
 - Cicero’s Library is no longer listed under **Locations**. Its fonts are in **All Fonts**, like those in your Fonts folder.
-- **Move Them** is gone from **Settings → General**. Fonts Cicero installed in your Fonts folder before stay there, and keep working.
 - The Font Library is now called **Cicero’s Library**, in Settings and everywhere else.
-- When you turn off **Install fonts into Cicero’s Library**, its folder becomes one of your locations, called **Cicero’s Library**, so its fonts stay listed, on or off as they were. Turn the setting back on, and it’s the library again. If you had turned it off before, the folder becomes a location the first time Cicero opens.
-- **Replace your copy** takes the place of **Use the added one** for fonts you add that are already in your library: your copy goes to the Trash, and the added file takes its place, with the same name in the same folder, on or off as it was. If the font is in more than one place, or InDesign, Illustrator or Photoshop is open, Cicero asks first. **Keep the newer version** is gone; if you had chosen it or **Use the added one** in Settings, Cicero asks each time again. **Add it as another copy** is now **Add as a copy**.
 - The folder of Cicero’s Library is now `~/Cicero/Library`. Cicero moves it there from `~/Cicero/Font Library` as it opens, fonts and all, unless you put it somewhere else.
 
 ## 0.10.9
