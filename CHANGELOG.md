@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Typing on a font page, and dragging its **Size**, **Tracking** and **Leading** sliders, no longer lags.
+
 ## 0.10.8
 
 - Opening Cicero no longer shows **Finding fonts** while it checks your fonts against the ones it remembered. Your fonts are in the window from the start, and the check changes nothing there unless it finds fonts to read. The same goes for the checks when you come back to Cicero and when fonts change.

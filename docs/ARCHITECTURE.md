@@ -211,6 +211,15 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   browser's tiles and rows hold a `FamilyOrder`, equal only to itself, for selecting ranges.
 - Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
   width that doesn't depend on them, so a layout settles in one pass.
+- No `ViewThatFits` around controls. It builds each of its choices again, AppKit views and menus included,
+  whenever it weighs them, which is whenever anything in them changes: the font page's Style menu, sliders
+  and alignment buttons in one made each letter typed and each step of a slider take a third of a second.
+  They're a `Layout` of their own (`TesterControls`), which keeps both of a slider's labels, the word and the
+  symbol, and shows the other one at no width.
+- What changes with each keystroke isn't saved to `UserDefaults` as it's typed. SwiftUI draws every view
+  with an `@AppStorage` again whenever anything is saved there, whatever the key: the browser behind a
+  font page, Settings and the Compare window. The type tester's text is kept in memory and saved a second
+  after typing stops, and at quit (`TesterTextStore`).
 - The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
   uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
   engine, exporter and backup, `using:` for app caches), so tests remove temporary files instead and

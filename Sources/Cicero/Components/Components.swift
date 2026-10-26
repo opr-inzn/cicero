@@ -403,8 +403,9 @@ struct ValueField: View {
         self.step = step
         self.unit = unit
         self.alignment = alignment
-        // The number from the start, not once it appears: a field in a layout `ViewThatFits` is still weighing, as the
-        // font page's row on one line, would measure as wide as its title, which it shows while empty.
+        // The number from the start, not once it appears: a field measured before it's on screen, as the font page's
+        // controls measure theirs to choose a layout (see `TesterControls`), would measure as wide as its title, which it
+        // shows while empty.
         _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
