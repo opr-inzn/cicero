@@ -23,9 +23,15 @@ public struct Locations: Sendable {
     /// Creative Cloud's list of the Adobe Fonts it keeps, with each one's page on Adobe Fonts' website (see
     /// `AdobeFontsPages`).
     public var adobeFontsList: URL?
-    /// ~/Cicero/Font Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
+    /// ~/Cicero/Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
     /// By default in the home folder `userFonts` is in, so a test run with another home keeps its own.
     public var defaultFontLibrary: URL
+
+    /// ~/Cicero/Font Library, where the Font Library was at first: one still there moves to `defaultFontLibrary` (see
+    /// `ActivationEngine.moveFromFormerPlace`).
+    public var formerDefaultFontLibrary: URL {
+        defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Font Library", isDirectory: true)
+    }
 
     public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
                 adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil) {
@@ -38,7 +44,7 @@ public struct Locations: Sendable {
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
         self.adobeFontsList = adobeFontsList
         self.defaultFontLibrary = defaultFontLibrary
-            ?? userFonts.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Cicero/Font Library", isDirectory: true)
+            ?? userFonts.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Cicero/Library", isDirectory: true)
     }
 
     public static var standard: Locations {

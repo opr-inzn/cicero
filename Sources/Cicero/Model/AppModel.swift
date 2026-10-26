@@ -332,8 +332,15 @@ final class AppModel {
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
             let tidied = await model.engine.tidyDeactivatedFolder(model.data.records)
             model.data.records = tidied.records
-            // The first scan may have listed the files before they went.
-            if tidied.removed > 0 { model.rescan(check: true) }
+            // A Font Library still in ~/Cicero/Font Library moves to ~/Cicero/Library, without a word; one that can't
+            // stays where it is until the next launch.
+            let moved = await model.engine.moveFromFormerPlace(records: model.data.records)
+            if let moved {
+                model.data.records = moved.records
+                model.data.fontLibraryPath = model.locations.defaultFontLibrary.path
+            }
+            // The first scan may have listed the files before they went, or the library where it was.
+            if tidied.removed > 0 || (moved?.succeeded ?? 0) > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
         rescan(check: true)

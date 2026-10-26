@@ -1,7 +1,7 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// Cicero's Font Library (see `UserData.fontLibraryPath`): a folder of its own, ~/Cicero/Font Library unless the user
+/// Cicero's Font Library (see `UserData.fontLibraryPath`): a folder of its own, ~/Cicero/Library unless the user
 /// moves it, where the fonts it installs go, a folder for each family, when the user chooses so. Fonts in it are
 /// registered where they are, so it's anywhere but a Fonts folder, and turning one off leaves it there.
 extension ActivationEngine {
@@ -154,10 +154,27 @@ extension ActivationEngine {
         records.inPlace = Set(records.inPlace.map(moved))
         records.temporary = Dictionary(records.temporary.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
         await register(moved)
-        if fontLibrary.standardizedFileURL.path == locations.defaultFontLibrary.standardizedFileURL.path {
+        let firstPlaces = [locations.defaultFontLibrary, locations.formerDefaultFontLibrary].map(\.standardizedFileURL.path)
+        if firstPlaces.contains(fontLibrary.standardizedFileURL.path) {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
         }
         return ActivationResult(records: records, succeeded: 1, failed: [], message: "Font Library moved to \(place)")
+    }
+
+    /// Moves a Font Library still in its former first place, ~/Cicero/Font Library, to today's, ~/Cicero/Library, as
+    /// `moveFontLibrary` does: the whole folder, so the old one is gone, with its fonts' registrations and the records.
+    /// nil, with nothing changed, for a library somewhere else (the user moved it), when something is in ~/Cicero/Library
+    /// already, or when the move fails. With no library folder yet, only its place changes (`succeeded` 0).
+    @concurrent
+    public func moveFromFormerPlace(records: ActivationRecords) async -> ActivationResult? {
+        let former = locations.formerDefaultFontLibrary.standardizedFileURL, new = locations.defaultFontLibrary.standardizedFileURL
+        guard let fontLibrary, fontLibrary.standardizedFileURL.path == former.path, former.path != new.path else { return nil }
+        let fm = FileManager.default
+        if fm.fileExists(atPath: new.path) {
+            guard let items = try? fm.contentsOfDirectory(atPath: new.path), items.allSatisfy({ $0 == ".DS_Store" }) else { return nil }
+        }
+        let result = await moveFontLibrary(to: new, records: records)
+        return result.failed.isEmpty ? result : nil
     }
 
     /// Why the Font Library can't go into a folder, said to the user; nil when it can. Not a Fonts folder, where macOS

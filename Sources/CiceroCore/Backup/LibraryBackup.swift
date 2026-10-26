@@ -413,12 +413,14 @@ public struct LibraryBackup: Sendable {
     }
 
     /// The backup's Font Library on this Mac (its path moved to this home folder) and the one its fonts go back into:
-    /// `target` if given, else the same. Both empty for a backup from before there was one, which has none to move.
+    /// `target` if given, else the same, but ~/Cicero/Library for one in its former first place, ~/Cicero/Font Library.
+    /// Both empty for a backup from before there was one, which has none to move.
     func fontLibraries(of contents: BackupContents, restoringInto target: String?) -> (backup: String, restored: String) {
         let saved = contents.userData.fontLibraryPath
         guard !saved.isEmpty else { return ("", target ?? "") }
         let backup = Self.move(saved, from: contents.manifest.home, to: home.path)
-        return (backup, target ?? backup)
+        let current = backup == locations.formerDefaultFontLibrary.path ? locations.defaultFontLibrary.path : backup
+        return (backup, target ?? current)
     }
 
     /// Whether a path is a font file in one of `roots` (from `fontLocations`) or in the Fonts folder next to
