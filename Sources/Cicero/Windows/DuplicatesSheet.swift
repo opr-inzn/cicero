@@ -34,7 +34,8 @@ struct DuplicatesSheet: View {
                 LazyVStack(spacing: 0) {
                     ForEach(prompt.duplicates) { duplicate in
                         row(duplicate)
-                        Divider().padding(.leading, 20)
+                        // Between rows only: the bar below has its own line.
+                        if duplicate.id != prompt.duplicates.last?.id { Divider().padding(.leading, 20) }
                     }
                 }
             }
@@ -64,7 +65,7 @@ struct DuplicatesSheet: View {
             }
             .padding(16)
         }
-        .frame(width: 720, height: min(540, 190 + CGFloat(prompt.duplicates.count) * 58))
+        .frame(width: 720, height: min(540, 190 + prompt.duplicates.map(Self.rowHeight).reduce(0, +)))
     }
 
     private func row(_ duplicate: AddedDuplicate) -> some View {
@@ -98,6 +99,11 @@ struct DuplicatesSheet: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+    }
+
+    /// A row's height: a line more for one that can't be replaced, or that warns it replaces more than one file.
+    private static func rowHeight(_ duplicate: AddedDuplicate) -> CGFloat {
+        duplicate.replaceBlock != nil || duplicate.replacesSeveralCopies ? 80 : 58
     }
 
     /// "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000".
