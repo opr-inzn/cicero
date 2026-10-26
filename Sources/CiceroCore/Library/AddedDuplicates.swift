@@ -177,11 +177,12 @@ public enum AddedDuplicates {
     }
 
     /// Whether Cicero may put another file in a copy's place: not macOS's, an app's, Adobe Fonts', one in an app's own
-    /// folder, one on for all users, nor one an application set has on while its app is open.
+    /// folder, nor one on for all users. One on for a while, until Cicero quits or for an app folder's app, goes on
+    /// again the same way (see `ActivationEngine.replace`).
     static func mayReplace(_ copy: FaceCopy) -> Bool {
         guard copy.app == nil, !ActivationEngine.isProtected(copy.face.path) else { return false }
         switch copy.state.source {
-        case .macOS?, .allUsers?, .app?, .adobeFonts?, .temporary(.whileAppsRun)?: return false
+        case .macOS?, .allUsers?, .app?, .adobeFonts?: return false
         default: return true
         }
     }

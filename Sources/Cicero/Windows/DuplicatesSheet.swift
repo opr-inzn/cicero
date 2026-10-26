@@ -147,7 +147,7 @@ private extension ReplaceBlock {
     var explanation: String {
         switch self {
         case .differentFiles: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently."
-        case .unchangeable: "Can’t be replaced: your copy comes with macOS or an app, or from Adobe Fonts."
+        case .unchangeable: "Can’t be replaced: macOS, an app or Adobe Fonts keeps your copy."
         }
     }
 }
