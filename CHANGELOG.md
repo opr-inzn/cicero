@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
+
 ## 0.10.11
 
 - **Show Missing**, under **Coverage** in the Info panel, lists the characters a font still needs for the next Latin size. **Copy Characters** puts them on the clipboard.

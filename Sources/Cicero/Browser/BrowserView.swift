@@ -300,22 +300,20 @@ private struct EmptyBrowser: View {
         switch model.selection ?? .all {
         case .folder(let id) where model.availability(ofFolder: id) != nil || model.onlineOnlyCount(inFolder: id) > 0:
             FolderOutOfReach(folderID: id)
-        case .inactive where model.data.folders.isEmpty && model.data.fontFiles.isEmpty:
-            ContentUnavailableView {
-                Label("No Locations", systemImage: "folder.badge.plus")
-            } description: {
-                Text("Add a folder of fonts, or font files, to browse them here. Nothing gets installed until you activate it.")
-            } actions: {
-                Button("Add Location") { model.presentAddFolderPanel() }
-                Button("Add Fonts") { model.presentAddFontsPanel() }
-            }
         case .inactive:
+            // With no locations of their own too: what's here is what's on, and Proofing may well be under Locations.
+            // Add Fonts only while it lists files where they are; installing them would turn them on.
             ContentUnavailableView {
                 Label("Everything Is Active", systemImage: "checkmark.seal")
             } description: {
-                Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")
+                Text(model.installsAddedFiles
+                    ? "Every font in your library is turned on. Add a folder of fonts to keep more here without activating them."
+                    : "Every font in your library is turned on. Add a folder of fonts, or font files, to keep more here without activating them.")
             } actions: {
                 Button("Add Location") { model.presentAddFolderPanel() }
+                if !model.installsAddedFiles {
+                    Button("Add Fonts") { model.presentAddFontsPanel() }
+                }
             }
         case .active:
             ContentUnavailableView("Nothing Active", systemImage: "xmark.seal",
