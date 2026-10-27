@@ -125,5 +125,6 @@ public enum FeatureAlternates {
         "onum": "Old-Style Figures", "lnum": "Lining Figures", "pnum": "Proportional Figures", "zero": "Slashed Zero",
         "titl": "Titling Alternates", "hist": "Historical Forms", "calt": "Contextual Alternates", "rand": "Randomize",
         "nalt": "Alternate Annotation Forms", "ornm": "Ornaments", "jalt": "Justification Alternates",
+        "locl": "Localized Forms", "tnum": "Tabular Figures",
     ]
 }

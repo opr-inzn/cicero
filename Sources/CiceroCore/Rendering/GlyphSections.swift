@@ -230,6 +230,15 @@ public enum GlyphCell: Hashable, Sendable {
     case character(UInt32)
     case feature(FeatureGlyph)
     case alternate(FeatureAlternate)
+
+    /// Whether it's an alternate of the cell before it, a character's or a feature glyph's, like a small capital's.
+    public var isAlternate: Bool {
+        switch self {
+        case .character: false
+        case .feature(let glyph): glyph.isAlternate
+        case .alternate: true
+        }
+    }
 }
 
 /// A face's glyphs in one group for the glyph grid: its characters, then the glyphs features draw in place of theirs.
@@ -331,6 +340,19 @@ public struct GlyphSection: Identifiable, Sendable {
             else { return nil }
             return group
         }
+    }
+
+    /// The private-use characters a font maps to `glyphs`, like the U+F761 an older font keeps for its small capital a,
+    /// which is listed with the small capitals.
+    public static func privateUse(in font: CTFont, coverage: ScalarRanges, drawing glyphs: Set<CGGlyph>) -> Set<UInt32> {
+        guard !glyphs.isEmpty else { return [] }
+        var found: Set<UInt32> = []
+        for range in coverage.ranges where range.upperBound >= 0xE000 {
+            for value in range where Unicode.Scalar(value)?.properties.generalCategory == .privateUse {
+                if let glyph = Self.glyph(of: value, in: font), glyphs.contains(glyph) { found.insert(value) }
+            }
+        }
+        return found
     }
 
     private static func glyph(of value: UInt32, in font: CTFont) -> CGGlyph? {
