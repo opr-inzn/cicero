@@ -282,7 +282,7 @@ private struct StackedLayout: View {
         VStack(alignment: .leading, spacing: 6) {
             // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
-                let color = Color.primary.resolve(in: context.environment).cgColor
+                let color = Color.ink.resolve(in: context.environment).cgColor
                 context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: sample.line.ascent), color: color) }
             }
             .frame(width: overhang + width, height: sample.line.ascent + sample.line.descent)

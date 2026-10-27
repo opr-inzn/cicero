@@ -340,6 +340,7 @@ private struct Tile: View {
                         size: preview.size, weight: weight, variations: sample.variations, features: sample.features,
                         scale: { fit.scale(sample, text: text, in: $0) }
                     )
+                    .foregroundStyle(Color.ink)
                     // Only where its letters fit but its line doesn't: a font whose first or last letter leaves a lot of room
                     // beside it.
                     .minimumScaleFactor(0.4)

@@ -135,6 +135,7 @@ private struct TextTab: View {
                         text: sample, face: family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
                         variations: model.variations(for: family)
                     )
+                    .foregroundStyle(Color.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     // Glyphs taller than the row run over its edges rather than be cut off.
                     .frame(height: 22)
@@ -298,6 +299,7 @@ private struct LanguagesTab: View {
                     }
                     .frame(width: 220, alignment: .leading)
                     FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
+                        .foregroundStyle(Color.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: 22)
                 }
