@@ -311,14 +311,14 @@ private struct EmptyBrowser: View {
             }
         case .inactive:
             ContentUnavailableView {
-                Label("Everything Is Active", systemImage: "checkmark.circle")
+                Label("Everything Is Active", systemImage: "checkmark.seal")
             } description: {
                 Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")
             } actions: {
                 Button("Add Location") { model.presentAddFolderPanel() }
             }
         case .active:
-            ContentUnavailableView("Nothing Active", systemImage: "circle.dashed",
+            ContentUnavailableView("Nothing Active", systemImage: "xmark.seal",
                                    description: Text("Turn a font on and it shows up here."))
         case .temporary:
             ContentUnavailableView("No Temporary Fonts", systemImage: "clock",

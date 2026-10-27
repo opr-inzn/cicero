@@ -105,9 +105,9 @@ struct DocumentFontsSheet: View {
     @ViewBuilder
     private func statusIcon(_ match: DocumentFontMatch) -> some View {
         if isOn(match) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityLabel("Active")
+            Image(systemName: "checkmark.seal.fill").foregroundStyle(.green).accessibilityLabel("Active")
         } else if match.face != nil {
-            Image(systemName: "circle.dashed").foregroundStyle(.secondary).accessibilityLabel("Inactive")
+            Image(systemName: "xmark.seal").foregroundStyle(.secondary).accessibilityLabel("Inactive")
         } else {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel("Missing")
         }

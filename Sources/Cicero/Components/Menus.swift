@@ -39,7 +39,7 @@ struct FamilyMenu: View {
         let app = titles.app
         // The symbols of the sidebar's Active and Inactive, and half for the switch's middle position.
         if families.contains(where: \.hasActivatable) {
-            Button(titles.activate, systemImage: "checkmark.circle") { model.activate(families) }
+            Button(titles.activate, systemImage: "checkmark.seal") { model.activate(families) }
         }
         if let app, families.contains(where: { $0.position != .app }) {
             Button("Use in \(app) Only", systemImage: "circle.lefthalf.filled") { model.useInAppOnly(families.flatMap(\.faces)) }
@@ -50,7 +50,7 @@ struct FamilyMenu: View {
             }
         }
         if families.contains(where: \.hasDeactivatable) {
-            Button(titles.deactivate, systemImage: "circle.dashed") { model.deactivate(families) }
+            Button(titles.deactivate, systemImage: "xmark.seal") { model.deactivate(families) }
         }
         if families.contains(where: { $0.faces.contains(where: \.isAdobeFonts) }) {
             if families.count == 1, let page = CreativeCloud.page(for: families[0]) {
@@ -153,7 +153,7 @@ struct StyleMenu: View {
     var body: some View {
         Text(face.state.label)
         if face.canActivate {
-            Button("Activate Style", systemImage: "checkmark.circle") {
+            Button("Activate Style", systemImage: "checkmark.seal") {
                 model.activate([face], title: "\(family.name) \(face.face.styleName)")
             }
         }
@@ -161,7 +161,7 @@ struct StyleMenu: View {
             Button("Activate Temporarily", systemImage: "clock") { model.activateTemporarily([face]) }
         }
         if face.canDeactivate {
-            Button("Deactivate Style", systemImage: "circle.dashed") { model.deactivate([face]) }
+            Button("Deactivate Style", systemImage: "xmark.seal") { model.deactivate([face]) }
         }
         CopySourcesMenu(styles: [face], title: "\(family.name) \(face.face.styleName)", model: model)
         Divider()

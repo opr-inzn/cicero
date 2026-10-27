@@ -150,13 +150,13 @@ struct CiceroCommands: Commands {
         }
         CommandMenu("Fonts") {
             let selection = model.selectedFamilies
-            Button("Activate", systemImage: "checkmark.circle") { model.activate(selection) }
+            Button("Activate", systemImage: "checkmark.seal") { model.activate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
             Button("Activate Temporarily", systemImage: "clock") { model.activateTemporarily(selection) }
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
-            Button("Deactivate", systemImage: "circle.dashed") { model.deactivate(selection) }
+            Button("Deactivate", systemImage: "xmark.seal") { model.deactivate(selection) }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()

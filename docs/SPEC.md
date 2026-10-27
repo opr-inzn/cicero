@@ -35,7 +35,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   section header; unchecked items are dimmed, and disappear when you click Done. Sections and character set
   groups stay open or closed as outside it, and open and close the same way (one state for both). Switching
   isn't animated: hundreds of rows animating in and out ran into each other.
-- Fixed rows: All Fonts (books.vertical), Active (checkmark.circle), Inactive (circle.dashed), Temporary (clock, only
+- Fixed rows: All Fonts (books.vertical), Active (checkmark.seal), Inactive (xmark.seal), Temporary (clock, only
   while a font is on until Cicero quits or while it's selected), Recents (tray.and.arrow.down; not a clock, which is
   Temporary's), System Fonts (apple.logo, only while system fonts are shown), Conflicts (exclamationmark.triangle, count
   badge). A saved order of these rows from before Temporary or Recents puts them last.
