@@ -23,7 +23,7 @@ final class QuickLook {
     /// Saved once the user resizes it. (The size under "quickLook.size" was saved on every close, so it was
     /// the old default, 680 × 620, for most.)
     private static let sizeKey = "quickLook.panelSize"
-    private static let defaultSize = NSSize(width: 520, height: 440)
+    static let defaultSize = NSSize(width: 520, height: 440)
 
     // MARK: What it shows
 
@@ -248,15 +248,17 @@ final class WindowReaderView: NSView {
 
 // MARK: - Content
 
-/// The panel's content, while it's open.
+/// The panel's content, while it's open, in the panel's width, which its type follows.
 private struct QuickLookView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         if model.quickLook.isOpen, let shown = model.quickLook.shown {
-            FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count)
-                // A new family starts at the top.
-                .id(shown.family.id)
+            GeometryReader { proxy in
+                FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count, width: proxy.size.width)
+                    // A new family starts at the top.
+                    .id(shown.family.id)
+            }
         }
     }
 }
@@ -268,31 +270,43 @@ private struct FamilyQuickLook: View {
     let family: Family
     let index: Int
     let count: Int
+    let width: CGFloat
 
     /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
-    private static let styleSize: Double = 22
+
+    /// How much bigger than in the panel at its first width the type and the room around it are: they grow and shrink
+    /// with the panel's width, the margins at the sides stay.
+    private var scale: CGFloat {
+        max(0.1, (width - 2 * Self.inset) / (QuickLook.defaultSize.width - 2 * Self.inset))
+    }
+
+    /// A size in the panel at its first width, at the panel's width, in whole points.
+    private func size(_ points: Double) -> Double {
+        max(1, (points * scale).rounded())
+    }
 
     var body: some View {
+        let styleSize = size(22)
         ScrollView {
             // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
                 sample()
                     .padding(.horizontal, Self.inset)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
+                    .padding(.top, 12 * scale)
+                    .padding(.bottom, 24 * scale)
                 // With one style the sample already shows it.
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 15)
+                        .padding(.bottom, 15 * scale)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: Self.styleSize, weight: style.face.styleWeight)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: styleSize, weight: style.face.styleWeight)
                             // As tall as the font's own line spacing, without padding: some fonts keep room above their
                             // capitals (for accents, a taller style), and padding as well spread the rows far apart.
                             // At least 1.25 × the size, for fonts set tight.
-                            .frame(minHeight: Self.styleSize * 1.25)
+                            .frame(minHeight: styleSize * 1.25)
                             .padding(.horizontal, Self.inset)
                     }
                 }
@@ -312,16 +326,16 @@ private struct FamilyQuickLook: View {
         let variations = model.variations(for: family)
         return Group {
             if preview.sampleText.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96,
+                VStack(alignment: .leading, spacing: 14 * scale) {
+                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: size(96),
                                   variations: variations)
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
-                                  lineLimit: nil, lineHeight: 24 * 1.2)
+                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: size(24),
+                                  variations: variations, lineLimit: nil, lineHeight: size(24) * 1.2)
                 }
             } else {
-                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
-                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
+                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: size(56),
+                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: size(56)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
