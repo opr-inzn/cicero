@@ -10,6 +10,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Variable** is a search filter: type **var** and choose it under **Filters** to list only variable fonts.
 - A font page’s **Leading** is exact for fonts with their own line gap. Before, 100 % could be as loose as 120 %.
 - A font page’s text sits in the middle between the controls and **Styles**, by its capitals and baseline, where it often looked high.
+- Preview Options’ **Presets** add “Lorem ipsum dolor sit amet”.
 
 ## 0.10.11
 
