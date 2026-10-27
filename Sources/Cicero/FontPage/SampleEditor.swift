@@ -105,7 +105,10 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         coordinator.style = style
         coordinator.glyphStyle = glyphStyle
         coordinator.markedGlyphs = glyphs
-        (view.textLayoutManager as? SampleLayoutManager)?.font = font
+        if let manager = view.textLayoutManager as? SampleLayoutManager {
+            manager.font = font
+            manager.raise = style.raise
+        }
         let attributes = style.attributes
         view.typingAttributes = attributes
         view.defaultParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
@@ -147,6 +150,13 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             // like Va stood apart. Not tracking, which breaks ligatures apart once it isn't 0.
             if kerning != 0 { attributes[.kern] = kerning }
             return attributes
+        }
+
+        /// How far each line is drawn above where TextKit sets it, the font's descent above the bottom of the line:
+        /// half of what the line height adds to the font's height, so it sits in the middle of the line, as on the
+        /// web. Below 0 when the lines are closer than the font is tall, which lowers it.
+        var raise: CGFloat {
+            (lineHeight - CTFontGetAscent(font).rounded() - CTFontGetDescent(font).rounded()) / 2
         }
 
         static func == (a: Style, b: Style) -> Bool {
@@ -332,34 +342,45 @@ private struct SampleMenu<Content: View>: View {
 }
 
 /// Sets the insertion point on the font rather than on the line: from the font's ascent above the baseline to its
-/// descent below, as far apart as the lines may be. TextKit made it as tall as the line, so with the lines closer
-/// than the font is tall it started halfway up the capitals and reached below the descenders, and with them farther
-/// apart it reached high above the letters.
+/// descent below, as far apart as the lines may be, and raised with the line (`raise`, see `UnclippedFragment`).
+/// TextKit made it as tall as the line, so with the lines closer than the font is tall it started halfway up the
+/// capitals and reached below the descenders, and with them farther apart it reached high above the letters.
 nonisolated private final class SampleLayoutManager: NSTextLayoutManager {
     var font: CTFont?
+    /// How far each line is drawn above where TextKit sets it (see `SampleEditor.Style.raise`).
+    var raise: CGFloat = 0
 
     override func enumerateTextSegments(in textRange: NSTextRange, type: SegmentType, options: SegmentOptions = [],
                                         using block: (NSTextRange?, CGRect, CGFloat, NSTextContainer) -> Bool) {
         guard textRange.isEmpty, let font else { return super.enumerateTextSegments(in: textRange, type: type, options: options, using: block) }
         let ascent = CTFontGetAscent(font).rounded(), descent = CTFontGetDescent(font).rounded()
         super.enumerateTextSegments(in: textRange, type: type, options: options) { range, frame, baseline, container in
-            let caret = CGRect(x: frame.minX, y: frame.minY + baseline - ascent, width: frame.width, height: ascent + descent)
+            let caret = CGRect(x: frame.minX, y: frame.minY + baseline - raise - ascent, width: frame.width, height: ascent + descent)
             return block(range, caret, ascent, container)
         }
     }
 }
 
-/// A paragraph of the sample whose glyphs draw however far past their lines they reach. TextKit draws each
-/// paragraph within its rendering surface, which is only as tall as the font's ascent and descent.
+/// A paragraph of the sample whose glyphs draw however far past their lines they reach, each line in the middle of
+/// its height. TextKit draws each paragraph within its rendering surface, which is only as tall as the font's ascent
+/// and descent, and sets each baseline the font's descent above the bottom of its line, so all the room a large
+/// line height added went above the letters: a single line sat at the bottom of the text.
 nonisolated private final class UnclippedFragment: NSTextLayoutFragment {
+    private var raise: CGFloat { (textLayoutManager as? SampleLayoutManager)?.raise ?? 0 }
+
+    override func draw(at point: CGPoint, in context: CGContext) {
+        super.draw(at: CGPoint(x: point.x, y: point.y - raise), in: context)
+    }
+
     override var renderingSurfaceBounds: CGRect {
-        textLineFragments.reduce(super.renderingSurfaceBounds) { bounds, line in
+        let raise = raise
+        return textLineFragments.reduce(super.renderingSurfaceBounds.offsetBy(dx: 0, dy: -raise)) { bounds, line in
             let string = line.attributedString.attributedSubstring(from: line.characterRange)
             let ink = CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(string), .useGlyphPathBounds)
             guard !ink.isNull, !ink.isEmpty else { return bounds }
             // From the line's baseline, y up, to the paragraph's coordinates, y down.
             let x = line.typographicBounds.minX + line.glyphOrigin.x
-            let baseline = line.typographicBounds.minY + line.glyphOrigin.y
+            let baseline = line.typographicBounds.minY + line.glyphOrigin.y - raise
             let glyphs = CGRect(x: x + ink.minX, y: baseline - ink.maxY, width: ink.width, height: ink.height)
             return bounds.union(glyphs.insetBy(dx: -2, dy: -2))
         }
