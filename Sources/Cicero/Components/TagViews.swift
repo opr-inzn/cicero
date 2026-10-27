@@ -25,13 +25,17 @@ extension TagColor {
 
     var title: String { rawValue.capitalized }
 
+    /// A dot for menus (see `NSImage.menuDot`).
+    var menuImage: NSImage { .menuDot(NSColor(color)) }
+}
+
+extension NSImage {
     /// A dot for menus, which draw SF Symbols as templates, in one colour. Its label needs `.titleAndIcon`: built
     /// with the macOS 27 SDK, menus hide every other image.
-    var menuImage: NSImage {
-        let nsColor = NSColor(color)
-        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
-            nsColor.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+    static func menuDot(_ color: NSColor, size: CGFloat = 12, inset: CGFloat = 1) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: inset, dy: inset)).fill()
             return true
         }
         image.isTemplate = false

@@ -5,6 +5,10 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Quick Look no longer has a button to fill the screen. Resize it by its edges instead.
+- In Compare’s **Overlay**, click the dot next to a font’s name to choose its color.
+- Compare holds up to 12 fonts, one for each color.
+- In **Overlay**, the colors mix where fonts overlap, so every font shows through the ones drawn over it. Before, a few fonts on top could hide the serifs of one below.
+- Compare has its own preview text. Typing it no longer changes the previews in the main window, and Compare’s **Preview Options** no longer show **Leading**, as each font there is one line.
 
 ## 0.10.12
 
