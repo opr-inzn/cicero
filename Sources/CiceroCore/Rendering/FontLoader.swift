@@ -35,8 +35,17 @@ public final class FontLoader: Sendable {
         var lanes = 0
         /// Bumped by `invalidate`, so fonts made from an old version of a file are never served again.
         var generations: [String: Int] = [:]
+        /// Files fonts were made from since they last changed.
+        var drawn: Set<String> = []
+        /// How many times a file changed after fonts were made from it (see `font`).
+        var changes: [String: Int] = [:]
         /// Variable faces' axes, by face and generation (see `axes(of:)`).
         var axes: [String: [AxisRange]] = [:]
+
+        mutating func changed(_ path: String) {
+            generations[path, default: 0] += 1
+            if drawn.remove(path) != nil { changes[path, default: 0] += 1 }
+        }
     }
 
     /// The 'wght' axis.
@@ -54,7 +63,10 @@ public final class FontLoader: Sendable {
         let weight = face.weightAxis.flatMap { axis in weight.map { min(max($0, axis.minimum), axis.maximum) } }
         let variations = face.axes.isEmpty ? [] : variations.sorted { $0.key < $1.key }
         let features = features.sorted { ($0.type, $0.selector) < ($1.type, $1.selector) }
-        let generation = state.withLock { $0.generations[face.path] ?? 0 }
+        let (generation, changes) = state.withLock { state in
+            state.drawn.insert(face.path)
+            return (state.generations[face.path] ?? 0, state.changes[face.path] ?? 0)
+        }
         var key = "\(face.id)|\(generation)|\(Int((size * 2).rounded()))"
         if let weight { key += "|w\(Int(weight.rounded()))" }
         for (tag, value) in variations { key += "|\(tag)=\(value)" }
@@ -68,10 +80,11 @@ public final class FontLoader: Sendable {
         for feature in features {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
         }
-        // A millionth of a point larger for each time the file changed. CoreText calls fonts of the same file, name
-        // and size equal whatever the file holds now, and the sample, the grid and anything else drawing text with a
-        // font made from a new version kept drawing the old letters: text reuses an equal font it already has.
-        let font = CTFontCreateWithFontDescriptor(descriptor, size + CGFloat(generation) / 1_000_000, nil)
+        // A millionth of a point larger for each time the file changed after fonts were made from it. CoreText calls
+        // fonts of the same file, name and size equal whatever the file holds now, and the sample, the grid and anything
+        // else drawing text with a font made from a new version kept drawing the old letters: text reuses an equal font
+        // it already has. Fonts from files that didn't change while Cicero was open are exactly their size.
+        let font = CTFontCreateWithFontDescriptor(descriptor, size + CGFloat(changes) / 1_000_000, nil)
         if cached { fonts[key] = font }
         return font
     }
@@ -189,7 +202,7 @@ public final class FontLoader: Sendable {
         state.withLock { state in
             state.descriptors[path] = FileDescriptors(descriptors)
             state.pending.remove(path)
-            state.generations[path, default: 0] += 1
+            state.changed(path)
         }
     }
 
@@ -235,7 +248,7 @@ public final class FontLoader: Sendable {
             for path in paths {
                 state.descriptors[path] = nil
                 state.pending.remove(path)
-                state.generations[path, default: 0] += 1
+                state.changed(path)
             }
         }
     }
