@@ -647,13 +647,13 @@ private extension TypeTester {
 }
 
 /// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
-/// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above.
+/// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above, and
+/// the preview text is for the browser, so each style shows the family's name.
 /// Weight when the styles are of more than one (see `Family.stylesDifferInWeight`), then a column for each other axis
 /// the styles sit apart on, like Width or one of the designer's own, in the order the styles are listed by (see
 /// `Family.styleAxes`).
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     let family: Family
 
     var body: some View {
@@ -687,7 +687,7 @@ private struct StyleRows: View {
             ForEach(family.faces) { style in
                 Divider()
                 row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
-                    FontText(text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face, size: 20,
+                    FontText(text: model.scriptSamples.text(family.name, for: style.face), face: style.face, size: 20,
                              weight: style.face.styleWeight)
                         .foregroundStyle(Color.ink)
                 } style: {
