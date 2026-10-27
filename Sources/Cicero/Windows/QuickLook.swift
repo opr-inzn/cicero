@@ -272,6 +272,7 @@ private struct FamilyQuickLook: View {
     /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
+    private static let styleSize: Double = 22
 
     var body: some View {
         ScrollView {
@@ -285,11 +286,14 @@ private struct FamilyQuickLook: View {
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 15)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: Self.styleSize, weight: style.face.styleWeight)
+                            // As tall as the font's own line spacing, without padding: some fonts keep room above their
+                            // capitals (for accents, a taller style), and padding as well spread the rows far apart.
+                            // At least 1.25 × the size, for fonts set tight.
+                            .frame(minHeight: Self.styleSize * 1.25)
                             .padding(.horizontal, Self.inset)
-                            .padding(.vertical, 5)
                     }
                 }
             }
@@ -301,7 +305,8 @@ private struct FamilyQuickLook: View {
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
 
-    /// On the left, with Preview Options' leading.
+    /// On the left. The sample text with Preview Options' leading; the alphabet, three lines of letters rather than
+    /// text, always 120 % of its size apart, so a high Leading set for the text doesn't spread them out.
     private func sample() -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
@@ -312,7 +317,7 @@ private struct FamilyQuickLook: View {
                                   variations: variations)
                         .minimumScaleFactor(0.4)
                     QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
-                                  lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
+                                  lineLimit: nil, lineHeight: 24 * 1.2)
                 }
             } else {
                 QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
