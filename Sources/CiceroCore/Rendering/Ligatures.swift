@@ -564,18 +564,37 @@ public struct FeatureGlyph: Hashable, Sendable {
         }
     }
 
-    /// Where a small capital goes in its group: where its letter goes on the page, a capital's where its lowercase
-    /// letter does, whichever feature draws it, so a and A's are together, from A to Z, then the accented ones, a
-    /// capital İ's among them, then figures and signs.
-    static func smallCapOrder(of character: UInt32) -> (GlyphGroup, UInt32, UInt32) {
+    /// Where a small capital goes in its group: letter by letter, each with its accented forms and the letters drawn
+    /// from it (see `baseLetter`), in code point order after it, a capital's after its lowercase letter's, whichever
+    /// feature draws it: a, A's, à, á and the other a's, æ, then b, and a capital İ's among the i's; then figures and signs.
+    static func smallCapOrder(of character: UInt32) -> (GlyphGroup, UInt32, Int, UInt32, Int, UInt32) {
         let group: GlyphGroup = switch GlyphGroup.of(character) ?? .graphical {
-        case .uppercase: .lowercase
-        case .uppercaseAccents: .lowercaseAccents
+        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents: .lowercase
         case let other: other
         }
-        let lowercase = Unicode.Scalar(character).map { Array(String(Character($0)).lowercased().unicodeScalars) } ?? []
-        return (group, lowercase.count == 1 ? lowercase[0].value : character, character)
+        guard let scalar = Unicode.Scalar(character) else { return (group, character, 0, character, 0, character) }
+        let lowercase = Array(String(Character(scalar)).lowercased().unicodeScalars)
+        let letter = lowercase.count == 1 ? lowercase[0].value : character
+        let base = scalar.properties.isAlphabetic ? baseLetter(of: lowercase) : letter
+        return (group, base, letter == base ? 0 : 1, letter, character == letter ? 0 : 1, character)
     }
+
+    /// The letter a lowercase one is a form of: the one under its accents, like the a of à and ǻ, the first of those it's
+    /// made of, like the i of ĳ, or for one Unicode doesn't take apart, the one it's drawn from, like the a of æ and ǽ,
+    /// the d of ð and the o of œ. Another script's, like the α of ά, the same way.
+    static func baseLetter(of lowercase: [Unicode.Scalar]) -> UInt32 {
+        let parts = String(String.UnicodeScalarView(lowercase)).decomposedStringWithCompatibilityMapping.unicodeScalars
+        if let latin = parts.first(where: { (0x61...0x7A).contains($0.value) }) { return latin.value }
+        guard let first = parts.first?.value else { return 0 }
+        return drawnFrom[first] ?? first
+    }
+
+    /// æ and ɑ, ð and đ, ə and ǝ, ƒ, ɡ, ħ, ı, ȷ, ĸ, ł, ŋ, ø and œ, ß, þ and ŧ.
+    private static let drawnFrom: [UInt32: UInt32] = [
+        0xE6: 0x61, 0x251: 0x61, 0xF0: 0x64, 0x111: 0x64, 0x259: 0x65, 0x1DD: 0x65, 0x192: 0x66, 0x261: 0x67, 0x127: 0x68,
+        0x131: 0x69, 0x237: 0x6A, 0x138: 0x6B, 0x142: 0x6C, 0x14B: 0x6E, 0xF8: 0x6F, 0x153: 0x6F, 0xDF: 0x73, 0xFE: 0x74,
+        0x167: 0x74,
+    ]
 
     /// Tabular figures in another style, like old-style ones, by style, then character: glyphs of their own (a
     /// zero.osf.tf, New York's zero.onum.tnum) that neither feature draws for a character alone. Tabular Figures draws
