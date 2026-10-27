@@ -33,7 +33,7 @@ struct LanguagesRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: face.id, cached: { [face] in model.coverage.coverage(of: face.id) }) { [face] in
+        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id) }) { [face] in
             await model.coverage.coverage(computing: face)
         }
     }
@@ -115,7 +115,7 @@ struct CharacterSetsRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: face.id, cached: { [face] in model.coverage.coverage(of: face.id)?.scalars }) { [face] in
+        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id)?.scalars }) { [face] in
             await model.coverage.coverage(computing: face).scalars
         }
     }
@@ -175,7 +175,7 @@ struct UnicodeBlocksRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: face.id, cached: { [face] in model.coverage.coverage(of: face.id).map { blocks(covered: $0.scalars) } }) { [face] in
+        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id).map { blocks(covered: $0.scalars) } }) { [face] in
             let ranges = await model.coverage.coverage(computing: face).scalars
             return blocks(covered: ranges)
         }
