@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- When you save a new version of a font over the old file, a font page’s text and the grid show its new letters at once. Before, they kept showing the old ones until Cicero quit, while **Glyphs** already showed the new ones.
 - A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language.
 - **Glyphs** lists Roman numerals in a group of their own, after the figures, and a Latin font’s forms for the start and end of a word among the alternates.
 - A font page’s **Glyphs** lists small capitals in a group of their own, **Small Caps**, right after the letters, each followed by its alternates, like a stylistic set’s or a Turkish one. Before, they followed their letters as alternates, and their own alternates weren’t listed.
