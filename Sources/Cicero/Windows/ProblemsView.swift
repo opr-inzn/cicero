@@ -54,7 +54,8 @@ private struct ProblemGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
+            // Centred, not on the baseline: there the buttons sat low beside the large title.
+            HStack(spacing: 12) {
                 Text(kind.title).font(.title2.bold())
                 Spacer(minLength: 0)
                 // One problem's extra copies have their own buttons.
