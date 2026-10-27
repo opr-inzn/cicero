@@ -40,7 +40,7 @@ Click anywhere on a section’s title. The groups inside **Coverage** open and c
 
 To hide one item quickly, right-click it and choose **Hide from Sidebar**, or drag it out of the sidebar and let go, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. Dragged out, a location, folder or tag is removed rather than hidden, as below. Changed your mind? Click **Undo** in the note at the bottom of the window. Under **Coverage**, right-click a group’s title, like **Unicode Blocks**, to hide the whole group.
 
-The same checkboxes are in **Settings → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
+The same checkboxes are in **Preferences → Sidebar**, in the sidebar’s order. **Show All** brings back everything you hid. There, **Foundries** has a single checkbox for the whole section; to hide individual foundries, use **Edit** in the sidebar.
 
 When you make a new folder or coverage set, or add a location, its section shows again if you’d hidden it.
 
@@ -48,7 +48,7 @@ When you make a new folder or coverage set, or add a location, its section shows
 
 Drag items to where you want them, as in the Finder’s sidebar. An item moves within its own section: folders among your folders, locations among your locations, and so on. Character sets under **Coverage** move within their group. To reorder the groups in **Coverage**, drag a group’s title onto another: it takes that group’s place, and the groups in between move up or down one. The sections themselves stay in their place.
 
-Items that are gone for now, like **System Fonts** while system fonts are hidden, keep their place. New items go at the end. To go back to the usual order, click **Reset Order** in **Settings → Sidebar**.
+Items that are gone for now, like **System Fonts** while system fonts are hidden, keep their place. New items go at the end. To go back to the usual order, click **Reset Order** in **Preferences → Sidebar**.
 
 ### Select several items
 
@@ -75,7 +75,7 @@ Add folders of fonts to see their fonts in your library without activating them.
 
 ### Add a location
 
-Choose **File → Add Location** (⇧⌘O), click **+** next to **Locations**, or click **+** in **Settings → Locations**, and pick a folder of fonts. You can pick several folders at once.
+Choose **File → Add Location** (⇧⌘O), click **+** next to **Locations**, or click **+** in **Preferences → Locations**, and pick a folder of fonts. You can pick several folders at once.
 
 A folder called “Fonts” is shown with the name of the folder it’s in, like “Projects Fonts”.
 
@@ -83,23 +83,23 @@ A folder called “Fonts” is shown with the name of the folder it’s in, like
 
 Right-click a location in the sidebar:
 
-- **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Settings and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts** and **Added Fonts** can be renamed too. Leave the name empty to go back to the folder’s own.
+- **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Preferences and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts** and **Added Fonts** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
 - **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
-- **Remove Location from Library**: Cicero stops listing it. The files stay where they are. Dragging the location out of the sidebar does the same, with **Undo** in the note at the bottom of the window. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Settings → Locations** and click **−**.
+- **Remove Location from Library**: Cicero stops listing it. The files stay where they are. Dragging the location out of the sidebar does the same, with **Undo** in the note at the bottom of the window. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Preferences → Locations** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 
 ### Proofing
 
-The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Proofing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Proofing** isn’t one of your locations: you turn it on or off with **Show fonts installed for proofing in Adobe apps** under **Library** in **Settings → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Proofing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
+The fonts that Adobe apps load from their own folders, where type designers put fonts to test them, are listed together as **Proofing**, while there are any. They aren’t Adobe Fonts, which have an item of their own. **Proofing** isn’t one of your locations: you turn it on or off with **Show fonts installed for proofing in Adobe apps** under **Library** in **Preferences → General** (on at first). If you add one of those folders with **+**, Cicero turns that switch on instead. Right-click **Proofing** and choose **Reveal in Finder** to see the folders. For how these fonts turn on and off, see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
 
 ### Adobe Fonts
 
-The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show fonts installed for proofing in Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Settings → General**: they’re then left out of every list, smart folders and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
+The fonts from Adobe Fonts, which Creative Cloud turns on, are listed as **Adobe Fonts**, while there are any, whatever **Show fonts installed for proofing in Adobe apps** says. A family of yours that Adobe Fonts also has is in it too. To hide them, turn off **Show fonts from Creative Cloud** in **Preferences → General**: they’re then left out of every list, smart folders and the Character Toolbox, and **Adobe Fonts** leaves the sidebar. Families you also have yourself stay, as yours. Right-click **Adobe Fonts** and choose **Manage in Creative Cloud** to turn them on or off there. See [Adobe Fonts](activating.md#adobe-fonts).
 
 ### Folders in the cloud: iCloud Drive, Dropbox, Google Drive
 
-Cloud services can keep files online only: the Finder shows them, but their contents aren’t on your Mac. Cicero leaves those fonts out, because reading them would download them. When a location has some, the browser says how many above its fonts, and **Settings → Locations** says so under it. Click **Download** to bring them down. The cloud service may take them off your Mac again later; to keep them, make the folder available offline in the Finder (right-click it and choose **Make Available Offline**, **Available offline** or **Keep Downloaded**, depending on the service).
+Cloud services can keep files online only: the Finder shows them, but their contents aren’t on your Mac. Cicero leaves those fonts out, because reading them would download them. When a location has some, the browser says how many above its fonts, and **Preferences → Locations** says so under it. Click **Download** to bring them down. The cloud service may take them off your Mac again later; to keep them, make the folder available offline in the Finder (right-click it and choose **Make Available Offline**, **Available offline** or **Keep Downloaded**, depending on the service).
 
 The first time Cicero looks in a cloud service’s folder, macOS asks whether it may. If you said no, the location says “Cicero isn’t allowed to read it”: allow it in **System Settings → Privacy & Security → Files and Folders**, then click **Try Again**.
 
@@ -119,7 +119,7 @@ When a font is in more than one folder on your Mac, like a copy from each client
 
 Font files you add one at a time are listed where they are, without being activated, like the fonts in a location. They show up together as **Added Fonts** under **Locations**, while there are any.
 
-If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next to **Activate fonts by** in Settings → General, font files you add are installed instead: Cicero copies or moves them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed, not under Added Fonts. Copied, the originals stay where they are. Moved, they’re gone from there, though the folder they were in stays; see [Copy or use in place](activating.md#copy-or-use-in-place). Fonts already under Added Fonts that you open again, or turn on by copying or moving, leave Added Fonts the same way.
+If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** next to **Activate fonts by** in Preferences → General, font files you add are installed instead: Cicero copies or moves them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed, not under Added Fonts. Copied, the originals stay where they are. Moved, they’re gone from there, though the folder they were in stays; see [Copy or use in place](activating.md#copy-or-use-in-place). Fonts already under Added Fonts that you open again, or turn on by copying or moving, leave Added Fonts the same way.
 
 ### Add font files
 
@@ -137,9 +137,9 @@ A font file you add may have fonts your library has already, from another file: 
 - **Add as a copy** lists or installs the file next to the library’s copy, as for any other file. You can switch between them later with [Use Copy From](activating.md#use-another-copy-of-a-font).
 - **Replace your copy** moves your copy to the Trash and puts the added file in its place, under the same name and in the same folder. A font that was on stays on, and one that was off stays off. For one that’s off in your Fonts folder, the added file goes into Cicero’s Library instead, still off, when Cicero installs fonts there. Otherwise Cicero first waits until macOS has let go of the old file, usually a second or so, as macOS would otherwise turn the new one on. If that takes longer than 10 seconds, the new file gets a “2” in its name for the moment, and gets its name back as soon as macOS lets go, while Cicero is open. It stays in every folder and tag it was in. If you have the font in more than one place, like a client’s folder and your Fonts folder, each of those files is replaced, and Cicero warns you first. It only works file for file: if your copy is a collection and the added fonts come in a file each, or the other way round, you can’t choose it for that family. Fonts that come with macOS or an app, and Adobe Fonts, stay where they are. If InDesign, Illustrator or Photoshop is open, Cicero asks first: those apps keep the old version until they restart, and documents open in them can show wrong letters, so quit them first or restart them afterwards.
 
-The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Replace your copy** when the added one is newer (at **Add as a copy** if it can’t be replaced), else at **Skip it**. With **Replace your copy** chosen in Settings, every family that can be replaced starts there; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
+The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Replace your copy** when the added one is newer (at **Add as a copy** if it can’t be replaced), else at **Skip it**. With **Replace your copy** chosen in Preferences, every family that can be replaced starts there; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
 
-To stop being asked, choose next to **When an added font is already in your library** in Settings → General: **Add as a copy**, **Skip it** or **Replace your copy**. With **Replace your copy**, Cicero still asks when a font is in your library more than once, or can’t be replaced file for file. Locations you add, and files **Find on This Mac** turns up for a document, are added as they are.
+To stop being asked, choose next to **When an added font is already in your library** in Preferences → General: **Add as a copy**, **Skip it** or **Replace your copy**. With **Replace your copy**, Cicero still asks when a font is in your library more than once, or can’t be replaced file for file. Locations you add, and files **Find on This Mac** turns up for a document, are added as they are.
 
 When a file you added changes, as when you build a new version of a font you’re making, Cicero reads it again.
 
@@ -277,7 +277,7 @@ Cicero sorts families into Serif, Sans Serif, Monospaced, Script, Ornamental, Sy
 2. Words in the name, like “Mono”, “Stencil”, “Slab”, “Sans”, “Grotesk”, “Script” or “Symbol”.
 3. The shapes of the letters. An I and an l with feet on both sides are serif, plain ones sans serif, and letters all as wide as each other monospaced. Letters that are none of these, like a script’s, say nothing.
 4. The font’s PANOSE numbers, another way fonts can say what they are.
-5. With **Classify fonts automatically** on in **Settings → General**, a classification Cicero recognizes, on your Mac:
+5. With **Classify fonts automatically** on in **Preferences → General**, a classification Cicero recognizes, on your Mac:
    - On macOS 26 with Apple Intelligence on, from the family’s name, when the name says. The Info panel says “Recognized from its name by Apple Intelligence” under such a classification.
    - Otherwise from the shapes of its letters, when Cicero is sure enough: it tells serif, sans serif, script and ornamental letters apart, italics, display and variable fonts too, the way it learned to from thousands of freely licensed fonts. The Info panel says “Recognized from the shapes of its letters”.
 
@@ -295,7 +295,7 @@ A family none of them tells stays Unclassified, rather than ending up in the wro
 
 **System Fonts** shows the fonts that come with macOS. They’re always on, and Cicero can’t turn them off.
 
-To keep them out of your lists, open **Settings → General** and turn off **Show system fonts**. They’re then hidden everywhere: in every list, in smart folders, in the Character Toolbox, and **System Fonts** leaves the sidebar too.
+To keep them out of your lists, open **Preferences → General** and turn off **Show system fonts**. They’re then hidden everywhere: in every list, in smart folders, in the Character Toolbox, and **System Fonts** leaves the sidebar too.
 
 ## Coverage
 
