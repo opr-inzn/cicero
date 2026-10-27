@@ -2,24 +2,15 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.12
 
-- **Glyphs** lists accented letters and small caps alphabetically by glyph name, with letters like ɛ, ɔ and ʌ among the e’s, o’s and v’s.
-- **Greek** and **Cyrillic** list capitals first, then lowercase letters, then punctuation and accents.
-- Punctuation, symbols and operators come in a type designer’s order: . , : ; first, then dashes, brackets in pairs and quotes. Case-sensitive forms are in the same order.
-- %, ‰ and ^ are with the operators now, `` ` `` with the accents, the florin ƒ with the currency signs, the micro sign µ with the symbols, and ▷ and ◁ with the other triangles.
-- **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
-- **Forget All** in Conflicts forgets every missing file at once.
-- **Forget** takes a missing file off **Conflicts** at once. Before, it could stay listed until your fonts next changed.
-- Empty screens, like an empty **Inactive**, show their symbol closer to the title.
-- A font page’s **Styles** always show the family’s name, whatever the preview text.
-- Font pages no longer list similar fonts under **Similar**. **Show Similar Fonts** in a family’s menu lists them.
+- **Glyphs** lists letters, accents, Greek, Cyrillic, punctuation and symbols alphabetically by glyph name, with Greek and Cyrillic capitals first, then lowercase, then punctuation and accents.
 - **Variable** is a search filter: type **var** and choose it under **Filters** to list only variable fonts.
 - A font page’s **Leading** is exact for fonts with their own line gap. Before, 100 % could be as loose as 120 %.
-- A font page’s text sits in the middle between the controls and **Styles**, by its capitals and baseline, where it often looked high.
-- Preview Options’ **Presets** add “Lorem ipsum dolor sit amet”.
-- **Conflicts** scrolls wherever the pointer is in the window, with its scroll bar at the window’s edge. Before, only the list itself scrolled.
-- Choosing a preset or typing a preview text changes the grid in one step. Before, the widest fonts were drawn too small for a moment, then grew.
+- A font page’s text sits in the middle between the controls and **Styles**, and its **Styles** always show the family’s name.
+- Font pages no longer show **Similar**. Right-click a family and choose **Show Similar Fonts** to see them.
+- **Inactive** with nothing in it says **Everything Is Active**.
+- **Forget All** in Conflicts forgets every missing file at once.
 
 ## 0.10.11
 
