@@ -69,7 +69,7 @@ Classifications Cicero recognizes, from the shapes of the letters or, on macOS 2
 
 - Language data: [Hyperglot](https://github.com/rosettatype/hyperglot) by Rosetta, Apache License 2.0.
 - Character sets: [Latin S–XL](https://github.com/koeberlin/Latin-Character-Sets) by Christoph Koeberlin (MIT), [Adobe Latin](https://github.com/adobe-type-tools/adobe-latin-charsets) by Adobe (MIT), the [Google Fonts glyph sets](https://github.com/googlefonts/glyphsets) (Apache License 2.0), and Unicode block data from the [Unicode Character Database](https://www.unicode.org/ucd/) (Unicode License V3).
-- Order of Latin letters: the glyph names of [GlyphsInfo](https://github.com/schriftgestalt/GlyphsInfo) by Georg Seifert, BSD 3-Clause License.
+- Order of Latin, Greek and Cyrillic letters: the glyph names, categories and scripts of [GlyphsInfo](https://github.com/schriftgestalt/GlyphsInfo) by Georg Seifert, BSD 3-Clause License.
 - Updates: [Sparkle](https://sparkle-project.org).
 - Typefaces: [Mischief](https://www.lucasportron.com) by Lucas Portron and [ABC Areal](https://abcdinamo.com/typefaces/areal) by Dinamo.
 - Design and functionality inspired by [Typecase](https://typecase.app/) and [Pica](https://pica.joshpuckett.me/).

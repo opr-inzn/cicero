@@ -299,8 +299,9 @@ public struct GlyphSection: Identifiable, Sendable {
 
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
     /// point order within a group, but for superscripts, subscripts and fractions (see `valueOrder`), and the accented
-    /// letters (see `letterOrder`) and punctuation, symbols and operators (see `signOrder`), as type designers list
-    /// them; private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
+    /// letters (see `letterOrder`), punctuation, symbols and operators (see `signOrder`), and Greek and Cyrillic (see
+    /// `glyphsGreekOrder`), as type designers list them;
+    /// private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
     /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very
     /// large fonts to a sensible number of characters from each Unicode block.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [], privateUse: [UInt32: GlyphGroup] = [:],
@@ -326,6 +327,9 @@ public struct GlyphSection: Identifiable, Sendable {
         for group in [GlyphGroup.punctuationAndSymbols, .mathematicalOperators] {
             buckets[group] = buckets[group]?.map { (Self.signOrder(of: $0), $0) }.sorted { $0.0 < $1.0 }.map(\.1)
         }
+        for group in [GlyphGroup.greek, .script("Cyrillic")] {
+            buckets[group] = buckets[group]?.map { (Self.glyphsRanks[$0] ?? .max, $0) }.sorted { $0 < $1 }.map(\.1)
+        }
         let glyphs = Dictionary(grouping: features, by: \.group)
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
         // A font without Latin letters, like an Arabic or a Syriac one, starts with its scripts: the one it has the most
@@ -345,14 +349,15 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// Where a letter goes among others of its case, like the accented capitals: Latin letters as Glyphs lists them, by
-    /// glyph name (see `glyphsLetterOrder`), so Á Ă Â Ä À Ā Ą Å Ã, then Æ, ß after the s's and ɛ among the e's; then
-    /// those it has no name for and other scripts' letters, letter by letter, each followed by its accented forms in
-    /// code point order, like α, ά, a capital where its lowercase letter goes, after it. Characters that aren't letters
-    /// go by code point. Lists of both cases, like the small capitals, go by their lowercase letters (see
-    /// `FeatureGlyph.letterOrder`).
+    /// Where a letter goes among others of its case, like the accented capitals: Latin, Greek and Cyrillic letters as
+    /// `glyphsLatinOrder`, `glyphsGreekOrder` and `glyphsCyrillicOrder` list them: Latin's by glyph name, as Glyphs
+    /// sorts them, so Á Ă Â Ä À Ā Ą Å Ã, then Æ, ß after the s's and ɛ among the e's, Greek's and Cyrillic's by
+    /// alphabet, α to ω, then ά; then those GlyphsInfo has nothing for and other scripts' letters, letter by letter,
+    /// each followed by its accented forms in code point order, a capital where its lowercase letter goes, after it.
+    /// Characters that aren't letters go by code point. Lists of both cases, like the small capitals, go by their
+    /// lowercase letters (see `FeatureGlyph.letterOrder`).
     static func letterOrder(of character: UInt32) -> (UInt32, UInt32, UInt32, Int, UInt32) {
-        if let rank = letterRanks[character] { return (0, UInt32(rank), 0, 0, character) }
+        if let rank = glyphsRanks[character] { return (0, UInt32(rank), 0, 0, character) }
         guard let scalar = Unicode.Scalar(character), scalar.properties.isAlphabetic else { return (character, 0, character, 0, character) }
         let lowercase = String(Character(scalar)).lowercased()
         let scalars = Array(lowercase.unicodeScalars)
@@ -364,9 +369,10 @@ public struct GlyphSection: Identifiable, Sendable {
         return (base, kind, letter, character == letter ? 0 : 1, character)
     }
 
-    /// Each letter's place in `glyphsLetterOrder`.
-    private static let letterRanks: [UInt32: Int] = Dictionary(
-        glyphsLetterOrder.unicodeScalars.filter { !$0.properties.isWhitespace }.enumerated().map { ($1.value, $0) }
+    /// Each character's place in `glyphsLatinOrder`, `glyphsGreekOrder` or `glyphsCyrillicOrder`.
+    private static let glyphsRanks: [UInt32: Int] = Dictionary(
+        (glyphsLatinOrder + glyphsGreekOrder + glyphsCyrillicOrder).unicodeScalars.filter { $0 != "\n" }.enumerated()
+            .map { ($1.value, $0) }
     ) { first, _ in first }
 
     /// Where a superscript, subscript or fraction goes in its group. Superscripts and subscripts: the figures from 0 to

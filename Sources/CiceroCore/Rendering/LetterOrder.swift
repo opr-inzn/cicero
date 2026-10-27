@@ -4,7 +4,7 @@
 extension GlyphSection {
     /// Latin letters: capitals, then lowercase letters, then those without case, each by
     /// glyph name, so Á Ă Â Ä follow A, and Æ, Ð, Ŋ, Œ, Þ and ß after the letter they're read as.
-    static let glyphsLetterOrder = """
+    static let glyphsLatinOrder = """
         AꜲꜺꜼÁĂẮẶẰẲẴǍÂẤẬẦẨẪȀÄǞȦẠǠꞺÀẢꜤȂꜢⱭⱰĀꜴĄÅǺḀȺÃ
         ⱯꜶꜸÆǼǢ
         BḂḄꞴƁḆɃƂ
@@ -165,5 +165,64 @@ extension GlyphSection {
         ꞟ
         ꝣ
         Ↄ
+        """
+
+    /// Greek characters: capitals, then lowercase letters, each Α to Ω, then Ά Έ Ή Ί Ό Ύ Ώ Ϊ Ϋ,
+    /// then the archaic ones, then the polytonic ones letter by letter; then numbers, punctuation, symbols and accents.
+    static let glyphsGreekOrder = """
+        ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ
+        ΆΈΉΊΌΎΏΪΫ
+        ͰͲͶͿϏϒϓϔϘϚϜϞϠϴϷϹϺϽϾϿ
+        ἈἉἊἋἌἍἎἏᾸᾹᾺΆᾈᾉᾊᾋᾌᾍᾎᾏᾼἘἙἚἛἜἝῈΈἨἩἪἫἬἭἮἯῊΉᾘ
+        ᾙᾚᾛᾜᾝᾞᾟῌἸἹἺἻἼἽἾἿῘῙῚΊὈὉὊὋὌὍῸΌῬὙὛὝὟῨῩῪΎὨὩὪ
+        ὫὬὭὮὯῺΏᾨᾩᾪᾫᾬᾭᾮᾯῼ
+        αβγδεζηθικλμνξοπρςστυφχψω
+        ΐάέήίΰϊϋόύώ
+        ͱͳͷͻͼͽϐϑϕϖϗϙϛϝϟϡϰϱϲϳϵϸϻϼ
+        ἀἁἂἃἄἅἆἇὰάᾰᾱᾶᾀᾁᾂᾃᾄᾅᾆᾇᾲᾳᾴᾷἐἑἒἓἔἕὲέἠἡἢἣἤἥἦ
+        ἧὴήῆᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῇἰἱἲἳἴἵἶἷὶίιῐῑῒΐῖῗὀὁὂὃὄὅὸ
+        όῤῥὐὑὒὓὔὕὖὗὺύῠῡῢΰῦῧὠὡὢὣὤὥὦὧὼώῶᾠᾡᾢᾣᾤᾥᾦᾧῲῳ
+        ῴῷ
+        ᴦᴧᴨᴩᴪꭥ
+        ᵦᵧᵨᵩᵪ
+        ͺ
+        ᵞᵠ
+        𐅀𐅁𐅂𐅃𐅄𐅅𐅆𐅇𐅈𐅉𐅊𐅋𐅌𐅍𐅎𐅏𐅐𐅑𐅒𐅓𐅔𐅕𐅖𐅗𐅘𐅙𐅚𐅛𐅜𐅝𐅞𐅟𐅠𐅡𐅢𐅣𐅤𐅥𐅦𐅧
+        𐅨𐅩𐅪𐅫𐅬𐅭𐅮𐅯𐅰𐅱𐅲𐅳𐅴
+        𐅵𐅶𐅷𐅸𐆊𐆋
+        ;·
+        ʹ͵
+        ℩𐅹𐅺𐅻𐅼𐅽𐅾𐅿𐆀𐆁𐆂𐆃𐆄𐆅𐆆𐆇𐆈𐆉𐆌𐆍𐆎𐆠
+        ϶
+        \u{342}\u{343}\u{344}
+        \u{345}
+        ΄΅᾽᾿῀῁῍῎῏῝῞῟῭΅`´῾
+        \u{1DC0}\u{1DC1}
+        """
+
+    /// Cyrillic characters: capitals, then lowercase letters, each А to Я with
+    /// Ѓ Ґ after Г and Ѐ Ё after Е, then Ђ Є Ѕ І Ї Ј Љ Њ Ћ Џ, then the others; then punctuation, symbols and marks.
+    static let glyphsCyrillicOrder = """
+        АБВГЃҐӶҒҔДЕЀЁЖЗИЙЍҊКЌЛМНОПРСТУЎФХЦЧШЩЪЫЬ
+        ЭЮЯ
+        ЂЄЅІЇЈЉЊЋЏ
+        ѠѢѤѦѨѪѬѮѰѲѴѶѸѺѼѾҀҌҎҖҘҚҜҞҠҢҤҦҨҪҬҮҰҲҴҶҸҺҼҾ
+        ӀӁӃӅӇӉӋӍӐӒӔӖӘӚӜӞӠӢӤӦӨӪӬӮӰӲӴӸӺӼӾԀԂԄԆԈԊԌԎԐ
+        ԒԔԖԘԚԜԞԠԢԤԦԨԪԬԮᲉꙀꙂꙄꙆꙈꙊꙌꙎꙐꙒꙔꙖꙘꙚꙜꙞꙠꙢꙤꙦꙨꙪꙬꚀ
+        ꚂꚄꚆꚈꚊꚌꚎꚐꚒꚔꚖꚘꚚ
+        абвгѓґӷғҕдеѐёжзийѝҋкќлмнопрстуўфхцчшщъыь
+        эюя
+        ђєѕіїјљњћџ
+        ѡѣѥѧѩѫѭѯѱѳѵѷѹѻѽѿҁҍҏҗҙқҝҟҡңҥҧҩҫҭүұҳҵҷҹһҽҿ
+        ӂӄӆӈӊӌӎӏӑӓӕӗәӛӝӟӡӣӥӧөӫӭӯӱӳӵӹӻӽӿԁԃԅԇԉԋԍԏԑ
+        ԓԕԗԙԛԝԟԡԣԥԧԩԫԭԯᲀᲁᲂᲃᲄᲅᲆᲇᲈᲊᴫꙁꙃꙅꙇꙉꙋꙍꙏꙑꙓꙕꙗꙙꙛ
+        ꙝꙟꙡꙣꙥꙧꙩꙫꙭꚁꚃꚅꚇꚉꚋꚍꚏꚑꚓꚕꚗꚙꚛ
+        ꙮ
+        ᵸꙿꚜꚝ𞀰𞀱𞀲𞀳𞀴𞀵𞀶𞀷𞀸𞀹𞀺𞀻𞀼𞀽𞀾𞀿𞁀𞁁𞁂𞁃𞁄𞁅𞁆𞁇𞁈𞁉𞁊𞁋𞁌𞁍𞁎𞁏𞁐𞁑𞁒𞁓
+        𞁔𞁕𞁖𞁗𞁘𞁙𞁚𞁛𞁜𞁝𞁞𞁟𞁠𞁡𞁢𞁣𞁤𞁥𞁦𞁧𞁨𞁩𞁪𞁫𞁬𞁭
+        ꙳꙾
+        ҂
+        \u{483}\u{484}\u{485}\u{486}\u{487}\u{A66F}\u{A674}\u{A675}\u{A676}\u{A677}\u{A678}\u{A679}\u{A67A}\u{A67B}\u{A67C}\u{A67D}\u{A69E}\u{A69F}\u{FE2E}\u{FE2F}\u{1E08F}
+        \u{488}\u{489}\u{A670}\u{A671}\u{A672}
         """
 }
