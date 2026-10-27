@@ -400,6 +400,7 @@ struct GlyphsSection: View {
         } else {
             FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: style.face, size: size, weight: style.weight,
                      variations: style.variations)
+                .foregroundStyle(Color.ink)
         }
     }
 

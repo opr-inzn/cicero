@@ -18,6 +18,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font page’s **Glyphs** lists small capitals in a group of their own, **Small Caps**, right after the letters, each followed by its alternates, like a stylistic set’s or a Turkish one. Before, they followed their letters as alternates, and their own alternates weren’t listed.
 - **Uppercase Accents** and **Lowercase Accents** go letter by letter, all the a’s, then the b’s, with letters like æ and ß after the a’s and s’s. Before, they were in Unicode’s order, which split them up.
 - **Leading** now goes up to 200 %, down from 250 %.
+- On a font page, the family name, the styles list and **Glyphs** are in full black (white in Dark Mode), like the text at the top, rather than a dark grey.
 - A font page’s text now sits in the middle of its lines at any **Leading**, with as much room above as below. Before, all of a large Leading’s room went above the letters, so a single line, or the cursor in empty text, sat near the bottom.
 - The text cursor on a font page now fits the letters at any **Leading**. Before, it started halfway up the capitals when the lines were tight and reached far above them when they were loose.
 - **Leave the files where they are** in **Preferences → General** is now **Leave files where they are**.

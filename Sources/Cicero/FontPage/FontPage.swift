@@ -180,7 +180,7 @@ private struct FamilyName: View {
     var body: some View {
         ReadingFonts(paths: [face.path]) {
             Canvas { context, area in
-                let color = Color.primary.resolve(in: context.environment).cgColor
+                let color = Color.ink.resolve(in: context.environment).cgColor
                 context.withCGContext { Self.draw(name, face: face, in: area, color: color, into: $0) }
             }
         }
@@ -689,6 +689,7 @@ private struct StyleRows: View {
                 row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
                     FontText(text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face, size: 20,
                              weight: style.face.styleWeight)
+                        .foregroundStyle(Color.ink)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {

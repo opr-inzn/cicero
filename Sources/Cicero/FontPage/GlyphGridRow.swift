@@ -153,7 +153,7 @@ private struct GridRowDrawing: View, Equatable {
             let width = size.width - room.leading - room.trailing
             let frames = GlyphGridRow.frames(width: width, columns: columns, count: cells.count, scale: scale)
             let unrounded = GlyphGridRow.frames(width: width, columns: columns, count: cells.count)
-            let color = Color.primary.resolve(in: context.environment).cgColor
+            let color = Color.ink.resolve(in: context.environment).cgColor
             let baseline = GlyphGridRow.baseline(in: GlyphsSection.cell, font: font, scale: scale)
             // A cell at a time, each over the one before, as when they were views of their own.
             for (index, cell) in cells.enumerated() {
