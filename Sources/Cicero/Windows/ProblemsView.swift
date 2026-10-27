@@ -67,6 +67,12 @@ private struct ProblemGroup: View {
                         ? "Keeps the newest copy of each font and moves the others to the Trash."
                         : "Keeps the newest copy of each font in each folder and moves the others to the Trash.")
                 }
+                // Not fonts missing from folders: Remove from Folder is a different thing to do.
+                let forgettable = problems.filter { $0.fixes.contains(where: \.isForget) }
+                if kind == .missing && forgettable.count > 1 {
+                    Button("Forget All") { model.forgetAll(of: forgettable) }
+                        .help("Cicero stops looking for these files and forgets them.")
+                }
             }
             Text(kind.explanation).foregroundStyle(.secondary)
             ForEach(problems) { ProblemCard(problem: $0) }

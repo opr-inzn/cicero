@@ -1077,7 +1077,7 @@ extension AppModel {
             trashPlan = plan
         case .forgetInPlace(let path):
             enqueue { model in
-                model.data.records = await model.engine.forgetInPlace(path, records: model.data.records)
+                model.data.records = await model.engine.forgetInPlace([path], records: model.data.records)
                 model.rescan()
             }
         case .forgetInstalledCopy(let path):
@@ -1097,6 +1097,27 @@ extension AppModel {
             }
         case .removeFromAdobeFonts(let paths):
             CreativeCloud.open(paths)
+        }
+    }
+
+    /// Forget All: every problem's missing files at once, in one operation.
+    func forgetAll(of problems: [Problem]) {
+        var inPlace: [String] = [], copies: [String] = []
+        for fix in problems.flatMap(\.fixes) {
+            switch fix {
+            case .forgetInPlace(let path): inPlace.append(path)
+            case .forgetInstalledCopy(let path): copies.append(path)
+            default: break
+            }
+        }
+        enqueue { model in
+            for path in copies { model.data.records.installedCopies[path] = nil }
+            if !inPlace.isEmpty {
+                model.data.records = await model.engine.forgetInPlace(inPlace, records: model.data.records)
+                model.rescan()
+            }
+            // Not left to the scan: with the files gone already, it finds the same library and leaves the problems as they were.
+            model.updateProblems()
         }
     }
 

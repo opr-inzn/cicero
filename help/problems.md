@@ -34,6 +34,8 @@ Cicero remembers these files, but they’re gone.
 - **A copy Cicero installed:** the copy is gone from your Fonts folder. **Forget** clears Cicero’s note of it.
 - **A family in a folder that’s no longer in your library:** **Remove from Folder** takes it out of the folder. Families that are only away for now, on a disk that isn’t connected or online only in a cloud folder, aren’t listed.
 
+With more than one missing file, **Forget All** at the top forgets them all at once. Families missing from folders stay listed.
+
 ## Damaged or Unreadable Files
 
 Cicero couldn’t read these files. They may be damaged, or not font files at all. Use **Reveal** to look at them, or **Move to Trash** to remove one.

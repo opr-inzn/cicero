@@ -874,12 +874,12 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
-    /// Stops using a file registered in place (e.g. one whose file is gone) and forgets it.
+    /// Stops using files registered in place (e.g. ones whose files are gone) and forgets them.
     @concurrent
-    public func forgetInPlace(_ path: String, records: ActivationRecords) async -> ActivationRecords {
+    public func forgetInPlace(_ paths: [String], records: ActivationRecords) async -> ActivationRecords {
         var records = records
-        _ = await registrar.unregister([Self.url(path)], scope: .persistent)
-        records.inPlace.remove(path)
+        _ = await registrar.unregister(paths.map(Self.url), scope: .persistent)
+        records.inPlace.subtract(paths)
         return records
     }
 

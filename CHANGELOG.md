@@ -9,6 +9,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Punctuation, symbols and operators come in a type designer’s order: . , : ; first, then dashes, brackets in pairs and quotes. Case-sensitive forms are in the same order.
 - %, ‰ and ^ are with the operators now, `` ` `` with the accents, the florin ƒ with the currency signs and the micro sign µ with the symbols.
 - **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
+- **Forget All** in Conflicts forgets every missing file at once.
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
 - A font page’s **Styles** always show the family’s name, whatever the preview text.
 - **Variable** is a search filter: type **var** and choose it under **Filters** to list only variable fonts.

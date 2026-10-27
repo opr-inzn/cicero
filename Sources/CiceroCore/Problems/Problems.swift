@@ -100,6 +100,13 @@ public enum ProblemFix: Hashable, Sendable {
         case .removeFromAdobeFonts: "Remove in Adobe Fonts…"
         }
     }
+
+    public var isForget: Bool {
+        switch self {
+        case .forgetInPlace, .forgetInstalledCopy: true
+        default: false
+        }
+    }
 }
 
 public struct Problem: Identifiable, Hashable, Sendable {
