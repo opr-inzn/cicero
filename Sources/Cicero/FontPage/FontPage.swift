@@ -2,8 +2,8 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// One family's page, pushed over the browser: a type tester, every style, the families that look most like it, then the
-/// glyphs, the ligatures among them, one under the other.
+/// One family's page, pushed over the browser: a type tester, every style, then the glyphs, the ligatures among them,
+/// one under the other.
 struct FontPage: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -41,7 +41,6 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                SimilarSection(family: family)
                 // Lazy for the glyphs, which can run to thousands of cells. Their group titles scroll with them
                 // rather than pin, so the cells only meet the toolbar, where they fade out, instead of showing
                 // between it and a pinned title and ending at the title's edge. Only rows about one height go in it:
