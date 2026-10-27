@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Quick Look no longer has a button to fill the screen. Resize it by its edges instead.
+
 ## 0.10.12
 
 - **Glyphs** lists letters, accents, Greek, Cyrillic, punctuation and symbols alphabetically by glyph name, with Greek and Cyrillic capitals first, then lowercase, then punctuation and accents.
