@@ -31,9 +31,10 @@ public struct FontInfo: Sendable {
         return cache.withLock { $0[key] }
     }
 
-    /// Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Vendor ID, Weight, Variable
-    /// weight, Glyphs, Format, Embedding, Copyright. Reads the font, so call off the main thread unless the file wouldn't
-    /// keep it waiting (see `FontLoader.wouldWait(for:)`), and keeps what it finds for `cached`.
+    /// Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Vendor ID, Variable weight, Glyphs,
+    /// Format, Embedding, Copyright; no weight, as the style's read as the whole family's, and its name says it. Reads
+    /// the font, so call off the main thread unless the file wouldn't keep it waiting (see `FontLoader.wouldWait(for:)`),
+    /// and keeps what it finds for `cached`.
     public static func read(_ face: FontFace) -> FontInfo {
         let cacheKey = CacheKey(face)
         let font = FontLoader.shared.font(face, size: 12)
@@ -50,7 +51,6 @@ public struct FontInfo: Sendable {
             ("Designer", name(kCTFontDesignerNameKey)),
             ("Manufacturer", name(kCTFontManufacturerNameKey) ?? face.manufacturer),
             ("Vendor ID", face.vendorID),
-            ("Weight", String(face.weight)),
             ("Variable weight", face.weightAxis.map { "\(Int($0.minimum))–\(Int($0.maximum))" }),
             ("Glyphs", CTFontGetGlyphCount(font).formatted()),
             ("Format", FontFormat.of(path: face.path).rawValue),
