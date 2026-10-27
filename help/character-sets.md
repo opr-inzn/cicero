@@ -28,7 +28,7 @@ Click a set under **Coverage** in the sidebar. The browser shows the families th
 You can also:
 
 - show a character set as a column in the [list view](browsing.md#list) and sort by it: **Latin S–XL**, **Adobe Latin**, **GF Latin**, **GF Cyrillic** and **GF Greek** show the largest set of that kind a family has, and any other set shows whether a family has all of it or how many characters it lacks
-- see the sets a font has, and how many characters it lacks for the next Latin size, under **Coverage** in the [Info panel](browsing.md#see-a-fonts-details)
+- see the sets a font has, and how many characters it lacks for the next Latin size, under **Coverage** in the [Info panel](browsing.md#see-a-fonts-details). **Show Missing** lists them.
 - use a set in a [smart folder](organizing.md#smart-folders) rule, like “Coverage includes Adobe Latin 3”
 
 ### Choose which sets the sidebar shows

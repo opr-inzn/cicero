@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Show Missing**, under **Coverage** in the Info panel, lists the characters a font still needs for the next Latin size, like Latin S, with their names and codes. **Copy Characters** there puts them on the clipboard, to paste into your font editor.
+- The Info panel no longer has a **Weight** row. It showed the weight of the style the panel describes, which read as the whole family’s.
 - Quick Look has the two buttons of Finder’s Quick Look in place of the window buttons: one closes it, the other fills the screen with it, and a second click puts it back. Filling the screen no longer changes the size Quick Look opens at.
 - Quick Look’s type grows and shrinks with its window as you resize it.
 - Scrolled down, Quick Look’s title bar turns translucent over the text, with a thin line under it, as in System Settings.

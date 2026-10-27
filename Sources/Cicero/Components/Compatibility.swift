@@ -28,6 +28,15 @@ extension View {
         }
     }
 
+    /// The same along the bottom, for a button that floats over what scrolls.
+    @ViewBuilder func bottomBar(@ViewBuilder _ bar: () -> some View) -> some View {
+        if #available(macOS 26, *) {
+            safeAreaBar(edge: .bottom, spacing: 0, content: bar)
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0) { bar().frame(maxWidth: .infinity).background(.bar) }
+        }
+    }
+
     /// A hard scroll edge along the top, a line under what's over it; macOS 15 draws none.
     @ViewBuilder func hardTopScrollEdge() -> some View {
         if #available(macOS 26, *) { scrollEdgeEffectStyle(.hard, for: .top) } else { self }

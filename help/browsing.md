@@ -165,10 +165,10 @@ The panel describes the family’s regular style. Its **Info** tab shows:
 - **Tags**: the family’s tags, or **No Tags**. **Change** gives it more or takes them off.
 - **Rating**: five stars to click to give the family a [rating](organizing.md#ratings). Click the one it has again to take the rating away.
 - version, designer, manufacturer, and the vendor ID: the four letters a foundry registers, like ADBE for Adobe
-- weight, and the weight range of a variable font
+- the weight range of a variable font
 - number of glyphs, format, embedding and copyright. **Embedding** is what the font’s license lets a document do with it, as the font says: **Installable**, **Editable** (the document can be edited with the font in it), **Preview & Print** (viewed and printed, not edited) or **Restricted** (not embedded at all)
 - **Languages** the font supports, like “213 languages, including English, German, …”. **Show All** lists them by script, with a search field; a checkmark marks full support. See [Languages](character-sets.md#how-cicero-decides-a-font-supports-a-language).
-- **Coverage**: the largest set of each kind the font has, like “Latin S, Adobe Latin 3, GF Latin Core”, and how close it is to the next Latin size, like “Latin M needs 12 more characters”
+- **Coverage**: the largest set of each kind the font has, like “Latin S, Adobe Latin 3, GF Latin Core”, and how close it is to the next Latin size, like “Latin M needs 12 more characters”. **Show Missing** lists those characters with their names and codes, and **Copy Characters** there puts them on the clipboard, to paste into your font editor.
 - **Unicode Blocks** it covers completely, and how many more it covers in part. **Show All** lists every block with a count.
 - **Location**, the file’s path, with **Reveal in Finder**
 - **Other copies** of the same font elsewhere on your Mac. Click one to reveal it.
