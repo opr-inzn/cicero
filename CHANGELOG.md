@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - With a family selected, ⌘O opens its font page, as in the Finder. With none selected, it still adds fonts.
+- ⌘← (**View → Back**) goes from a font page back to the browser, as Esc does.
 - Scrolling through a font page’s **Glyphs** is smooth again, even in fonts with thousands of glyphs.
 - In a font page’s **Glyphs**, a character wider than its cell, like a long Arabic ligature, is scaled down to fit, as alternates and ligatures already were. **Copy as Vector** in a glyph’s right-click menu is greyed out for one without an outline, as in its popover.
 - The symbols some fonts keep in private use, like SF Pro’s, are listed under **Graphical** on a font page. Before, SF Pro’s showed up as **Myanmar** letters.

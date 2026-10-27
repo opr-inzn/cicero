@@ -12,6 +12,7 @@
 | ⇧⌘N | **File → New Folder** |
 | ⌥⌘N | **File → New Smart Folder** |
 | ⇧⌘E | **File → Export Fonts** |
+| ⌘← | **View → Back** (a font page) |
 | ⌘+ | **View → Zoom In** (the Compare window) |
 | ⌘− | **View → Zoom Out** (the Compare window) |
 | ⌘↩ | **Fonts → Activate** |
@@ -72,7 +73,7 @@ In **Add Families**:
 
 | Shortcut | Does |
 | --- | --- |
-| Esc | Goes back to the browser |
+| Esc or ⌘← | Goes back to the browser |
 
 ## The sidebar
 

@@ -131,6 +131,12 @@ struct CiceroCommands: Commands {
         // keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
         CommandGroup(after: .sidebar) {
             Divider()
+            // From a font page to the browser, as Esc and the toolbar's back button go. While the page's text is being
+            // typed in, ⌘← goes to the start of the line instead (see `TextEditingKeys`).
+            Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(model.openFamilyID == nil)
+            Divider()
             Button("Zoom In", systemImage: "plus.magnifyingglass") {
                 if let size = compareSize { compareSize = CompareWindow.bigger(than: size) }
             }
