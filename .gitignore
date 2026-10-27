@@ -18,3 +18,4 @@ Tests/
 # Instruments recordings and their exports stay local.
 *.trace
 *.xctrace
+AGENTS.md
