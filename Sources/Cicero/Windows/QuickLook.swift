@@ -424,9 +424,10 @@ private struct FamilyQuickLook: View {
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
 
-    /// How much bigger than in the panel at its first width the sample and the styles are drawn: they're laid out as
-    /// there and zoomed to the panel's width, the margins at the sides staying as they are (see `Zoomed`).
-    private var scale: CGFloat {
+    /// How much bigger than in the panel at its first width the type and the room around it are: they grow and shrink
+    /// with the panel's width smoothly, set at sizes in fractions of a point, the margins at the sides staying as they
+    /// are. (Zoomed as a picture, the type was blurred; at whole points, lines jumped from one size to the next.)
+    private var scale: Double {
         max(0.1, (width - 2 * Self.inset) / (QuickLook.defaultSize.width - 2 * Self.inset))
     }
 
@@ -435,23 +436,21 @@ private struct FamilyQuickLook: View {
         ScrollView {
             // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
-                sample()
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
-                    .zoomed(scale)
+                sample(scale: scale)
                     .padding(.horizontal, Self.inset)
+                    .padding(.top, 12 * scale)
+                    .padding(.bottom, 24 * scale)
                 // With one style the sample already shows it.
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 15 * scale)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: 22 * scale, weight: style.face.styleWeight)
                             // As tall as the font's own line spacing, without padding: some fonts keep room above their
                             // capitals (for accents, a taller style), and padding as well spread the rows far apart.
                             // At least 1.25 × the size, for fonts set tight.
-                            .frame(minHeight: 22 * 1.25)
-                            .zoomed(scale)
+                            .frame(minHeight: 22 * scale * 1.25)
                             .padding(.horizontal, Self.inset)
                     }
                 }
@@ -466,21 +465,21 @@ private struct FamilyQuickLook: View {
 
     /// On the left. The sample text with Preview Options' leading; the alphabet, three lines of letters rather than
     /// text, always 120 % of its size apart, so a high Leading set for the text doesn't spread them out.
-    private func sample() -> some View {
+    private func sample(scale: Double) -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
         return Group {
             if preview.sampleText.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96,
+                VStack(alignment: .leading, spacing: 14 * scale) {
+                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96 * scale,
                                   variations: variations)
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
-                                  lineLimit: nil, lineHeight: 24 * 1.2)
+                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24 * scale,
+                                  variations: variations, lineLimit: nil, lineHeight: 24 * scale * 1.2)
                 }
             } else {
-                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
-                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
+                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56 * scale,
+                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56 * scale))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -533,31 +532,6 @@ private struct FamilyQuickLook: View {
     }
 }
 
-/// Lays its content out `scale` times smaller than the room it's given and draws it `scale` times bigger, so it looks the
-/// same at any width, only bigger or smaller: resizing the panel zooms it smoothly, where setting the type a size bigger
-/// or smaller had lines jump from one whole point to the next and rows move with them.
-private struct Zoomed: Layout {
-    let scale: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let content = subviews.first else { return .zero }
-        let size = content.sizeThatFits(ProposedViewSize(width: proposal.width.map { $0 / scale },
-                                                         height: proposal.height.map { $0 / scale }))
-        return CGSize(width: size.width * scale, height: size.height * scale)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
-                              proposal: ProposedViewSize(width: bounds.width / scale, height: bounds.height / scale))
-    }
-}
-
-private extension View {
-    func zoomed(_ scale: CGFloat) -> some View {
-        Zoomed(scale: scale) { scaleEffect(scale, anchor: .topLeading) }
-    }
-}
-
 /// `FontText` once its face's file has been read. Until then the file is read off the main thread, with room
 /// kept for the text, so stepping onto a family whose files nothing has read yet never holds up the selection.
 private struct QuickLookText: View {
@@ -573,7 +547,7 @@ private struct QuickLookText: View {
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
             FontText(text: text, face: face, size: size, weight: weight, variations: variations,
-                     lineLimit: lineLimit, lineHeight: lineHeight)
+                     lineLimit: lineLimit, lineHeight: lineHeight, cached: false)
         } else {
             Text(text)
                 .font(.system(size: size))
@@ -581,11 +555,7 @@ private struct QuickLookText: View {
                 .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
                 .hidden()
                 .task(id: face.id) {
-                    let (face, size, weight, variations) = (face, size, weight, variations)
-                    // Makes the font too, so drawing it is a cache hit.
-                    await Task.detached(priority: .userInitiated) {
-                        _ = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
-                    }.value
+                    await FontLoader.shared.read(face.path)
                     readPath = face.path
                 }
         }
