@@ -8,7 +8,7 @@ import SwiftUI
 /// on the left.
 @Observable
 final class PreviewSettings {
-    static let presets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@"]
+    static let presets = ["Sphinx of black quartz, judge my vow.", "Lorem ipsum dolor sit amet", "Hamburgefonstiv", "0123456789 €$£¥ %&@"]
     /// What grid tiles show when no sample text is set: capitals, lowercase, a descender and figures.
     static let tileSample = "Aa Gg 123"
     /// Preview Options' Size; a smaller size saved before 24 pt was the least goes up to it.

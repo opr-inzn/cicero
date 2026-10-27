@@ -8,6 +8,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
 - A font page’s **Styles** always show the family’s name, whatever the preview text.
 - **Variable** is a search filter: type **var** and choose it under **Filters** to list only variable fonts.
+- Preview Options’ **Presets** add “Lorem ipsum dolor sit amet”.
 
 ## 0.10.11
 
