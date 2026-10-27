@@ -1078,6 +1078,8 @@ extension AppModel {
         case .forgetInPlace(let path):
             enqueue { model in
                 model.data.records = await model.engine.forgetInPlace([path], records: model.data.records)
+                // A file that's gone was out of the library already: the scan finds the same one and leaves the problems as they were.
+                model.updateProblems()
                 model.rescan()
             }
         case .forgetInstalledCopy(let path):
