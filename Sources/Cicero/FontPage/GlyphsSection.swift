@@ -84,8 +84,8 @@ struct GlyphsSection: View {
             // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes, or after the one
             // script a font without Latin letters starts with.
             if !shownLigatures.isEmpty {
-                LigaturesSection(face: style.face, weight: style.weight, variations: style.variations, columns: columns, groups: shownLigatures,
-                                 characters: ligatureCharacters)
+                LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
+                                 columns: columns, groups: shownLigatures, characters: ligatureCharacters)
             }
             ForEach(shown.dropFirst(lead)) { section in
                 self.section(section, style: style)
@@ -186,12 +186,12 @@ struct GlyphsSection: View {
                     .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: glyph.character)
                 // The glyph has no code of its own: what's copied is the character, which the font draws like this
-                // where the feature is on.
+                // where the feature is on, and the page's text where it's pasted (see `SampleGlyph`).
                 VStack {
                     // A localized form in text of its language, any other with its features on.
                     let drawn = glyph.feature == "locl" ? "in \(glyph.featureName) text" : "with \(glyph.featureNames.formatted(.list(type: .and))) on"
-                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(glyph.character), shown: Self.shown(glyph.character)) }
-                        .help("Copies “\(Self.text(glyph.character))”, which this font draws like this \(drawn)")
+                    Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
+                        .help("Copies “\(Self.text(glyph.character))”, which shows like this when pasted into the text above, and elsewhere \(drawn)")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())
@@ -207,8 +207,8 @@ struct GlyphsSection: View {
                     .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: alternate.character)
                 VStack {
-                    Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(alternate.character), shown: Self.shown(alternate.character)) }
-                        .help("Copies “\(Self.text(alternate.character))”, which this font draws like this with \(names) on")
+                    Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
+                        .help("Copies “\(Self.text(alternate.character))”, which shows like this when pasted into the text above, and elsewhere with \(names) on")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())
@@ -223,7 +223,7 @@ struct GlyphsSection: View {
     @ViewBuilder
     private func copyMenu(_ cell: Cell, style: Style) -> some View {
         let scalar = Self.character(of: cell)
-        Button("Copy Character", systemImage: "doc.on.clipboard") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
+        Button("Copy Character", systemImage: "doc.on.clipboard") { copyCharacter(cell, style: style) }
         // Not greyed out for a glyph without an outline: the menus are made with every cell, and the outline isn't.
         Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(cell, style: style) }
         Button("Copy Unicode", systemImage: "doc.on.clipboard") { copy(CharacterCodes.unicode(scalar), shown: CharacterCodes.unicode(scalar)) }
@@ -245,10 +245,32 @@ struct GlyphsSection: View {
         model.showToast("\(shown) copied to clipboard")
     }
 
+    /// The cell's character, which the page's text draws as the cell's glyph where it's pasted there.
+    private func copyCharacter(_ cell: Cell, style: Style) {
+        sampleClip(cell, style: style).copy()
+        popover = nil
+        model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard")
+    }
+
+    /// What the cell pastes as in the page's text: its character, and for a feature's glyph, the glyph drawn in its
+    /// place (see `SampleGlyph`).
+    private func sampleClip(_ cell: Cell, style: Style) -> SampleClip {
+        let text = Self.text(Self.character(of: cell))
+        let glyph: SampleGlyph? = switch cell {
+        case .character: nil
+        case .feature(let glyph):
+            SampleGlyph(family: family.id, characters: text, face: style.face, glyph: glyph.glyph, features: glyph.featureTags)
+        case .alternate(let alternate):
+            SampleGlyph(family: family.id, characters: text, face: style.face, glyph: alternate.glyph,
+                        features: Array(alternate.features.prefix(1)))
+        }
+        return SampleClip(text: text, glyph: glyph)
+    }
+
     /// The glyph's outline, as for text; a beep for a glyph without one.
     private func copyVector(_ cell: Cell, style: Style) {
         guard let outline = outline(cell, style: style) else { return NSSound.beep() }
-        GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell))
+        GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell), clip: sampleClip(cell, style: style))
         popover = nil
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
     }

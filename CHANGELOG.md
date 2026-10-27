@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- An alternate, small capital or ligature copied from a font page’s **Glyphs** now shows as itself when you paste it into the text at the top of the page, in any of the family’s styles. Other apps still get the plain character.
 - When you save a new version of a font over the old file, a font page’s text and the grid show its new letters at once. Before, they kept showing the old ones until Cicero quit, while **Glyphs** already showed the new ones.
 - A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language.
 - **Glyphs** lists Roman numerals in a group of their own, after the figures, and a Latin font’s forms for the start and end of a word among the alternates.
