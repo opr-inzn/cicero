@@ -2,14 +2,12 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.13
 
-- Quick Look no longer has a button to fill the screen. Resize it by its edges instead.
 - In Compare’s **Overlay**, click the dot next to a font’s name to choose its color.
 - Compare holds up to 12 fonts, one for each color.
-- In **Overlay**, the colors mix where fonts overlap, so every font shows through the ones drawn over it. Before, a few fonts on top could hide the serifs of one below.
 - In **Overlay**, the fonts line up on the first stem of their first letter, so a serif font’s stem stands on a sans font’s. Before, each line started at the same place, which put a serif font’s stems further right.
-- Compare has its own preview text. Typing it no longer changes the previews in the main window, and Compare’s **Preview Options** no longer show **Leading**, as each font there is one line.
+- Compare has its own preview text. Typing it no longer changes the previews in the main window.
 
 ## 0.10.12
 
