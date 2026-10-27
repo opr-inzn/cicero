@@ -169,8 +169,9 @@ final class QuickLook {
         panel.setFrame(NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height), display: false)
     }
 
+    /// Not while it fills the screen: filling it and going back end as a live resize does.
     private func saveSize() {
-        guard let panel, panel.isVisible else { return }
+        guard let panel, panel.isVisible, !panel.isZoomed else { return }
         UserDefaults.standard.set(NSStringFromSize(panel.frame.size), forKey: Self.sizeKey)
     }
 }
