@@ -5,6 +5,8 @@ import SwiftUI
 extension Color {
     /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
+    /// Specimen text on it: the text colour, full black or white, as in the type tester, rather than the labels' grey.
+    static let ink = Color(nsColor: .textColor)
     /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
     /// system green in light mode, which is too light for small text on its own tint.
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
