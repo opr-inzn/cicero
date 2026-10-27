@@ -107,7 +107,7 @@ extension View {
     }
 }
 
-/// Keyboard handling for the browser: Return opens, Escape deselects, ⌘A selects all, typing the start of a name
+/// Keyboard handling for the browser: Return and ⌘↓ open, Escape deselects, ⌘A selects all, typing the start of a name
 /// jumps to the first family starting with it (spaces included while typing), Space opens and closes Quick Look, and the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
@@ -129,16 +129,7 @@ struct FamilyKeys: ViewModifier {
     func body(content: Content) -> some View {
         let quickLook = model.quickLook
         content
-            .onKeyPress(.return) {
-                // With Quick Look open, the family it shows, which may be one of several selected.
-                if quickLook.isOpen, let shown = quickLook.shown {
-                    model.openFamilyID = shown.family.id
-                    return .handled
-                }
-                guard model.selectedIDs.count == 1 else { return .ignored }
-                model.openFamilyID = model.selectedIDs.first
-                return .handled
-            }
+            .onKeyPress(.return) { open() }
             .onKeyPress(.escape) {
                 // Quick Look closes before the selection clears.
                 if quickLook.isOpen { quickLook.close() } else { model.selectedIDs = [] }
@@ -223,7 +214,22 @@ struct FamilyKeys: ViewModifier {
         proxy.scrollTo(id, anchor: .top)
     }
 
+    private func open() -> KeyPress.Result {
+        // With Quick Look open, the family it shows, which may be one of several selected.
+        if model.quickLook.isOpen, let shown = model.quickLook.shown {
+            model.openFamilyID = shown.family.id
+            return .handled
+        }
+        guard model.selectedIDs.count == 1 else { return .ignored }
+        model.openFamilyID = model.selectedIDs.first
+        return .handled
+    }
+
     private func arrow(_ press: KeyPress) -> KeyPress.Result {
+        // ⌘↓ as in the Finder, now that the menu's Open has ⌘O while families are selected.
+        if press.key == .downArrow, press.modifiers.contains(.command), press.modifiers.isDisjoint(with: [.shift, .option, .control]) {
+            return open()
+        }
         guard press.modifiers.isDisjoint(with: [.command, .option, .control]) else { return .ignored }
         let vertical = press.key == .upArrow || press.key == .downArrow
         let forward = press.key == .downArrow || press.key == .rightArrow

@@ -88,6 +88,10 @@ struct CiceroCommands: Commands {
     @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
+    /// ⌘O opens the family selected in the browser, as in the Finder, and adds fonts while none is. ⌘↓ opens it
+    /// too, from the browser (see `FamilyKeys`).
+    private var opensSelection: Bool { model.openFamilyID == nil && !model.selectedIDs.isEmpty }
+
     var body: some Commands {
         // The menu bar's commands are made at launch and have these even while no window is open.
         let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
@@ -100,7 +104,7 @@ struct CiceroCommands: Commands {
         }
         CommandGroup(after: .newItem) {
             Button("Add Fonts", systemImage: "doc.badge.plus") { model.presentAddFontsPanel() }
-                .keyboardShortcut("o", modifiers: .command)
+                .keyboardShortcut(opensSelection ? nil : KeyboardShortcut("o"))
             Button("Add Location", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Find Fonts in Document", systemImage: "doc.text.magnifyingglass") { model.presentFindFontsPanel() }
@@ -127,6 +131,12 @@ struct CiceroCommands: Commands {
         // keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
         CommandGroup(after: .sidebar) {
             Divider()
+            // From a font page to the browser, as Esc and the toolbar's back button go. While the page's text is being
+            // typed in, ⌘← goes to the start of the line instead (see `TextEditingKeys`).
+            Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(model.openFamilyID == nil)
+            Divider()
             Button("Zoom In", systemImage: "plus.magnifyingglass") {
                 if let size = compareSize { compareSize = CompareWindow.bigger(than: size) }
             }
@@ -151,7 +161,7 @@ struct CiceroCommands: Commands {
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
-                .keyboardShortcut(.downArrow, modifiers: .command)
+                .keyboardShortcut(opensSelection ? KeyboardShortcut("o") : KeyboardShortcut(.downArrow))
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
             Button("Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)

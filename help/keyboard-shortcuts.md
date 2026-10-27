@@ -7,18 +7,19 @@
 | Shortcut | Command |
 | --- | --- |
 | ⌘, | **Cicero → Preferences** |
-| ⌘O | **File → Add Fonts** |
+| ⌘O | **File → Add Fonts** (no family selected) |
 | ⇧⌘O | **File → Add Location** |
 | ⇧⌘N | **File → New Folder** |
 | ⌥⌘N | **File → New Smart Folder** |
 | ⇧⌘E | **File → Export Fonts** |
+| ⌘← | **View → Back** (a font page) |
 | ⌘+ | **View → Zoom In** (the Compare window) |
 | ⌘− | **View → Zoom Out** (the Compare window) |
 | ⌘↩ | **Fonts → Activate** |
 | ⌥⌘↩ | **Fonts → Activate Temporarily** |
 | ⌫ | **Fonts → Deactivate** |
 | ⌘Y | **Fonts → Quick Look** |
-| ⌘↓ | **Fonts → Open** (one family selected) |
+| ⌘O or ⌘↓ | **Fonts → Open** (one family selected) |
 | ⌘I | **Fonts → Show Info** |
 | ⇧⌘R | **Fonts → Reveal in Finder** |
 | ⌘⌫ | **Fonts → Move to Trash** |
@@ -72,7 +73,7 @@ In **Add Families**:
 
 | Shortcut | Does |
 | --- | --- |
-| Esc | Goes back to the browser |
+| Esc or ⌘← | Goes back to the browser |
 
 ## The sidebar
 
