@@ -689,8 +689,8 @@ extension AppModel {
     var libraryRows: [SidebarRow] {
         let rows = [
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
-            SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", item: .active),
-            SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", item: .inactive),
+            SidebarRow(key: "library.active", title: "Active", icon: "checkmark.seal", item: .active),
+            SidebarRow(key: "library.inactive", title: "Inactive", icon: "xmark.seal", item: .inactive),
             // Only while a font is on until Cicero quits, and while it's selected, so turning the last one off there doesn't
             // take the row away under the pointer. The symbol of Activate Temporarily and the Temporary tag.
             hasTemporaryFonts || selectedItems.contains(.temporary)

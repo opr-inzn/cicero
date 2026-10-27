@@ -320,8 +320,8 @@ private struct SidebarRowMenu: View {
         case .temporary:
             if rows.count == 1 {
                 // Only the styles on until Cicero quits: the families' other styles stay as they are.
-                Button("Activate Permanently", systemImage: "checkmark.circle") { model.activateFonts(in: rows) }
-                Button("Deactivate", systemImage: "circle.dashed") { model.deactivateFonts(in: [row.item]) }
+                Button("Activate Permanently", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
+                Button("Deactivate", systemImage: "xmark.seal") { model.deactivateFonts(in: [row.item]) }
             }
         case .folder:
             locationItems(rows.compactMap { if case .folder(let id) = $0.item { id } else { nil } })
@@ -440,9 +440,9 @@ private struct SidebarRowMenu: View {
         let kind = sets.isEmpty ? "Smart Folder" : "Folder"
         let kinds = rows.count == 1 ? kind : kind + "s"
         // The symbols of the sidebar's Active and Inactive.
-        Button("Activate \(kinds)", systemImage: "checkmark.circle") { model.activateFonts(in: rows) }
+        Button("Activate \(kinds)", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
         Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: rows.map(\.item)) }
-        Button("Deactivate \(kinds)", systemImage: "circle.dashed") { model.deactivateFonts(in: rows.map(\.item)) }
+        Button("Deactivate \(kinds)", systemImage: "xmark.seal") { model.deactivateFonts(in: rows.map(\.item)) }
         Divider()
         if rows.count == 1 {
             if let id = sets.first, let set = model.data.sets.first(where: { $0.id == id }) {
