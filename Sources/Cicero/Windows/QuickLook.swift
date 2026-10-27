@@ -423,6 +423,10 @@ private struct FamilyQuickLook: View {
     /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
+    /// The type in full black, or full white in dark mode: the primary colour, which lets a little of the page through.
+    private static let ink = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .white : .black
+    })
 
     /// How much bigger than in the panel at its first width the type and the room around it are: they grow and shrink
     /// with the panel's width smoothly, set at sizes in fractions of a point, the margins at the sides staying as they
@@ -457,6 +461,7 @@ private struct FamilyQuickLook: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
+            .foregroundStyle(Self.ink)
         }
         .background(Color.canvas)
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
