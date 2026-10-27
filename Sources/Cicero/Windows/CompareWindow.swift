@@ -326,18 +326,21 @@ private struct StackedLayout: View {
     }
 }
 
-/// Every sample over the others, each in its tint, on a shared baseline. Dragging a chip in the legend below changes
-/// the order; its dot changes the colour.
+/// Every sample over the others, each in its tint, on a shared baseline, their first letters' first stems on each other
+/// (see `FirstStem`). Dragging a chip in the legend below changes the order; its dot changes the colour.
 private struct OverlayLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
         let ascent = samples.map(\.line.ascent).max() ?? 0
         let descent = samples.map(\.line.descent).max() ?? 0
-        // Glyphs reaching left of the start go into the margin, as in the stacked rows, so the lines start level
-        // with the legend.
-        let overhang = samples.map(\.line.overhang).max() ?? 0
-        let width = (samples.map(\.line.width).max() ?? 0) + 2
+        // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
+        // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.
+        let stems = samples.map { FirstStem.x(in: $0.line.line) ?? 0 }
+        let starts = stems.map { (stems.max() ?? 0) - $0 }
+        // Glyphs reaching left of that go into the margin, as in the stacked rows.
+        let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
+        let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
         VStack(alignment: .leading, spacing: 16) {
             Canvas { context, _ in
                 let environment = context.environment
@@ -345,9 +348,9 @@ private struct OverlayLayout: View {
                     // Over each other as inks on paper, or as lights in Dark Mode, so every font shows through those
                     // drawn over it. Simply laid over each other at 70 %, a few stems hid the serifs of a font below.
                     cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
-                    for sample in samples {
+                    for (sample, start) in zip(samples, starts) {
                         let color = sample.tint.opacity(0.7).resolve(in: environment).cgColor
-                        sample.line.draw(in: cg, baselineAt: CGPoint(x: overhang, y: ascent), color: color)
+                        sample.line.draw(in: cg, baselineAt: CGPoint(x: overhang + start, y: ascent), color: color)
                     }
                 }
             }
