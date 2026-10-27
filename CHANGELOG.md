@@ -12,6 +12,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Clear Font Caches** no longer turns off the fonts Cicero uses where they are, like those in your locations, in Cicero’s Library or on in every app from Adobe’s folders.
 - Cicero’s Deactivated folder is now called Inactive, `~/Library/Application Support/Cicero/Inactive`. Cicero renames it as it opens.
 - The Info panel opens with the font’s details already in it, and shows them at once when you select a font while it’s open. Before, it slid in with spinners and the details faded in only after it had stopped, and selecting a font with nothing selected showed a spinner for a moment.
+- With **Ask each time** chosen in **Settings → General**, turning on a font that’s off in your Fonts folder or in Cicero’s Library no longer asks how to turn it on. It goes on where it is, as it did whichever you picked.
 
 ## 0.10.10
 

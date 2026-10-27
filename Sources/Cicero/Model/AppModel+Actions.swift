@@ -8,16 +8,17 @@ extension AppModel {
         activate(families.flatMap(\.faces), title: Self.title(for: families))
     }
 
-    /// Asks how to activate when the install method is Ask, unless every face comes from a folder
-    /// an app loads by itself (those are always used where they are). Asks first whether to turn on so many when that's
-    /// more than `UserData.manyFamilies` families, unless `confirmed`.
+    /// Asks how to activate when the install method is Ask, unless every face goes on the same way whatever it is, like
+    /// those in a Fonts folder, which go on where they are (see `ActivationEngine.ignoresInstallMethod`). Asks first
+    /// whether to turn on so many when that's more than `UserData.manyFamilies` families, unless `confirmed`.
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
             return manyActivationPrompt = prompt
         }
-        let needsChoice = targets.contains { $0.app == nil }
+        let engine = engine
+        let needsChoice = targets.contains { !engine.ignoresInstallMethod($0) }
         if data.installMethod == .ask && needsChoice {
             activationPrompt = ActivationPrompt(title: title, faces: targets)
         } else {
@@ -153,7 +154,8 @@ extension AppModel {
 
     func confirmCopySwitch(_ request: CopySwitchRequest) {
         let targets = request.plan.switches.compactMap(\.target)
-        if data.installMethod == .ask && !targets.isEmpty {
+        let engine = engine
+        if data.installMethod == .ask && targets.contains(where: { !engine.ignoresInstallMethod($0) }) {
             activationPrompt = ActivationPrompt(title: request.title, faces: targets, switching: request)
         } else {
             performCopySwitch(request, method: data.installMethod == .ask ? .inPlace : data.installMethod)
