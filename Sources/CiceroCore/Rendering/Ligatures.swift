@@ -350,8 +350,8 @@ enum GSUBSubstitutions {
     }
 }
 
-/// A glyph an OpenType feature puts in place of a character's, like a tabular figure or a hyphen for capitals, which
-/// has no character of its own.
+/// A glyph an OpenType feature puts in place of a character's, like a small capital, a tabular figure or a hyphen for
+/// capitals, which has no character of its own.
 public struct FeatureGlyph: Hashable, Sendable {
     public let glyph: CGGlyph
     /// The character whose glyph it replaces.
@@ -371,6 +371,7 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// The features read for the font page's glyphs, in the order it lists their glyphs, with their names and the
     /// groups they go in.
     public static let features: [(tag: String, name: String, group: GlyphGroup)] = [
+        ("smcp", "Small Capitals", .smallCaps), ("c2sc", "Capitals to Small Capitals", .smallCaps),
         ("tnum", "Tabular Figures", .tabularFigures),
         ("sups", "Superscript", .superscripts), ("subs", "Subscript", .subscripts), ("sinf", "Scientific Inferiors", .subscripts),
         ("numr", "Numerators", .numerators), ("dnom", "Denominators", .denominators), ("ordn", "Ordinals", .ordinals),
@@ -386,10 +387,10 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// Keeps a font with features over thousands of glyphs to a sensible number.
     public static let limit = 3000
 
-    /// The face's glyphs that only those features draw, each once, by feature, then character; a glyph a character
-    /// has too, like a superscript two the font maps U+00B2 to, is left to the character, and accents' case-sensitive
-    /// forms are left out. Reads the font's GSUB table;
-    /// call off the main thread.
+    /// The face's glyphs that only those features draw, each once, by feature, then character, but the small capitals
+    /// first, in their letters' order (see `smallCapOrder`); a glyph a character has too, like a superscript two the
+    /// font maps U+00B2 to, is left to the character, and accents' case-sensitive forms are left out. Reads the font's
+    /// GSUB table; call off the main thread.
     public static func read(_ face: FontFace) -> [FeatureGlyph] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
@@ -425,7 +426,22 @@ public struct FeatureGlyph: Hashable, Sendable {
                 result.append(glyph)
             }
         }
-        return result
+        let smallCaps = result.filter { $0.group == .smallCaps }
+            .sorted { smallCapOrder(of: $0.character) < smallCapOrder(of: $1.character) }
+        return smallCaps + result.filter { $0.group != .smallCaps }
+    }
+
+    /// Where a small capital goes in its group: where its letter goes on the page, a capital's where its lowercase
+    /// letter does, whichever feature draws it, so a and A's are together, from A to Z, then the accented ones, a
+    /// capital İ's among them, then figures and signs.
+    static func smallCapOrder(of character: UInt32) -> (GlyphGroup, UInt32, UInt32) {
+        let group: GlyphGroup = switch GlyphGroup.of(character) ?? .graphical {
+        case .uppercase: .lowercase
+        case .uppercaseAccents: .lowercaseAccents
+        case let other: other
+        }
+        let lowercase = Unicode.Scalar(character).map { Array(String(Character($0)).lowercased().unicodeScalars) } ?? []
+        return (group, lowercase.count == 1 ? lowercase[0].value : character, character)
     }
 
     /// Tabular figures in another style, like old-style ones, by style, then character: glyphs of their own (a
