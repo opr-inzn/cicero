@@ -21,7 +21,7 @@ Any of these work:
 
 To turn on a single style, open the font page and use the style’s switch in **Styles**, or right-click the style and choose **Activate Style**.
 
-Every app lists the fonts that are on in its font menu, so hundreds at once can make apps slower to open. When you turn on more than 100 families at once, Cicero asks first. Check **Don’t ask again** there, or turn off **Ask before activating more than 100 families at once** in **Settings → General**, to go ahead without asking. App folders and imports never ask.
+Every app lists the fonts that are on in its font menu, so hundreds at once can make apps slower to open. When you turn on more than 100 families at once, Cicero asks first. Check **Don’t ask again** there, or turn off **Ask before activating more than 100 families at once** in **Preferences → General**, to go ahead without asking. App folders and imports never ask.
 
 ### Turn on a whole folder
 
@@ -29,7 +29,7 @@ Right-click a folder or smart folder in the sidebar and choose **Activate Folder
 
 ### Keep a location’s fonts on
 
-Choose **Active** for one of your locations, next to it in **Settings → Locations** or under **Fonts in This Location** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off, also when the folder is on a disk you unplug and connect again. Choose **Inactive** again, or remove the location, and Cicero turns off the fonts it turned on.
+Choose **Active** for one of your locations, next to it in **Preferences → Locations** or under **Fonts in This Location** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off, also when the folder is on a disk you unplug and connect again. Choose **Inactive** again, or remove the location, and Cicero turns off the fonts it turned on.
 
 ## Copy or use in place
 
@@ -41,9 +41,9 @@ There are two ways to turn on a font that isn’t in a Fonts folder:
 | Good for | Fonts you always need, or fonts on a disk you unplug | Large libraries you keep in one place |
 | Watch out | Takes disk space | The fonts stop working if their files move or their disk is unplugged, and Microsoft Office can’t use them |
 
-Choose which one in **Settings → General**, next to **Activate fonts by**:
+Choose which one in **Preferences → General**, next to **Activate fonts by**:
 
-- **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Fonts in your Fonts folder or in Cicero’s Library go on where they are without asking, as there’s nothing to choose. Check **Remember this choice** to stop being asked; you can change it again in Settings.
+- **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Fonts in your Fonts folder or in Cicero’s Library go on where they are without asking, as there’s nothing to choose. Check **Remember this choice** to stop being asked; you can change it again in Preferences.
 - **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
 - **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. Fonts in your [locations](organizing.md#locations) are copied, so their folders stay as they are, and so is a file **Find on This Mac** finds for a document.
 - **Leave files where they are**
@@ -64,7 +64,7 @@ Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are 
 - fonts turned on temporarily, or by an [app folder](#turn-fonts-on-with-an-app)
 - fonts in [Adobe apps’ folders](#fonts-in-adobe-apps-folders), also when they’re on in every app
 
-To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Settings → General**, with **Install fonts into Cicero’s Library** off. A font that’s on where it is already has to be turned off and on again that way.
+To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. A font that’s on where it is already has to be turned off and on again that way.
 
 Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too, and for turning a font off: Office still lists it the next time it opens, and lets go of it the time after.
 
@@ -72,7 +72,7 @@ Other apps, like Pages and Adobe’s, use fonts from anywhere.
 
 ## Cicero’s Library
 
-Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, Cicero’s Library, and have macOS use them from there. Turn on **Install fonts into Cicero’s Library** in **Settings → General**, under **Activate fonts by**. The library is `~/Cicero/Library` at first, with a folder for each family, like `~/Cicero/Library/Inter`.
+Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, Cicero’s Library, and have macOS use them from there. Turn on **Install fonts into Cicero’s Library** in **Preferences → General**, under **Activate fonts by**. The library is `~/Cicero/Library` at first, with a folder for each family, like `~/Cicero/Library/Inter`.
 
 - **Turning a font on**, by copying or moving it, or opening a file from the Finder with either chosen, puts its file into its family’s folder in the library and turns it on there. A file with fonts of more than one family, as a font collection can be, goes into the folder of the family you turned on, or of its first font when you open it from the Finder. When the library has the same file already, Cicero uses that one rather than copying it again. A font in the [Inactive folder](#the-inactive-folder) moves into the library.
 - **Turning a font off** only turns it off: the file stays in the library, listed and off, ready to turn on again. It never goes to the Trash or the Inactive folder. **Move to Trash** removes it from the library, and its family’s folder goes once nothing is left in it.
@@ -159,7 +159,7 @@ Some fonts belong to macOS or another app. Their switch is dimmed, and holding t
 
 ## Adobe Fonts
 
-The fonts you turn on in Adobe Fonts, in Creative Cloud, are on in every app. Cicero lists them, with a purple **Adobe Fonts** tag, and together as **Adobe Fonts** under **Locations**. To keep them out of your lists, turn off **Show fonts from Creative Cloud** in **Settings → General**.
+The fonts you turn on in Adobe Fonts, in Creative Cloud, are on in every app. Cicero lists them, with a purple **Adobe Fonts** tag, and together as **Adobe Fonts** under **Locations**. To keep them out of your lists, turn off **Show fonts from Creative Cloud** in **Preferences → General**.
 
 Adobe apps can also turn on Adobe Fonts by themselves, for instance for a document that uses them. Those are on in Adobe apps only: their switch sits halfway, and their styles say **Active in Adobe apps**, like the fonts in Adobe’s folders.
 
@@ -178,7 +178,7 @@ Type designers export fonts there to test them: an Adobe app picks up a new vers
 
 These folders have nothing to do with Adobe Fonts, the fonts you turn on in Creative Cloud (see [Adobe Fonts](#adobe-fonts)).
 
-Cicero lists the fonts in all of them together as **Proofing** under **Locations**, while there are any. They show as active in those apps, with a red tag, **Proofing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for proofing in Adobe apps** under **Library** in **Settings → General**. Adobe Fonts have a switch of their own, **Show fonts from Creative Cloud**.
+Cicero lists the fonts in all of them together as **Proofing** under **Locations**, while there are any. They show as active in those apps, with a red tag, **Proofing**, or the app’s name for its own folder, like **InDesign**, instead of as inactive. To hide them, turn off **Show fonts installed for proofing in Adobe apps** under **Library** in **Preferences → General**. Adobe Fonts have a switch of their own, **Show fonts from Creative Cloud**.
 
 ### The three-position switch
 
@@ -198,7 +198,7 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 
 ### Your own folder that an app loads
 
-If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder under **Locations** in the sidebar and choose **Active in Adobe apps**, or **Active in Specific App** to type the app’s name, under **Fonts in This Location**. The same choices are next to it in **Settings → Locations**.
+If an app loads fonts from a folder of yours, tell Cicero, so it shows those fonts as active in that app and gives them the same switch. Right-click the folder under **Locations** in the sidebar and choose **Active in Adobe apps**, or **Active in Specific App** to type the app’s name, under **Fonts in This Location**. The same choices are next to it in **Preferences → Locations**.
 
 ## Turn on the fonts a document uses
 
@@ -220,7 +220,7 @@ Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrato
 
 ### Fonts documents open in Adobe apps use
 
-You don’t have to look up a document before you open it. Turn on **Auto-activate fonts in Adobe apps** in **Settings → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [app folder](#turn-fonts-on-with-an-app) does, with the same graphite **App Folder** tag.
+You don’t have to look up a document before you open it. Turn on **Auto-activate fonts in Adobe apps** in **Preferences → General**, and when a document you open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero turns them on, and turns them off again when the app quits, as an [app folder](#turn-fonts-on-with-an-app) does, with the same graphite **App Folder** tag.
 
 - Cicero asks the app in front, twice a second, which fonts its open documents use. The first time, macOS asks whether Cicero may control InDesign, Illustrator or Photoshop; click **Allow**. To change your answer, go to **System Settings → Privacy & Security → Automation**.
 - The app’s Missing Fonts dialog still comes up as the document opens, since Cicero can only ask about a document once it’s open. Close it (**Skip** in InDesign, **Close** in Illustrator), and the text sets in the fonts. Photoshop shows none: its text layers look as they did when saved, and use the fonts once you edit them. Either way, the app can take a few seconds to take up the fonts.
@@ -249,7 +249,7 @@ A few rules:
 
 ## Open Cicero at login
 
-Turn on **Open at login** in **Settings → General**, or check **Open Cicero at login** in an app folder’s apps window.
+Turn on **Open at login** in **Preferences → General**, or check **Open Cicero at login** in an app folder’s apps window.
 
 - If macOS needs your approval, allow Cicero in **System Settings → General → Login Items**.
 - Cicero has to be in your Applications folder for this. If it isn’t, it offers to move there.

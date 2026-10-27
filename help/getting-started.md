@@ -30,7 +30,7 @@ Cicero looks for fonts in these places:
 
 Looking changes nothing: no font is turned on, off, copied or moved until you ask.
 
-The first time it opens, Cicero asks whether to classify your fonts automatically: the ones whose files don’t say what they are. Choose **Classify**, and it sorts them by the shapes of their letters and, with Apple Intelligence on macOS 26, by their names, on your Mac. Choose **Not Now**, and they stay Unclassified until you put them somewhere. You can change your mind with **Classify fonts automatically** in **Settings → General** (see [Classifications](organizing.md#classifications)).
+The first time it opens, Cicero asks whether to classify your fonts automatically: the ones whose files don’t say what they are. Choose **Classify**, and it sorts them by the shapes of their letters and, with Apple Intelligence on macOS 26, by their names, on your Mac. Choose **Not Now**, and they stay Unclassified until you put them somewhere. You can change your mind with **Classify fonts automatically** in **Preferences → General** (see [Classifications](organizing.md#classifications)).
 
 When a scan takes a moment, a small capsule at the bottom right says what Cicero is doing, like “Identifying fonts, 200 of 4,000”. Cicero reads each font file once and remembers what it found, so later scans are quick. Now and then an update to Cicero learns something new from each font, so it reads them all again once: your fonts stay in the window meanwhile, and the capsule says “Updating font details”. If you quit before it’s done, it goes on where it stopped.
 
@@ -65,7 +65,7 @@ You can add single font files too, without adding the folder they’re in:
 - Drag font files from the Finder onto Cicero’s window.
 - In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
 
-They’re listed where they are, under **Added Fonts**, without being activated. If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** in Settings → General, they’re copied or moved into your Fonts folder instead and turned on, and they’re in **All Fonts** like any font you’ve installed. See [Added Fonts](organizing.md#added-fonts).
+They’re listed where they are, under **Added Fonts**, without being activated. If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** in Preferences → General, they’re copied or moved into your Fonts folder instead and turned on, and they’re in **All Fonts** like any font you’ve installed. See [Added Fonts](organizing.md#added-fonts).
 
 If a file has fonts your library has already, from another file, like a newer version of one you installed, Cicero asks whether to skip it, add it as a copy or replace your copy with it. See [Fonts already in your library](organizing.md#fonts-already-in-your-library).
 
@@ -121,7 +121,7 @@ Cicero has an icon in the menu bar, the cube of its app icon. Click it to open C
 
 Closing Cicero’s windows doesn’t quit it, so app folders keep working.
 
-- To do without the icon, open **Settings → General** and turn off **Show Cicero in the menu bar**
+- To do without the icon, open **Preferences → General** and turn off **Show Cicero in the menu bar**
 - With the icon there, you can turn off **Show Cicero in the Dock**. Cicero is then in the Dock and the app switcher only while one of its windows is open
 
 ## Keep Cicero up to date
@@ -129,7 +129,7 @@ Closing Cicero’s windows doesn’t quit it, so app folders keep working.
 Cicero checks for new versions each time it opens and once a day while it stays open, and asks before it installs one.
 
 - To check now, choose **Cicero → Check for Updates**
-- To stop checking by itself, open **Settings → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
+- To stop checking by itself, open **Preferences → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
 
 Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). **Help → Release Notes** opens it, so you can see what changed in each version.
 

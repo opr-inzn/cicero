@@ -33,7 +33,7 @@ You can also:
 
 ### Choose which sets the sidebar shows
 
-Open **Settings → Coverage**. Each group lists its sets with a checkbox, a short description and the number of characters; uncheck the ones you don’t need. All of them are shown at first. Each group also links to where its sets come from.
+Open **Preferences → Coverage**. Each group lists its sets with a checkbox, a short description and the number of characters; uncheck the ones you don’t need. All of them are shown at first. Each group also links to where its sets come from.
 
 You can also hide sets with **Edit** in the sidebar, like any other item. See [Hide items you don’t use](organizing.md#hide-items-you-dont-use).
 
@@ -41,12 +41,12 @@ You can also hide sets with **Edit** in the sidebar, like any other item. See [H
 
 Make a set from the characters you need, like a client’s name or a language’s alphabet:
 
-1. Click **+** next to **Coverage** in the sidebar, or **+** next to **Your Coverage Sets** at the top of **Settings → Coverage**.
+1. Click **+** next to **Coverage** in the sidebar, or **+** next to **Your Coverage Sets** at the top of **Preferences → Coverage**.
 2. Give it a name.
 3. Under **Characters**, type or paste them. You can also use codes like `U+00C1` or `0x00C1`, and ranges like `U+0100–U+017F`. Spaces and line breaks don’t count, so you can use them to lay things out.
 4. Check the characters and their count under **Preview**, and click **Create**.
 
-Your sets appear under **Your Coverage Sets** in the sidebar. To change one, right-click it and choose **Edit Coverage Set**; to remove it, choose **Delete Coverage Set**. In **Settings → Coverage** you can right-click them too, or click **Edit**; the editor has a **Delete** button as well.
+Your sets appear under **Your Coverage Sets** in the sidebar. To change one, right-click it and choose **Edit Coverage Set**; to remove it, choose **Delete Coverage Set**. In **Preferences → Coverage** you can right-click them too, or click **Edit**; the editor has a **Delete** button as well.
 
 ## The Character Toolbox
 

@@ -6,13 +6,13 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - **Leading** now goes up to 200 %, down from 250 %.
 - The text cursor on a font page now fits the letters at any **Leading**. Before, it started halfway up the capitals when the lines were tight and reached far above them when they were loose.
-- **Leave the files where they are** in **Settings → General** is now **Leave files where they are**.
+- **Leave the files where they are** in **Preferences → General** is now **Leave files where they are**.
 - Turning off a font in your Fonts folder no longer moves its file. Cicero turns it off where it is, as Font Book does, and that goes for copies Cicero installed there too.
 - Fonts that earlier versions moved to Cicero’s Deactivated folder go back as Cicero opens, still off: into your Fonts folder, or into Cicero’s Library if Cicero installs fonts there.
 - **Clear Font Caches** no longer turns off the fonts Cicero uses where they are, like those in your locations, in Cicero’s Library or on in every app from Adobe’s folders.
 - Cicero’s Deactivated folder is now called Inactive, `~/Library/Application Support/Cicero/Inactive`. Cicero renames it as it opens.
 - The Info panel opens with the font’s details already in it, and shows them at once when you select a font while it’s open. Before, it slid in with spinners and the details faded in only after it had stopped, and selecting a font with nothing selected showed a spinner for a moment.
-- With **Ask each time** chosen in **Settings → General**, turning on a font that’s off in your Fonts folder or in Cicero’s Library no longer asks how to turn it on. It goes on where it is, as it did whichever you picked.
+- With **Ask each time** chosen in **Preferences → General**, turning on a font that’s off in your Fonts folder or in Cicero’s Library no longer asks how to turn it on. It goes on where it is, as it did whichever you picked.
 - When **Replace** puts a newer version of a font in the place of the one the Info panel shows, the panel shows the new version’s details. Before, it kept the old ones until you selected another font.
 
 ## 0.10.10
@@ -21,7 +21,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Hiding or showing the sidebar no longer rearranges the grid. The tiles keep their number and height, grow wider or narrower, and every font in them grows or shrinks with them, as when you open the Info panel. **Size** in Preview Options shows the size they’re drawn at.
 - The Info panel slides in and out like the sidebar, and the grid narrows and widens along with it. Before, it appeared and disappeared at once.
 - Cicero’s Library is no longer listed under **Locations**. Its fonts are in **All Fonts**, like those in your Fonts folder.
-- The Font Library is now called **Cicero’s Library**, in Settings and everywhere else.
+- The Font Library is now called **Cicero’s Library**, in Preferences and everywhere else.
 - The folder of Cicero’s Library is now `~/Cicero/Library`. Cicero moves it there from `~/Cicero/Font Library` as it opens, fonts and all, unless you put it somewhere else.
 
 ## 0.10.9
@@ -39,13 +39,13 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - The Character Toolbox’s text field keeps the focus as you type. It lost it whenever the list of fonts came or went: with the first letter typed, the last one deleted, and each letter while no font had every character.
 - Filters in the search field, like **Italic** or **Bold**, are tinted with your highlight color, the one selected text has, rather than grey. Choose it in System Settings → Appearance.
-- The search field stays dark when you switch Cicero to Dark in **Settings → General**. It turned light again half a second later and stayed light until the fonts scrolled.
+- The search field stays dark when you switch Cicero to Dark in **Preferences → General**. It turned light again half a second later and stayed light until the fonts scrolled.
 
 ## 0.10.6
 
 - Grid tiles no longer say **1 Weight**. A family of one style says **1 Style**, and one with a regular and an italic **2 Styles**, rather than **1 Weight · 2 Styles**.
 - In the sheet that **File → Import from FontExplorer X** shows, the line under **Font Library** gives just where it is and, in brackets, how many font files it has. The line under **Fonts in other folders** names the folders those fonts are in.
-- **Show fonts from Creative Cloud** in **Settings → General** says that Creative Cloud activates and deactivates Adobe Fonts, and Cicero can’t manage them.
+- **Show fonts from Creative Cloud** in **Preferences → General** says that Creative Cloud activates and deactivates Adobe Fonts, and Cicero can’t manage them.
 
 ## 0.10.5
 
@@ -73,11 +73,11 @@ Each version’s notes here become its release notes on the [releases page](http
 - Drag an item out of the sidebar to take it away, as in the Finder’s sidebar: once it’s outside, the pointer shows an ×. A location leaves your library, as with **Remove Location from Library**, a folder or tag is deleted, as with **Delete Folder** and **Delete Tag**, and any other item is hidden. **Undo** at the bottom of the window brings it back. Before, dragging an item out of the sidebar made Cicero quit unexpectedly.
 - An item you drag in the sidebar looks as it does in the Finder, its symbol in the same grey as its name. On macOS 26 the symbol was white.
 - Items you drag to a new place in the sidebar land at once. Before, the items below them slid up into place afterwards, cut off at their edges.
-- **All Fonts**, **Active** and **Inactive** can no longer be hidden from the sidebar: their checkboxes in **Edit** and **Settings → Sidebar** stay on, and their menus have no **Hide from Sidebar**. One you had hidden is back.
+- **All Fonts**, **Active** and **Inactive** can no longer be hidden from the sidebar: their checkboxes in **Edit** and **Preferences → Sidebar** stay on, and their menus have no **Hide from Sidebar**. One you had hidden is back.
 - Right-clicking one of several items selected in the sidebar now acts on all of them. **Delete Folders**, **Delete Tags**, **Delete Classifications**, **Delete Coverage Sets**, **Remove Locations from Library**, **Hide from Sidebar**, **Export Fonts**, a tag’s **Color** and a folder’s **Activate** and **Deactivate** take every selected item. Before, only the item you right-clicked was deleted or removed. Renaming and editing are for one item at a time, so they’re left out then.
 - On a font page, the **Size**, **Tracking** and **Leading** sliders take all the width beside the **Style** menu, and are as long as each other. Before, they stayed short, with empty space beside them. They stay beside the menu until they're at their narrowest, with symbols in place of their names when the names don't fit, as in a layout app's character panel, and only then go on a row of their own, which they fill to the right edge of the alignment buttons above.
 - **Preview Options** no longer have **Weight**. Previews show each family in its regular style, or the style you search for, like **bold** or **light**, which is how to see other weights now. A weight you had set is forgotten.
-- The Settings window is a little wider, and in **Settings → General** the menus for **Activate fonts by** and **When an added font is already in your library** are the same width.
+- The Preferences window is a little wider, and in **Preferences → General** the menus for **Activate fonts by** and **When an added font is already in your library** are the same width.
 
 ## 0.10.2
 
@@ -85,7 +85,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - On a font page, the **Size**, **Tracking** and **Leading** values sit right after their sliders, as close as the labels before them.
 - When a font page is too narrow for **Size**, **Tracking** and **Leading** beside the **Style** menu, they go on a row of their own at the left, under the menu. Before, they were at the right.
 - In the grid, every font is at the size you chose, also monospaced and other wide fonts: the tiles are as wide as the families listed need. Only the widest few are drawn a little smaller, and they grow and shrink with the rest as you change the size. Before, fonts wider than the Mac’s own stopped growing while the rest went on, until the tiles got fewer and bigger. With the Info panel open, every sample is a little smaller, all alike, rather than wide fonts being squeezed to the width of the rest, and **Size** in Preview Options shows the size they’re drawn at.
-- The fonts Adobe apps load from their own folders, where type designers put fonts to test them, are now called **Proofing**, in the sidebar and on their red tag. **Testing** read like trial fonts. The switch in **Settings → General** is now **Show fonts installed for proofing in Adobe apps**. A name you gave the item yourself stays.
+- The fonts Adobe apps load from their own folders, where type designers put fonts to test them, are now called **Proofing**, in the sidebar and on their red tag. **Testing** read like trial fonts. The switch in **Preferences → General** is now **Show fonts installed for proofing in Adobe apps**. A name you gave the item yourself stays.
 
 ## 0.10.1
 
@@ -93,7 +93,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## 0.10.0
 
-- In the sidebar, **Folders** is now called **Locations**, for the places on your Mac Cicero lists fonts from, and sets are now folders: **Sets** is called **Folders**, with a folder icon, smart sets are smart folders and application sets app folders. The menus say so too, like **File → New Folder** (⇧⌘N), **New Smart Folder**, **New App Folder** and **Add Location** (⇧⌘O), **Add to Folder** in a family’s menu, and **Settings → Locations**. In a smart folder’s rules, **Set** is now **Folder** and **Folder** is **Location**.
+- In the sidebar, **Folders** is now called **Locations**, for the places on your Mac Cicero lists fonts from, and sets are now folders: **Sets** is called **Folders**, with a folder icon, smart sets are smart folders and application sets app folders. The menus say so too, like **File → New Folder** (⇧⌘N), **New Smart Folder**, **New App Folder** and **Add Location** (⇧⌘O), **Add to Folder** in a family’s menu, and **Preferences → Locations**. In a smart folder’s rules, **Set** is now **Folder** and **Folder** is **Location**.
 - Search for a style, like **italic**, **bold** or **condensed**, and the previews show each family in that style, or the nearest one it has. Before, they showed the regular style. **bold italic** shows the bold italics, and a font page shows the style too while its **Style** is **Automatic**.
 - The search field has filters. Type **ital**, **bold**, **cond** or **fig**, say, and choose **Italic**, a weight from **Thin** to **Black**, **Condensed** or **Extended**, **Tabular Figures** or **Old-Style Figures** from the suggestions. Each one becomes a token in the field, and the families shown have all of them: with **Italic** and **Bold**, a bold italic. The previews show that style, and the figures you asked for. To know which figures your fonts have, Cicero reads them again once after the update; the window shows your fonts meanwhile.
 - The sidebar has **Recents**, under **Inactive**: the families with a font that arrived on your Mac in the last week, however it came, the latest first. Fonts you add together stay together, in alphabetical order, so the ones you just added are at the top. Fonts that come with macOS or an app don’t count.
@@ -104,7 +104,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Size** in Preview Options goes up to 200 pt instead of 160.
 - Turning a font off and on again keeps its **Date Added**. Before, Cicero moved the file to its Deactivated folder and back, which gave it the date of the move.
 - Cicero’s icon has new letters, C, 1 and 6 from Mischief, the typeface of Cicero’s website, on a bigger, brighter cube without a shadow, whose faces meet without light lines between them and whose letters stay sharp at small sizes, as in the Dock.
-- Cicero has an icon in the menu bar. Click it to open Cicero. Right-click it, or click it with two fingers, for a menu with the fonts that are on for open apps and until Cicero quits, your folders to turn on and off, **Add Fonts**, **Find Fonts in Current Document** (the one open in the app you’re in, like a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop), **Preferences** and **Quit Cicero**. Drop font files on it to add them, or a document to see the fonts it uses. Turn it off with **Show Cicero in the menu bar** in **Settings → General**.
+- Cicero has an icon in the menu bar. Click it to open Cicero. Right-click it, or click it with two fingers, for a menu with the fonts that are on for open apps and until Cicero quits, your folders to turn on and off, **Add Fonts**, **Find Fonts in Current Document** (the one open in the app you’re in, like a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop), **Preferences** and **Quit Cicero**. Drop font files on it to add them, or a document to see the fonts it uses. Turn it off with **Show Cicero in the menu bar** in **Preferences → General**.
 - Right-click Cicero’s icon in the Dock for its open windows, as other apps list theirs, and **Add Fonts**, as in the File menu. The **Window** menu lists the open windows too, and calls the main window **Library**. Add Fonts opens Cicero’s window too, so you see the fonts you add.
 - With the icon in the menu bar, **Show Cicero in the Dock** can be off: Cicero is then in the Dock only while one of its windows is open, and closing the last one takes you back to the app you were in.
 - App folders and the fonts Adobe documents use start working as Cicero opens, also when it opens without its window. Before, they waited for the window.
@@ -113,7 +113,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The **Fonts in Document** sheet has **Show in Library**, which shows the document’s fonts that are in your library in the main window, each set in itself, as **Show Similar Fonts** shows its list. **Done** in the bar above them takes you back.
 - The **Fonts in Document** sheet counts a document’s fonts as active and inactive, as the rest of Cicero does, rather than on and off: “12 fonts · 8 active · 2 inactive · 2 missing”.
 - In a smart folder’s **Kind** rule, the kinds are in alphabetical order: **Italic**, **Monospaced**, **Variable**.
-- **Keep installed fonts in Cicero’s Font Library** in **Settings → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
+- **Keep installed fonts in Cicero’s Font Library** in **Preferences → General** is now called **Install fonts into Cicero’s Font Library**, and says more plainly what it does: Cicero keeps the fonts it installs in a folder of its own instead of putting them into ~/Library/Fonts.
 
 ## 0.9.4
 
