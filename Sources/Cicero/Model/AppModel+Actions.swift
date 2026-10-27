@@ -188,11 +188,31 @@ extension AppModel {
         return "in “\(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent)”"
     }
 
-    /// The places Replace puts an added family: "in your Fonts folder and in Clients".
-    func replacedPlaces(_ duplicate: AddedDuplicate) -> String {
-        let places = duplicate.replacements.map { placeName(of: $0.old) }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+    /// Where the files Replace sends to the Trash for an added family are: "in your Fonts folder and in Clients".
+    func replacedPlaces(_ duplicate: AddedDuplicate) -> String { places(of: duplicate.replacements.map(\.old)) }
+
+    /// Where files are, each place once: "in your Fonts folder and in Clients".
+    func places(of paths: [String]) -> String {
+        let places = paths.map(placeName).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         guard places.count > 1 else { return places.first ?? "" }
         return places.dropLast().joined(separator: ", ") + " and " + places.last!
+    }
+
+    /// Cicero's copies that Replace just sends to the Trash for an added family, as its file in Cicero's Library takes the
+    /// added one (see `ActivationEngine.spareCopies`).
+    func spareCopies(_ duplicate: AddedDuplicate) -> [String] {
+        engine.spareCopies(among: duplicate.replacements, records: data.records).keys.sorted()
+    }
+
+    /// The sheet's warning for a family replaced in more than one place: "Replaces 2 files: in your Fonts folder and in
+    /// Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts folder goes to the Trash".
+    func replaceWarning(_ duplicate: AddedDuplicate) -> String {
+        let spare = spareCopies(duplicate)
+        let replaced = duplicate.replacements.map(\.old).filter { !spare.contains($0) }
+        let files = replaced.count == 1 ? "the file \(places(of: replaced))" : "\(replaced.count) files: \(places(of: replaced))"
+        guard !spare.isEmpty else { return "Replaces \(files)" }
+        let copies = spare.count == 1 ? "Cicero’s copy \(places(of: spare)) goes" : "Cicero’s copies \(places(of: spare)) go"
+        return "Replaces \(files), and \(copies) to the Trash"
     }
 
     /// Installing into the Font Library on or off. Off, its folder becomes one of the user's locations while it has fonts,
