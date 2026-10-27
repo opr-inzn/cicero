@@ -196,7 +196,7 @@ final class QuickLookPanel: NSPanel {
         // The title bar in the page's colour, so the name sits on the specimen.
         titlebarAppearsTransparent = true
         titlebarSeparatorStyle = .none
-        backgroundColor = .textBackgroundColor
+        backgroundColor = Self.page
         addTitleBar()
         NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: self, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateFillButton() }
@@ -205,6 +205,19 @@ final class QuickLookPanel: NSPanel {
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// The page's colour, under the title bar and the specimen alike: the text background's grey as an sRGB colour.
+    /// SwiftUI draws that grey as if it were sRGB, lighter in dark mode than AppKit draws it, and the title bar stood
+    /// out from the page.
+    static let page = NSColor(name: nil) { appearance in
+        var page = NSColor.textBackgroundColor
+        appearance.performAsCurrentDrawingAppearance {
+            if let grey = NSColor.textBackgroundColor.usingColorSpace(.genericGamma22Gray) {
+                page = NSColor(srgbRed: grey.whiteComponent, green: grey.whiteComponent, blue: grey.whiteComponent, alpha: grey.alphaComponent)
+            }
+        }
+        return page
+    }
 
     override var title: String {
         didSet { titleLabel.stringValue = title }
@@ -459,7 +472,7 @@ private struct FamilyQuickLook: View {
             .padding(.bottom, 8)
             .foregroundStyle(Color.ink)
         }
-        .background(Color.canvas)
+        .background(Color(nsColor: QuickLookPanel.page))
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
