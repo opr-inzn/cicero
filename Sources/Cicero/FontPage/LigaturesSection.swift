@@ -37,7 +37,7 @@ struct LigaturesSection: View {
                         .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
                 }
             } header: {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text(group.name).font(.headline)
                     Text("– \(group.ligatures.count.formatted())").font(.callout).foregroundStyle(.secondary)
                     Spacer()

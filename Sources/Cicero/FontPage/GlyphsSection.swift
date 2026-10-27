@@ -43,8 +43,12 @@ struct GlyphsSection: View {
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 24
-    /// The room above a labelled row, like a localized form's language, for its label.
-    static let labelRoom: CGFloat = 30
+    /// A labelled row's label, like a localized form's language: one line of callout text, right under the group's
+    /// title, or an empty line of it below the run before, and as far from its cells as the title is from its cells.
+    static let labelLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .callout)).rounded(.up)
+    static let labelGap: CGFloat = 4
+    /// Above a label after a run, which leaves `spacing` below its last row.
+    static let runGap = labelLine - spacing
     /// The size a cell's character, or ligature, is set at.
     static let glyphSize: CGFloat = 26
 
@@ -115,22 +119,25 @@ struct GlyphsSection: View {
             // A label goes over room above its row, not in a stack with it: rows in stacks of their own drew other
             // groups' rows in their place after a long jump down the page.
             ForEach(rows.indices, id: \.self) { row in
+                // Right under the group's title, a line clear of the run before; as close to its cells as the title is.
+                let above = row == 0 ? 0 : Self.runGap
                 glyphRow(rows[row].cells, style: style)
-                    .padding(.top, rows[row].label == nil ? 0 : Self.labelRoom)
+                    .padding(.top, rows[row].label == nil ? 0 : above + Self.labelLine + Self.labelGap)
                     .overlay(alignment: .topLeading) {
                         if let label = rows[row].label {
                             Text(label)
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
-                                .padding(.top, 4)
+                                .frame(height: Self.labelLine)
+                                .padding(.top, above)
                         }
                     }
                     .padding(.horizontal, Self.inset)
                     .padding(.bottom, row == rows.count - 1 ? 18 : Self.spacing)
             }
         } header: {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Text(section.title).font(.headline)
                 Text("– \(total.formatted())").font(.callout).foregroundStyle(.secondary)
                 Spacer()
