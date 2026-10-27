@@ -94,7 +94,7 @@ Search for a style, like **italic**, **bold**, **light** or **condensed bold**, 
 
 ### Filter by style and figures
 
-To narrow the search to a style or to figures, choose a filter from the suggestions as you type. Type **ital**, **bold**, **cond** or **fig**, say, and choose **Italic**, **Bold**, **Condensed**, **Tabular Figures** or **Old-Style Figures** under **Filters**. Type **weight** for all the weights, from **Thin** to **Black**, and **width** for **Condensed** and **Extended**. A filter goes into the search field as a token, next to what you type, and you can add more: **Italic** and **Bold** show the families that have a bold italic, in their bold italic. A second weight takes the place of the first. Delete a token to take its filter away.
+To narrow the search to a style, to figures or to variable fonts, choose a filter from the suggestions as you type. Type **ital**, **bold**, **cond**, **fig** or **var**, say, and choose **Italic**, **Bold**, **Condensed**, **Tabular Figures**, **Old-Style Figures** or **Variable** under **Filters**. Type **weight** for all the weights, from **Thin** to **Black**, and **width** for **Condensed** and **Extended**. A filter goes into the search field as a token, next to what you type, and you can add more: **Italic** and **Bold** show the families that have a bold italic, in their bold italic, and **Variable** and **Italic** those with a variable italic. A second weight takes the place of the first. Delete a token to take its filter away.
 
 Tabular figures are all as wide, for columns of numbers; old-style figures sit like lowercase letters, for numbers in text. A family has them when its figures are made like that, or when one of its features turns them on. With the filter, the previews show them.
 
