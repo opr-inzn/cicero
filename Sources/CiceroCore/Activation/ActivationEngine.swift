@@ -428,6 +428,14 @@ public struct ActivationEngine: Sendable {
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
+    /// Whether `activate` does the same with the face whatever the install method: it turns one from an app's own folder, a
+    /// Fonts folder or Cicero's Library on where it is, and moves one from the Inactive folder where turning it on puts it,
+    /// so there's nothing to ask.
+    public func ignoresInstallMethod(_ face: LibraryFace) -> Bool {
+        let path = face.face.path
+        return face.app != nil || isInsideFontsFolder(path) || isInFontLibrary(path) || isInInactiveFolder(path)
+    }
+
     /// Copies font files into ~/Library/Fonts and turns them on, as opening files the library doesn't have does when
     /// fonts are activated by copying. The originals stay where they are, out of the library; the copies stay in the
     /// Fonts folder when turned off. `moving`, as when fonts are activated by moving, they go (see `removeOriginals`).

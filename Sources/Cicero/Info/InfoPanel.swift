@@ -232,7 +232,7 @@ private struct InfoRows: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         // Read now unless the file would keep the panel waiting, as samples are drawn: well under a millisecond, and the
         // panel opens, or goes to another font, with the info in place rather than a moment of spinner.
-        .loading($info, for: face.id, cached: { [face = face.face] in
+        .loading($info, for: FileFace(face.face), cached: { [face = face.face] in
             CiceroCore.FontInfo.cached(face) ?? (FontLoader.shared.wouldWait(for: face.path) ? nil : CiceroCore.FontInfo.read(face))
         }) { [face = face.face] in
             await Task.detached(priority: .userInitiated) { CiceroCore.FontInfo.read(face) }.value
@@ -436,7 +436,7 @@ private struct FeatureControls: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .loading($loaded, for: face.id) { [face] in
+        .loading($loaded, for: FileFace(face)) { [face] in
             await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
         }
     }
@@ -486,6 +486,19 @@ private struct FeatureControls: View {
                 set(list)
             }
         )
+    }
+}
+
+/// A face as its file is now, which an Info panel row works out what it shows for: a file that changed, as Replace puts a
+/// newer version in under the same path, counts as another (see `FontLoader.generation(of:)`). By the face's ID alone, the
+/// panel went on showing the old version's details until another font was selected.
+struct FileFace: Hashable {
+    let id: FaceID
+    let generation: Int
+
+    init(_ face: FontFace) {
+        id = face.id
+        generation = FontLoader.shared.generation(of: face.path)
     }
 }
 
