@@ -507,6 +507,7 @@ private struct TesterText: View {
         let lineHeightPoints = size * preview.lineSpacing / 100
         let room = Self.room(for: text.wrappedValue, glyphs: shownGlyphs(glyphs.wrappedValue), in: font, kerning: kerning,
                              lineHeight: lineHeightPoints)
+        let lowered = Self.lowered(in: font, room: room)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
         SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
                      kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
@@ -514,7 +515,8 @@ private struct TesterText: View {
             FamilyMenu(families: [family], model: model)
         }
             .frame(minHeight: 280)
-            .padding(.vertical, 20)
+            .padding(.top, Self.padding + lowered)
+            .padding(.bottom, Self.padding - lowered)
             // Out over the page's margins, for glyphs reaching past the lines' ends, like a swash at the start of one.
             .padding(.horizontal, -24)
             // Around the text too, which has it in its own menu (see `SampleEditor`).
@@ -570,6 +572,26 @@ private struct TesterText: View {
         let fontAscent = CTFontGetAscent(font).rounded(), fontDescent = CTFontGetDescent(font).rounded()
         let raise = (lineHeight - fontAscent - fontDescent) / 2
         return (max(0, ascent - fontAscent - raise).rounded(.up), max(0, descent - fontDescent - raise).rounded(.up))
+    }
+
+    /// Above and below the text, between the controls and the styles.
+    static let padding: CGFloat = 20
+    /// From the end of the text to the capitals of the styles' title: `StyleRows`' room above it, its title row's, and
+    /// the title's own above its capitals.
+    static let titleBelow: CGFloat = 12 + 6 + 3
+
+    /// How far the text sits below the middle of its room, so that it looks in the middle between the controls and the
+    /// styles' title: its first line's capitals as far below the controls as its last line's baseline is above the
+    /// title. Each line sits in the middle of its height by the font's ascent and descent, so with a font whose ascent
+    /// ends at its capitals the text looked high, the more so as the title is further below it than the controls above.
+    /// No further than the padding either way, so the text never reaches the controls or the styles.
+    static func lowered(in font: CTFont, room: (above: CGFloat, below: CGFloat)) -> CGFloat {
+        let ascent = CTFontGetAscent(font).rounded(), descent = CTFontGetDescent(font).rounded()
+        let capHeight = CTFontGetCapHeight(font)
+        // A font that says nothing of its capitals, as if they were as far below its ascent as its descent goes.
+        let aboveCapitals = capHeight > 0 && capHeight <= ascent ? ascent - capHeight : descent
+        let lowered = (descent - aboveCapitals + room.below - room.above + titleBelow) / 2
+        return min(padding, max(-padding, lowered))
     }
 
     static let defaultText = "Sphinx of black quartz, judge my vow."
@@ -723,6 +745,7 @@ private struct StyleRows: View {
             Divider()
         }
         .padding(.horizontal, 24)
+        // Counted in where the type tester's text sits (`TesterText.titleBelow`).
         .padding(.top, 12)
     }
 

@@ -8,6 +8,8 @@ Each version’s notes here become its release notes on the [releases page](http
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
 - A font page’s **Styles** always show the family’s name, whatever the preview text.
 - **Variable** is a search filter: type **var** and choose it under **Filters** to list only variable fonts.
+- A font page’s **Leading** is exact for fonts with their own line gap. Before, 100 % could be as loose as 120 %.
+- A font page’s text sits in the middle between the controls and **Styles**, by its capitals and baseline, where it often looked high.
 
 ## 0.10.11
 
