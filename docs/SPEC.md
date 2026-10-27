@@ -397,12 +397,15 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   "Can’t be replaced: macOS, an app or Adobe Fonts keeps your copy."), starting, with Replace your copy chosen in Settings, at Replace your copy for every family it can be done for (`AddedDuplicate.startingChoice`), else at Replace your copy when the added one is
   newer (Add as a copy when replacing can't be done), else Skip it; with Replace your copy chosen for a family
   replaced in more than one place, an orange warning under it: "Replaces 2 files: in your Fonts folder and in Clients"
-  (`AppModel.placeName`); Choose for All (Replace your copy only where it can be done); Cancel adds nothing of the batch, Add adds everything
+  (`AppModel.placeName`), or, with Cicero's copy of it in a Fonts folder that just goes to the Trash
+  (`ActivationEngine.spareCopies`), "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts folder goes to
+  the Trash"; Choose for All (Replace your copy only where it can be done); Cancel adds nothing of the batch, Add adds everything
   else as usual. The setting can instead always Add as a copy (as before), Skip it, or Replace your copy;
   with Replace, a batch with a family it can't be done for shows the sheet, and one with a family replaced in more
   than one place first an alert (`replacePrompt`): "Replace Helvetica in 2 Places?" / "Replace Fonts in More Than One
   Place?", "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one
-  takes its place.", Replace (default), Choose for Each… (the sheet), Cancel. Saved choices from before ("useAdded",
+  takes its place." (with such a copy: "…goes to the Trash. The added one takes the place of each, except Cicero’s copy of
+  Helvetica in your Fonts folder: Helvetica is off, so the one in Cicero’s Library is enough."), Replace (default), Choose for Each… (the sheet), Cancel. Saved choices from before ("useAdded",
   which turned the library's copy off, and "keepNewer") read as Ask, so nothing goes to the Trash unchosen. Skipped: a
   file only of skipped families stays out, the browser shows the library's copies, and the toast says "Skipped
   Helvetica, already in your library" / "Skipped 3 families already in your library". Replace

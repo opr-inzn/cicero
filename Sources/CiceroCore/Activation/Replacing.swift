@@ -20,6 +20,7 @@ extension ActivationEngine {
         let persistent = olds.filter { records.inPlace.contains($0) || isInsideUserFonts($0) && registrar.isActive(Self.url($0)) }
         let session = olds.filter { records.temporary[$0] != nil }
         let off = Set(olds.filter { isInsideFontsFolder($0) && records.temporary[$0] == nil && !registrar.isActive(Self.url($0)) })
+        let spareCopies = spareCopies(among: replacements, records: records)
         var records = records
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
@@ -32,12 +33,10 @@ extension ActivationEngine {
         // Staged copy → the replacement it's for, of those that go in off, into a Fonts folder or Cicero's Library.
         var goingInOff: [String: FileReplacement] = [:]
         var intoLibrary: [String: FileReplacement] = [:]
-        // Off copies whose originals in Cicero's Library take the added file: with fonts installed there, nothing goes in
-        // for them, or the library would have the font twice.
+        // Copies nothing goes in for (see `spareCopies`), with their originals.
         var spare: [(replacement: FileReplacement, original: String)] = []
         for replacement in replacements {
-            if off.contains(replacement.old), installsIntoFontLibrary, let original = records.installedCopies[replacement.old],
-               isInFontLibrary(original), olds.contains(original) {
+            if let original = spareCopies[replacement.old] {
                 spare.append((replacement, original))
                 continue
             }
@@ -130,6 +129,20 @@ extension ActivationEngine {
         result.placed = placed
         result.renameLater = renameLater
         return result
+    }
+
+    /// The copies Replace just sends to the Trash, each with its original: with fonts installed into Cicero's Library, ones
+    /// Cicero installed in a Fonts folder that are off, whose originals in Cicero's Library take the added file too.
+    /// Nothing goes in for them, or the library would have the font twice; the original is the font.
+    public func spareCopies(among replacements: [FileReplacement], records: ActivationRecords) -> [String: String] {
+        guard installsIntoFontLibrary else { return [:] }
+        let olds = Set(replacements.map(\.old))
+        var spare: [String: String] = [:]
+        for old in olds where isInsideFontsFolder(old) && records.temporary[old] == nil && !registrar.isActive(Self.url(old)) {
+            guard let original = records.installedCopies[old], isInFontLibrary(original), olds.contains(original) else { continue }
+            spare[old] = original
+        }
+        return spare
     }
 
     /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement). macOS keeps a

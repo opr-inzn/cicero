@@ -81,7 +81,7 @@ struct DuplicatesSheet: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } else if choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) == .replace, duplicate.replacesSeveralCopies {
-                    Label("Replaces \(duplicate.replacements.count) files: \(model.replacedPlaces(duplicate))", systemImage: "exclamationmark.triangle.fill")
+                    Label(model.replaceWarning(duplicate), systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
                         .foregroundStyle(.orange)
                 }

@@ -239,11 +239,21 @@ private struct ReplaceAlerts: ViewModifier {
     }
 
     /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
+    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…goes to the Trash. The added one takes the place
+    /// of each, except Cicero’s copy of Helvetica in your Fonts folder: Helvetica is off, so the one in Cicero’s Library is
+    /// enough."
     private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
         let several = prompt.duplicates.filter(\.replacesSeveralCopies)
         var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
         if several.count > 3 { lines.append("And \(several.count - 3) more.") }
-        return (lines + ["Each of these files goes to the Trash, and the added one takes its place."]).joined(separator: " ")
+        let spare = several.map { ($0.family, model.spareCopies($0).count) }.filter { $0.1 > 0 }
+        guard !spare.isEmpty else { return (lines + ["Each of these files goes to the Trash, and the added one takes its place."]).joined(separator: " ") }
+        let families = spare.map(\.0)
+        let off = families.count == 1 ? "\(families[0]) is off" : "they’re off"
+        let except = spare.reduce(0) { $0 + $1.1 } == 1
+            ? "Cicero’s copy of \(families[0]) in your Fonts folder: \(off), so the one in Cicero’s Library is enough."
+            : "Cicero’s copies of \(Self.list(families)) in your Fonts folder: \(off), so the ones in Cicero’s Library are enough."
+        return (lines + ["Each of these files goes to the Trash. The added one takes the place of each, except " + except]).joined(separator: " ")
     }
 }
 
