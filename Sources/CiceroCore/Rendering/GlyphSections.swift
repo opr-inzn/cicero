@@ -185,8 +185,9 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .decimalNumber:
             return .proportionalFigures
         case .mathSymbol:
-            // The vertical line is typed as punctuation, with the broken bar.
-            return value == 0x7C ? .punctuationAndSymbols : .mathematicalOperators
+            // The vertical line is typed as punctuation, with the broken bar; the shapes Unicode calls math signs, like ▷,
+            // ◁ and ◻, with the other shapes, as Glyphs has them.
+            return value == 0x7C || block == "Geometric Shapes" ? .punctuationAndSymbols : .mathematicalOperators
         // %, ‰ and ‱ with the operators, as Glyphs has them.
         case .otherPunctuation where [0x25, 0x2030, 0x2031].contains(value):
             return .mathematicalOperators

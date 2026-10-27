@@ -7,7 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Glyphs** lists accented letters and small caps alphabetically by glyph name, with letters like ɛ, ɔ and ʌ among the e’s, o’s and v’s.
 - **Greek** and **Cyrillic** list capitals first, then lowercase letters, then punctuation and accents.
 - Punctuation, symbols and operators come in a type designer’s order: . , : ; first, then dashes, brackets in pairs and quotes. Case-sensitive forms are in the same order.
-- %, ‰ and ^ are with the operators now, `` ` `` with the accents, the florin ƒ with the currency signs and the micro sign µ with the symbols.
+- %, ‰ and ^ are with the operators now, `` ` `` with the accents, the florin ƒ with the currency signs, the micro sign µ with the symbols, and ▷ and ◁ with the other triangles.
 - **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
 - **Forget All** in Conflicts forgets every missing file at once.
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
