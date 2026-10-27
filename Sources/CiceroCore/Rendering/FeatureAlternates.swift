@@ -24,8 +24,9 @@ public enum FeatureAlternates {
     public static let limit = 3000
 
     /// The features that offer another design of a character, in the order a character's alternates are listed. Those
-    /// that shape a script, set vertical text or the forms of East Asian characters are left out, and so are those
-    /// with groups of their own (`FeatureGlyph`) and the ligatures'.
+    /// that shape a script, set vertical text or the forms of East Asian characters are left out, but for the forms by
+    /// place in a word that a Latin font can have too, and so are those with groups of their own (`FeatureGlyph`) and
+    /// the ligatures'.
     static func rank(of tag: String) -> Int? {
         func numbered(_ prefix: String, through last: Int) -> Bool {
             tag.hasPrefix(prefix) && Int(tag.dropFirst(2)).map { (1...last).contains($0) } == true
@@ -39,6 +40,11 @@ public enum FeatureAlternates {
         case "c2pc": return 5
         case "onum", "lnum", "pnum", "zero": return 6
         case "titl", "hist", "calt", "rand", "nalt", "ornm", "jalt": return 7
+        // A Latin font's forms for the start, middle and end of a word, and for a letter alone (see `positional`).
+        case "init": return 8
+        case "medi": return 9
+        case "fina": return 10
+        case "isol": return 11
         default: return nil
         }
     }
@@ -56,8 +62,19 @@ public enum FeatureAlternates {
                        names: names(in: font))
     }
 
+    /// Forms by place in a word: alternates for a Latin font's letters, figures or signs, but how a script like Arabic
+    /// joins its letters, so not for those of a script with a group of its own.
+    static let positional: Set<String> = ["init", "medi", "fina", "isol"]
+
     static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32], excluding: Set<CGGlyph>,
                         names: [String: String]) -> [UInt32: [FeatureAlternate]] {
+        var inScript: [UInt32: Bool] = [:]
+        func isInScript(_ character: UInt32) -> Bool {
+            if let known = inScript[character] { return known }
+            let found = GlyphGroup.of(character)?.isScript ?? false
+            inScript[character] = found
+            return found
+        }
         var order: [CGGlyph] = []
         var drawnFor: [CGGlyph: UInt32] = [:]
         var tags: [CGGlyph: [String]] = [:]
@@ -65,7 +82,8 @@ public enum FeatureAlternates {
         for feature in features {
             for entry in found[feature] ?? [] {
                 guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
-                      characters[entry.glyph] == nil, !excluding.contains(entry.glyph)
+                      characters[entry.glyph] == nil, !excluding.contains(entry.glyph),
+                      !positional.contains(feature) || !isInScript(character)
                 else { continue }
                 if let first = drawnFor[entry.glyph] {
                     // Another feature that draws it for the same character.
@@ -125,6 +143,7 @@ public enum FeatureAlternates {
         "onum": "Old-Style Figures", "lnum": "Lining Figures", "pnum": "Proportional Figures", "zero": "Slashed Zero",
         "titl": "Titling Alternates", "hist": "Historical Forms", "calt": "Contextual Alternates", "rand": "Randomize",
         "nalt": "Alternate Annotation Forms", "ornm": "Ornaments", "jalt": "Justification Alternates",
-        "locl": "Localized Forms", "tnum": "Tabular Figures",
+        "locl": "Localized Forms", "tnum": "Tabular Figures", "init": "Initial Forms", "medi": "Medial Forms",
+        "fina": "Terminal Forms", "isol": "Isolated Forms",
     ]
 }

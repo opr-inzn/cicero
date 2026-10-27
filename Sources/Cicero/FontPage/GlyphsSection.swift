@@ -188,8 +188,10 @@ struct GlyphsSection: View {
                 // The glyph has no code of its own: what's copied is the character, which the font draws like this
                 // where the feature is on.
                 VStack {
+                    // A localized form in text of its language, any other with its features on.
+                    let drawn = glyph.feature == "locl" ? "in \(glyph.featureName) text" : "with \(glyph.featureNames.formatted(.list(type: .and))) on"
                     Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(glyph.character), shown: Self.shown(glyph.character)) }
-                        .help("Copies “\(Self.text(glyph.character))”, which this font draws like this with \(glyph.featureNames.formatted(.list(type: .and))) on")
+                        .help("Copies “\(Self.text(glyph.character))”, which this font draws like this \(drawn)")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())

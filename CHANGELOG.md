@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language.
+- **Glyphs** lists Roman numerals in a group of their own, after the figures, and a Latin font’s forms for the start and end of a word among the alternates.
 - A font page’s **Glyphs** lists small capitals in a group of their own, **Small Caps**, right after the letters, each followed by its alternates, like a stylistic set’s or a Turkish one. Before, they followed their letters as alternates, and their own alternates weren’t listed.
 - **Leading** now goes up to 200 %, down from 250 %.
 - The text cursor on a font page now fits the letters at any **Leading**. Before, it started halfway up the capitals when the lines were tight and reached far above them when they were loose.
