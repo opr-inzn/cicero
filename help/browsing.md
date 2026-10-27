@@ -138,7 +138,7 @@ Press Space, or choose **Fonts → Quick Look** (⌘Y), to see the selected fami
 
 ## Open a font page
 
-Double-click a family, or select it and press ↩ or ⌘↓ (**Fonts → Open**). The font page opens over the browser. To go back, press Esc or click the back button in the toolbar.
+Double-click a family, or select it and press ↩, ⌘O or ⌘↓ (**Fonts → Open**). The font page opens over the browser. To go back, press Esc or click the back button in the toolbar.
 
 From top to bottom, a font page has:
 

@@ -7,7 +7,7 @@
 | Shortcut | Command |
 | --- | --- |
 | ⌘, | **Cicero → Preferences** |
-| ⌘O | **File → Add Fonts** |
+| ⌘O | **File → Add Fonts** (no family selected) |
 | ⇧⌘O | **File → Add Location** |
 | ⇧⌘N | **File → New Folder** |
 | ⌥⌘N | **File → New Smart Folder** |
@@ -18,7 +18,7 @@
 | ⌥⌘↩ | **Fonts → Activate Temporarily** |
 | ⌫ | **Fonts → Deactivate** |
 | ⌘Y | **Fonts → Quick Look** |
-| ⌘↓ | **Fonts → Open** (one family selected) |
+| ⌘O or ⌘↓ | **Fonts → Open** (one family selected) |
 | ⌘I | **Fonts → Show Info** |
 | ⇧⌘R | **Fonts → Reveal in Finder** |
 | ⌘⌫ | **Fonts → Move to Trash** |
