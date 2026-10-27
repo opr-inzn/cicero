@@ -99,6 +99,26 @@ public struct LigatureGroup: Identifiable, Sendable {
     /// The character each needed glyph is drawn for: the lowest one when several share a glyph.
     static func characterGlyphs(of font: CTFont, needed: Set<CGGlyph>) -> [CGGlyph: UInt32] {
         var result: [CGGlyph: UInt32] = [:]
+        forEachCharacter(of: font) { scalar, glyph in
+            if needed.contains(glyph), result[glyph] == nil { result[glyph] = scalar }
+            return result.count < needed.count
+        }
+        return result
+    }
+
+    /// Every character each needed glyph is drawn for, in code point order, like the Latin ĸ and the Cyrillic к of a
+    /// font that draws them alike.
+    static func allCharacters(of font: CTFont, needed: Set<CGGlyph>) -> [CGGlyph: [UInt32]] {
+        var result: [CGGlyph: [UInt32]] = [:]
+        forEachCharacter(of: font) { scalar, glyph in
+            if needed.contains(glyph) { result[glyph, default: []].append(scalar) }
+            return true
+        }
+        return result
+    }
+
+    /// The font's characters and their glyphs, in code point order, while `body` says to go on.
+    private static func forEachCharacter(of font: CTFont, _ body: (UInt32, CGGlyph) -> Bool) {
         var units: [UniChar] = [0, 0]
         var glyphs: [CGGlyph] = [0, 0]
         for range in ScalarRanges(characterSet: CTFontCopyCharacterSet(font)).ranges {
@@ -114,14 +134,9 @@ public struct LigatureGroup: Identifiable, Sendable {
                     count = 2
                 }
                 guard CTFontGetGlyphsForCharacters(font, units, &glyphs, count) else { continue }
-                let glyph = glyphs[0]
-                if needed.contains(glyph), result[glyph] == nil {
-                    result[glyph] = scalar
-                    if result.count == needed.count { return result }
-                }
+                if !body(scalar, glyphs[0]) { return }
             }
         }
-        return result
     }
 }
 
@@ -158,6 +173,46 @@ enum GSUBSubstitutions {
             }
         }
         return result.filter { !$0.value.isEmpty }
+    }
+
+    /// A feature's substitutions by the languages its records are for, by their OpenType tags, like ["TRK", "AZE"], as
+    /// the script list's language systems name them: a font's localized forms. Records only a script's default
+    /// language system lists, which are on for every language, are left out.
+    static func readByLanguage(_ table: Data, feature tag: String) -> [(languages: [String], entries: [Entry])] {
+        let reader = Reader(bytes: [UInt8](table))
+        guard let scriptList = reader.u16(4), let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [] }
+        // Feature index → the languages whose language systems list it.
+        var languages: [Int: [String]] = [:]
+        for script in 0..<(reader.u16(scriptList) ?? 0) {
+            guard let offset = reader.u16(scriptList + 2 + script * 6 + 4) else { continue }
+            let start = scriptList + offset
+            for system in 0..<(reader.u16(start + 2) ?? 0) {
+                let at = start + 4 + system * 6
+                guard let language = reader.tag(at)?.trimmingCharacters(in: .whitespaces), let offset = reader.u16(at + 4) else { continue }
+                let langSys = start + offset
+                // Lookup order (reserved), then the required feature's index, then the others'.
+                let required = reader.u16(langSys + 2).flatMap { $0 == 0xFFFF ? nil : $0 }
+                let indices = (0..<(reader.u16(langSys + 4) ?? 0)).compactMap { reader.u16(langSys + 6 + $0 * 2) }
+                for index in (required.map { [$0] } ?? []) + indices where !languages[index, default: []].contains(language) {
+                    languages[index, default: []].append(language)
+                }
+            }
+        }
+        let lookups = Lookups(reader: reader, list: lookupList)
+        var result: [(languages: [String], entries: [Entry])] = []
+        for record in 0..<(reader.u16(featureList) ?? 0) {
+            let at = featureList + 2 + record * 6
+            guard reader.tag(at) == tag, let names = languages[record], let offset = reader.u16(at + 4) else { continue }
+            let feature = featureList + offset
+            var entries: [Entry] = []
+            for index in 0..<(reader.u16(feature + 2) ?? 0) {
+                guard let lookup = reader.u16(feature + 4 + index * 2) else { continue }
+                var visited = Set<Int>()
+                entries += lookups.ligatures(in: lookup, visited: &visited)
+            }
+            if !entries.isEmpty { result.append((names, entries)) }
+        }
+        return result
     }
 
     private struct Lookups {
@@ -365,15 +420,18 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// Whether it's an alternate of another of these glyphs, like a stylistic set's small capital a of the small
     /// capital a: listed after it, marked as an alternate.
     public let isAlternate: Bool
+    /// The languages a localized form is for, by their OpenType tags, like ["SRB", "MKD"].
+    public let languages: [String]
 
     public init(glyph: CGGlyph, character: UInt32, feature: String, alongWith: [String] = [], alongWithNames: [String]? = nil,
-                isAlternate: Bool = false) {
+                isAlternate: Bool = false, languages: [String] = []) {
         self.glyph = glyph
         self.character = character
         self.feature = feature
         self.alongWith = alongWith
         self.alongWithNames = alongWithNames ?? alongWith.map { FeatureAlternates.name(of: $0, in: [:]) }
         self.isAlternate = isAlternate
+        self.languages = languages
     }
 
     /// The features read for the font page's glyphs, in the order it lists their glyphs, with their names and the
@@ -383,10 +441,14 @@ public struct FeatureGlyph: Hashable, Sendable {
         ("tnum", "Tabular Figures", .tabularFigures),
         ("sups", "Superscript", .superscripts), ("subs", "Subscript", .subscripts), ("sinf", "Scientific Inferiors", .subscripts),
         ("numr", "Numerators", .numerators), ("dnom", "Denominators", .denominators), ("ordn", "Ordinals", .ordinals),
-        ("case", "Case-Sensitive Forms", .caseSensitiveForms),
+        ("case", "Case-Sensitive Forms", .caseSensitiveForms), ("locl", "Localized Forms", .localizedForms),
     ]
 
-    public var featureName: String { Self.features.first { $0.tag == feature }?.name ?? feature }
+    /// The feature's name, or for a localized form the languages it's for, like "Serbian and Macedonian".
+    public var featureName: String {
+        if feature == "locl", !languages.isEmpty { return OpenTypeLanguages.names(of: languages) }
+        return Self.features.first { $0.tag == feature }?.name ?? feature
+    }
     /// Its feature's tag and those it takes along with it, and their names, in the same order.
     public var featureTags: [String] { [feature] + alongWith }
     public var featureNames: [String] { [featureName] + alongWithNames }
@@ -396,9 +458,10 @@ public struct FeatureGlyph: Hashable, Sendable {
     public static let limit = 3000
 
     /// The face's glyphs that only those features draw, each once, by feature, then character, but the small capitals
-    /// first, in their letters' order (see `smallCapOrder`), each followed by its alternates (see `smallCapAlternates`);
-    /// a glyph a character has too, like a superscript two the font maps U+00B2 to, is left to the character, and
-    /// accents' case-sensitive forms are left out. Reads the font's GSUB table; call off the main thread.
+    /// first, in their letters' order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`),
+    /// and the localized forms by language (see `localizedForms`); a glyph a character has too, like a superscript two
+    /// the font maps U+00B2 to, is left to the character, and accents' case-sensitive forms are left out. Reads the font's
+    /// GSUB table; call off the main thread.
     public static func read(_ face: FontFace) -> [FeatureGlyph] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
@@ -407,7 +470,11 @@ public struct FeatureGlyph: Hashable, Sendable {
             .mapValues { $0.filter { $0.components.count == 1 } }
         let glyphs = Set(found.values.flatMap { $0.flatMap { [$0.glyph] + $0.components } })
         guard !glyphs.isEmpty else { return [] }
-        return resolve(found, characters: LigatureGroup.characterGlyphs(of: font, needed: glyphs), names: FeatureAlternates.names(in: font))
+        let localized = found["locl"] == nil ? [] : GSUBSubstitutions.readByLanguage(table, feature: "locl")
+            .map { (languages: $0.languages, entries: $0.entries.filter { $0.components.count == 1 }) }
+        let shared = localized.isEmpty ? [:] : LigatureGroup.allCharacters(of: font, needed: Set(localized.flatMap { $0.entries.compactMap(\.components.first) }))
+        return resolve(found, characters: LigatureGroup.characterGlyphs(of: font, needed: glyphs), names: FeatureAlternates.names(in: font),
+                       localized: localized, shared: shared)
     }
 
     /// The features whose glyphs for small capitals are small capitals too: those that offer alternates, like a stylistic
@@ -427,10 +494,18 @@ public struct FeatureGlyph: Hashable, Sendable {
     static let figureStyles = ["onum", "lnum", "zero"]
 
     static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32],
-                        names: [String: String] = [:]) -> [FeatureGlyph] {
+                        names: [String: String] = [:],
+                        localized: [(languages: [String], entries: [GSUBSubstitutions.Entry])] = [],
+                        shared: [CGGlyph: [UInt32]] = [:]) -> [FeatureGlyph] {
         var seen = Set<CGGlyph>()
         var result: [FeatureGlyph] = []
         for feature in features {
+            if feature.tag == "locl" {
+                for glyph in localizedForms(localized, characters: characters, shared: shared) where result.count < limit && seen.insert(glyph.glyph).inserted {
+                    result.append(glyph)
+                }
+                continue
+            }
             let entries = (found[feature.tag] ?? []).compactMap { entry -> FeatureGlyph? in
                 guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
                       characters[entry.glyph] == nil || feature.group == .smallCaps && isPrivateUse(characters[entry.glyph]!)
@@ -458,9 +533,48 @@ public struct FeatureGlyph: Hashable, Sendable {
             result.append(alternate)
             if let of { after[of, default: []].append(alternate) } else { blocks.append([alternate]) }
         }
-        let ordered = blocks.map { (order: smallCapOrder(of: $0[0].character), then: ($0[0].isAlternate ? 1 : 0, $0[0].glyph), block: $0) }
+        let ordered = blocks.map { (order: letterOrder(of: $0[0].character), then: ($0[0].isAlternate ? 1 : 0, $0[0].glyph), block: $0) }
             .sorted { $0.order != $1.order ? $0.order < $1.order : $0.then < $1.then }
         return ordered.flatMap { $0.block + (after[$0.block[0].glyph] ?? []) } + result.filter { $0.group != .smallCaps }
+    }
+
+    /// A font's localized forms, each once, for the languages of every record of the feature that draws it for the same
+    /// character, in a run for each of those, the runs of Latin letters first, then by the script of their first
+    /// character, then the languages' names; each in its letters' order (see `letterOrder`). Records that draw the same
+    /// form for another character, and glyphs a character has too, like the ș Romanian's draw for ş, are left out. A
+    /// glyph several characters share, in `shared`, is the one of the script most of its record's are in: a Bulgarian
+    /// к, not the Latin ĸ a font draws like it.
+    static func localizedForms(_ localized: [(languages: [String], entries: [GSUBSubstitutions.Entry])],
+                               characters: [CGGlyph: UInt32], shared: [CGGlyph: [UInt32]] = [:]) -> [FeatureGlyph] {
+        var order: [CGGlyph] = []
+        var forms: [CGGlyph: (character: UInt32, languages: [String])] = [:]
+        for (languages, entries) in localized {
+            let scripts = entries.compactMap { $0.components.first.flatMap { characters[$0] }.flatMap(UnicodeScripts.script(of:)) }
+            let main = Dictionary(grouping: scripts, by: { $0 }).max { ($0.value.count, $1.key) < ($1.value.count, $0.key) }?.key
+            for entry in entries {
+                guard let input = entry.components.first, var character = characters[input], entry.glyph != input,
+                      characters[entry.glyph] == nil
+                else { continue }
+                if let main, UnicodeScripts.script(of: character) != main,
+                   let other = shared[input]?.first(where: { UnicodeScripts.script(of: $0) == main }) {
+                    character = other
+                }
+                if let form = forms[entry.glyph] {
+                    guard form.character == character else { continue }
+                    forms[entry.glyph]!.languages += languages.filter { !form.languages.contains($0) }
+                } else {
+                    order.append(entry.glyph)
+                    forms[entry.glyph] = (character, languages)
+                }
+            }
+        }
+        let glyphs = order.map { FeatureGlyph(glyph: $0, character: forms[$0]!.character, feature: "locl", languages: forms[$0]!.languages) }
+        let runs = Dictionary(grouping: glyphs, by: \.languages).values.map { run in
+            let sorted = run.map { (order: letterOrder(of: $0.character), glyph: $0) }
+                .sorted { $0.order != $1.order ? $0.order < $1.order : $0.glyph.glyph < $1.glyph.glyph }.map(\.glyph)
+            return (script: letterOrder(of: sorted[0].character).0, name: OpenTypeLanguages.names(of: sorted[0].languages), glyphs: sorted)
+        }
+        return runs.sorted { ($0.script, $0.name) < ($1.script, $1.name) }.flatMap(\.glyphs)
     }
 
     /// The small capitals other features draw, with the one each is an alternate of, if any: a stylistic set's small
@@ -555,7 +669,7 @@ public struct FeatureGlyph: Hashable, Sendable {
         }
         // Stylistic alternates, sets and character variants, then swashes and so on, then the forms for a language, like
         // FeatureAlternates.rank has them; each by its tags, then glyph.
-        func order(_ glyph: FeatureGlyph) -> [Int] { glyph.alongWith.map { FeatureAlternates.rank(of: $0) ?? ($0 == "locl" ? 8 : 9) } }
+        func order(_ glyph: FeatureGlyph) -> [Int] { glyph.alongWith.map { FeatureAlternates.rank(of: $0) ?? ($0 == "locl" ? 20 : 21) } }
         return alternates.sorted { a, b in
             let (x, y) = (order(a.0), order(b.0))
             if x != y { return x.lexicographicallyPrecedes(y) }
@@ -564,18 +678,37 @@ public struct FeatureGlyph: Hashable, Sendable {
         }
     }
 
-    /// Where a small capital goes in its group: where its letter goes on the page, a capital's where its lowercase
-    /// letter does, whichever feature draws it, so a and A's are together, from A to Z, then the accented ones, a
-    /// capital İ's among them, then figures and signs.
-    static func smallCapOrder(of character: UInt32) -> (GlyphGroup, UInt32, UInt32) {
+    /// Where a small capital or localized form goes in its group: letter by letter, each with its accented forms and the letters drawn
+    /// from it (see `baseLetter`), in code point order after it, a capital's after its lowercase letter's, whichever
+    /// feature draws it: a, A's, à, á and the other a's, æ, then b, and a capital İ's among the i's; then figures and signs.
+    static func letterOrder(of character: UInt32) -> (GlyphGroup, UInt32, Int, UInt32, Int, UInt32) {
         let group: GlyphGroup = switch GlyphGroup.of(character) ?? .graphical {
-        case .uppercase: .lowercase
-        case .uppercaseAccents: .lowercaseAccents
+        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents: .lowercase
         case let other: other
         }
-        let lowercase = Unicode.Scalar(character).map { Array(String(Character($0)).lowercased().unicodeScalars) } ?? []
-        return (group, lowercase.count == 1 ? lowercase[0].value : character, character)
+        guard let scalar = Unicode.Scalar(character) else { return (group, character, 0, character, 0, character) }
+        let lowercase = Array(String(Character(scalar)).lowercased().unicodeScalars)
+        let letter = lowercase.count == 1 ? lowercase[0].value : character
+        let base = scalar.properties.isAlphabetic ? baseLetter(of: lowercase) : letter
+        return (group, base, letter == base ? 0 : 1, letter, character == letter ? 0 : 1, character)
     }
+
+    /// The letter a lowercase one is a form of: the one under its accents, like the a of à and ǻ, the first of those it's
+    /// made of, like the i of ĳ, or for one Unicode doesn't take apart, the one it's drawn from, like the a of æ and ǽ,
+    /// the d of ð and the o of œ. Another script's, like the α of ά, the same way.
+    static func baseLetter(of lowercase: [Unicode.Scalar]) -> UInt32 {
+        let parts = String(String.UnicodeScalarView(lowercase)).decomposedStringWithCompatibilityMapping.unicodeScalars
+        if let latin = parts.first(where: { (0x61...0x7A).contains($0.value) }) { return latin.value }
+        guard let first = parts.first?.value else { return 0 }
+        return drawnFrom[first] ?? first
+    }
+
+    /// æ and ɑ, ð and đ, ə and ǝ, ƒ, ɡ, ħ, ı, ȷ, ĸ, ł, ŋ, ø and œ, ß, þ and ŧ.
+    private static let drawnFrom: [UInt32: UInt32] = [
+        0xE6: 0x61, 0x251: 0x61, 0xF0: 0x64, 0x111: 0x64, 0x259: 0x65, 0x1DD: 0x65, 0x192: 0x66, 0x261: 0x67, 0x127: 0x68,
+        0x131: 0x69, 0x237: 0x6A, 0x138: 0x6B, 0x142: 0x6C, 0x14B: 0x6E, 0xF8: 0x6F, 0x153: 0x6F, 0xDF: 0x73, 0xFE: 0x74,
+        0x167: 0x74,
+    ]
 
     /// Tabular figures in another style, like old-style ones, by style, then character: glyphs of their own (a
     /// zero.osf.tf, New York's zero.onum.tnum) that neither feature draws for a character alone. Tabular Figures draws

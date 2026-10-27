@@ -2,18 +2,19 @@ import CoreText
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the small
-/// capitals its features draw for them, the figures, then punctuation, which any text has, before currency and the
-/// other signs, then each other script, Greek first, as Unicode lists them, then what's in no script, like the
-/// private-use glyphs, and last the accents and marks, which have no letter to sit on and are looked for least. A font without Latin letters starts with its scripts (see
-/// `GlyphSection.sections`).
+/// capitals its features draw for them, the figures, Roman numerals among them, then punctuation, which any text has,
+/// before currency and the other signs, then each other script, Greek first, as Unicode lists them, then the forms
+/// its features draw for languages, which can be of any script, then what's in no script, like the private-use glyphs,
+/// and last the accents and marks, which have no letter to sit on and are looked for least. A font without Latin
+/// letters starts with its scripts (see `GlyphSection.sections`).
 public enum GlyphGroup: Hashable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, proportionalFigures, tabularFigures
-    case circledFigures, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
+    case circledFigures, romanNumerals, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
     case caseSensitiveForms, arrows
     /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
     /// in the Unicode blocks for it.
     case script(String)
-    case graphical, diacriticalMarks, combiningMarks
+    case localizedForms, graphical, diacriticalMarks, combiningMarks
 
     public static let greek = GlyphGroup.script("Greek")
 
@@ -32,6 +33,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
         case .circledFigures: "Circled Figures"
+        case .romanNumerals: "Roman Numerals"
         case .punctuationAndSymbols: "Punctuation and Symbols"
         case .currency: "Currency"
         case .mathematicalOperators: "Mathematical Operators"
@@ -44,6 +46,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .caseSensitiveForms: "Case Sensitive Forms"
         case .arrows: "Arrows"
         case .script(let name): name
+        case .localizedForms: "Localized Forms"
         case .graphical: "Graphical"
         case .diacriticalMarks: "Diacritical Marks"
         case .combiningMarks: "Combining Marks"
@@ -69,21 +72,23 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .proportionalFigures: 6
         case .tabularFigures: 7
         case .circledFigures: 8
-        case .punctuationAndSymbols: 9
-        case .currency: 10
-        case .mathematicalOperators: 11
-        case .superscripts: 12
-        case .subscripts: 13
-        case .fractions: 14
-        case .numerators: 15
-        case .denominators: 16
-        case .ordinals: 17
-        case .caseSensitiveForms: 18
-        case .arrows: 19
-        case .script: 20
-        case .graphical: 21
-        case .diacriticalMarks: 22
-        case .combiningMarks: 23
+        case .romanNumerals: 9
+        case .punctuationAndSymbols: 10
+        case .currency: 11
+        case .mathematicalOperators: 12
+        case .superscripts: 13
+        case .subscripts: 14
+        case .fractions: 15
+        case .numerators: 16
+        case .denominators: 17
+        case .ordinals: 18
+        case .caseSensitiveForms: 19
+        case .arrows: 20
+        case .script: 21
+        case .localizedForms: 22
+        case .graphical: 23
+        case .diacriticalMarks: 24
+        case .combiningMarks: 25
         }
     }
 
@@ -161,6 +166,8 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         // Figures in circles, like ① and ❶, and the blocks' other numbered ones, like ⑴ and ⒈. The letters there, like Ⓐ
         // or the Ⓟ some fonts have for ℗, go with the symbols.
         if (block.hasPrefix("Enclosed Alphanumeric") || block == "Dingbats") && properties.numericType != nil { return .circledFigures }
+        // Ⅰ to Ⅿ and ⅰ to ⅿ, and the old forms, like ↀ; Unicode has them as Latin letters or numbers.
+        if name.contains("ROMAN NUMERAL") { return .romanNumerals }
         // Latin letters in other blocks too, like ə in IPA Extensions or a fullwidth Ａ.
         let latin = ownScript == "Latin" || block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
@@ -385,9 +392,30 @@ public struct GlyphSection: Identifiable, Sendable {
     /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
     /// ones, then old-style ones, whichever the font's own are, then their other alternates, like a slashed zero, then
     /// the signs a feature draws to go with them, by their own groups, then code point: a tabular percent, then a dollar.
+    /// Roman numerals are capitals, then small ones; localized forms a run for each language.
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
+        func withAlternates(_ scalars: [UInt32]) -> [GlyphCell] {
+            scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) }
+        }
+        switch group {
+        case .romanNumerals:
+            // Capitals, then small ones, like ⅰ.
+            let small = scalars.filter { Self.name(of: $0)?.hasPrefix("SMALL") == true }
+            return [withAlternates(scalars.filter { !small.contains($0) }), withAlternates(small) + glyphs.map(GlyphCell.feature)]
+                .filter { !$0.isEmpty }
+        case .localizedForms:
+            // A row for each language, or each that share their forms, as `FeatureGlyph.localizedForms` lists them.
+            var runs: [[GlyphCell]] = []
+            for (index, glyph) in glyphs.enumerated() {
+                if index == 0 || glyph.languages != glyphs[index - 1].languages { runs.append([]) }
+                runs[runs.count - 1].append(.feature(glyph))
+            }
+            return runs
+        default:
+            break
+        }
         guard group == .proportionalFigures || group == .tabularFigures else {
-            return [scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) } + glyphs.map(GlyphCell.feature)]
+            return [withAlternates(scalars) + glyphs.map(GlyphCell.feature)]
         }
         let found = scalars.map { ($0, alternates($0)) }
         // The font's own figures are old-style when a feature offers lining ones for them, and none old-style ones.
