@@ -681,16 +681,17 @@ public struct FeatureGlyph: Hashable, Sendable {
         }
     }
 
-    /// Where a small capital or localized form goes in its group: the letters first, letter by letter as
-    /// `GlyphSection.letterOrder` has them, a capital's where its lowercase letter's goes, whichever feature draws it;
-    /// then figures and signs.
+    /// Where a small capital or localized form goes in its group: the letters first, in their lowercase letters' order
+    /// (see `GlyphSection.letterOrder`), as Glyphs names small capitals after those, like aacute.sc, a capital's after
+    /// its lowercase letter's, whichever feature draws it, like İ's after i's; then figures and signs.
     static func letterOrder(of character: UInt32) -> (GlyphGroup, UInt32, UInt32, UInt32, Int, UInt32) {
         let group: GlyphGroup = switch GlyphGroup.of(character) ?? .graphical {
         case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents: .lowercase
         case let other: other
         }
-        let (base, kind, letter, capital, character) = GlyphSection.letterOrder(of: character)
-        return (group, base, kind, letter, capital, character)
+        let lowercase = Unicode.Scalar(character).flatMap { String(Character($0)).lowercased().unicodeScalars.first?.value } ?? character
+        let (base, kind, letter, _, _) = GlyphSection.letterOrder(of: lowercase)
+        return (group, base, kind, letter, lowercase == character ? 0 : 1, character)
     }
 
     /// Tabular figures in another style, like old-style ones, by style, then character: glyphs of their own (a

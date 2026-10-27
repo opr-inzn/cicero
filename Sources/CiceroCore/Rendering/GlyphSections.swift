@@ -298,9 +298,9 @@ public struct GlyphSection: Identifiable, Sendable {
     public static let limit = 6000
 
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
-    /// point order within a group, but for superscripts, subscripts and fractions (see `valueOrder`), the accented
-    /// letters, letter by letter (see `letterOrder`), and punctuation, symbols and operators, as type designers list
-    /// them (see `signOrder`); private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
+    /// point order within a group, but for superscripts, subscripts and fractions (see `valueOrder`), and the accented
+    /// letters (see `letterOrder`) and punctuation, symbols and operators (see `signOrder`), as type designers list
+    /// them; private-use characters in the groups `privateUse` gives them (see `privateUseGroups`).
     /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very
     /// large fonts to a sensible number of characters from each Unicode block.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [], privateUse: [UInt32: GlyphGroup] = [:],
@@ -345,46 +345,29 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// Where a letter goes among others, like the accented ones or the small capitals: letter by letter, each followed
-    /// by its accented forms in code point order, then by the letters drawn from it (see `baseLetter`), each with its
-    /// own, so a, à, á and the other a's, æ, ǽ, then b, and ß after the s's; a capital where its lowercase letter goes,
-    /// after it, like ẞ. Characters that aren't letters go by code point.
+    /// Where a letter goes among others of its case, like the accented capitals: Latin letters as Glyphs lists them, by
+    /// glyph name (see `glyphsLetterOrder`), so Á Ă Â Ä À Ā Ą Å Ã, then Æ, ß after the s's and ɛ among the e's; then
+    /// those it has no name for and other scripts' letters, letter by letter, each followed by its accented forms in
+    /// code point order, like α, ά, a capital where its lowercase letter goes, after it. Characters that aren't letters
+    /// go by code point. Lists of both cases, like the small capitals, go by their lowercase letters (see
+    /// `FeatureGlyph.letterOrder`).
     static func letterOrder(of character: UInt32) -> (UInt32, UInt32, UInt32, Int, UInt32) {
+        if let rank = letterRanks[character] { return (0, UInt32(rank), 0, 0, character) }
         guard let scalar = Unicode.Scalar(character), scalar.properties.isAlphabetic else { return (character, 0, character, 0, character) }
         let lowercase = String(Character(scalar)).lowercased()
         let scalars = Array(lowercase.unicodeScalars)
         let letter = scalars.count == 1 ? scalars[0].value : character
-        let base = baseLetter(of: lowercase)
-        // What its accents sit on: the base letter, or a letter drawn from it, like æ for ǽ, which goes after the base
-        // letter's accented forms, with those drawn from it in code point order.
+        // The letter it's a form of, the first Unicode takes it apart into, like the α of ά, and what its accents sit on.
+        let base = lowercase.decomposedStringWithCompatibilityMapping.unicodeScalars.first?.value ?? letter
         let built = lowercase.decomposedStringWithCanonicalMapping.unicodeScalars.first?.value ?? letter
         let kind: UInt32 = letter == base ? 0 : built == base ? 1 : max(built, 2)
         return (base, kind, letter, character == letter ? 0 : 1, character)
     }
 
-    /// The letter a lowercase one is a form of: the one under its accents, like the a of à and ǻ, the first of those it's
-    /// made of, like the i of ĳ, or for one Unicode doesn't take apart, the one its name says it has a stroke or hook
-    /// on, like the b of ƀ and the d of ɗ, or the one it's drawn from, like the a of æ and ǽ, the d of ð and the o of œ.
-    /// Another script's, like the α of ά, the same way.
-    static func baseLetter(of lowercase: String) -> UInt32 {
-        let parts = lowercase.decomposedStringWithCompatibilityMapping.unicodeScalars
-        if let latin = parts.first(where: { (0x61...0x7A).contains($0.value) }) { return latin.value }
-        guard let first = parts.first else { return 0 }
-        // "LATIN SMALL LETTER B WITH STROKE".
-        if let name = first.properties.name, name.hasPrefix("LATIN SMALL LETTER "),
-           let letter = name.dropFirst(19).split(separator: " ").first, letter.count == 1, name.dropFirst(20).hasPrefix(" WITH "),
-           let value = letter.lowercased().unicodeScalars.first?.value {
-            return value
-        }
-        return drawnFrom[first.value] ?? first.value
-    }
-
-    /// æ and ɑ, ð and đ, ə and ǝ, ƒ, ɡ, ħ, ı, ȷ, ĸ, ł, ŋ, ø and œ, ß, þ and ŧ.
-    private static let drawnFrom: [UInt32: UInt32] = [
-        0xE6: 0x61, 0x251: 0x61, 0xF0: 0x64, 0x111: 0x64, 0x259: 0x65, 0x1DD: 0x65, 0x192: 0x66, 0x261: 0x67, 0x127: 0x68,
-        0x131: 0x69, 0x237: 0x6A, 0x138: 0x6B, 0x142: 0x6C, 0x14B: 0x6E, 0xF8: 0x6F, 0x153: 0x6F, 0xDF: 0x73, 0xFE: 0x74,
-        0x167: 0x74,
-    ]
+    /// Each letter's place in `glyphsLetterOrder`.
+    private static let letterRanks: [UInt32: Int] = Dictionary(
+        glyphsLetterOrder.unicodeScalars.filter { !$0.properties.isWhitespace }.enumerated().map { ($1.value, $0) }
+    ) { first, _ in first }
 
     /// Where a superscript, subscript or fraction goes in its group. Superscripts and subscripts: the figures from 0 to
     /// 9, then the signs, like ⁺, then the letters, like ʰ. Fractions: the fraction slash, then the fractions by value,
