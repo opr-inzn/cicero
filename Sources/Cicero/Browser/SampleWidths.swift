@@ -5,8 +5,9 @@ import Synchronization
 
 /// How wide the families' grid samples are, per point of the size, and so how wide the tiles need to be for all but the
 /// library's widest fonts to be drawn at the size chosen (see `FontGrid`). One width for every list, so the tiles and the
-/// rows don't change from one sidebar item, or search, to the next. Each sample is measured once, off the main thread,
-/// for its style, text and settings: its glyphs' outlines scale with the size, so dragging Size measures nothing.
+/// rows don't change from one sidebar item, or search, to the next. Each sample is measured once, off the main thread and
+/// several side by side, for its style, text and settings: its glyphs' outlines scale with the size, so dragging Size
+/// measures nothing.
 @Observable
 final class SampleWidths {
     static let shared = SampleWidths()
@@ -17,7 +18,6 @@ final class SampleWidths {
     private(set) var listRatio: CGFloat?
 
     @ObservationIgnored private var measuredInputs: Int?
-    @ObservationIgnored private var task: Task<Void, Never>?
     private static let savedKey = "grid.sampleWidthRatio"
     /// What each sample measured, per point of the size, by `Sample.key`.
     nonisolated private static let ratios = Mutex<[String: CGFloat]>([:])
@@ -45,17 +45,15 @@ final class SampleWidths {
         }
     }
 
-    /// Measures the library's samples, unless `inputs` says they're those measured last. The tiles keep the width they
-    /// have until it's done.
-    func update(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) {
-        guard inputs != measuredInputs else { return }
+    /// Measures the library's samples, unless `inputs` says they're those measured last, and returns `listRatio` for them:
+    /// as it was, should it be cancelled or have no sample to measure.
+    func measure(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
+        guard inputs != measuredInputs else { return listRatio }
+        guard let ratio = await Self.listRatio(samples, scriptSamples: scriptSamples), !Task.isCancelled else { return listRatio }
         measuredInputs = inputs
-        task?.cancel()
-        task = Task {
-            guard let ratio = await Self.listRatio(samples, scriptSamples: scriptSamples), !Task.isCancelled else { return }
-            if listRatio != ratio { listRatio = ratio }
-            UserDefaults.standard.set(Double(ratio), forKey: Self.savedKey)
-        }
+        if listRatio != ratio { listRatio = ratio }
+        UserDefaults.standard.set(Double(ratio), forKey: Self.savedKey)
+        return ratio
     }
 
     /// The sample's width per point of `font`'s size, `text` being what the tile draws in it: measured before, or now.
@@ -77,14 +75,30 @@ final class SampleWidths {
         return max(advance, ink.maxX) - min(0, ink.minX)
     }
 
+    /// A share of the samples on each core, so a new preview text is measured in a moment: the grid waits for it to show
+    /// the text (see `FontGrid.shown`).
     @concurrent
     nonisolated private static func listRatio(_ samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
-        guard let widths = widths(of: samples, scriptSamples: scriptSamples) else { return nil }
-        return widest(widths)
+        let lanes = ProcessInfo.processInfo.activeProcessorCount
+        let share = max(1, (samples.count + lanes - 1) / lanes)
+        let measured = await withTaskGroup(of: [CGFloat]?.self) { group -> [CGFloat]? in
+            for start in stride(from: 0, to: samples.count, by: share) {
+                let part = samples[start..<min(start + share, samples.count)]
+                group.addTask { widths(of: part, scriptSamples: scriptSamples) }
+            }
+            var all: [CGFloat] = []
+            all.reserveCapacity(samples.count)
+            for await part in group {
+                guard let part else { return nil }
+                all += part
+            }
+            return all
+        }
+        return measured.flatMap(widest)
     }
 
     /// Each sample's width per point of the size; nil once the task is cancelled.
-    nonisolated private static func widths(of samples: [Sample], scriptSamples: ScriptSamples) -> [CGFloat]? {
+    nonisolated private static func widths(of samples: ArraySlice<Sample>, scriptSamples: ScriptSamples) -> [CGFloat]? {
         var widths: [CGFloat] = []
         widths.reserveCapacity(samples.count)
         for (index, sample) in samples.enumerated() {

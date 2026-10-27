@@ -188,8 +188,11 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   another (Active next to All Fonts, without the narrower fonts for Adobe apps) had wider tiles, often one fewer in a
   row and so half as wide again and higher, from one click to the next. Files a reading would wait for (on a server, or
   kept online only) count once read. Measured again when the library, Show system fonts, Show fonts from Creative Cloud,
-  the preview text or the weight change; until then the tiles keep the width they had; the last width is kept for the
-  next launch. The widest
+  the preview text or the weight change, a share of the families on each core; until then the tiles keep the width they
+  had; the last width is kept for the next launch. A new preview text (a preset, or each letter typed) shows in the grid
+  once it's measured, a moment later, or after 0.3 s, so the tiles take its layout and fit the widest fonts to it at
+  once (shown at once, the tiles took the text's width in the system font, and the widest fonts were drawn that wide
+  until it was measured, then grew). The widest
   twentieth (Zapfino's swashes, dingbats, the most extended faces), wider than the tiles' room (`SampleFit`: the tile's
   least width less 28 pt), are drawn smaller, until they're that wide. That room goes up with the size, not with the
   tiles, so they grow and shrink with the size like the rest. (Shrunk to fit its tile, a font stopped growing while the
