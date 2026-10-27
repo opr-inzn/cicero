@@ -6,7 +6,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - An alternate, small capital or ligature copied from a font page’s **Glyphs** now shows as itself when you paste it into the text at the top of the page, in any of the family’s styles. Other apps still get the plain character.
 - When you save a new version of a font over the old file, a font page’s text and the grid show its new letters at once. Before, they kept showing the old ones until Cicero quit, while **Glyphs** already showed the new ones.
-- A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language.
+- A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language, named above it.
+- **Circled Figures** has every circled number a font has, like ㉑ to ㊿ and the Chinese ㊀ and ㈠, which were under **Punctuation and Symbols**, in a row for each kind, from ⓪ up.
 - **Glyphs** lists Roman numerals in a group of their own, after the figures, and a Latin font’s forms for the start and end of a word among the alternates.
 - A font page’s **Glyphs** lists small capitals in a group of their own, **Small Caps**, right after the letters, each followed by its alternates, like a stylistic set’s or a Turkish one. Before, they followed their letters as alternates, and their own alternates weren’t listed.
 - **Uppercase Accents** and **Lowercase Accents** go letter by letter, all the a’s, then the b’s, with letters like æ and ß after the a’s and s’s. Before, they were in Unicode’s order, which split them up.

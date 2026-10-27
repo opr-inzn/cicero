@@ -113,6 +113,10 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         // not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators.
         if block == "Letterlike Symbols" && properties.isAlphabetic { return .punctuationAndSymbols }
         if block == "Mathematical Alphanumeric Symbols" { return .mathematicalOperators }
+        // Numbers in circles, like ①, ❶ and ㉑, and the other numbers Unicode has for numbering, like ⑴, ⒈ and 🄁, the Chinese
+        // ones too, like ㊀ and ㈠, by their names, whichever block or script they're in. The letters in circles, like Ⓐ or
+        // the Ⓟ some fonts have for ℗, have no numeric value and go with the symbols.
+        if properties.numericType != nil, Self.isEnclosedNumber(name) { return .circledFigures }
         // A script's own characters. In the blocks for it, all of them: Arabic's letters, figures and tatweel, Greek's tonos
         // and question mark. Elsewhere, its letters, marks and figures, like Greek's small capitals among the phonetic
         // letters, the Coptic letters in Greek's block, 々 among CJK punctuation or halfwidth katakana, but not those
@@ -163,9 +167,6 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if name.contains("FRACTION") { return .fractions }
         // Arrows, but not the combining ones, which are marks.
         if name.contains("ARROW") && !isMark { return .arrows }
-        // Figures in circles, like ① and ❶, and the blocks' other numbered ones, like ⑴ and ⒈. The letters there, like Ⓐ
-        // or the Ⓟ some fonts have for ℗, go with the symbols.
-        if (block.hasPrefix("Enclosed Alphanumeric") || block == "Dingbats") && properties.numericType != nil { return .circledFigures }
         // Ⅰ to Ⅿ and ⅰ to ⅿ, and the old forms, like ↀ; Unicode has them as Latin letters or numbers.
         if name.contains("ROMAN NUMERAL") { return .romanNumerals }
         // Latin letters in other blocks too, like ə in IPA Extensions or a fullwidth Ａ.
@@ -205,6 +206,33 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     }
 
     /// Whether Unicode names it a superscript or subscript, like ᵝ MODIFIER LETTER SMALL BETA or ₐ.
+    /// Whether Unicode names a number as one in a circle, in parentheses, or with a full stop or a comma after it, like
+    /// CIRCLED NUMBER TWENTY ONE, PARENTHESIZED DIGIT ONE, DIGIT ONE FULL STOP or DIGIT ZERO COMMA.
+    static func isEnclosedNumber(_ name: String) -> Bool {
+        name.contains("CIRCLED") || name.hasPrefix("PARENTHESIZED") || name.hasSuffix(" FULL STOP") || name.hasSuffix(" COMMA")
+    }
+
+    /// The kind of a numbering character, its Unicode name without its number: "CIRCLED" for ⓪, ① and ㉑, "NEGATIVE
+    /// CIRCLED" for ⓿, ❶ and ⓫, "FULL STOP" for ⒈, "CIRCLED IDEOGRAPH" for ㊀. DINGBAT is left out too: Unicode keeps
+    /// ❶ to ❿ among the dingbats and ⓫ to ⓴ elsewhere, but they're one set.
+    static func enclosureKind(of value: UInt32) -> String {
+        let name = Unicode.Scalar(value)?.properties.name ?? ""
+        return name.split(separator: " ").filter { !Self.numberWords.contains(String($0)) }.joined(separator: " ")
+    }
+
+    private static let numberWords: Set<String> = [
+        "DINGBAT", "DIGIT", "NUMBER", "ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
+        "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY",
+        "THIRTY", "FORTY", "FIFTY", "SIXTY", "SEVENTY", "EIGHTY",
+    ]
+
+    /// The order of the kinds' rows: those in circles, then in parentheses, then with a full stop or comma, the Chinese
+    /// ones last; a kind a later Unicode adds after them, by name.
+    static let enclosureKinds = [
+        "CIRCLED", "NEGATIVE CIRCLED", "DOUBLE CIRCLED", "CIRCLED SANS-SERIF", "NEGATIVE CIRCLED SANS-SERIF", "PARENTHESIZED",
+        "FULL STOP", "COMMA", "CIRCLED ON BLACK SQUARE", "CIRCLED IDEOGRAPH", "PARENTHESIZED IDEOGRAPH",
+    ]
+
     private static func isRaisedOrLowered(_ name: String) -> Bool {
         name.contains("SUBSCRIPT") || name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL")
             || name.hasPrefix("MODIFIER LETTER CAPITAL")
@@ -437,12 +465,20 @@ public struct GlyphSection: Identifiable, Sendable {
     /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
     /// ones, then old-style ones, whichever the font's own are, then their other alternates, like a slashed zero, then
     /// the signs a feature draws to go with them, by their own groups, then code point: a tabular percent, then a dollar.
-    /// Roman numerals are capitals, then small ones; localized forms a run for each language.
+    /// Roman numerals are capitals, then small ones; circled figures a run for each kind; localized forms a run for each
+    /// language.
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
         func withAlternates(_ scalars: [UInt32]) -> [GlyphCell] {
             scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) }
         }
         switch group {
+        case .circledFigures:
+            // A row for each kind (see `GlyphGroup.enclosureKind`), from its lowest number up: ⓪ ① … ⑳ ㉑ … ㊿, then ⓿ ❶ … ⓴.
+            func rank(_ kind: String) -> (Int, String) { (GlyphGroup.enclosureKinds.firstIndex(of: kind) ?? .max, kind) }
+            func value(_ scalar: UInt32) -> Double { Unicode.Scalar(scalar)?.properties.numericValue ?? 0 }
+            let kinds = Dictionary(grouping: scalars, by: GlyphGroup.enclosureKind(of:)).sorted { rank($0.key) < rank($1.key) }
+            return kinds.map { withAlternates($0.value.sorted { (value($0), $0) < (value($1), $1) }) }
+                + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
         case .romanNumerals:
             // Capitals, then small ones, like ⅰ.
             let small = scalars.filter { Self.name(of: $0)?.hasPrefix("SMALL") == true }
@@ -492,6 +528,16 @@ public struct GlyphSection: Identifiable, Sendable {
             return a < b
         }
         return Run.allCases.compactMap { runs[$0] }
+    }
+
+    /// The runs, each with the words above it on the page, if any: a localized form's languages, like "Bulgarian".
+    public func labeledRuns(alternates: (UInt32) -> [FeatureAlternate]) -> [(label: String?, cells: [GlyphCell])] {
+        let runs = runs(alternates: alternates)
+        guard group == .localizedForms else { return runs.map { (nil, $0) } }
+        return runs.map { run in
+            guard case .feature(let glyph) = run.first else { return (nil, run) }
+            return (glyph.featureName, run)
+        }
     }
 
     /// The Unicode name, e.g. "LATIN SMALL LETTER A WITH ACUTE".

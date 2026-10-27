@@ -43,6 +43,8 @@ struct GlyphsSection: View {
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 24
+    /// The room above a labelled row, like a localized form's language, for its label.
+    static let labelRoom: CGFloat = 30
     /// The size a cell's character, or ligature, is set at.
     static let glyphSize: CGFloat = 26
 
@@ -96,19 +98,34 @@ struct GlyphsSection: View {
 
     private func section(_ section: GlyphSection, style: Style) -> some View {
         let filter = Filter(query)
-        // Figures in runs, lining, old-style and so on, each starting a row (see `GlyphSection.runs`).
-        let runs = section.runs { shownAlternates(of: $0, filter) }
+        // Figures in runs, lining, old-style and so on, each starting a row (see `GlyphSection.runs`); a run's first row
+        // has its label above it, if it has one, like a localized form's language.
+        let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
         let rows = runs.flatMap { run in
-            stride(from: 0, to: run.count, by: columns).map { run[$0 ..< min($0 + columns, run.count)] }
+            stride(from: 0, to: run.cells.count, by: columns).map { start in
+                (label: start == 0 ? run.label : nil, cells: run.cells[start ..< min(start + columns, run.cells.count)])
+            }
         }
-        let total = runs.reduce(0) { $0 + $1.count }
+        let total = runs.reduce(0) { $0 + $1.cells.count }
         return Section {
             // Rows of the page's stack, not a LazyVGrid per group in it. The stack guesses the height of groups it
             // hasn't placed from those it has, and groups run from one row to hundreds, so every correction shifted
             // the page and changed which groups were placed: it re-laid itself out at full CPU. Rows of fixed cells
-            // are all one height, so the guesses are right.
+            // are all one height, so the guesses are right; labelled ones are few, in the small Localized Forms group.
+            // A label goes over room above its row, not in a stack with it: rows in stacks of their own drew other
+            // groups' rows in their place after a long jump down the page.
             ForEach(rows.indices, id: \.self) { row in
-                glyphRow(rows[row], style: style)
+                glyphRow(rows[row].cells, style: style)
+                    .padding(.top, rows[row].label == nil ? 0 : Self.labelRoom)
+                    .overlay(alignment: .topLeading) {
+                        if let label = rows[row].label {
+                            Text(label)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .padding(.top, 4)
+                        }
+                    }
                     .padding(.horizontal, Self.inset)
                     .padding(.bottom, row == rows.count - 1 ? 18 : Self.spacing)
             }
