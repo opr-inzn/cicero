@@ -68,7 +68,10 @@ public final class FontLoader: Sendable {
         for feature in features {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
         }
-        let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
+        // A millionth of a point larger for each time the file changed. CoreText calls fonts of the same file, name
+        // and size equal whatever the file holds now, and the sample, the grid and anything else drawing text with a
+        // font made from a new version kept drawing the old letters: text reuses an equal font it already has.
+        let font = CTFontCreateWithFontDescriptor(descriptor, size + CGFloat(generation) / 1_000_000, nil)
         if cached { fonts[key] = font }
         return font
     }
