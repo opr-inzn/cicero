@@ -192,6 +192,8 @@ final class QuickLookPanel: NSPanel {
         isRestorable = false
         isExcludedFromWindowsMenu = true
         collectionBehavior.insert(.fullScreenAuxiliary)
+        // On macOS 26 the page runs on under the title bar and fades out there (see `fadingUnderTitleBar`).
+        if #available(macOS 26, *) { styleMask.insert(.fullSizeContentView) }
         minSize = NSSize(width: 420, height: 320)
         // The title bar in the page's colour, so the name sits on the specimen.
         titlebarAppearsTransparent = true
@@ -416,7 +418,8 @@ private struct QuickLookView: View {
     var body: some View {
         if model.quickLook.isOpen, let shown = model.quickLook.shown {
             GeometryReader { proxy in
-                FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count, width: proxy.size.width)
+                FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count, width: proxy.size.width,
+                                titleBar: proxy.safeAreaInsets.top)
                     // A new family starts at the top.
                     .id(shown.family.id)
             }
@@ -432,6 +435,8 @@ private struct FamilyQuickLook: View {
     let index: Int
     let count: Int
     let width: CGFloat
+    /// How tall the title bar is, over the top of the page on macOS 26.
+    let titleBar: CGFloat
 
     /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
@@ -472,6 +477,7 @@ private struct FamilyQuickLook: View {
             .padding(.bottom, 8)
             .foregroundStyle(Color.ink)
         }
+        .fadingUnderTitleBar(titleBar)
         .background(Color(nsColor: QuickLookPanel.page))
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
@@ -543,6 +549,26 @@ private struct FamilyQuickLook: View {
         let labels = Set(family.faces.map(\.state.label))
         if labels.count == 1, let label = labels.first { return label }
         return family.activeCount == family.faces.count ? "Active" : "\(family.activeCount) of \(family.faces.count) active"
+    }
+}
+
+private extension View {
+    /// The page under a title bar `height` tall, fading out there as under a toolbar rather than ending at its edge: macOS
+    /// blurs it away under a bar, and the page's colour comes in over it behind the title. macOS 15 has no such effect, and
+    /// the page stays below the title bar.
+    @ViewBuilder func fadingUnderTitleBar(_ height: CGFloat) -> some View {
+        if #available(macOS 26, *) {
+            let page = Color(nsColor: QuickLookPanel.page)
+            // A bar that draws nothing, clear, gets no blur under it.
+            safeAreaBar(edge: .top, spacing: 0) {
+                LinearGradient(stops: [.init(color: page, location: 0), .init(color: page, location: 0.35), .init(color: page.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: height)
+            }
+            .ignoresSafeArea(.container, edges: .top)
+        } else {
+            self
+        }
     }
 }
 
