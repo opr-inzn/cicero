@@ -2,8 +2,8 @@ import CoreText
 import Foundation
 
 /// A filter in the search field beside what's typed, chosen from its suggestions: a style the families have to have,
-/// which their previews then show (see `Family.previewStyle(for:tokens:weight:)`), or figures they have to be able to
-/// set, which their previews then use. A family has to match every token, and the text.
+/// which their previews then show (see `Family.previewStyle(for:tokens:weight:)`), figures they have to be able to
+/// set, which their previews then use, or variable styles. A family has to match every token, and the text.
 public enum SearchToken: Hashable, Identifiable, Sendable {
     case italic
     /// On the OS/2 scale, a multiple of 100 from 100 to 900.
@@ -12,11 +12,12 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
     case extended
     case tabularFigures
     case oldStyleFigures
+    case variable
 
     public var id: Self { self }
 
     /// Every token, in the order the suggestions list them.
-    public static let all: [SearchToken] = [.italic] + weights.map { .weight($0.weight) } + [.condensed, .extended, .tabularFigures, .oldStyleFigures]
+    public static let all: [SearchToken] = [.italic] + weights.map { .weight($0.weight) } + [.condensed, .extended, .tabularFigures, .oldStyleFigures, .variable]
 
     /// The weights' names, and the other words for them.
     private static let weights: [(weight: Int, name: String, others: [String])] = [
@@ -33,6 +34,7 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         case .extended: "Extended"
         case .tabularFigures: "Tabular Figures"
         case .oldStyleFigures: "Old-Style Figures"
+        case .variable: "Variable"
         }
     }
 
@@ -46,6 +48,7 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         case .extended: ["extended", "expanded", "wide", "width"]
         case .tabularFigures: ["tabular figures", "tnum", "numbers", "numerals"]
         case .oldStyleFigures: ["old-style figures", "oldstyle figures", "old style figures", "onum", "numbers", "numerals"]
+        case .variable: ["variable"]
         }
     }
 
@@ -57,6 +60,7 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         case .condensed, .extended: 2
         case .tabularFigures: 3
         case .oldStyleFigures: 4
+        case .variable: 5
         }
     }
 
@@ -91,7 +95,7 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
             case .weight(let weight): style.weight = weight
             case .condensed: style.width = 3
             case .extended: style.width = 7
-            case .tabularFigures, .oldStyleFigures: break
+            case .tabularFigures, .oldStyleFigures, .variable: break
             }
         }
         return style == SearchQuery.Style() ? nil : style
@@ -111,14 +115,17 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
 
 extension Family {
     /// Whether the family has what the tokens ask for: a style that's everything the style tokens say, italic, of the
-    /// weight (a variable one whose weight axis reaches it, or one named for it), narrower or wider than normal; and the
-    /// figures, in any of its styles.
+    /// weight (a variable one whose weight axis reaches it, or one named for it), narrower or wider than normal, and
+    /// variable for Variable; and the figures, in any of its styles.
     public func matches(_ tokens: [SearchToken]) -> Bool {
         if tokens.contains(.tabularFigures), !faces.contains(where: { $0.face.figures.contains(.tabular) }) { return false }
         if tokens.contains(.oldStyleFigures), !faces.contains(where: { $0.face.figures.contains(.oldStyle) }) { return false }
+        let variable = tokens.contains(.variable)
+        if variable, !isVariable { return false }
         guard let style = SearchToken.style(of: tokens) else { return true }
         return faces.contains { library in
             let face = library.face
+            if variable && face.axes.isEmpty { return false }
             if style.isItalic && !face.isItalic { return false }
             if let width = style.width, (widthClass(of: face) - 5).signum() != (width - 5).signum() { return false }
             guard let weight = style.weight else { return true }

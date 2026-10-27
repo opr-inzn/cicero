@@ -63,7 +63,8 @@ private struct SuggestionsHeader: View {
 }
 
 /// What a filter asks for, in the system's fonts: "Aa" in italic, of a weight or of a width, "123" in tabular or
-/// old-style figures (in New York, as the system's sans serif has none of those).
+/// old-style figures (in New York, as the system's sans serif has none of those); for Variable, the symbol of its tag
+/// (see `VariableTag`).
 private struct TokenSample: View {
     let token: SearchToken
 
@@ -75,6 +76,7 @@ private struct TokenSample: View {
         case .extended: Text("Aa").font(.system(size: 14)).fontWidth(.expanded)
         case .tabularFigures: Text("123").font(.system(size: 14)).monospacedDigit()
         case .oldStyleFigures: Text("123").font(Self.oldStyle)
+        case .variable: Image(systemName: "slider.horizontal.3").font(.system(size: 14))
         }
     }
 

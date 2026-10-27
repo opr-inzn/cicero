@@ -199,32 +199,37 @@ extension Family {
     }
 
     /// The style to preview the family in for a search, and the weight to draw it at: the one its tokens and typed words
-    /// name (see `SearchToken.style(of:over:)` and `SearchQuery.Style`), else the one for `weight`, at that weight. A
-    /// weight they name is where a variable style of that weight sits on the weight axis, as not every font's axis is on
-    /// the OS/2 scale (one has its Light at 450), else that weight.
+    /// name (see `SearchToken.style(of:over:)` and `SearchQuery.Style`), else the one for `weight`, at that weight; a
+    /// variable one for the Variable token. A weight they name is where a variable style of that weight sits on the
+    /// weight axis, as not every font's axis is on the OS/2 scale (one has its Light at 450), else that weight.
     public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double) -> (face: LibraryFace, weight: Double) {
         let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
-        guard let style = SearchToken.style(of: tokens, over: typed) else { return (face(nearestWeight: weight), weight) }
-        guard let named = style.weight else { return (face(for: style, weight: weight), weight) }
-        let face = face(for: style, weight: Double(named))
+        let variable = tokens.contains(.variable)
+        guard let style = SearchToken.style(of: tokens, over: typed) else {
+            let nearest = face(nearestWeight: weight)
+            return (variable && nearest.face.axes.isEmpty ? face(for: SearchQuery.Style(), weight: weight, variable: true) : nearest, weight)
+        }
+        guard let named = style.weight else { return (face(for: style, weight: weight, variable: variable), weight) }
+        let face = face(for: style, weight: Double(named), variable: variable)
         let isNamed = face.face.weightAxis != nil && FontFace.hundreds(face.face.namedWeight) == FontFace.hundreds(Double(named))
         return (face, isNamed ? face.face.styleWeight : Double(named))
     }
 
-    /// The style nearest one a search names: of the italics when it's italic, else of the uprights; of those, the ones
-    /// nearest its width, on the narrower or wider side when there are any; then the one nearest the weight, by its name
-    /// when that says one (a Bold the file classes at 400 is still Bold), the normal width first among the same weight. A
-    /// variable style with a weight axis comes first, as it draws every weight, and of the variable styles, with a weight
-    /// axis or not, the ones where the regular is on the axes the search says nothing about. Not one of ornaments, unless
-    /// that's all there is. When the family has none of a kind, the next step chooses among them all, so a family without
-    /// italics shows its upright.
-    func face(for style: SearchQuery.Style, weight: Double) -> LibraryFace {
+    /// The style nearest one a search names: of the variable styles when `variable`; of those, the italics when it's
+    /// italic, else the uprights; of those, the ones nearest its width, on the narrower or wider side when there are any;
+    /// then the one nearest the weight, by its name when that says one (a Bold the file classes at 400 is still Bold),
+    /// the normal width first among the same weight. A variable style with a weight axis comes first, as it draws every
+    /// weight, and of the variable styles, with a weight axis or not, the ones where the regular is on the axes the
+    /// search says nothing about. Not one of ornaments, unless that's all there is. When the family has none of a kind,
+    /// the next step chooses among them all, so a family without italics shows its upright.
+    func face(for style: SearchQuery.Style, weight: Double, variable: Bool = false) -> LibraryFace {
         let letters = faces.filter { !$0.face.isOrnaments }
         var candidates = letters.isEmpty ? faces : letters
         func keep(_ test: (LibraryFace) -> Bool) {
             let kept = candidates.filter(test)
             if !kept.isEmpty { candidates = kept }
         }
+        if variable { keep { !$0.face.axes.isEmpty } }
         keep { $0.face.isItalic == style.isItalic }
         if let wanted = style.width {
             keep { (widthClass(of: $0.face) - 5).signum() == (wanted - 5).signum() }
