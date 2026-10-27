@@ -4,6 +4,7 @@ import SwiftUI
 /// The families that look most like the page's, each its name set in itself, under the styles and titled as they are:
 /// a click opens one's page, Show All lists as many as Show Similar Fonts does, right there, and Not Similar, on a row
 /// the pointer is over, takes one out. Left out for a family Cicero can't measure, like one without Latin letters.
+/// Not on the page for now, which leaves similar fonts to Show Similar Fonts; kept for when it comes back.
 struct SimilarSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
