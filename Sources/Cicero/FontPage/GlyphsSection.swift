@@ -180,10 +180,14 @@ struct GlyphsSection: View {
                     .frame(width: 160, height: 130)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
-                Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
-                // "Tabular Figures (tnum)", and "Old-Style Figures (onum)" under it for a tabular old-style figure.
-                Text(zip(glyph.featureNames, glyph.featureTags).map { "\($0) (\($1))" }.joined(separator: "\n"))
-                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                // The name, then the features right under it, as lines of one text.
+                VStack(spacing: 0) {
+                    Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed")
+                    // "Tabular Figures (tnum)", and "Old-Style Figures (onum)" under it for a tabular old-style figure.
+                    Text(zip(glyph.featureNames, glyph.featureTags).map { "\($0) (\($1))" }.joined(separator: "\n"))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: glyph.character)
                 // The glyph has no code of its own: what's copied is the character, which the font draws like this
                 // where the feature is on, and the page's text where it's pasted (see `SampleGlyph`).
@@ -201,10 +205,13 @@ struct GlyphsSection: View {
                     .frame(width: 160, height: 130)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
-                Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
-                // "Single-storey a (ss07)"
-                Text(zip(alternate.featureNames, alternate.features).map { "\($0) (\($1))" }.joined(separator: "\n"))
-                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                VStack(spacing: 0) {
+                    Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed")
+                    // "Single-storey a (ss07)"
+                    Text(zip(alternate.featureNames, alternate.features).map { "\($0) (\($1))" }.joined(separator: "\n"))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: alternate.character)
                 VStack {
                     Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
