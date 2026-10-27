@@ -19,6 +19,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font page’s text sits in the middle between the controls and **Styles**, by its capitals and baseline, where it often looked high.
 - Preview Options’ **Presets** add “Lorem ipsum dolor sit amet”.
 - **Conflicts** scrolls wherever the pointer is in the window, with its scroll bar at the window’s edge. Before, only the list itself scrolled.
+- Choosing a preset or typing a preview text changes the grid in one step. Before, the widest fonts were drawn too small for a moment, then grew.
 
 ## 0.10.11
 

@@ -14,6 +14,11 @@ struct FontGrid: View {
     /// two together, rather than the width measured with how far in the panel is by now, a frame further on its way.
     @State private var gridRoom = GridRoom(width: 0, infoShown: 0)
     @State private var visibleHeight: CGFloat = 0
+    /// The text the tiles show, with how wide the library's samples of it are (`SampleWidths.listRatio`). A new preview
+    /// text is shown once that's measured, a moment later, so the tiles take its layout and fit the widest fonts to it at
+    /// once: shown before, the tiles took its width in the system font, the widest fonts were drawn that wide, and grew
+    /// once it was measured. Nil until the grid has measured; a text that takes over 0.3 s is shown before.
+    @State private var shown: Shown?
 
     /// Between tiles, and between the last column and the Info panel.
     static let spacing: CGFloat = 12
@@ -79,9 +84,9 @@ struct FontGrid: View {
     }
 
     var body: some View {
-        let sample = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
-        let measure = Measure(sample, size: preview.size)
-        let ratio = SampleWidths.shared.listRatio
+        let shown = shown ?? Shown(text: sampleText, ratio: SampleWidths.shared.listRatio)
+        let measure = Measure(shown.text, size: preview.size)
+        let ratio = shown.ratio
         let (count, tile, restingTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
         let sampleHeight = max(measure.height(size: preview.size), restingTile * Self.sampleHeightPerWidth)
         // Bigger or smaller by as much as the sidebar hidden or the Info panel open makes the tiles wider or narrower.
@@ -93,7 +98,7 @@ struct FontGrid: View {
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
                     ForEach(families) { family in
-                        Tile(family: family, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
+                        Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
                 }
@@ -107,7 +112,7 @@ struct FontGrid: View {
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .visibleHeight($visibleHeight)
-            .task(id: inputs) { measureSamples(inputs) }
+            .task(id: inputs) { await measureSamples(inputs) }
             .onChange(of: factor, initial: true) { GridScale.shared.factor = factor }
             .onDisappear { GridScale.shared.factor = nil }
             .modifier(KeepsTopOnResize())
@@ -131,15 +136,29 @@ struct FontGrid: View {
         return hasher.finalize()
     }
 
+    /// The preview text, or the tiles' own when it's empty.
+    private var sampleText: String {
+        preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
+    }
+
     /// Has the samples of the families All Fonts lists measured, so the tiles are wide enough for them (see
-    /// `SampleWidths`): in the styles the tiles show without a search, before the text in a font's own script.
-    private func measureSamples(_ inputs: Int) {
-        let text = preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
+    /// `SampleWidths`): in the styles the tiles show without a search, before the text in a font's own script. Then shows
+    /// the text with them.
+    private func measureSamples(_ inputs: Int) async {
+        let text = sampleText
         let samples = model.library.families.filter(model.data.lists).map { family in
             let (style, weight) = family.previewStyle(for: SearchQuery(""), weight: preview.weight)
             return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: model.variations(for: family, face: style.id), features: [])
         }
-        SampleWidths.shared.update(inputs, samples: samples, scriptSamples: model.scriptSamples)
+        // Should that take a while, as when the files are first read, the text in the meantime with the width as it is.
+        let meanwhile = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            if !Task.isCancelled { shown = Shown(text: text, ratio: SampleWidths.shared.listRatio) }
+        }
+        defer { meanwhile.cancel() }
+        let ratio = await SampleWidths.shared.measure(inputs, samples: samples, scriptSamples: model.scriptSamples)
+        guard !Task.isCancelled else { return }
+        shown = Shown(text: text, ratio: ratio)
     }
 
     /// The tiles in a row, also for ↑/↓, and their width: as many as fit at `minimum` in the rows the grid has with the
@@ -158,6 +177,11 @@ struct FontGrid: View {
     nonisolated struct GridRoom: Equatable {
         var width: CGFloat
         var infoShown: CGFloat
+    }
+
+    struct Shown {
+        var text: String
+        var ratio: CGFloat?
     }
 }
 
@@ -308,6 +332,8 @@ struct SampleFit {
 private struct Tile: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
+    /// The preview text the grid shows (see `FontGrid.shown`).
+    let sampleText: String
     let sampleHeight: CGFloat
     let baselineBelowCentre: CGFloat
     let fit: SampleFit
@@ -327,8 +353,8 @@ private struct Tile: View {
             // On one baseline in every tile, whatever each font's ascent and descent, where the sample's letters are centred
             // (see `Measure`), at the preview size unless it's wider than the tiles have room for (see `SampleFit`). Not
             // clipped: what reaches past it runs into the padding.
-            let sample = SampleWidths.Sample(face: style.face, text: preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText,
-                                             weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures)
+            let sample = SampleWidths.Sample(face: style.face, text: sampleText, weight: weight,
+                                             variations: model.variations(for: family, face: style.id), features: model.searchFeatures)
             let text = model.scriptSamples.text(sample.text, for: style.face)
             Color.clear
                 .frame(maxWidth: .infinity)
