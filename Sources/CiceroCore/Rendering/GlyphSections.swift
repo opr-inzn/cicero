@@ -107,11 +107,11 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         let block = unicodeBlock?.name ?? ""
         let isMark = category == .nonspacingMark || category == .spacingMark || category == .enclosingMark
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
-        // Every script's currency signs together, like ฿ and ؋.
-        if category == .currencySymbol { return .currency }
-        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and ℝ: with ℮,
-        // not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators.
-        if block == "Letterlike Symbols" && properties.isAlphabetic { return .punctuationAndSymbols }
+        // Every script's currency signs together, like ฿ and ؋, and the florin ƒ, a letter to Unicode.
+        if category == .currencySymbol || value == 0x192 { return .currency }
+        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres, ℝ and the micro
+        // sign µ: with ℮, not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators.
+        if block == "Letterlike Symbols" && properties.isAlphabetic || value == 0xB5 { return .punctuationAndSymbols }
         if block == "Mathematical Alphanumeric Symbols" { return .mathematicalOperators }
         // Numbers in circles, like ①, ❶ and ㉑, and the other numbers Unicode has for numbering, like ⑴, ⒈ and 🄁, the Chinese
         // ones too, like ㊀ and ㈠, by their names, whichever block or script they're in. The letters in circles, like Ⓐ or
