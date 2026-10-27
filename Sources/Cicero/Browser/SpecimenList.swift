@@ -79,6 +79,7 @@ private struct Specimen: View {
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
                 size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures
             )
+            .foregroundStyle(Color.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             if family.faces.count > 1 {
                 FlowLayout(spacing: 14, lineSpacing: 4) {

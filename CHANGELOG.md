@@ -4,6 +4,11 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- Quick Look has the two buttons of Finder’s Quick Look in place of the window buttons: one closes it, the other fills the screen with it, and a second click puts it back. Filling the screen no longer changes the size Quick Look opens at.
+- Quick Look’s type grows and shrinks with its window as you resize it.
+- Scrolled down, Quick Look’s title bar turns translucent over the text, with a thin line under it, as in System Settings.
+- In Dark Mode, the bar at the bottom of Quick Look stands out from the page, so it looks as if it floats, as it does in Light Mode.
+- Quick Look keeps the alphabet under **Aa Gg 123** at the same line spacing whatever the **Leading**, and lists the styles closer together.
 - **Active** and **Inactive** in the sidebar, and **Activate** and **Deactivate** in menus, have Font Book’s symbols, a seal with a check or a cross.
 - **Show All** under **Languages** in the Info panel looks like the other lists there: the languages reach the popover’s edges and scroll up under the search field.
 - With a family selected, ⌘O opens its font page, as in the Finder. With none selected, it still adds fonts.
@@ -20,6 +25,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Uppercase Accents** and **Lowercase Accents** go letter by letter, all the a’s, then the b’s, with letters like æ and ß after the a’s and s’s. Before, they were in Unicode’s order, which split them up.
 - **Leading** now goes up to 200 %, down from 250 %.
 - On a font page, the family name, the styles list and **Glyphs** are in full black (white in Dark Mode), like the text at the top, rather than a dark grey.
+- The list, grid and specimens, **Similar** on font pages, Compare, the **Character Toolbox** and Quick Look show fonts in full black (white in Dark Mode) too.
 - A font page’s text now sits in the middle of its lines at any **Leading**, with as much room above as below. Before, all of a large Leading’s room went above the letters, so a single line, or the cursor in empty text, sat near the bottom.
 - The text cursor on a font page now fits the letters at any **Leading**. Before, it started halfway up the capitals when the lines were tight and reached far above them when they were loose.
 - **Leave the files where they are** in **Preferences → General** is now **Leave files where they are**.

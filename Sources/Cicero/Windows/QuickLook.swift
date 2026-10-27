@@ -23,7 +23,7 @@ final class QuickLook {
     /// Saved once the user resizes it. (The size under "quickLook.size" was saved on every close, so it was
     /// the old default, 680 × 620, for most.)
     private static let sizeKey = "quickLook.panelSize"
-    private static let defaultSize = NSSize(width: 520, height: 440)
+    static let defaultSize = NSSize(width: 520, height: 440)
 
     // MARK: What it shows
 
@@ -169,8 +169,9 @@ final class QuickLook {
         panel.setFrame(NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height), display: false)
     }
 
+    /// Not while it fills the screen: filling it and going back end as a live resize does.
     private func saveSize() {
-        guard let panel, panel.isVisible else { return }
+        guard let panel, panel.isVisible, !panel.isZoomed else { return }
         UserDefaults.standard.set(NSStringFromSize(panel.frame.size), forKey: Self.sizeKey)
     }
 }
@@ -191,15 +192,177 @@ final class QuickLookPanel: NSPanel {
         isRestorable = false
         isExcludedFromWindowsMenu = true
         collectionBehavior.insert(.fullScreenAuxiliary)
+        // On macOS 26 the page runs on under the title bar, which turns translucent over it (see `underTitleBar`).
+        if #available(macOS 26, *) { styleMask.insert(.fullSizeContentView) }
         minSize = NSSize(width: 420, height: 320)
         // The title bar in the page's colour, so the name sits on the specimen.
         titlebarAppearsTransparent = true
         titlebarSeparatorStyle = .none
-        backgroundColor = .textBackgroundColor
+        backgroundColor = Self.page
+        addTitleBar()
+        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: self, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateFillButton() }
+        }
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// The page's colour, under the title bar and the specimen alike: the text background's grey as an sRGB colour.
+    /// SwiftUI draws that grey as if it were sRGB, lighter in dark mode than AppKit draws it, and the title bar stood
+    /// out from the page.
+    static let page = NSColor(name: nil) { appearance in
+        var page = NSColor.textBackgroundColor
+        appearance.performAsCurrentDrawingAppearance {
+            if let grey = NSColor.textBackgroundColor.usingColorSpace(.genericGamma22Gray) {
+                page = NSColor(srgbRed: grey.whiteComponent, green: grey.whiteComponent, blue: grey.whiteComponent, alpha: grey.alphaComponent)
+            }
+        }
+        return page
+    }
+
+    override var title: String {
+        didSet { titleLabel.stringValue = title }
+    }
+
+    private let titleLabel = NSTextField(labelWithString: "")
+    private var fillButton: QuickLookTitleButton?
+
+    /// Finder's Quick Look's title bar: two buttons in place of the window's own, which a panel that's never key shows
+    /// grey and empty (one closes it, the other fills the screen with it and goes back to the size it had, as the green
+    /// button did), and the title beside them. A title of its own: AppKit sets its title after the buttons it shows, and
+    /// elsewhere once the title bar has views of its own.
+    private func addTitleBar() {
+        guard let close = standardWindowButton(.closeButton), let bar = close.superview else { return }
+        titleVisibility = .hidden
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            standardWindowButton(kind)?.isHidden = true
+        }
+        let closeButton = QuickLookTitleButton(glyph: .close) { [weak self] in self?.close() }
+        closeButton.toolTip = "Close"
+        closeButton.setAccessibilityLabel("Close")
+        let fillButton = QuickLookTitleButton(glyph: .fill) { [weak self] in self?.zoom(nil) }
+        // Where Finder's are: the close button 1.5 pt right of the window's own, the other 20 pt on. Kept from the bar's
+        // top and left.
+        let top: NSView.AutoresizingMask = bar.isFlipped ? .maxYMargin : .minYMargin
+        let centre = NSPoint(x: close.frame.midX + 1.5, y: close.frame.midY)
+        for (index, button) in [closeButton, fillButton].enumerated() {
+            let side = QuickLookTitleButton.side
+            button.frame = NSRect(x: centre.x + CGFloat(index) * 20 - side / 2, y: centre.y - side / 2, width: side, height: side)
+            button.autoresizingMask = [.maxXMargin, top]
+            bar.addSubview(button)
+        }
+        titleLabel.font = .titleBarFont(ofSize: 0)
+        titleLabel.textColor = QuickLookTitleButton.titleColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.sizeToFit()
+        // Its letters 9 pt after the second circle, less the label's own inset.
+        let start = (centre.x + 20 + QuickLookTitleButton.diameter / 2 + 9 - 2.5).rounded()
+        titleLabel.frame = NSRect(x: start, y: (centre.y - titleLabel.frame.height / 2).rounded(),
+                                  width: max(0, bar.bounds.width - start - 12), height: titleLabel.frame.height)
+        titleLabel.autoresizingMask = [.width, top]
+        bar.addSubview(titleLabel)
+        self.fillButton = fillButton
+        updateFillButton()
+    }
+
+    private func updateFillButton() {
+        guard let fillButton else { return }
+        let filled = isZoomed
+        fillButton.glyph = filled ? .unfill : .fill
+        fillButton.toolTip = filled ? "Return to the previous size" : "Fill the screen"
+        fillButton.setAccessibilityLabel(filled ? "Return to Previous Size" : "Fill")
+    }
+}
+
+/// A grey circle with its symbol cut out, drawn as Finder's Quick Look draws its own: a 12 pt circle, an × of round
+/// strokes or the full-screen triangles. Drawn here rather than as a tinted symbol, which AppKit greys in a window that
+/// isn't key, as this one never is. It takes the first click in the panel.
+private final class QuickLookTitleButton: NSButton {
+    enum Glyph {
+        case close, fill, unfill
+    }
+
+    static let diameter: CGFloat = 12
+    /// Room to click around the circle.
+    static let side: CGFloat = 16
+    /// Finder's greys, measured from its Quick Look on screen: black or white, partly see-through.
+    private static let circle = grey(light: 0.55, dark: 0.8)
+    private static let pressedCircle = grey(light: 0.72, dark: 0.92)
+    static let titleColor = grey(light: 0.71, dark: 0.74)
+
+    private static func grey(light: CGFloat, dark: CGFloat) -> NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 1, green: 1, blue: 1, alpha: dark) : NSColor(srgbRed: 0, green: 0, blue: 0, alpha: light)
+        }
+    }
+
+    private let perform: () -> Void
+
+    var glyph: Glyph {
+        didSet { if glyph != oldValue { needsDisplay = true } }
+    }
+
+    init(glyph: Glyph, action: @escaping () -> Void) {
+        self.glyph = glyph
+        perform = action
+        super.init(frame: .zero)
+        isBordered = false
+        title = ""
+        target = self
+        self.action = #selector(clicked)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var isFlipped: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    @objc private func clicked() { perform() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.saveGState()
+        context.translateBy(x: bounds.midX - Self.diameter / 2, y: bounds.midY - Self.diameter / 2)
+        // The symbol cuts the circle only.
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        context.setFillColor((isHighlighted ? Self.pressedCircle : Self.circle).cgColor)
+        context.fillEllipse(in: CGRect(x: 0, y: 0, width: Self.diameter, height: Self.diameter))
+        context.setBlendMode(.clear)
+        switch glyph {
+        case .close:
+            context.setLineWidth(1.75)
+            context.setLineCap(.round)
+            context.strokeLineSegments(between: [CGPoint(x: 3.57, y: 3.57), CGPoint(x: 8.43, y: 8.43),
+                                                 CGPoint(x: 3.57, y: 8.43), CGPoint(x: 8.43, y: 3.57)])
+        case .fill:
+            // Pointing out to the top left and the bottom right.
+            context.addPath(Self.triangle(corner: CGPoint(x: 3, y: 3), legs: 4.25, towards: 1))
+            context.addPath(Self.triangle(corner: CGPoint(x: 9, y: 9), legs: 4.25, towards: -1))
+            context.fillPath()
+        case .unfill:
+            // Pointing in, at each other.
+            context.addPath(Self.triangle(corner: CGPoint(x: 5.25, y: 5.25), legs: 3.5, towards: -1))
+            context.addPath(Self.triangle(corner: CGPoint(x: 6.75, y: 6.75), legs: 3.5, towards: 1))
+            context.fillPath()
+        }
+        context.endTransparencyLayer()
+        context.restoreGState()
+    }
+
+    /// A right triangle with its right angle at `corner`, rounded, and its legs running right and down from it
+    /// (`towards` 1) or left and up (-1).
+    private static func triangle(corner: CGPoint, legs: CGFloat, towards direction: CGFloat) -> CGPath {
+        let across = CGPoint(x: corner.x + legs * direction, y: corner.y)
+        let path = CGMutablePath()
+        path.move(to: across)
+        path.addLine(to: CGPoint(x: corner.x, y: corner.y + legs * direction))
+        path.addArc(tangent1End: corner, tangent2End: across, radius: 1)
+        path.closeSubpath()
+        return path
+    }
 }
 
 /// Takes a click in a window that isn't key as a click, not as a request to bring the window forward:
@@ -248,15 +411,18 @@ final class WindowReaderView: NSView {
 
 // MARK: - Content
 
-/// The panel's content, while it's open.
+/// The panel's content, while it's open, in the panel's width, which its type follows.
 private struct QuickLookView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         if model.quickLook.isOpen, let shown = model.quickLook.shown {
-            FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count)
-                // A new family starts at the top.
-                .id(shown.family.id)
+            GeometryReader { proxy in
+                FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count, width: proxy.size.width,
+                                titleBar: proxy.safeAreaInsets.top)
+                    // A new family starts at the top.
+                    .id(shown.family.id)
+            }
         }
     }
 }
@@ -265,58 +431,81 @@ private struct QuickLookView: View {
 private struct FamilyQuickLook: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    @Environment(\.colorScheme) private var colorScheme
     let family: Family
     let index: Int
     let count: Int
+    let width: CGFloat
+    /// How tall the title bar is, over the top of the page on macOS 26.
+    let titleBar: CGFloat
+    /// Whether the page is scrolled down, under the title bar.
+    @State private var isScrolled = false
 
     /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
 
+    /// How much bigger than in the panel at its first width the type and the room around it are: they grow and shrink
+    /// with the panel's width smoothly, set at sizes in fractions of a point, the margins at the sides staying as they
+    /// are. (Zoomed as a picture, the type was blurred; at whole points, lines jumped from one size to the next.)
+    private var scale: Double {
+        max(0.1, (width - 2 * Self.inset) / (QuickLook.defaultSize.width - 2 * Self.inset))
+    }
+
     var body: some View {
+        let scale = scale
         ScrollView {
             // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
-                sample()
+                sample(scale: scale)
                     .padding(.horizontal, Self.inset)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
+                    .padding(.top, 12 * scale)
+                    .padding(.bottom, 24 * scale)
                 // With one style the sample already shows it.
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 15 * scale)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: 22 * scale, weight: style.face.styleWeight)
+                            // As tall as the font's own line spacing, without padding: some fonts keep room above their
+                            // capitals (for accents, a taller style), and padding as well spread the rows far apart.
+                            // At least 1.25 × the size, for fonts set tight.
+                            .frame(minHeight: 22 * scale * 1.25)
                             .padding(.horizontal, Self.inset)
-                            .padding(.vertical, 5)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
+            .foregroundStyle(Color.ink)
         }
-        .background(Color.canvas)
+        .onScrollGeometryChange(for: Bool.self, of: { $0.contentOffset.y + $0.contentInsets.top > 0.5 }) { _, scrolled in
+            isScrolled = scrolled
+        }
+        .underTitleBar(titleBar, isScrolled: isScrolled)
+        .background(Color(nsColor: QuickLookPanel.page))
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
 
-    /// On the left, with Preview Options' leading.
-    private func sample() -> some View {
+    /// On the left. The sample text with Preview Options' leading; the alphabet, three lines of letters rather than
+    /// text, always 120 % of its size apart, so a high Leading set for the text doesn't spread them out.
+    private func sample(scale: Double) -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
         return Group {
             if preview.sampleText.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96,
+                VStack(alignment: .leading, spacing: 14 * scale) {
+                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96 * scale,
                                   variations: variations)
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
-                                  lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
+                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24 * scale,
+                                  variations: variations, lineLimit: nil, lineHeight: 24 * scale * 1.2)
                 }
             } else {
-                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
-                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
+                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56 * scale,
+                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56 * scale))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -347,6 +536,12 @@ private struct FamilyQuickLook: View {
         .padding(.horizontal, 14)
         .frame(height: 36)
         .glass(in: .capsule)
+        .overlay {
+            // In dark mode the glass is as dark as the page, and the bar didn't look as if it floated over it.
+            if #available(macOS 26, *), colorScheme == .dark {
+                Capsule().fill(.white.opacity(0.06)).allowsHitTesting(false)
+            }
+        }
         .padding(12)
     }
 
@@ -369,6 +564,27 @@ private struct FamilyQuickLook: View {
     }
 }
 
+private extension View {
+    /// The page under the title bar, as under a window's toolbar: on macOS 26 it runs on under the title bar `height` tall,
+    /// which stays the page's colour while the page is at the top and, scrolled, turns translucent over it, with a line
+    /// under it. macOS 15 keeps the page below the title bar, and draws the line.
+    @ViewBuilder func underTitleBar(_ height: CGFloat, isScrolled: Bool) -> some View {
+        if #available(macOS 26, *) {
+            // A bar that draws something, however faint: a clear one gets no edge effect under it.
+            safeAreaBar(edge: .top, spacing: 0) {
+                Color.black.opacity(0.001)
+                    .frame(height: height)
+                    .overlay(alignment: .bottom) { if isScrolled { Divider() } }
+                    .allowsHitTesting(false)
+            }
+            .scrollEdgeEffectStyle(.hard, for: .top)
+            .ignoresSafeArea(.container, edges: .top)
+        } else {
+            overlay(alignment: .top) { if isScrolled { Divider() } }
+        }
+    }
+}
+
 /// `FontText` once its face's file has been read. Until then the file is read off the main thread, with room
 /// kept for the text, so stepping onto a family whose files nothing has read yet never holds up the selection.
 private struct QuickLookText: View {
@@ -384,7 +600,7 @@ private struct QuickLookText: View {
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
             FontText(text: text, face: face, size: size, weight: weight, variations: variations,
-                     lineLimit: lineLimit, lineHeight: lineHeight)
+                     lineLimit: lineLimit, lineHeight: lineHeight, cached: false)
         } else {
             Text(text)
                 .font(.system(size: size))
@@ -392,11 +608,7 @@ private struct QuickLookText: View {
                 .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
                 .hidden()
                 .task(id: face.id) {
-                    let (face, size, weight, variations) = (face, size, weight, variations)
-                    // Makes the font too, so drawing it is a cache hit.
-                    await Task.detached(priority: .userInitiated) {
-                        _ = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
-                    }.value
+                    await FontLoader.shared.read(face.path)
                     readPath = face.path
                 }
         }

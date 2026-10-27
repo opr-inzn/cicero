@@ -37,13 +37,18 @@ struct FontText: View {
     var lineHeight: Double?
     /// What to multiply the size by, for the font at the size: the grid draws fonts too wide for its tiles smaller.
     var scale: ((CTFont) -> CGFloat)?
+    /// False makes the font without keeping it, for text whose size changes smoothly, as Quick Look's does while its
+    /// panel is resized: kept, every size would push fonts on screen out of the cache, which keeps sizes to half a point
+    /// and so would hand back a font a little bigger or smaller.
+    var cached = true
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let atSize = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let atSize = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features, cached: cached)
             let scale = scale?(atSize) ?? 1
-            let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations, features: features)
+            let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations,
+                                                                    features: features, cached: cached)
             Text(text.isEmpty ? " " : text)
                 .font(Font(font))
                 .lineLimit(lineLimit)

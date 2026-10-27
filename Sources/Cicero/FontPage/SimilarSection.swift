@@ -76,6 +76,7 @@ struct SimilarSection: View {
         } label: {
             // Its name, whatever the preview text, so that the row says which family it is.
             FontText(text: other.name, face: face, size: 20, weight: preview.weight, features: model.features(for: other))
+                .foregroundStyle(Color.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // One height for every row, whatever each font's line spacing; tall glyphs reach past it, never cut off.
                 .frame(height: 44)
