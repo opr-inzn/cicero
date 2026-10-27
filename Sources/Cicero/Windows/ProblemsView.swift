@@ -12,8 +12,8 @@ struct ProblemsView: View {
         }
         Group {
             if groups.isEmpty {
-                ContentUnavailableView("No Conflicts", systemImage: "checkmark.circle",
-                                       description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts"))
+                EmptyState("No Conflicts", systemImage: "checkmark.circle",
+                           description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts"))
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {

@@ -334,6 +334,55 @@ struct StatusTag: View {
     }
 }
 
+/// ContentUnavailableView with its symbol nearer the title: macOS leaves 22 pt between them, so they looked like two
+/// separate things. The same symbol and title otherwise, to the pixel on macOS 26, in light and dark.
+struct EmptyState<Actions: View>: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    var description: Text?
+    @ViewBuilder var actions: Actions
+
+    init(_ title: LocalizedStringKey, systemImage: String, description: Text? = nil,
+         @ViewBuilder actions: () -> Actions) {
+        self.title = title
+        self.systemImage = systemImage
+        self.description = description
+        self.actions = actions()
+    }
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage).labelStyle(EmptyStateLabelStyle())
+        } description: {
+            description
+        } actions: {
+            actions
+        }
+    }
+}
+
+extension EmptyState where Actions == EmptyView {
+    init(_ title: LocalizedStringKey, systemImage: String, description: Text? = nil) {
+        self.init(title, systemImage: systemImage, description: description) {}
+    }
+
+    /// The system's search one: no families match what's typed or the filter tokens.
+    static func search(text: String = "") -> Self {
+        EmptyState(text.isEmpty ? "No Results" : "No Results for “\(text)”", systemImage: "magnifyingglass",
+                   description: Text("Check the spelling or try a new search."))
+    }
+}
+
+/// ContentUnavailableView's own label, which can't be given a spacing (or a style from outside the view).
+private struct EmptyStateLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: 8) {
+            configuration.icon.font(.system(size: 36)).foregroundStyle(.tertiary)
+            configuration.title.bold()
+        }
+    }
+}
+
 /// The system slider on macOS 27, which draws it itself, and one drawn by Cicero before that: macOS 26's slider's
 /// glass knob disappears in toolbar popovers. Continuous, rounded to the step: a stepped system slider can
 /// show a tick for every step.

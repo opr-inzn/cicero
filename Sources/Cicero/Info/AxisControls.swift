@@ -16,8 +16,8 @@ struct AxisControls: View {
         ReadingFonts(paths: [style.face.path]) {
             let axes = FontLoader.shared.axes(of: style.face)
             if axes.isEmpty {
-                ContentUnavailableView("No Axes", systemImage: "slider.horizontal.3",
-                                       description: Text("\(style.face.styleName) isn’t a variable style."))
+                EmptyState("No Axes", systemImage: "slider.horizontal.3",
+                           description: Text("\(style.face.styleName) isn’t a variable style."))
             } else {
                 form(axes, style: style, weight: weight)
             }

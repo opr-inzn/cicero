@@ -142,8 +142,8 @@ private struct InfoPanel: View {
             FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
         } else {
             let count = model.selectedIDs.count
-            ContentUnavailableView(count > 1 ? "\(count) Fonts Selected" : "No Selection", systemImage: "info.circle",
-                                   description: Text("Select a single font to see its info."))
+            EmptyState(count > 1 ? "\(count) Fonts Selected" : "No Selection", systemImage: "info.circle",
+                       description: Text("Select a single font to see its info."))
         }
     }
 }
@@ -415,8 +415,8 @@ private struct FeatureControls: View {
         let groups = loaded?.value
         Group {
             if let groups, groups.isEmpty {
-                ContentUnavailableView("No Features", systemImage: "textformat.abc",
-                                       description: Text("This font has no optional OpenType features to switch on or off."))
+                EmptyState("No Features", systemImage: "textformat.abc",
+                           description: Text("This font has no optional OpenType features to switch on or off."))
             } else if let groups {
                 // A box of switches per feature, like the system Typography panel.
                 Form {

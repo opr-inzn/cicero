@@ -75,11 +75,11 @@ private struct TextTab: View {
         ZStack {
             table
             if query.text.isEmpty {
-                ContentUnavailableView("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
-                                       description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
+                EmptyState("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
+                           description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
             } else if matches.isEmpty && !isSearching {
-                ContentUnavailableView("No Fonts Have Every Character", systemImage: "character.textbox",
-                                       description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
+                EmptyState("No Fonts Have Every Character", systemImage: "character.textbox",
+                           description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -327,8 +327,8 @@ private struct LanguagesTab: View {
             }
             .task(id: query) { await load(query) }
         } else {
-            ContentUnavailableView("No Language Selected", systemImage: "globe",
-                                   description: Text("Choose a language to see which fonts support it."))
+            EmptyState("No Language Selected", systemImage: "globe",
+                       description: Text("Choose a language to see which fonts support it."))
         }
     }
 

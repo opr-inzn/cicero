@@ -222,40 +222,28 @@ private struct FolderOutOfReach: View {
         let name = folder?.displayName ?? "This folder"
         switch model.availability(ofFolder: folderID) {
         case .noAccess:
-            ContentUnavailableView {
-                Label("Cicero Can’t Read “\(name)”", systemImage: "lock")
-            } description: {
-                Text("macOS hasn’t let Cicero into this folder. Allow it in System Settings → Privacy & Security → Files and Folders, then try again.")
-            } actions: {
+            EmptyState("Cicero Can’t Read “\(name)”", systemImage: "lock",
+                       description: Text("macOS hasn’t let Cicero into this folder. Allow it in System Settings → Privacy & Security → Files and Folders, then try again.")) {
                 Button("Open Privacy & Security") { model.openFilesAndFoldersSettings() }
                 Button("Try Again") { model.rescan() }
             }
         case .disconnected(let volume):
-            ContentUnavailableView {
-                Label("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark")
-            } description: {
-                Text("The fonts in “\(name)” are back as soon as you connect it. Their folders and tags stay as they are.")
-            } actions: {
+            EmptyState("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark",
+                       description: Text("The fonts in “\(name)” are back as soon as you connect it. Their folders and tags stay as they are.")) {
                 Button("Try Again") { model.rescan() }
             }
         case .notFound:
-            ContentUnavailableView {
-                Label("Can’t Find “\(name)”", systemImage: "questionmark.folder")
-            } description: {
-                Text("Nothing is at \(((folder?.path ?? "") as NSString).abbreviatingWithTildeInPath) now. If it’s on a disk or a server, connect it. If it moved, remove it from the library and add it again.")
-            } actions: {
+            EmptyState("Can’t Find “\(name)”", systemImage: "questionmark.folder",
+                       description: Text("Nothing is at \(((folder?.path ?? "") as NSString).abbreviatingWithTildeInPath) now. If it’s on a disk or a server, connect it. If it moved, remove it from the library and add it again.")) {
                 Button("Try Again") { model.rescan() }
                 Button("Remove Location from Library") { model.removeFolder(folderID) }
             }
         case nil:
             let count = model.onlineOnlyCount(inFolder: folderID)
-            ContentUnavailableView {
-                Label("Online Only", systemImage: "icloud.and.arrow.down")
-            } description: {
-                Text(count == 1
-                    ? "The font file here is online only: the cloud service keeps it off this Mac. Download it to see it. To keep it on this Mac, make the folder available offline in the Finder."
-                    : "The \(count.formatted()) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")
-            } actions: {
+            EmptyState("Online Only", systemImage: "icloud.and.arrow.down",
+                       description: Text(count == 1
+                           ? "The font file here is online only: the cloud service keeps it off this Mac. Download it to see it. To keep it on this Mac, make the folder available offline in the Finder."
+                           : "The \(count.formatted()) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")) {
                 if let progress = model.downloads[folderID] {
                     ProgressView("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
                         .controlSize(.small)
@@ -273,9 +261,9 @@ private struct EmptyBrowser: View {
     var body: some View {
         let query = model.appliedSearch.trimmingCharacters(in: .whitespaces)
         if !query.isEmpty {
-            ContentUnavailableView.search(text: query)
+            EmptyState.search(text: query)
         } else if !model.searchTokens.isEmpty {
-            ContentUnavailableView.search
+            EmptyState.search()
         } else {
             content
         }
@@ -285,11 +273,11 @@ private struct EmptyBrowser: View {
     private var content: some View {
         if model.similarFamilyID != nil {
             // Only when the family is gone, or hidden: it comes first otherwise.
-            ContentUnavailableView("Font Not Available", systemImage: "textformat",
-                                   description: Text("This font is no longer in your library."))
+            EmptyState("Font Not Available", systemImage: "textformat",
+                       description: Text("This font is no longer in your library."))
         } else if let list = model.documentList {
-            ContentUnavailableView("No Fonts in Your Library", systemImage: "doc.text.magnifyingglass",
-                                   description: Text("None of the fonts “\(list.name)” uses are in your library."))
+            EmptyState("No Fonts in Your Library", systemImage: "doc.text.magnifyingglass",
+                       description: Text("None of the fonts “\(list.name)” uses are in your library."))
         } else {
             sidebarItemContent
         }
@@ -303,48 +291,42 @@ private struct EmptyBrowser: View {
         case .inactive:
             // With no locations of their own too: what's here is what's on, and Proofing may well be under Locations.
             // Add Fonts only while it lists files where they are; installing them would turn them on.
-            ContentUnavailableView {
-                Label("Everything Is Active", systemImage: "checkmark.seal")
-            } description: {
-                Text(model.installsAddedFiles
-                    ? "Every font in your library is turned on. Add a folder of fonts to keep more here without activating them."
-                    : "Every font in your library is turned on. Add a folder of fonts, or font files, to keep more here without activating them.")
-            } actions: {
+            EmptyState("Everything Is Active", systemImage: "checkmark.seal",
+                       description: Text(model.installsAddedFiles
+                           ? "Every font in your library is turned on. Add a folder of fonts to keep more here without activating them."
+                           : "Every font in your library is turned on. Add a folder of fonts, or font files, to keep more here without activating them.")) {
                 Button("Add Location") { model.presentAddFolderPanel() }
                 if !model.installsAddedFiles {
                     Button("Add Fonts") { model.presentAddFontsPanel() }
                 }
             }
         case .active:
-            ContentUnavailableView("Nothing Active", systemImage: "xmark.seal",
-                                   description: Text("Turn a font on and it shows up here."))
+            EmptyState("Nothing Active", systemImage: "xmark.seal",
+                       description: Text("Turn a font on and it shows up here."))
         case .temporary:
-            ContentUnavailableView("No Temporary Fonts", systemImage: "clock",
-                                   description: Text("Fonts you activate temporarily show up here until Cicero quits."))
+            EmptyState("No Temporary Fonts", systemImage: "clock",
+                       description: Text("Fonts you activate temporarily show up here until Cicero quits."))
         case .recent:
-            ContentUnavailableView("No Recent Fonts", systemImage: "tray.and.arrow.down",
-                                   description: Text("Fonts that arrive on your Mac show up here for a week."))
+            EmptyState("No Recent Fonts", systemImage: "tray.and.arrow.down",
+                       description: Text("Fonts that arrive on your Mac show up here for a week."))
         case .set:
-            ContentUnavailableView("Empty Folder", systemImage: "folder",
-                                   description: Text("Drag fonts onto the folder in the sidebar, or right-click a font and choose Add to Folder."))
+            EmptyState("Empty Folder", systemImage: "folder",
+                       description: Text("Drag fonts onto the folder in the sidebar, or right-click a font and choose Add to Folder."))
         case .smartSet(let id):
-            ContentUnavailableView {
-                Label("No Matching Fonts", systemImage: "gearshape")
-            } description: {
-                Text("No fonts in your library match this smart folder’s rules.")
-            } actions: {
+            EmptyState("No Matching Fonts", systemImage: "gearshape",
+                       description: Text("No fonts in your library match this smart folder’s rules.")) {
                 if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
                     Button("Edit Smart Folder") { model.editingSmartSet = smartSet }
                 }
             }
         case .characterSet(let id) where model.coverageProgress != nil:
-            ContentUnavailableView("Checking Characters", systemImage: "character.textbox",
-                                   description: Text("Fonts that have every character of \(model.characterSet(id)?.name ?? "this set") will show up here."))
+            EmptyState("Checking Characters", systemImage: "character.textbox",
+                       description: Text("Fonts that have every character of \(model.characterSet(id)?.name ?? "this set") will show up here."))
         case .characterSet(let id):
-            ContentUnavailableView("No Fonts with Every Character", systemImage: "character.textbox",
-                                   description: Text("None of these fonts have all the characters in \(model.characterSet(id)?.name ?? "this set")."))
+            EmptyState("No Fonts with Every Character", systemImage: "character.textbox",
+                       description: Text("None of these fonts have all the characters in \(model.characterSet(id)?.name ?? "this set")."))
         default:
-            ContentUnavailableView("No Fonts", systemImage: "textformat")
+            EmptyState("No Fonts", systemImage: "textformat")
         }
     }
 }

@@ -48,11 +48,8 @@ struct CompareWindow: View {
                 // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls
                 // under it.
                 ScrollView {
-                    ContentUnavailableView {
-                        Label("Nothing to Compare", systemImage: "square.on.square")
-                    } description: {
-                        Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")
-                    } actions: {
+                    EmptyState("Nothing to Compare", systemImage: "square.on.square",
+                               description: Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")) {
                         Button("Add Families") { isAdding = true }
                     }
                     .containerRelativeFrame([.horizontal, .vertical])

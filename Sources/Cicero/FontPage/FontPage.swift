@@ -17,8 +17,8 @@ struct FontPage: View {
         if let family = model.family(familyID) {
             page(family)
         } else {
-            ContentUnavailableView("Font Not Available", systemImage: "textformat",
-                                   description: Text("This font is no longer in your library."))
+            EmptyState("Font Not Available", systemImage: "textformat",
+                       description: Text("This font is no longer in your library."))
                 .onExitCommand { model.openFamilyID = nil }
         }
     }

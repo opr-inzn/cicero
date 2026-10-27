@@ -79,8 +79,8 @@ struct GlyphsSection: View {
         .padding(.top, 56)
         .padding(.bottom, 4)
         if shown.isEmpty && shownLigatures.isEmpty {
-            ContentUnavailableView(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
-                                   description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
+            EmptyState(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
+                       description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else {
             let lead = GlyphSection.beforeLigatures(shown, of: sections)
