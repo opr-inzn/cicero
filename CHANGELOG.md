@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Show Missing**, under **Coverage** in the Info panel, lists the characters a font still needs for the next Latin size, like Latin S, with their names and codes. **Copy Characters** there puts them on the clipboard, to paste into your font editor.
+- The Info panel no longer has a **Weight** row. It showed the weight of the style the panel describes, which read as the whole family’s.
 - **Active** and **Inactive** in the sidebar, and **Activate** and **Deactivate** in menus, have Font Book’s symbols, a seal with a check or a cross.
 - With a family selected, ⌘O opens its font page, as in the Finder. With none selected, it still adds fonts.
 - ⌘← (**View → Back**) goes from a font page back to the browser, as Esc does.
