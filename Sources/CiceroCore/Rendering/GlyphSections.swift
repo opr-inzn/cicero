@@ -2,19 +2,19 @@ import CoreText
 import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the small
-/// capitals its features draw for them, the figures, Roman numerals among them, then punctuation, which any text has,
-/// before currency and the other signs, then each other script, Greek first, as Unicode lists them, then the forms
-/// its features draw for languages, which can be of any script, then what's in no script, like the private-use glyphs,
-/// and last the accents and marks, which have no letter to sit on and are looked for least. A font without Latin
-/// letters starts with its scripts (see `GlyphSection.sections`).
+/// capitals its features draw for them, the ligatures, then the forms its features draw for languages, after the
+/// letters they're forms of, the figures, Roman numerals among them, then punctuation, which any text has, before
+/// currency and the other signs, then each other script, Greek first, as Unicode lists them, then what's in no
+/// script, like the private-use glyphs, and last the accents and marks, which have no letter to sit on and are looked
+/// for least. A font without Latin letters starts with its scripts (see `GlyphSection.sections`).
 public enum GlyphGroup: Hashable, Comparable, Sendable {
-    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, proportionalFigures, tabularFigures
+    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, localizedForms, proportionalFigures, tabularFigures
     case circledFigures, romanNumerals, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
     case caseSensitiveForms, arrows
     /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
     /// in the Unicode blocks for it.
     case script(String)
-    case localizedForms, graphical, diacriticalMarks, combiningMarks
+    case graphical, diacriticalMarks, combiningMarks
 
     public static let greek = GlyphGroup.script("Greek")
 
@@ -69,23 +69,23 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .lowercaseAccents: 3
         case .smallCaps: 4
         case .ligatures: 5
-        case .proportionalFigures: 6
-        case .tabularFigures: 7
-        case .circledFigures: 8
-        case .romanNumerals: 9
-        case .punctuationAndSymbols: 10
-        case .currency: 11
-        case .mathematicalOperators: 12
-        case .superscripts: 13
-        case .subscripts: 14
-        case .fractions: 15
-        case .numerators: 16
-        case .denominators: 17
-        case .ordinals: 18
-        case .caseSensitiveForms: 19
-        case .arrows: 20
-        case .script: 21
-        case .localizedForms: 22
+        case .localizedForms: 6
+        case .proportionalFigures: 7
+        case .tabularFigures: 8
+        case .circledFigures: 9
+        case .romanNumerals: 10
+        case .punctuationAndSymbols: 11
+        case .currency: 12
+        case .mathematicalOperators: 13
+        case .superscripts: 14
+        case .subscripts: 15
+        case .fractions: 16
+        case .numerators: 17
+        case .denominators: 18
+        case .ordinals: 19
+        case .caseSensitiveForms: 20
+        case .arrows: 21
+        case .script: 22
         case .graphical: 23
         case .diacriticalMarks: 24
         case .combiningMarks: 25

@@ -47,8 +47,8 @@ struct GlyphsSection: View {
     /// title, or an empty line of it below the run before, and as far from its cells as the title is from its cells.
     static let labelLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .callout)).rounded(.up)
     static let labelGap: CGFloat = 4
-    /// Above a label after a run, which leaves `spacing` below its last row.
-    static let runGap = labelLine - spacing
+    /// Above a label after a run, which leaves `spacing` below its last row: an empty line, but 2 pt.
+    static let runGap = labelLine - spacing - 2
     /// The size a cell's character, or ligature, is set at.
     static let glyphSize: CGFloat = 26
 
