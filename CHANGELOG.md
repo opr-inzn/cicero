@@ -13,7 +13,6 @@ Each version’s notes here become its release notes on the [releases page](http
 - Cicero’s Deactivated folder is now called Inactive, `~/Library/Application Support/Cicero/Inactive`. Cicero renames it as it opens.
 - The Info panel opens with the font’s details already in it, and shows them at once when you select a font while it’s open. Before, it slid in with spinners and the details faded in only after it had stopped, and selecting a font with nothing selected showed a spinner for a moment.
 - With **Ask each time** chosen in **Preferences → General**, turning on a font that’s off in your Fonts folder or in Cicero’s Library no longer asks how to turn it on. It goes on where it is, as it did whichever you picked.
-- **Replace** now also puts the new version into Cicero’s Library when the font in your Fonts folder is a copy Cicero installed from there. Before, the old version stayed there.
 - When **Replace** puts a newer version of a font in the place of the one the Info panel shows, the panel shows the new version’s details. Before, it kept the old ones until you selected another font.
 
 ## 0.10.10

@@ -7,17 +7,15 @@ extension ActivationEngine {
     /// that takes and on again the way it was: in place, until Cicero quits, or from a Fonts folder. One that's off in a
     /// Fonts folder has its copy go in off (see `moveIntoFontsFolderOff`), as macOS turns on whatever arrives there; see
     /// `replaceOff`. With fonts installed into Cicero's Library, its copy goes there instead, off, as FontExplorer X
-    /// does it; see `replaceIntoLibrary`. A copy Cicero installed from an original in Cicero's Library has the original
-    /// replaced too, listed or not (see `originalsInLibrary`); one that's off then just goes to the Trash while fonts are
-    /// installed there, as the original is the font. The copy is made in Cicero's staging folder first, so a file whose
-    /// copy can't be made or go in, or that can't go to the Trash, stays as it was. Its paths stay, so the records and
+    /// does it; see `replaceIntoLibrary`; and one Cicero installed from an original there that's replaced too just goes to
+    /// the Trash, as the original is the font. The copy is made in Cicero's staging folder first, so a file whose copy
+    /// can't be made or go in, or that can't go to the Trash, stays as it was. Its paths stay, so the records and
     /// everything the user put it in do too, but for an off one that went in under another name or went for its original
     /// (`placed` says where). `moving`, an added file that took every place it was meant for goes, as activating by
     /// moving does.
     @concurrent
     public func replace(_ replacements: [FileReplacement], moving: Bool, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
-        let replacements = replacements + originalsInLibrary(of: replacements, records: records)
         let olds = replacements.map(\.old)
         let persistent = olds.filter { records.inPlace.contains($0) || isInsideUserFonts($0) && registrar.isActive(Self.url($0)) }
         let session = olds.filter { records.temporary[$0] != nil }
@@ -132,26 +130,6 @@ extension ActivationEngine {
         result.placed = placed
         result.renameLater = renameLater
         return result
-    }
-
-    /// The originals in Cicero's Library of copies Cicero installed that these replace, each to take the same added file:
-    /// the library doesn't list them while fonts aren't installed there, and an old version left there, still named as
-    /// the copy's original, would show up beside the new one once fonts are installed there again. Not one whose fonts
-    /// aren't the copy's, by PostScript name, as one changed since might not be.
-    func originalsInLibrary(of replacements: [FileReplacement], records: ActivationRecords) -> [FileReplacement] {
-        var olds = Set(replacements.map(\.old))
-        var originals: [FileReplacement] = []
-        func names(_ path: String) -> Set<String> { Set(FontFileReader.faces(atPath: path).map(\.postScriptName)) }
-        for replacement in replacements {
-            guard let original = records.installedCopies[replacement.old], isInFontLibrary(original), !olds.contains(original),
-                  FileManager.default.fileExists(atPath: original)
-            else { continue }
-            let fonts = names(original)
-            guard !fonts.isEmpty, fonts == names(replacement.old) else { continue }
-            olds.insert(original)
-            originals.append(FileReplacement(old: original, added: replacement.added))
-        }
-        return originals
     }
 
     /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement). macOS keeps a
