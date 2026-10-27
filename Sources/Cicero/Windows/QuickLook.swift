@@ -217,29 +217,32 @@ final class QuickLookPanel: NSPanel {
     /// button did), and the title beside them. A title of its own: AppKit sets its title after the buttons it shows, and
     /// elsewhere once the title bar has views of its own.
     private func addTitleBar() {
-        guard let close = standardWindowButton(.closeButton), let second = standardWindowButton(.miniaturizeButton),
-              let bar = close.superview else { return }
+        guard let close = standardWindowButton(.closeButton), let bar = close.superview else { return }
         titleVisibility = .hidden
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             standardWindowButton(kind)?.isHidden = true
         }
-        let closeButton = QuickLookTitleButton(symbol: "xmark.circle.fill") { [weak self] in self?.close() }
+        let closeButton = QuickLookTitleButton(glyph: .close) { [weak self] in self?.close() }
         closeButton.toolTip = "Close"
         closeButton.setAccessibilityLabel("Close")
-        let fillButton = QuickLookTitleButton(symbol: "arrow.up.left.and.arrow.down.right.circle.fill") { [weak self] in self?.zoom(nil) }
-        // Kept where the window's buttons are, from the title bar's top and left.
+        let fillButton = QuickLookTitleButton(glyph: .fill) { [weak self] in self?.zoom(nil) }
+        // Where Finder's are: the close button 1.5 pt right of the window's own, the other 20 pt on. Kept from the bar's
+        // top and left.
         let top: NSView.AutoresizingMask = bar.isFlipped ? .maxYMargin : .minYMargin
-        for (button, place) in [(closeButton, close.frame), (fillButton, second.frame)] {
-            button.frame = place
+        let centre = NSPoint(x: close.frame.midX + 1.5, y: close.frame.midY)
+        for (index, button) in [closeButton, fillButton].enumerated() {
+            let side = QuickLookTitleButton.side
+            button.frame = NSRect(x: centre.x + CGFloat(index) * 20 - side / 2, y: centre.y - side / 2, width: side, height: side)
             button.autoresizingMask = [.maxXMargin, top]
             bar.addSubview(button)
         }
         titleLabel.font = .titleBarFont(ofSize: 0)
-        titleLabel.textColor = .windowFrameTextColor
+        titleLabel.textColor = QuickLookTitleButton.titleColor
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.sizeToFit()
-        let start = second.frame.maxX + 13
-        titleLabel.frame = NSRect(x: start, y: (close.frame.midY - titleLabel.frame.height / 2).rounded(),
+        // Its letters 9 pt after the second circle, less the label's own inset.
+        let start = (centre.x + 20 + QuickLookTitleButton.diameter / 2 + 9 - 2.5).rounded()
+        titleLabel.frame = NSRect(x: start, y: (centre.y - titleLabel.frame.height / 2).rounded(),
                                   width: max(0, bar.bounds.width - start - 12), height: titleLabel.frame.height)
         titleLabel.autoresizingMask = [.width, top]
         bar.addSubview(titleLabel)
@@ -250,50 +253,99 @@ final class QuickLookPanel: NSPanel {
     private func updateFillButton() {
         guard let fillButton else { return }
         let filled = isZoomed
-        fillButton.symbol = filled ? "arrow.down.right.and.arrow.up.left.circle.fill" : "arrow.up.left.and.arrow.down.right.circle.fill"
+        fillButton.glyph = filled ? .unfill : .fill
         fillButton.toolTip = filled ? "Return to the previous size" : "Fill the screen"
         fillButton.setAccessibilityLabel(filled ? "Return to Previous Size" : "Fill")
     }
 }
 
-/// A grey circle with its symbol cut out, as Finder's Quick Look has. It takes the first click in the panel, which is
-/// never key.
+/// A grey circle with its symbol cut out, drawn as Finder's Quick Look draws its own: a 12 pt circle, an × of round
+/// strokes or the full-screen triangles. Drawn here rather than as a tinted symbol, which AppKit greys in a window that
+/// isn't key, as this one never is. It takes the first click in the panel.
 private final class QuickLookTitleButton: NSButton {
-    /// The traffic lights' size.
-    private static let diameter: CGFloat = 14
-    private let perform: () -> Void
-
-    var symbol: String {
-        didSet { if symbol != oldValue { image = Self.image(symbol) } }
+    enum Glyph {
+        case close, fill, unfill
     }
 
-    init(symbol: String, action: @escaping () -> Void) {
-        self.symbol = symbol
+    static let diameter: CGFloat = 12
+    /// Room to click around the circle.
+    static let side: CGFloat = 16
+    /// Finder's greys, measured from its Quick Look on screen: black or white, partly see-through.
+    private static let circle = grey(light: 0.55, dark: 0.8)
+    private static let pressedCircle = grey(light: 0.72, dark: 0.92)
+    static let titleColor = grey(light: 0.71, dark: 0.74)
+
+    private static func grey(light: CGFloat, dark: CGFloat) -> NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 1, green: 1, blue: 1, alpha: dark) : NSColor(srgbRed: 0, green: 0, blue: 0, alpha: light)
+        }
+    }
+
+    private let perform: () -> Void
+
+    var glyph: Glyph {
+        didSet { if glyph != oldValue { needsDisplay = true } }
+    }
+
+    init(glyph: Glyph, action: @escaping () -> Void) {
+        self.glyph = glyph
         perform = action
         super.init(frame: .zero)
         isBordered = false
-        imagePosition = .imageOnly
-        imageScaling = .scaleNone
-        image = Self.image(symbol)
-        contentTintColor = .secondaryLabelColor
+        title = ""
         target = self
         self.action = #selector(clicked)
     }
 
     required init?(coder: NSCoder) { nil }
 
+    override var isFlipped: Bool { true }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     @objc private func clicked() { perform() }
 
-    /// The symbol, its circle as wide as the traffic lights.
-    private static func image(_ symbol: String) -> NSImage? {
-        func image(_ size: CGFloat) -> NSImage? {
-            NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: size, weight: .regular))
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.saveGState()
+        context.translateBy(x: bounds.midX - Self.diameter / 2, y: bounds.midY - Self.diameter / 2)
+        // The symbol cuts the circle only.
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        context.setFillColor((isHighlighted ? Self.pressedCircle : Self.circle).cgColor)
+        context.fillEllipse(in: CGRect(x: 0, y: 0, width: Self.diameter, height: Self.diameter))
+        context.setBlendMode(.clear)
+        switch glyph {
+        case .close:
+            context.setLineWidth(1.75)
+            context.setLineCap(.round)
+            context.strokeLineSegments(between: [CGPoint(x: 3.57, y: 3.57), CGPoint(x: 8.43, y: 8.43),
+                                                 CGPoint(x: 3.57, y: 8.43), CGPoint(x: 8.43, y: 3.57)])
+        case .fill:
+            // Pointing out to the top left and the bottom right.
+            context.addPath(Self.triangle(corner: CGPoint(x: 3, y: 3), legs: 4.25, towards: 1))
+            context.addPath(Self.triangle(corner: CGPoint(x: 9, y: 9), legs: 4.25, towards: -1))
+            context.fillPath()
+        case .unfill:
+            // Pointing in, at each other.
+            context.addPath(Self.triangle(corner: CGPoint(x: 5.25, y: 5.25), legs: 3.5, towards: -1))
+            context.addPath(Self.triangle(corner: CGPoint(x: 6.75, y: 6.75), legs: 3.5, towards: 1))
+            context.fillPath()
         }
-        guard let measured = image(diameter), measured.size.width > 0 else { return nil }
-        return image(diameter * diameter / measured.size.width)
+        context.endTransparencyLayer()
+        context.restoreGState()
+    }
+
+    /// A right triangle with its right angle at `corner`, rounded, and its legs running right and down from it
+    /// (`towards` 1) or left and up (-1).
+    private static func triangle(corner: CGPoint, legs: CGFloat, towards direction: CGFloat) -> CGPath {
+        let across = CGPoint(x: corner.x + legs * direction, y: corner.y)
+        let path = CGMutablePath()
+        path.move(to: across)
+        path.addLine(to: CGPoint(x: corner.x, y: corner.y + legs * direction))
+        path.addArc(tangent1End: corner, tangent2End: across, radius: 1)
+        path.closeSubpath()
+        return path
     }
 }
 
