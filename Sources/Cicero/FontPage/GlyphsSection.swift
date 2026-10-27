@@ -43,7 +43,7 @@ struct GlyphsSection: View {
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 24
-    /// A labelled row's label, like a localized form's language: one line of callout text, right under the group's
+    /// A labelled row's label, like a localized form's language: one line of callout text, the line after the group's
     /// title, or an empty line of it below the run before, and as far from its cells as the title is from its cells.
     static let labelLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .callout)).rounded(.up)
     static let labelGap: CGFloat = 4
@@ -143,7 +143,9 @@ struct GlyphsSection: View {
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
-            .padding(.vertical, 4)
+            // A first row's label follows the title as its next line.
+            .padding(.top, 4)
+            .padding(.bottom, runs.first?.label == nil ? 4 : 0)
         }
     }
 
