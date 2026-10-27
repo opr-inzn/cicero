@@ -2,11 +2,13 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Every character a style draws, and the glyphs its features draw in place of characters', like tabular figures, by
-/// group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place, under headers like the
-/// groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and feature glyphs too.
-/// The alternates its features offer, like a stylistic set's, follow the characters they're for, marked with a grey dot;
-/// figures go in rows by kind instead, lining, old-style, other alternates, then signs (see `GlyphSection.runs`).
+/// Every character a style draws, and the glyphs its features draw in place of characters', like small capitals and
+/// tabular figures, by group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place,
+/// under headers like the groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and
+/// feature glyphs too.
+/// The alternates its features offer, like a stylistic set's, follow the characters or small capitals they're for,
+/// marked with a grey dot; figures go in rows by kind instead, lining, old-style, other alternates, then signs (see
+/// `GlyphSection.runs`).
 /// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
@@ -286,12 +288,12 @@ struct GlyphsSection: View {
         GlyphVectors.dragItem(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
     }
 
-    /// What a glyph's file is called after when the font doesn't name the glyph: its character's code, and the feature
-    /// that draws it, as in "Inter Regular U+0061.ss01.svg".
+    /// What a glyph's file is called after when the font doesn't name the glyph: its character's code, and the features
+    /// that draw it, as in "Inter Regular U+0061.ss01.svg" or "U+0061.smcp.ss01" for a stylistic set's small capital.
     private static func fileFallback(_ cell: Cell) -> String {
         switch cell {
         case .character(let scalar): CharacterCodes.unicode(scalar)
-        case .feature(let glyph): "\(CharacterCodes.unicode(glyph.character)).\(glyph.feature)"
+        case .feature(let glyph): ([CharacterCodes.unicode(glyph.character)] + glyph.featureTags).joined(separator: ".")
         case .alternate(let alternate): "\(CharacterCodes.unicode(alternate.character)).\(alternate.features.first ?? "alt")"
         }
     }
@@ -319,9 +321,9 @@ struct GlyphsSection: View {
         }
         .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
         .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-        // An alternate, after the character's own glyph; grey, as colours stand for tags.
+        // An alternate, after the character's own glyph or a small capital; grey, as colours stand for tags.
         .overlay(alignment: .topTrailing) {
-            if case .alternate = cell {
+            if cell.isAlternate {
                 Circle().fill(.secondary).frame(width: 6, height: 6).padding(5)
             }
         }

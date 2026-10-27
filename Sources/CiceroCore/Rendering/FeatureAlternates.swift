@@ -1,8 +1,8 @@
 import CoreText
 import Foundation
 
-/// A glyph a feature offers in place of a character's own, like a single-storey a in a stylistic set, a small capital
-/// or an old-style figure: the font page lists it after the character's, marked as an alternate.
+/// A glyph a feature offers in place of a character's own, like a single-storey a in a stylistic set, a swash or an
+/// old-style figure: the font page lists it after the character's, marked as an alternate.
 public struct FeatureAlternate: Hashable, Sendable {
     public let glyph: CGGlyph
     /// The character whose glyph it replaces.
@@ -35,8 +35,8 @@ public enum FeatureAlternates {
         if numbered("cv", through: 99) { return 2 }
         switch tag {
         case "swsh", "cswh": return 3
-        case "smcp", "pcap", "unic": return 4
-        case "c2sc", "c2pc": return 5
+        case "pcap", "unic": return 4
+        case "c2pc": return 5
         case "onum", "lnum", "pnum", "zero": return 6
         case "titl", "hist", "calt", "rand", "nalt", "ornm", "jalt": return 7
         default: return nil
@@ -125,5 +125,6 @@ public enum FeatureAlternates {
         "onum": "Old-Style Figures", "lnum": "Lining Figures", "pnum": "Proportional Figures", "zero": "Slashed Zero",
         "titl": "Titling Alternates", "hist": "Historical Forms", "calt": "Contextual Alternates", "rand": "Randomize",
         "nalt": "Alternate Annotation Forms", "ornm": "Ornaments", "jalt": "Justification Alternates",
+        "locl": "Localized Forms", "tnum": "Tabular Figures",
     ]
 }

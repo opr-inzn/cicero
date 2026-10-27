@@ -1,13 +1,13 @@
 import CoreText
 import Foundation
 
-/// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the figures,
-/// then punctuation, which any text has, before currency and the other signs, then each other script, Greek first, as
-/// Unicode lists them, then what's in no script, like the private-use glyphs, and last the accents and marks, which
-/// have no letter to sit on and are looked for least. A font without Latin letters starts with its scripts (see
+/// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the small
+/// capitals its features draw for them, the figures, then punctuation, which any text has, before currency and the
+/// other signs, then each other script, Greek first, as Unicode lists them, then what's in no script, like the
+/// private-use glyphs, and last the accents and marks, which have no letter to sit on and are looked for least. A font without Latin letters starts with its scripts (see
 /// `GlyphSection.sections`).
 public enum GlyphGroup: Hashable, Comparable, Sendable {
-    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, ligatures, proportionalFigures, tabularFigures
+    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, proportionalFigures, tabularFigures
     case circledFigures, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
     case caseSensitiveForms, arrows
     /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
@@ -27,6 +27,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .lowercase: "Lowercase"
         case .uppercaseAccents: "Uppercase Accents"
         case .lowercaseAccents: "Lowercase Accents"
+        case .smallCaps: "Small Caps"
         case .ligatures: "Ligatures"
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
@@ -63,25 +64,26 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .lowercase: 1
         case .uppercaseAccents: 2
         case .lowercaseAccents: 3
-        case .ligatures: 4
-        case .proportionalFigures: 5
-        case .tabularFigures: 6
-        case .circledFigures: 7
-        case .punctuationAndSymbols: 8
-        case .currency: 9
-        case .mathematicalOperators: 10
-        case .superscripts: 11
-        case .subscripts: 12
-        case .fractions: 13
-        case .numerators: 14
-        case .denominators: 15
-        case .ordinals: 16
-        case .caseSensitiveForms: 17
-        case .arrows: 18
-        case .script: 19
-        case .graphical: 20
-        case .diacriticalMarks: 21
-        case .combiningMarks: 22
+        case .smallCaps: 4
+        case .ligatures: 5
+        case .proportionalFigures: 6
+        case .tabularFigures: 7
+        case .circledFigures: 8
+        case .punctuationAndSymbols: 9
+        case .currency: 10
+        case .mathematicalOperators: 11
+        case .superscripts: 12
+        case .subscripts: 13
+        case .fractions: 14
+        case .numerators: 15
+        case .denominators: 16
+        case .ordinals: 17
+        case .caseSensitiveForms: 18
+        case .arrows: 19
+        case .script: 20
+        case .graphical: 21
+        case .diacriticalMarks: 22
+        case .combiningMarks: 23
         }
     }
 
@@ -228,6 +230,15 @@ public enum GlyphCell: Hashable, Sendable {
     case character(UInt32)
     case feature(FeatureGlyph)
     case alternate(FeatureAlternate)
+
+    /// Whether it's an alternate of the cell before it, a character's or a feature glyph's, like a small capital's.
+    public var isAlternate: Bool {
+        switch self {
+        case .character: false
+        case .feature(let glyph): glyph.isAlternate
+        case .alternate: true
+        }
+    }
 }
 
 /// A face's glyphs in one group for the glyph grid: its characters, then the glyphs features draw in place of theirs.
@@ -271,8 +282,9 @@ public struct GlyphSection: Identifiable, Sendable {
         let glyphs = Dictionary(grouping: features, by: \.group)
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
         // A font without Latin letters, like an Arabic or a Syriac one, starts with its scripts: the one it has the most
-        // letters of, then the others, like the Arabic figures of a Syriac font, in Unicode's order.
-        if !groups.contains(where: { $0 < .ligatures }) {
+        // letters of, then the others, like the Arabic figures of a Syriac font, in Unicode's order; its small capitals, like
+        // a Greek font's, after them.
+        if !groups.contains(where: { $0 < .smallCaps }) {
             let main = groups.filter(\.isScript).max { a, b in
                 let (x, y) = (buckets[a]?.count ?? 0, buckets[b]?.count ?? 0)
                 return x != y ? x < y : b < a
@@ -330,6 +342,19 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
+    /// The private-use characters a font maps to `glyphs`, like the U+F761 an older font keeps for its small capital a,
+    /// which is listed with the small capitals.
+    public static func privateUse(in font: CTFont, coverage: ScalarRanges, drawing glyphs: Set<CGGlyph>) -> Set<UInt32> {
+        guard !glyphs.isEmpty else { return [] }
+        var found: Set<UInt32> = []
+        for range in coverage.ranges where range.upperBound >= 0xE000 {
+            for value in range where Unicode.Scalar(value)?.properties.generalCategory == .privateUse {
+                if let glyph = Self.glyph(of: value, in: font), glyphs.contains(glyph) { found.insert(value) }
+            }
+        }
+        return found
+    }
+
     private static func glyph(of value: UInt32, in font: CTFont) -> CGGlyph? {
         guard let scalar = Unicode.Scalar(value) else { return nil }
         var units = Array(String(Character(scalar)).utf16)
@@ -348,8 +373,8 @@ public struct GlyphSection: Identifiable, Sendable {
     }
 
     /// How many of `shown`, some or all of a font's `sections` in their order, come before the ligatures it makes: the
-    /// letters, Latin's or those of the scripts a font without Latin starts with, and the Ligatures group's characters,
-    /// like ﬀ.
+    /// letters, Latin's or those of the scripts a font without Latin starts with, the small capitals and the Ligatures
+    /// group's characters, like ﬀ.
     public static func beforeLigatures(_ shown: [GlyphSection], of sections: [GlyphSection]) -> Int {
         let leading = Set(sections.prefix { $0.group.isScript }.map(\.group))
         let start = shown.prefix { leading.contains($0.group) }.count

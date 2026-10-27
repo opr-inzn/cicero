@@ -119,6 +119,9 @@ final class PageContents {
         let empty = EmptyGlyphs(font: font)
         let scalars = await coverage.coverage(computing: face).scalars
         let featureGlyphs = await features.filter { !empty.contains($0.glyph) }
+        // Small capitals an older font keeps in private use too are listed as small capitals, not again as characters.
+        let smallCaps = GlyphSection.privateUse(in: font, coverage: scalars,
+                                                drawing: Set(featureGlyphs.filter { $0.group == .smallCaps }.map(\.glyph)))
         // Those in groups of their own, like tabular figures, aren't listed again after their characters.
         let grouped = Set(featureGlyphs.map(\.glyph))
         let listed = await alternates.compactMapValues { list in
@@ -133,7 +136,7 @@ final class PageContents {
         // page shows the ones it draws something for anyway.
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
                                              privateUse: GlyphSection.privateUseGroups(in: font, coverage: scalars),
-                                             leavingOut: { EmptyGlyphs.isInvisible($0) && empty.drawsNothing(for: $0) })
+                                             leavingOut: { smallCaps.contains($0) || EmptyGlyphs.isInvisible($0) && empty.drawsNothing(for: $0) })
         return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font)
     }
 }
