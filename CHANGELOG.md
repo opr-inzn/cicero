@@ -2,44 +2,13 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.10.11
 
-- **Show Missing**, under **Coverage** in the Info panel, lists the characters a font still needs for the next Latin size, like Latin S, with their names and codes. **Copy Characters** there puts them on the clipboard, to paste into your font editor.
-- The Info panel no longer has a **Weight** row. It showed the weight of the style the panel describes, which read as the whole family’s.
-- Quick Look has the two buttons of Finder’s Quick Look in place of the window buttons: one closes it, the other fills the screen with it, and a second click puts it back. Filling the screen no longer changes the size Quick Look opens at.
+- **Show Missing**, under **Coverage** in the Info panel, lists the characters a font still needs for the next Latin size. **Copy Characters** puts them on the clipboard.
+- **Glyphs** groups **Small Caps**, **Localized Forms**, **Circled Figures** and Roman numerals on their own, and lists accents and small caps letter by letter.
+- Font samples are full black (white in Dark Mode) in the browser, on font pages, in Compare, the **Character Toolbox** and Quick Look.
 - Quick Look’s type grows and shrinks with its window as you resize it.
-- Scrolled down, Quick Look’s title bar turns translucent over the text, with a thin line under it, as in System Settings.
-- In Dark Mode, the bar at the bottom of Quick Look stands out from the page, so it looks as if it floats, as it does in Light Mode.
-- Quick Look keeps the alphabet under **Aa Gg 123** at the same line spacing whatever the **Leading**, and lists the styles closer together.
-- **Active** and **Inactive** in the sidebar, and **Activate** and **Deactivate** in menus, have Font Book’s symbols, a seal with a check or a cross.
-- **Show All** under **Languages** in the Info panel looks like the other lists there: the languages reach the popover’s edges and scroll up under the search field.
-- With a family selected, ⌘O opens its font page, as in the Finder. With none selected, it still adds fonts.
-- ⌘← (**View → Back**) goes from a font page back to the browser, as Esc does.
 - Scrolling through a font page’s **Glyphs** is smooth again, even in fonts with thousands of glyphs.
-- In a font page’s **Glyphs**, a character wider than its cell, like a long Arabic ligature, is scaled down to fit, as alternates and ligatures already were. **Copy as Vector** in a glyph’s right-click menu is greyed out for one without an outline, as in its popover.
-- The symbols some fonts keep in private use, like SF Pro’s, are listed under **Graphical** on a font page. Before, SF Pro’s showed up as **Myanmar** letters.
-- An alternate, small capital or ligature copied from a font page’s **Glyphs** now shows as itself when you paste it into the text at the top of the page, in any of the family’s styles. Other apps still get the plain character.
-- When you save a new version of a font over the old file, a font page’s text and the grid show its new letters at once. Before, they kept showing the old ones until Cicero quit, while **Glyphs** already showed the new ones.
-- A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language, named above it.
-- **Circled Figures** has every circled number a font has, like ㉑ to ㊿ and the Chinese ㊀ and ㈠, which were under **Punctuation and Symbols**, in a row for each kind, from ⓪ up.
-- **Glyphs** lists Roman numerals in a group of their own, after the figures, and a Latin font’s forms for the start and end of a word among the alternates.
-- A font page’s **Glyphs** lists small capitals in a group of their own, **Small Caps**, right after the letters, each followed by its alternates, like a stylistic set’s or a Turkish one. Before, they followed their letters as alternates, and their own alternates weren’t listed.
-- **Uppercase Accents** and **Lowercase Accents** go letter by letter, all the a’s, then the b’s, with letters like æ and ß after the a’s and s’s. Before, they were in Unicode’s order, which split them up.
-- **Leading** now goes up to 200 %, down from 250 %.
-- On a font page, the family name, the styles list and **Glyphs** are in full black (white in Dark Mode), like the text at the top, rather than a dark grey.
-- The list, grid and specimens, **Similar** on font pages, Compare, the **Character Toolbox** and Quick Look show fonts in full black (white in Dark Mode) too.
-- A font page’s text now sits in the middle of its lines at any **Leading**, with as much room above as below. Before, all of a large Leading’s room went above the letters, so a single line, or the cursor in empty text, sat near the bottom.
-- The text cursor on a font page now fits the letters at any **Leading**. Before, it started halfway up the capitals when the lines were tight and reached far above them when they were loose.
-- **Leave the files where they are** in **Preferences → General** is now **Leave files where they are**.
-- Turning off a font in your Fonts folder no longer moves its file. Cicero turns it off where it is, as Font Book does, and that goes for copies Cicero installed there too.
-- Fonts that earlier versions moved to Cicero’s Deactivated folder go back as Cicero opens, still off: into your Fonts folder, or into Cicero’s Library if Cicero installs fonts there.
-- **Clear Font Caches** no longer turns off the fonts Cicero uses where they are, like those in your locations, in Cicero’s Library or on in every app from Adobe’s folders.
-- Cicero’s Deactivated folder is now called Inactive, `~/Library/Application Support/Cicero/Inactive`. Cicero renames it as it opens.
-- The Info panel opens with the font’s details already in it, and shows them at once when you select a font while it’s open. Before, it slid in with spinners and the details faded in only after it had stopped, and selecting a font with nothing selected showed a spinner for a moment.
-- With **Ask each time** chosen in **Preferences → General**, turning on a font that’s off in your Fonts folder or in Cicero’s Library no longer asks how to turn it on. It goes on where it is, as it did whichever you picked.
-- When **Replace** puts a newer version of a font in the place of the one the Info panel shows, the panel shows the new version’s details. Before, it kept the old ones until you selected another font.
-- After **Replace**, a font without Latin letters shows its new version’s letters in the browser at once. Before, it asked for the old version’s letters until you opened Cicero again, and macOS drew them in another font.
-- A font whose folder you move out of Cicero’s Library or one of your locations and back in again shows in its own letters. Before, a font that was on showed boxes with question marks until Cicero quit, and one that was off could show in Helvetica. The same went for fonts on a disk you ejected and connected again.
 
 ## 0.10.10
 
