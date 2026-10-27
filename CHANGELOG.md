@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Active** and **Inactive** in the sidebar, and **Activate** and **Deactivate** in menus, have Font Book’s symbols, a seal with a check or a cross.
 - With a family selected, ⌘O opens its font page, as in the Finder. With none selected, it still adds fonts.
 - ⌘← (**View → Back**) goes from a font page back to the browser, as Esc does.
 - Scrolling through a font page’s **Glyphs** is smooth again, even in fonts with thousands of glyphs.
