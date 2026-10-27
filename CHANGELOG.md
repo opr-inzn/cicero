@@ -14,6 +14,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - The Info panel opens with the font’s details already in it, and shows them at once when you select a font while it’s open. Before, it slid in with spinners and the details faded in only after it had stopped, and selecting a font with nothing selected showed a spinner for a moment.
 - With **Ask each time** chosen in **Preferences → General**, turning on a font that’s off in your Fonts folder or in Cicero’s Library no longer asks how to turn it on. It goes on where it is, as it did whichever you picked.
 - When **Replace** puts a newer version of a font in the place of the one the Info panel shows, the panel shows the new version’s details. Before, it kept the old ones until you selected another font.
+- After **Replace**, a font without Latin letters shows its new version’s letters in the browser at once. Before, it asked for the old version’s letters until you opened Cicero again, and macOS drew them in another font.
 - A font whose folder you move out of Cicero’s Library or one of your locations and back in again shows in its own letters. Before, a font that was on showed boxes with question marks until Cicero quit, and one that was off could show in Helvetica. The same went for fonts on a disk you ejected and connected again.
 
 ## 0.10.10

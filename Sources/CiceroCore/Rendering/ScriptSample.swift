@@ -60,10 +60,12 @@ public struct ScriptSample: Hashable, Sendable {
     }
 }
 
-/// Each face's `ScriptSample`, worked out the first time a preview needs it.
+/// Each face's `ScriptSample`, worked out the first time a preview needs it, and again once its file changed, as Replace
+/// puts a newer version in under the same path (see `FontLoader.generation(of:)`): by the face's ID alone, a tile went on
+/// asking for the old version's letters, which macOS then drew in another font.
 public final class ScriptSamples: Sendable {
     private let languages: LanguageCatalog
-    private let samples = Mutex<[FaceID: ScriptSample?]>([:])
+    private let samples = Mutex<[FaceID: (generation: Int, sample: ScriptSample?)]>([:])
 
     public init(languages: LanguageCatalog) {
         self.languages = languages
@@ -73,15 +75,19 @@ public final class ScriptSamples: Sendable {
     /// `ScriptSample`), `long` or short. `text` while the face's file hasn't been read, as reading it could take a while.
     public func text(_ text: String, for face: FontFace, long: Bool = false) -> String {
         guard !FontLoader.shared.wouldWait(for: face.path) else { return text }
+        // Before the font, so a sample from a file that changed meanwhile is worked out again next time.
+        let generation = FontLoader.shared.generation(of: face.path)
         let font = FontLoader.shared.font(face, size: 12)
-        guard ScriptSample.isNeeded(for: text, has: { Self.has($0, font) }), let sample = sample(for: face, font: font) else { return text }
+        guard ScriptSample.isNeeded(for: text, has: { Self.has($0, font) }),
+              let sample = sample(for: face, generation: generation, font: font)
+        else { return text }
         return long ? sample.long : sample.short
     }
 
-    private func sample(for face: FontFace, font: CTFont) -> ScriptSample? {
-        if let known = samples.withLock({ $0[face.id] }) { return known }
+    private func sample(for face: FontFace, generation: Int, font: CTFont) -> ScriptSample? {
+        if let known = samples.withLock({ $0[face.id] }), known.generation == generation { return known.sample }
         let sample = ScriptSample(characters: ScalarRanges(characterSet: CTFontCopyCharacterSet(font)), languages: languages.languages)
-        samples.withLock { $0[face.id] = .some(sample) }
+        samples.withLock { $0[face.id] = (generation, sample) }
         return sample
     }
 
