@@ -442,13 +442,23 @@ public struct GlyphSection: Identifiable, Sendable {
         return CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count) && glyphs[0] != 0 ? glyphs[0] : nil
     }
 
-    /// The character a glyph name like uni0E34 or u1F600 says, its first in a ligature's uni0066006C.
+    /// The character a glyph name like uni0E34 or u1F600 says, its first in a ligature's uni0066006C: uni and groups of
+    /// four hex digits, or u and four to six, as the Adobe Glyph List has them. Others say none, like SF Pro's uni10003A
+    /// for a symbol, whose first four digits made it the Myanmar letter U+1000.
     static func character(named name: String) -> UInt32? {
         let hex: Substring
-        if name.hasPrefix("uni"), name.count >= 7 { hex = name.dropFirst(3).prefix(4) }
-        else if name.hasPrefix("u"), (5...7).contains(name.count) { hex = name.dropFirst() }
+        if name.hasPrefix("uni") {
+            let digits = name.dropFirst(3)
+            guard !digits.isEmpty, digits.count % 4 == 0, digits.allSatisfy(\.isHexDigit) else { return nil }
+            hex = digits.prefix(4)
+        } else if name.hasPrefix("u") {
+            hex = name.dropFirst()
+            guard (4...6).contains(hex.count), hex.allSatisfy(\.isHexDigit) else { return nil }
+        } else {
+            return nil
+        }
+        guard let value = UInt32(hex, radix: 16), let scalar = Unicode.Scalar(value), scalar.properties.generalCategory != .privateUse
         else { return nil }
-        guard let value = UInt32(hex, radix: 16), Unicode.Scalar(value)?.properties.generalCategory != .privateUse else { return nil }
         return value
     }
 
