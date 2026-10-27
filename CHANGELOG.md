@@ -10,6 +10,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - %, ‰ and ^ are with the operators now, `` ` `` with the accents, the florin ƒ with the currency signs, the micro sign µ with the symbols, and ▷ and ◁ with the other triangles.
 - **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
 - **Forget All** in Conflicts forgets every missing file at once.
+- **Forget** takes a missing file off **Conflicts** at once. Before, it could stay listed until your fonts next changed.
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
 - A font page’s **Styles** always show the family’s name, whatever the preview text.
 - Font pages no longer list similar fonts under **Similar**. **Show Similar Fonts** in a family’s menu lists them.
