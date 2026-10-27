@@ -11,6 +11,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - A font page’s **Leading** is exact for fonts with their own line gap. Before, 100 % could be as loose as 120 %.
 - A font page’s text sits in the middle between the controls and **Styles**, by its capitals and baseline, where it often looked high.
 - Preview Options’ **Presets** add “Lorem ipsum dolor sit amet”.
+- **Conflicts** scrolls wherever the pointer is in the window, with its scroll bar at the window’s edge. Before, only the list itself scrolled.
 
 ## 0.10.11
 
