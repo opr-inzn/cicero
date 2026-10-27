@@ -31,6 +31,9 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         // TextKit 2, with a layout manager of its own for the insertion point (see `SampleLayoutManager`).
         let content = NSTextContentStorage()
         let manager = SampleLayoutManager()
+        // Lines exactly the Leading apart: TextKit added the font's own line gap below each line on top of it, so
+        // 100 % of a font with a gap of 20 % of the em set its lines 120 % apart, and each sat high in its room.
+        manager.usesFontLeading = false
         content.addTextLayoutManager(manager)
         manager.textContainer = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
         let view = SampleTextView(frame: .zero, textContainer: manager.textContainer)

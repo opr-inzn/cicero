@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
 - A font page’s **Styles** always show the family’s name, whatever the preview text.
+- A font page’s **Leading** is exact for fonts with their own line gap. Before, 100 % could be as loose as 120 %, and the text sat high on the page.
 
 ## 0.10.11
 
