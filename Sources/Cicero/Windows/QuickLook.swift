@@ -192,7 +192,7 @@ final class QuickLookPanel: NSPanel {
         isRestorable = false
         isExcludedFromWindowsMenu = true
         collectionBehavior.insert(.fullScreenAuxiliary)
-        // On macOS 26 the page runs on under the title bar and fades out there (see `fadingUnderTitleBar`).
+        // On macOS 26 the page runs on under the title bar, which turns translucent over it (see `underTitleBar`).
         if #available(macOS 26, *) { styleMask.insert(.fullSizeContentView) }
         minSize = NSSize(width: 420, height: 320)
         // The title bar in the page's colour, so the name sits on the specimen.
@@ -431,12 +431,15 @@ private struct QuickLookView: View {
 private struct FamilyQuickLook: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    @Environment(\.colorScheme) private var colorScheme
     let family: Family
     let index: Int
     let count: Int
     let width: CGFloat
     /// How tall the title bar is, over the top of the page on macOS 26.
     let titleBar: CGFloat
+    /// Whether the page is scrolled down, under the title bar.
+    @State private var isScrolled = false
 
     /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
@@ -477,7 +480,10 @@ private struct FamilyQuickLook: View {
             .padding(.bottom, 8)
             .foregroundStyle(Color.ink)
         }
-        .fadingUnderTitleBar(titleBar)
+        .onScrollGeometryChange(for: Bool.self, of: { $0.contentOffset.y + $0.contentInsets.top > 0.5 }) { _, scrolled in
+            isScrolled = scrolled
+        }
+        .underTitleBar(titleBar, isScrolled: isScrolled)
         .background(Color(nsColor: QuickLookPanel.page))
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
@@ -530,6 +536,12 @@ private struct FamilyQuickLook: View {
         .padding(.horizontal, 14)
         .frame(height: 36)
         .glass(in: .capsule)
+        .overlay {
+            // In dark mode the glass is as dark as the page, and the bar didn't look as if it floated over it.
+            if #available(macOS 26, *), colorScheme == .dark {
+                Capsule().fill(.white.opacity(0.06)).allowsHitTesting(false)
+            }
+        }
         .padding(12)
     }
 
@@ -553,21 +565,22 @@ private struct FamilyQuickLook: View {
 }
 
 private extension View {
-    /// The page under a title bar `height` tall, fading out there as under a toolbar rather than ending at its edge: macOS
-    /// blurs it away under a bar, and the page's colour comes in over it behind the title. macOS 15 has no such effect, and
-    /// the page stays below the title bar.
-    @ViewBuilder func fadingUnderTitleBar(_ height: CGFloat) -> some View {
+    /// The page under the title bar, as under a window's toolbar: on macOS 26 it runs on under the title bar `height` tall,
+    /// which stays the page's colour while the page is at the top and, scrolled, turns translucent over it, with a line
+    /// under it. macOS 15 keeps the page below the title bar, and draws the line.
+    @ViewBuilder func underTitleBar(_ height: CGFloat, isScrolled: Bool) -> some View {
         if #available(macOS 26, *) {
-            let page = Color(nsColor: QuickLookPanel.page)
-            // A bar that draws nothing, clear, gets no blur under it.
+            // A bar that draws something, however faint: a clear one gets no edge effect under it.
             safeAreaBar(edge: .top, spacing: 0) {
-                LinearGradient(stops: [.init(color: page, location: 0), .init(color: page, location: 0.35), .init(color: page.opacity(0), location: 1)],
-                               startPoint: .top, endPoint: .bottom)
+                Color.black.opacity(0.001)
                     .frame(height: height)
+                    .overlay(alignment: .bottom) { if isScrolled { Divider() } }
+                    .allowsHitTesting(false)
             }
+            .scrollEdgeEffectStyle(.hard, for: .top)
             .ignoresSafeArea(.container, edges: .top)
         } else {
-            self
+            overlay(alignment: .top) { if isScrolled { Divider() } }
         }
     }
 }

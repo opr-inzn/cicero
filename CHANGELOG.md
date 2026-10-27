@@ -6,7 +6,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - Quick Look has the two buttons of Finder’s Quick Look in place of the window buttons: one closes it, the other fills the screen with it, and a second click puts it back. Filling the screen no longer changes the size Quick Look opens at.
 - Quick Look’s type grows and shrinks with its window as you resize it.
-- Scrolling Quick Look, the text fades out under its title bar, as under the main window’s toolbar, rather than ending at a hard edge.
+- Scrolled down, Quick Look’s title bar turns translucent over the text, with a thin line under it, as in System Settings.
+- In Dark Mode, the bar at the bottom of Quick Look stands out from the page, so it looks as if it floats, as it does in Light Mode.
 - Quick Look keeps the alphabet under **Aa Gg 123** at the same line spacing whatever the **Leading**, and lists the styles closer together.
 - **Active** and **Inactive** in the sidebar, and **Activate** and **Deactivate** in menus, have Font Book’s symbols, a seal with a check or a cross.
 - **Show All** under **Languages** in the Info panel looks like the other lists there: the languages reach the popover’s edges and scroll up under the search field.
