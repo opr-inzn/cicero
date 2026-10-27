@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Glyphs** lists punctuation, symbols and operators in a type designer’s order: . , : ; first, then dashes, brackets in pairs and quotes. %, ‰ and ^ are with the operators now, and `` ` `` with the accents. Case-sensitive forms follow the same order.
 - **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
 
 ## 0.10.11

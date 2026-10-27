@@ -457,11 +457,12 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// Keeps a font with features over thousands of glyphs to a sensible number.
     public static let limit = 3000
 
-    /// The face's glyphs that only those features draw, each once, by feature, then character, but the small capitals
-    /// first, in their letters' order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`),
-    /// and the localized forms by language (see `localizedForms`); a glyph a character has too, like a superscript two
-    /// the font maps U+00B2 to, is left to the character, and accents' case-sensitive forms are left out. Reads the font's
-    /// GSUB table; call off the main thread.
+    /// The face's glyphs that only those features draw, each once, by feature, then character, the case-sensitive forms
+    /// as their characters are listed (see `GlyphSection.signPrecedes`), but the small capitals first, in their letters'
+    /// order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`), and the localized forms by
+    /// language (see `localizedForms`); a glyph a character has too, like a superscript two the font maps U+00B2 to, is
+    /// left to the character, and accents' case-sensitive forms are left out. Reads the font's GSUB table; call off the
+    /// main thread.
     public static func read(_ face: FontFace) -> [FeatureGlyph] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
@@ -518,7 +519,9 @@ public struct FeatureGlyph: Hashable, Sendable {
                 }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
             }
-            let sorted = entries.sorted { $0.character < $1.character }
+            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`).
+            let sorted = feature.tag == "case" ? entries.sorted { GlyphSection.signPrecedes($0.character, $1.character) }
+                : entries.sorted { $0.character < $1.character }
             let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
             for glyph in sorted + combined where result.count < limit && seen.insert(glyph.glyph).inserted {
                 result.append(glyph)
