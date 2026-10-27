@@ -536,37 +536,88 @@ private struct SampleCaption: View {
     }
 }
 
-/// A legend chip's dot, which opens the tints to choose the font's colour from.
+/// A legend chip's dot, which opens the tints to choose the font's colour from: an AppKit menu, from a view of its own
+/// over the dot. As the button of a SwiftUI menu, the dot lit up while the menu was open.
 private struct TintMenu: View {
     @Environment(AppModel.self) private var model
     @Environment(\.self) private var environment
     let sample: CompareSample
 
     var body: some View {
-        Menu {
-            ForEach(CompareSample.tints.indices, id: \.self) { index in
-                let tint = CompareSample.tints[index]
-                Toggle(isOn: Binding(get: { sample.tintIndex == index }, set: { _ in model.setCompareTint(index, of: sample.id) })) {
-                    Label { Text(tint.title) } icon: { Image(nsImage: .menuDot(resolved(tint.color))) }
-                        .labelStyle(.titleAndIcon)
-                }
+        Circle()
+            .fill(sample.tint)
+            .frame(width: 8, height: 8)
+            // A larger target, the dot where it is.
+            .padding(3)
+            .overlay {
+                TintMenuArea(tints: CompareSample.tints.map { (title: $0.title, image: NSImage.menuDot(resolved($0.color))) },
+                             chosen: sample.tintIndex) { model.setCompareTint($0, of: sample.id) }
             }
-        } label: {
-            // An image: a menu's label leaves out shapes.
-            Image(nsImage: .menuDot(resolved(sample.tint), size: 8, inset: 0))
-        }
-        .menuStyle(.button)
-        .buttonStyle(.borderless)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        // The button's own margins, so the dot stays where it was before it opened a menu, with a larger target.
-        .padding(.horizontal, -3)
-        .help("Choose a color")
-        .accessibilityLabel("Color")
+            .padding(-3)
     }
 
     /// A tint as this appearance shows it, as a menu's images don't change with it.
     private func resolved(_ color: Color) -> NSColor {
         NSColor(cgColor: color.resolve(in: environment).cgColor) ?? .gray
+    }
+}
+
+/// Opens the tints under the dot as the mouse goes down, as a pop-up button does, the one chosen checked.
+private struct TintMenuArea: NSViewRepresentable {
+    let tints: [(title: String, image: NSImage)]
+    let chosen: Int
+    let choose: (Int) -> Void
+
+    func makeNSView(context: Context) -> TintMenuView { TintMenuView() }
+
+    func updateNSView(_ view: TintMenuView, context: Context) {
+        view.tints = tints
+        view.chosen = chosen
+        view.choose = choose
+    }
+}
+
+private final class TintMenuView: NSView {
+    var tints: [(title: String, image: NSImage)] = []
+    var chosen = 0
+    var choose: (Int) -> Void = { _ in }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        toolTip = "Choose a color"
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func mouseDown(with event: NSEvent) {
+        showMenu()
+    }
+
+    private func showMenu() {
+        let menu = NSMenu()
+        for (index, tint) in tints.enumerated() {
+            let item = NSMenuItem(title: tint.title, action: #selector(chooseTint(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            item.image = tint.image
+            item.state = index == chosen ? .on : .off
+            menu.addItem(item)
+        }
+        // Its top-left corner just under the dot's.
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: isFlipped ? bounds.maxY + 4 : -4), in: self)
+    }
+
+    @objc private func chooseTint(_ item: NSMenuItem) {
+        choose(item.tag)
+    }
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .popUpButton }
+    override func accessibilityLabel() -> String? { "Color" }
+    override func accessibilityValue() -> Any? { tints.indices.contains(chosen) ? tints[chosen].title : nil }
+
+    override func accessibilityPerformPress() -> Bool {
+        showMenu()
+        return true
     }
 }
