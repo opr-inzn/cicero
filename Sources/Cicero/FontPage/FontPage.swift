@@ -553,10 +553,10 @@ private struct TesterText: View {
     }
 
     /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
-    /// above or what follows. The editor sets each baseline the font's descent above the bottom of its line, so all
-    /// that the line spacing leaves out of the font's height goes above the first line, like a script font's
-    /// ascenders at tight spacing, and below the last only what reaches lower than the font's descent. Its glyphs'
-    /// own reach counts where it's greater than the font's (see `TextLine`).
+    /// above or what follows. The editor sets each line in the middle of its height (see `SampleEditor.Style.raise`),
+    /// so glyphs need room where they reach past the font's ascent or descent by more than half of what the line
+    /// spacing adds to the font's height, like a script font's ascenders, or at all when the lines are closer than the
+    /// font is tall. Its glyphs' own reach counts where it's greater than the font's (see `TextLine`).
     /// Glyphs pasted into the text, like a swash, count with their own reach.
     static func room(for text: String, glyphs: [CGGlyph], in font: CTFont, kerning: Double,
                      lineHeight: Double) -> (above: CGFloat, below: CGFloat) {
@@ -567,8 +567,9 @@ private struct TesterText: View {
             ascent = max(ascent, ink.maxY.rounded(.up))
             descent = max(descent, -ink.minY.rounded(.down))
         }
-        let fontDescent = CTFontGetDescent(font).rounded()
-        return (max(0, ascent - (lineHeight - fontDescent)).rounded(.up), max(0, descent - fontDescent).rounded(.up))
+        let fontAscent = CTFontGetAscent(font).rounded(), fontDescent = CTFontGetDescent(font).rounded()
+        let raise = (lineHeight - fontAscent - fontDescent) / 2
+        return (max(0, ascent - fontAscent - raise).rounded(.up), max(0, descent - fontDescent - raise).rounded(.up))
     }
 
     static let defaultText = "Sphinx of black quartz, judge my vow."
