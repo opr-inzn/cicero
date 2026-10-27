@@ -196,10 +196,105 @@ final class QuickLookPanel: NSPanel {
         titlebarAppearsTransparent = true
         titlebarSeparatorStyle = .none
         backgroundColor = .textBackgroundColor
+        addTitleBar()
+        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: self, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateFillButton() }
+        }
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    override var title: String {
+        didSet { titleLabel.stringValue = title }
+    }
+
+    private let titleLabel = NSTextField(labelWithString: "")
+    private var fillButton: QuickLookTitleButton?
+
+    /// Finder's Quick Look's title bar: two buttons in place of the window's own, which a panel that's never key shows
+    /// grey and empty (one closes it, the other fills the screen with it and goes back to the size it had, as the green
+    /// button did), and the title beside them. A title of its own: AppKit sets its title after the buttons it shows, and
+    /// elsewhere once the title bar has views of its own.
+    private func addTitleBar() {
+        guard let close = standardWindowButton(.closeButton), let second = standardWindowButton(.miniaturizeButton),
+              let bar = close.superview else { return }
+        titleVisibility = .hidden
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            standardWindowButton(kind)?.isHidden = true
+        }
+        let closeButton = QuickLookTitleButton(symbol: "xmark.circle.fill") { [weak self] in self?.close() }
+        closeButton.toolTip = "Close"
+        closeButton.setAccessibilityLabel("Close")
+        let fillButton = QuickLookTitleButton(symbol: "arrow.up.left.and.arrow.down.right.circle.fill") { [weak self] in self?.zoom(nil) }
+        // Kept where the window's buttons are, from the title bar's top and left.
+        let top: NSView.AutoresizingMask = bar.isFlipped ? .maxYMargin : .minYMargin
+        for (button, place) in [(closeButton, close.frame), (fillButton, second.frame)] {
+            button.frame = place
+            button.autoresizingMask = [.maxXMargin, top]
+            bar.addSubview(button)
+        }
+        titleLabel.font = .titleBarFont(ofSize: 0)
+        titleLabel.textColor = .windowFrameTextColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.sizeToFit()
+        let start = second.frame.maxX + 13
+        titleLabel.frame = NSRect(x: start, y: (close.frame.midY - titleLabel.frame.height / 2).rounded(),
+                                  width: max(0, bar.bounds.width - start - 12), height: titleLabel.frame.height)
+        titleLabel.autoresizingMask = [.width, top]
+        bar.addSubview(titleLabel)
+        self.fillButton = fillButton
+        updateFillButton()
+    }
+
+    private func updateFillButton() {
+        guard let fillButton else { return }
+        let filled = isZoomed
+        fillButton.symbol = filled ? "arrow.down.right.and.arrow.up.left.circle.fill" : "arrow.up.left.and.arrow.down.right.circle.fill"
+        fillButton.toolTip = filled ? "Return to the previous size" : "Fill the screen"
+        fillButton.setAccessibilityLabel(filled ? "Return to Previous Size" : "Fill")
+    }
+}
+
+/// A grey circle with its symbol cut out, as Finder's Quick Look has. It takes the first click in the panel, which is
+/// never key.
+private final class QuickLookTitleButton: NSButton {
+    /// The traffic lights' size.
+    private static let diameter: CGFloat = 14
+    private let perform: () -> Void
+
+    var symbol: String {
+        didSet { if symbol != oldValue { image = Self.image(symbol) } }
+    }
+
+    init(symbol: String, action: @escaping () -> Void) {
+        self.symbol = symbol
+        perform = action
+        super.init(frame: .zero)
+        isBordered = false
+        imagePosition = .imageOnly
+        imageScaling = .scaleNone
+        image = Self.image(symbol)
+        contentTintColor = .secondaryLabelColor
+        target = self
+        self.action = #selector(clicked)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    @objc private func clicked() { perform() }
+
+    /// The symbol, its circle as wide as the traffic lights.
+    private static func image(_ symbol: String) -> NSImage? {
+        func image(_ size: CGFloat) -> NSImage? {
+            NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: size, weight: .regular))
+        }
+        guard let measured = image(diameter), measured.size.width > 0 else { return nil }
+        return image(diameter * diameter / measured.size.width)
+    }
 }
 
 /// Takes a click in a window that isn't key as a click, not as a request to bring the window forward:
@@ -276,37 +371,34 @@ private struct FamilyQuickLook: View {
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
 
-    /// How much bigger than in the panel at its first width the type and the room around it are: they grow and shrink
-    /// with the panel's width, the margins at the sides stay.
+    /// How much bigger than in the panel at its first width the sample and the styles are drawn: they're laid out as
+    /// there and zoomed to the panel's width, the margins at the sides staying as they are (see `Zoomed`).
     private var scale: CGFloat {
         max(0.1, (width - 2 * Self.inset) / (QuickLook.defaultSize.width - 2 * Self.inset))
     }
 
-    /// A size in the panel at its first width, at the panel's width, in whole points.
-    private func size(_ points: Double) -> Double {
-        max(1, (points * scale).rounded())
-    }
-
     var body: some View {
-        let styleSize = size(22)
+        let scale = scale
         ScrollView {
             // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
                 sample()
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
+                    .zoomed(scale)
                     .padding(.horizontal, Self.inset)
-                    .padding(.top, 12 * scale)
-                    .padding(.bottom, 24 * scale)
                 // With one style the sample already shows it.
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 15 * scale)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: styleSize, weight: style.face.styleWeight)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight)
                             // As tall as the font's own line spacing, without padding: some fonts keep room above their
                             // capitals (for accents, a taller style), and padding as well spread the rows far apart.
                             // At least 1.25 × the size, for fonts set tight.
-                            .frame(minHeight: styleSize * 1.25)
+                            .frame(minHeight: 22 * 1.25)
+                            .zoomed(scale)
                             .padding(.horizontal, Self.inset)
                     }
                 }
@@ -326,16 +418,16 @@ private struct FamilyQuickLook: View {
         let variations = model.variations(for: family)
         return Group {
             if preview.sampleText.isEmpty {
-                VStack(alignment: .leading, spacing: 14 * scale) {
-                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: size(96),
+                VStack(alignment: .leading, spacing: 14) {
+                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96,
                                   variations: variations)
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: size(24),
-                                  variations: variations, lineLimit: nil, lineHeight: size(24) * 1.2)
+                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24, variations: variations,
+                                  lineLimit: nil, lineHeight: 24 * 1.2)
                 }
             } else {
-                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: size(56),
-                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: size(56)))
+                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56,
+                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -385,6 +477,31 @@ private struct FamilyQuickLook: View {
         let labels = Set(family.faces.map(\.state.label))
         if labels.count == 1, let label = labels.first { return label }
         return family.activeCount == family.faces.count ? "Active" : "\(family.activeCount) of \(family.faces.count) active"
+    }
+}
+
+/// Lays its content out `scale` times smaller than the room it's given and draws it `scale` times bigger, so it looks the
+/// same at any width, only bigger or smaller: resizing the panel zooms it smoothly, where setting the type a size bigger
+/// or smaller had lines jump from one whole point to the next and rows move with them.
+private struct Zoomed: Layout {
+    let scale: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let size = content.sizeThatFits(ProposedViewSize(width: proposal.width.map { $0 / scale },
+                                                         height: proposal.height.map { $0 / scale }))
+        return CGSize(width: size.width * scale, height: size.height * scale)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                              proposal: ProposedViewSize(width: bounds.width / scale, height: bounds.height / scale))
+    }
+}
+
+private extension View {
+    func zoomed(_ scale: CGFloat) -> some View {
+        Zoomed(scale: scale) { scaleEffect(scale, anchor: .topLeading) }
     }
 }
 
