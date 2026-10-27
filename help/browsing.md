@@ -211,15 +211,17 @@ The same options apply to every view, font pages and the Compare window, but the
 
 You can also open the Compare window by itself, with **Window → Compare**, or **Fonts → Compare** with no families selected, and pick the fonts there: click **+** in its toolbar (or **Add Families**, while it’s empty), type a name, and click a family or press Return to add it. ↑ and ↓ move to the next family found. Families already there have a checkmark; click one again to take it out. The list has every family in your library, wherever it is and whatever the main window shows, so families far apart are as easy to put together as neighbors.
 
-The Compare window shows them with the preview text and spacing from Preview Options (or “Hamburgefonstiv”, when there’s no preview text). It has its own **Preview Options** button. Choose a layout in the toolbar:
+The Compare window shows them in a text of its own, “Hamburgefonstiv” until you type another in its own **Preview Options**. Typing it there leaves the previews in the main window as they are. Choose a layout in the toolbar:
 
 - **Stacked:** one row per font, each starting at the same place, with the name and style under each. A row is as tall as its font needs, so the rows above stay where they are as you add or take out fonts.
-- **Overlay:** every font drawn over the others in its own color, on a shared baseline, with their names below. The last one is drawn on top.
+- **Overlay:** every font drawn over the others in its own color, on a shared baseline, with their names below. Where they overlap, the colors mix like inks on paper (or like lights, in Dark Mode), so each font shows through the others. To change a font’s color, click the dot next to its name and choose one.
 
 The Compare window has a size of its own, from 24 to 720 pt, 72 pt at first, so you can look at the fonts up close without changing the previews in the main window. Set it with **Size** in the Compare window’s **Preview Options**, or choose **View → Zoom Out** or **Zoom In** (⌘− and ⌘+) to go to the next smaller or bigger common size, like 96, 120 or 144 pt.
 
 Each font is in its regular style at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to the regular style. **Compare Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
 
 To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
+
+Compare holds up to 12 fonts, one for each color. Once it’s full, take one out to add another.
 
 To add fonts, drag families from the main window into the Compare window, or select one family and choose **Fonts → Compare**, or right-click it and choose **Add to Compare**: it joins the fonts already there. To take one out, click its remove button. Choosing **Compare** with several families selected starts over with them.

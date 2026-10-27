@@ -47,12 +47,12 @@ final class PreviewSettings {
                           Self.lineSpacings.upperBound)
     }
 
-    /// Whether the preview text is one of the presets saved with Save as Preset.
-    var isSavedPreset: Bool { savedPresets.contains(sampleText) }
+    /// Whether a text, the preview text or Compare's, is one of the presets saved with Save as Preset.
+    func isSavedPreset(_ text: String) -> Bool { savedPresets.contains(text) }
 
-    /// Whether Save as Preset can save the preview text: it has something to see, and isn't a preset already.
-    var canSavePreset: Bool {
-        !sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !Self.presets.contains(sampleText) && !isSavedPreset
+    /// Whether Save as Preset can save a text: it has something to see, and isn't a preset already.
+    func canSavePreset(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !Self.presets.contains(text) && !isSavedPreset(text)
     }
 
     func text(for family: Family) -> String {

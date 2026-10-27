@@ -18,9 +18,11 @@ extension FocusedValues {
 }
 
 /// Families next to each other, each in a style of its choosing: one row each on a shared baseline, or drawn over
-/// each other in tints, at a size of the window's own.
+/// each other in tints, in a text and at a size of the window's own.
 struct CompareWindow: View {
     static let sizes: ClosedRange<Double> = 24...720
+    /// What the samples show while the window's text is empty.
+    static let placeholder = "Hamburgefonstiv"
     /// What View → Zoom In and Zoom Out step through, each a fifth to a third bigger than the one before; a size set in
     /// between goes to the next one either way.
     static let steps: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
@@ -29,6 +31,8 @@ struct CompareWindow: View {
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
     @AppStorage("compare.size") private var size = 72.0
+    /// Its own, so typing here leaves the previews in the main window as they are.
+    @AppStorage("compare.text") private var text = ""
     /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
     @State private var read: Set<String> = []
     @State private var isAdding = false
@@ -42,7 +46,9 @@ struct CompareWindow: View {
         }
         // A family whose file is on a server joins the others once it's been read in the background.
         let waiting = entries.map(\.path).filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
-        let samples = entries.filter { !waiting.contains($0.path) }.map { CompareSample($0.entry, family: $0.family, size: size, model: model, preview: preview) }
+        let samples = entries.filter { !waiting.contains($0.path) }.map {
+            CompareSample($0.entry, family: $0.family, text: text.isEmpty ? Self.placeholder : text, size: size, model: model, preview: preview)
+        }
         Group {
             if entries.isEmpty {
                 // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls
@@ -90,7 +96,9 @@ struct CompareWindow: View {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
                               help: "One row per font, or every font over each other")
             }
-            ToolbarCapsule { PreviewOptionsButton(size: $size, sizeRange: Self.sizes) }
+            ToolbarCapsule {
+                PreviewOptionsButton(own: OwnPreviewOptions(text: $text, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
+            }
         }
     }
 }
@@ -125,7 +133,8 @@ private struct AddFamiliesButton: View {
 
 /// Every family the library lists, wherever it is in the library and whatever the main window shows, or those what's
 /// typed finds, as the main window's search does. Clicking one, or Return on the highlighted one, adds it to Compare,
-/// or takes it out when it's checked, there already; ↑ and ↓ move the highlight. It stays open for the next.
+/// or takes it out when it's checked, there already; ↑ and ↓ move the highlight. It stays open for the next. While
+/// Compare is full, the families not in it are dimmed, and a line under them says why.
 private struct AddFamilies: View {
     @Environment(AppModel.self) private var model
     @Environment(\.self) private var environment
@@ -137,12 +146,13 @@ private struct AddFamilies: View {
 
     var body: some View {
         let compared = Set(model.compareEntries.map(\.familyID))
+        let isFull = model.isCompareFull
         VStack(spacing: 0) {
             TextField("Search", text: $text, prompt: Text("Search"))
                 .textFieldStyle(.roundedBorder)
                 .focused($isFocused)
                 // The field can keep an action from before the last search: `current` is read when it's pressed.
-                .onSubmit { if let current { model.toggleInCompare(current) } }
+                .onSubmit { if let current { toggle(current) } }
                 .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                     guard let current, let index = families.firstIndex(where: { $0.id == current }) else { return .ignored }
                     highlighted = families[min(max(index + (press.key == .downArrow ? 1 : -1), 0), families.count - 1)].id
@@ -160,7 +170,8 @@ private struct AddFamilies: View {
                         LazyVStack(spacing: 0) {
                             let current = current
                             ForEach(families) { family in
-                                row(family, isCompared: compared.contains(family.id), isHighlighted: family.id == current)
+                                let isCompared = compared.contains(family.id)
+                                row(family, isCompared: isCompared, isAvailable: isCompared || !isFull, isHighlighted: family.id == current)
                             }
                         }
                         .padding(.vertical, 4)
@@ -169,6 +180,14 @@ private struct AddFamilies: View {
                     .id(text)
                     .onChange(of: highlighted) { if let id = $1 { proxy.scrollTo(id) } }
                 }
+            }
+            if isFull {
+                Divider()
+                Text("Compare holds up to \(AppModel.compareLimit) fonts. Take one out to add another.")
+                    .font(.callout)
+                    .foregroundStyle(Color(Color.secondary.resolve(in: environment)))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
             }
         }
         .frame(width: 320, height: 400)
@@ -184,19 +203,27 @@ private struct AddFamilies: View {
         highlighted.flatMap { id in families.contains { $0.id == id } ? id : nil } ?? families.first?.id
     }
 
+    /// Adds the family, or takes it out; one not in Compare stays out while it's full.
+    private func toggle(_ id: String) {
+        guard !model.isCompareFull || model.compareEntries.contains(where: { $0.familyID == id }) else { return }
+        model.toggleInCompare(id)
+    }
+
     /// "Aa" in its regular style, its name and a check while it's in Compare, as the search field's suggestions show
     /// a family: the name in the label colour and "Aa" in the secondary one, resolved, as the popover's material
     /// lightens a colour that changes with the appearance, and the highlighted one in white on the selection colour.
-    private func row(_ family: Family, isCompared: Bool, isHighlighted: Bool) -> some View {
+    private func row(_ family: Family, isCompared: Bool, isAvailable: Bool, isHighlighted: Bool) -> some View {
         HStack(spacing: 0) {
             // A fixed width keeps the names lined up however wide each family's letters are, as in the suggestions.
             FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
                 .foregroundStyle(isHighlighted ? Color.white : Color(Color.secondary.resolve(in: environment)))
                 .frame(width: 28)
                 .padding(.trailing, 3)
+                .opacity(isAvailable ? 1 : 0.4)
             Text(family.name)
                 .foregroundStyle(isHighlighted ? Color.white : Color(Color.primary.resolve(in: environment)))
                 .lineLimit(1)
+                .opacity(isAvailable ? 1 : 0.4)
             Spacer(minLength: 8)
             Image(systemName: "checkmark")
                 .font(.callout.weight(.semibold))
@@ -215,27 +242,35 @@ private struct AddFamilies: View {
         .contentShape(.rect)
         .onTapGesture {
             highlighted = family.id
-            model.toggleInCompare(family.id)
+            toggle(family.id)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isCompared ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction { model.toggleInCompare(family.id) }
+        .accessibilityAction { toggle(family.id) }
     }
 }
 
 /// One family's sample, set in the style chosen for it, else the one nearest the preview weight.
 private struct CompareSample: Identifiable {
-    static let tints: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .teal, .indigo, .brown, .cyan, .mint, .yellow]
+    /// The tints the fonts get in turn, as they join, and that each font's colour menu offers: one for each font
+    /// Compare holds (`AppModel.compareLimit`).
+    static let tints: [(title: String, color: Color)] = [
+        ("Blue", .blue), ("Red", .red), ("Green", .green), ("Orange", .orange), ("Purple", .purple), ("Pink", .pink),
+        ("Teal", .teal), ("Indigo", .indigo), ("Brown", .brown), ("Cyan", .cyan), ("Mint", .mint), ("Yellow", .yellow),
+    ]
 
     let family: Family
     let face: LibraryFace
     /// The style chosen; nil when it follows the preview weight.
     let style: FaceID?
     let line: TextLine
-    let tint: Color
+    /// Its place in `tints`.
+    let tintIndex: Int
     let id: UUID
 
-    init(_ entry: CompareEntry, family: Family, size: Double, model: AppModel, preview: PreviewSettings) {
+    var tint: Color { Self.tints[tintIndex].color }
+
+    init(_ entry: CompareEntry, family: Family, text: String, size: Double, model: AppModel, preview: PreviewSettings) {
         self.family = family
         id = entry.id
         let chosen = Self.chosenStyle(of: entry, in: family)
@@ -243,8 +278,8 @@ private struct CompareSample: Identifiable {
         face = Self.face(for: entry, in: family, preview: preview)
         let weight = chosen.map(\.face.styleWeight) ?? preview.weight
         let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
-        line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: 0)
-        tint = Self.tints[entry.tint % Self.tints.count]
+        line = TextLine(text, font: font, kerning: 0)
+        tintIndex = entry.tint % Self.tints.count
     }
 
     /// The style chosen for the family, if one was.
@@ -292,7 +327,7 @@ private struct StackedLayout: View {
 }
 
 /// Every sample over the others, each in its tint, on a shared baseline. Dragging a chip in the legend below changes
-/// the order, so the last one is drawn on top.
+/// the order; its dot changes the colour.
 private struct OverlayLayout: View {
     let samples: [CompareSample]
 
@@ -305,9 +340,15 @@ private struct OverlayLayout: View {
         let width = (samples.map(\.line.width).max() ?? 0) + 2
         VStack(alignment: .leading, spacing: 16) {
             Canvas { context, _ in
-                for sample in samples {
-                    let color = sample.tint.opacity(0.7).resolve(in: context.environment).cgColor
-                    context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
+                let environment = context.environment
+                context.withCGContext { cg in
+                    // Over each other as inks on paper, or as lights in Dark Mode, so every font shows through those
+                    // drawn over it. Simply laid over each other at 70 %, a few stems hid the serifs of a font below.
+                    cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
+                    for sample in samples {
+                        let color = sample.tint.opacity(0.7).resolve(in: environment).cgColor
+                        sample.line.draw(in: cg, baselineAt: CGPoint(x: overhang, y: ascent), color: color)
+                    }
                 }
             }
             .frame(width: overhang + width, height: ascent + descent)
@@ -445,7 +486,7 @@ private struct SampleCaption: View {
     var body: some View {
         HStack(spacing: 6) {
             if showsTint {
-                Circle().fill(sample.tint).frame(width: 8, height: 8)
+                TintMenu(sample: sample)
             }
             Text(sample.family.name).fontWeight(.semibold)
             styleMenu
@@ -475,6 +516,7 @@ private struct SampleCaption: View {
                     let shown = model.compareEntries.filter { $0.familyID == sample.family.id }.map { $0.style ?? automatic }
                     model.compareAnotherStyle(of: sample.id, besides: Set(shown))
                 }
+                .disabled(model.isCompareFull)
             }
         } label: {
             // One text, as a menu's label puts an image of its own first. Grey here only: on the menu, the grey
@@ -488,5 +530,40 @@ private struct SampleCaption: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Choose the style to compare")
+    }
+}
+
+/// A legend chip's dot, which opens the tints to choose the font's colour from.
+private struct TintMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.self) private var environment
+    let sample: CompareSample
+
+    var body: some View {
+        Menu {
+            ForEach(CompareSample.tints.indices, id: \.self) { index in
+                let tint = CompareSample.tints[index]
+                Toggle(isOn: Binding(get: { sample.tintIndex == index }, set: { _ in model.setCompareTint(index, of: sample.id) })) {
+                    Label { Text(tint.title) } icon: { Image(nsImage: .menuDot(resolved(tint.color))) }
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+        } label: {
+            // An image: a menu's label leaves out shapes.
+            Image(nsImage: .menuDot(resolved(sample.tint), size: 8, inset: 0))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        // The button's own margins, so the dot stays where it was before it opened a menu, with a larger target.
+        .padding(.horizontal, -3)
+        .help("Choose a color")
+        .accessibilityLabel("Color")
+    }
+
+    /// A tint as this appearance shows it, as a menu's images don't change with it.
+    private func resolved(_ color: Color) -> NSColor {
+        NSColor(cgColor: color.resolve(in: environment).cgColor) ?? .gray
     }
 }

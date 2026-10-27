@@ -858,11 +858,19 @@ struct FlowLayout: Layout {
     }
 }
 
-/// The toolbar button with sample text, size, weight and spacing.
+/// A text and size of a window's own, as Compare has, in place of the previews', so the window leaves the previews
+/// as they are. It sets each sample on one line: its Preview Options have no Leading.
+struct OwnPreviewOptions {
+    var text: Binding<String>
+    /// What the window shows while the text is empty.
+    var placeholder: String
+    var size: Binding<Double>
+    var sizeRange: ClosedRange<Double>
+}
+
+/// The toolbar button with sample text, size and leading.
 struct PreviewOptionsButton: View {
-    /// A size of the window's own, as Compare has, in place of the previews'.
-    var size: Binding<Double>?
-    var sizeRange: ClosedRange<Double> = PreviewSettings.sizes
+    var own: OwnPreviewOptions?
     @State private var isPresented = false
 
     var body: some View {
@@ -872,34 +880,34 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help("Preview text, size and leading")
-        .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(size: size, sizeRange: sizeRange) }
+        .help(own == nil ? "Preview text, size and leading" : "Preview text and size")
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(own: own) }
     }
 }
 
 private struct PreviewOptions: View {
     @Environment(PreviewSettings.self) private var preview
-    let size: Binding<Double>?
-    let sizeRange: ClosedRange<Double>
+    let own: OwnPreviewOptions?
 
     var body: some View {
         @Bindable var preview = preview
+        let text = own?.text ?? $preview.sampleText
         Form {
             Section {
-                TextField("Preview Text", text: $preview.sampleText, prompt: Text("Preview Text"))
+                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview Text"))
                     .labelsHidden()
                 HStack {
                     // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
                     Menu("Presets\u{200A}") {
                         // Yours first, in the order saved, then Cicero's.
                         ForEach(preview.savedPresets, id: \.self) { sample in
-                            Button(Self.title(of: sample)) { preview.sampleText = sample }
+                            Button(Self.title(of: sample)) { text.wrappedValue = sample }
                         }
                         if !preview.savedPresets.isEmpty {
                             Divider()
                         }
                         ForEach(PreviewSettings.presets, id: \.self) { sample in
-                            Button(sample) { preview.sampleText = sample }
+                            Button(sample) { text.wrappedValue = sample }
                         }
                     }
                     .menuStyle(.button)
@@ -907,30 +915,34 @@ private struct PreviewOptions: View {
                     .fixedSize()
                     Spacer()
                     // Once the text is one of yours, the button takes it out again.
-                    if preview.isSavedPreset {
-                        Button("Remove Preset") { preview.savedPresets.removeAll { $0 == preview.sampleText } }
+                    if preview.isSavedPreset(text.wrappedValue) {
+                        Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
                             .help("Takes the preview text out of Presets")
                     } else {
-                        Button("Save as Preset") { preview.savedPresets.append(preview.sampleText) }
-                            .disabled(!preview.canSavePreset)
+                        Button("Save as Preset") { preview.savedPresets.append(text.wrappedValue) }
+                            .disabled(!preview.canSavePreset(text.wrappedValue))
                             .help("Adds the preview text to Presets")
                     }
                 }
             }
             Section {
-                if size == nil, let factor = GridScale.shared.factor {
+                if let own {
+                    row("Size", own.size, range: own.sizeRange, unit: " pt")
+                } else if let factor = GridScale.shared.factor {
                     // The size the grid draws at while the sidebar is hidden or the Info panel open (see `GridScale`).
                     row("Size", Binding {
                         GridScale.drawn(preview.size, factor: factor)
                     } set: {
-                        preview.size = min(max(GridScale.chosen(drawing: $0, factor: factor), sizeRange.lowerBound), sizeRange.upperBound)
-                    }, range: GridScale.drawn(sizeRange.lowerBound, factor: factor)...GridScale.drawn(sizeRange.upperBound, factor: factor), unit: " pt")
+                        preview.size = min(max(GridScale.chosen(drawing: $0, factor: factor), PreviewSettings.sizes.lowerBound), PreviewSettings.sizes.upperBound)
+                    }, range: GridScale.drawn(PreviewSettings.sizes.lowerBound, factor: factor)...GridScale.drawn(PreviewSettings.sizes.upperBound, factor: factor), unit: " pt")
                     .help("The grid’s size while the sidebar is hidden or the Info panel open: \(Int(preview.size)) pt with the sidebar shown and the panel closed")
                 } else {
-                    row("Size", size ?? $preview.size, range: sizeRange, unit: " pt")
+                    row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
                 }
-                row("Leading", $preview.lineSpacing, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
-                    .help("The distance between lines, in percent of the size, where a sample runs over several lines")
+                if own == nil {
+                    row("Leading", $preview.lineSpacing, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
+                        .help("The distance between lines, in percent of the size, where a sample runs over several lines")
+                }
             }
         }
         .formStyle(.grouped)

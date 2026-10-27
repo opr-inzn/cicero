@@ -49,14 +49,15 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// A family in Compare, in a style.
+/// A family in Compare, in a style and a colour.
 struct CompareEntry: Identifiable, Equatable {
     let id = UUID()
     let familyID: String
     /// nil: the one nearest the preview weight.
     var style: FaceID?
-    /// Its place among the tints, kept while it stays, so moving or removing the others doesn't change its colour.
-    let tint: Int
+    /// Its place among the tints, the first free one at first or one chosen, kept while it stays, so moving or
+    /// removing the others doesn't change its colour.
+    var tint: Int
 }
 
 struct SidebarRow: Identifiable, Hashable {

@@ -967,24 +967,35 @@ extension AppModel {
 
     // MARK: Compare
 
+    /// As many fonts as Compare has tints, so each has a colour of its own.
+    static let compareLimit = 12
+
+    var isCompareFull: Bool { compareEntries.count >= Self.compareLimit }
+
     func compare(_ families: [Family]) {
         compareEntries = []
         _ = addToCompare(families.map(\.id))
     }
 
-    /// Adds the families that aren't in Compare yet, in the style the preview weight picks.
+    /// Adds the families that aren't in Compare yet, in the style the preview weight picks, as many as there's room
+    /// for; a toast says when some didn't fit.
     func addToCompare(_ names: [String]) -> Bool {
         let new = names.filter { name in family(name) != nil && !compareEntries.contains { $0.familyID == name } }
-        for name in new {
+        let added = new.prefix(Self.compareLimit - compareEntries.count)
+        for name in added {
             compareEntries.append(CompareEntry(familyID: name, tint: nextCompareTint))
         }
-        return !new.isEmpty
+        if added.count < new.count {
+            showToast("Compare holds up to \(Self.compareLimit) fonts")
+        }
+        return !added.isEmpty
     }
 
     /// The same family again, after it, in its first style not in `shown`: the styles Compare shows it in, those that
     /// follow the preview weight included.
     func compareAnotherStyle(of id: UUID, besides shown: Set<FaceID>) {
-        guard let index = compareEntries.firstIndex(where: { $0.id == id }), let family = family(compareEntries[index].familyID) else { return }
+        guard !isCompareFull, let index = compareEntries.firstIndex(where: { $0.id == id }),
+              let family = family(compareEntries[index].familyID) else { return }
         let style = family.faces.first { !shown.contains($0.id) }?.id
         compareEntries.insert(CompareEntry(familyID: family.id, style: style, tint: nextCompareTint), at: index + 1)
     }
@@ -993,6 +1004,11 @@ extension AppModel {
     func setCompareStyle(_ style: FaceID?, of id: UUID) {
         guard let index = compareEntries.firstIndex(where: { $0.id == id }) else { return }
         compareEntries[index].style = style
+    }
+
+    func setCompareTint(_ tint: Int, of id: UUID) {
+        guard let index = compareEntries.firstIndex(where: { $0.id == id }) else { return }
+        compareEntries[index].tint = tint
     }
 
     func removeFromCompare(_ id: UUID) {
