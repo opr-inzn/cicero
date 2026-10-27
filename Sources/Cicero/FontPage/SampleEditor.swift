@@ -1,4 +1,5 @@
 import AppKit
+import CiceroCore
 import SwiftUI
 
 /// The font page's editable sample: a text view of its own rather than SwiftUI's TextEditor, which cuts off
@@ -7,10 +8,14 @@ import SwiftUI
 /// reaches. It's as tall as its lines at the width the page gives it, and the room above and below them for
 /// glyphs reaching past them (`roomAbove`, `roomBelow`); `margin` at either side of the lines is room for glyphs
 /// reaching past their ends, as nothing is drawn outside the view. A right-click shows Cut, Copy and Paste, then
-/// `menu`. Left empty, it shows `defaultText` again.
+/// `menu`. Left empty, it shows `defaultText` again. Glyphs copied from the page's Glyphs, like an alternate, are
+/// drawn as copied where they're pasted (`glyphs`, see `SampleGlyph`), in `face`, a style of `family`.
 struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
+    @Binding var glyphs: [SampleGlyphRun]
     let defaultText: String
+    let family: String
+    let face: FontFace
     let font: CTFont
     let kerning: Double
     let lineHeight: Double
@@ -20,7 +25,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     let roomBelow: CGFloat
     @ViewBuilder let menu: () -> MenuContent
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text, defaultText: defaultText) }
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, glyphs: $glyphs, defaultText: defaultText) }
 
     func makeNSView(context: Context) -> NSTextView {
         // TextKit 2, with a layout manager of its own for the insertion point (see `SampleLayoutManager`).
@@ -30,6 +35,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         manager.textContainer = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
         let view = SampleTextView(frame: .zero, textContainer: manager.textContainer)
         view.content = content
+        content.delegate = context.coordinator
         manager.delegate = context.coordinator
         view.delegate = context.coordinator
         view.textStorage?.delegate = context.coordinator
@@ -47,9 +53,16 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSTextView, context: Context) {
-        context.coordinator.text = $text
-        context.coordinator.defaultText = defaultText
-        if view.string != text { view.string = text }
+        let coordinator = context.coordinator
+        coordinator.text = $text
+        coordinator.glyphs = $glyphs
+        coordinator.defaultText = defaultText
+        if view.string != text {
+            coordinator.isSettingText = true
+            view.string = text
+            coordinator.isSettingText = false
+            coordinator.markedGlyphs = nil
+        }
         update(view, context: context)
     }
 
@@ -78,21 +91,43 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     }
 
     /// Sets the font, spacing and alignment when they change, not on every keystroke, which would upset typing
-    /// with an input method.
+    /// with an input method, and marks the pasted glyphs again when the text was set from outside.
     private func update(_ view: NSTextView, context: Context) {
         setMenu(of: view)
         view.textContainerInset = NSSize(width: margin, height: 0)
         (view as? SampleTextView)?.roomAbove = roomAbove
+        let coordinator = context.coordinator
         let style = Style(font: font, kerning: kerning, lineHeight: lineHeight, alignment: alignment)
-        guard style != context.coordinator.style || view.textStorage?.length != context.coordinator.styledLength else { return }
-        context.coordinator.style = style
+        let glyphStyle = GlyphStyle(family: family, face: face, font: font)
+        guard let storage = view.textStorage else { return }
+        let restyles = style != coordinator.style || storage.length != coordinator.styledLength
+        guard restyles || glyphStyle != coordinator.glyphStyle || glyphs != coordinator.markedGlyphs else { return }
+        coordinator.style = style
+        coordinator.glyphStyle = glyphStyle
+        coordinator.markedGlyphs = glyphs
         (view.textLayoutManager as? SampleLayoutManager)?.font = font
         let attributes = style.attributes
         view.typingAttributes = attributes
         view.defaultParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
-        if let storage = view.textStorage {
-            storage.setAttributes(attributes, range: NSRange(location: 0, length: storage.length))
-            context.coordinator.styledLength = storage.length
+        // In one edit with the pasted glyphs, which setting the attributes takes off: the text is then drawn again,
+        // with the style's glyphs for them.
+        coordinator.isSettingText = true
+        storage.beginEditing()
+        storage.setAttributes(attributes, range: NSRange(location: 0, length: storage.length))
+        storage.addSampleGlyphs(glyphs)
+        storage.endEditing()
+        coordinator.isSettingText = false
+        coordinator.styledLength = storage.length
+    }
+
+    /// What the pasted glyphs are drawn in.
+    struct GlyphStyle: Equatable {
+        let family: String
+        let face: FontFace
+        let font: CTFont
+
+        static func == (a: GlyphStyle, b: GlyphStyle) -> Bool {
+            a.family == b.family && a.face.id == b.face.id && CFEqual(a.font, b.font)
         }
     }
 
@@ -119,15 +154,27 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate, NSTextLayoutManagerDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate, NSTextLayoutManagerDelegate,
+                             NSTextContentStorageDelegate {
         var text: Binding<String>
+        var glyphs: Binding<[SampleGlyphRun]>
         var defaultText: String
         var style: Style?
         /// The text's length when the style was last set: text pasted since may have brought its own.
         var styledLength = 0
+        var glyphStyle: GlyphStyle? {
+            didSet { if glyphStyle != oldValue { shownGlyphs.removeAll() } }
+        }
+        /// Each pasted glyph's in the style shown, nil for one it doesn't have.
+        private var shownGlyphs: [SampleGlyph: CGGlyph?] = [:]
+        /// The pasted glyphs as last marked in the text, or as the text last told; nil once it's set from outside.
+        var markedGlyphs: [SampleGlyphRun]?
+        /// While the text is set from outside, when the glyphs pasted into it aren't marked yet.
+        var isSettingText = false
 
-        init(text: Binding<String>, defaultText: String) {
+        init(text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
             self.text = text
+            self.glyphs = glyphs
             self.defaultText = defaultText
         }
 
@@ -139,8 +186,40 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         /// Every change to the text, an undone one too, which the text view doesn't tell its delegate about.
         func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range: NSRange,
                          changeInLength: Int) {
-            guard editedMask.contains(.editedCharacters), storage.string != text.wrappedValue else { return }
-            text.wrappedValue = storage.string
+            guard editedMask.contains(.editedCharacters), !isSettingText else { return }
+            if storage.string != text.wrappedValue { text.wrappedValue = storage.string }
+            let pasted = storage.sampleGlyphs()
+            markedGlyphs = pasted
+            if pasted != glyphs.wrappedValue { glyphs.wrappedValue = pasted }
+        }
+
+        /// What's typed next to a pasted glyph is typed as it is, not as the glyph.
+        func textView(_ view: NSTextView, shouldChangeTypingAttributes oldAttributes: [String: Any],
+                      toAttributes newAttributes: [NSAttributedString.Key: Any]) -> [NSAttributedString.Key: Any] {
+            newAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo }
+        }
+
+        /// A paragraph as drawn: its pasted glyphs in place of their characters, where the style has them. Only
+        /// drawn, so the text itself keeps its attributes as they are while typing.
+        func textContentStorage(_ content: NSTextContentStorage, textParagraphWith range: NSRange) -> NSTextParagraph? {
+            guard let storage = content.textStorage, let glyphStyle else { return nil }
+            let pasted = storage.sampleGlyphs(in: range)
+            guard !pasted.isEmpty else { return nil }
+            let paragraph = NSMutableAttributedString(attributedString: storage.attributedSubstring(from: range))
+            for run in pasted where run.glyph.family == glyphStyle.family {
+                guard let glyph = shownGlyph(run.glyph, in: glyphStyle),
+                      let info = NSGlyphInfo(cgGlyph: glyph, for: glyphStyle.font as NSFont, baseString: run.glyph.characters)
+                else { continue }
+                paragraph.addAttribute(.glyphInfo, value: info, range: run.range)
+            }
+            return NSTextParagraph(attributedString: paragraph)
+        }
+
+        private func shownGlyph(_ glyph: SampleGlyph, in style: GlyphStyle) -> CGGlyph? {
+            if let shown = shownGlyphs[glyph] { return shown }
+            let shown = glyph.glyph(in: style.font, face: style.face)
+            shownGlyphs[glyph] = shown
+            return shown
         }
 
         /// Puts the default text back when the text is left with nothing to see, as a step of its own to undo.
@@ -162,7 +241,8 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
 }
 
 /// Esc goes back from the font page, as everywhere else on it, rather than offering completions. A right-click
-/// shows the page's menu, not the text view's.
+/// shows the page's menu, not the text view's. Glyphs copied from the page's Glyphs paste as glyphs, and those in
+/// its text copy as glyphs too.
 private final class SampleTextView: NSTextView {
     /// The text, which the text view only points to.
     var content: NSTextContentStorage?
@@ -189,6 +269,48 @@ private final class SampleTextView: NSTextView {
         guard let makeMenu else { return super.menu(for: event) }
         shownMenu = makeMenu()
         return shownMenu
+    }
+
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        [.sampleClip] + super.readablePasteboardTypes
+    }
+
+    override func preferredPasteboardType(from availableTypes: [NSPasteboard.PasteboardType],
+                                          restrictedToTypesFrom allowedTypes: [NSPasteboard.PasteboardType]?) -> NSPasteboard.PasteboardType? {
+        if availableTypes.contains(.sampleClip), allowedTypes?.contains(.sampleClip) ?? true { return .sampleClip }
+        return super.preferredPasteboardType(from: availableTypes, restrictedToTypesFrom: allowedTypes)
+    }
+
+    /// The characters with their glyphs marked, in place of the selection, as one step to undo.
+    override func readSelection(from pasteboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        guard type == .sampleClip, let clip = SampleClip.read(from: pasteboard) else {
+            return super.readSelection(from: pasteboard, type: type)
+        }
+        let range = rangeForUserTextChange
+        guard range.location != NSNotFound, let storage = textStorage else { return false }
+        // Not with what was typed before it or after.
+        breakUndoCoalescing()
+        guard shouldChangeText(in: range, replacementString: clip.text) else { return false }
+        let attributes = typingAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo }
+        let pasted = NSMutableAttributedString(string: clip.text, attributes: attributes)
+        pasted.addSampleGlyphs(clip.glyphs)
+        storage.replaceCharacters(in: range, with: pasted)
+        didChangeText()
+        setSelectedRange(NSRange(location: range.location + pasted.length, length: 0))
+        breakUndoCoalescing()
+        return true
+    }
+
+    override func writeSelection(to pasteboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool {
+        guard super.writeSelection(to: pasteboard, types: types) else { return false }
+        let ranges = selectedRanges.map(\.rangeValue)
+        if ranges.count == 1, let range = ranges.first, let storage = textStorage {
+            let glyphs = storage.sampleGlyphs(in: range)
+            if !glyphs.isEmpty {
+                SampleClip(text: (storage.string as NSString).substring(with: range), glyphs: glyphs).add(to: pasteboard)
+            }
+        }
+        return true
     }
 }
 

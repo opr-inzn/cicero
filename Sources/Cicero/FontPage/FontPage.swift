@@ -231,7 +231,7 @@ private struct TypeTester: View {
     /// overview's, which sets every font with its own spacing.
     @AppStorage("typeTester.tracking") private var tracking = Self.savedTracking
     /// What's typed over the text in a font's own script, on this family's page only (see `TesterText.shownText`).
-    @State private var ownScript: (family: String, text: String)?
+    @State private var ownScript: OwnScriptText?
 
     var body: some View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
@@ -493,7 +493,7 @@ private struct TesterText: View {
     let size: Double
     let tracking: Double
     let alignment: SampleAlignment
-    @Binding var ownScript: (family: String, text: String)?
+    @Binding var ownScript: OwnScriptText?
     @Bindable private var store = TesterTextStore.shared
 
     private var text: String {
@@ -502,13 +502,15 @@ private struct TesterText: View {
     }
 
     var body: some View {
-        let (text, defaultText) = shownText
+        let (text, glyphs, defaultText) = shownText
         let kerning = size * tracking / 100
         let lineHeightPoints = size * preview.lineSpacing / 100
-        let room = Self.room(for: text.wrappedValue, in: font, kerning: kerning, lineHeight: lineHeightPoints)
+        let room = Self.room(for: text.wrappedValue, glyphs: shownGlyphs(glyphs.wrappedValue), in: font, kerning: kerning,
+                             lineHeight: lineHeightPoints)
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
-        SampleEditor(text: text, defaultText: defaultText, font: font, kerning: kerning, lineHeight: lineHeightPoints,
-                     alignment: alignment.paragraph, margin: 24, roomAbove: room.above, roomBelow: room.below) {
+        SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
+                     kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
+                     roomAbove: room.above, roomBelow: room.below) {
             FamilyMenu(families: [family], model: model)
         }
             .frame(minHeight: 280)
@@ -520,23 +522,34 @@ private struct TesterText: View {
             .contextMenu { FamilyMenu(families: [family], model: model) }
             // Text left empty as the last page closed, which the editor doesn't hear about.
             .onAppear {
-                if self.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.text = Self.defaultText }
+                if self.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.text = Self.defaultText
+                    store.glyphs = []
+                }
             }
     }
 
     /// The text to show and type into: what's been typed, kept from one page to the next, or, for a font with none of its
-    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only. And
-    /// what it goes back to when it's left empty.
-    private var shownText: (text: Binding<String>, defaultText: String) {
+    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only. The
+    /// glyphs pasted into it, and what it goes back to when it's left empty.
+    private var shownText: (text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
         let sample = model.scriptSamples.text(text, for: face, long: true)
-        guard sample != text else { return ($store.text, Self.defaultText) }
+        guard sample != text else { return ($store.text, $store.glyphs, Self.defaultText) }
         let family = family.id
-        let text = Binding {
-            ownScript.flatMap { $0.family == family ? $0.text : nil } ?? sample
-        } set: {
-            ownScript = (family, $0)
+        // Read as they're set, as the editor sets the text and then its glyphs.
+        func own() -> OwnScriptText? { ownScript.flatMap { $0.family == family ? $0 : nil } }
+        let text = Binding { own()?.text ?? sample } set: {
+            ownScript = OwnScriptText(family: family, text: $0, glyphs: own()?.glyphs ?? [])
         }
-        return (text, sample)
+        let glyphs = Binding { own()?.glyphs ?? [] } set: {
+            ownScript = OwnScriptText(family: family, text: own()?.text ?? sample, glyphs: $0)
+        }
+        return (text, glyphs, sample)
+    }
+
+    /// The pasted glyphs this style draws, as it draws them.
+    private func shownGlyphs(_ runs: [SampleGlyphRun]) -> [CGGlyph] {
+        runs.compactMap { $0.glyph.family == family.id ? $0.glyph.glyph(in: font, face: face) : nil }
     }
 
     /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
@@ -544,13 +557,28 @@ private struct TesterText: View {
     /// that the line spacing leaves out of the font's height goes above the first line, like a script font's
     /// ascenders at tight spacing, and below the last only what reaches lower than the font's descent. Its glyphs'
     /// own reach counts where it's greater than the font's (see `TextLine`).
-    static func room(for text: String, in font: CTFont, kerning: Double, lineHeight: Double) -> (above: CGFloat, below: CGFloat) {
+    /// Glyphs pasted into the text, like a swash, count with their own reach.
+    static func room(for text: String, glyphs: [CGGlyph], in font: CTFont, kerning: Double,
+                     lineHeight: Double) -> (above: CGFloat, below: CGFloat) {
         let line = TextLine(text, font: font, kerning: kerning)
-        let descent = CTFontGetDescent(font).rounded()
-        return (max(0, line.ascent - (lineHeight - descent)).rounded(.up), max(0, line.descent - descent).rounded(.up))
+        var ascent = line.ascent, descent = line.descent
+        if !glyphs.isEmpty {
+            let ink = CTFontGetBoundingRectsForGlyphs(font, .horizontal, glyphs, nil, glyphs.count)
+            ascent = max(ascent, ink.maxY.rounded(.up))
+            descent = max(descent, -ink.minY.rounded(.down))
+        }
+        let fontDescent = CTFontGetDescent(font).rounded()
+        return (max(0, ascent - (lineHeight - fontDescent)).rounded(.up), max(0, descent - fontDescent).rounded(.up))
     }
 
     static let defaultText = "Sphinx of black quartz, judge my vow."
+}
+
+/// Text typed over the sample in a font's own script, and the glyphs pasted into it, on one family's page.
+struct OwnScriptText {
+    let family: String
+    let text: String
+    let glyphs: [SampleGlyphRun]
 }
 
 /// The type tester's text, kept from one page to the next and for the next launch: saved a second after typing stops, and
@@ -561,15 +589,24 @@ private struct TesterText: View {
 private final class TesterTextStore {
     static let shared = TesterTextStore()
     private static let key = "typeTester.text"
+    private static let glyphsKey = "typeTester.glyphs"
 
     var text: String {
+        didSet { saveSoon() }
+    }
+    /// The glyphs pasted into it (see `SampleGlyph`).
+    var glyphs: [SampleGlyphRun] {
         didSet { saveSoon() }
     }
 
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
 
     private init() {
-        text = UserDefaults.standard.string(forKey: Self.key) ?? TesterText.defaultText
+        let text = (UserDefaults.standard.string(forKey: Self.key) ?? TesterText.defaultText) as NSString
+        self.text = text as String
+        let saved = UserDefaults.standard.data(forKey: Self.glyphsKey).flatMap { try? JSONDecoder().decode([SampleGlyphRun].self, from: $0) }
+        // Those whose characters are still there, should the text have been changed without them.
+        glyphs = (saved ?? []).filter { NSMaxRange($0.range) <= text.length && text.substring(with: $0.range) == $0.glyph.characters }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { TesterTextStore.shared.save() }
         }
@@ -588,6 +625,11 @@ private final class TesterTextStore {
         pendingSave?.cancel()
         pendingSave = nil
         UserDefaults.standard.set(text, forKey: Self.key)
+        if glyphs.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.glyphsKey)
+        } else if let data = try? JSONEncoder().encode(glyphs) {
+            UserDefaults.standard.set(data, forKey: Self.glyphsKey)
+        }
     }
 }
 

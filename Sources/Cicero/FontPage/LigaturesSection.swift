@@ -9,6 +9,8 @@ import SwiftUI
 struct LigaturesSection: View {
     @Environment(AppModel.self) private var model
     /// The style the page's text is set in, at its weight.
+    /// The family's ID, for the ligatures copied (see `SampleGlyph`).
+    let family: String
     let face: FontFace
     let weight: Double
     /// Axes moved in the Info panel, by tag.
@@ -79,8 +81,8 @@ struct LigaturesSection: View {
             .onTapGesture { popover = (group.tag, ligature.characters) }
             .onDrag { dragItem(ligature) }
             .contextMenu {
-                Button("Copy Characters", systemImage: "doc.on.clipboard") { copy(ligature.text, shown: "“\(ligature.text)”") }
-                Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(ligature) }
+                Button("Copy Characters", systemImage: "doc.on.clipboard") { copyCharacters(ligature, in: group) }
+                Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(ligature, in: group) }
                 Button("Copy Unicode", systemImage: "doc.on.clipboard") {
                     copy(CharacterCodes.unicode(ligature.characters), shown: CharacterCodes.unicode(ligature.characters))
                 }
@@ -112,11 +114,11 @@ struct LigaturesSection: View {
                     .textSelection(.enabled)
             }
             // A ligature has no code of its own: what's copied is its characters, which the font draws as this glyph
-            // where its feature is on.
+            // where its feature is on, and the page's text where they're pasted (see `SampleGlyph`).
             VStack {
-                Button("Copy Characters", systemImage: "doc.on.doc") { copy(ligature.text, shown: "“\(ligature.text)”") }
-                    .help("Copies “\(ligature.text)”, which this font draws as this ligature with \(group.name) on")
-                Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(ligature) }
+                Button("Copy Characters", systemImage: "doc.on.doc") { copyCharacters(ligature, in: group) }
+                    .help("Copies “\(ligature.text)”, which shows as this ligature when pasted into the text above, and elsewhere with \(group.name) on")
+                Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(ligature, in: group) }
                     .disabled(outline(ligature) == nil)
                     .help("Copies the ligature’s outline, to paste into a design app as a shape you can edit, or as SVG code")
             }
@@ -133,9 +135,22 @@ struct LigaturesSection: View {
         model.showToast("\(shown) copied to clipboard")
     }
 
-    private func copyVector(_ ligature: Ligature) {
+    /// Its characters, which the page's text draws as the ligature where they're pasted there.
+    private func copyCharacters(_ ligature: Ligature, in group: LigatureGroup) {
+        sampleClip(ligature, in: group).copy()
+        popover = nil
+        model.showToast("“\(ligature.text)” copied to clipboard")
+    }
+
+    /// What it pastes as in the page's text: its characters, the ligature drawn in their place (see `SampleGlyph`).
+    private func sampleClip(_ ligature: Ligature, in group: LigatureGroup) -> SampleClip {
+        SampleClip(text: ligature.text, glyph: SampleGlyph(family: family, characters: ligature.text, face: face,
+                                                           glyph: ligature.glyph, features: [group.tag]))
+    }
+
+    private func copyVector(_ ligature: Ligature, in group: LigatureGroup) {
         guard let outline = outline(ligature) else { return NSSound.beep() }
-        GlyphVectors.copy(outline, style: face.fullName, fallback: Self.fileFallback(ligature))
+        GlyphVectors.copy(outline, style: face.fullName, fallback: Self.fileFallback(ligature), clip: sampleClip(ligature, in: group))
         popover = nil
         model.showToast("“\(ligature.text)” copied to clipboard as a vector")
     }

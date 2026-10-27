@@ -26,8 +26,9 @@ enum GlyphVectors {
     /// a file: Messages and WhatsApp take the first thing they can send, and named a PDF “FILE_3121.pdf”, and Figma,
     /// which takes a file before SVG code, imports SVG but not PDF. Then as paths for design apps: InDesign's from
     /// Illustrator's clipboard format, as it places a PDF as a graphic, and Illustrator's from the PDF, as it reads that
-    /// format in its own operators only. And as SVG, as an image and as text, as Illustrator's own copies have it.
-    static func copy(_ outline: GlyphOutline, style: String, fallback: String) {
+    /// format in its own operators only. And as SVG, as an image and as text, as Illustrator's own copies have it. And
+    /// as `clip` for the font page's text, which pastes the glyph there rather than its SVG code.
+    static func copy(_ outline: GlyphOutline, style: String, fallback: String, clip: SampleClip) {
         let item = NSPasteboardItem()
         let svg = outline.svg
         if let file = temporaryFile(outline.fileName(style: style, fallback: fallback), Data(svg.utf8)) {
@@ -37,6 +38,7 @@ enum GlyphVectors {
         item.setData(outline.pdf, forType: .pdf)
         item.setData(Data(svg.utf8), forType: NSPasteboard.PasteboardType(UTType.svg.identifier))
         item.setString(svg, forType: .string)
+        if let data = clip.data { item.setData(data, forType: .sampleClip) }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([item])
     }

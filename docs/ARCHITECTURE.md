@@ -220,7 +220,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - What changes with each keystroke isn't saved to `UserDefaults` as it's typed. SwiftUI draws every view
   with an `@AppStorage` again whenever anything is saved there, whatever the key: the browser behind a
   font page, Settings and the Compare window. The type tester's text is kept in memory and saved a second
-  after typing stops, and at quit (`TesterTextStore`).
+  after typing stops, and at quit (`TesterTextStore`), with the glyphs pasted into it (`SampleGlyph`).
 - The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
   uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
   engine, exporter and backup, `using:` for app caches), so tests remove temporary files instead and
