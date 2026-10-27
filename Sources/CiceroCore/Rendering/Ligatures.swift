@@ -457,11 +457,12 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// Keeps a font with features over thousands of glyphs to a sensible number.
     public static let limit = 3000
 
-    /// The face's glyphs that only those features draw, each once, by feature, then character, but the small capitals
-    /// first, in their letters' order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`),
-    /// and the localized forms by language (see `localizedForms`); a glyph a character has too, like a superscript two
-    /// the font maps U+00B2 to, is left to the character, and accents' case-sensitive forms are left out. Reads the font's
-    /// GSUB table; call off the main thread.
+    /// The face's glyphs that only those features draw, each once, by feature, then character, the case-sensitive forms
+    /// as their characters are listed (see `GlyphSection.signPrecedes`), but the small capitals first, in their letters'
+    /// order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`), and the localized forms by
+    /// language (see `localizedForms`); a glyph a character has too, like a superscript two the font maps U+00B2 to, is
+    /// left to the character, and accents' case-sensitive forms are left out. Reads the font's GSUB table; call off the
+    /// main thread.
     public static func read(_ face: FontFace) -> [FeatureGlyph] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
@@ -518,7 +519,9 @@ public struct FeatureGlyph: Hashable, Sendable {
                 }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
             }
-            let sorted = entries.sorted { $0.character < $1.character }
+            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`).
+            let sorted = feature.tag == "case" ? entries.sorted { GlyphSection.signPrecedes($0.character, $1.character) }
+                : entries.sorted { $0.character < $1.character }
             let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
             for glyph in sorted + combined where result.count < limit && seen.insert(glyph.glyph).inserted {
                 result.append(glyph)
@@ -678,16 +681,17 @@ public struct FeatureGlyph: Hashable, Sendable {
         }
     }
 
-    /// Where a small capital or localized form goes in its group: the letters first, letter by letter as
-    /// `GlyphSection.letterOrder` has them, a capital's where its lowercase letter's goes, whichever feature draws it;
-    /// then figures and signs.
+    /// Where a small capital or localized form goes in its group: the letters first, in their lowercase letters' order
+    /// (see `GlyphSection.letterOrder`), as Glyphs names small capitals after those, like aacute.sc, a capital's after
+    /// its lowercase letter's, whichever feature draws it, like İ's after i's; then figures and signs.
     static func letterOrder(of character: UInt32) -> (GlyphGroup, UInt32, UInt32, UInt32, Int, UInt32) {
         let group: GlyphGroup = switch GlyphGroup.of(character) ?? .graphical {
         case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents: .lowercase
         case let other: other
         }
-        let (base, kind, letter, capital, character) = GlyphSection.letterOrder(of: character)
-        return (group, base, kind, letter, capital, character)
+        let lowercase = Unicode.Scalar(character).flatMap { String(Character($0)).lowercased().unicodeScalars.first?.value } ?? character
+        let (base, kind, letter, _, _) = GlyphSection.letterOrder(of: lowercase)
+        return (group, base, kind, letter, lowercase == character ? 0 : 1, character)
     }
 
     /// Tabular figures in another style, like old-style ones, by style, then character: glyphs of their own (a

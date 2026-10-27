@@ -4,6 +4,10 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Glyphs** lists accented letters and small caps alphabetically by glyph name, with letters like ɛ, ɔ and ʌ among the e’s, o’s and v’s.
+- **Greek** and **Cyrillic** list capitals first, then lowercase letters, then punctuation and accents.
+- Punctuation, symbols and operators come in a type designer’s order: . , : ; first, then dashes, brackets in pairs and quotes. Case-sensitive forms are in the same order.
+- %, ‰ and ^ are with the operators now, `` ` `` with the accents, the florin ƒ with the currency signs and the micro sign µ with the symbols.
 - **Inactive** with nothing in it says **Everything Is Active**, rather than **No Locations** while **Proofing** or **Adobe Fonts** was under **Locations**.
 - Empty screens, like an empty **Inactive**, show their symbol closer to the title.
 - A font page’s **Styles** always show the family’s name, whatever the preview text.
