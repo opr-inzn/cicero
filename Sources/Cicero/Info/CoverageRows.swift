@@ -65,30 +65,33 @@ private struct LanguageList: View {
                 || $0.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
         }
         let scripts = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
-        VStack(spacing: 8) {
-            TextField("Search", text: $query, prompt: Text("Search languages"))
-                .textFieldStyle(.roundedBorder)
-            List {
-                ForEach(scripts.keys.sorted { (scripts[$0]?.count ?? 0) > (scripts[$1]?.count ?? 0) }, id: \.self) { script in
-                    Section("\(script) (\(scripts[script]?.count ?? 0))") {
-                        ForEach(scripts[script] ?? []) { language in
-                            HStack {
-                                Text(language.name)
-                                if let autonym = language.autonym, autonym != language.name {
-                                    Text(autonym).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if coverage.support(for: language.id) == .full {
-                                    Image(systemName: "checkmark").foregroundStyle(.secondary).help("Fully supported, including less common characters")
-                                }
+        List {
+            ForEach(scripts.keys.sorted { (scripts[$0]?.count ?? 0) > (scripts[$1]?.count ?? 0) }, id: \.self) { script in
+                Section("\(script) (\(scripts[script]?.count ?? 0))") {
+                    ForEach(scripts[script] ?? []) { language in
+                        HStack {
+                            Text(language.name)
+                            if let autonym = language.autonym, autonym != language.name {
+                                Text(autonym).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if coverage.support(for: language.id) == .full {
+                                Image(systemName: "checkmark").foregroundStyle(.secondary).help("Fully supported, including less common characters")
                             }
                         }
                     }
                 }
             }
-            .listStyle(.plain)
         }
-        .padding(10)
+        .listStyle(.plain)
+        // Floating over the list, whose rows scroll up under it, so the list reaches the popover's edges as the
+        // other rows' lists do.
+        .topBar {
+            TextField("Search", text: $query, prompt: Text("Search languages"))
+                .textFieldStyle(.roundedBorder)
+                .padding([.horizontal, .top], 10)
+                .padding(.bottom, 6)
+        }
         .frame(width: 320, height: 420)
     }
 }
