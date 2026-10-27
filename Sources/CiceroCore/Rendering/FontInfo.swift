@@ -32,8 +32,8 @@ public struct FontInfo: Sendable {
     }
 
     /// Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Vendor ID, Weight, Variable
-    /// weight, Glyphs, Format, Embedding, Copyright. Reads the font, so call off the main thread, and keeps what it finds
-    /// for `cached`.
+    /// weight, Glyphs, Format, Embedding, Copyright. Reads the font, so call off the main thread unless the file wouldn't
+    /// keep it waiting (see `FontLoader.wouldWait(for:)`), and keeps what it finds for `cached`.
     public static func read(_ face: FontFace) -> FontInfo {
         let cacheKey = CacheKey(face)
         let font = FontLoader.shared.font(face, size: 12)

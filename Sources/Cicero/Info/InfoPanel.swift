@@ -57,8 +57,6 @@ struct InfoPanelOverlay: ViewModifier {
                         .padding(.top, InfoPanelOverlay.top)
                         .offset(x: (1 - shown) * (InfoPanelOverlay.width + InfoPanelOverlay.gap))
                         .transition(.identity)
-                } else {
-                    InfoPrefetch()
                 }
             }
         }
@@ -130,23 +128,6 @@ struct KeepsTopOnResize: ViewModifier {
             // Reported before the visible families update, so `topID` is still the one from before.
             .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, _ in
                 if !isAtTop, let topID { position.scrollTo(id: topID, anchor: .top) }
-            }
-    }
-}
-
-/// While the panel is shut, reads the info of the font it would show, so that it opens with it.
-private struct InfoPrefetch: View {
-    @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
-
-    var body: some View {
-        let face = model.inspectedFamily?.face(nearestWeight: preview.weight).face
-        Color.clear
-            .frame(width: 0, height: 0)
-            .accessibilityHidden(true)
-            .task(id: face?.id) {
-                guard let face, CiceroCore.FontInfo.cached(face) == nil else { return }
-                _ = await Task.detached(priority: .utility) { CiceroCore.FontInfo.read(face) }.value
             }
     }
 }
@@ -249,7 +230,11 @@ private struct InfoRows: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .loading($info, for: face.id, cached: { [face = face.face] in CiceroCore.FontInfo.cached(face) }) { [face = face.face] in
+        // Read now unless the file would keep the panel waiting, as samples are drawn: well under a millisecond, and the
+        // panel opens, or goes to another font, with the info in place rather than a moment of spinner.
+        .loading($info, for: face.id, cached: { [face = face.face] in
+            CiceroCore.FontInfo.cached(face) ?? (FontLoader.shared.wouldWait(for: face.path) ? nil : CiceroCore.FontInfo.read(face))
+        }) { [face = face.face] in
             await Task.detached(priority: .userInitiated) { CiceroCore.FontInfo.read(face) }.value
         }
     }
