@@ -171,7 +171,7 @@ struct GlyphImage: View {
     var body: some View {
         Canvas { context, area in
             let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
-            let color = Color.primary.resolve(in: context.environment).cgColor
+            let color = Color.ink.resolve(in: context.environment).cgColor
             context.withCGContext { cg in
                 GlyphDrawing.draw(glyph, font: font, in: CGRect(origin: .zero, size: area), color: color, into: cg)
             }
