@@ -179,11 +179,14 @@ public final class FontLoader: Sendable {
         _ = fcntl(fd, F_RDADVISE, &advice)
     }
 
-    /// Keeps descriptors read elsewhere: the scanner reads every new file.
+    /// Keeps descriptors read elsewhere: the scanner reads every new file. It reads one only when it's new or changed, so
+    /// fonts made from the path before are out of date, like the stand-in for a file that was moved away and back: the
+    /// grid still drew it as it went, from no file, which macOS answers with its "?" font for one that's on.
     func keep(_ descriptors: [CTFontDescriptor], for path: String) {
         state.withLock { state in
             state.descriptors[path] = FileDescriptors(descriptors)
             state.pending.remove(path)
+            state.generations[path, default: 0] += 1
         }
     }
 
@@ -223,7 +226,7 @@ public final class FontLoader: Sendable {
         }
     }
 
-    /// Drops what's cached for files that changed or went away.
+    /// Drops what's cached for files that changed, went away or came back (see `Library.changedPaths`).
     public func invalidate(paths: Set<String>) {
         state.withLock { state in
             for path in paths {

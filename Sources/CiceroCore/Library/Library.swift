@@ -97,8 +97,9 @@ public struct Library: Sendable {
     public let activePaths: Set<String>
     /// Changes whenever anything visible about the library changes (files, stamps, states, folders).
     public let fingerprint: Int
-    /// Files that changed or went away since the library the scanner built before this one, so
-    /// whatever was read from them can be dropped.
+    /// Files that changed or went away since the library the scanner built before this one, and those back from out of
+    /// reach, so whatever was read from them can be dropped: what was made for a file while it was away, as the grid drew
+    /// it while it went, stood in for a file that wasn't there.
     public let changedPaths: Set<String>
     /// Watched folders that can't be read now, and why. Their fonts are out of the library until they're back.
     public let unavailableFolders: [UUID: FolderAvailability]
@@ -226,6 +227,8 @@ public final class LibraryScanner: Sendable {
         var last: (inputs: Int, library: Library)?
         /// The stamps of the files the last library was built from.
         var lastStamps: [String: FaceStamp] = [:]
+        /// Whether a library was built yet (see `Library.changedPaths`).
+        var built = false
         /// The library restored at launch (see `savedLibrary`), which the window shows until a scan builds one.
         var restored: Library?
         /// The fingerprint of the library last saved for the next launch.
@@ -351,7 +354,7 @@ public final class LibraryScanner: Sendable {
         if parsed.isEmpty, let last = state.withLock({ $0.last }), last.inputs == inputs {
             return last.library
         }
-        let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach) }
+        let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys)) }
         state.withLock { $0.last = (inputs, library) }
         // After a few changed files the caches are written once the library is back, as on a busy Mac that can
         // take longer than everything else.
@@ -839,7 +842,8 @@ public final class LibraryScanner: Sendable {
         var app: String?
     }
 
-    private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput, reach: OutOfReach) -> Library {
+    /// `read` are the files this scan read (see `Library.changedPaths`).
+    private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput, reach: OutOfReach, read: Set<String>) -> Library {
         var candidates: [FaceKey: [Candidate]] = [:]
         candidates.reserveCapacity(files.values.reduce(0) { $0 + $1.faces.count })
         var unreadable: [String] = []
@@ -921,10 +925,16 @@ public final class LibraryScanner: Sendable {
         hasher.combine(reach.onlineOnly)
         hasher.combine(offline)
         let changed: Set<String> = state.withLock { state in
-            let changed = state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys
+            var changed = Set(state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys)
+            // Files back without being read again, their faces kept while they were out of reach; to the first library,
+            // every file is new. One read again is new to `FontLoader` already (see `FontLoader.keep`).
+            if state.built {
+                for path in found.keys where state.lastStamps[path] == nil && !read.contains(path) { changed.insert(path) }
+            }
+            state.built = true
             state.lastStamps = found.mapValues(\.stamp)
             state.restored = nil
-            return Set(changed)
+            return changed
         }
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
                        unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
