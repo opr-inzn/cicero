@@ -47,10 +47,12 @@ enum GlyphVectors {
     /// copies it and Messages sends it by its name, where its contents alone came as “SVG image.svg”. Nothing to drop
     /// for a glyph without an outline.
     static func dragItem(_ outline: GlyphOutline?, style: String, fallback: String) -> NSItemProvider {
-        guard let outline, let file = temporaryFile(outline.fileName(style: style, fallback: fallback), Data(outline.svg.utf8)) else {
-            return NSItemProvider()
-        }
-        return NSItemProvider(object: file as NSURL)
+        dragFile(outline, style: style, fallback: fallback).map { NSItemProvider(object: $0 as NSURL) } ?? NSItemProvider()
+    }
+
+    /// The SVG file itself, for a drag AppKit starts.
+    static func dragFile(_ outline: GlyphOutline?, style: String, fallback: String) -> URL? {
+        outline.flatMap { temporaryFile($0.fileName(style: style, fallback: fallback), Data($0.svg.utf8)) }
     }
 
     /// A file of its own in a new temporary folder, so it can have the name given: what's copied or dragged.

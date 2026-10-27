@@ -4,6 +4,8 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- Scrolling through a font page’s **Glyphs** is smooth again, even in fonts with thousands of glyphs.
+- In a font page’s **Glyphs**, a character wider than its cell, like a long Arabic ligature, is scaled down to fit, as alternates and ligatures already were. **Copy as Vector** in a glyph’s right-click menu is greyed out for one without an outline, as in its popover.
 - An alternate, small capital or ligature copied from a font page’s **Glyphs** now shows as itself when you paste it into the text at the top of the page, in any of the family’s styles. Other apps still get the plain character.
 - When you save a new version of a font over the old file, a font page’s text and the grid show its new letters at once. Before, they kept showing the old ones until Cicero quit, while **Glyphs** already showed the new ones.
 - A font page’s **Glyphs** has a **Localized Forms** group: the letters a font draws differently for a language, like Bulgarian, Serbian or Turkish, in a row for each language.

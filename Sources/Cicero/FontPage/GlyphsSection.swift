@@ -141,14 +141,12 @@ struct GlyphsSection: View {
         let column = popover.flatMap { cells.firstIndex(of: $0) }.map { $0 - cells.startIndex }
         // The clicked cell's bottom middle, within two points: the cells are as wide as the row allows.
         let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
-        return HStack(spacing: Self.spacing) {
-            ForEach(cells, id: \.self) { cell in
-                glyph(cell, style: style)
-            }
-            ForEach(cells.count..<columns, id: \.self) { _ in
-                Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell)
-            }
-        }
+        let cells = Array(cells)
+        let font = FontLoader.shared.font(style.face, size: Self.glyphSize, weight: style.weight, variations: style.variations)
+        let actions = GridRowActions(open: { popover = cells[$0] }, menu: { copyMenu(cells[$0], style: style) },
+                                     file: { dragFile(cells[$0], style: style) })
+        return GlyphGridRow(cells: cells.map { gridCell($0, in: font) }, columns: columns, face: style.face, weight: style.weight,
+                            variations: style.variations, selected: column, actions: actions)
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let popover {
                 details(popover, style: style)
@@ -226,15 +224,16 @@ struct GlyphsSection: View {
     }
 
     /// Copy Character, Copy as Vector, Copy Unicode and Copy HTML Entity, for a cell's right-click menu: a feature's
-    /// glyph copies the character it's drawn for, as text, and its own shape as a vector.
-    @ViewBuilder
-    private func copyMenu(_ cell: Cell, style: Style) -> some View {
+    /// glyph copies the character it's drawn for, as text, and its own shape as a vector. Made as it opens, so Copy as
+    /// Vector is greyed out for a glyph without an outline, as in the popover.
+    private func copyMenu(_ cell: Cell, style: Style) -> [GridMenuItem] {
         let scalar = Self.character(of: cell)
-        Button("Copy Character", systemImage: "doc.on.clipboard") { copyCharacter(cell, style: style) }
-        // Not greyed out for a glyph without an outline: the menus are made with every cell, and the outline isn't.
-        Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(cell, style: style) }
-        Button("Copy Unicode", systemImage: "doc.on.clipboard") { copy(CharacterCodes.unicode(scalar), shown: CharacterCodes.unicode(scalar)) }
-        Button("Copy HTML Entity", systemImage: "doc.on.clipboard") { copy(CharacterCodes.htmlEntity(scalar), shown: CharacterCodes.htmlEntity(scalar)) }
+        return [
+            GridMenuItem(title: "Copy Character") { copyCharacter(cell, style: style) },
+            GridMenuItem(title: "Copy as Vector", isEnabled: outline(cell, style: style) != nil) { copyVector(cell, style: style) },
+            GridMenuItem(title: "Copy Unicode") { copy(CharacterCodes.unicode(scalar), shown: CharacterCodes.unicode(scalar)) },
+            GridMenuItem(title: "Copy HTML Entity") { copy(CharacterCodes.htmlEntity(scalar), shown: CharacterCodes.htmlEntity(scalar)) },
+        ]
     }
 
     /// Copy as Vector, under Copy Character in a glyph's popover.
@@ -319,6 +318,11 @@ struct GlyphsSection: View {
         GlyphVectors.dragItem(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
     }
 
+    /// The same file, for a cell dragged out of the grid.
+    private func dragFile(_ cell: Cell, style: Style) -> URL? {
+        GlyphVectors.dragFile(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
+    }
+
     /// What a glyph's file is called after when the font doesn't name the glyph: its character's code, and the features
     /// that draw it, as in "Inter Regular U+0061.ss01.svg" or "U+0061.smcp.ss01" for a stylistic set's small capital.
     private static func fileFallback(_ cell: Cell) -> String {
@@ -340,37 +344,28 @@ struct GlyphsSection: View {
         Unicode.Scalar(scalar).map { String(Character($0)) } ?? ""
     }
 
-    private func glyph(_ cell: Cell, style: Style) -> some View {
-        Group {
-            switch cell {
-            case .character(let scalar): character(scalar, style: style, size: Self.glyphSize)
-            case .feature(let glyph):
-                GlyphImage(face: style.face, glyph: glyph.glyph, size: Self.glyphSize, weight: style.weight, variations: style.variations)
-            case .alternate(let alternate):
-                GlyphImage(face: style.face, glyph: alternate.glyph, size: Self.glyphSize, weight: style.weight, variations: style.variations)
+    /// What a cell draws: a character as text, or from its glyph where it takes no room of its own (see `character`),
+    /// a feature's glyph or an alternate from its glyph, with a dot for an alternate, after the character's own glyph or
+    /// a small capital. VoiceOver reads the character, and the features of a glyph drawn in its place.
+    private func gridCell(_ cell: Cell, in font: CTFont) -> GridCell {
+        switch cell {
+        case .character(let scalar):
+            if let glyph = GlyphVectors.glyph(of: scalar, in: font), Self.isCombining(scalar) || Self.takesNoRoom(glyph, in: font) {
+                return GridCell(content: .glyph(glyph), label: Self.text(scalar))
             }
+            return GridCell(content: .text(Self.text(scalar)), label: Self.text(scalar))
+        case .feature(let glyph):
+            return GridCell(content: .glyph(glyph.glyph), isAlternate: cell.isAlternate,
+                            label: "\(Self.text(glyph.character)), \(glyph.featureNames.formatted(.list(type: .and)))")
+        case .alternate(let alternate):
+            return GridCell(content: .glyph(alternate.glyph), isAlternate: true,
+                            label: "\(Self.text(alternate.character)), \(alternate.featureNames.formatted(.list(type: .or)))")
         }
-        .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
-        .background(.quaternary.opacity(popover == cell ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-        // An alternate, after the character's own glyph or a small capital; grey, as colours stand for tags.
-        .overlay(alignment: .topTrailing) {
-            if cell.isAlternate {
-                Circle().fill(.secondary).frame(width: 6, height: 6).padding(5)
-            }
-        }
-        .contentShape(.rect)
-        .onTapGesture { popover = cell }
-        // Out of the page as an SVG file, or into a design app as a vector.
-        .onDrag { dragItem(cell, style: style) }
-        // VoiceOver opens the popover as a click does.
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { popover = cell }
-        .contextMenu { copyMenu(cell, style: style) }
     }
 
-    /// A character set in the font. One that takes no room of its own is drawn from its outline instead: a mark that
-    /// combines with the character before it (an acute, a cedilla), or one a font keeps in private use, like a Thai tone
-    /// mark shifted left, set on its own has nothing to sit on and showed nothing.
+    /// A character set in the font, for its popover. One that takes no room of its own is drawn from its outline instead:
+    /// a mark that combines with the character before it (an acute, a cedilla), or one a font keeps in private use, like a
+    /// Thai tone mark shifted left, set on its own has nothing to sit on and showed nothing.
     @ViewBuilder
     private func character(_ scalar: UInt32, style: Style, size: CGFloat) -> some View {
         let font = FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)

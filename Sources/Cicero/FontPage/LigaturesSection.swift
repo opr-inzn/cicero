@@ -23,7 +23,6 @@ struct LigaturesSection: View {
     /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
 
-    private static var cell: CGFloat { GlyphsSection.cell }
     private static var spacing: CGFloat { GlyphsSection.spacing }
     private static var inset: CGFloat { GlyphsSection.inset }
 
@@ -54,14 +53,12 @@ struct LigaturesSection: View {
             shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
         }.map { $0 - ligatures.startIndex }
         let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
-        return HStack(spacing: Self.spacing) {
-            ForEach(ligatures) { ligature in
-                cell(ligature, in: group)
-            }
-            ForEach(ligatures.count..<columns, id: \.self) { _ in
-                Color.clear.frame(maxWidth: .infinity, maxHeight: Self.cell)
-            }
-        }
+        let shown = Array(ligatures)
+        // The characters in its tooltip; a long one is scaled down to fit, 2 pt clear of the cell's sides.
+        let actions = GridRowActions(open: { popover = (group.tag, shown[$0].characters) }, menu: { menu(shown[$0], in: group) },
+                                     file: { dragFile(shown[$0]) }, help: { shown[$0].text })
+        return GlyphGridRow(cells: shown.map { GridCell(content: .glyph($0.glyph), label: "Ligature of \($0.text)") }, columns: columns,
+                            face: face, weight: weight, variations: variations, padding: 2, selected: column, actions: actions)
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let column {
                 details(ligatures[ligatures.startIndex + column], in: group)
@@ -69,28 +66,15 @@ struct LigaturesSection: View {
         }
     }
 
-    private func cell(_ ligature: Ligature, in group: LigatureGroup) -> some View {
-        let isShown = popover?.tag == group.tag && popover?.characters == ligature.characters
-        // The glyphs' size; a long one is scaled down to fit.
-        return GlyphImage(face: face, glyph: ligature.glyph, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
-            .padding(.horizontal, 2)
-            .frame(minWidth: Self.cell, maxWidth: .infinity, minHeight: Self.cell, maxHeight: Self.cell)
-            .background(.quaternary.opacity(isShown ? 0.9 : 0.35), in: .rect(cornerRadius: 6))
-            .contentShape(.rect)
-            .help(ligature.text)
-            .onTapGesture { popover = (group.tag, ligature.characters) }
-            .onDrag { dragItem(ligature) }
-            .contextMenu {
-                Button("Copy Characters", systemImage: "doc.on.clipboard") { copyCharacters(ligature, in: group) }
-                Button("Copy as Vector", systemImage: "doc.on.clipboard") { copyVector(ligature, in: group) }
-                Button("Copy Unicode", systemImage: "doc.on.clipboard") {
-                    copy(CharacterCodes.unicode(ligature.characters), shown: CharacterCodes.unicode(ligature.characters))
-                }
-            }
-        .accessibilityElement()
-        .accessibilityLabel("Ligature of \(ligature.text)")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { popover = (group.tag, ligature.characters) }
+    /// Its right-click menu, with Copy as Vector greyed out for one without an outline, as in the popover.
+    private func menu(_ ligature: Ligature, in group: LigatureGroup) -> [GridMenuItem] {
+        [
+            GridMenuItem(title: "Copy Characters") { copyCharacters(ligature, in: group) },
+            GridMenuItem(title: "Copy as Vector", isEnabled: outline(ligature) != nil) { copyVector(ligature, in: group) },
+            GridMenuItem(title: "Copy Unicode") {
+                copy(CharacterCodes.unicode(ligature.characters), shown: CharacterCodes.unicode(ligature.characters))
+            },
+        ]
     }
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
@@ -164,6 +148,11 @@ struct LigaturesSection: View {
         GlyphVectors.dragItem(outline(ligature), style: face.fullName, fallback: Self.fileFallback(ligature))
     }
 
+    /// The same file, for a ligature dragged out of the grid.
+    private func dragFile(_ ligature: Ligature) -> URL? {
+        GlyphVectors.dragFile(outline(ligature), style: face.fullName, fallback: Self.fileFallback(ligature))
+    }
+
     /// What its file is called after when the font doesn't name the glyph: its characters, as in "Inter Regular f_i.svg".
     private static func fileFallback(_ ligature: Ligature) -> String {
         ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: "_")
@@ -171,9 +160,7 @@ struct LigaturesSection: View {
 }
 
 /// One glyph of a face, by its ID: a ligature or an alternate has no character of its own to set. Drawn as text is,
-/// not filled from its outline, which came out a quarter lighter than the characters set next to it, as macOS
-/// thickens text a little when it draws it. Centred on the font's ascender and descender, so glyphs side by side
-/// share a baseline, and scaled down when it's wider than the room.
+/// centred on the font's ascender and descender and scaled down when it's wider than the room (see `GlyphDrawing`).
 struct GlyphImage: View {
     let face: FontFace
     let glyph: CGGlyph
@@ -184,23 +171,9 @@ struct GlyphImage: View {
     var body: some View {
         Canvas { context, area in
             let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
-            var glyph = glyph
-            var bounds = CGRect.zero
-            CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyph, &bounds, 1)
-            guard !bounds.isEmpty else { return }
-            // The font's ascent and descent, or as far as the glyph reaches past them: all of it fits the cell.
-            let ascent = max(CTFontGetAscent(font), bounds.maxY), descent = max(CTFontGetDescent(font), -bounds.minY)
-            let scale = min(1, (area.width - 6) / max(bounds.width, 1), area.height / max(ascent + descent, 1))
-            let x = (area.width - bounds.width * scale) / 2 - bounds.minX * scale
-            let baseline = (area.height + (ascent - descent) * scale) / 2
             let color = Color.primary.resolve(in: context.environment).cgColor
             context.withCGContext { cg in
-                cg.setFillColor(color)
-                // From the canvas's top-left origin to the glyph's baseline, with y going up.
-                cg.translateBy(x: x, y: baseline)
-                cg.scaleBy(x: scale, y: -scale)
-                var origin = CGPoint.zero
-                CTFontDrawGlyphs(font, &glyph, &origin, 1, cg)
+                GlyphDrawing.draw(glyph, font: font, in: CGRect(origin: .zero, size: area), color: color, into: cg)
             }
         }
         .accessibilityHidden(true)

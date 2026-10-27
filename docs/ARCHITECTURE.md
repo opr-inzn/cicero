@@ -207,6 +207,13 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Only rows of about one height go in a lazy stack: the page's header, type tester and styles sit in a
   plain stack above the lazy one, since a family's fifty styles, one 2,000 pt row of it, made the guesses
   swing the same way whenever the page was scrolled to its end.
+- A row of many cells in a lazy stack is one view, not a view per cell. The font page's glyphs were a view
+  per cell, each with its background, dot, menu, drag and click; the stack built some twenty of them for
+  every row coming into view, about 12 ms per 40 pt scrolled, so a font with thousands of glyphs
+  stuttered. `GlyphGridRow` draws a row's cells in one `Canvas`, about 2 ms, characters on the pixels
+  `Text` put them on (ascent and descent to the nearest point, no leading, the advance to the pixel above,
+  cells shared out as a stack does); an AppKit view over the row tells clicks, drags, right-clicks and
+  tooltips apart by where they are, and `accessibilityRepresentation` gives VoiceOver a button per cell.
 - A row of a lazy stack doesn't hold the whole list it's in. SwiftUI compares every row's inputs whenever
   it updates, and arrays of families compare every family in them unless they're the same array: the
   browser's tiles and rows hold a `FamilyOrder`, equal only to itself, for selecting ranges.
