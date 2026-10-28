@@ -358,7 +358,8 @@ public struct ActivationEngine: Sendable {
         var toCopy: [(path: String, family: String)] = []
         // Files to register where they are; `record` for those Cicero must remember to unregister.
         var toRegister: [(path: String, record: Bool)] = []
-        let targets = Self.uniqueByPath(faces.map { currentVersion(of: $0, records: records) }).filter(\.canActivate)
+        let targets = Self.uniqueByPath(faces.map { currentVersion(of: installedCopy(of: $0, records: records), records: records) })
+            .filter(\.canActivate)
         // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder ends
         // only once the file is on there (below): ending it first would take the file off macOS's list of fonts it has
         // off, and leave it off.
@@ -366,6 +367,9 @@ public struct ActivationEngine: Sendable {
         let sessionOnly = temporary.filter { !isInsideFontsFolder($0) }
         let stuckInSession = sessionOnly.isEmpty ? [] : await registrar.unregister(sessionOnly.map(Self.url), scope: .session)
         for path in temporary where !stuckInSession.contains(path) { records.temporary[path] = nil }
+        // Files Cicero installed a copy of before, still there: they stay installed, copied again as a new version also
+        // when fonts are turned on where they are (see `installedCopy` for one that's unchanged).
+        let installedBefore = Set(records.installedCopies.filter { FileManager.default.fileExists(atPath: $0.key) }.values)
         for face in targets {
             let path = face.face.path
             if records.appFolderOrigins[path] != nil {
@@ -376,7 +380,7 @@ public struct ActivationEngine: Sendable {
                 }
             } else if isInsideFontsFolder(path) {
                 toRegister.append((path, false))
-            } else if face.app != nil || method == .inPlace && !isInInactiveFolder(path) || isInFontLibrary(path) {
+            } else if face.app != nil || method == .inPlace && !isInInactiveFolder(path) && !installedBefore.contains(path) || isInFontLibrary(path) {
                 toRegister.append((path, true))
             } else {
                 toCopy.append((path, face.face.familyName))
@@ -1123,6 +1127,20 @@ public struct ActivationEngine: Sendable {
         }.keys.sorted()
         guard !candidates.isEmpty, !FontFileReader.faces(atPath: path).isEmpty else { return [] }
         return candidates
+    }
+
+    /// For a file Cicero installed a copy of before, that copy, when it's off and still the same as the file: a font that
+    /// was installed goes on again where it was installed, also when it's turned on where it is now (Ask, Leave), so it
+    /// stays in the Fonts folder for Microsoft Office.
+    private func installedCopy(of face: LibraryFace, records: ActivationRecords) -> LibraryFace {
+        let path = face.face.path
+        guard !face.state.isActive, face.app == nil, !isInsideFontsFolder(path), !isInFontLibrary(path), !isInInactiveFolder(path)
+        else { return face }
+        let copy = face.copies.filter { copy in
+            records.installedCopies[copy.face.path] == path && !copy.state.isActive && copy.app == nil
+                && Self.isIdenticalCopy(copy.face.path, of: path)
+        }.min { $0.face.path < $1.face.path }
+        return copy?.libraryFace ?? face
     }
 
     /// For an installed copy that's off, the file it was copied from, when that's in the library and has changed since:

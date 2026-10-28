@@ -52,7 +52,7 @@ A few things happen either way:
 
 - Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders).
 - When a copy has the same name as a file already where it goes, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
-- A font Cicero copied before goes on as that copy again. If its file has changed since, like a new version from the foundry in one of your [locations](organizing.md#locations), or another font saved under its name, the old copy goes to the Trash and the new one is copied in its place.
+- A font Cicero copied before goes on as that copy again, also with **Ask each time** or **Leave files where they are**, so it stays usable in Microsoft Office. If its file has changed since, like a new version from the foundry in one of your [locations](organizing.md#locations), or another font saved under its name, the old copy goes to the Trash and the new one is copied in its place.
 - A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
 
 ### Fonts in Microsoft Office
