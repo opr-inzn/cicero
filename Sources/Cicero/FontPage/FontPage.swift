@@ -277,7 +277,7 @@ private struct TypeTester: View {
     /// The text's size and tracking, and its leading, which is Preview Options' too.
     @ViewBuilder
     private var sliders: some View {
-        slider("Size", symbol: "textformat.size.larger", $size, range: 12...240, unit: " pt")
+        slider("Size", symbol: "textformat", $size, range: 12...240, unit: " pt")
         slider("Tracking", symbol: "arrow.left.and.right.text.vertical", $tracking, range: -10...40, step: 0.5, unit: "%")
             .help("The space added between letters, in percent of the em, on top of the font’s kerning")
         slider("Leading", symbol: "arrow.up.and.down.text.horizontal",
@@ -285,17 +285,17 @@ private struct TypeTester: View {
             .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
     }
 
-    /// A label, a slider that narrows where the row is short of room, and the value, which takes a number typed in too.
-    /// The label is there as a word and as a symbol, as in a layout app's character panel, with the word as its tooltip
-    /// (Preview Options' symbol is `textformat.size`, so Size's is the larger A alone); `TesterControls` shows one of them.
+    /// A symbol for a label, as in a layout app's character panel, with the word as its tooltip, a slider that narrows
+    /// where the row is short of room, and the value, which takes a number typed in too.
     private func slider(_ title: String, symbol: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1,
                         unit: String) -> some View {
         Group {
-            Text(title)
-                .controlLabel(.word)
-            // The word stands for it to VoiceOver, whichever is shown.
-            Image(systemName: symbol).help(title).accessibilityHidden(true)
-                .controlLabel(.symbol)
+            Image(systemName: symbol)
+                .help(title)
+                .accessibilityLabel(title)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .layoutValue(key: TesterControls.RoleKey.self, value: .label)
             // Ideally as narrow as at the least: the row they fit in is the menu's, while they fit at all.
             ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
                 .layoutValue(key: TesterControls.RoleKey.self, value: .slider)
@@ -352,16 +352,15 @@ private struct AxesButton: View {
 }
 
 /// The type tester's controls: the Style menu, the sliders with their labels and values, the case, alignment and Axes buttons.
-/// On one row wherever the sliders fit at their narrowest, with symbols for labels where the words don't fit, else the
-/// sliders on a row of their own under the menu, with their words again: with the Info panel open, a narrow window has
-/// too little for all of them, and squeezed further, the labels would wrap and the row grow. Either way the sliders share
-/// all the width their row leaves, as long as each other, and the last value ends where the row does. Each slider's
-/// label, slider and value are 8 pt apart, everything else 16. A layout of its own, not `ViewThatFits` over the three
-/// ways, which made each of them afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed
-/// and each step of a slider, a third of a second.
+/// On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the menu: with the
+/// Info panel open, a narrow window has too little for all of them. Either way the sliders share all the width their row
+/// leaves, as long as each other, and the last value ends where the row does. Each slider's symbol, slider and value are
+/// 8 pt apart, everything else 16. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
+/// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider, a
+/// third of a second.
 private struct TesterControls: Layout {
     enum Role {
-        case menu, word, symbol, slider, value, button
+        case menu, label, slider, value, button
     }
 
     struct RoleKey: LayoutValueKey {
@@ -374,10 +373,6 @@ private struct TesterControls: Layout {
         var sizes: [CGSize]
     }
 
-    private enum Arrangement {
-        case words, symbols, twoRows
-    }
-
     func makeCache(subviews: Subviews) -> Cache {
         Cache(roles: subviews.map { $0[RoleKey.self] }, sizes: subviews.map { $0.sizeThatFits(.unspecified) })
     }
@@ -388,9 +383,8 @@ private struct TesterControls: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
         let proposed = proposal.width.flatMap { $0.isFinite ? $0 : nil }
-        let arrangement = arrangement(width: proposed, cache)
-        guard arrangement == .twoRows else {
-            let row = oneRow(symbols: arrangement == .symbols, cache)
+        guard !fitsOneRow(width: proposed, cache) else {
+            let row = Array(cache.roles.indices)
             return CGSize(width: proposed ?? width(of: row, cache), height: height(of: row, cache))
         }
         let (top, bottom) = twoRows(cache)
@@ -399,9 +393,8 @@ private struct TesterControls: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
-        let arrangement = arrangement(width: bounds.width, cache)
-        guard arrangement == .twoRows else {
-            place(oneRow(symbols: arrangement == .symbols, cache), in: bounds, subviews, cache)
+        guard !fitsOneRow(width: bounds.width, cache) else {
+            place(Array(cache.roles.indices), in: bounds, subviews, cache)
             return
         }
         let (top, bottom) = twoRows(cache)
@@ -419,21 +412,13 @@ private struct TesterControls: Layout {
         place(bottom, in: rest, subviews, cache)
     }
 
-    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave; the labels
-    /// not in it at no width, where they'd be, with nothing to see.
+    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave.
     private func place(_ row: [Int], in bounds: CGRect, _ subviews: Subviews, _ cache: Cache) {
         let sliders = row.filter { cache.roles[$0] == .slider }
         let extra = max(0, bounds.width - width(of: row, cache)) / CGFloat(max(1, sliders.count))
         var x = bounds.minX
-        for index in subviews.indices {
+        for index in row {
             let size = cache.sizes[index]
-            guard row.contains(index) else {
-                if cache.roles[index] == .word || cache.roles[index] == .symbol {
-                    subviews[index].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
-                                          proposal: ProposedViewSize(width: 0, height: size.height))
-                }
-                continue
-            }
             if index != row.first { x += gap(before: index, cache) }
             let width = cache.roles[index] == .slider ? size.width + extra : size.width
             subviews[index].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
@@ -442,22 +427,15 @@ private struct TesterControls: Layout {
         }
     }
 
-    private func arrangement(width: CGFloat?, _ cache: Cache) -> Arrangement {
-        guard let width else { return .words }
-        if self.width(of: oneRow(symbols: false, cache), cache) <= width { return .words }
-        if self.width(of: oneRow(symbols: true, cache), cache) <= width { return .symbols }
-        return .twoRows
+    private func fitsOneRow(width: CGFloat?, _ cache: Cache) -> Bool {
+        guard let width else { return true }
+        return self.width(of: Array(cache.roles.indices), cache) <= width
     }
 
-    /// Everything, with the labels' words or their symbols.
-    private func oneRow(symbols: Bool, _ cache: Cache) -> [Int] {
-        cache.roles.indices.filter { cache.roles[$0] != (symbols ? .word : .symbol) }
-    }
-
-    /// The menu and buttons, then the sliders with their words.
+    /// The menu and buttons, then the sliders with their symbols.
     private func twoRows(_ cache: Cache) -> (top: [Int], bottom: [Int]) {
         let top = cache.roles.indices.filter { cache.roles[$0] == .menu || cache.roles[$0] == .button }
-        return (top, cache.roles.indices.filter { [.word, .slider, .value].contains(cache.roles[$0]) })
+        return (top, cache.roles.indices.filter { [.label, .slider, .value].contains(cache.roles[$0]) })
     }
 
     private func gap(before index: Int, _ cache: Cache) -> CGFloat {
@@ -470,18 +448,6 @@ private struct TesterControls: Layout {
 
     private func height(of row: [Int], _ cache: Cache) -> CGFloat {
         row.map { cache.sizes[$0].height }.max() ?? 0
-    }
-}
-
-private extension View {
-    /// A slider's label in `TesterControls`, as a word or as a symbol: grey, and at no width, with nothing to see, when
-    /// the controls show the other one.
-    func controlLabel(_ role: TesterControls.Role) -> some View {
-        foregroundStyle(.secondary)
-            .fixedSize()
-            .frame(minWidth: 0, alignment: .leading)
-            .clipped()
-            .layoutValue(key: TesterControls.RoleKey.self, value: role)
     }
 }
 
