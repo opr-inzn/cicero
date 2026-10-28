@@ -757,10 +757,11 @@ enum CaseConversion: CaseIterable {
         }
     }
 
-    /// Without the Mac's language, which would put a Turkish user's i in capitals as İ.
-    func apply(to text: String) -> String {
+    /// Without the Mac's language, which would put a Turkish user's i in capitals as İ. In capitals, ß is SS, unless
+    /// `capitalSharpS`, for a font that has the capital ẞ.
+    func apply(to text: String, capitalSharpS: Bool = false) -> String {
         switch self {
-        case .upper: text.uppercased()
+        case .upper: (capitalSharpS ? text.replacingOccurrences(of: "ß", with: "ẞ") : text).uppercased()
         case .title: text.capitalized
         case .lower: text.lowercased()
         }

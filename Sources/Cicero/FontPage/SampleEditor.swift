@@ -72,7 +72,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         update(view, context: context)
         if caseChange != coordinator.caseChange {
             coordinator.caseChange = caseChange
-            if let caseChange { (view as? SampleTextView)?.convert(caseChange.conversion) }
+            if let caseChange { (view as? SampleTextView)?.convert(caseChange.conversion, in: font) }
         }
     }
 
@@ -304,14 +304,15 @@ private final class SampleTextView: NSTextView {
     }
 
     /// The selection in another case, or the whole text with nothing selected, as one step to undo, selected afterwards
-    /// if it was before. Pasted glyphs stay marked where their characters are the same, as figures are; a letter in
+    /// if it was before. ß in capitals is ẞ where `font` has it, SS where it doesn't. Pasted glyphs stay marked where their characters are the same, as figures are; a letter in
     /// another case is another glyph.
-    func convert(_ conversion: CaseConversion) {
+    func convert(_ conversion: CaseConversion, in font: CTFont) {
         guard let storage = textStorage else { return }
         let selected = selectedRange()
         let range = selected.length > 0 ? selected : NSRange(location: 0, length: storage.length)
         let old = storage.attributedSubstring(from: range)
-        let converted = conversion.apply(to: old.string)
+        var capitalSharpS: UniChar = 0x1E9E, glyph: CGGlyph = 0
+        let converted = conversion.apply(to: old.string, capitalSharpS: CTFontGetGlyphsForCharacters(font, &capitalSharpS, &glyph, 1))
         guard converted != old.string else { return }
         let new = NSMutableAttributedString(string: converted, attributes: typingAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo })
         // Letter for letter, unless one became two, like ß as SS.
