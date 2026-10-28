@@ -72,6 +72,6 @@ When it’s done, a message says what came back, like “Restored 4 folders and 
 - Nothing is written over. A file that’s already in its place stays as it is.
 - Cicero puts only font files back, and only into font folders. Folders that are missing are made.
 - Paths in your home folder move with you, so a backup works on another Mac or under another user name.
-- A file that can’t go back where it was, for example because the folder belongs to an app that isn’t installed, like `/Applications/Adobe InDesign 2025/Fonts`, goes into a folder called **Fonts Restored from Cicero** in your home folder, under the same path. Cicero adds that folder to your library as a location.
-- Font files you added one at a time aren’t in a font folder, so when they aren’t in their place already, they go into **Fonts Restored from Cicero** too.
+- A file that can’t go back where it was, for example because the folder belongs to an app that isn’t installed, like `/Applications/Adobe InDesign 2025/Fonts`, goes into **~/Cicero/Restored**, under the same path. Cicero adds that folder to your library as a location.
+- Font files you added one at a time aren’t in a font folder, so when they aren’t in their place already, they go into **~/Cicero/Restored** too.
 - Fonts that were used where they are get turned on again. Copies Cicero installed count again when both the copy and the original are back. Fonts that were on only temporarily stay off.

@@ -208,7 +208,7 @@ extension AppModel {
             notes.append(fonts.skipped == 1 ? "1 was already there" : "\(fonts.skipped.formatted()) were already there")
         }
         if let fonts, fonts.fallback > 0 {
-            notes.append("\(fonts.fallback.formatted()) couldn’t go back and are in “\(LibraryBackup.fallbackFolderName)”")
+            notes.append("\(fonts.fallback.formatted()) couldn’t go back and are in ~/\(LibraryBackup.fallbackFolderPath)")
         }
         if let fonts, fonts.failed > 0 {
             notes.append("\(fonts.failed.formatted()) couldn’t be written")

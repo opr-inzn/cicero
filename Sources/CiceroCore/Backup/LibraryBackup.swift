@@ -119,8 +119,9 @@ public struct FontRestoreResult: Sendable, Equatable {
 /// home folder as "~", so a backup restores on another Mac or account.
 public struct LibraryBackup: Sendable {
     public static let fileExtension = "cicerobackup"
-    /// In the home folder: where fonts go that can't go back where they were.
-    public static let fallbackFolderName = "Fonts Restored from Cicero"
+    /// In the home folder: where fonts go that can't go back where they were, ~/Cicero/Restored, next to the Font
+    /// Library's default place.
+    public static let fallbackFolderPath = "Cicero/Restored"
 
     public enum Failure: Error, Sendable {
         case notABackup
@@ -147,7 +148,7 @@ public struct LibraryBackup: Sendable {
     }
 
     /// Where fonts go that can't go back where they were.
-    public var fallbackFolder: URL { home.appendingPathComponent(Self.fallbackFolderName, isDirectory: true) }
+    public var fallbackFolder: URL { home.appendingPathComponent(Self.fallbackFolderPath, isDirectory: true) }
     /// Where the current setup is saved before a restore replaces it.
     public var snapshotsFolder: URL { locations.support.appendingPathComponent("Backups", isDirectory: true) }
 
