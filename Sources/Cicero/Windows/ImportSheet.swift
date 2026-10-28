@@ -14,6 +14,8 @@ struct ImportSheet: View {
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
     @State private var summary: ImportSummary?
+    /// How to turn on the fonts that were on, when the install method is Ask.
+    @State private var askedMethod = InstallMethod.copy
     /// The other app is open, so its library can't be imported yet.
     @State private var appIsOpen = false
     /// Reading the library again, as the app left it on quitting.
@@ -202,10 +204,8 @@ struct ImportSheet: View {
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {
-                    // FontBase's own library can't be imported until it has quit, so it can't turn them off again.
-                    let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so it doesn’t deactivate them again."
-                    checkbox("Activate the fonts that were active", detail: "\(count(library.active.count, "style")), activated where they are." + quit,
-                             isOn: $choices.activate)
+                    checkbox("Activate the fonts that were active", detail: activateDetail, isOn: $choices.activate)
+                    if model.importMethod == nil { askedMethodPicker }
                 }
                 // While the app is open its copies are its own: it deletes them as it quits, unless it's set not to. So
                 // they're only offered once the library has been read again after it quit.
@@ -290,7 +290,7 @@ struct ImportSheet: View {
         stage = .starting
         let choices = choices
         task = Task {
-            let result = await model.performImport(prompt, choices: choices) { stage in
+            let result = await model.performImport(prompt, choices: choices, method: activationMethod) { stage in
                 Task { @MainActor in if self.summary == nil { self.stage = stage } }
             }
             task = nil
@@ -328,7 +328,7 @@ struct ImportSheet: View {
                 Text(detail)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .truncationMode(.middle)
             }
         }
@@ -355,6 +355,33 @@ struct ImportSheet: View {
             || (choices.tags && !library.tags.isEmpty) || (choices.classifications && !library.classifications.isEmpty)
             || (choices.ratings && !library.ratings.isEmpty) || (choices.comments && !library.comments.isEmpty)
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
+    }
+
+    /// How the fonts that were on are turned on: as Activate fonts by says, or as chosen here with Ask.
+    private var activationMethod: InstallMethod { model.importMethod ?? askedMethod }
+
+    /// With Ask, the two ways under the checkbox, in Settings' words, lined up with its title.
+    private var askedMethodPicker: some View {
+        Picker("", selection: $askedMethod) {
+            Text(model.data.installsIntoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts").tag(InstallMethod.copy)
+            Text("Leave files where they are").tag(InstallMethod.inPlace)
+        }
+        .pickerStyle(.radioGroup)
+        .horizontalRadioGroupLayout()
+        .labelsHidden()
+        .disabled(!choices.activate)
+        .padding(.leading, 40)
+        .padding(.bottom, 3)
+    }
+
+    /// How they're turned on (`activationMethod`), and whether Office can use them.
+    private var activateDetail: String {
+        let copies = activationMethod == .copy
+        let how = copies ? "copied into \(model.installPlace) and activated" : "activated where they are"
+        let office = copies && !model.data.installsIntoFontLibrary ? "" : ", so Microsoft Office can’t use them"
+        // FontBase's own library can't be imported until it has quit, so it can't turn them off again.
+        let quit = prompt.waitsForQuit ? "" : copies ? " Quit \(appName) first, so they aren’t on twice." : " Quit \(appName) first, so it doesn’t deactivate them again."
+        return "\(count(library.active.count, "style")), \(how)\(office)." + quit
     }
 
     private var classificationsDetail: String {

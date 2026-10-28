@@ -136,8 +136,10 @@ extension AppModel {
 
     /// Saves the current setup to the Backups folder; puts a backup's fonts in place (the long part, in the caller's
     /// task so it can be cancelled); lists the other app's fonts and reads them in one queued operation; brings in the
-    /// rest, matched against them; then turns on, where they are, the fonts that were on. Nil when nothing was done.
-    func performImport(_ prompt: ImportPrompt, choices: ImportChoices, stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
+    /// rest, matched against them; then turns on the fonts that were on with `method` (see `importMethod`). Nil when
+    /// nothing was done.
+    func performImport(_ prompt: ImportPrompt, choices: ImportChoices, method: InstallMethod,
+                       stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
         let imported = prompt.library
         isImporting = true
         defer { isImporting = false }
@@ -179,11 +181,24 @@ extension AppModel {
             if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
             model.data = updated
             model.rescan()
-            if !faces.isEmpty { model.performActivation(faces, method: .inPlace) }
+            if !faces.isEmpty { model.performActivation(faces, method: method) }
             result.activated = faces.count
             summary = result
         }
         return summary
+    }
+}
+
+extension AppModel {
+    /// How an import turns on the fonts that were on: copied into the Fonts folder or Cicero's Library with Copy, and with
+    /// Move too, as the other app's files stay where they are; where they are with Leave. Nil with Ask: the Import sheet
+    /// asks which of the two.
+    var importMethod: InstallMethod? {
+        switch data.installMethod {
+        case .copy, .move: .copy
+        case .inPlace: .inPlace
+        case .ask: nil
+        }
     }
 }
 
