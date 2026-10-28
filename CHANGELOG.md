@@ -10,6 +10,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Turning a font on never copies it: fonts in your locations or under **Added Fonts** are activated where they are with every setting, so Microsoft Office can’t use them. **Activate fonts by** only decides what happens as you add font files.
 - **File → Import from FontBase** copies FontBase’s fonts into your Fonts folder and brings over its collections, favorites and tags, turning on the fonts that were on. The sheet asks you to quit FontBase first and says what stays behind.
 - Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. Fonts that weren’t active come in inactive.
+- If you imported from FontExplorer X before, Cicero offers to copy the fonts of its Font Library in and remove the location, keeping your folders, tags, ratings and notes.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
 - **AA**, **Aa** and **aa** on the font page put the text, or just the selected part, in capitals, capitalize each word, or put it in lowercase (⌘Z undoes it). Preview Options has them too, under **Presets**, so you can save a preset in another case. In capitals, ß becomes ẞ where the font has it, and SS where it doesn’t.

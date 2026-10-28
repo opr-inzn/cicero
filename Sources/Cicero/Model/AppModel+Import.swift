@@ -165,6 +165,10 @@ extension AppModel {
         stage(.starting)
         var summary: ImportSummary?
         await enqueued { model in
+            // Files Cicero still has on where they are, though the library doesn't list them any more, as a location it
+            // was in has gone: their copies take over, so the fonts aren't on from the other app's files.
+            let stale = files.map(\.source).filter { model.data.records.inPlace.contains($0) && installed.placed[$0] != nil }
+            if !stale.isEmpty { model.data.records = await model.engine.forgetInPlace(stale, records: model.data.records) }
             // The library with the copies in it, to match against.
             let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
             let scanned = try? await model.scanner.scan(input) { progress in
@@ -182,8 +186,12 @@ extension AppModel {
             if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
             model.data = updated
             model.rescan()
+            // And the copies of those that were on from the other app's files.
+            let takingOver = Set(stale.compactMap { installed.placed[$0] }).subtracting(faces.map(\.face.path))
+            let more = takingOver.isEmpty ? []
+                : (scanned ?? model.library).families.flatMap(\.faces).filter { takingOver.contains($0.face.path) && $0.canActivate }
             // In a Fonts folder or Cicero's Library, they go on where they are.
-            if !faces.isEmpty { model.performActivation(faces) }
+            if !faces.isEmpty || !more.isEmpty { model.performActivation(faces + more) }
             result.activated = faces.count
             summary = result
         }
