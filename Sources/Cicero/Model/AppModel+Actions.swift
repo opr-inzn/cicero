@@ -199,7 +199,20 @@ extension AppModel {
         engine.spareCopies(among: duplicate.replacements, records: data.records).keys.sorted()
     }
 
-    /// The sheet's warning for a family replaced in more than one place: "Replaces 2 files: in your Fonts folder and in
+    /// Whether Replace asks first for an added family, even with Replace chosen in Preferences: when it puts the added
+    /// file in more than one place, or in place of a file in one of the user's own folders, like a client's, which they
+    /// may not expect it to change. Files in the Fonts folder, the Inactive folder and Cicero's Library are Cicero's to
+    /// change.
+    func warnsBeforeReplacing(_ duplicate: AddedDuplicate) -> Bool {
+        duplicate.replacesSeveralCopies || duplicate.replacements.contains { replacement in
+            let path = replacement.old
+            let isCiceros = path.hasPrefix(locations.userFonts.path + "/") || locations.isInInactiveFolder(path)
+                || data.fontLibrary.map { path.hasPrefix($0.path + "/") } == true
+            return !isCiceros
+        }
+    }
+
+    /// The sheet's warning for a family replaced in more than one place, or in one of the user's own folders: "Replaces 2 files: in your Fonts folder and in
     /// Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts folder goes to the Trash".
     func replaceWarning(_ duplicate: AddedDuplicate) -> String {
         let spare = spareCopies(duplicate)

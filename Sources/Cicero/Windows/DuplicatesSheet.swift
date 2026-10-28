@@ -61,7 +61,7 @@ struct DuplicatesSheet: View {
             }
             .padding(16)
         }
-        .frame(width: 720, height: min(540, 146 + prompt.duplicates.map(Self.rowHeight).reduce(0, +)))
+        .frame(width: 720, height: min(540, 146 + prompt.duplicates.map(rowHeight).reduce(0, +)))
     }
 
     private func row(_ duplicate: AddedDuplicate) -> some View {
@@ -80,7 +80,7 @@ struct DuplicatesSheet: View {
                     Text(block.explanation)
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                } else if choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) == .replace, duplicate.replacesSeveralCopies {
+                } else if choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) == .replace, model.warnsBeforeReplacing(duplicate) {
                     Label(model.replaceWarning(duplicate), systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
                         .foregroundStyle(.orange)
@@ -100,10 +100,10 @@ struct DuplicatesSheet: View {
         .padding(.vertical, 10)
     }
 
-    /// A row's height: a line more for one that can't be replaced, or that warns it replaces more than one file. With
-    /// the title and the bar below (146), the sheet is as tall as its rows, up to 540.
-    private static func rowHeight(_ duplicate: AddedDuplicate) -> CGFloat {
-        duplicate.replaceBlock != nil || duplicate.replacesSeveralCopies ? 73 : 54
+    /// A row's height: a line more for one that can't be replaced, or that warns what it replaces. With the title and
+    /// the bar below (146), the sheet is as tall as its rows, up to 540.
+    private func rowHeight(_ duplicate: AddedDuplicate) -> CGFloat {
+        duplicate.replaceBlock != nil || model.warnsBeforeReplacing(duplicate) ? 73 : 54
     }
 
     /// "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000".

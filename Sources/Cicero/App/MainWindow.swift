@@ -183,7 +183,7 @@ struct MainWindow: View {
 }
 
 /// A page of the detail column: room for the Info panel, and files dropped on it.
-/// The questions before fonts are replaced: in more than one place (`replacePrompt`), and while apps that keep a font's
+/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and while apps that keep a font's
 /// old version are open (`openAppsReplacePrompt`).
 private struct ReplaceAlerts: ViewModifier {
     @Environment(AppModel.self) private var model
@@ -191,7 +191,7 @@ private struct ReplaceAlerts: ViewModifier {
     func body(content: Content) -> some View {
         content
             .alert(
-                model.replacePrompt.map(Self.replaceTitle) ?? "",
+                model.replacePrompt.map(replaceTitle) ?? "",
                 isPresented: Binding(get: { model.replacePrompt != nil }, set: { if !$0 { model.replacePrompt = nil } }),
                 presenting: model.replacePrompt
             ) { prompt in
@@ -232,23 +232,32 @@ private struct ReplaceAlerts: ViewModifier {
         names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.joined()
     }
 
-    /// "Replace Helvetica in 2 Places?", or for several families "Replace Fonts in More Than One Place?".
-    static func replaceTitle(_ prompt: DuplicatePrompt) -> String {
-        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
-        guard several.count == 1 else { return "Replace Fonts in More Than One Place?" }
-        return "Replace \(several[0].family) in \(several[0].replacements.count) Places?"
+    /// "Replace Helvetica in 2 Places?", "Replace Helvetica in Clients?", or for several families "Replace Fonts in More
+    /// Than One Place?" or "Replace These Fonts?".
+    private func replaceTitle(_ prompt: DuplicatePrompt) -> String {
+        let warned = prompt.duplicates.filter(model.warnsBeforeReplacing)
+        guard warned.count == 1 else {
+            return warned.allSatisfy(\.replacesSeveralCopies) ? "Replace Fonts in More Than One Place?" : "Replace These Fonts?"
+        }
+        let one = warned[0]
+        return one.replacesSeveralCopies ? "Replace \(one.family) in \(one.replacements.count) Places?"
+            : "Replace \(one.family) \(model.replacedPlaces(one))?"
     }
 
     /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
+    /// For one file: "Helvetica is in Clients. The file goes to the Trash, and the added one takes its place."
     /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…goes to the Trash. The added one takes the place
     /// of each, except Cicero’s copy of Helvetica in your Fonts folder: Helvetica is off, so the one in Cicero’s Library is
     /// enough."
     private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
-        let several = prompt.duplicates.filter(\.replacesSeveralCopies)
+        let several = prompt.duplicates.filter(model.warnsBeforeReplacing)
         var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
         if several.count > 3 { lines.append("And \(several.count - 3) more.") }
         let spare = several.map { ($0.family, model.spareCopies($0).count) }.filter { $0.1 > 0 }
-        guard !spare.isEmpty else { return (lines + ["Each of these files goes to the Trash, and the added one takes its place."]).joined(separator: " ") }
+        guard !spare.isEmpty else {
+            let files = several.reduce(0) { $0 + $1.replacements.count } == 1 ? "The file goes" : "Each of these files goes"
+            return (lines + ["\(files) to the Trash, and the added one takes its place."]).joined(separator: " ")
+        }
         let families = spare.map(\.0)
         let off = families.count == 1 ? "\(families[0]) is off" : "they’re off"
         let except = spare.reduce(0) { $0 + $1.1 } == 1

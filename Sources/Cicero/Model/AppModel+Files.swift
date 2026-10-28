@@ -124,7 +124,7 @@ extension AppModel {
     /// from other files, and doing with those as Settings → General says: asking family by family, adding them as
     /// other copies, leaving them out, or putting them in place of the library's copies (see `DuplicateHandling`).
     /// Replace asks family by family too where it can't be done, and first warns when it would put a file in more than
-    /// one place (`replacePrompt`).
+    /// one place, or in one of the user's own folders (`replacePrompt`, `warnsBeforeReplacing`).
     func addCheckingDuplicates(_ paths: [String], then: @escaping (AppModel, Set<String>) -> Void) {
         let new = paths.filter { !isListed($0) }
         guard !new.isEmpty, data.duplicateHandling != .addCopy else { return addFontFiles(paths, then: then) }
@@ -141,7 +141,7 @@ extension AppModel {
                 duplicatePrompt = prompt
                 return
             }
-            if handling == .replace, duplicates.contains(where: \.replacesSeveralCopies) {
+            if handling == .replace, duplicates.contains(where: warnsBeforeReplacing) {
                 replacePrompt = prompt
                 return
             }
