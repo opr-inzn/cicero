@@ -4,10 +4,13 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **Installing and turning on fonts works differently.** With **Ask each time** in **Preferences → General**, Cicero asks whether to copy, move or leave font files where they are as you add them, and turning fonts on no longer asks: they go on where they are.
+- Microsoft Office only uses fonts in your Fonts folder. If you use **Ask each time** and need your fonts in Word or PowerPoint, switch to **Copy into ~/Library/Fonts** in **Preferences → General**.
+- **Copy into ~/Library/Fonts** is the setting at first, so Cicero copies font files into your Fonts folder as you add them.
+- When a font file in one of your locations has changed since Cicero copied it into your Fonts folder, turning the font on copies the new version in place of the old one.
 - **File → Import from FontBase** brings over FontBase’s folder, collections, favorites and tags, and turns on the fonts that were on. The sheet asks you to quit FontBase first and says what stays behind.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
-- Cicero copies fonts into your Fonts folder as you add them. With **Ask each time** in **Preferences → General**, it asks whether to copy, move or leave them where they are.
 
 ## 0.10.13
 

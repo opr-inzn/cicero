@@ -83,6 +83,7 @@ extension AppModel {
         var webFonts: Set<String> = []
         // Another font manager's library or collections open the Import sheet.
         let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
+        let readFolders = readFolders
         for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
             let url = url.standardizedFileURL
             var isDirectory: ObjCBool = false
@@ -90,8 +91,8 @@ extension AppModel {
             let pathExtension = url.pathExtension.lowercased()
             if isDirectory.boolValue {
                 if !NSWorkspace.shared.isFilePackage(atPath: url.path) { folders.append(url) }
-            } else if FontFormat.fileExtensions.contains(pathExtension), !files.contains(url.path) {
-                files.append(url.path)
+            } else if FontFormat.fileExtensions.contains(pathExtension), case let path = libraryPath(of: url.path, folders: readFolders), !files.contains(path) {
+                files.append(path)
             } else if DocumentFonts.fileExtensions.contains(pathExtension) {
                 documents.append(url)
             } else if ["woff", "woff2"].contains(pathExtension) {
@@ -307,10 +308,37 @@ extension AppModel {
         return library.families.contains { $0.faces.contains { $0.face.path == path || $0.otherCopies.contains(path) } }
     }
 
-    /// In a Fonts folder, the Inactive folder or a watched folder.
+    /// In a Fonts folder, the Inactive folder or a watched folder, also when the path reaches it another way (see
+    /// `libraryPath`): moving such a file would take it out of the folder.
     private func isInReadFolder(_ path: String) -> Bool {
-        let folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
+        let folders = readFolders
+        let path = libraryPath(of: path, folders: folders)
         return folders.contains { path.hasPrefix($0 + "/") }
+    }
+
+    /// The Fonts folders, the Inactive folder and the watched folders.
+    private var readFolders: [String] {
+        [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
+    }
+
+    /// The path the way the library has it: through the folder it reads, when `path` reaches a file in it another way,
+    /// through a symbolic link, like a shortcut to a synced folder, or in other letter case.
+    func libraryPath(of path: String, folders: [String]? = nil) -> String {
+        let folders = folders ?? readFolders
+        guard !folders.contains(where: { path.hasPrefix($0 + "/") }), let real = Self.realPath(path) else { return path }
+        for folder in folders {
+            guard let realFolder = Self.realPath(folder), real.hasPrefix(realFolder + "/") else { continue }
+            return folder + real.dropFirst(realFolder.count)
+        }
+        return path
+    }
+
+    /// The path as the disk has it, symbolic links resolved and each name in its own letter case; nil when there's
+    /// nothing there.
+    private static func realPath(_ path: String) -> String? {
+        guard let real = realpath(path, nil) else { return nil }
+        defer { free(real) }
+        return String(cString: real)
     }
 
     /// The files among `paths` added one at a time and in no folder the library reads: activating by moving moves
