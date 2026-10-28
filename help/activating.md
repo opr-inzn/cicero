@@ -14,7 +14,7 @@ A switch moves the moment you click it and stays there while Cicero works. If so
 
 Any of these work:
 
-- Click the family’s switch in the list, grid or specimens.
+- Click the family’s switch in the list, grid or specimens. With several families selected, clicking the switch of one of them turns them all on.
 - Select one or more families and choose **Fonts → Activate** (⌘↩).
 - Right-click a family and choose **Activate**. If some of its styles are on already, the item says **Activate Remaining Styles**.
 - On a font page, click **Activate**.
@@ -121,7 +121,7 @@ While fonts are on until Cicero quits, the sidebar has **Temporary**, under **In
 
 Any of these work:
 
-- Click the family’s switch.
+- Click the family’s switch. With several families selected, clicking the switch of one that’s on turns them all off.
 - Select families and press ⌫, or choose **Fonts → Deactivate**.
 - Right-click a family and choose **Deactivate**, or a style and choose **Deactivate Style**.
 - Right-click a folder or smart folder in the sidebar and choose **Deactivate Folder** or **Deactivate Smart Folder**.

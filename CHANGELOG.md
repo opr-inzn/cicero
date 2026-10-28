@@ -5,6 +5,7 @@ Each version’s notes here become its release notes on the [releases page](http
 ## Unreleased
 
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
+- With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
 
 ## 0.10.13
 
