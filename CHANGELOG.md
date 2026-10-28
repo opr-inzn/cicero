@@ -11,7 +11,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **File → Import from FontBase** brings over FontBase’s folder, collections, favorites and tags, and turns on the fonts that were on. The sheet asks you to quit FontBase first and says what stays behind.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
-- **AA**, **Aa** and **aa** on the font page put the text, or just the selected part, in capitals, capitalize each word, or put it in lowercase (⌘Z undoes it). In capitals, ß becomes ẞ where the font has it, and SS where it doesn’t.
+- **AA**, **Aa** and **aa** on the font page put the text, or just the selected part, in capitals, capitalize each word, or put it in lowercase (⌘Z undoes it). Preview Options has them too, under **Presets**, so you can save a preset in another case. In capitals, ß becomes ẞ where the font has it, and SS where it doesn’t.
 
 ## 0.10.13
 
