@@ -494,7 +494,7 @@ Sidebar item with badge; groups with a short explanation and fixes:
 - Damaged or unreadable files: Reveal, Move to Trash
 - Fonts on external disks used in place: Install a Copy Instead.
 - Spare copies: a file is offered for removal only when every face in it, of every family, has a copy in another file that stays (not the same file by another path). Which faces a file holds comes from the library, and the file is read too: one with faces the library leaves out (hidden families) is never offered. When a fix can't be offered, it's left out. The confirmation names the other families in the files ("The file also contains B, which keeps its other copies."), and the files are checked again right before they go: if a copy went in the meantime, nothing moves ("Kept the file: it holds the only copy of a font."). Deactivate asks first like any deactivation.
-- Empty state "No Conflicts". Never trash protected paths or a font's only copy.
+- Empty state "No Conflicts" ("Checking Fonts" before the first scan), saying what shows up here. Never trash protected paths or a font's only copy.
 
 ## Font caches
 
