@@ -162,7 +162,7 @@ struct GeneralSettings: View {
     private var activationExplanation: String {
         let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
         return switch model.data.installMethod {
-        case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
+        case .ask: "When you add font files, Cicero asks whether to copy them into \(place) or leave them where they are. Fonts you turn on yourself are activated where they are, and Microsoft Office can’t use them."
         case .copy: "Copying puts font files into \(place) and leaves the originals where they are."
         case .move: "Moving puts font files into \(place)."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves. Microsoft Office can’t use them."

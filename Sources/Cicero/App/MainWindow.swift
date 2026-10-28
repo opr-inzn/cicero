@@ -47,9 +47,9 @@ struct MainWindow: View {
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
         .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
-        // While the Fonts in Document sheet is up, it asks how to activate itself: a window shows one sheet.
-        .sheet(item: Binding(get: { model.documentFonts == nil ? model.activationPrompt : nil }, set: { model.activationPrompt = $0 })) {
-            ActivationSheet(prompt: $0)
+        // While the Fonts in Document sheet is up, it asks how to install itself: a window shows one sheet.
+        .sheet(item: Binding(get: { model.documentFonts == nil ? model.installPrompt : nil }, set: { model.installPrompt = $0 })) {
+            InstallSheet(prompt: $0)
         }
         .confirmsManyActivations(when: model.documentFonts == nil)
         .sheet(item: $model.documentFonts) { DocumentFontsSheet(report: $0) }

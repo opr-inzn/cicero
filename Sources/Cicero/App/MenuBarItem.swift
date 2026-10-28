@@ -208,8 +208,8 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         } else {
             model.activateFonts(in: [row])
         }
-        // Asking how to activate, or whether to turn on so many, happens in the main window.
-        if model.activationPrompt != nil || model.manyActivationPrompt != nil {
+        // Asking whether to turn on so many happens in the main window.
+        if model.manyActivationPrompt != nil {
             NSApp.bringForward { openWindow?(id: WindowID.main) }
         }
     }

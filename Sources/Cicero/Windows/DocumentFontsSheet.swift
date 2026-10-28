@@ -66,8 +66,8 @@ struct DocumentFontsSheet: View {
             .padding(16)
         }
         .frame(width: 680, height: 540)
-        // The main window can't show a sheet over this one, so activating asks how from here.
-        .sheet(item: $model.activationPrompt) { ActivationSheet(prompt: $0) }
+        // The main window can't show a sheet over this one, so adding a font file asks how from here.
+        .sheet(item: $model.installPrompt) { InstallSheet(prompt: $0) }
         .confirmsManyActivations()
     }
 
@@ -136,13 +136,8 @@ struct DocumentFontsSheet: View {
             switch searches[match.id] {
             case .found(let path):
                 // Copied even when fonts are activated by moving: Spotlight may have found it in another document's folder.
-                if model.installsAddedFiles {
-                    Button("Install") { model.addFontFiles([path], mayMove: false) }
-                        .help("Copies the file into \(model.installPlace) and turns it on")
-                } else {
-                    Button("Add") { model.addFontFiles([path]) }
-                        .help("Lists the file in your library where it is, under Added Fonts")
-                }
+                Button(model.data.installMethod == .inPlace ? "Add" : "Install") { model.addFontFiles([path], mayMove: false) }
+                    .help(installHelp)
             case .searching:
                 ProgressView().controlSize(.small)
             case nil, .notFound:
@@ -153,6 +148,15 @@ struct DocumentFontsSheet: View {
     }
 
     // MARK: Helpers
+
+    /// Copied even when fonts are activated by moving (see `action`).
+    private var installHelp: String {
+        switch model.data.installMethod {
+        case .copy, .move: "Copies the file into \(model.installPlace) and turns it on"
+        case .inPlace: "Lists the file in your library where it is, under Added Fonts"
+        case .ask: "Asks whether to copy the file into \(model.installPlace) or leave it where it is"
+        }
+    }
 
     /// The family and style as the library names them, else as the document does: a PDF gives only PostScript names.
     private func title(_ match: DocumentFontMatch) -> String {

@@ -180,7 +180,8 @@ final class AppModel {
 
     // MARK: Prompts
 
-    var activationPrompt: ActivationPrompt?
+    /// Font files being added, waiting for the user to say how to install them (while the install method is Ask).
+    var installPrompt: InstallPrompt?
     /// Turning on many families at once, waiting for the user to agree (see `UserData.asksBeforeActivatingMany`).
     var manyActivationPrompt: ManyActivationPrompt?
     /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
@@ -925,12 +926,15 @@ struct ManyActivationPrompt: Identifiable {
     var temporarily: Bool
 }
 
-struct ActivationPrompt: Identifiable {
+/// Font files being added while the install method is Ask, waiting for the user to say how (see `InstallSheet`).
+struct InstallPrompt: Identifiable {
     let id = UUID()
-    var title: String
-    var faces: [LibraryFace]
-    /// Set when the faces are copies taking over from others.
-    var switching: CopySwitchRequest?
+    /// The files the library doesn't have yet, for the sheet's title.
+    var files: [String]
+    /// Some of them can move: the user picked them, and no folder the library reads has them.
+    var offersMove: Bool
+    /// Adds the files the way the user chose.
+    var add: (AppModel, InstallMethod) -> Void
 }
 
 /// Using a place's copies of some styles (see `AppModel.useCopies`).

@@ -290,7 +290,7 @@ private struct EmptyBrowser: View {
             FolderOutOfReach(folderID: id)
         case .inactive:
             // With no locations of their own too: what's here is what's on, and Proofing may well be under Locations.
-            // Add Fonts only while it lists files where they are; installing them would turn them on.
+            // Add Fonts only while it lists files where they are, or asks; installing them would turn them on.
             EmptyState("Everything Is Active", systemImage: "checkmark.seal",
                        description: Text(model.installsAddedFiles
                            ? "Every font in your library is turned on. Add a folder of fonts to keep more here without activating them."
