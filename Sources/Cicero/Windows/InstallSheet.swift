@@ -32,8 +32,8 @@ struct InstallSheet: View {
             }
             // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
-            Toggle("Remember this choice (you can change it in Preferences → General)", isOn: $remember)
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("Remember this choice (you can change it later)", isOn: $remember)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
             }
