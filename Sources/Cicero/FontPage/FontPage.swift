@@ -353,8 +353,9 @@ private struct AxesButton: View {
 
 /// The type tester's controls: the Style menu, the sliders with their labels and values, the case, alignment and Axes buttons.
 /// On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the menu: with the
-/// Info panel open, a narrow window has too little for all of them. Either way the sliders share all the width their row
-/// leaves, as long as each other, and the last value ends where the row does. Each slider's symbol, slider and value are
+/// Info panel open, a narrow window has too little for all of them. On one row, the sliders share the width the row leaves
+/// up to `longestSlider` each, as long as each other, and what's left goes either side of them, so they stand as a group
+/// between the menu and the buttons; on a row of their own, they share all of it, and the last value ends where the row does. Each slider's symbol, slider and value are
 /// 8 pt apart, everything else 16. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
 /// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider, a
 /// third of a second.
@@ -392,9 +393,12 @@ private struct TesterControls: Layout {
                       height: height(of: top, cache) + 10 + height(of: bottom, cache))
     }
 
+    /// The longest a slider grows on the row with the menu and buttons.
+    static let longestSlider: CGFloat = 180
+
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
         guard !fitsOneRow(width: bounds.width, cache) else {
-            place(Array(cache.roles.indices), in: bounds, subviews, cache)
+            place(Array(cache.roles.indices), in: bounds, subviews, cache, grouped: true)
             return
         }
         let (top, bottom) = twoRows(cache)
@@ -412,14 +416,32 @@ private struct TesterControls: Layout {
         place(bottom, in: rest, subviews, cache)
     }
 
-    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave.
-    private func place(_ row: [Int], in bounds: CGRect, _ subviews: Subviews, _ cache: Cache) {
+    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave; `grouped`, no
+    /// longer than `longestSlider`, with the rest either side of them, or after them with nothing before.
+    private func place(_ row: [Int], in bounds: CGRect, _ subviews: Subviews, _ cache: Cache, grouped: Bool = false) {
         let sliders = row.filter { cache.roles[$0] == .slider }
-        let extra = max(0, bounds.width - width(of: row, cache)) / CGFloat(max(1, sliders.count))
+        let room = max(0, bounds.width - width(of: row, cache))
+        var extra = room / CGFloat(max(1, sliders.count))
+        var before: CGFloat = 0, after: CGFloat = 0
+        let group = row.filter { [.label, .slider, .value].contains(cache.roles[$0]) }
+        if grouped, let first = group.first, let last = group.last, let slider = sliders.first {
+            extra = min(extra, max(0, Self.longestSlider - cache.sizes[slider].width))
+            let left = room - extra * CGFloat(sliders.count)
+            switch (first != row.first, last != row.last) {
+            case (true, true): (before, after) = (left / 2, left / 2)
+            case (false, true): after = left
+            case (true, false): before = left
+            case (false, false): extra = room / CGFloat(sliders.count)
+            }
+        }
+        // What follows the sliders' last value.
+        let afterGroup = group.last.flatMap { last in row.drop { $0 != last }.dropFirst().first }
         var x = bounds.minX
         for index in row {
             let size = cache.sizes[index]
             if index != row.first { x += gap(before: index, cache) }
+            if index == group.first { x += before }
+            if index == afterGroup { x += after }
             let width = cache.roles[index] == .slider ? size.width + extra : size.width
             subviews[index].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
                                   proposal: ProposedViewSize(width: width, height: size.height))
