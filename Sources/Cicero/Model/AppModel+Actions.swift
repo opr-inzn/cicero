@@ -9,7 +9,7 @@ extension AppModel {
     }
 
     /// Turns fonts on as the install method says; with Ask, which asks as files are added (see `InstallSheet`), where
-    /// they are. Asks first whether to turn on so many when that's more than `UserData.manyFamilies` families, unless
+    /// they are. Fonts in the user's locations go on where they are whatever it says (see `performActivation`). Asks first whether to turn on so many when that's more than `UserData.manyFamilies` families, unless
     /// `confirmed`.
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
@@ -20,11 +20,14 @@ extension AppModel {
         performActivation(targets, method: data.installMethod == .ask ? .inPlace : data.installMethod)
     }
 
+    /// Copying or moving the fonts as `method` says, except those in the user's locations, which go on where they are:
+    /// also when an old copy of one gives way to its file (see `ActivationEngine.currentVersion`).
     func performActivation(_ faces: [LibraryFace], method: InstallMethod) {
         let operation = expect(faces, at: .on)
         let movable = movableFiles(among: faces.map(\.face.path))
+        let inPlace = filesInLocations(among: faces.flatMap { [$0.face.path] + $0.otherCopies })
         enqueue { model in
-            let result = await model.engine.activate(faces, method: method, records: model.data.records, movable: movable)
+            let result = await model.engine.activate(faces, method: method, records: model.data.records, movable: movable, inPlace: inPlace)
             model.finish(result, operation: operation)
         }
     }
@@ -157,8 +160,9 @@ extension AppModel {
 
     func performCopySwitch(_ request: CopySwitchRequest, method: InstallMethod) {
         let operation = expect(request.plan.styles, at: .on)
+        let inPlace = filesInLocations(among: request.plan.switches.compactMap(\.target?.face.path))
         enqueue { model in
-            var result = await model.engine.switchCopies(request.plan.switches, method: method, records: model.data.records)
+            var result = await model.engine.switchCopies(request.plan.switches, method: method, records: model.data.records, inPlace: inPlace)
             if result.failed.isEmpty {
                 result.message = "Using the copies from \(request.source)"
                     + (request.plan.leavesOtherCopiesOn ? ". Another copy Cicero didn’t turn on is still on, so apps may use that one" : "")

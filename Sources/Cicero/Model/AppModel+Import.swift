@@ -134,12 +134,11 @@ extension AppModel {
 
     // MARK: Importing
 
-    /// Saves the current setup to the Backups folder; puts a backup's fonts in place (the long part, in the caller's
-    /// task so it can be cancelled); lists the other app's fonts and reads them in one queued operation; brings in the
-    /// rest, matched against them; then turns on the fonts that were on with `method` (see `importMethod`). Nil when
+    /// Saves the current setup to the Backups folder; copies the other app's fonts in, off, where installing puts them
+    /// (the long part, in the caller's task so it can be cancelled: the copies made so far go again); reads them in one
+    /// queued operation; brings in the rest, matched against the copies; then turns on the fonts that were on. Nil when
     /// nothing was done.
-    func performImport(_ prompt: ImportPrompt, choices: ImportChoices, method: InstallMethod,
-                       stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
+    func performImport(_ prompt: ImportPrompt, choices: ImportChoices, stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
         let imported = prompt.library
         isImporting = true
         defer { isImporting = false }
@@ -150,21 +149,24 @@ extension AppModel {
             showToast("Couldn’t save the current setup first, so nothing was imported")
             return nil
         }
-        // The other app's copies go first, so the scan doesn't list them.
+        // The other app's copies go first, so they aren't on beside Cicero's.
         let removed = choices.removeCopies ? LibraryImport.removeCopies(imported) : 0
-        var placed = 0
-        if choices.fontFolder, imported.bundledFonts != nil {
-            placed = await LibraryImport.placeBundledFonts(imported) { done, total in stage(.copying(done: done, total: total)) }
-            if Task.isCancelled { return nil }
+        var data = data
+        let files = LibraryImport.fontFiles(imported, choices: choices, data: &data, locations: locations)
+        self.data.showAdobeAppFolders = data.showAdobeAppFolders
+        let installed = await engine.installOff(files.map(\.source)) { done, total in stage(.copying(done: done, total: total)) }
+        if Task.isCancelled {
+            for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
+            return nil
         }
+        // The other app's paths → the copies'.
+        var paths: [String: String] = [:]
+        for file in files { if let copy = installed.placed[file.source] { paths[file.path] = copy } }
         stage(.starting)
         var summary: ImportSummary?
-        await enqueued { [placed] model in
-            var data = model.data
-            let fonts = LibraryImport.addFonts(imported, choices: choices, placed: placed, to: &data, locations: model.locations)
-            model.data = data
-            // The library with the other app's fonts in it, to match against.
-            let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
+        await enqueued { model in
+            // The library with the copies in it, to match against.
+            let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
             let scanned = try? await model.scanner.scan(input) { progress in
                 switch progress {
                 case .identifying(let done, let total), .updating(let done, let total): stage(.reading(done: done, total: total))
@@ -172,33 +174,20 @@ extension AppModel {
                 }
             }
             var updated = model.data
-            var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library)
-            result.fonts = fonts
+            var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library, paths: paths)
+            result.fonts = installed.new.count
             result.removedCopies = removed
-            if fonts > 0 { updated.sidebar.hidden.remove(SidebarSection.folders.key) }
             if result.sets + result.applicationSets + result.smartSets > 0 { updated.sidebar.hidden.remove(SidebarSection.sets.key) }
             if result.tags > 0 { updated.sidebar.hidden.remove(SidebarSection.tags.key) }
             if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
             model.data = updated
             model.rescan()
-            if !faces.isEmpty { model.performActivation(faces, method: method) }
+            // In a Fonts folder or Cicero's Library, they go on where they are, whatever Activate fonts by says.
+            if !faces.isEmpty { model.performActivation(faces, method: .copy) }
             result.activated = faces.count
             summary = result
         }
         return summary
-    }
-}
-
-extension AppModel {
-    /// How an import turns on the fonts that were on: copied into the Fonts folder or Cicero's Library with Copy, and with
-    /// Move too, as the other app's files stay where they are; where they are with Leave. Nil with Ask: the Import sheet
-    /// asks which of the two.
-    var importMethod: InstallMethod? {
-        switch data.installMethod {
-        case .copy, .move: .copy
-        case .inPlace: .inPlace
-        case .ask: nil
-        }
     }
 }
 

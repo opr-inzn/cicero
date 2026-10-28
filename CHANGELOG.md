@@ -7,9 +7,9 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Installing and turning on fonts works differently.** With **Ask each time** in **Preferences → General**, Cicero asks whether to copy, move or leave font files where they are as you add them, and turning fonts on no longer asks: they go on where they are.
 - Microsoft Office only uses fonts in your Fonts folder. If you use **Ask each time** and need your fonts in Word or PowerPoint, switch to **Copy into ~/Library/Fonts** in **Preferences → General**.
 - **Copy into ~/Library/Fonts** is the setting at first, so Cicero copies font files into your Fonts folder as you add them.
-- When a font file in one of your locations has changed since Cicero copied it into your Fonts folder, turning the font on copies the new version in place of the old one.
-- **File → Import from FontBase** brings over FontBase’s folder, collections, favorites and tags, and turns on the fonts that were on. The sheet asks you to quit FontBase first and says what stays behind.
-- Importing from FontExplorer X or FontBase turns on the fonts that were on as you chose next to **Activate fonts by**, and asks how with **Ask each time**. With **Copy into ~/Library/Fonts**, they’re copied into your Fonts folder, so Microsoft Office can use them.
+- Fonts in your locations are activated where they are with every setting, rather than copied into your Fonts folder, so Microsoft Office can’t use them.
+- **File → Import from FontBase** copies FontBase’s fonts into your Fonts folder and brings over its collections, favorites and tags, turning on the fonts that were on. The sheet asks you to quit FontBase first and says what stays behind.
+- Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. Fonts that weren’t active come in inactive.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
 - **AA**, **Aa** and **aa** on the font page put the text, or just the selected part, in capitals, capitalize each word, or put it in lowercase (⌘Z undoes it). Preview Options has them too, under **Presets**, so you can save a preset in another case. In capitals, ß becomes ẞ where the font has it, and SS where it doesn’t.

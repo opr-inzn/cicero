@@ -77,6 +77,7 @@ public enum FontBaseImport {
             var unreadable: [FontExplorerImport.UnreadableKind: Int] = [:]
             var other = Set<String>()
             var count = 0
+            var inFolder: [String] = []
             for (relative, entry) in values["fontbase_pathsAll"]?.properties ?? [] {
                 guard relative.hasPrefix("/"), !relative.split(separator: "/").contains("..") else { continue }
                 if let id = entry["id"]?.string, pathOf[id] == nil { pathOf[id] = relative }
@@ -99,6 +100,7 @@ public enum FontBaseImport {
                 let real = Self.realPath(path)
                 if real.hasPrefix(realRoot + "/") {
                     located[relative] = path
+                    inFolder.append(path)
                     count += 1
                 } else {
                     located[relative] = real
@@ -108,6 +110,7 @@ public enum FontBaseImport {
             if fm.fileExists(atPath: root) {
                 library.fontFolder = root
                 library.fontFolderCount = count
+                library.fontFolderFiles = inFolder.sorted()
             } else if !(values["fontbase_pathsAll"]?.properties ?? []).isEmpty {
                 library.notes.append("its folder, \((root as NSString).abbreviatingWithTildeInPath), which isn’t on this Mac")
             }

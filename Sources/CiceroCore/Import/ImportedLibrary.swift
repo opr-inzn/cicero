@@ -34,10 +34,13 @@ public struct ImportedLibrary: Sendable {
     }
 
     public var source: Source
-    /// The folder the other app kept its fonts in, to list where it is: FontExplorer X's Font Library, FontBase's folder.
+    /// The folder the other app kept its fonts in: FontExplorer X's Font Library, FontBase's folder.
     public var fontFolder: String?
     /// How many font files are in `fontFolder`, for the sheet.
     public var fontFolderCount = 0
+    /// The font files in `fontFolder` the other app has, to copy in. A backup's are under `fontFolder` too, as if put
+    /// there (see `bundledFonts`).
+    public var fontFolderFiles: [String] = []
     /// Font files the other app used from other places, outside the Fonts folders and `fontFolder`.
     public var otherFiles: [String] = []
     public var sets: [ImportedSet] = []
@@ -55,10 +58,10 @@ public struct ImportedLibrary: Sendable {
     /// Fonts that were on in the other app.
     public var active: [ImportedFont] = []
     /// Copies the other app made in a Fonts folder to turn fonts on and left there, of fonts in `fontFolder`: once
-    /// Cicero turns those on where they are, each would be on twice.
+    /// Cicero has copies of its own, each would be on twice.
     public var leftoverCopies: [String] = []
-    /// Fonts in a backup to put in `fontFolder` before anything else: their folder in the unzipped backup, and their
-    /// paths under it, which are their paths under `fontFolder` too.
+    /// Fonts in a backup, to copy in from there: their folder in the unzipped backup, and their paths under it, which
+    /// are their paths under `fontFolder` too.
     public var bundledFonts: (folder: URL, files: [String])?
     /// What doesn't come over, for the sheet: "12 comments".
     public var notes: [String] = []
