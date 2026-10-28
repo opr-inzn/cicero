@@ -24,7 +24,7 @@ struct ActivationSheet: View {
                            detail: "Moves the files you added into \(model.installPlace). The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",
-                       detail: "macOS uses the files from where they are. If they move or their disk is unplugged, the fonts stop working. Microsoft Office can’t use them.") { choose(.inPlace) }
+                       detail: "macOS uses the files from where they are. Microsoft Office can’t use them.") { choose(.inPlace) }
             }
             // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
@@ -59,7 +59,6 @@ struct ActivationSheet: View {
                     .foregroundStyle(.tint)
                     .frame(height: 36)
                 Text(title).font(.headline)
-                // A bordered button keeps its label to one line, cutting the rest off, unless told otherwise.
                 Text(detail)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -70,8 +69,7 @@ struct ActivationSheet: View {
             .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity, alignment: .top)
             .padding(12)
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.roundedRectangle(radius: 10))
+        .buttonStyle(OptionButtonStyle())
     }
 
     private func choose(_ method: InstallMethod) {
@@ -82,6 +80,16 @@ struct ActivationSheet: View {
             model.performActivation(prompt.faces, method: method)
         }
         dismiss()
+    }
+}
+
+/// A card that's as tall as its label. A bordered button sized it on its own, cutting the last line of a long detail
+/// off at the bottom on some Macs.
+private struct OptionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? AnyShapeStyle(.fill) : AnyShapeStyle(.fill.secondary), in: .rect(cornerRadius: 10))
+            .contentShape(.rect(cornerRadius: 10))
     }
 }
 

@@ -53,7 +53,7 @@ public struct UserData: Codable, Equatable, Sendable {
     public var classificationRenames: [String: String] = [:]
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
-    public var installMethod: InstallMethod = .ask
+    public var installMethod: InstallMethod = .copy
     /// The fonts Cicero installs go into its Font Library (`fontLibraryPath`), a folder for each family, and are used from
     /// there, rather than copied into ~/Library/Fonts (see `ActivationEngine.installsIntoFontLibrary`).
     public var installsIntoFontLibrary = false
@@ -166,7 +166,7 @@ public struct UserData: Codable, Equatable, Sendable {
         customCharacterSets = try value(.customCharacterSets, d.customCharacterSets)
         sidebar = try value(.sidebar, d.sidebar)
         // A way a later version adds is Ask here, rather than a file that doesn't load.
-        installMethod = try value(.installMethod, String?.none).flatMap(InstallMethod.init(rawValue:)) ?? d.installMethod
+        installMethod = try value(.installMethod, String?.none).map { InstallMethod(rawValue: $0) ?? .ask } ?? d.installMethod
         installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
         fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
         // Test builds saved the library's name with the location its folder becomes ("Font Library", then "Cicero’s Font
