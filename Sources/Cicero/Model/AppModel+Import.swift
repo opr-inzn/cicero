@@ -8,6 +8,11 @@ struct ImportPrompt: Identifiable {
     let library: ImportedLibrary
     /// "FontExplorer X’s library on this Mac", or the file's name.
     let origin: String
+    /// What it was read from, to read it again.
+    var urls: [URL] = []
+    /// The other app keeps writing to it while it's open: it can't be imported until the app has quit, and is read
+    /// again then. FontBase's own library on this Mac.
+    var waitsForQuit = false
 
     var source: ImportedLibrary.Source { library.source }
 }
@@ -35,6 +40,12 @@ extension AppModel {
         readImport(collections, source: .fontBook, origin: "Font Book’s collections on this Mac")
     }
 
+    /// File → Import from FontBase: its library on this Mac, else its folder from another Mac, which the user picks.
+    func importFromFontBase() {
+        guard let folder = FontBaseImport.folder() else { return chooseImportFile(for: .fontBase) }
+        readImport([folder], source: .fontBase, origin: "FontBase’s library on this Mac")
+    }
+
     /// Asks for FontExplorer X's database or a backup of it (a `.fexconfig` is a folder), or Font Book collections.
     func chooseImportFile(for source: ImportedLibrary.Source) {
         let panel = NSOpenPanel()
@@ -53,6 +64,11 @@ extension AppModel {
             panel.allowsMultipleSelection = true
             panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/FontCollections", isDirectory: true)
             panel.message = "Choose Font Book collections (.collection files), like those in Library/FontCollections in a home folder."
+        case .fontBase:
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.message = "Choose FontBase’s folder from another Mac, the one in Library/Application Support in a home folder."
         }
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         let origin = panel.urls.count == 1 ? "“\(panel.urls[0].lastPathComponent)”" : "\(panel.urls.count) collections"
@@ -76,14 +92,7 @@ extension AppModel {
     /// Reads the library off the main thread and shows the Import sheet, or says why it can't.
     private func readImport(_ urls: [URL], source: ImportedLibrary.Source, origin: String) {
         Task {
-            let read = await Task.detached(priority: .userInitiated) { () async -> Result<ImportedLibrary, Error> in
-                switch source {
-                case .fontExplorer:
-                    do { return .success(try await FontExplorerImport.read(urls[0])) } catch { return .failure(error) }
-                case .fontBook:
-                    return .success(FontBookImport.read(urls))
-                }
-            }.value
+            let read = await Self.read(urls, source: source)
             switch read {
             case .success(let library) where isImporting:
                 library.discard()
@@ -92,11 +101,35 @@ extension AppModel {
                 library.discard()
                 showToast(source == .fontBook ? "No collections Cicero can import" : "Nothing in it Cicero can import")
             case .success(let library):
-                importing = ImportPrompt(library: library, origin: origin)
+                let waits = source == .fontBase && urls == [FontBaseImport.folder()].compactMap { $0 }
+                importing = ImportPrompt(library: library, origin: origin, urls: urls, waitsForQuit: waits)
             case .failure:
-                showToast(source == .fontBook ? "Couldn’t read the collections" : "That isn’t a FontExplorer X library or backup")
+                switch source {
+                case .fontExplorer: showToast("That isn’t a FontExplorer X library or backup")
+                case .fontBook: showToast("Couldn’t read the collections")
+                case .fontBase: showToast("That isn’t FontBase’s folder")
+                }
             }
         }
+    }
+
+    /// The library read again, as the other app left it on quitting; nil when it can't be read now.
+    func reread(_ prompt: ImportPrompt) async -> ImportPrompt? {
+        guard case .success(let library) = await Self.read(prompt.urls, source: prompt.source) else { return nil }
+        return ImportPrompt(library: library, origin: prompt.origin, urls: prompt.urls, waitsForQuit: prompt.waitsForQuit)
+    }
+
+    private nonisolated static func read(_ urls: [URL], source: ImportedLibrary.Source) async -> Result<ImportedLibrary, Error> {
+        await Task.detached(priority: .userInitiated) { () async -> Result<ImportedLibrary, Error> in
+            switch source {
+            case .fontExplorer:
+                do { return .success(try await FontExplorerImport.read(urls[0])) } catch { return .failure(error) }
+            case .fontBook:
+                return .success(FontBookImport.read(urls))
+            case .fontBase:
+                do { return .success(try FontBaseImport.read(urls[0])) } catch { return .failure(error) }
+            }
+        }.value
     }
 
     // MARK: Importing
@@ -115,6 +148,8 @@ extension AppModel {
             showToast("Couldn’t save the current setup first, so nothing was imported")
             return nil
         }
+        // The other app's copies go first, so the scan doesn't list them.
+        let removed = choices.removeCopies ? LibraryImport.removeCopies(imported) : 0
         var placed = 0
         if choices.fontFolder, imported.bundledFonts != nil {
             placed = await LibraryImport.placeBundledFonts(imported) { done, total in stage(.copying(done: done, total: total)) }
@@ -137,6 +172,7 @@ extension AppModel {
             var updated = model.data
             var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library)
             result.fonts = fonts
+            result.removedCopies = removed
             if fonts > 0 { updated.sidebar.hidden.remove(SidebarSection.folders.key) }
             if result.sets + result.applicationSets + result.smartSets > 0 { updated.sidebar.hidden.remove(SidebarSection.sets.key) }
             if result.tags > 0 { updated.sidebar.hidden.remove(SidebarSection.tags.key) }
@@ -155,6 +191,6 @@ extension ImportedLibrary {
     /// Nothing to bring in.
     var isEmpty: Bool {
         fontFolder == nil && otherFiles.isEmpty && sets.isEmpty && smartSets.isEmpty && tags.isEmpty && classifications.isEmpty && ratings.isEmpty
-            && history.isEmpty
+            && history.isEmpty && active.isEmpty
     }
 }

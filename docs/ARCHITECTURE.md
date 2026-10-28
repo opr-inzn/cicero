@@ -95,7 +95,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Cicero uses. Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
 - **Import** (`Import/`): `FontExplorerImport` reads FontExplorer X Pro's SQLite database (a copy, opened read-only
   and immutable through `SQLiteFile`, the system's SQLite) or its backups, and `FontBookImport` Font Book's
-  `.collection` archives (their font descriptors read as attributes, without AppKit), into an `ImportedLibrary`:
+  `.collection` archives (their font descriptors read as attributes, without AppKit), and `FontBaseImport` FontBase's
+  IndexedDB (through `ChromiumIndexedDB`: LevelDB, Snappy, Chromium's keys and blob files, V8 values), into an `ImportedLibrary`:
   fonts named by file, PostScript name or family and style, sets, smart sets with their rules already in Cicero's
   terms, labels as tags, ratings, comments, activation history. `LibraryImport` adds the other app's fonts to the user data,
   then, once a scan has read them, matches the rest to the library and adds it, only ever adding.

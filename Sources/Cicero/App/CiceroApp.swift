@@ -118,6 +118,7 @@ struct CiceroCommands: Commands {
             Divider()
             Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
             Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+            Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])

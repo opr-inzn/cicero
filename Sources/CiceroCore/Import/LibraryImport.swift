@@ -18,6 +18,8 @@ public struct ImportChoices: Equatable, Sendable {
     public var history = true
     /// Turn on, in place, the fonts that were on in the other app.
     public var activate = false
+    /// Move the other app's `leftoverCopies` to the Trash.
+    public var removeCopies = true
 
     /// Everything but the other app's own sets, which Font Book makes for everyone, and smart sets that can't come over;
     /// the fonts that were on are turned on again, so they stay on once the other app is gone.
@@ -46,6 +48,8 @@ public struct ImportSummary: Equatable, Sendable {
     public var notedFamilies = 0
     /// Styles to turn on, as they were on in the other app.
     public var activated = 0
+    /// The other app's copies moved to the Trash.
+    public var removedCopies = 0
     /// Fonts the sets, tags or ratings name that aren't in the library.
     public var notFound = 0
     /// Sets left out as none of their fonts are in the library: they would be empty.
@@ -93,6 +97,15 @@ public enum LibraryImport {
             }
         }
         return count
+    }
+
+    /// Moves the other app's copies of its fonts out of the Fonts folder, to the Trash: only the ones it read, and
+    /// only font files. Returns how many were moved.
+    public static func removeCopies(_ imported: ImportedLibrary) -> Int {
+        imported.leftoverCopies.count { path in
+            FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased())
+                && (try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)) != nil
+        }
     }
 
     /// Puts a backup's fonts in the Font Library's folder, keeping their folders. A file already there is left alone.
