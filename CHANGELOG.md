@@ -12,6 +12,7 @@ This version makes a fundamental change to how Cicero installs and turns on font
 - Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. Fonts that weren’t active come in inactive.
 - If you imported from FontExplorer X before, Cicero offers to copy the fonts of its Font Library in and remove the location, keeping your folders, tags, ratings and notes.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
+- **Fonts in Document** shows fonts active only in Adobe apps as such, with **Activate in All Apps**, and no longer has **Find on This Mac** or **Make Folder**.
 
 ## 0.10.13
 

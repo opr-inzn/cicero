@@ -16,8 +16,6 @@ struct DocumentFontsReport: Identifiable {
     let fonts: [DocumentFont]
 
     var name: String { url.lastPathComponent }
-    /// What a set made from it is called: the file's name without its extension.
-    var setName: String { url.deletingPathExtension().lastPathComponent }
 }
 
 extension AppModel {
@@ -91,21 +89,6 @@ extension AppModel {
         let matches = DocumentFonts.match(report.fonts, in: library)
         documentMatchesCache = (report.id, library.fingerprint, matches)
         return matches
-    }
-
-    /// A set named after the document with the families of its fonts that are in the library; a set with that
-    /// name already gets them added. Returns what to say about it.
-    func makeSet(for report: DocumentFontsReport) -> String {
-        var seen = Set<String>()
-        let families = documentMatches(report).compactMap(\.family).filter { seen.insert($0).inserted }.compactMap(family)
-        guard !families.isEmpty else { return "None of its fonts are in your library." }
-        let count = families.count == 1 ? "1 family" : "\(families.count) families"
-        if let existing = data.sets.first(where: { $0.name == report.setName }) {
-            setMembership(true, for: families, in: existing.id)
-            return "Added \(count) to the folder “\(report.setName)”."
-        }
-        addSet(named: report.setName, with: families)
-        return "Made the folder “\(report.setName)” with \(count)."
     }
 
     /// Turns on every font of the document that's in the library and off.

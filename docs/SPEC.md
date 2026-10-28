@@ -355,17 +355,12 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   0.5 s of coming to the front; the `.idlk` lock file appears ~15 ms into an open, too late to beat its font check;
   a file in ~/Library/Application Support/Adobe/Fonts isn't taken up faster. Photoshop's `app.refreshFonts()` takes
   the font up at once but freezes it for ~2 s, so it isn't used.
-- Sheet "Fonts in “Brochure.indd”", "12 fonts · 8 active · 2 inactive · 2 missing" (active and inactive, as the rest of the app says), one row per font, missing first, then inactive,
-  then active, each by name: a status symbol (green check, dashed circle, orange triangle), the name (family and style,
+- Sheet "Fonts in “Brochure.indd”", "12 fonts · 8 active · 2 in Adobe apps · 1 inactive · 1 missing" (active and inactive, as the rest of the app says; a count per app for faces on in an app's own folder only, `FaceState.appOnly`), one row per font, missing first, then inactive,
+  then on in an app only, then active, each by name: a status symbol (green check, outlined check in the Proofing tag's red for an app only, dashed circle, orange triangle), the name (family and style,
   else the PostScript name) with the PostScript name under it, an "Embedded" tag for a PDF's embedded fonts, the
   status (the face's state label, "Installed with macOS" for one CoreText has though the library doesn't, else "Not
-  in your library") and an action: Activate, or for a missing font Find on This Mac, which asks
-  Spotlight (`mdfind 'kMDItemFonts == "Name"'`, local) for font files with its PostScript name, newest first, none
-  in the Trash: "Found “Name.otf”" with Install (copies it in, or asks with Ask; never moves it; without changing the browser), or Add with Leave files where they are (lists it under Added Fonts), else "Not
-  found on this Mac" (Find again stays available). Spotlight hides files in the folders macOS keeps private until
-  the user lets the app in, without asking; so before searching, Cicero lists ~/Documents, ~/Desktop and
-  ~/Downloads, which asks once (Info.plist explains why, for each). Listing them waits while macOS asks: when it takes
-  over half a second, the row says "Waiting for access to your folders" until the answers are in, then "Searching".
+  in your library") and an action: Activate ("Activate in All Apps" for a face from an app's folder, as the family menu says), or none for a missing font (the row follows once the font's file is added). No
+  divider under the last row.
 - Matching: the library's face with the PostScript name, else the family and style names (case, spaces, hyphens
   and underscores ignored); a font the library hasn't but `CTFontCreateWithName` gives back by that exact name is on.
   Cached until the library changes, so the rows follow activations and added files.
@@ -373,8 +368,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   list those families instead of a sidebar item's, as Show Similar Fonts does: `AppModel.documentList`, the title
   "Fonts in “Brochure.indd”", a bar above the list saying "The fonts “Brochure.indd” uses that are in your library."
   with Done, which goes back to the sidebar's selection and font page from before, as does selecting a sidebar item;
-  "No Fonts in Your Library" when none are left), Make Folder (a folder named after the file without its extension, with the
-  families in the library; one of that name gets them added; the sheet says what it did), Activate All (every face in
+  "No Fonts in Your Library" when none are left), Activate All (every face in
   the library that's off), Done. The sheet presents the activation prompt itself; the main window holds it back meanwhile.
 
 ## Opening and adding files

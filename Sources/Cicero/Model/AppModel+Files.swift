@@ -175,15 +175,14 @@ extension AppModel {
     /// Brings in the font files the library doesn't have yet, along with files under Added Fonts that are off, as
     /// `method` says, else the install method: copies or moves them into ~/Library/Fonts, where they're on and in All
     /// Fonts like any installed font, or lists them where they are, under Added Fonts, without turning them on. With
-    /// Ask, the user says which first (`installPrompt`), when there are files the library doesn't have. `mayMove`
-    /// false copies them rather than moving them, for files the user didn't pick, like one Spotlight found. Then
+    /// Ask, the user says which first (`installPrompt`), when there are files the library doesn't have. Then
     /// rescans, or `then` does, given the paths the library has the files at: the copies' for files it installed.
     ///
     /// `duplicates` are families the library has already, from other files, and `choices` what to do with each: a file
     /// only of families left out stays out (`then` gets the library's copies of them instead, to show), and one that
     /// replaces the library's copies goes in their places, which `then` gets (see `ActivationEngine.replace`).
     func addFontFiles(_ paths: [String], resolving duplicates: [AddedDuplicate] = [], choices: [String: DuplicateChoice] = [:],
-                      method: InstallMethod? = nil, mayMove: Bool = true, then: ((AppModel, Set<String>) -> Void)? = nil,
+                      method: InstallMethod? = nil, then: ((AppModel, Set<String>) -> Void)? = nil,
                       askedAboutOpenApps: Bool = false) {
         let skipped = duplicates.filter { choices[$0.id] == .skip }
         let replacements = duplicates.filter { choices[$0.id] == .replace && $0.canReplace }.flatMap(\.replacements)
@@ -191,7 +190,7 @@ extension AppModel {
         // wrong letters once its file is replaced: the user says first. Once the alert or sheet before has gone.
         if !replacements.isEmpty, !askedAboutOpenApps, case let apps = openAppsKeepingFonts, !apps.isEmpty {
             let prompt = OpenAppsReplacePrompt(apps: apps) { model in
-                model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, mayMove: mayMove, then: then,
+                model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, then: then,
                                    askedAboutOpenApps: true)
             }
             Task { openAppsReplacePrompt = prompt }
@@ -205,8 +204,8 @@ extension AppModel {
         let offAdded = movableFiles(among: paths).filter { !library.activePaths.contains($0) }
         if method == nil, data.installMethod == .ask,
            case let asked = paths.filter({ !left.contains($0) && (!isListed($0) || offAdded.contains($0)) }), !asked.isEmpty {
-            let prompt = InstallPrompt(files: asked, offersMove: mayMove && asked.contains { !isInReadFolder($0) }) { model, method in
-                model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, mayMove: mayMove, then: then,
+            let prompt = InstallPrompt(files: asked, offersMove: asked.contains { !isInReadFolder($0) }) { model, method in
+                model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, then: then,
                                    askedAboutOpenApps: true)
             }
             Task {
@@ -229,7 +228,7 @@ extension AppModel {
         let installing = !installs ? [] : paths.filter { path in
             !isListed(path) || movable.contains(path) && !library.activePaths.contains(path)
         }
-        let moving = mayMove && method == .move
+        let moving = method == .move
         // Copied or moved, files the library doesn't list are installed, or take over the library's copies.
         let new = installs ? [] : paths.filter { !isListed($0) }
         if !new.isEmpty {

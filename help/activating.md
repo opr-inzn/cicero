@@ -45,7 +45,7 @@ Choose which one in **Preferences → General**, next to **When you add font fil
 
 - **Ask each time**: when you [add font files](organizing.md#add-font-files), Cicero asks once for all of them: **Install a Copy** or **Move Into Fonts Folder**, which turn them on, or **Leave Files Where They Are**, which lists them under [Added Fonts](organizing.md#added-fonts) without turning them on. Check **Remember this choice** to stop being asked; you can change it again in Preferences. Turning fonts on never asks: fonts in your [locations](organizing.md#locations) go on where they are, so Microsoft Office can’t use them.
 - **Copy into ~/Library/Fonts** (the setting at first): font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
-- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. A file **Find on This Mac** finds for a document is copied, so its folder stays as it is.
+- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty.
 - **Leave files where they are**: font files you add are listed where they are, under [Added Fonts](organizing.md#added-fonts), without being turned on. Turn them on when you need them: they go on where they are, also if you choose another way here later.
 
 A few things happen either way:
@@ -207,9 +207,10 @@ To see which fonts a document needs, and turn on the ones you have:
 1. Choose **File → Find Fonts in Document** and pick the document, or drag it from the Finder onto Cicero’s window.
 2. Cicero lists every font the document uses, missing ones first:
    - **Active** (a green check): apps have it. The status says how, like “Active” or “Installed with macOS”.
+   - **Active in Adobe apps** (a red check): it’s in a folder Adobe apps load fonts from by themselves, so only they have it, like the fonts you [proof in Adobe apps](#fonts-in-adobe-apps-folders). Click **Activate in All Apps** to turn it on everywhere.
    - **Inactive** (a dashed circle): it’s in your library but inactive. Click **Activate**.
-   - **Missing** (an orange triangle): it isn’t in your library. Click **Find on This Mac** to look for its file with Spotlight; when Cicero finds one, **Add** lists it in your library, under [Added Fonts](organizing.md#added-fonts), and you can activate it. With **Copy into ~/Library/Fonts** chosen, the button says **Install** and copies it into your Fonts folder, on. The first time, macOS asks whether Cicero may look in your Documents, Desktop and Downloads folders, and the font says **Waiting for access to your folders** until you’ve answered; see [Privacy](privacy.md#when-macos-asks-for-permission).
-3. **Activate All** turns on every font of the document that’s in your library. **Make Folder** makes a folder named after the document with its fonts that are in your library, or adds them to a folder of that name. **Show in Library** shows those fonts in the main window, each set in itself, with everything you can do there as with any list; **Done** in the bar above them takes you back.
+   - **Missing** (an orange triangle): it isn’t in your library. To add it, find its file and [add it](organizing.md#add-font-files) as any font file; the font then shows as active or inactive.
+3. **Activate All** turns on every font of the document that’s in your library. **Show in Library** shows those fonts in the main window, each set in itself, with everything you can do there as with any list; **Done** in the bar above them takes you back.
 
 Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrator files (`.ai`) and Photoshop files (`.psd`, `.psb`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.
 
