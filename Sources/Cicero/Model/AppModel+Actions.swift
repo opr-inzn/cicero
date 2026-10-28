@@ -8,8 +8,8 @@ extension AppModel {
         activate(families.flatMap(\.faces), title: Self.title(for: families))
     }
 
-    /// Turns fonts on as the install method says; with Ask, which asks as files are added (see `InstallSheet`), where
-    /// they are. Fonts in the user's locations go on where they are whatever it says (see `performActivation`). Asks first whether to turn on so many when that's more than `UserData.manyFamilies` families, unless
+    /// Turns fonts on where they are, whatever the install method says: it's for adding files (see `performActivation`).
+    /// Asks first whether to turn on so many when that's more than `UserData.manyFamilies` families, unless
     /// `confirmed`.
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
@@ -17,17 +17,16 @@ extension AppModel {
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
             return manyActivationPrompt = prompt
         }
-        performActivation(targets, method: data.installMethod == .ask ? .inPlace : data.installMethod)
+        performActivation(targets)
     }
 
-    /// Copying or moving the fonts as `method` says, except those in the user's locations, which go on where they are:
-    /// also when an old copy of one gives way to its file (see `ActivationEngine.currentVersion`).
-    func performActivation(_ faces: [LibraryFace], method: InstallMethod) {
+    /// Never copying them: a font in a location or under Added Fonts goes on where it is, an installed one where it was
+    /// installed, and one an earlier version copied as that copy, while it's the same as its file (see
+    /// `ActivationEngine.activate`).
+    func performActivation(_ faces: [LibraryFace]) {
         let operation = expect(faces, at: .on)
-        let movable = movableFiles(among: faces.map(\.face.path))
-        let inPlace = filesInLocations(among: faces.flatMap { [$0.face.path] + $0.otherCopies })
         enqueue { model in
-            let result = await model.engine.activate(faces, method: method, records: model.data.records, movable: movable, inPlace: inPlace)
+            let result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
             model.finish(result, operation: operation)
         }
     }
@@ -155,14 +154,13 @@ extension AppModel {
     }
 
     func confirmCopySwitch(_ request: CopySwitchRequest) {
-        performCopySwitch(request, method: data.installMethod == .ask ? .inPlace : data.installMethod)
+        performCopySwitch(request)
     }
 
-    func performCopySwitch(_ request: CopySwitchRequest, method: InstallMethod) {
+    func performCopySwitch(_ request: CopySwitchRequest) {
         let operation = expect(request.plan.styles, at: .on)
-        let inPlace = filesInLocations(among: request.plan.switches.compactMap(\.target?.face.path))
         enqueue { model in
-            var result = await model.engine.switchCopies(request.plan.switches, method: method, records: model.data.records, inPlace: inPlace)
+            var result = await model.engine.switchCopies(request.plan.switches, method: .inPlace, records: model.data.records)
             if result.failed.isEmpty {
                 result.message = "Using the copies from \(request.source)"
                     + (request.plan.leavesOtherCopiesOn ? ". Another copy Cicero didn’t turn on is still on, so apps may use that one" : "")
@@ -434,7 +432,7 @@ extension AppModel {
     func keepOn(_ faces: [LibraryFace]) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return }
-        performActivation(targets, method: .inPlace)
+        performActivation(targets)
     }
 
     /// What Cicero turned on where it is in these folders, as it does for Active ones.

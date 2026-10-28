@@ -247,10 +247,13 @@ extension AppModel {
         enqueue { model in
             var messages: [String] = []
             var replaced = replacements.map(\.old)
+            // Each file installed → its copy.
+            var copies: [String: String] = [:]
             if !installing.isEmpty {
                 let result = await model.engine.install(installing, moving: moving, records: model.data.records)
                 model.data.records = result.records
                 messages.append(result.message)
+                copies = result.placed
             }
             if !replacements.isEmpty {
                 let result = await model.engine.replace(replacements, moving: moving, records: model.data.records)
@@ -259,11 +262,11 @@ extension AppModel {
                 replaced = replaced.map { result.placed[$0] ?? $0 }
                 if !result.renameLater.isEmpty { model.renameBackLater(result.renameLater) }
             }
+            // An added file Cicero installed leaves Added Fonts: the copy is the font now.
+            model.data.fontFiles.removeAll { copies[$0] != nil }
             model.forgetInstalledAddedFiles()
             model.showToast((messages + [skipNote]).filter { !$0.isEmpty }.joined(separator: ". "))
-            let originals = Set(installing)
-            let copies = Set(model.data.records.installedCopies.filter { originals.contains($0.value) }.keys)
-            let found = shown.union(copies).union(existing).union(replaced)
+            let found = shown.union(copies.values).union(existing).union(replaced)
             // Nothing to show when nothing went in: the toast says so.
             if let then, !found.isEmpty { then(model, found) } else { model.rescan() }
         }
@@ -292,9 +295,9 @@ extension AppModel {
         return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
     }
 
-    /// Added files Cicero installed a copy of leave Added Fonts: the copy in ~/Library/Fonts is the font in the
-    /// library now, in All Fonts like any installed font, and what Reveal in Finder shows. For the records an
-    /// operation leaves, before the scan after it.
+    /// Added files an earlier version installed a copy of leave Added Fonts: the copy in ~/Library/Fonts is the font in
+    /// the library now, in All Fonts like any installed font, and what Reveal in Finder shows. For the records earlier
+    /// versions wrote, before the scan after an operation.
     func forgetInstalledAddedFiles() {
         let installed = Set(data.records.installedCopies.values)
         guard data.fontFiles.contains(where: installed.contains) else { return }
@@ -346,12 +349,6 @@ extension AppModel {
     func movableFiles(among paths: [String]) -> Set<String> {
         let added = Set(data.fontFiles)
         return Set(paths.filter { added.contains($0) && !isInReadFolder($0) })
-    }
-
-    /// The files among `paths` in the user's locations, which go on where they are whatever Activate fonts by says.
-    func filesInLocations(among paths: [String]) -> Set<String> {
-        let folders = data.folders.map { $0.path + "/" }
-        return Set(paths.filter { path in folders.contains { path.hasPrefix($0) } })
     }
 
     /// Shows the families of files `open` added, once scan `id` has listed them: in Added Fonts, or the set
