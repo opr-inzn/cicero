@@ -18,8 +18,7 @@ extension AppModel {
 
     // MARK: Adding
 
-    /// File → Add Fonts…: font files to list where they are, without installing them, or to install with fonts
-    /// activated by copying or moving.
+    /// File → Add Fonts…: font files to install as the install method says, or as the user chooses with Ask.
     func presentAddFontsPanel() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -30,15 +29,16 @@ extension AppModel {
         panel.message = switch data.installMethod {
         case .copy: "Choose font files. They’re copied into \(installPlace) and turned on. The originals stay where they are."
         case .move: "Choose font files. They’re moved into \(installPlace) and turned on."
-        case .ask, .inPlace: "Choose font files. They’re listed in your library where they are, without being activated."
+        case .inPlace: "Choose font files. They’re listed in your library where they are, without being activated."
+        case .ask: "Choose font files. Cicero asks whether to copy them into \(installPlace), move them there or leave them where they are."
         }
         guard panel.runModal() == .OK else { return }
         open(panel.urls)
     }
 
     /// Font files, folders and documents opened from the Finder, dropped on or pasted into the window, or chosen in Add Fonts….
-    /// Folders are added as folders; font files the library doesn't have yet are listed where they are, or
-    /// installed with fonts activated by copying or moving (see `addFontFiles`). Once a scan has read them, the browser
+    /// Folders are added as folders; font files the library doesn't have yet are installed as the install method
+    /// says (see `addFontFiles`). Once a scan has read them, the browser
     /// goes to the first of their families, selected (see `showOpenedFiles`).
     /// Dropped or pasted into a set, they join it. A document (PDF, IDML, InDesign, Illustrator, Photoshop) shows the fonts it uses.
     /// Several arriving one by one, as from the Finder, are added together.
@@ -164,31 +164,34 @@ extension AppModel {
         addFontFiles(prompt.paths, resolving: prompt.duplicates, choices: choices, then: prompt.then)
     }
 
-    /// Whether font files the user adds are installed rather than listed where they are: with fonts activated by
-    /// copying or moving.
+    /// Whether font files the user adds are copied or moved into the Fonts folder (or Cicero's Library), rather than
+    /// listed where they are, or asked about.
     var installsAddedFiles: Bool { data.installMethod == .copy || data.installMethod == .move }
 
     /// Where installed fonts go, for what Cicero says: "your Fonts folder", or "Cicero’s Library".
     var installPlace: String { data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder" }
 
-    /// Brings in the font files the library doesn't have yet: lists them where they are, under Added Fonts, or with
-    /// fonts activated by copying or moving, copies or moves them into ~/Library/Fonts, where they're on and in All
-    /// Fonts like any installed font, along with files under Added Fonts that are off. `mayMove` false copies them
-    /// even then, for files the user didn't pick, like one Spotlight found. Then rescans, or `then` does, given
-    /// the paths the library has the files at: the copies' for files it installed.
+    /// Brings in the font files the library doesn't have yet, along with files under Added Fonts that are off, as
+    /// `method` says, else the install method: copies or moves them into ~/Library/Fonts, where they're on and in All
+    /// Fonts like any installed font, or lists them where they are, under Added Fonts, without turning them on. With
+    /// Ask, the user says which first (`installPrompt`), when there are files the library doesn't have. `mayMove`
+    /// false copies them rather than moving them, for files the user didn't pick, like one Spotlight found. Then
+    /// rescans, or `then` does, given the paths the library has the files at: the copies' for files it installed.
     ///
     /// `duplicates` are families the library has already, from other files, and `choices` what to do with each: a file
     /// only of families left out stays out (`then` gets the library's copies of them instead, to show), and one that
     /// replaces the library's copies goes in their places, which `then` gets (see `ActivationEngine.replace`).
     func addFontFiles(_ paths: [String], resolving duplicates: [AddedDuplicate] = [], choices: [String: DuplicateChoice] = [:],
-                      mayMove: Bool = true, then: ((AppModel, Set<String>) -> Void)? = nil, askedAboutOpenApps: Bool = false) {
+                      method: InstallMethod? = nil, mayMove: Bool = true, then: ((AppModel, Set<String>) -> Void)? = nil,
+                      askedAboutOpenApps: Bool = false) {
         let skipped = duplicates.filter { choices[$0.id] == .skip }
         let replacements = duplicates.filter { choices[$0.id] == .replace && $0.canReplace }.flatMap(\.replacements)
         // InDesign, Illustrator and Photoshop keep a font's old version until they restart, so open documents can show
         // wrong letters once its file is replaced: the user says first. Once the alert or sheet before has gone.
         if !replacements.isEmpty, !askedAboutOpenApps, case let apps = openAppsKeepingFonts, !apps.isEmpty {
             let prompt = OpenAppsReplacePrompt(apps: apps) { model in
-                model.addFontFiles(paths, resolving: duplicates, choices: choices, mayMove: mayMove, then: then, askedAboutOpenApps: true)
+                model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, mayMove: mayMove, then: then,
+                                   askedAboutOpenApps: true)
             }
             Task { openAppsReplacePrompt = prompt }
             return
@@ -196,16 +199,38 @@ extension AppModel {
         // A file only of skipped families stays out, and one that takes the library's copies' places is in as those.
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
             .union(replacements.map(\.added))
+        // With Ask, how to bring in files the library doesn't have yet, and added ones that are off; once the sheet or
+        // alert before has gone. Files added while it's up join it.
+        let offAdded = movableFiles(among: paths).filter { !library.activePaths.contains($0) }
+        if method == nil, data.installMethod == .ask,
+           case let asked = paths.filter({ !left.contains($0) && (!isListed($0) || offAdded.contains($0)) }), !asked.isEmpty {
+            let prompt = InstallPrompt(files: asked, offersMove: mayMove && asked.contains { !isInReadFolder($0) }) { model, method in
+                model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, mayMove: mayMove, then: then,
+                                   askedAboutOpenApps: true)
+            }
+            Task {
+                guard let shown = installPrompt else { return installPrompt = prompt }
+                installPrompt = InstallPrompt(files: shown.files + prompt.files.filter { !shown.files.contains($0) },
+                                              offersMove: shown.offersMove || prompt.offersMove) { model, method in
+                    shown.add(model, method)
+                    prompt.add(model, method)
+                }
+            }
+            return
+        }
+        let method = method ?? data.installMethod
+        let installs = method == .copy || method == .move
         let paths = paths.filter { !left.contains($0) }
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
         let movable = movableFiles(among: paths)
-        let installing = !installsAddedFiles ? [] : paths.filter { path in
+        // Files the library doesn't list, and added ones that are off.
+        let installing = !installs ? [] : paths.filter { path in
             !isListed(path) || movable.contains(path) && !library.activePaths.contains(path)
         }
-        let moving = mayMove && data.installMethod == .move
+        let moving = mayMove && method == .move
         // Copied or moved, files the library doesn't list are installed, or take over the library's copies.
-        let new = installsAddedFiles ? [] : paths.filter { !isListed($0) }
+        let new = installs ? [] : paths.filter { !isListed($0) }
         if !new.isEmpty {
             data.fontFiles += new
             data.sidebar.hidden.remove(SidebarSection.folders.key)

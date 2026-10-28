@@ -8,22 +8,16 @@ extension AppModel {
         activate(families.flatMap(\.faces), title: Self.title(for: families))
     }
 
-    /// Asks how to activate when the install method is Ask, unless every face goes on the same way whatever it is, like
-    /// those in a Fonts folder, which go on where they are (see `ActivationEngine.ignoresInstallMethod`). Asks first
-    /// whether to turn on so many when that's more than `UserData.manyFamilies` families, unless `confirmed`.
+    /// Turns fonts on as the install method says; with Ask, which asks as files are added (see `InstallSheet`), where
+    /// they are. Asks first whether to turn on so many when that's more than `UserData.manyFamilies` families, unless
+    /// `confirmed`.
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
             return manyActivationPrompt = prompt
         }
-        let engine = engine
-        let needsChoice = targets.contains { !engine.ignoresInstallMethod($0) }
-        if data.installMethod == .ask && needsChoice {
-            activationPrompt = ActivationPrompt(title: title, faces: targets)
-        } else {
-            performActivation(targets, method: data.installMethod == .ask ? .inPlace : data.installMethod)
-        }
+        performActivation(targets, method: data.installMethod == .ask ? .inPlace : data.installMethod)
     }
 
     func performActivation(_ faces: [LibraryFace], method: InstallMethod) {
@@ -145,7 +139,7 @@ extension AppModel {
     }
 
     /// Uses a place's copies of the styles it has and turns off the other copies of them Cicero turned on.
-    /// Asks first when that turns off other styles too, and how to activate when the install method is Ask.
+    /// Asks first when that turns off other styles too.
     func useCopies(from source: CopySource, title: String) {
         let plan = CopyChooser.plan(source, records: data.records, library: library)
         guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name)") }
@@ -158,13 +152,7 @@ extension AppModel {
     }
 
     func confirmCopySwitch(_ request: CopySwitchRequest) {
-        let targets = request.plan.switches.compactMap(\.target)
-        let engine = engine
-        if data.installMethod == .ask && targets.contains(where: { !engine.ignoresInstallMethod($0) }) {
-            activationPrompt = ActivationPrompt(title: request.title, faces: targets, switching: request)
-        } else {
-            performCopySwitch(request, method: data.installMethod == .ask ? .inPlace : data.installMethod)
-        }
+        performCopySwitch(request, method: data.installMethod == .ask ? .inPlace : data.installMethod)
     }
 
     func performCopySwitch(_ request: CopySwitchRequest, method: InstallMethod) {

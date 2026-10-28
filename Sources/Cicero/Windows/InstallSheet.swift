@@ -1,10 +1,10 @@
 import CiceroCore
 import SwiftUI
 
-/// Asks how to activate when the install method is Ask: copy the files, move the ones added one at a time,
-/// leave them where they are, or only for a while.
-struct ActivationSheet: View {
-    let prompt: ActivationPrompt
+/// Asks how to bring in font files the user adds while the install method is Ask: copy them into the Fonts folder and
+/// turn them on, move the ones that can move there, or list them where they are, off.
+struct InstallSheet: View {
+    let prompt: InstallPrompt
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var remember = false
@@ -12,42 +12,39 @@ struct ActivationSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Activate \(prompt.title)").font(.title2.bold())
-                Text(prompt.faces.count == 1 ? "How should Cicero turn this font on?" : "How should Cicero turn these fonts on?")
+                Text(title).font(.title2.bold()).lineLimit(1).truncationMode(.middle)
+                Text(prompt.files.count == 1 ? "How should Cicero install this font file?" : "How should Cicero install these font files?")
                     .foregroundStyle(.secondary)
             }
+            let one = prompt.files.count == 1
             HStack(spacing: 12) {
                 option("Install a Copy", icon: "doc.on.doc",
-                       detail: "Copies the files into \(model.installPlace). The originals stay where they are.") { choose(.copy) }
-                if offersMove {
+                       detail: one ? "Copies the file into \(model.installPlace) and turns it on. The original stays where it is."
+                           : "Copies the files into \(model.installPlace) and turns them on. The originals stay where they are.") { choose(.copy) }
+                if prompt.offersMove {
                     option(model.data.installsIntoFontLibrary ? "Move Into Cicero’s Library" : "Move Into Fonts Folder", icon: "folder",
-                           detail: "Moves the files you added into \(model.installPlace). The folders they were in stay.") { choose(.move) }
+                           detail: one ? "Moves the file into \(model.installPlace) and turns it on. The folder it was in stays."
+                               : "Moves the files into \(model.installPlace) and turns them on. The folders they were in stay.") { choose(.move) }
                 }
                 option("Leave Files Where They Are", icon: "link",
-                       detail: "macOS uses the files from where they are. Microsoft Office can’t use them.") { choose(.inPlace) }
+                       detail: one ? "Lists the file under Added Fonts, where it is, without turning it on."
+                           : "Lists the files under Added Fonts, where they are, without turning them on.") { choose(.inPlace) }
             }
             // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
             Toggle("Remember this choice (you can change it in Preferences → General)", isOn: $remember)
             HStack {
-                if prompt.switching == nil && prompt.faces.contains(where: \.canActivateTemporarily) {
-                    Button("Activate Temporarily") {
-                        model.activateTemporarily(prompt.faces, confirmed: true)
-                        dismiss()
-                    }
-                    .help(prompt.faces.count == 1 ? "Turns the font on until Cicero quits." : "Turns the fonts on until Cicero quits.")
-                }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
             }
         }
         .padding(20)
-        .frame(width: offersMove ? 720 : 560)
+        .frame(width: prompt.offersMove ? 720 : 560)
     }
 
-    /// Some of the files were added one at a time, so they can move (see `AppModel.movableFiles`).
-    private var offersMove: Bool {
-        prompt.switching == nil && !model.movableFiles(among: prompt.faces.map(\.face.path)).isEmpty
+    /// "Add “Name-Regular.otf”", or "Add 12 Font Files".
+    private var title: String {
+        prompt.files.count == 1 ? "Add “\(URL(fileURLWithPath: prompt.files[0]).lastPathComponent)”" : "Add \(prompt.files.count) Font Files"
     }
 
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {
@@ -74,12 +71,8 @@ struct ActivationSheet: View {
 
     private func choose(_ method: InstallMethod) {
         if remember { model.data.installMethod = method }
-        if let switching = prompt.switching {
-            model.performCopySwitch(switching, method: method)
-        } else {
-            model.performActivation(prompt.faces, method: method)
-        }
         dismiss()
+        prompt.add(model, method)
     }
 }
 
