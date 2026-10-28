@@ -231,6 +231,8 @@ private struct TypeTester: View {
     @AppStorage("typeTester.tracking") private var tracking = Self.savedTracking
     /// What's typed over the text in a font's own script, on this family's page only (see `TesterText.shownText`).
     @State private var ownScript: OwnScriptText?
+    /// The case the text was last put in with the AA, Aa and aa buttons, which the editor converts it to as a step to undo.
+    @State private var caseChange: CaseChange?
 
     var body: some View {
         let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
@@ -247,7 +249,7 @@ private struct TypeTester: View {
                 TesterText(family: family, face: face.face,
                            font: FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
                                                         features: model.features(for: family)),
-                           size: size, tracking: tracking, alignment: alignment, ownScript: $ownScript)
+                           size: size, tracking: tracking, alignment: alignment, caseChange: caseChange, ownScript: $ownScript)
             }
             .frame(minHeight: 320)
         }
@@ -304,6 +306,7 @@ private struct TypeTester: View {
 
     @ViewBuilder
     private func buttons(hasAxes: Bool) -> some View {
+        CaseButtons { caseChange = .next($0, after: caseChange) }
         IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
             .help("Align left, center or right")
         if hasAxes {
@@ -348,7 +351,7 @@ private struct AxesButton: View {
     }
 }
 
-/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment and Axes buttons.
+/// The type tester's controls: the Style menu, the sliders with their labels and values, the case, alignment and Axes buttons.
 /// On one row wherever the sliders fit at their narrowest, with symbols for labels where the words don't fit, else the
 /// sliders on a row of their own under the menu, with their words again: with the Info panel open, a narrow window has
 /// too little for all of them, and squeezed further, the labels would wrap and the row grow. Either way the sliders share
@@ -492,6 +495,7 @@ private struct TesterText: View {
     let size: Double
     let tracking: Double
     let alignment: SampleAlignment
+    let caseChange: CaseChange?
     @Binding var ownScript: OwnScriptText?
     @Bindable private var store = TesterTextStore.shared
 
@@ -510,7 +514,7 @@ private struct TesterText: View {
         // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
         SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
                      kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
-                     roomAbove: room.above, roomBelow: room.below) {
+                     roomAbove: room.above, roomBelow: room.below, caseChange: caseChange) {
             FamilyMenu(families: [family], model: model)
         }
             .frame(minHeight: 280)

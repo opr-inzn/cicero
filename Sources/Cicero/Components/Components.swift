@@ -736,6 +736,78 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
     func makeCoordinator() -> SegmentTarget { SegmentTarget() }
 }
 
+/// Capitals, each word capitalised, or lowercase: a change to the text itself, as Convert Case makes it, not to how it's
+/// shown, so a text changed so can be saved as a preset, and what's typed after it is typed as it is.
+enum CaseConversion: CaseIterable {
+    case upper, title, lower
+
+    var label: String {
+        switch self {
+        case .upper: "AA"
+        case .title: "Aa"
+        case .lower: "aa"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .upper: "Uppercase"
+        case .title: "Capitalize"
+        case .lower: "Lowercase"
+        }
+    }
+
+    /// Without the Mac's language, which would put a Turkish user's i in capitals as İ.
+    func apply(to text: String) -> String {
+        switch self {
+        case .upper: text.uppercased()
+        case .title: text.capitalized
+        case .lower: text.lowercased()
+        }
+    }
+}
+
+/// A case conversion asked for, numbered so that asking for the same one again is a change too.
+struct CaseChange: Equatable {
+    let conversion: CaseConversion
+    let number: Int
+
+    static func next(_ conversion: CaseConversion, after last: CaseChange?) -> CaseChange {
+        CaseChange(conversion: conversion, number: (last?.number ?? 0) + 1)
+    }
+}
+
+/// AA, Aa and aa side by side, as one control, each a button rather than a choice that stays chosen. Segments of a set
+/// width, as in `IconSegments`.
+struct CaseButtons: NSViewRepresentable {
+    let convert: (CaseConversion) -> Void
+    private let segmentWidth: CGFloat = 28
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(labels: CaseConversion.allCases.map(\.label), trackingMode: .momentary,
+                                         target: context.coordinator, action: #selector(SegmentTarget.choose(_:)))
+        for (index, conversion) in CaseConversion.allCases.enumerated() {
+            control.setWidth(segmentWidth, forSegment: index)
+            control.setToolTip(conversion.title, forSegment: index)
+        }
+        control.setAccessibilityLabel("Case")
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.onChoose = { index in
+            guard CaseConversion.allCases.indices.contains(index) else { return }
+            convert(CaseConversion.allCases[index])
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSSegmentedControl, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+
+    func makeCoordinator() -> SegmentTarget { SegmentTarget() }
+}
+
 final class SegmentTarget: NSObject {
     var onChoose: (Int) -> Void = { _ in }
 
@@ -913,6 +985,8 @@ private struct PreviewOptions: View {
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .fixedSize()
+                    // The text in another case, which Save as Preset then saves as it is.
+                    CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
                     Spacer()
                     // Once the text is one of yours, the button takes it out again.
                     if preview.isSavedPreset(text.wrappedValue) {
