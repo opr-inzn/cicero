@@ -94,7 +94,7 @@ What comes over:
 
 License details stay in FontExplorer X. Cicero opens a copy of its database and copies the fonts, so FontExplorer X and its library stay as they are.
 
-If you imported from FontExplorer X with Cicero 0.10.13 or earlier, Cicero added its Font Library as a location rather than copying the fonts. As it opens, Cicero offers to copy them in now: click **Copy Fonts**, and they go into your Fonts folder, or Cicero’s Library when you use it, inactive. The ones that were on stay on, as their copies, and the location goes. Your folders, tags, ratings and notes stay as they are. Click **Not Now** to keep the location; Cicero asks again the next time it opens.
+If you imported from FontExplorer X with Cicero 0.10.13 or earlier, Cicero added its Font Library as a location rather than copying the fonts. As it opens, Cicero offers to copy them in now: click **Copy Fonts**, and they’re copied into your Fonts folder, or Cicero’s Library when you use it. Fonts that are active now are active as their copies; the others come in inactive. Then the location goes. Your folders, tags, ratings and notes stay as they are. Click **Not Now** to keep the location; Cicero asks again the next time it opens.
 
 ### FontBase
 
