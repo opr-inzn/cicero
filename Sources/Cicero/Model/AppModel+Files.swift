@@ -36,11 +36,11 @@ extension AppModel {
         open(panel.urls)
     }
 
-    /// Font files, folders and documents opened from the Finder, dropped on the window or chosen in Add Fonts….
+    /// Font files, folders and documents opened from the Finder, dropped on or pasted into the window, or chosen in Add Fonts….
     /// Folders are added as folders; font files the library doesn't have yet are listed where they are, or
     /// installed with fonts activated by copying or moving (see `addFontFiles`). Once a scan has read them, the browser
     /// goes to the first of their families, selected (see `showOpenedFiles`).
-    /// Dropped into a set, they join it. A document (PDF, IDML, InDesign, Illustrator, Photoshop) shows the fonts it uses.
+    /// Dropped or pasted into a set, they join it. A document (PDF, IDML, InDesign, Illustrator, Photoshop) shows the fonts it uses.
     /// Several arriving one by one, as from the Finder, are added together.
     func open(_ urls: [URL], into set: UUID? = nil) {
         openQueue.urls += urls
@@ -51,6 +51,23 @@ extension AppModel {
             guard !Task.isCancelled else { return }
             self?.openWaitingFiles()
         }
+    }
+
+    /// The set the browser shows, which fonts dropped on the window or pasted into it join.
+    var setForAddedFiles: UUID? {
+        guard openFamilyID == nil, selectedItems.count == 1, case .set(let id) = selection else { return nil }
+        return id
+    }
+
+    /// Font files and folders copied in the Finder, which ⌘V adds.
+    static var pastedFiles: [URL] {
+        NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+    }
+
+    /// Edit → Paste in the main window: adds the files copied in the Finder as if dropped on it.
+    func pasteFiles() {
+        let urls = Self.pastedFiles
+        if !urls.isEmpty { open(urls, into: setForAddedFiles) }
     }
 
     /// Adds what `open` gathered, once the library has been scanned for the first time.

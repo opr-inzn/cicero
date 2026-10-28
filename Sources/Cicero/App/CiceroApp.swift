@@ -223,7 +223,9 @@ struct CiceroCommands: Commands {
 /// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
 /// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
 /// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
-final class AppDelegate: NSObject, NSApplicationDelegate {
+/// Last in the responder chain, it takes Edit → Paste (⌘V) in the main window where nothing else does, as while the
+/// sidebar has the focus: font files and folders copied in the Finder are added as if dropped on it (see `FileDrop`).
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
     var model: AppModel? {
         didSet { flush() }
@@ -257,6 +259,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.bringForward()
         addsFonts = true
         flush()
+    }
+
+    @objc func paste(_ sender: Any?) {
+        if canPaste { model?.pasteFiles() }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action == #selector(paste(_:)) ? canPaste : true
+    }
+
+    /// Files are on the pasteboard and the main window is in front, without a sheet over it.
+    private var canPaste: Bool {
+        model != nil && NSApp.keyWindow != nil && NSApp.keyWindow === TextEditingKeys.mainWindow && !AppModel.pastedFiles.isEmpty
     }
 
     private func flush() {
