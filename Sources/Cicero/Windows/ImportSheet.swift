@@ -464,11 +464,16 @@ struct ImportSheet: View {
 
     private func resultLines(_ summary: ImportSummary) -> [String] {
         var lines: [String] = []
-        let kinds: [(Int, String)] = [
-            (summary.sets, "folder"), (summary.applicationSets, "app folder"),
-            (summary.smartSets, "smart folder"), (summary.tags, "tag"),
+        // In the other app's words, as the sheet listed them: "12 collections as folders".
+        let sets = prompt.source == .fontExplorer ? "set" : "collection"
+        let labels = prompt.source == .fontExplorer
+        let kinds: [(Int, String, String)] = [
+            (summary.sets, "\(sets) as a folder", "\(sets)s as folders"),
+            (summary.applicationSets, "application set as an app folder", "application sets as app folders"),
+            (summary.smartSets, "smart set as a smart folder", "smart sets as smart folders"),
+            (summary.tags, labels ? "label as a tag" : "tag", labels ? "labels as tags" : "tags"),
         ]
-        let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1) }
+        let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1, $0.2) }
         if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
         if summary.activated > 0 {
