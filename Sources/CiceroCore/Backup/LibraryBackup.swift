@@ -493,7 +493,7 @@ public struct LibraryBackup: Sendable {
 
     /// The backup's user data with every path moved from the home folder it was made in to this
     /// one. Temporary activations are over. Records are kept only about font files in font locations
-    /// (`fontLocations`), installed copies only in ~/Library/Fonts and files kept out of an app's folder
+    /// (`fontLocations`) or among the files the user added, installed copies only in ~/Library/Fonts and files kept out of an app's folder
     /// only in Cicero's Inactive folder: activating moves such a file back to the folder its record
     /// names. The rest are merged by `mergedRecords`. The Font Library is the backup's unless `fontLibrary` says where
     /// it's to be, as this Mac's when only fonts are restored: the paths in the backup's move there.
@@ -518,7 +518,11 @@ public struct LibraryBackup: Sendable {
         data.records.installedCopies = map(data.records.installedCopies).filter { copy, origin in
             (isFont(copy, in: locations.userFonts) || fontLibrary.map { isFont(copy, in: $0) } == true) && isFont(origin)
         }
-        data.records.inPlace = Set(data.records.inPlace.map(map).filter(isFont))
+        // Also the files the user added where they are, which go on where they are again.
+        let added = Set(data.fontFiles)
+        data.records.inPlace = Set(data.records.inPlace.map(map).filter { path in
+            isFont(path) || added.contains(path) && Self.isPlainPath(path) && Self.isFontFile(path) && !ActivationEngine.isProtected(path)
+        })
         data.records.temporary = [:]
         data.records.appFolderOrigins = map(data.records.appFolderOrigins).filter { isFont($0.key, in: locations.inactiveFolder) && isFont($0.value) }
         return data

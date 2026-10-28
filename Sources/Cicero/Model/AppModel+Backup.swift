@@ -160,7 +160,7 @@ extension AppModel {
             model.data.records = merged.records
             if !merged.reactivate.isEmpty {
                 // macOS doesn't know these registrations; a scan finds the faces of the files just put back.
-                let input = ScanInput(folders: model.data.scannedFolders(), records: model.data.records)
+                let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
                 if let library = try? await model.scanner.scan(input, progress: { _ in }) {
                     let wanted = Set(merged.reactivate)
                     let faces = library.families.flatMap(\.faces).filter { wanted.contains($0.face.path) && $0.canActivate }
