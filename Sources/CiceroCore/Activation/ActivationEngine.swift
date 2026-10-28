@@ -336,7 +336,9 @@ public struct ActivationEngine: Sendable {
 
     /// Copies into ~/Library/Fonts, or into the family's folder in the Font Library (see `installsIntoFontLibrary`), or
     /// registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`, files in `movable` (ones the user
-    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. A copy Cicero installed
+    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. Files in `inPlace`, those
+    /// in the user's locations, are registered in place whatever `method` is: a location's fonts are never copied, so
+    /// they're never left behind as old copies when the files change. A copy Cicero installed
     /// before goes on again while it's the same as its file; once the file has changed, the copy, off, goes to the Trash
     /// and the new version takes its place (see `currentVersion`). Files from Cicero's Inactive folder, which only keeps
     /// fonts while they're off, are always moved, whatever `method` is. Faces from
@@ -349,7 +351,8 @@ public struct ActivationEngine: Sendable {
     /// later. A file counts as activated once macOS reports it active, so it's usable in every app as
     /// soon as this returns.
     @concurrent
-    public func activate(_ faces: [LibraryFace], method: InstallMethod, records: ActivationRecords, movable: Set<String> = []) async -> ActivationResult {
+    public func activate(_ faces: [LibraryFace], method: InstallMethod, records: ActivationRecords, movable: Set<String> = [],
+                         inPlace: Set<String> = []) async -> ActivationResult {
         let signpost = Signposts.activation.beginInterval("Activate", "\(faces.count) faces")
         defer { Signposts.activation.endInterval("Activate", signpost) }
         var records = records
@@ -381,7 +384,9 @@ public struct ActivationEngine: Sendable {
                 }
             } else if isInsideFontsFolder(path) {
                 toRegister.append((path, false))
-            } else if face.app != nil || method == .inPlace && !isInInactiveFolder(path) && !installedBefore.contains(path) || isInFontLibrary(path) {
+            } else if face.app != nil || isInFontLibrary(path) || !isInInactiveFolder(path)
+                        && (inPlace.contains(path) && earlierCopy(of: path, family: face.face.familyName, records: records) == nil
+                            || method == .inPlace && !installedBefore.contains(path)) {
                 toRegister.append((path, true))
             } else {
                 toCopy.append((path, face.face.familyName))
@@ -557,11 +562,12 @@ public struct ActivationEngine: Sendable {
     /// back rather than none; any that can't come back are among `failed`. With `.move`, new copies in `movable` are
     /// moved into the Fonts folder (see `activate`).
     @concurrent
-    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords, movable: Set<String> = []) async -> ActivationResult {
+    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords, movable: Set<String> = [],
+                             inPlace: Set<String> = []) async -> ActivationResult {
         let origins = records.installedCopies
         var moved: [String: String] = [:]
         let off = await deactivate(switches.flatMap(\.others), records: records, trashingCopies: true, moved: &moved)
-        let on = await activate(switches.compactMap(\.target), method: method, records: off.records, movable: movable)
+        let on = await activate(switches.compactMap(\.target), method: method, records: off.records, movable: movable, inPlace: inPlace)
         var result = ActivationResult(records: on.records, succeeded: on.succeeded, failed: off.failed + on.failed, message: "Switched")
         let stuck = Set(on.failed)
         let restoring = switches.filter { $0.target.map { stuck.contains($0.face.path) } ?? false }

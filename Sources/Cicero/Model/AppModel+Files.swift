@@ -348,6 +348,12 @@ extension AppModel {
         return Set(paths.filter { added.contains($0) && !isInReadFolder($0) })
     }
 
+    /// The files among `paths` in the user's locations, which go on where they are whatever Activate fonts by says.
+    func filesInLocations(among paths: [String]) -> Set<String> {
+        let folders = data.folders.map { $0.path + "/" }
+        return Set(paths.filter { path in folders.contains { path.hasPrefix($0) } })
+    }
+
     /// Shows the families of files `open` added, once scan `id` has listed them: in Added Fonts, or the set
     /// they joined, or the sidebar item shown when it has them all, else in All Fonts (where installed ones go).
     /// The browser goes to the first of them, selected, rather than a font page opening.

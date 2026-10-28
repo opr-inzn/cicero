@@ -165,8 +165,8 @@ struct GeneralSettings: View {
         let copiedBefore = "A font Cicero copied before goes on as that copy again."
         return switch model.data.installMethod {
         case .ask: "When you add font files, Cicero asks whether to copy them into \(place) or leave them where they are. Fonts you turn on yourself are activated where they are, and Microsoft Office can’t use them. \(copiedBefore)"
-        case .copy: "Copying puts font files into \(place) and leaves the originals where they are."
-        case .move: "Moving takes font files you add out of their folders and puts them into \(place). Fonts in your locations are copied instead."
+        case .copy: "Copying puts font files you add into \(place) and leaves the originals where they are. Fonts in your locations are activated where they are, and Microsoft Office can’t use them."
+        case .move: "Moving takes font files you add out of their folders and puts them into \(place). Fonts in your locations are activated where they are, and Microsoft Office can’t use them."
         case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves. Microsoft Office can’t use them. \(copiedBefore)"
         }
     }

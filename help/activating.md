@@ -33,7 +33,7 @@ Choose **Active** for one of your locations, next to it in **Preferences → Loc
 
 ## Copy or use in place
 
-There are two ways to turn on a font that isn’t in a Fonts folder:
+Fonts in your [locations](organizing.md#locations) are always turned on where they are: a location is a folder Cicero lists, and nothing in it is copied, so Microsoft Office can’t use its fonts. For font files you add, there are two ways:
 
 | | Install a copy | Leave files where they are |
 | --- | --- | --- |
@@ -45,14 +45,14 @@ Choose which one in **Preferences → General**, next to **Activate fonts by**:
 
 - **Ask each time**: when you [add font files](organizing.md#add-font-files), Cicero asks once for all of them: **Install a Copy** or **Move Into Fonts Folder**, which turn them on, or **Leave Files Where They Are**, which lists them under [Added Fonts](organizing.md#added-fonts) without turning them on. Check **Remember this choice** to stop being asked; you can change it again in Preferences. Turning fonts on never asks: fonts in your [locations](organizing.md#locations) go on where they are, so Microsoft Office can’t use them.
 - **Copy into ~/Library/Fonts** (the setting at first): font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
-- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. Fonts in your [locations](organizing.md#locations) are copied, so their folders stay as they are, and so is a file **Find on This Mac** finds for a document.
+- **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. A file **Find on This Mac** finds for a document is copied, so its folder stays as it is.
 - **Leave files where they are**: font files you add are listed where they are, under [Added Fonts](organizing.md#added-fonts), without being turned on. Turn them on when you need them.
 
 A few things happen either way:
 
 - Fonts from a folder an app loads by itself, like Adobe’s, are always used where they are, never copied. See [Fonts in Adobe apps’ folders](#fonts-in-adobe-apps-folders).
 - When a copy has the same name as a file already where it goes, Cicero gives it a new name, like “Name 2.otf”. If the file there has the same contents, Cicero uses it instead.
-- A font Cicero copied before goes on as that copy again, also with **Ask each time** or **Leave files where they are**, so it stays usable in Microsoft Office. If its file has changed since, like a new version from the foundry in one of your [locations](organizing.md#locations), or another font saved under its name, the old copy goes to the Trash and the new one is copied in its place. The same happens when a new version replaces the old file under another name. **Activate Temporarily** turns on the new version where it is.
+- A font Cicero copied before goes on as that copy again, also with **Ask each time** or **Leave files where they are**, so it stays usable in Microsoft Office. That includes fonts in your locations that an earlier version of Cicero copied. Once the file has changed, like a new version from the foundry, a font in a location goes on where it is instead, and a font listed under [Added Fonts](organizing.md#added-fonts) is copied again in place of the old copy, which goes to the Trash. **Activate Temporarily** turns on the new version where it is.
 - A font in your Fonts folder that’s turned off in macOS is turned back on where it is.
 
 ### Fonts in Microsoft Office
@@ -61,11 +61,11 @@ Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are 
 
 - fonts turned on with **Ask each time** or **Leave files where they are** chosen
 - fonts in [Cicero’s Library](#ciceros-library)
-- fonts in a location you chose **Active** for
+- fonts in your [locations](organizing.md#locations)
 - fonts turned on temporarily, or by an [app folder](#turn-fonts-on-with-an-app)
 - fonts in [Adobe apps’ folders](#fonts-in-adobe-apps-folders), also when they’re on in every app
 
-To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks as you add it, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. A font that’s on where it is already has to be turned off and on again that way.
+To use a font in Office, turn it on by copying it into your Fonts folder: choose **Install a Copy** when Cicero asks as you add it, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. A font you added that’s on where it is already has to be turned off and on again that way. For a font in one of your locations, copy its file into `~/Library/Fonts` in the Finder.
 
 Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too, and for turning a font off: Office still lists it the next time it opens, and lets go of it the time after.
 
