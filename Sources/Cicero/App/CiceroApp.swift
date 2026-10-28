@@ -108,13 +108,16 @@ struct CiceroCommands: Commands {
             Button("Add Location", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Find Fonts in Document", systemImage: "doc.text.magnifyingglass") { model.presentFindFontsPanel() }
-            Button("New Folder", systemImage: "folder") {
+            // The selected families go in, so the name says so, as the context menu's does.
+            Button(model.selectedFamilies.isEmpty ? "New Folder" : "New Folder from Selection", systemImage: "folder") {
                 model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Smart Folder", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
-            Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet(with: model.selectedFamilies) }
+            Button(model.selectedFamilies.isEmpty ? "New App Folder" : "New App Folder from Selection", systemImage: "app.badge.checkmark") {
+                model.newApplicationSet(with: model.selectedFamilies)
+            }
             Divider()
             Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
             Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }

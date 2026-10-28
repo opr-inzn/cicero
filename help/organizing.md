@@ -155,7 +155,7 @@ A folder is a list of families you put together by hand, like the fonts for one 
 
 ### Make a folder
 
-- Choose **File → New Folder** (⇧⌘N). The families you’ve selected go into it.
+- Choose **File → New Folder** (⇧⌘N). With families selected, it’s called **New Folder from Selection**, and they go into it.
 - Or click **+** next to **Folders** and choose **New Folder**
 - Or right-click selected families and choose **Add to Folder → New Folder from Selection**
 
