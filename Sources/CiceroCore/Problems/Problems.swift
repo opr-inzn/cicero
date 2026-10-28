@@ -235,7 +235,10 @@ public enum ProblemDetector {
                 case .allUsers: return "Installed for all users"
                 case .app: return "Comes with an app"
                 case .adobeFonts: return "Adobe Fonts"
-                case .fontsFolder: return "In your Fonts folder"
+                case .fontsFolder:
+                    // A folder in it is often another app's, like FontBase's copies of the fonts it has on.
+                    let inside = path.dropFirst(locations.userFonts.path.count + 1).split(separator: "/").dropLast()
+                    return inside.isEmpty ? "In your Fonts folder" : "In “\(inside.joined(separator: "/"))” in your Fonts folder"
                 case .inPlace: return "Used where it is"
                 case .temporary(.untilQuit): return "Active until Cicero quits"
                 case .temporary(.whileAppsRun): return "Active while its app is open"
