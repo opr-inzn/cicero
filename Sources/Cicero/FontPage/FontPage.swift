@@ -306,9 +306,9 @@ private struct TypeTester: View {
 
     @ViewBuilder
     private func buttons(hasAxes: Bool) -> some View {
-        CaseButtons { caseChange = .next($0, after: caseChange) }
         IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
             .help("Align left, center or right")
+        CaseButtons { caseChange = .next($0, after: caseChange) }
         if hasAxes {
             AxesButton()
         }
@@ -351,11 +351,12 @@ private struct AxesButton: View {
     }
 }
 
-/// The type tester's controls: the Style menu, the sliders with their labels and values, the case, alignment and Axes buttons.
+/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment, case and Axes buttons.
 /// On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the menu: with the
-/// Info panel open, a narrow window has too little for all of them. On one row, the sliders share the width the row leaves
-/// up to `longestSlider` each, as long as each other, and what's left goes either side of them, so they stand as a group
-/// between the menu and the buttons; on a row of their own, they share all of it, and the last value ends where the row does. Each slider's symbol, slider and value are
+/// Info panel open, a narrow window has too little for all of them. On one row, the sliders share the width the row leaves,
+/// as long as each other, but past `longestSlider` each, up to `groupGap` more goes either side of them first, so they
+/// stand as a group between the menu and the buttons; on a row of their own, they share all of it. Either way the last
+/// value or button ends where the row does. Each slider's symbol, slider and value are
 /// 8 pt apart, everything else 16. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
 /// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider, a
 /// third of a second.
@@ -393,8 +394,10 @@ private struct TesterControls: Layout {
                       height: height(of: top, cache) + 10 + height(of: bottom, cache))
     }
 
-    /// The longest a slider grows on the row with the menu and buttons.
+    /// How long a slider grows on the row with the menu and buttons before the room either side of them does.
     static let longestSlider: CGFloat = 180
+    /// The most room added either side of the sliders, on top of the usual 16 pt.
+    static let groupGap: CGFloat = 32
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
         guard !fitsOneRow(width: bounds.width, cache) else {
@@ -416,8 +419,8 @@ private struct TesterControls: Layout {
         place(bottom, in: rest, subviews, cache)
     }
 
-    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave; `grouped`, no
-    /// longer than `longestSlider`, with the rest either side of them, or after them with nothing before.
+    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave; `grouped`, with
+    /// up to `groupGap` of it either side of them once they're `longestSlider` long (see `TesterControls`).
     private func place(_ row: [Int], in bounds: CGRect, _ subviews: Subviews, _ cache: Cache, grouped: Bool = false) {
         let sliders = row.filter { cache.roles[$0] == .slider }
         let room = max(0, bounds.width - width(of: row, cache))
@@ -428,11 +431,13 @@ private struct TesterControls: Layout {
             extra = min(extra, max(0, Self.longestSlider - cache.sizes[slider].width))
             let left = room - extra * CGFloat(sliders.count)
             switch (first != row.first, last != row.last) {
-            case (true, true): (before, after) = (left / 2, left / 2)
-            case (false, true): after = left
-            case (true, false): before = left
-            case (false, false): extra = room / CGFloat(sliders.count)
+            case (true, true): (before, after) = (min(left / 2, Self.groupGap), min(left / 2, Self.groupGap))
+            case (false, true): after = min(left, Self.groupGap)
+            case (true, false): before = min(left, Self.groupGap)
+            case (false, false): break
             }
+            // The rest to the sliders again.
+            extra += (left - before - after) / CGFloat(sliders.count)
         }
         // What follows the sliders' last value.
         let afterGroup = group.last.flatMap { last in row.drop { $0 != last }.dropFirst().first }
