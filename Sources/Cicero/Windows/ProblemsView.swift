@@ -12,8 +12,14 @@ struct ProblemsView: View {
         }
         Group {
             if groups.isEmpty {
-                EmptyState("No Conflicts", systemImage: "checkmark.circle",
-                           description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts"))
+                // Like the other empty states: what shows up here, not a verdict on the fonts.
+                if model.hasScanned {
+                    EmptyState("No Conflicts", systemImage: "checkmark.circle",
+                               description: Text("Fonts installed twice, duplicates, and missing or damaged files show up here."))
+                } else {
+                    EmptyState("Checking Fonts", systemImage: "checkmark.circle",
+                               description: Text("Fonts installed twice, duplicates, and missing or damaged files will show up here."))
+                }
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {

@@ -290,15 +290,10 @@ private struct EmptyBrowser: View {
             FolderOutOfReach(folderID: id)
         case .inactive:
             // With no locations of their own too: what's here is what's on, and Proofing may well be under Locations.
-            // Add Fonts only while it lists files where they are, or asks; installing them would turn them on.
+            // The same whatever "When you add font files" says: a location keeps its fonts off with every choice.
             EmptyState("Everything Is Active", systemImage: "checkmark.seal",
-                       description: Text(model.installsAddedFiles
-                           ? "Every font in your library is turned on. Add a folder of fonts to keep more here without activating them."
-                           : "Every font in your library is turned on. Add a folder of fonts, or font files, to keep more here without activating them.")) {
+                       description: Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")) {
                 Button("Add Location") { model.presentAddFolderPanel() }
-                if !model.installsAddedFiles {
-                    Button("Add Fonts") { model.presentAddFontsPanel() }
-                }
             }
         case .active:
             EmptyState("Nothing Active", systemImage: "xmark.seal",
