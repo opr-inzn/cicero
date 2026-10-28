@@ -3,18 +3,27 @@ import SwiftUI
 
 /// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts, its
 /// sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as notes), activation
-/// history and the fonts that were on; or Font Book's collections. Then progress while it's brought in, and what came over.
+/// history and the fonts that were on; Font Book's collections; or FontBase's folder, collections, tags and the fonts
+/// that were on. Then progress while it's brought in, and what came over. A library its app writes to while it's open
+/// waits for the app to quit, and is read again then.
 struct ImportSheet: View {
-    let prompt: ImportPrompt
+    @State private var prompt: ImportPrompt
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var choices: ImportChoices
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
     @State private var summary: ImportSummary?
+    /// The other app is open, so its library can't be imported yet.
+    @State private var appIsOpen = false
+    /// Reading the library again, as the app left it on quitting.
+    @State private var isRereading = false
+    /// The choices' height, and the header's, to fit the sheet to them.
+    @State private var contentHeight: CGFloat?
+    @State private var headerHeight: CGFloat = 0
 
     init(prompt: ImportPrompt) {
-        self.prompt = prompt
+        _prompt = State(initialValue: prompt)
         _choices = State(initialValue: ImportChoices(for: prompt.library))
     }
 
@@ -27,18 +36,85 @@ struct ImportSheet: View {
                 result(summary)
             } else {
                 header
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                 Divider()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) { sections }
                         .padding(.vertical, 16)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                 }
+                // As tall as what's in it, up to the sheet's 640 points, so nothing is left empty below the last line.
+                .frame(height: contentHeight.map { min($0, 640 - headerHeight - 70) })
                 .disabled(stage != nil)
                 Divider()
                 footer
             }
         }
-        .frame(width: 600, height: summary == nil ? min(640, height) : nil)
+        .frame(width: 600)
+        .onAppear { appIsOpen = isAppRunning }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
+            if isOtherApp(note) { appIsOpen = isAppRunning }
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { note in
+            guard isOtherApp(note) else { return }
+            appIsOpen = isAppRunning
+            if !appIsOpen { reread() }
+        }
+    }
+
+    // MARK: Waiting for the other app
+
+    /// The app whose library this is, when it writes to it while open: FontBase's bundle ID.
+    private var waitsForBundleID: String? {
+        prompt.waitsForQuit && prompt.source == .fontBase ? FontBaseImport.bundleIdentifier : nil
+    }
+
+    private var isAppRunning: Bool {
+        guard let bundleID = waitsForBundleID else { return false }
+        return !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
+    }
+
+    private func isOtherApp(_ note: Notification) -> Bool {
+        guard let bundleID = waitsForBundleID else { return false }
+        return (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier == bundleID
+    }
+
+    private var isWaiting: Bool { appIsOpen || isRereading }
+
+    /// Reads the library as the app left it, keeping what the user chose: what's new is chosen as it would be at first.
+    private func reread() {
+        isRereading = true
+        Task {
+            defer { isRereading = false }
+            guard let fresh = await model.reread(prompt) else { return }
+            let before = prompt.library
+            let defaults = ImportChoices(for: fresh.library)
+            let oldSets = Set(before.sets.map(\.id))
+            choices.sets = choices.sets.intersection(fresh.library.sets.map(\.id)).union(defaults.sets.subtracting(oldSets))
+            if before.active.isEmpty { choices.activate = defaults.activate }
+            prompt = fresh
+        }
+    }
+
+    private var quitBanner: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Quit \(appName) to import").bold()
+                Text("\(appName) saves its library as it quits. Cicero reads it again then, and you can import.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("Quit \(appName)") {
+                guard let bundleID = waitsForBundleID else { return }
+                for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleID) { app.terminate() }
+            }
+        }
+        .padding(12)
+        .background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: Choosing
@@ -52,9 +128,15 @@ struct ImportSheet: View {
                     .buttonStyle(.link)
                     .disabled(stage != nil)
             }
+            if appIsOpen { quitBanner.padding(.top, 10) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
+    }
+
+    /// What the other app calls the folder its fonts are in.
+    private var fontFolderTitle: String {
+        prompt.source == .fontBase ? "FontBase’s folder" : "Font Library"
     }
 
     @ViewBuilder
@@ -62,7 +144,7 @@ struct ImportSheet: View {
         if library.fontFolder != nil || !library.otherFiles.isEmpty {
             section("Fonts") {
                 if let folder = library.fontFolder {
-                    checkbox("Font Library", detail: fontLibraryDetail(folder), isOn: $choices.fontFolder)
+                    checkbox(fontFolderTitle, detail: fontLibraryDetail(folder), isOn: $choices.fontFolder)
                 }
                 if !library.otherFiles.isEmpty {
                     checkbox("Fonts in other folders", detail: otherFilesDetail, isOn: $choices.otherFiles)
@@ -71,7 +153,7 @@ struct ImportSheet: View {
         }
         let plain = library.sets.filter { !$0.isApplicationSet }
         if !plain.isEmpty {
-            section(prompt.source == .fontBook ? "Collections" : "Sets", selecting: plain.map(\.id), in: \.sets) {
+            section(prompt.source == .fontExplorer ? "Sets" : "Collections", selecting: plain.map(\.id), in: \.sets) {
                 ForEach(plain) { set in checkbox(set.name, detail: detail(set), isOn: member(set.id, of: \.sets)) }
             }
         }
@@ -96,8 +178,11 @@ struct ImportSheet: View {
         }
         if !library.tags.isEmpty || !library.classifications.isEmpty || !library.ratings.isEmpty || !library.comments.isEmpty
             || !library.history.isEmpty || !library.active.isEmpty {
-            section("Tags, Classifications, Ratings and Activations") {
-                if !library.tags.isEmpty {
+            section(prompt.source == .fontBase ? "Tags and Activations" : "Tags, Classifications, Ratings and Activations") {
+                if !library.tags.isEmpty, prompt.source == .fontBase {
+                    checkbox("Tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the tag.",
+                             isOn: $choices.tags)
+                } else if !library.tags.isEmpty {
                     checkbox("Labels as tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the label.",
                              isOn: $choices.tags)
                 }
@@ -117,17 +202,34 @@ struct ImportSheet: View {
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {
-                    checkbox("Activate the fonts that were active", detail: "\(count(library.active.count, "style")), activated where they are. Quit \(appName) first, so it doesn’t deactivate them again.",
+                    // FontBase's own library can't be imported until it has quit, so it can't turn them off again.
+                    let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so it doesn’t deactivate them again."
+                    checkbox("Activate the fonts that were active", detail: "\(count(library.active.count, "style")), activated where they are." + quit,
                              isOn: $choices.activate)
+                }
+                // While the app is open its copies are its own: it deletes them as it quits, unless it's set not to. So
+                // they're only offered once the library has been read again after it quit.
+                if !library.leftoverCopies.isEmpty, !isWaiting {
+                    checkbox("Remove \(appName)’s copies", detail: "\(count(library.leftoverCopies.count, "copy", "copies")) it left in "
+                        + "\(commonFolder(library.leftoverCopies)), to the Trash, so those fonts aren’t on twice.",
+                             isOn: $choices.removeCopies)
                 }
             }
         }
         if !library.notes.isEmpty {
-            Text("Not imported: \(library.notes.formatted(.list(type: .and))).")
+            section("Not Imported") {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(library.notes, id: \.self) { note in
+                        Label { Text(note.prefix(1).uppercased() + note.dropFirst()).fixedSize(horizontal: false, vertical: true) }
+                            icon: { Image(systemName: "circle.fill").font(.system(size: 5)) }
+                            .labelStyle(BulletLabelStyle())
+                    }
+                }
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20)
+                .padding(.top, 2)
+            }
         }
     }
 
@@ -135,6 +237,9 @@ struct ImportSheet: View {
         HStack(spacing: 12) {
             if let stage {
                 progress(stage)
+            } else if isRereading {
+                ProgressView().controlSize(.small)
+                Text("Reading \(appName)’s library").font(.callout).foregroundStyle(.secondary)
             } else {
                 Text("Your current setup is saved first, in Backups.")
                     .font(.callout)
@@ -150,7 +255,7 @@ struct ImportSheet: View {
             .disabled(stage != nil && !isCopying)
             Button("Import") { start() }
                 .keyboardShortcut(.defaultAction)
-                .disabled(stage != nil || !hasChoice)
+                .disabled(stage != nil || !hasChoice || isWaiting)
         }
         .padding(16)
     }
@@ -244,17 +349,6 @@ struct ImportSheet: View {
 
     /// Enough for every section and row, before it scrolls: the title and the buttons, each section's title and the
     /// space after it, each row's two lines, and the line about what isn't imported.
-    private var height: CGFloat {
-        let fonts = (library.fontFolder != nil ? 1 : 0) + (library.otherFiles.isEmpty ? 0 : 1)
-        let plain = library.sets.count { !$0.isApplicationSet }
-        let applicationSets = library.sets.count - plain
-        let others = [library.tags.isEmpty, library.classifications.isEmpty, library.ratings.isEmpty, library.comments.isEmpty,
-                      library.history.isEmpty, library.active.isEmpty].filter { !$0 }.count
-        let rows = [fonts, plain, applicationSets, library.smartSets.count, others]
-        let sections = rows.filter { $0 > 0 }.count
-        return 150 + CGFloat(sections) * 46 + CGFloat(rows.reduce(0, +)) * 44 + (library.notes.isEmpty ? 0 : 50)
-    }
-
     private var hasChoice: Bool {
         (choices.fontFolder && library.fontFolder != nil) || (choices.otherFiles && !library.otherFiles.isEmpty)
             || !choices.sets.isEmpty || !choices.smartSets.isEmpty
@@ -268,6 +362,12 @@ struct ImportSheet: View {
         let yours = own.isEmpty ? "" : " Your own, \(own.map { "“\($0)”" }.formatted(.list(type: .and))), come along."
         return "\(count(library.classifications.count, "classified style")). A family goes in the classification most of its styles have, "
             + "unless you’ve chosen one for it." + yours
+    }
+
+    /// The folder the files are in, "~/Library/Fonts/FontBase", or the first one's.
+    private func commonFolder(_ paths: [String]) -> String {
+        let folders = paths.map { ($0 as NSString).deletingLastPathComponent }
+        return ((folders.first ?? "") as NSString).abbreviatingWithTildeInPath
     }
 
     private func fontLibraryDetail(_ folder: String) -> String {
@@ -344,7 +444,15 @@ struct ImportSheet: View {
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1) }
         if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
-        if summary.activated > 0 { lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).") }
+        if summary.activated > 0 {
+            lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).")
+            if prompt.source == .fontBase {
+                lines.append("When FontBase opens, it activates them again, from copies of its own, so they’re on twice. Deactivate them in FontBase to stop that.")
+            }
+        }
+        if summary.removedCopies > 0 {
+            lines.append("\(count(summary.removedCopies, "copy", "copies")) \(appName) left in the Fonts folder moved to the Trash.")
+        }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
         if summary.classifiedFamilies > 0 { lines.append("\(count(summary.classifiedFamilies, "family", "families")) classified.") }
         if summary.notedFamilies > 0 {
@@ -353,7 +461,12 @@ struct ImportSheet: View {
         // Before what didn't come over: with nothing new, importing again says so first.
         if lines.isEmpty { lines.append("Nothing new: Cicero has all of it from before.") }
         if summary.notFound > 0 {
-            lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(prompt.source == .fontBook ? "collections" : "sets, tags, classifications and ratings") \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
+            let kinds = switch prompt.source {
+            case .fontBook: "collections"
+            case .fontBase: "collections, tags and active fonts"
+            case .fontExplorer: "sets, tags, classifications and ratings"
+            }
+            lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(kinds) \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
         }
         if !summary.emptySets.isEmpty {
             lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.formatted(.list(type: .and))), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")

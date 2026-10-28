@@ -69,9 +69,9 @@ They’re listed where they are, under **Added Fonts**, without being activated.
 
 If a file has fonts your library has already, from another file, like a newer version of one you installed, Cicero asks whether to skip it, add it as a copy or replace your copy with it. See [Fonts already in your library](organizing.md#fonts-already-in-your-library).
 
-## Coming from FontExplorer X or Font Book
+## Coming from FontExplorer X, FontBase or Font Book
 
-Cicero can bring over what you set up in FontExplorer X Pro or Font Book, so you don’t have to start again.
+Cicero can bring over what you set up in FontExplorer X Pro, FontBase or Font Book, so you don’t have to start again.
 
 ### FontExplorer X
 
@@ -93,6 +93,21 @@ What comes over:
 - **The fonts that were active,** activated again where they are. Quit FontExplorer X first, so it doesn’t deactivate them when it quits.
 
 License details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
+
+### FontBase
+
+1. Choose **File → Import from FontBase**. Cicero finds FontBase’s library on this Mac by itself; to import one from another Mac, click **Choose Another** and pick its FontBase folder, from Library/Application Support in that Mac’s home folder.
+2. If FontBase is open, quit it: Cicero says so and can’t import until it has quit, because FontBase saves its library as it quits. Click **Quit FontBase** in the sheet, or quit it yourself; Cicero reads the library again then.
+3. Uncheck what you don’t want, and click **Import**.
+
+What comes over:
+
+- **Your fonts.** FontBase’s folder (~/FontBase unless you moved it) is added as a location, called **FontBase** in the sidebar. Nothing is moved.
+- **Collections,** as folders, and **Favorites** as a folder of that name.
+- **Tags** you gave fonts, given to their families.
+- **The fonts that were active,** activated again where they are, in FontBase’s folder. FontBase turns a font on by copying it into ~/Library/Fonts/FontBase and deletes the copies when it quits; if it left any there, Cicero offers to move them to the Trash, so those fonts aren’t on twice. When you open FontBase again, it makes those copies again, so the fonts are on twice: deactivate them in FontBase to stop that.
+
+What stays behind, as the sheet lists it: the tags FontBase gives fonts itself (like Sans and Script), Google and FontMarket fonts you haven’t downloaded, licenses, sample texts and preview settings, and turning on new fonts in an active folder by themselves. Cicero only reads FontBase’s library; FontBase and its folder stay as they are.
 
 ### Font Book
 

@@ -4,6 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
+- **File → Import from FontBase** brings over FontBase’s folder, collections, favorites and tags, and turns on the fonts that were on. The sheet asks you to quit FontBase first and says what stays behind.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
 - Cicero copies fonts into your Fonts folder when you turn them on, rather than asking how each time. Choose **Ask each time** in **Preferences → General** to be asked again.

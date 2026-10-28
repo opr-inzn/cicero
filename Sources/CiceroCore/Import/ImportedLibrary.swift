@@ -21,18 +21,20 @@ public struct ImportedLibrary: Sendable {
     public enum Source: String, Sendable {
         case fontExplorer
         case fontBook
+        case fontBase
 
         /// The app's name, for the sheet and messages.
         public var appName: String {
             switch self {
             case .fontExplorer: "FontExplorer X"
             case .fontBook: "Font Book"
+            case .fontBase: "FontBase"
             }
         }
     }
 
     public var source: Source
-    /// The folder the other app kept its fonts in, to list where it is: FontExplorer X's Font Library.
+    /// The folder the other app kept its fonts in, to list where it is: FontExplorer X's Font Library, FontBase's folder.
     public var fontFolder: String?
     /// How many font files are in `fontFolder`, for the sheet.
     public var fontFolderCount = 0
@@ -52,6 +54,9 @@ public struct ImportedLibrary: Sendable {
     public var history: [ImportedHistory] = []
     /// Fonts that were on in the other app.
     public var active: [ImportedFont] = []
+    /// Copies the other app made in a Fonts folder to turn fonts on and left there, of fonts in `fontFolder`: once
+    /// Cicero turns those on where they are, each would be on twice.
+    public var leftoverCopies: [String] = []
     /// Fonts in a backup to put in `fontFolder` before anything else: their folder in the unzipped backup, and their
     /// paths under it, which are their paths under `fontFolder` too.
     public var bundledFonts: (folder: URL, files: [String])?
