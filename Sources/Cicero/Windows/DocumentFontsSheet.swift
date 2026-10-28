@@ -14,6 +14,8 @@ struct DocumentFontsSheet: View {
     @State private var message: String?
 
     enum Search {
+        /// macOS is asking whether Cicero may look in the user's folders (see `askForFolders`).
+        case waitingForAccess
         case searching
         case found(String)
         case notFound
@@ -117,6 +119,7 @@ struct DocumentFontsSheet: View {
         if let face = match.face { return face.state.label }
         if match.isInstalled { return "Installed with macOS" }
         switch searches[match.id] {
+        case .waitingForAccess: return "Waiting for access to your folders"
         case .searching: return "Searching"
         case .found(let path): return "Found “\(URL(fileURLWithPath: path).lastPathComponent)”"
         case .notFound: return "Not found on this Mac"
@@ -138,7 +141,7 @@ struct DocumentFontsSheet: View {
                 // Copied even when fonts are activated by moving: Spotlight may have found it in another document's folder.
                 Button(model.data.installMethod == .inPlace ? "Add" : "Install") { model.addFontFiles([path], mayMove: false) }
                     .help(installHelp)
-            case .searching:
+            case .waitingForAccess, .searching:
                 ProgressView().controlSize(.small)
             case nil, .notFound:
                 Button("Find on This Mac") { find(postScriptName, for: match.id) }
@@ -200,7 +203,14 @@ struct DocumentFontsSheet: View {
     private func find(_ postScriptName: String, for id: String) {
         searches[id] = .searching
         Task {
+            // Looking in a folder waits while macOS asks, once for each: the row says so unless it's quick.
+            let waiting = Task {
+                try await Task.sleep(for: .milliseconds(500))
+                if !Task.isCancelled { searches[id] = .waitingForAccess }
+            }
             await Self.askForFolders()
+            waiting.cancel()
+            searches[id] = .searching
             let paths = await FontFileSearch.files(withPostScriptName: postScriptName)
             searches[id] = paths.first.map(Search.found) ?? .notFound
         }
