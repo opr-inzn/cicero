@@ -9,7 +9,8 @@ import SwiftUI
 /// glyphs reaching past them (`roomAbove`, `roomBelow`); `margin` at either side of the lines is room for glyphs
 /// reaching past their ends, as nothing is drawn outside the view. A right-click shows Cut, Copy and Paste, then
 /// `menu`. Left empty, it shows `defaultText` again. Glyphs copied from the page's Glyphs, like an alternate, are
-/// drawn as copied where they're pasted (`glyphs`, see `SampleGlyph`), in `face`, a style of `family`.
+/// drawn as copied where they're pasted (`glyphs`, see `SampleGlyph`), in `face`, a style of `family`. A new `caseChange`
+/// converts the selection's case, or the whole text's with nothing selected, as a step to undo.
 struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
     @Binding var glyphs: [SampleGlyphRun]
@@ -23,6 +24,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     let margin: CGFloat
     let roomAbove: CGFloat
     let roomBelow: CGFloat
+    var caseChange: CaseChange?
     @ViewBuilder let menu: () -> MenuContent
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text, glyphs: $glyphs, defaultText: defaultText) }
@@ -51,6 +53,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         view.isHorizontallyResizable = false
         view.textContainer?.widthTracksTextView = true
         view.string = text
+        context.coordinator.caseChange = caseChange
         update(view, context: context)
         return view
     }
@@ -67,6 +70,10 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             coordinator.markedGlyphs = nil
         }
         update(view, context: context)
+        if caseChange != coordinator.caseChange {
+            coordinator.caseChange = caseChange
+            if let caseChange { (view as? SampleTextView)?.convert(caseChange.conversion, in: font) }
+        }
     }
 
     /// As tall as its lines, laid out at the width it's offered, and the room above and below them. An invisible
@@ -184,6 +191,8 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         var markedGlyphs: [SampleGlyphRun]?
         /// While the text is set from outside, when the glyphs pasted into it aren't marked yet.
         var isSettingText = false
+        /// The case change last made, so that each is made once.
+        var caseChange: CaseChange?
 
         init(text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
             self.text = text
@@ -292,6 +301,37 @@ private final class SampleTextView: NSTextView {
                                           restrictedToTypesFrom allowedTypes: [NSPasteboard.PasteboardType]?) -> NSPasteboard.PasteboardType? {
         if availableTypes.contains(.sampleClip), allowedTypes?.contains(.sampleClip) ?? true { return .sampleClip }
         return super.preferredPasteboardType(from: availableTypes, restrictedToTypesFrom: allowedTypes)
+    }
+
+    /// The selection in another case, or the whole text with nothing selected, as one step to undo, selected afterwards
+    /// if it was before. ß in capitals is ẞ where `font` has it, SS where it doesn't. Pasted glyphs stay marked where their characters are the same, as figures are; a letter in
+    /// another case is another glyph.
+    func convert(_ conversion: CaseConversion, in font: CTFont) {
+        guard let storage = textStorage else { return }
+        let selected = selectedRange()
+        let range = selected.length > 0 ? selected : NSRange(location: 0, length: storage.length)
+        let old = storage.attributedSubstring(from: range)
+        var capitalSharpS: UniChar = 0x1E9E, glyph: CGGlyph = 0
+        let converted = conversion.apply(to: old.string, capitalSharpS: CTFontGetGlyphsForCharacters(font, &capitalSharpS, &glyph, 1))
+        guard converted != old.string else { return }
+        let new = NSMutableAttributedString(string: converted, attributes: typingAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo })
+        // Letter for letter, unless one became two, like ß as SS.
+        if (converted as NSString).length == old.length {
+            let oldString = old.string as NSString, newString = converted as NSString
+            old.enumerateAttributes(in: NSRange(location: 0, length: old.length)) { attributes, run, _ in
+                let same = oldString.substring(with: run) == newString.substring(with: run)
+                new.setAttributes(same ? attributes : attributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo }, range: run)
+            }
+        }
+        // In the text, so that Undo, which goes to it, takes the change back, and typing carries on there.
+        window?.makeFirstResponder(self)
+        breakUndoCoalescing()
+        guard shouldChangeText(in: range, replacementString: converted) else { return }
+        storage.replaceCharacters(in: range, with: new)
+        didChangeText()
+        breakUndoCoalescing()
+        setSelectedRange(selected.length > 0 ? NSRange(location: range.location, length: new.length)
+                                              : NSRange(location: min(selected.location, storage.length), length: 0))
     }
 
     /// The characters with their glyphs marked, in place of the selection, as one step to undo.
