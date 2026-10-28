@@ -81,8 +81,7 @@ extension ActivationEngine {
                 let folder = installFolder(for: path, family: nil)
                 let name = (path as NSString).lastPathComponent
                 let same = folder.appendingPathComponent(name, isDirectory: false)
-                let looked = folder == locations.userFonts ? [folder] : [folder, locations.userFonts]
-                if let there = looked.lazy.compactMap({ Self.identicalFile(to: path, named: name, in: $0) }).first {
+                if let there = installedAlready(path, into: folder) {
                     placed[path] = there
                     continue
                 }
@@ -119,6 +118,15 @@ extension ActivationEngine {
         }
         progress(files.count, files.count)
         return (placed, new)
+    }
+
+    /// The file `installOff` takes as it is for `path`: one with the same contents where it would copy it (`folder`, else
+    /// where installing puts it), or in ~/Library/Fonts while Cicero's Library is used. Nil when it would copy it.
+    public func installedAlready(_ path: String, into folder: URL? = nil) -> String? {
+        let folder = folder ?? installFolder(for: path, family: nil)
+        let name = (path as NSString).lastPathComponent
+        let looked = folder == locations.userFonts ? [folder] : [folder, locations.userFonts]
+        return looked.lazy.compactMap { Self.identicalFile(to: path, named: name, in: $0) }.first
     }
 
     /// A file in `folder` with the same contents as `path`, under `name` or a numbered name as `uniqueURL` gives them.

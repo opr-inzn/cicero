@@ -18,6 +18,8 @@ struct ImportSheet: View {
     @State private var appIsOpen = false
     /// Reading the library again, as the app left it on quitting.
     @State private var isRereading = false
+    /// The files whose copies are in already (see `findInstalledAlready`).
+    @State private var installedAlready: Set<String> = []
     /// The choices' height, and the header's, to fit the sheet to them.
     @State private var contentHeight: CGFloat?
     @State private var headerHeight: CGFloat = 0
@@ -53,6 +55,7 @@ struct ImportSheet: View {
         }
         .frame(width: 600)
         .onAppear { appIsOpen = isAppRunning }
+        .task(id: prompt.id) { await findInstalledAlready() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
             if isOtherApp(note) { appIsOpen = isAppRunning }
         }
@@ -383,13 +386,29 @@ struct ImportSheet: View {
     }
 
     /// The files importing copies in, as `performImport` will: those Cicero reads already, in a Fonts folder, a location
-    /// (like a Font Library an earlier import added) or Added Fonts, stay as they are.
+    /// (like a Font Library an earlier import added) or Added Fonts, stay as they are, and so do those already copied in
+    /// (`installedAlready`).
     private var toCopy: Set<String> {
+        Set(candidates.map(\.path)).subtracting(installedAlready)
+    }
+
+    /// The files importing would copy in but for those already copied in.
+    private var candidates: [(path: String, source: String)] {
         var data = model.data
         var all = choices
         all.fontFolder = true
         all.otherFiles = true
-        return Set(LibraryImport.fontFiles(library, choices: all, data: &data, locations: model.locations).map(\.path))
+        return LibraryImport.fontFiles(library, choices: all, data: &data, locations: model.locations)
+    }
+
+    /// Finds the files whose copies are where importing would put them already, as an earlier import or the offer to copy
+    /// an earlier import's location in left them, reading them off the main thread.
+    private func findInstalledAlready() async {
+        let engine = model.engine
+        let files = candidates
+        installedAlready = await Task.detached(priority: .userInitiated) {
+            Set(files.filter { engine.installedAlready($0.source) != nil }.map(\.path))
+        }.value
     }
 
     /// ", 3 in your library already", or ", in your library already" for all of them.

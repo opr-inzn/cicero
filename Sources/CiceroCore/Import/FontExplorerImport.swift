@@ -29,6 +29,23 @@ public enum FontExplorerImport {
         home.appendingPathComponent("Library/Preferences/com.linotype.FontExplorerX.plist")
     }
 
+    /// The location an import made of FontExplorer X's Font Library up to 0.10.13, which imports copy fonts in now: the
+    /// location called after FontExplorer X, as the import named it, or else the one that is the Font Library, where
+    /// FontExplorer X's settings put it or in its default place. Nil when there's none, or its folder isn't there.
+    public static func earlierImportLocation(in data: UserData, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> WatchedFolder? {
+        let named = data.folders.first { data.folderNames[$0.id.uuidString] == ImportedLibrary.Source.fontExplorer.appName }
+        var libraries = [home.appendingPathComponent("FontExplorer X/Font Library").path]
+        if let setting = (NSDictionary(contentsOf: preferences(home: home)) as? [String: Any])?["fontFolderLocation"] as? String, !setting.isEmpty {
+            let expanded = setting.hasPrefix("~/") ? home.path + setting.dropFirst() : setting
+            libraries.insert(expanded.hasSuffix("/") ? String(expanded.dropLast()) : expanded, at: 0)
+        }
+        let standardized = Set(libraries.map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        let folder = named ?? data.folders.first { standardized.contains(URL(fileURLWithPath: $0.path).standardizedFileURL.path) }
+        var isDirectory: ObjCBool = false
+        guard let folder, FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue else { return nil }
+        return folder
+    }
+
     /// The name of the database in a backup, next to the app's settings.
     static let backupDatabase = "FontDatabase.db"
     static let backupPreferences = "com.linotype.FontExplorerX.plist"

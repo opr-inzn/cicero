@@ -211,6 +211,10 @@ final class AppModel {
     }
     /// An import is under way, which a library read meanwhile mustn't take the place of.
     var isImporting = false
+    /// FontExplorer X's Font Library as a location, offered to be copied in (see `offerEarlierImportCopy`).
+    var earlierImportPrompt: EarlierImportPrompt?
+    /// Asked about it this launch already.
+    @ObservationIgnored var askedAboutEarlierImport = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
     /// What the toast's Undo does; nil for a toast without one.
@@ -560,6 +564,7 @@ final class AppModel {
         library = new
         activateAddedFonts(knowing: known, offline: offline)
         endScan(id)
+        if first { offerEarlierImportCopy() }
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
