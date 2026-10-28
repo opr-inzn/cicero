@@ -353,6 +353,7 @@ public struct ActivationEngine: Sendable {
         let signpost = Signposts.activation.beginInterval("Activate", "\(faces.count) faces")
         defer { Signposts.activation.endInterval("Activate", signpost) }
         var records = records
+        followRenamedOrigins(of: faces, records: &records)
         var failed: [String] = []
         // Files to copy, and the family each is copied for (see `placeCopy`).
         var toCopy: [(path: String, family: String)] = []
@@ -509,13 +510,16 @@ public struct ActivationEngine: Sendable {
     @concurrent
     public func activateTemporarily(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records
+        followRenamedOrigins(of: faces, records: &records)
         var failed: [String] = []
         var succeeded = 0
         var done = Set<String>()
         var toRegister: [String] = []
         let session = Self.currentSession()
+        // An old copy whose file has changed gives way to the new version, where it is, as `activate` copies it.
+        let targets = Self.uniqueByPath(faces.map { currentVersion(of: $0, records: records) })
         // Never one of Creative Cloud's: one only Adobe apps load would be on in every app.
-        for face in Self.uniqueByPath(faces) where !face.isAdobeFonts {
+        for face in targets where !face.isAdobeFonts {
             let path = face.face.path
             if records.temporary[path] != nil {
                 records.temporary[path] = TemporaryRecord(scope: .untilQuit, session: session)
@@ -536,13 +540,13 @@ public struct ActivationEngine: Sendable {
             }
         }
         let message: String
-        if failed.isEmpty, let name = Self.names(of: faces, in: done) {
+        if failed.isEmpty, let name = Self.names(of: targets, in: done) {
             message = "\(name) activated until Cicero quits"
         } else if failed.isEmpty {
             message = succeeded <= 1 ? "Activated until Cicero quits" : "Activated \(succeeded) files until Cicero quits"
         } else {
             message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count,
-                                   undone: Self.names(of: faces, in: Set(failed)))
+                                   undone: Self.names(of: targets, in: Set(failed)))
         }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
@@ -1151,6 +1155,25 @@ public struct ActivationEngine: Sendable {
               Self.hasChanged(origin, since: path), !registrar.isActive(Self.url(path))
         else { return face }
         return file.libraryFace
+    }
+
+    /// Copies Cicero installed whose file is gone, among `faces`' files, follow the one file with the same font left in
+    /// its folder: a new version saved under another name, or the same file renamed. It's then that copy's file, which
+    /// `installedCopy` and `currentVersion` go by. Not while the folder can't be reached, or with several to choose from.
+    private func followRenamedOrigins(of faces: [LibraryFace], records: inout ActivationRecords) {
+        let fm = FileManager.default
+        for face in faces {
+            let files = [face.face.path] + face.copies.map(\.face.path)
+            for copy in files {
+                guard let origin = records.installedCopies[copy], !fm.fileExists(atPath: origin) else { continue }
+                let folder = (origin as NSString).deletingLastPathComponent
+                let successors = files.filter {
+                    $0 != copy && records.installedCopies[$0] == nil && ($0 as NSString).deletingLastPathComponent == folder
+                        && fm.fileExists(atPath: $0)
+                }
+                if successors.count == 1 { records.installedCopies[copy] = successors[0] }
+            }
+        }
     }
 
     /// Whether `original` no longer has the contents `copy` was made with. Not when either is only in iCloud Drive or
