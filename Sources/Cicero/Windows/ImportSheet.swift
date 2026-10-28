@@ -1,10 +1,10 @@
 import CiceroCore
 import SwiftUI
 
-/// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts, its
-/// sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as notes), activation
-/// history and the fonts that were on; Font Book's collections; or FontBase's folder, collections, tags and the fonts
-/// that were on. Then progress while it's brought in, and what came over. A library its app writes to while it's open
+/// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts
+/// (copied in), its sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as notes),
+/// activation history and the fonts that were on; Font Book's collections; or FontBase's fonts (copied in), collections,
+/// tags and the fonts that were on. Then progress while it's brought in, and what came over. A library its app writes to while it's open
 /// waits for the app to quit, and is read again then.
 struct ImportSheet: View {
     @State private var prompt: ImportPrompt
@@ -14,8 +14,6 @@ struct ImportSheet: View {
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
     @State private var summary: ImportSummary?
-    /// How to turn on the fonts that were on, when the install method is Ask.
-    @State private var askedMethod = InstallMethod.copy
     /// The other app is open, so its library can't be imported yet.
     @State private var appIsOpen = false
     /// Reading the library again, as the app left it on quitting.
@@ -145,6 +143,13 @@ struct ImportSheet: View {
     private var sections: some View {
         if library.fontFolder != nil || !library.otherFiles.isEmpty {
             section("Fonts") {
+                Text(toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
+                    : "They’re copied into \(model.installPlace), inactive. \(appName)’s own files stay where they are.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 2)
                 if let folder = library.fontFolder {
                     checkbox(fontFolderTitle, detail: fontLibraryDetail(folder), isOn: $choices.fontFolder)
                 }
@@ -205,7 +210,6 @@ struct ImportSheet: View {
                 }
                 if !library.active.isEmpty {
                     checkbox("Activate the fonts that were active", detail: activateDetail, isOn: $choices.activate)
-                    if model.importMethod == nil { askedMethodPicker }
                 }
                 // While the app is open its copies are its own: it deletes them as it quits, unless it's set not to. So
                 // they're only offered once the library has been read again after it quit.
@@ -248,7 +252,7 @@ struct ImportSheet: View {
             }
             Spacer()
             // While fonts are copied, the task closes the sheet once it has stopped: closing it discards the unzipped
-            // backup, which a copy may still be reading. Once they're listed, the rest goes through.
+            // backup, which a copy may still be reading. Once they're copied, the rest goes through.
             Button("Cancel", role: .cancel) {
                 if let task { task.cancel() } else { dismiss() }
             }
@@ -266,7 +270,7 @@ struct ImportSheet: View {
             switch stage {
             case .copying(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Putting fonts in the Font Library, \(done.formatted()) of \(total.formatted())")
+                Text("Copying fonts, \(done.formatted()) of \(total.formatted())")
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
                 Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
@@ -290,7 +294,7 @@ struct ImportSheet: View {
         stage = .starting
         let choices = choices
         task = Task {
-            let result = await model.performImport(prompt, choices: choices, method: activationMethod) { stage in
+            let result = await model.performImport(prompt, choices: choices) { stage in
                 Task { @MainActor in if self.summary == nil { self.stage = stage } }
             }
             task = nil
@@ -357,31 +361,12 @@ struct ImportSheet: View {
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
     }
 
-    /// How the fonts that were on are turned on: as Activate fonts by says, or as chosen here with Ask.
-    private var activationMethod: InstallMethod { model.importMethod ?? askedMethod }
-
-    /// With Ask, the two ways under the checkbox, in Settings' words, lined up with its title.
-    private var askedMethodPicker: some View {
-        Picker("", selection: $askedMethod) {
-            Text(model.data.installsIntoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts").tag(InstallMethod.copy)
-            Text("Leave files where they are").tag(InstallMethod.inPlace)
-        }
-        .pickerStyle(.radioGroup)
-        .horizontalRadioGroupLayout()
-        .labelsHidden()
-        .disabled(!choices.activate)
-        .padding(.leading, 40)
-        .padding(.bottom, 3)
-    }
-
-    /// How they're turned on (`activationMethod`), and whether Office can use them.
+    /// Whether Office can use them, and why to quit the other app first.
     private var activateDetail: String {
-        let copies = activationMethod == .copy
-        let how = copies ? "copied into \(model.installPlace) and activated" : "activated where they are"
-        let office = copies && !model.data.installsIntoFontLibrary ? "" : ", so Microsoft Office can’t use them"
-        // FontBase's own library can't be imported until it has quit, so it can't turn them off again.
-        let quit = prompt.waitsForQuit ? "" : copies ? " Quit \(appName) first, so they aren’t on twice." : " Quit \(appName) first, so it doesn’t deactivate them again."
-        return "\(count(library.active.count, "style")), \(how)\(office)." + quit
+        let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
+        // FontBase's own library can't be imported until it has quit.
+        let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so they aren’t on twice."
+        return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
     }
 
     private var classificationsDetail: String {
@@ -397,12 +382,28 @@ struct ImportSheet: View {
         return ((folders.first ?? "") as NSString).abbreviatingWithTildeInPath
     }
 
+    /// The files importing copies in, as `performImport` will: those Cicero reads already, in a Fonts folder, a location
+    /// (like a Font Library an earlier import added) or Added Fonts, stay as they are.
+    private var toCopy: Set<String> {
+        var data = model.data
+        var all = choices
+        all.fontFolder = true
+        all.otherFiles = true
+        return Set(LibraryImport.fontFiles(library, choices: all, data: &data, locations: model.locations).map(\.path))
+    }
+
+    /// ", 3 in your library already", or ", in your library already" for all of them.
+    private func alreadyNote(total: Int, copying: Int) -> String {
+        copying >= total ? "" : copying == 0 ? ", in your library already" : ", \((total - copying).formatted()) in your library already"
+    }
+
     private func fontLibraryDetail(_ folder: String) -> String {
         let place = (folder as NSString).abbreviatingWithTildeInPath
+        let copying = toCopy.count { $0.hasPrefix(folder + "/") }
         if let bundled = library.bundledFonts {
-            return "\(place) (\(count(bundled.files.count, "font file")) from the backup)"
+            return "\(place) (\(count(bundled.files.count, "font file")) from the backup\(alreadyNote(total: bundled.files.count, copying: copying)))"
         }
-        return "\(place) (\(count(library.fontFolderCount, "font file")))"
+        return "\(place) (\(count(library.fontFolderCount, "font file"))\(alreadyNote(total: library.fontFolderCount, copying: copying)))"
     }
 
     /// The folders the other files are in, those with the most first, then how many there are: "~/Desktop/Client and
@@ -412,7 +413,8 @@ struct ImportSheet: View {
             .sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }
             .map { ($0.key as NSString).abbreviatingWithTildeInPath }
         let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
-        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file")))"
+        let copying = library.otherFiles.count(where: toCopy.contains)
+        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying)))"
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".
@@ -475,7 +477,7 @@ struct ImportSheet: View {
         ]
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1, $0.2) }
         if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
-        if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) listed in your library.") }
+        if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) copied into \(model.installPlace).") }
         if summary.activated > 0 {
             lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).")
             if prompt.source == .fontBase {

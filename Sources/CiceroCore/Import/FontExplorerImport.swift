@@ -411,8 +411,8 @@ private struct Reader {
             if container.isActive, !container.isSystem, !container.isCloud { library.active += fonts(id) }
         }
 
-        // The fonts to list: those in the Font Library as a folder, the others one by one, where they are. Fonts in the
-        // Fonts folders Cicero reads anyway, and from SkyFonts, Adobe Fonts or Monotype's cloud, aren't added.
+        // The fonts to copy in: those in the Font Library, and the others. Fonts in the Fonts folders Cicero reads
+        // anyway, and from SkyFonts, Adobe Fonts or Monotype's cloud, aren't.
         let fm = FileManager.default
         var missing = 0
         var inLibrary: [String] = []
@@ -430,6 +430,7 @@ private struct Reader {
             }
         }
         library.fontFolder = newLibrary
+        if let newLibrary { library.fontFolderFiles = inLibrary.map { newLibrary + "/" + $0 } }
         if let backupFolder, newLibrary != nil {
             library.bundledFonts = bundled(in: backupFolder, files: inLibrary)
         } else if let newLibrary, !fm.fileExists(atPath: newLibrary), library.fontFolderCount > 0 {
@@ -437,8 +438,9 @@ private struct Reader {
             // fonts in it can't be listed.
             absentLibrary = (newLibrary, library.fontFolderCount)
             library.fontFolderCount = 0
+            library.fontFolderFiles = []
         }
-        // FontExplorer X left the fonts where they were, or its Font Library isn't here: nothing to list there.
+        // FontExplorer X left the fonts where they were, or its Font Library isn't here: nothing to copy from there.
         if library.fontFolderCount == 0 { library.fontFolder = nil }
 
         // The sidebar: sets in folders get the folders' names, as Cicero's sets aren't in folders.

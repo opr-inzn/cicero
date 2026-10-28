@@ -81,7 +81,7 @@ Cicero can bring over what you set up in FontExplorer X Pro, FontBase or Font Bo
 
 What comes over:
 
-- **Your fonts.** FontExplorer X’s Font Library is added as a location, called **FontExplorer X** in the sidebar, and the fonts it used from other folders are listed where they are, under **Added Fonts**. Nothing is moved or activated. From a `.fexbackup` with fonts, they’re put back where the Font Library was, in your home folder, without writing over anything. Fonts Cicero can’t use, like PostScript Type 1 fonts, font suitcases and web fonts (WOFF), stay behind, and so do sets that have only those; the import sheet says how many there are. macOS’s own fonts stay out too, even the ones FontExplorer X lists as if they were yours. A database copied from another Mac needs its Font Library where it was, in your home folder or on a disk that’s connected; if it isn’t, Cicero says where it looked, and once the folder is there, importing again brings in its fonts.
+- **Your fonts,** copied into your Fonts folder, or into [Cicero’s Library](activating.md#ciceros-library) when you use it: those in FontExplorer X’s Font Library and those it used from other folders. They come in inactive, apart from the ones you activate again (below), and FontExplorer X’s own files stay where they are. A font that’s there already with the same contents isn’t copied twice, so importing again copies nothing new. From a `.fexbackup` with fonts, they’re copied in from the backup. Fonts Cicero can’t use, like PostScript Type 1 fonts, font suitcases and web fonts (WOFF), stay behind, and so do sets that have only those; the import sheet says how many there are. macOS’s own fonts stay out too, even the ones FontExplorer X lists as if they were yours. A database copied from another Mac needs its Font Library where it was, in your home folder or on a disk that’s connected; if it isn’t, Cicero says where it looked, and once the folder is there, importing again brings in its fonts. If an earlier version of Cicero added the Font Library as a location, its fonts stay there and aren’t copied.
 - **Sets,** as folders, with the FontExplorer X folders they were in in their names, like “Clients / Acme”. FontExplorer X puts files in sets, so a folder gets every style in its set’s files: a whole family when it has them all, otherwise just those styles.
 - **Application sets,** as app folders, with their apps. An app that isn’t on this Mac is found by its name, also with another year, like Adobe InDesign 2026 for Adobe InDesign 2024. Cicero has no fonts to turn off while an app is open, so the **Autodeactivate** part stays behind.
 - **Smart sets,** as smart folders, when Cicero has a rule for every one of their rules: name, family name, manufacturer (as the foundry), comment (as the note, contains or doesn’t contain), designer, whether it’s activated, whether it’s a system font, rating, the set a font is in, label, number of activations, last activated and import date (in the last 7 or 30 days). Others, like ones that look at the format or language, are listed but stay behind, as without those rules they’d pick other fonts.
@@ -90,9 +90,9 @@ What comes over:
 - **Ratings.** A family gets the stars of its best-rated style, unless you gave it a rating already.
 - **Comments,** as notes. A family’s note gets the comments on its files and styles, each once, unless you wrote a note already.
 - **Activations:** how often each family was turned on and when last, for the **Times Activated** and **Last Activated** rules.
-- **The fonts that were active,** activated again as you chose next to **Activate fonts by** in **Preferences → General**: with **Copy** or **Move**, they’re copied into your Fonts folder, or into [Cicero’s Library](activating.md#ciceros-library) when you use it; with **Leave files where they are**, they’re used where they are, and Microsoft Office can’t use them. With **Ask each time**, the import sheet asks which of the two. FontExplorer X’s files are never moved. Quit FontExplorer X first, as it turns its fonts on and off itself.
+- **The fonts that were active,** activated again once they’re copied in. In Cicero’s Library, Microsoft Office can’t use them. Quit FontExplorer X first, as it turns its fonts on and off itself.
 
-License details stay in FontExplorer X. Cicero opens a copy of its database, so FontExplorer X and its library stay as they are.
+License details stay in FontExplorer X. Cicero opens a copy of its database and copies the fonts, so FontExplorer X and its library stay as they are.
 
 ### FontBase
 
@@ -102,12 +102,12 @@ License details stay in FontExplorer X. Cicero opens a copy of its database, so 
 
 What comes over:
 
-- **Your fonts.** FontBase’s folder (~/FontBase unless you moved it) is added as a location, called **FontBase** in the sidebar. Nothing is moved.
+- **Your fonts,** copied from FontBase’s folder (~/FontBase unless you moved it) into your Fonts folder, or into Cicero’s Library when you use it, inactive apart from the ones you activate again. FontBase’s folder stays as it is.
 - **Collections,** as folders, and **Favorites** as a folder of that name.
 - **Tags** you gave fonts, given to their families.
-- **The fonts that were active,** activated again as you chose next to **Activate fonts by**, as for FontExplorer X above. FontBase’s files are never moved. FontBase turns a font on by copying it into ~/Library/Fonts/FontBase and deletes the copies when it quits; if it left any there, Cicero offers to move them to the Trash, so those fonts aren’t on twice. When you open FontBase again, it makes those copies again, so the fonts are on twice: deactivate them in FontBase to stop that.
+- **The fonts that were active,** activated again once they’re copied in, as for FontExplorer X above. FontBase turns a font on by copying it into ~/Library/Fonts/FontBase and deletes the copies when it quits; if it left any there, Cicero offers to move them to the Trash, so those fonts aren’t on twice. When you open FontBase again, it makes those copies again, so the fonts are on twice: deactivate them in FontBase to stop that.
 
-What stays behind, as the sheet lists it: the tags FontBase gives fonts itself (like Sans and Script), Google and FontMarket fonts you haven’t downloaded, licenses, sample texts and preview settings, and turning on new fonts in an active folder by themselves. Cicero only reads FontBase’s library; FontBase and its folder stay as they are.
+What stays behind, as the sheet lists it: the tags FontBase gives fonts itself (like Sans and Script), Google and FontMarket fonts you haven’t downloaded, licenses, sample texts and preview settings, and turning on new fonts in an active folder by themselves. Cicero only reads FontBase’s library and copies its fonts; FontBase and its folder stay as they are.
 
 ### Font Book
 

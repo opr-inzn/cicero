@@ -2,9 +2,9 @@ import Foundation
 
 /// What to bring in from another font manager, as the Import sheet's checkboxes have it.
 public struct ImportChoices: Equatable, Sendable {
-    /// List FontExplorer X's Font Library as a folder.
+    /// Copy in the fonts in FontExplorer X's Font Library or FontBase's folder.
     public var fontFolder = true
-    /// List the font files it used from other places, one by one.
+    /// Copy in the font files it used from other places.
     public var otherFiles = true
     /// The sets, application sets and collections to bring in, by `ImportedSet.id`.
     public var sets: Set<String> = []
@@ -16,7 +16,7 @@ public struct ImportChoices: Equatable, Sendable {
     /// Comments, as notes.
     public var comments = true
     public var history = true
-    /// Turn on, in place, the fonts that were on in the other app.
+    /// Turn on again the fonts that were on in the other app, once they're copied in.
     public var activate = false
     /// Move the other app's `leftoverCopies` to the Trash.
     public var removeCopies = true
@@ -32,7 +32,7 @@ public struct ImportChoices: Equatable, Sendable {
 
 /// What an import did, for the message afterwards.
 public struct ImportSummary: Equatable, Sendable {
-    /// Font files listed: the Font Library's and the others.
+    /// Font files copied in: the Font Library's and the others. Not those already there with the same name and contents.
     public var fonts = 0
     /// Sets made, or that had the name of one and got fonts or apps from it. What a set had already isn't counted, so
     /// importing again counts nothing.
@@ -62,41 +62,46 @@ public struct ImportSummary: Equatable, Sendable {
     public init() {}
 }
 
-/// Brings what another font manager has into Cicero: first its fonts (`addFonts`, and `placeBundledFonts` for a backup
-/// that has them), then, once a scan has listed them, the rest (`apply`). Only ever adds: a set with the name of one
-/// that's there already gets its fonts, so importing again changes nothing.
+/// Brings what another font manager has into Cicero: first its fonts, copied in off (`fontFiles`,
+/// `ActivationEngine.installOff`), then, once a scan has listed them, the rest (`apply`). Only ever adds: a set with the
+/// name of one that's there already gets its fonts, so importing again changes nothing.
 public enum LibraryImport {
-    /// Lists the other app's fonts: its Font Library as a folder, and the files it used from elsewhere one by one,
-    /// where they are. Returns how many files weren't in the library before: the Font Library's when it wasn't, else
-    /// those `placed` from a backup.
-    public static func addFonts(_ imported: ImportedLibrary, choices: ImportChoices, placed: Int = 0, to data: inout UserData, locations: Locations) -> Int {
-        var count = 0
-        var folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
-        func isRead(_ path: String) -> Bool { folders.contains { path == $0 || path.hasPrefix($0 + "/") } }
+    /// The font files to copy in, each as the other app names it (`path`, what its sets and tags go by) and where to
+    /// copy it from (`source`): the Font Library's, from a backup when it has them, and those it used from elsewhere. Not
+    /// one Cicero reads already, in a Fonts folder, one of the user's locations or among the files they added, which stays
+    /// as it is; nor those in an Adobe app's folder, which comes with the Proofing switch instead, as when the user adds
+    /// one (`data`). A backup is a file anyone could have made: only font files are taken, and only from inside the
+    /// unzipped backup, never through a symbolic link or out of it.
+    public static func fontFiles(_ imported: ImportedLibrary, choices: ImportChoices, data: inout UserData,
+                                 locations: Locations) -> [(path: String, source: String)] {
+        let folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
+        let listed = Set(data.fontFiles)
+        func isRead(_ path: String) -> Bool { listed.contains(path) || folders.contains { path == $0 || path.hasPrefix($0 + "/") } }
+        func isFont(_ path: String) -> Bool { FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased()) }
+        var files: [(path: String, source: String)] = []
         if choices.fontFolder, let folder = imported.fontFolder {
-            // A backup's are those it has, which `placeBundledFonts` put there.
-            count += isRead(folder) ? placed : imported.bundledFonts?.files.count ?? imported.fontFolderCount
-            if !isRead(folder) {
-                // Adobe's folders come with the Proofing switch, as when the user adds one.
-                if WatchedFolder.detectAppName(forPath: folder) != nil {
-                    data.showAdobeAppFolders = true
-                } else {
-                    // Called after the app in the sidebar: "Font Library" alone reads like Cicero's own.
-                    let added = WatchedFolder(path: folder)
-                    data.folders.append(added)
-                    data.folderNames[added.id.uuidString] = imported.source.appName
+            if WatchedFolder.detectAppName(forPath: folder) != nil {
+                data.showAdobeAppFolders = true
+            } else if let bundled = imported.bundledFonts {
+                let source = URL(fileURLWithPath: bundled.folder.resolvingSymlinksInPath().path)
+                for file in bundled.files where isFont(file) {
+                    let parts = file.split(separator: "/", omittingEmptySubsequences: false)
+                    guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { continue }
+                    let from = source.appendingPathComponent(file)
+                    guard from.resolvingSymlinksInPath().path == from.path,
+                          (try? from.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true,
+                          !isRead(folder + "/" + file)
+                    else { continue }
+                    files.append((folder + "/" + file, from.path))
                 }
-                folders.append(folder)
+            } else {
+                files += imported.fontFolderFiles.filter { isFont($0) && !isRead($0) }.map { ($0, $0) }
             }
         }
         if choices.otherFiles {
-            let listed = Set(data.fontFiles)
-            for path in imported.otherFiles where !listed.contains(path) && !isRead(path) {
-                data.fontFiles.append(path)
-                count += 1
-            }
+            files += imported.otherFiles.filter { isFont($0) && !isRead($0) }.map { ($0, $0) }
         }
-        return count
+        return files
     }
 
     /// Moves the other app's copies of its fonts out of the Fonts folder, to the Trash: only the ones it read, and
@@ -108,52 +113,21 @@ public enum LibraryImport {
         }
     }
 
-    /// Puts a backup's fonts in the Font Library's folder, keeping their folders. A file already there is left alone.
-    /// A backup is a file anyone could have made: only font files are copied, and only from inside the unzipped
-    /// backup, never through a symbolic link or out of either folder. Returns how many were copied; cancelling stops
-    /// between files.
-    @concurrent
-    public static func placeBundledFonts(_ imported: ImportedLibrary, progress: @escaping @Sendable (Int, Int) -> Void) async -> Int {
-        guard let bundled = imported.bundledFonts, let destination = imported.fontFolder else { return 0 }
-        let fm = FileManager.default
-        let source = bundled.folder.resolvingSymlinksInPath().path
-        var copied = 0
-        for (index, file) in bundled.files.enumerated() {
-            if Task.isCancelled { break }
-            progress(index, bundled.files.count)
-            let parts = file.split(separator: "/", omittingEmptySubsequences: false)
-            guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
-                  FontFormat.fileExtensions.contains((file as NSString).pathExtension.lowercased())
-            else { continue }
-            let from = URL(fileURLWithPath: source).appendingPathComponent(file)
-            guard from.resolvingSymlinksInPath().path == from.path,
-                  (try? from.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
-            else { continue }
-            let to = URL(fileURLWithPath: destination).appendingPathComponent(file)
-            guard !fm.fileExists(atPath: to.path) else { continue }
-            do {
-                try fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try fm.copyItem(at: from, to: to)
-                copied += 1
-            } catch {
-                continue
-            }
-        }
-        progress(bundled.files.count, bundled.files.count)
-        return copied
-    }
-
     /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the library, which has
-    /// the other app's fonts by now; and gives the styles to turn on, when chosen. Apps of application sets are looked
-    /// for where they were, then by name in `appFolders`.
+    /// the other app's fonts by now, at the paths their copies have (`paths`, the other app's → the copy's); and gives
+    /// the styles to turn on, when chosen. Apps of application sets are looked for where they were, then by name in
+    /// `appFolders`.
     public static func apply(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, library: Library,
-                             appFolders: [URL] = AppFinder.defaultFolders) -> (summary: ImportSummary, activate: [LibraryFace]) {
+                             paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders)
+        -> (summary: ImportSummary, activate: [LibraryFace]) {
         let matcher = FontMatcher(library)
         var summary = ImportSummary()
         var notFound = Set<ImportedFont>()
         func faces(_ fonts: [ImportedFont], wholeFiles: Bool = false) -> [(family: Family, face: LibraryFace)] {
             fonts.flatMap { font in
-                let found = matcher.faces(font, wholeFile: wholeFiles)
+                var copied = font
+                if let path = font.path, let copy = paths[path] { copied.path = copy }
+                let found = matcher.faces(copied, wholeFile: wholeFiles)
                 if found.isEmpty { notFound.insert(font) }
                 return found
             }

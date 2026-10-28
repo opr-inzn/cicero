@@ -58,6 +58,82 @@ extension ActivationEngine {
         return (placed, failed)
     }
 
+    /// Copies font files in where installing puts them, off, as an import brings in another app's fonts: into
+    /// ~/Library/Fonts (see `moveIntoFontsFolderOff`), or their family's folder in Cicero's Library, where a font is on
+    /// only while Cicero has it registered. A file with the same contents there already, under its name or a numbered one
+    /// ("Name 2.otf", as one of two files of the same name went in), or in ~/Library/Fonts while Cicero's Library is
+    /// used, is taken as it is, on or off: importing again copies nothing twice. Nothing is remembered as a copy of
+    /// anything: the files are the user's own from now on. Returns where each
+    /// file is now, and which of those are new; cancelling stops between batches.
+    @concurrent
+    public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async -> (placed: [String: String], new: [String]) {
+        let fm = FileManager.default
+        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
+        var placed: [String: String] = [:]
+        var new: [String] = []
+        for start in stride(from: 0, to: files.count, by: Self.offBatchSize) {
+            if Task.isCancelled { break }
+            progress(start, files.count)
+            // Each staged copy → where it goes in ~/Library/Fonts, and the file it's a copy of.
+            var intoFontsFolder: [String: String] = [:]
+            var sources: [String: String] = [:]
+            for path in files[start..<min(start + Self.offBatchSize, files.count)] where placed[path] == nil {
+                let folder = installFolder(for: path, family: nil)
+                let name = (path as NSString).lastPathComponent
+                let same = folder.appendingPathComponent(name, isDirectory: false)
+                let looked = folder == locations.userFonts ? [folder] : [folder, locations.userFonts]
+                if let there = looked.lazy.compactMap({ Self.identicalFile(to: path, named: name, in: $0) }).first {
+                    placed[path] = there
+                    continue
+                }
+                // Copied next to where it goes first, so a Fonts folder never has half a file.
+                let staged = staging.appendingPathComponent(UUID().uuidString + "-" + name, isDirectory: false)
+                do {
+                    try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+                    try fm.copyItem(at: Self.url(path), to: staged)
+                } catch {
+                    continue
+                }
+                if folder == locations.userFonts {
+                    intoFontsFolder[staged.path] = same.path
+                    sources[staged.path] = path
+                    continue
+                }
+                let destination = Self.uniqueURL(for: name, in: folder)
+                do {
+                    try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try fm.moveItem(at: staged, to: destination)
+                    placed[path] = destination.path
+                    new.append(destination.path)
+                } catch {
+                    try? fm.removeItem(at: staged)
+                }
+            }
+            let moved = await moveIntoFontsFolderOff(intoFontsFolder)
+            for (staged, destination) in moved.placed {
+                guard let source = sources[staged] else { continue }
+                placed[source] = destination
+                new.append(destination)
+            }
+            for staged in moved.failed { try? fm.removeItem(atPath: staged) }
+        }
+        progress(files.count, files.count)
+        return (placed, new)
+    }
+
+    /// A file in `folder` with the same contents as `path`, under `name` or a numbered name as `uniqueURL` gives them.
+    static func identicalFile(to path: String, named name: String, in folder: URL) -> String? {
+        let base = (name as NSString).deletingPathExtension, ext = (name as NSString).pathExtension
+        var candidate = folder.appendingPathComponent(name, isDirectory: false)
+        var number = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            if isIdenticalCopy(candidate.path, of: path) { return candidate.path }
+            candidate = folder.appendingPathComponent(ext.isEmpty ? "\(base) \(number)" : "\(base) \(number).\(ext)", isDirectory: false)
+            number += 1
+        }
+        return nil
+    }
+
     private func noteTurningOff(_ paths: [String]) throws {
         try FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
         try JSONEncoder().encode(paths).write(to: turningOffList, options: .atomic)
