@@ -62,7 +62,7 @@ Their fonts show up in your library without being activated: they’re listed un
 You can add single font files too, without adding the folder they’re in:
 
 - Choose **File → Add Fonts** (⌘O), or right-click Cicero’s icon in the Dock and choose **Add Fonts**, and pick the files.
-- Drag font files from the Finder onto Cicero’s window.
+- Drag font files from the Finder onto Cicero’s window, or copy them in the Finder (⌘C) and paste them into Cicero’s window (⌘V).
 - In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
 
 They’re listed where they are, under **Added Fonts**, without being activated. If you chose **Copy into ~/Library/Fonts** or **Move into ~/Library/Fonts** in Preferences → General, they’re copied or moved into your Fonts folder instead and turned on, and they’re in **All Fonts** like any font you’ve installed. See [Added Fonts](organizing.md#added-fonts).

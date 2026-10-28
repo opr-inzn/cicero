@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
+
 ## 0.10.13
 
 - In Compare’s **Overlay**, click the dot next to a font’s name to choose its color.

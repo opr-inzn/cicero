@@ -265,8 +265,8 @@ private struct DetailPage: ViewModifier {
     }
 }
 
-/// Font files and folders dropped from the Finder onto the browser or a font page join the library, and the
-/// set the browser shows when it shows one. The page is outlined while files are over it.
+/// Font files and folders dropped from the Finder onto the browser or a font page, or copied there and pasted with ⌘V,
+/// join the library, and the set the browser shows when it shows one. The page is outlined while files are over it.
 private struct FileDrop: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var isTargeted = false
@@ -276,8 +276,10 @@ private struct FileDrop: ViewModifier {
             // From outside Cicero: families dragged within the window are names, not files.
             .drops(of: URL.self, fromOutsideOnly: true, isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
-                model.open(urls, into: set)
+                model.open(urls, into: model.setForAddedFiles)
             }
+            // While the grid, the list or the page has the focus; elsewhere `AppDelegate` takes ⌘V.
+            .onPasteCommand(of: [.fileURL]) { _ in model.pasteFiles() }
             .overlay {
                 if isTargeted {
                     RoundedRectangle(cornerRadius: 12)
@@ -286,12 +288,6 @@ private struct FileDrop: ViewModifier {
                         .allowsHitTesting(false)
                 }
             }
-    }
-
-    /// The set the browser shows, which dropped fonts join.
-    private var set: UUID? {
-        guard model.openFamilyID == nil, model.selectedItems.count == 1, case .set(let id) = model.selection else { return nil }
-        return id
     }
 }
 
