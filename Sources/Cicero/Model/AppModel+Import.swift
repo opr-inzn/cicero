@@ -182,8 +182,8 @@ extension AppModel {
             if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
             model.data = updated
             model.rescan()
-            // In a Fonts folder or Cicero's Library, they go on where they are, whatever Activate fonts by says.
-            if !faces.isEmpty { model.performActivation(faces, method: .copy) }
+            // In a Fonts folder or Cicero's Library, they go on where they are.
+            if !faces.isEmpty { model.performActivation(faces) }
             result.activated = faces.count
             summary = result
         }
