@@ -737,7 +737,7 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
 }
 
 /// Capitals, each word capitalised, or lowercase: a change to the text itself, as Convert Case makes it, not to how it's
-/// shown, so a text changed so can be saved as a preset, and what's typed after it is typed as it is.
+/// shown, so what's typed after it is typed as it is.
 enum CaseConversion: CaseIterable {
     case upper, title, lower
 
@@ -986,8 +986,6 @@ private struct PreviewOptions: View {
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .fixedSize()
-                    // The text in another case, which Save as Preset then saves as it is.
-                    CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
                     Spacer()
                     // Once the text is one of yours, the button takes it out again.
                     if preview.isSavedPreset(text.wrappedValue) {
