@@ -364,7 +364,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   in the Trash: "Found “Name.otf”" with Install (copies it in, or asks with Ask; never moves it; without changing the browser), or Add with Leave files where they are (lists it under Added Fonts), else "Not
   found on this Mac" (Find again stays available). Spotlight hides files in the folders macOS keeps private until
   the user lets the app in, without asking; so before searching, Cicero lists ~/Documents, ~/Desktop and
-  ~/Downloads, which asks once (Info.plist explains why, for each).
+  ~/Downloads, which asks once (Info.plist explains why, for each). Listing them waits while macOS asks: when it takes
+  over half a second, the row says "Waiting for access to your folders" until the answers are in, then "Searching".
 - Matching: the library's face with the PostScript name, else the family and style names (case, spaces, hyphens
   and underscores ignored); a font the library hasn't but `CTFontCreateWithName` gives back by that exact name is on.
   Cached until the library changes, so the rows follow activations and added files.
