@@ -427,7 +427,7 @@ extension AppModel {
         return library.families.flatMap(\.faces).filter { face in prefixes.contains { face.face.path.hasPrefix($0) } }
     }
 
-    /// Turned on where they are, whatever Activate fonts by says: moving or copying them would take them out of
+    /// Turned on where they are, whatever When you add font files says: moving or copying them would take them out of
     /// the folder that keeps them on.
     func keepOn(_ faces: [LibraryFace]) {
         let targets = faces.filter(\.canActivate)

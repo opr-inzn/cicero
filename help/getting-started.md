@@ -65,7 +65,7 @@ You can add single font files too, without adding the folder they’re in:
 - Drag font files from the Finder onto Cicero’s window, or copy them in the Finder (⌘C) and paste them into Cicero’s window (⌘V).
 - In the Finder, right-click a font file and choose **Open With → Cicero**, or double-click it when Cicero is the app that opens fonts.
 
-Cicero copies them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed. To move them there instead, or list them where they are without turning them on, choose next to **Activate fonts by** in Preferences → General, or choose **Ask each time** to decide whenever you add fonts. See [Added Fonts](organizing.md#added-fonts).
+Cicero copies them into your Fonts folder and turns them on, and they’re in **All Fonts** like any font you’ve installed. To move them there instead, or list them where they are without turning them on, choose next to **When you add font files** in Preferences → General, or choose **Ask each time** to decide whenever you add fonts. See [Added Fonts](organizing.md#added-fonts).
 
 If a file has fonts your library has already, from another file, like a newer version of one you installed, Cicero asks whether to skip it, add it as a copy or replace your copy with it. See [Fonts already in your library](organizing.md#fonts-already-in-your-library).
 

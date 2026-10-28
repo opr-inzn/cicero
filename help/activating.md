@@ -29,11 +29,11 @@ Right-click a folder or smart folder in the sidebar and choose **Activate Folder
 
 ### Keep a location’s fonts on
 
-Choose **Active** for one of your locations, next to it in **Preferences → Locations** or under **Fonts in This Location** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **Activate fonts by**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off, also when the folder is on a disk you unplug and connect again. Choose **Inactive** again, or remove the location, and Cicero turns off the fonts it turned on.
+Choose **Active** for one of your locations, next to it in **Preferences → Locations** or under **Fonts in This Location** when you right-click it in the sidebar, and Cicero turns on every font in it. They stay where they are, whatever you chose next to **When you add font files**. Fonts you put in the folder later go on by themselves, and a font you turn off stays off, also when the folder is on a disk you unplug and connect again. Choose **Inactive** again, or remove the location, and Cicero turns off the fonts it turned on.
 
 ## Copy or use in place
 
-Turning a font on never copies it. Fonts in your [locations](organizing.md#locations) and under [Added Fonts](organizing.md#added-fonts) go on where they are, so Microsoft Office can’t use them. Copying happens as you add font files, in one of two ways:
+Turning a font on never copies it. Fonts in your [locations](organizing.md#locations) and under [Added Fonts](organizing.md#added-fonts) go on where they are, so Microsoft Office can’t use them. Copying happens only as you add font files, and when you [import from another font manager](getting-started.md#coming-from-fontexplorer-x-fontbase-or-font-book). As you add files, Cicero installs a copy or leaves them where they are:
 
 | | Install a copy | Leave files where they are |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ Turning a font on never copies it. Fonts in your [locations](organizing.md#locat
 | Good for | Fonts you always need, or fonts on a disk you unplug | Large libraries you keep in one place |
 | Watch out | Takes disk space | The fonts stop working if their files move or their disk is unplugged, and Microsoft Office can’t use them |
 
-Choose which one in **Preferences → General**, next to **Activate fonts by**:
+Choose which one in **Preferences → General**, next to **When you add font files**:
 
 - **Ask each time**: when you [add font files](organizing.md#add-font-files), Cicero asks once for all of them: **Install a Copy** or **Move Into Fonts Folder**, which turn them on, or **Leave Files Where They Are**, which lists them under [Added Fonts](organizing.md#added-fonts) without turning them on. Check **Remember this choice** to stop being asked; you can change it again in Preferences. Turning fonts on never asks: fonts in your [locations](organizing.md#locations) go on where they are, so Microsoft Office can’t use them.
 - **Copy into ~/Library/Fonts** (the setting at first): font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
@@ -65,7 +65,7 @@ Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are 
 - fonts turned on temporarily, or by an [app folder](#turn-fonts-on-with-an-app)
 - fonts in [Adobe apps’ folders](#fonts-in-adobe-apps-folders), also when they’re on in every app
 
-To use a font in Office, install it by copying it into your Fonts folder as you add it: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **Activate fonts by** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. For a font that’s listed where it is, in one of your locations or under Added Fonts, copy its file into `~/Library/Fonts` in the Finder.
+To use a font in Office, install it by copying it into your Fonts folder as you add it: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **When you add font files** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. For a font that’s listed where it is, in one of your locations or under Added Fonts, copy its file into `~/Library/Fonts` in the Finder.
 
 Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too, and for turning a font off: Office still lists it the next time it opens, and lets go of it the time after.
 
@@ -73,9 +73,9 @@ Other apps, like Pages and Adobe’s, use fonts from anywhere.
 
 ## Cicero’s Library
 
-Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, Cicero’s Library, and have macOS use them from there. Turn on **Install fonts into Cicero’s Library** in **Preferences → General**, under **Activate fonts by**. The library is `~/Cicero/Library` at first, with a folder for each family, like `~/Cicero/Library/Inter`.
+Instead of copying fonts into your Fonts folder, Cicero can keep the fonts it installs in a folder of its own, Cicero’s Library, and have macOS use them from there. Turn on **Install fonts into Cicero’s Library** in **Preferences → General**, above **When you add font files**. The library is `~/Cicero/Library` at first, with a folder for each family, like `~/Cicero/Library/Inter`.
 
-- **Turning a font on**, by copying or moving it, or opening a file from the Finder with either chosen, puts its file into its family’s folder in the library and turns it on there. A file with fonts of more than one family, as a font collection can be, goes into the folder of the family you turned on, or of its first font when you open it from the Finder. When the library has the same file already, Cicero uses that one rather than copying it again. A font in the [Inactive folder](#the-inactive-folder) moves into the library.
+- **Adding font files** with **Copy into Cicero’s Library** or **Move into Cicero’s Library**, chosen next to **When you add font files** or when Cicero asks, puts each file into its family’s folder in the library and turns it on there. A file with fonts of more than one family, as a font collection can be, goes into the folder of its first font’s family. When the library has the same file already, Cicero uses that one rather than copying it again. Importing from FontExplorer X or FontBase copies their fonts in there too. Turning a font on never copies it, but a font in the [Inactive folder](#the-inactive-folder) moves into the library as it goes on.
 - **Turning a font off** only turns it off: the file stays in the library, listed and off, ready to turn on again. It never goes to the Trash or the Inactive folder. **Move to Trash** removes it from the library, and its family’s folder goes once nothing is left in it.
 - **Its fonts are in your library** like the ones in your Fonts folder: under **All Fonts**, and **Active** or **Inactive**. Cicero’s Library itself isn’t in the sidebar.
 - **A font from one of your locations** has two files once it’s in the library: the one in its folder and the library’s copy. That’s not a duplicate: Conflicts leaves it alone, and **Use Copy From** counts the copy as being where its original is.

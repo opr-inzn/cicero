@@ -42,9 +42,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
   The app's `engine` carries the Font Library (`fontLibrary`, from `UserData.fontLibraryPath`) and whether to install
   into it (`installsIntoFontLibrary`): copies then go into a folder for each family there and are registered where
-  they are, recorded as installed copies and in place, and files in the library are only ever registered and
+  they are, recorded as in place, and files in the library are only ever registered and
   unregistered (`FontLibrary.swift`: folder names, taking away folders left empty, moving the copies installed in
-  ~/Library/Fonts before into the library, moving the library, and where it can't go).
+  ~/Library/Fonts before into the library, moving the library, and where it can't go). The app activates with
+  `.inPlace` only; copying and moving are for adding files (`install`) and imports (`installOff`).
 - **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
   (copy, register, confirm), scans (find, parse, build, save cache), restoring the saved library, applying a library, and coverage,
   for timing them in Instruments.

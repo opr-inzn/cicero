@@ -55,8 +55,8 @@ struct GeneralSettings: View {
                     PopUpPicker(options: InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) },
                                 selection: $model.data.installMethod)
                 } label: {
-                    Text("Activate fonts by")
-                    Text(activationExplanation)
+                    Text("When you add font files")
+                    Text(addingExplanation)
                 }
                 LabeledContent {
                     PopUpPicker(options: DuplicateHandling.allCases.map { (title: $0.title, value: $0) }, selection: $model.data.duplicateHandling)
@@ -159,15 +159,17 @@ struct GeneralSettings: View {
         }
     }
 
-    private var activationExplanation: String {
+    private var addingExplanation: String {
         let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
-        // With any method (see `ActivationEngine.installedCopy`).
+        // Whatever is chosen here (see `AppModel.performActivation`).
+        let turningOn = "Turning a font on never copies it: fonts in your locations or under Added Fonts go on where they are, and Microsoft Office can’t use them."
+        // With any choice (see `ActivationEngine.installedCopy`).
         let copiedBefore = "A font Cicero copied before goes on as that copy again."
         return switch model.data.installMethod {
-        case .ask: "When you add font files, Cicero asks whether to copy them into \(place) or leave them where they are. Fonts you turn on yourself are activated where they are, and Microsoft Office can’t use them. \(copiedBefore)"
-        case .copy: "Copying puts font files you add into \(place) and leaves the originals where they are. Fonts in your locations or under Added Fonts are activated where they are, and Microsoft Office can’t use them."
-        case .move: "Moving takes font files you add out of their folders and puts them into \(place). Fonts in your locations or under Added Fonts are activated where they are, and Microsoft Office can’t use them."
-        case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves. Microsoft Office can’t use them. \(copiedBefore)"
+        case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. \(turningOn) \(copiedBefore)"
+        case .copy: "They’re copied into \(place) and turned on, and the originals stay where they are. \(turningOn)"
+        case .move: "They’re taken out of their folders, put into \(place) and turned on. Files in your locations are copied instead, so your folders stay as they are. \(turningOn)"
+        case .inPlace: "They’re listed under Added Fonts where they are, without being turned on, and go on there; if a file moves, its font goes off. Microsoft Office can’t use them. \(copiedBefore)"
         }
     }
 }
