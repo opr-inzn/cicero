@@ -147,7 +147,7 @@ struct ImportSheet: View {
         if library.fontFolder != nil || !library.otherFiles.isEmpty {
             section("Fonts") {
                 Text(toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
-                    : "They’re copied into \(model.installPlace), inactive. \(appName)’s own files stay where they are.")
+                    : "They’re copied into \(model.installPlace), \(copiedState). \(appName)’s own files stay where they are.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -365,6 +365,11 @@ struct ImportSheet: View {
     }
 
     /// Whether Office can use them, and why to quit the other app first.
+    /// How the copies come in: inactive, unless the ones that were active are turned on again.
+    private var copiedState: String {
+        !library.active.isEmpty && choices.activate ? "inactive except the ones that were active" : "inactive"
+    }
+
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         // FontBase's own library can't be imported until it has quit.
