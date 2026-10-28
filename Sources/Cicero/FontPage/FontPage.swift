@@ -306,9 +306,9 @@ private struct TypeTester: View {
 
     @ViewBuilder
     private func buttons(hasAxes: Bool) -> some View {
-        CaseButtons { caseChange = .next($0, after: caseChange) }
         IconSegments(title: "Alignment", options: SampleAlignment.allCases.map { ($0.title, $0.icon, $0) }, selection: $alignment)
             .help("Align left, center or right")
+        CaseButtons { caseChange = .next($0, after: caseChange) }
         if hasAxes {
             AxesButton()
         }
@@ -351,7 +351,7 @@ private struct AxesButton: View {
     }
 }
 
-/// The type tester's controls: the Style menu, the sliders with their labels and values, the case, alignment and Axes buttons.
+/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment, case and Axes buttons.
 /// On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the menu: with the
 /// Info panel open, a narrow window has too little for all of them. On one row, the sliders share the width the row leaves,
 /// as long as each other, but past `longestSlider` each, up to `groupGap` more goes either side of them first, so they
