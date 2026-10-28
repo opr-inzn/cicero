@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- With several families selected, clicking one’s switch turns them all on, or all off when that one is on.
+
 ## 0.10.13
 
 - In Compare’s **Overlay**, click the dot next to a font’s name to choose its color.

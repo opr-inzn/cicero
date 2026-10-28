@@ -92,8 +92,13 @@ extension AppModel {
 
     /// On ↔ off; fonts an app loads from its own folder go from on in that app to on everywhere, then
     /// off everywhere, then back. A switch already moving waits for its operation.
+    /// The switch of one of several selected families turns them all the way it turns: off where it's on, else on.
     func toggle(_ family: Family) {
         guard expectedFamilyPositions[family.id] == nil else { return }
+        let targets = targets(for: family).filter { expectedFamilyPositions[$0.id] == nil }
+        if targets.count > 1 {
+            return family.position == .on ? deactivate(targets) : activate(targets)
+        }
         switch family.position {
         case .on: deactivate([family])
         case .app: activate([family])
