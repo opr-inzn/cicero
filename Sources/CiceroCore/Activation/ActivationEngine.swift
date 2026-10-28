@@ -336,8 +336,10 @@ public struct ActivationEngine: Sendable {
 
     /// Copies into ~/Library/Fonts, or into the family's folder in the Font Library (see `installsIntoFontLibrary`), or
     /// registers in place (`method` is `.copy`, `.move` or `.inPlace`). With `.move`, files in `movable` (ones the user
-    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. Files from Cicero's
-    /// Inactive folder, which only keeps fonts while they're off, are always moved, whatever `method` is. Faces from
+    /// added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. A copy Cicero installed
+    /// before goes on again while it's the same as its file; once the file has changed, the copy, off, goes to the Trash
+    /// and the new version takes its place (see `currentVersion`). Files from Cicero's Inactive folder, which only keeps
+    /// fonts while they're off, are always moved, whatever `method` is. Faces from
     /// app-only folders and from the Font Library are always registered in place, the former after going back into
     /// the folder if Cicero moved them out; faces in a Fonts folder that are off (turned off there, by Cicero or Font
     /// Book) are turned on there, and so is a copy installed before and turned off since. Temporarily active faces are
@@ -356,7 +358,7 @@ public struct ActivationEngine: Sendable {
         var toCopy: [(path: String, family: String)] = []
         // Files to register where they are; `record` for those Cicero must remember to unregister.
         var toRegister: [(path: String, record: Bool)] = []
-        let targets = Self.uniqueByPath(faces).filter(\.canActivate)
+        let targets = Self.uniqueByPath(faces.map { currentVersion(of: $0, records: records) }).filter(\.canActivate)
         // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder ends
         // only once the file is on there (below): ending it first would take the file off macOS's list of fonts it has
         // off, and leave it off.
@@ -379,6 +381,12 @@ public struct ActivationEngine: Sendable {
             } else {
                 toCopy.append((path, face.face.familyName))
             }
+        }
+        // Unregistering isn't needed: they're off. A new file where one turned off was a moment ago is turned on as it's
+        // registered (see `CoreTextRegistrar.register`).
+        for path in toCopy.flatMap({ outdatedCopies(of: $0.path, records: records) }) where (try? trash(Self.url(path))) != nil {
+            records.installedCopies[path] = nil
+            removeEmptyFolders(around: path)
         }
         var copies: [PlacedCopy] = []
         Signposts.activation.withIntervalSignpost("Copy", "\(toCopy.count) files") {
@@ -415,7 +423,7 @@ public struct ActivationEngine: Sendable {
         succeeded += installed.count
         let done = Set(targets.map(\.face.path)).subtracting(failed)
         let message = Self.message("Activated", "activate", succeeded: succeeded, failed: failed.count,
-                                   done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed)))
+                                   done: Self.names(of: targets, in: done), undone: Self.names(of: targets, in: Set(failed)))
         let removed = removeOriginals(of: installed.filter { copy in
             method == .move && movable.contains(copy.source)
                 || isInInactiveFolder(copy.source)
@@ -1072,10 +1080,9 @@ public struct ActivationEngine: Sendable {
         let fm = FileManager.default
         let source = Self.url(path)
         let folder = installFolder(for: path, family: family)
-        let earlier = records?.installedCopies.filter { copy, origin in
-            origin == path && (copy as NSString).deletingLastPathComponent == folder.path && Self.isIdenticalCopy(copy, of: path)
-        }.keys.min()
-        if let earlier { return PlacedCopy(destination: earlier, source: path, isNew: false) }
+        if let records, let earlier = earlierCopy(of: path, family: family, records: records) {
+            return PlacedCopy(destination: earlier, source: path, isNew: false)
+        }
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = source.lastPathComponent
         let first = folder.appendingPathComponent(name, isDirectory: false)
@@ -1097,6 +1104,47 @@ public struct ActivationEngine: Sendable {
         // A font back from the Inactive folder, which it only left the Fonts folder for, arrives no more than then.
         if isInInactiveFolder(path), let added = Self.dateAdded(of: source) { Self.setDateAdded(added, of: destination) }
         return PlacedCopy(destination: destination.path, source: path, isNew: true)
+    }
+
+    /// The copy of `path` Cicero installed before where it would install one now, if it's still the same as the file.
+    private func earlierCopy(of path: String, family: String?, records: ActivationRecords) -> String? {
+        let folder = installFolder(for: path, family: family).path
+        return records.installedCopies.filter { copy, origin in
+            origin == path && (copy as NSString).deletingLastPathComponent == folder && Self.isIdenticalCopy(copy, of: path)
+        }.keys.min()
+    }
+
+    /// The copies of `path` Cicero installed before that are off, the file having changed since, to a new version or to
+    /// another font saved under its name: they follow the file, as the new copy takes their place (left there, it would
+    /// land beside them as "Name 2.otf"). None while the file can't be read, as it can't be copied either.
+    private func outdatedCopies(of path: String, records: ActivationRecords) -> [String] {
+        let candidates = records.installedCopies.filter { copy, origin in
+            origin == path && Self.hasChanged(path, since: copy) && !registrar.isActive(Self.url(copy))
+        }.keys.sorted()
+        guard !candidates.isEmpty, !FontFileReader.faces(atPath: path).isEmpty else { return [] }
+        return candidates
+    }
+
+    /// For an installed copy that's off, the file it was copied from, when that's in the library and has changed since:
+    /// with both off, the library shows the copy in the Fonts folder, and turning it on would bring back the old version.
+    private func currentVersion(of face: LibraryFace, records: ActivationRecords) -> LibraryFace {
+        let path = face.face.path
+        guard let origin = records.installedCopies[path], let file = face.copies.first(where: { $0.face.path == origin }),
+              Self.hasChanged(origin, since: path), !registrar.isActive(Self.url(path))
+        else { return face }
+        return file.libraryFace
+    }
+
+    /// Whether `original` no longer has the contents `copy` was made with. Not when either is only in iCloud Drive or
+    /// Dropbox, not downloaded: reading it to compare would download it.
+    private static func hasChanged(_ original: String, since copy: String) -> Bool {
+        var copyInfo = stat(), originalInfo = stat()
+        guard stat(copy, &copyInfo) == 0, stat(original, &originalInfo) == 0,
+              copyInfo.st_mode & S_IFMT == S_IFREG, originalInfo.st_mode & S_IFMT == S_IFREG,
+              copyInfo.st_dev != originalInfo.st_dev || copyInfo.st_ino != originalInfo.st_ino,
+              (copyInfo.st_flags | originalInfo.st_flags) & UInt32(SF_DATALESS) == 0
+        else { return false }
+        return !isIdenticalCopy(copy, of: original)
     }
 
     /// Moves a file out of an app's folder into Cicero's Inactive folder, so the app stops loading it,
