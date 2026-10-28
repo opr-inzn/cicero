@@ -175,9 +175,8 @@ private struct RuleRow: View {
         case .folder:
             options(folderOptions, empty: "No locations yet")
         case .status:
-            // Active in Adobe Apps Only while Proofing is shown, or for a rule that has it.
-            let statuses = SmartRuleValue.statuses.filter { $0 != "appOnly" || model.data.showAdobeAppFolders || rule.value == $0 }
-            options(statuses.map { ($0, Self.statusTitle($0)) })
+            // Active in Adobe Apps Only also while Proofing is hidden: Adobe Fonts that Adobe apps turned on for themselves are still listed.
+            options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })
         case .format:

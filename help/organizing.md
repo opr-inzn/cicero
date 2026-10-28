@@ -203,7 +203,7 @@ To change it later, right-click it and choose **Edit Smart Folder**. To remove i
 | Has Note | Yes, No | Whether the family has a [note](#notes) |
 | Folder | is in, isn’t in | One of your folders |
 | Location | is in, isn’t in | One of your locations, Proofing, Adobe Fonts, or Added Fonts |
-| Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is there while **Show fonts installed for proofing in Adobe apps** is on, for the fonts only Adobe apps load (see [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders)) |
+| Status | is, is not | Active, Partly Active, Inactive, Active in Adobe Apps Only or Installed with macOS. **Active in Adobe Apps Only** is for the fonts only Adobe apps load: those in [Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders) and [Adobe Fonts](activating.md#adobe-fonts) that Adobe apps turned on by themselves |
 | Kind | is, is not | Italic, for a family with italic styles, Monospaced or Variable |
 | Format | is, is not | OpenType PostScript, OpenType TrueType, Font Collection, Datafork TrueType and others |
 | Number of Styles | is, is more than, is less than | A number |
