@@ -169,6 +169,11 @@ extension AppModel {
             // was in has gone: their copies take over, so the fonts aren't on from the other app's files.
             let stale = files.map(\.source).filter { model.data.records.inPlace.contains($0) && installed.placed[$0] != nil }
             if !stale.isEmpty { model.data.records = await model.engine.forgetInPlace(stale, records: model.data.records) }
+            // The other app's own files, still on after it quit, as FontExplorer X leaves them: turned off, so the copies
+            // can take over, rather than the fonts staying on from its files.
+            let copiedFrom = Set(files.map(\.source).filter { installed.placed[$0] != nil })
+            let onFromApp = choices.activate ? model.library.faces(inFiles: copiedFrom).filter { $0.state.source == .otherApp } : []
+            if !onFromApp.isEmpty { model.data.records = await model.engine.deactivate(onFromApp, records: model.data.records).records }
             // The library with the copies in it, to match against.
             let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
             let scanned = try? await model.scanner.scan(input) { progress in
@@ -179,6 +184,9 @@ extension AppModel {
             }
             var updated = model.data
             var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library, paths: paths)
+            // A style the other app's file still stands for goes on as its copy.
+            let copies = Set(installed.placed.values)
+            faces = faces.map { $0.copy(among: copies) }
             result.fonts = installed.new.count
             result.removedCopies = removed
             if result.sets + result.applicationSets + result.smartSets > 0 { updated.sidebar.hidden.remove(SidebarSection.sets.key) }
@@ -196,6 +204,23 @@ extension AppModel {
             summary = result
         }
         return summary
+    }
+}
+
+extension Library {
+    /// The styles in these files, each as that file, also where another copy stands for the style.
+    func faces(inFiles paths: Set<String>) -> [LibraryFace] {
+        families.flatMap(\.faces).flatMap { face in
+            (paths.contains(face.face.path) ? [face] : []) + face.copies.filter { paths.contains($0.face.path) }.map(\.libraryFace)
+        }
+    }
+}
+
+extension LibraryFace {
+    /// The style as its file among `paths` that's off, when another file stands for it; else as it is.
+    func copy(among paths: Set<String>) -> LibraryFace {
+        guard !paths.contains(face.path) else { return self }
+        return copies.first { paths.contains($0.face.path) && !$0.state.isActive }?.libraryFace ?? self
     }
 }
 

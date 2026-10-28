@@ -26,9 +26,14 @@ extension AppModel {
         let files = Set(faces.flatMap { [$0.face.path] + $0.otherCopies }).filter { $0.hasPrefix(prefix) }.sorted()
         guard !files.isEmpty else { return }
         askedAboutEarlierImport = true
-        let onCount = Set(faces.map(\.face.path).filter(data.records.inPlace.contains)).count
+        let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
         earlierImportPrompt = EarlierImportPrompt(folder: folder, files: files, onCount: onCount, smartSets: smartSets)
+    }
+
+    /// On from its file where it is: by Cicero, or by FontExplorer X, which leaves its fonts on after it quits.
+    func isOnWhereItIs(_ face: LibraryFace) -> Bool {
+        data.records.inPlace.contains(face.face.path) || face.state.source == .otherApp
     }
 
     /// Saves the current setup to the Backups folder; copies the location's fonts in, off, where installing puts them
@@ -64,8 +69,7 @@ extension AppModel {
         stage(.starting)
         let folder = prompt.folder
         await enqueued { model in
-            let prefix = folder.path + "/"
-            let on = model.faces(in: [folder]).filter { model.data.records.inPlace.contains($0.face.path) && $0.face.path.hasPrefix(prefix) }
+            let on = model.library.faces(inFiles: Set(prompt.files)).filter { model.isOnWhereItIs($0) }
             if !on.isEmpty {
                 let result = await model.engine.deactivate(on, records: model.data.records)
                 model.data.records = result.records
@@ -83,7 +87,7 @@ extension AppModel {
                 }
             }
             let wanted = Set(on.compactMap { installed.placed[$0.face.path] })
-            let copies = (scanned ?? model.library).families.flatMap(\.faces).filter { wanted.contains($0.face.path) && $0.canActivate }
+            let copies = (scanned ?? model.library).faces(inFiles: wanted).filter(\.canActivate)
             if !copies.isEmpty {
                 let result = await model.engine.activate(copies, method: .inPlace, records: model.data.records)
                 model.data.records = result.records
