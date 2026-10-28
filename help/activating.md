@@ -43,8 +43,8 @@ There are two ways to turn on a font that isn’t in a Fonts folder:
 
 Choose which one in **Preferences → General**, next to **Activate fonts by**:
 
-- **Ask each time** (the setting at first): when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Fonts in your Fonts folder or in Cicero’s Library go on where they are without asking, as there’s nothing to choose. Check **Remember this choice** to stop being asked; you can change it again in Preferences.
-- **Copy into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
+- **Ask each time**: when you turn fonts on, Cicero asks with **Install a Copy**, **Leave Files Where They Are**, or **Activate Temporarily**, and **Move Into Fonts Folder** for font files you [added](organizing.md#added-fonts) one at a time. Fonts in your Fonts folder or in Cicero’s Library go on where they are without asking, as there’s nothing to choose. Check **Remember this choice** to stop being asked; you can change it again in Preferences.
+- **Copy into ~/Library/Fonts** (the setting at first): font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
 - **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty. Fonts in your [locations](organizing.md#locations) are copied, so their folders stay as they are, and so is a file **Find on This Mac** finds for a document.
 - **Leave files where they are**
 
