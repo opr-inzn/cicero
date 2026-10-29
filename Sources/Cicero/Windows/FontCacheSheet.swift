@@ -65,7 +65,7 @@ struct FontCacheSheet: View {
                 Text("macOS and some apps keep lists of fonts that can go stale after fonts change. Clearing them makes the lists get rebuilt. You may need to restart your Mac afterwards.")
                     .foregroundStyle(.secondary)
             }
-            Form {
+            VStack(alignment: .leading, spacing: 10) {
                 option("macOS (my account)", isOn: $currentUser, detail: "Removes your account’s font caches and restarts the font service.")
                 option("macOS (all users)", isOn: $allUsers, detail: "Needs an administrator password.")
                 option("Adobe apps", isOn: includes(.adobe), detail: adobeDetail)
@@ -73,7 +73,6 @@ struct FontCacheSheet: View {
                 option("Microsoft Office", isOn: includes(.office), detail: officeDetail)
                     .disabled(runningApps[.office] != nil)
             }
-            .formStyle(.grouped)
             .fixedSize(horizontal: false, vertical: true)
             .disabled(isClearing)
             HStack {

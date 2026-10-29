@@ -30,13 +30,12 @@ struct RestoreSheet: View {
                 Text("Made with Cicero \(contents.manifest.appVersion) at \(contents.manifest.created.formatted(date: .omitted, time: .shortened)).")
                     .foregroundStyle(.secondary)
             }
-            Form {
+            VStack(alignment: .leading, spacing: 10) {
                 option("Folders, locations and settings", isOn: $settings, detail: settingsDetail)
                 if includesFonts {
                     option("Font files", isOn: $fonts, detail: fontsDetail)
                 }
             }
-            .formStyle(.grouped)
             .fixedSize(horizontal: false, vertical: true)
             .disabled(isRestoring)
             if isRestoring {

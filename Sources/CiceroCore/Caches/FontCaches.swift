@@ -23,10 +23,16 @@ public enum SystemFontCaches {
             // fontd may not be running; it starts again on demand either way.
             _ = try? await Process.run("/usr/bin/killall", ["fontd"])
         case .allUsers:
-            let script = "do shell script \"/usr/bin/atsutil databases -remove; /usr/bin/killall fontd || true\" with administrator privileges"
-            let result = try await Process.run("/usr/bin/osascript", ["-e", script])
-            guard result.status == 0 else {
-                throw result.stderr.contains("-128") ? Failure.cancelled : Failure.failed(result.stderr)
+            // Run in Cicero, not by osascript, so the password dialog names Cicero, as AdministratorTrash's does.
+            let script = "do shell script \"/usr/bin/atsutil databases -remove; /usr/bin/killall fontd || true\" with prompt \"Cicero wants to clear the macOS font caches for all users.\" with administrator privileges"
+            let error = await MainActor.run { () -> (number: Int?, message: String)? in
+                var error: NSDictionary?
+                guard let script = NSAppleScript(source: script) else { return (nil, "Couldn’t compile the script") }
+                _ = script.executeAndReturnError(&error)
+                return error.map { ($0[NSAppleScript.errorNumber] as? Int, $0[NSAppleScript.errorMessage] as? String ?? "") }
+            }
+            if let error {
+                throw error.number == -128 ? Failure.cancelled : Failure.failed(error.message)
             }
         }
     }
