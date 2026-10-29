@@ -356,8 +356,9 @@ private struct AxesButton: View {
 /// Info panel open, a narrow window has too little for all of them. On one row, the sliders share the width the row leaves,
 /// as long as each other, but past `longestSlider` each, up to `groupGap` more goes either side of them first, so they
 /// stand as a group between the menu and the buttons; on a row of their own, they share all of it. Either way the last
-/// value or button ends where the row does. Each slider's symbol, slider and value are
-/// 8 pt apart, everything else 16. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
+/// value or button ends where the row does. Each slider's symbol, slider and value are 8 pt apart, the group 32 pt from
+/// the menu and the buttons, everything else 16: a value's field is as wide as its widest value, so the room after a
+/// shorter one adds to the 16 pt to the next symbol, and 16 pt either side of the group looked narrower than that. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
 /// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider, a
 /// third of a second.
 private struct TesterControls: Layout {
@@ -396,8 +397,8 @@ private struct TesterControls: Layout {
 
     /// How long a slider grows on the row with the menu and buttons before the room either side of them does.
     static let longestSlider: CGFloat = 180
-    /// The most room added either side of the sliders, on top of the usual 16 pt.
-    static let groupGap: CGFloat = 32
+    /// The most room added either side of the sliders, on top of their 32 pt.
+    static let groupGap: CGFloat = 16
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
         guard !fitsOneRow(width: bounds.width, cache) else {
@@ -444,7 +445,7 @@ private struct TesterControls: Layout {
         var x = bounds.minX
         for index in row {
             let size = cache.sizes[index]
-            if index != row.first { x += gap(before: index, cache) }
+            if let previous = row.last(where: { $0 < index }) { x += gap(between: previous, and: index, cache) }
             if index == group.first { x += before }
             if index == afterGroup { x += after }
             let width = cache.roles[index] == .slider ? size.width + extra : size.width
@@ -465,12 +466,16 @@ private struct TesterControls: Layout {
         return (top, cache.roles.indices.filter { [.label, .slider, .value].contains(cache.roles[$0]) })
     }
 
-    private func gap(before index: Int, _ cache: Cache) -> CGFloat {
-        cache.roles[index] == .slider || cache.roles[index] == .value ? 8 : 16
+    private func gap(between previous: Int, and index: Int, _ cache: Cache) -> CGFloat {
+        let inGroup = { [.label, .slider, .value].contains(cache.roles[$0]) }
+        if inGroup(previous) != inGroup(index) { return 32 }
+        return cache.roles[index] == .slider || cache.roles[index] == .value ? 8 : 16
     }
 
     private func width(of row: [Int], _ cache: Cache) -> CGFloat {
-        row.reduce(0) { width, index in width + (index == row.first ? 0 : gap(before: index, cache)) + cache.sizes[index].width }
+        zip(row, row.dropFirst()).reduce(row.map { cache.sizes[$0].width }.reduce(0, +)) { width, pair in
+            width + gap(between: pair.0, and: pair.1, cache)
+        }
     }
 
     private func height(of row: [Int], _ cache: Cache) -> CGFloat {
