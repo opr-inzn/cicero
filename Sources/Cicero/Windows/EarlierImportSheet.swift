@@ -9,6 +9,10 @@ struct EarlierImportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
+    /// How long the copying has left, from when Copy Fonts is pressed.
+    @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
+    /// Cicero's Library was chosen in this sheet, so it can be undone here.
+    @State private var choseFontLibrary = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -27,6 +31,10 @@ struct EarlierImportSheet: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            if stage == nil, FontLibraryOffer.isShown(count: prompt.files.count, chose: choseFontLibrary,
+                                                      installsIntoFontLibrary: model.data.installsIntoFontLibrary) {
+                FontLibraryOffer(count: prompt.files.count, chose: $choseFontLibrary)
+            }
             HStack(spacing: 12) {
                 if let stage {
                     progress(stage)
@@ -72,7 +80,8 @@ struct EarlierImportSheet: View {
             switch stage {
             case .copying(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Copying fonts, \(done.formatted()) of \(total.formatted())")
+                // Too narrow for both on one line beside the buttons.
+                CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: true)
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
                 Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
@@ -94,9 +103,14 @@ struct EarlierImportSheet: View {
 
     private func start() {
         stage = .copying(done: 0, total: prompt.files.count)
+        estimate = CopyTimeEstimate(intoFontsFolder: !model.data.installsIntoFontLibrary)
         task = Task {
             let copied = await model.copyEarlierImport(prompt) { stage in
-                Task { @MainActor in self.stage = stage }
+                let now = ProcessInfo.processInfo.systemUptime
+                Task { @MainActor in
+                    if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
+                    self.stage = stage
+                }
             }
             task = nil
             if let copied {

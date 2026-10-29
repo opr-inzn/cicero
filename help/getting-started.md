@@ -115,6 +115,10 @@ What stays behind, as the sheet lists it: the tags FontBase gives fonts itself (
 
 Choose **File → Import from Font Book**. Each collection you made becomes a folder with its families and styles, leaving out the fonts you took out of it in Font Book. The ones Font Book comes with, like Fun and Web, start unchecked, and smart collections stay behind. To import collections from another Mac, click **Choose Another** and pick their `.collection` files, from Library/FontCollections in that Mac’s home folder.
 
+### Importing many fonts
+
+macOS gets slower with each font in your Fonts folder, so copying tens of thousands of fonts there can take an hour or more. When an import would copy more than 2,000 fonts into your Fonts folder, the sheet says how long it can take, and offers **Use Cicero’s Library**: the fonts go into [Cicero’s Library](activating.md#ciceros-library) instead, in a few minutes, and so do fonts you install later. Microsoft Office can’t use fonts there. **Use the Fonts Folder** changes it back. After five minutes of copying, the sheet says about how long is left.
+
 ### Importing again
 
 An import only adds: a folder you have with the name of one coming in gets the fonts it doesn’t have yet, and a smart folder you have with the name of one coming in stays as it is, so importing twice changes nothing, and says so: “Nothing new”. Cicero saves your current setup first, in `~/Library/Application Support/Cicero/Backups`, as it does before restoring a backup.

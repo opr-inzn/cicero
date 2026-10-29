@@ -698,11 +698,26 @@ final class AppModel {
             await previous?.value
             guard let self else { return }
             await work(self)
-            self.runningOperations -= 1
-            if let seen = self.changeSeenBeforeScan, self.runningOperations == 0 {
-                self.changeSeenBeforeScan = nil
-                if self.scanCount == seen { self.rescan() }
-            }
+            self.endOperation()
+        }
+    }
+
+    /// Until `releaseScans`, font changes are left to the scan after, as during an operation (see `fontsChanged`): an
+    /// import copying thousands of fonts into the Fonts folder, 20 at a time, would otherwise start a scan of everything
+    /// with each batch, and those scans would keep fontd too busy to take the next one.
+    func holdScans() {
+        runningOperations += 1
+    }
+
+    func releaseScans() {
+        endOperation()
+    }
+
+    private func endOperation() {
+        runningOperations -= 1
+        if let seen = changeSeenBeforeScan, runningOperations == 0 {
+            changeSeenBeforeScan = nil
+            if scanCount == seen { rescan() }
         }
     }
 

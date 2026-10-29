@@ -26,6 +26,12 @@ public protocol FontRegistrar: Sendable {
     /// Whether the system has the file active, in any scope. Also true for files `activeFontURLs` leaves
     /// out because their fonts have hidden names (starting with a dot).
     func isActive(_ url: URL) -> Bool
+    /// The files macOS's list of fonts it has off names, by path: off, without asking about each.
+    func offFontPaths() -> Set<String>
+}
+
+extension FontRegistrar {
+    public func offFontPaths() -> Set<String> { [] }
 }
 
 public struct CoreTextRegistrar: FontRegistrar {
@@ -154,6 +160,10 @@ public struct CoreTextRegistrar: FontRegistrar {
 
     public func activeFontURLs() -> [URL] {
         CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []
+    }
+
+    public func offFontPaths() -> Set<String> {
+        Self.offListPaths()
     }
 
     /// CoreText knows a file registered through a symlink (a folder linked into the home folder, say) by its path with

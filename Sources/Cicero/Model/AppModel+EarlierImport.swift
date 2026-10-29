@@ -53,6 +53,9 @@ extension AppModel {
             showToast("Couldn’t save the current setup first, so nothing was copied")
             return nil
         }
+        // The copies are read in one go once they're all in, rather than with each batch.
+        holdScans()
+        defer { releaseScans() }
         let installed = await engine.installOff(prompt.files) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
