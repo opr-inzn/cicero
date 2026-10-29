@@ -91,6 +91,8 @@ struct CompareWindow: View {
         .focusEffectDisabled()
         .defaultFocus($focused, true)
         .onChange(of: isAdding) { if !$1 { focused = true } }
+        // Closing the window ends the comparison: opened again, it starts empty or with the families selected.
+        .onDisappear { model.compareEntries = [] }
         .background(Color.canvas)
         .background(FontDropTarget { drags in _ = model.addToCompare(drags.flatMap(\.families)) })
         .task(id: waiting) {

@@ -209,7 +209,7 @@ The same options apply to every view, font pages and the Compare window, but the
 1. Select two or more families.
 2. Choose **Fonts → Compare** (⌥⌘C), or right-click them and choose **Compare**.
 
-You can also open the Compare window by itself, with **Window → Compare**, or **Fonts → Compare** with no families selected, and pick the fonts there: click **+** in its toolbar (or **Add Families**, while it’s empty), type a name, and click a family or press Return to add it. ↑ and ↓ move to the next family found. Families already there have a checkmark; click one again to take it out. The list has every family in your library, wherever it is and whatever the main window shows, so families far apart are as easy to put together as neighbors.
+You can also open the Compare window by itself, with **Window → Compare**, or **Fonts → Compare** with no families selected, and pick the fonts there: click **+** in its toolbar (or **Add Families**, while it’s empty), type a name, and click a family or press Return to add it. ↑ and ↓ move to the next family found. Families already there have a checkmark; click one again to take it out. The list has every family in your library, wherever it is and whatever the main window shows, so families far apart are as easy to put together as neighbors. Closing the Compare window empties it.
 
 The Compare window shows them in a text of its own, “Hamburgefonstiv” until you type another in its own **Preview Options**. Typing it there leaves the previews in the main window as they are. Choose a layout in the toolbar:
 
