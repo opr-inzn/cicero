@@ -21,8 +21,9 @@ struct GridCell: Hashable {
 
 /// What a row's cells do, by their index in it.
 struct GridRowActions {
-    /// A click, or VoiceOver's press: opens the cell's popover.
-    let open: (Int) -> Void
+    /// A click, or VoiceOver's press: opens the cell's popover. A click gives the cell's frame in the row, for the
+    /// popover to point at (see `cellPopover`); VoiceOver's press, which doesn't know it, gives none.
+    let open: (Int, CGRect?) -> Void
     /// The cell's right-click menu.
     let menu: (Int) -> [GridMenuItem]
     /// The file a cell is dragged out of the page as, made as the drag starts; nil when there's nothing to drag, like a
@@ -82,7 +83,7 @@ struct GlyphGridRow: View {
             .accessibilityRepresentation {
                 HStack(spacing: GlyphsSection.spacing) {
                     ForEach(cells.indices, id: \.self) { index in
-                        Button(cells[index].label) { actions.open(index) }
+                        Button(cells[index].label) { actions.open(index, nil) }
                             .frame(maxWidth: .infinity)
                     }
                     ForEach(cells.count..<max(columns, cells.count), id: \.self) { _ in
@@ -130,6 +131,21 @@ struct GlyphGridRow: View {
         let below = baseline + max(-box.minY, CTFontGetDescent(font) + half) - GlyphsSection.cell
         return EdgeInsets(top: max(0, above.rounded(.up)), leading: GlyphsSection.inset,
                           bottom: max(0, below.rounded(.up)), trailing: GlyphsSection.inset)
+    }
+}
+
+extension View {
+    /// The popover of a row's cell, open while there's a `column`. Pointed at the clicked cell's frame in the row, `cell`,
+    /// it has its arrow at the cell's top when it opens above, at its bottom when below, so it leaves the row clear for
+    /// clicking the cells beside it. Pointed at the cell's bottom middle, as it still is for VoiceOver's press, which
+    /// gives no frame, one opening above covered the cell and the row up to it. The frame comes with the click: a view
+    /// over each row measuring it (a GeometryReader) left rows in the middle of the page undrawn on macOS 15.
+    func cellPopover<Content: View>(column: Int?, columns: Int, cell: CGRect?, close: @escaping () -> Void,
+                                    @ViewBuilder content: @escaping () -> Content) -> some View {
+        let anchor: PopoverAttachmentAnchor = cell.map { .rect(.rect($0)) }
+            ?? .point(UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1))
+        return popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { close() } }), attachmentAnchor: anchor,
+                       content: content)
     }
 }
 
@@ -340,7 +356,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
         defer { press = nil }
         switch press {
         case .cell(let index, _) where index == self.index(at: point(of: event)):
-            actions?.open(index)
+            actions?.open(index, frames[index])
         case .passedOn:
             super.mouseUp(with: event)
         default:

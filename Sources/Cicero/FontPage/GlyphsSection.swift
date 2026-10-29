@@ -31,6 +31,8 @@ struct GlyphsSection: View {
     let generation: Int
     @State private var query = ""
     @State private var popover: Cell?
+    /// Where the popover's cell is in its row, from the click that opened it (see `cellPopover`).
+    @State private var popoverCell: CGRect?
 
     private typealias Cell = GlyphCell
 
@@ -167,15 +169,13 @@ struct GlyphsSection: View {
     /// whatever it is, without the page drawing them again as it changes; a short last row keeps their width.
     private func glyphRow(_ cells: ArraySlice<Cell>, style: Style) -> some View {
         let column = popover.flatMap { cells.firstIndex(of: $0) }.map { $0 - cells.startIndex }
-        // The clicked cell's bottom middle, within two points: the cells are as wide as the row allows.
-        let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
         let cells = Array(cells)
         let font = FontLoader.shared.font(style.face, size: Self.glyphSize, weight: style.weight, variations: style.variations)
-        let actions = GridRowActions(open: { popover = cells[$0] }, menu: { copyMenu(cells[$0], style: style) },
+        let actions = GridRowActions(open: { (popover, popoverCell) = (cells[$0], $1) }, menu: { copyMenu(cells[$0], style: style) },
                                      file: { dragFile(cells[$0], style: style) })
         return GlyphGridRow(cells: cells.map { gridCell($0, in: font) }, columns: columns, face: style.face, generation: generation,
                             weight: style.weight, variations: style.variations, selected: column, actions: actions)
-        .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
+        .cellPopover(column: column, columns: columns, cell: popoverCell, close: { popover = nil }) {
             if let popover {
                 details(popover, style: style)
             }
