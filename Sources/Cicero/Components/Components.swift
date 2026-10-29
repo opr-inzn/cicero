@@ -335,7 +335,8 @@ struct StatusTag: View {
 }
 
 /// ContentUnavailableView with its symbol nearer the title: macOS leaves 22 pt between them, so they looked like two
-/// separate things. The same symbol and title otherwise, to the pixel on macOS 26, in light and dark.
+/// separate things. The same symbol and title otherwise, to the pixel on macOS 26, in light and dark. The description
+/// is 4 pt nearer the title, and the buttons 6 pt further from it.
 struct EmptyState<Actions: View>: View {
     let title: LocalizedStringKey
     let systemImage: String
@@ -354,9 +355,11 @@ struct EmptyState<Actions: View>: View {
         ContentUnavailableView {
             Label(title, systemImage: systemImage).labelStyle(EmptyStateLabelStyle())
         } description: {
-            description
+            // Nearer the title, and the buttons further from it, so the text reads as the title's and the buttons
+            // as a step of their own.
+            description?.padding(.top, -4)
         } actions: {
-            actions
+            actions.padding(.top, 6)
         }
     }
 }
