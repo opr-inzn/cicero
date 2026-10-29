@@ -3,7 +3,7 @@ import CiceroCore
 import SwiftUI
 
 /// Cicero's icon in the menu bar, while Settings → General → Show Cicero in the menu bar is on (it is at first). A click
-/// opens the main window. A right-click, a click with two fingers or a Control-click opens a menu: the fonts on for open
+/// opens the main window, and closes it when it's already open in front. A right-click, a click with two fingers or a Control-click opens a menu: the fonts on for open
 /// apps and until Cicero quits, the sets as the sidebar lists them, Add Fonts and Find Fonts in Current Document,
 /// Preferences and Quit. VoiceOver's Show Menu action opens it too. Nothing is in a submenu: an
 /// item of a submenu can't bring Cicero to the front, as asking how to activate needs. Files dropped on the icon open as
@@ -107,9 +107,23 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             showMenu()
+        } else if let window = frontMainWindow {
+            window.performClose(nil)
+            // Back to the app that was in front before, rather than Cicero with nothing to show.
+            let hasWindow = NSApp.windows.contains { $0.styleMask.contains(.titled) && $0.isVisible }
+            if !hasWindow, NSApp.isActive { NSApp.hide(nil) }
         } else {
             NSApp.bringForward { openWindow?(id: WindowID.main) }
         }
+    }
+
+    /// The main window, while it shows in front of Cicero's others with Cicero in front. A click on the icon doesn't
+    /// bring Cicero to the front, so this is as it was before the click.
+    private var frontMainWindow: NSWindow? {
+        guard NSApp.isActive, let window = NSApp.mainWindow ?? NSApp.keyWindow,
+              window.identifier?.rawValue == WindowID.main, window.isVisible, !window.isMiniaturized
+        else { return nil }
+        return window
     }
 
     private func showMenu() {
