@@ -27,6 +27,8 @@ struct GlyphsSection: View {
     let ligatureCharacters: [CGGlyph: UInt32]
     /// The glyphs features offer in place of characters', by character.
     let alternates: [UInt32: [FeatureAlternate]]
+    /// The version of the face's file they were read from (see `PageContent.generation`).
+    let generation: Int
     @State private var query = ""
     @State private var popover: Cell?
 
@@ -91,7 +93,7 @@ struct GlyphsSection: View {
             // script a font without Latin letters starts with.
             if !shownLigatures.isEmpty {
                 LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
-                                 columns: columns, groups: shownLigatures, characters: ligatureCharacters)
+                                 columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation)
             }
             ForEach(shown.dropFirst(lead)) { section in
                 self.section(section, style: style)
@@ -171,8 +173,8 @@ struct GlyphsSection: View {
         let font = FontLoader.shared.font(style.face, size: Self.glyphSize, weight: style.weight, variations: style.variations)
         let actions = GridRowActions(open: { popover = cells[$0] }, menu: { copyMenu(cells[$0], style: style) },
                                      file: { dragFile(cells[$0], style: style) })
-        return GlyphGridRow(cells: cells.map { gridCell($0, in: font) }, columns: columns, face: style.face, weight: style.weight,
-                            variations: style.variations, selected: column, actions: actions)
+        return GlyphGridRow(cells: cells.map { gridCell($0, in: font) }, columns: columns, face: style.face, generation: generation,
+                            weight: style.weight, variations: style.variations, selected: column, actions: actions)
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let popover {
                 details(popover, style: style)

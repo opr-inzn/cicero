@@ -20,6 +20,8 @@ struct LigaturesSection: View {
     let groups: [LigatureGroup]
     /// The character a ligature's glyph is too, like U+FB01 for ﬁ.
     let characters: [CGGlyph: UInt32]
+    /// The version of the face's file they were read from (see `PageContent.generation`).
+    let generation: Int
     /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
 
@@ -58,7 +60,8 @@ struct LigaturesSection: View {
         let actions = GridRowActions(open: { popover = (group.tag, shown[$0].characters) }, menu: { menu(shown[$0], in: group) },
                                      file: { dragFile(shown[$0]) }, help: { shown[$0].text })
         return GlyphGridRow(cells: shown.map { GridCell(content: .glyph($0.glyph), label: "Ligature of \($0.text)") }, columns: columns,
-                            face: face, weight: weight, variations: variations, padding: 2, selected: column, actions: actions)
+                            face: face, generation: generation, weight: weight, variations: variations, padding: 2, selected: column,
+                            actions: actions)
         .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
             if let column {
                 details(ligatures[ligatures.startIndex + column], in: group)

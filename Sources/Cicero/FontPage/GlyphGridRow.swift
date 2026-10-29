@@ -48,6 +48,8 @@ struct GlyphGridRow: View {
     /// Cells per row: a short last row's cells are as wide as a full one's.
     let columns: Int
     let face: FontFace
+    /// The version of the face's file the cells were read from (see `PageContent.generation`).
+    let generation: Int
     let weight: Double
     /// Axes moved in the Info panel, by tag.
     let variations: [String: Double]
@@ -60,8 +62,8 @@ struct GlyphGridRow: View {
     var body: some View {
         let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
         let room = Self.room(for: cells, in: font)
-        let drawing = GridRowDrawing(cells: cells, columns: columns, face: face, weight: weight, variations: variations,
-                                     padding: padding, selected: selected, room: room)
+        let drawing = GridRowDrawing(cells: cells, columns: columns, face: face, generation: generation, weight: weight,
+                                     variations: variations, padding: padding, selected: selected, room: room)
         drawing.equatable()
             // Out past the row, for text reaching past its cell, as `UnclippedText` lets it.
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
@@ -69,8 +71,8 @@ struct GlyphGridRow: View {
             .overlay {
                 GridRowEvents(count: cells.count, columns: columns, actions: actions) { index, size, isDark, scale in
                     // The cell as it's drawn, to drag.
-                    let cell = GridRowDrawing(cells: [cells[index]], columns: 1, face: face, weight: weight, variations: variations,
-                                              padding: padding, selected: nil, room: EdgeInsets())
+                    let cell = GridRowDrawing(cells: [cells[index]], columns: 1, face: face, generation: generation, weight: weight,
+                                              variations: variations, padding: padding, selected: nil, room: EdgeInsets())
                     let renderer = ImageRenderer(content: cell.frame(width: size.width, height: size.height)
                         .environment(\.colorScheme, isDark ? .dark : .light))
                     renderer.scale = scale
@@ -131,11 +133,13 @@ struct GlyphGridRow: View {
     }
 }
 
-/// A row's cells, drawn again only when they or the open popover change.
+/// A row's cells, drawn again only when they or the open popover change, or when they're read from a new version of
+/// the file, even as the ones they were.
 private struct GridRowDrawing: View, Equatable {
     let cells: [GridCell]
     let columns: Int
     let face: FontFace
+    let generation: Int
     let weight: Double
     let variations: [String: Double]
     let padding: CGFloat
@@ -149,6 +153,9 @@ private struct GridRowDrawing: View, Equatable {
     var body: some View {
         Canvas { context, size in
             let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
+            // Glyphs by ID read from the file before it changed would be the new version's glyphs with those IDs; the
+            // cells stay empty until the page has read it again. Characters are drawn by character, which stays right.
+            let isCurrent = generation == FontLoader.shared.generation(of: face.path)
             let scale = context.environment.displayScale
             let width = size.width - room.leading - room.trailing
             let frames = GlyphGridRow.frames(width: width, columns: columns, count: cells.count, scale: scale)
@@ -166,6 +173,7 @@ private struct GridRowDrawing: View, Equatable {
                         GlyphDrawing.draw(text, font: font, in: unrounded[index].offsetBy(dx: room.leading, dy: room.top),
                                           baseline: frame.minY + baseline, scale: scale, color: color, into: cg)
                     case .glyph(let glyph):
+                        guard isCurrent else { break }
                         GlyphDrawing.draw(glyph, font: font, in: frame.insetBy(dx: padding, dy: 0), color: color, into: cg)
                     }
                 }

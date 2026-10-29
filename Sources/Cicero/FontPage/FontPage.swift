@@ -11,6 +11,12 @@ struct FontPage: View {
     @State private var glyphColumns: Int?
     /// The ligatures and characters of the face shown, when they weren't ready as the page opened.
     @State private var loaded: (face: FaceID, content: PageContent)?
+
+    /// A style and the version of its file: a new version is read again.
+    private struct Reading: Equatable {
+        let face: FaceID
+        let generation: Int
+    }
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -27,7 +33,9 @@ struct FontPage: View {
         // The style the text is set in, whose glyphs the page lists.
         let face = model.previewStyle(of: family, weight: preview.weight).face.face
         // Usually ready before the page opens: the browser starts on a family when it's selected. While another style's
-        // are read, the last one's stay, in that style, rather than a spinner in their place.
+        // are read, the last one's stay, in that style, rather than a spinner in their place; so do those of the file
+        // before it changed, as a spinner would take the page's height away and leave it scrolled to the top. Their
+        // glyphs by ID aren't drawn again meanwhile (see `GlyphGridRow`).
         let ready = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
         let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
             family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
@@ -55,7 +63,8 @@ struct FontPage: View {
                             let content = shown.content
                             GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
                                           characterCount: content.characterCount, ligatures: content.ligatures,
-                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates)
+                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates,
+                                          generation: content.generation)
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
@@ -67,7 +76,7 @@ struct FontPage: View {
             .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
         }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
-        .task(id: face.id) {
+        .task(id: Reading(face: face.id, generation: FontLoader.shared.generation(of: face.path))) {
             loaded = (face.id, await model.pageContents.content(loading: face))
         }
         .background(Color.canvas)

@@ -15,9 +15,14 @@ nonisolated struct PageContent: Sendable {
     let ligatureCharacters: [CGGlyph: UInt32]
     /// The glyphs features offer in place of characters', by character.
     let alternates: [UInt32: [FeatureAlternate]]
+    /// The version of the face's file it was read from (see `FontLoader.generation(of:)`). Its glyphs are by ID, which
+    /// a new version can give other glyphs, as one with letters added did: its alternates were drawn as the letters
+    /// that took their IDs.
+    let generation: Int
 
-    init(ligatures: [LigatureGroup], glyphs: [GlyphSection], alternates: [UInt32: [FeatureAlternate]], font: CTFont) {
+    init(ligatures: [LigatureGroup], glyphs: [GlyphSection], alternates: [UInt32: [FeatureAlternate]], font: CTFont, generation: Int) {
         self.alternates = alternates
+        self.generation = generation
         characterCount = glyphs.reduce(0) { $0 + $1.scalars.count }
         let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
@@ -40,6 +45,11 @@ nonisolated struct PageContent: Sendable {
         }
         ligatureCharacters = characters
     }
+
+    /// Whether it was read from the file as it is now.
+    func isCurrent(for face: FontFace) -> Bool {
+        generation == FontLoader.shared.generation(of: face.path)
+    }
 }
 
 /// Font pages' ligatures and characters, worked out off the main thread and kept for the faces shown last. The
@@ -50,7 +60,8 @@ final class PageContents {
     private var ready: [FaceID: PageContent] = [:]
     /// The faces in `ready`, least recently used first.
     private var recent: [FaceID] = []
-    private var loading: [FaceID: Task<PageContent, Never>] = [:]
+    /// With the version of the file each is reading.
+    private var loading: [FaceID: (generation: Int, task: Task<PageContent, Never>)] = [:]
     /// Bumped when files change, so what was read from an old version of one is never kept.
     private var generation = 0
     private static let kept = 24
@@ -59,36 +70,39 @@ final class PageContents {
         self.coverage = coverage
     }
 
-    /// nil until worked out.
+    /// nil until worked out, and for a file that changed since.
     func content(of face: FontFace) -> PageContent? {
-        ready[face.id]
+        ready[face.id].flatMap { $0.isCurrent(for: face) ? $0 : nil }
     }
 
     /// Starts on a face's content, unless it's ready or under way.
     func prepare(_ face: FontFace) {
-        if ready[face.id] == nil { _ = task(for: face) }
+        if content(of: face) == nil { _ = task(for: face) }
     }
 
     func content(loading face: FontFace) async -> PageContent {
-        if let content = ready[face.id] {
+        if let content = content(of: face) {
             keep(content, for: face.id)
             return content
         }
         return await task(for: face).value
     }
 
+    /// Reads the file as it is now. A file the scanner read anew has a new version before `forget` drops what was read
+    /// from the old one.
     private func task(for face: FontFace) -> Task<PageContent, Never> {
-        if let task = loading[face.id] { return task }
+        let version = FontLoader.shared.generation(of: face.path)
+        if let under = loading[face.id], under.generation == version { return under.task }
         let coverage = coverage
         let started = generation
         let task = Task {
-            let content = await Self.read(face, coverage: coverage)
-            guard started == generation else { return content }
+            let content = await Self.read(face, version: version, coverage: coverage)
+            guard started == generation, loading[face.id]?.generation == version else { return content }
             loading[face.id] = nil
             keep(content, for: face.id)
             return content
         }
-        loading[face.id] = task
+        loading[face.id] = (version, task)
         return task
     }
 
@@ -111,7 +125,7 @@ final class PageContents {
     /// Both together, so the page never shows one without the other. Glyphs that draw nothing, like a trial font's
     /// empty ones, are left out: a character's, a feature's, an alternate or a ligature.
     @concurrent
-    private static func read(_ face: FontFace, coverage: CoverageIndex) async -> PageContent {
+    private static func read(_ face: FontFace, version: Int, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
         async let features = FeatureGlyph.read(face)
         async let alternates = FeatureAlternates.read(face)
@@ -137,6 +151,6 @@ final class PageContents {
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
                                              privateUse: GlyphSection.privateUseGroups(in: font, coverage: scalars),
                                              leavingOut: { smallCaps.contains($0) || EmptyGlyphs.isInvisible($0) && empty.drawsNothing(for: $0) })
-        return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font)
+        return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font, generation: version)
     }
 }
