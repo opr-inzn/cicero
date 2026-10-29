@@ -1024,6 +1024,7 @@ private struct PreviewOptions: View {
             }
         }
         .formStyle(.grouped)
+        .popoverFormMargins()
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -1039,6 +1040,18 @@ private struct PreviewOptions: View {
                 ValueSlider(value: value, range: range, step: step)
                 ValueField(title, value: value, range: range, step: step, unit: unit)
             }
+        }
+    }
+}
+
+extension View {
+    /// A grouped form's margins in a popover as macOS 26 has them, 10 pt: macOS 15 leaves 20 pt around the sections,
+    /// too much for a popover. Its content margins add to those rather than replace them.
+    @ViewBuilder func popoverFormMargins() -> some View {
+        if #available(macOS 26, *) {
+            self
+        } else {
+            padding(-10)
         }
     }
 }
