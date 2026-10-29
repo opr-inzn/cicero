@@ -13,6 +13,8 @@ struct TextLine {
     /// room for the line never cuts off a descender.
     let ascent: CGFloat
     let descent: CGFloat
+    /// How far its glyphs reach above the baseline.
+    let inkAscent: CGFloat
     let xHeight: CGFloat
     let capHeight: CGFloat
 
@@ -29,6 +31,7 @@ struct TextLine {
         overhang = max(0, -ink.minX.rounded(.down))
         ascent = max(CTFontGetAscent(font), ink.maxY.rounded(.up))
         descent = max(CTFontGetDescent(font), -ink.minY.rounded(.down))
+        inkAscent = ink.maxY.rounded(.up)
         xHeight = CTFontGetXHeight(font)
         capHeight = CTFontGetCapHeight(font)
     }

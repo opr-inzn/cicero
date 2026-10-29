@@ -343,7 +343,10 @@ private struct OverlayLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        let ascent = samples.map(\.line.ascent).max() ?? 0
+        // The baseline where the stacked layout has its first row's, so switching layouts leaves the first font where
+        // it is, and lower only where another font's glyphs reach higher. The room a font keeps above its glyphs, for
+        // accents the text doesn't have, pushed it down a few points.
+        let ascent = max(samples.first?.line.ascent ?? 0, samples.map(\.line.inkAscent).max() ?? 0)
         let descent = samples.map(\.line.descent).max() ?? 0
         // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
         // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.

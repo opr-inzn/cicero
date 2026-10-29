@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- Switching Compare between **Stacked** and **Overlay** no longer moves the first font up or down.
+
 ## 0.11.0
 
 This version makes a fundamental change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
