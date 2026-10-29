@@ -2,7 +2,8 @@ import CiceroCore
 import SwiftUI
 
 /// Asks how to bring in font files the user adds while the install method is Ask: copy them into the Fonts folder and
-/// turn them on, move the ones that can move there, or list them where they are, off.
+/// turn them on, move the ones that can move there, or list them where they are, off. Dropped on a location, copying or
+/// moving puts them into it instead (see `DropLocation`).
 struct InstallSheet: View {
     let prompt: InstallPrompt
     @Environment(AppModel.self) private var model
@@ -13,18 +14,29 @@ struct InstallSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.title2.bold()).lineLimit(1).truncationMode(.middle)
-                Text(prompt.files.count == 1 ? "How should Cicero install this font file?" : "How should Cicero install these font files?")
-                    .foregroundStyle(.secondary)
+                Text(question).foregroundStyle(.secondary)
             }
             let one = prompt.files.count == 1
             HStack(spacing: 12) {
-                option("Install a Copy", icon: "doc.on.doc",
-                       detail: one ? "Copies the file into \(model.installPlace) and turns it on. The original stays where it is."
-                           : "Copies the files into \(model.installPlace) and turns them on. The originals stay where they are.") { choose(.copy) }
-                if prompt.offersMove {
-                    option(model.data.installsIntoFontLibrary ? "Move Into Cicero’s Library" : "Move Into Fonts Folder", icon: "folder",
-                           detail: one ? "Moves the file into \(model.installPlace) and turns it on. The folder it was in stays."
-                               : "Moves the files into \(model.installPlace) and turns them on. The folders they were in stay.") { choose(.move) }
+                if let location = prompt.location {
+                    let into = "into “\(location.name)”\(Self.effect(of: location, one: one))"
+                    option("Copy Into “\(location.name)”", icon: "doc.on.doc",
+                           detail: one ? "Copies the file \(into). The original stays where it is."
+                               : "Copies the files \(into). The originals stay where they are.") { choose(.copy) }
+                    if prompt.offersMove {
+                        option("Move Into “\(location.name)”", icon: "folder",
+                               detail: one ? "Moves the file \(into). The folder it was in stays."
+                                   : "Moves the files \(into). The folders they were in stay.") { choose(.move) }
+                    }
+                } else {
+                    option("Install a Copy", icon: "doc.on.doc",
+                           detail: one ? "Copies the file into \(model.installPlace) and turns it on. The original stays where it is."
+                               : "Copies the files into \(model.installPlace) and turns them on. The originals stay where they are.") { choose(.copy) }
+                    if prompt.offersMove {
+                        option(model.data.installsIntoFontLibrary ? "Move Into Cicero’s Library" : "Move Into Fonts Folder", icon: "folder",
+                               detail: one ? "Moves the file into \(model.installPlace) and turns it on. The folder it was in stays."
+                                   : "Moves the files into \(model.installPlace) and turns them on. The folders they were in stay.") { choose(.move) }
+                    }
                 }
                 option("Leave Files Where They Are", icon: "link",
                        detail: one ? "Lists the file under Added Fonts, where it is, without turning it on."
@@ -40,6 +52,22 @@ struct InstallSheet: View {
         }
         .padding(20)
         .frame(width: prompt.offersMove ? 720 : 560)
+    }
+
+    /// "How should Cicero install this font file?", or add it to the location it was dropped on.
+    private var question: String {
+        let files = prompt.files.count == 1 ? "this font file" : "these font files"
+        guard let location = prompt.location else { return "How should Cicero install \(files)?" }
+        return "How should Cicero add \(files) to “\(location.name)”?"
+    }
+
+    /// How the files are once in the location: " and turns it on" for an Active one, ", where Adobe apps use it" for one an
+    /// app loads by itself, else " without turning it on".
+    private static func effect(of location: DropLocation, one: Bool) -> String {
+        let it = one ? "it" : "them"
+        if location.isActive { return " and turns \(it) on" }
+        guard let app = location.app else { return " without turning \(it) on" }
+        return app == "Adobe" ? ", where Adobe apps use \(it)" : ", where \(app) uses \(it)"
     }
 
     /// "Add “Name-Regular.otf”", or "Add 12 Font Files".

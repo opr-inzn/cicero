@@ -54,7 +54,8 @@ struct DuplicatesSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Add") {
-                    model.addFontFiles(prompt.paths, resolving: prompt.duplicates, choices: choices, then: prompt.then)
+                    model.addFontFiles(prompt.paths, resolving: prompt.duplicates, choices: choices, method: prompt.method,
+                                       into: prompt.location, then: prompt.then)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

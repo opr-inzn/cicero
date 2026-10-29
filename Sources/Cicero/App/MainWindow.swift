@@ -276,7 +276,8 @@ private struct DetailPage: ViewModifier {
 }
 
 /// Font files and folders dropped from the Finder onto the browser or a font page, or copied there and pasted with ⌘V,
-/// join the library, and the set the browser shows when it shows one. The page is outlined while files are over it.
+/// join the library, and the folder or tag the browser shows, or go into the location it shows (see
+/// `AppModel.targetForAddedFiles`). The page is outlined while files are over it.
 private struct FileDrop: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var isTargeted = false
@@ -286,7 +287,7 @@ private struct FileDrop: ViewModifier {
             // From outside Cicero: families dragged within the window are names, not files.
             .drops(of: URL.self, fromOutsideOnly: true, isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
-                model.open(urls, into: model.setForAddedFiles)
+                model.open(urls, into: model.targetForAddedFiles)
             }
             // While the grid, the list or the page has the focus; elsewhere `AppDelegate` takes ⌘V.
             .onPasteCommand(of: [.fileURL]) { _ in model.pasteFiles() }

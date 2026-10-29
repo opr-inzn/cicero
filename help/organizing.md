@@ -122,7 +122,12 @@ With **Copy into ~/Library/Fonts** (the setting at first) or **Move into ~/Libra
 ### Add font files
 
 - Choose **File → Add Fonts** (⌘O) and pick one or more font files.
-- Drag font files from the Finder onto the browser or a font page. Drop them while the browser shows a folder, and they join that folder too.
+- Drag font files from the Finder onto the browser or a font page, or copy them in the Finder (⌘C) and paste them into the browser (⌘V). What happens depends on what the browser shows:
+  - **a folder** or **a tag**: they join that folder, or get that tag, as well as being added as usual.
+  - **a location**: with **Copy** or **Move** next to **When you add font files**, they’re copied or moved into that location’s folder rather than your Fonts folder, and they’re on or off as the location’s fonts are. **Ask each time** offers **Copy Into** and **Move Into** the location. With **Leave files where they are**, they stay where they are, under **Added Fonts**. On **Proofing**, they go into the first of Adobe’s folders Cicero can write to, usually `/Library/Application Support/Adobe/Fonts`. **Adobe Fonts** doesn’t take files: they’re added as usual.
+  - **Added Fonts**: they’re listed where they are, whichever way you add fonts.
+
+  The browser stays where it is and selects them there. It only goes elsewhere when they can’t show where you are: to **Added Fonts** for files left where they are, or, from anywhere but a folder, tag or location, to **All Fonts**.
 - In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All**
 
 Cicero reads OpenType, TrueType, font collections and datafork TrueType. It leaves out web fonts (WOFF and WOFF2), which are made for websites: Adobe apps can’t use them. Cicero then shows the fonts you added in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or one of your locations, are just shown. Dropping a folder adds it as a location, whichever way you activate fonts.
