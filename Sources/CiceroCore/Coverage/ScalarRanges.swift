@@ -153,6 +153,23 @@ public struct ScalarRanges: Sendable, Equatable {
         return ScalarRanges(bounds: kept)
     }
 
+    /// The scalars both cover. Each range the two have in common is whole in each, so the result is canonical too.
+    public func intersection(_ other: ScalarRanges) -> ScalarRanges {
+        var kept: [UInt32] = []
+        var mine = 0, theirs = 0
+        while mine < bounds.count, theirs < other.bounds.count {
+            let low = max(bounds[mine], other.bounds[theirs])
+            let high = min(bounds[mine + 1], other.bounds[theirs + 1])
+            if low <= high {
+                kept.append(low)
+                kept.append(high)
+            }
+            // The range that ends first can't meet any later one of the other.
+            if bounds[mine + 1] < other.bounds[theirs + 1] { mine += 2 } else { theirs += 2 }
+        }
+        return ScalarRanges(bounds: kept)
+    }
+
     /// Every covered scalar, in order.
     public var scalars: [UInt32] {
         var all: [UInt32] = []

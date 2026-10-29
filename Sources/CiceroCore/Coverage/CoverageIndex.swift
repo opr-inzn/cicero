@@ -64,9 +64,10 @@ public final class CoverageIndex: Sendable {
     }
 
     public init(caches: URL, languages: LanguageCatalog) {
-        // v3 leaves out characters whose glyphs draw nothing.
-        file = caches.appendingPathComponent("coverage-v3.plist", isDirectory: false)
-        oldFile = caches.appendingPathComponent("coverage-v2.plist", isDirectory: false)
+        // v4 leaves out characters CoreText adds that the font's character map doesn't have, v3 those whose glyphs
+        // draw nothing.
+        file = caches.appendingPathComponent("coverage-v4.plist", isDirectory: false)
+        oldFile = caches.appendingPathComponent("coverage-v3.plist", isDirectory: false)
         self.languages = languages
     }
 
@@ -150,7 +151,7 @@ public final class CoverageIndex: Sendable {
         return FaceCoverage(scalars: scalars, order: languages.order, bits: languages.support(in: scalars))
     }
 
-    /// The scalars the face's file says it covers, but those whose glyphs draw nothing, like a trial font's empty
+    /// The scalars the face's file says it covers (see `CharacterMap`), but those whose glyphs draw nothing, like a trial font's empty
     /// ones (see `EmptyGlyphs`); an installed font of the same name when the file can't be read, and nothing when
     /// neither exists.
     static func scalars(of face: FontFace) -> ScalarRanges {
@@ -158,7 +159,7 @@ public final class CoverageIndex: Sendable {
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         guard CTFontCopyPostScriptName(font) as String == face.postScriptName else { return .empty }
-        return EmptyGlyphs(font: font).drawn(ScalarRanges(characterSet: CTFontCopyCharacterSet(font)))
+        return EmptyGlyphs(font: font).drawn(CharacterMap.characters(of: font))
     }
 
     // MARK: - Disk cache
