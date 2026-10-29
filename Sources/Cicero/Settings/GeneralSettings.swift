@@ -161,15 +161,11 @@ struct GeneralSettings: View {
 
     private var addingExplanation: String {
         let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
-        // Whatever is chosen here (see `AppModel.performActivation`).
-        let turningOn = "Turning a font on never copies it: fonts in your locations or under Added Fonts go on where they are, and Microsoft Office can’t use them."
-        // With any choice (see `ActivationEngine.installedCopy`).
-        let copiedBefore = "A font Cicero copied before goes on as that copy again."
         return switch model.data.installMethod {
-        case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. \(turningOn) \(copiedBefore)"
-        case .copy: "They’re copied into \(place) and turned on, and the originals stay where they are. \(turningOn)"
-        case .move: "They’re taken out of their folders, put into \(place) and turned on. Files in your locations are copied instead, so your folders stay as they are. \(turningOn)"
-        case .inPlace: "They’re listed under Added Fonts where they are, without being turned on, and go on there; if a file moves, its font goes off. Microsoft Office can’t use them. \(copiedBefore)"
+        case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. Microsoft Office can’t use fonts left where they are."
+        case .copy: "They’re copied into \(place) and turned on. The originals stay where they are."
+        case .move: "They’re moved into \(place) and turned on. Files in your locations are copied instead."
+        case .inPlace: "They’re listed under Added Fonts where they are, but not turned on. Microsoft Office can’t use them."
         }
     }
 }
