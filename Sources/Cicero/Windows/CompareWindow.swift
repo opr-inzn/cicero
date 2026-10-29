@@ -36,6 +36,8 @@ struct CompareWindow: View {
     /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
     @State private var read: Set<String> = []
     @State private var isAdding = false
+    /// On macOS 15, the part of the window the samples scroll in, which they fill so they sit at its top left (see `body`).
+    @State private var viewport: CGSize = .zero
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -69,8 +71,15 @@ struct CompareWindow: View {
                         }
                     }
                     .padding(24)
+                    // As big as the window at least, so samples smaller than it sit at its top left: macOS 15 centres
+                    // them in a scroll view of both axes, whatever its alignment anchor. Its container is the window
+                    // less the toolbar already.
+                    .frame(minWidth: viewport.width, minHeight: viewport.height, alignment: .topLeading)
                 }
                 .defaultScrollAnchor(.topLeading, for: .alignment)
+                .onScrollGeometryChange(for: CGSize.self, of: \.containerSize) { _, size in
+                    if #unavailable(macOS 26) { viewport = size }
+                }
             }
         }
         // Filling the window when there's nothing to compare too, on the canvas.
