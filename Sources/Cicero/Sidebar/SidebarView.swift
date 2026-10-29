@@ -18,15 +18,17 @@ struct SidebarView: View {
     @State private var pace = SelectionPace()
     @State private var highlight = SidebarHighlight()
     @State private var drag = SidebarDrag()
+    @State private var fit = SidebarFit()
 
     var body: some View {
         let shown = pendingSelection ?? model.selectedItems
         // The rows are a view of their own: a list's selection updates whatever makes the list, and this
         // way that's just this, not every section and row. Each row's title reads the selection it draws.
         List(selection: Binding(get: { shown }, set: select)) {
-            SidebarContent(highlight: highlight, drag: drag)
+            SidebarContent(highlight: highlight, drag: drag, fit: fit)
         }
         .listStyle(.sidebar)
+        .background { SidebarSnapReader(fit: fit) }
         .onChange(of: shown, initial: true) { highlight.selected = shown }
         .contextMenu { EditSidebarButton(model: model) }
         .onChange(of: model.selectedItems) {
@@ -72,6 +74,7 @@ private struct SidebarContent: View {
     /// Passed in rather than through the environment, which a row's background doesn't get.
     let highlight: SidebarHighlight
     let drag: SidebarDrag
+    let fit: SidebarFit
     /// The character set group whose title is being dragged, and the one whose title it's over.
     @State private var draggedGroup: String?
     @State private var groupDropTarget: String?
@@ -148,8 +151,11 @@ private struct SidebarContent: View {
                 // rather than a button, so the title doesn't dim while it's pressed. An icon and full-strength
                 // text like the rows around it, as a playlist folder has in Music's sidebar. Coloured here, as the
                 // rows are (see `SidebarLabel`), or the list grays it while another window is in front.
-                Label(group.title, systemImage: "character.book.closed")
-                    .lineLimit(1)
+                Label {
+                    Text(group.title).lineLimit(1).sidebarTitle(group.title, key: key(group.id), fit: fit)
+                } icon: {
+                    Image(systemName: "character.book.closed")
+                }
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
@@ -212,7 +218,7 @@ private struct SidebarContent: View {
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
-        SectionHeader(title: section.title, isExpanded: expansion(section),
+        SectionHeader(title: section.title, key: section.key, fit: fit, isExpanded: expansion(section),
                       isDimmed: model.isEditingSidebar && !model.isVisible(section.key)) {
             if model.isEditingSidebar {
                 checkbox(section.key, section.title)
@@ -273,7 +279,7 @@ private struct SidebarContent: View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
-            SidebarLabel(row: row, highlight: highlight)
+            SidebarLabel(row: row, highlight: highlight, fit: fit)
         }
         .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
@@ -502,6 +508,8 @@ private struct EditSidebarButton: View {
 /// own view, so the pointer coming and going doesn't redo the sidebar's rows.
 private struct SectionHeader<Leading: View, Trailing: View>: View {
     let title: String
+    let key: String
+    let fit: SidebarFit
     @Binding var isExpanded: Bool
     let isDimmed: Bool
     @ViewBuilder let leading: Leading
@@ -511,10 +519,11 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
     var body: some View {
         HStack(spacing: 6) {
             leading
+            // As wide as the header lets it be, in place of a spacer.
             Text(title)
+                .sidebarTitle(title, key: key, fit: fit)
                 .opacity(isDimmed ? 0.45 : 1)
                 .accessibilityAction(named: isExpanded ? "Collapse" : "Expand", toggle)
-            Spacer()
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
@@ -549,12 +558,13 @@ final class SidebarHighlight {
 private struct SidebarLabel: View {
     let row: SidebarRow
     let highlight: SidebarHighlight
+    let fit: SidebarFit
 
     var body: some View {
         let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
             : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
         // On the symbol too: a sidebar styles symbols itself. A status's dot keeps its own colour.
-        Label { Text(row.title).lineLimit(1).foregroundStyle(style) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
+        Label { Text(row.title).lineLimit(1).foregroundStyle(style).sidebarTitle(row.title, key: row.key, fit: fit) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
     }
 }
 
