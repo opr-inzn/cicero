@@ -228,7 +228,7 @@ final class AppModel {
     // MARK: Opening files
 
     /// Files and folders opened or dropped, gathered for a moment so several arriving one by one are added together.
-    @ObservationIgnored var openQueue: (urls: [URL], set: UUID?, task: Task<Void, Never>?) = ([], nil, nil)
+    @ObservationIgnored var openQueue: (urls: [URL], target: SidebarItem?, task: Task<Void, Never>?) = ([], nil, nil)
     /// Files the browser shows once the scan that lists them is done.
     @ObservationIgnored var awaitingScan: OpenedFiles?
 
@@ -953,8 +953,24 @@ struct InstallPrompt: Identifiable {
     var files: [String]
     /// Some of them can move: the user picked them, and no folder the library reads has them.
     var offersMove: Bool
+    /// The location they were dropped on, which copying or moving puts them into, rather than the Fonts folder.
+    var location: DropLocation?
     /// Adds the files the way the user chose.
     var add: (AppModel, InstallMethod) -> Void
+}
+
+/// A location the browser showed as font files were dropped on it or pasted into it: copied or moved, as the install
+/// method says, they go into its folder, rather than the Fonts folder, and are on or off there as its fonts are (see
+/// `AppModel.addFontFiles`).
+struct DropLocation: Equatable {
+    var id: UUID
+    /// As the sidebar calls it: "Proofing".
+    var name: String
+    var folder: URL
+    /// Cicero keeps its fonts on (Active).
+    var isActive: Bool
+    /// The app that loads its fonts by itself: "Adobe" for Adobe apps, "InDesign".
+    var app: String?
 }
 
 /// Using a place's copies of some styles (see `AppModel.useCopies`).
@@ -982,8 +998,11 @@ struct DuplicatePrompt: Identifiable {
     var duplicates: [AddedDuplicate]
     /// The choice in Settings when the sheet asks, which each family starts at where it can.
     var handling: DuplicateHandling = .ask
+    /// How to bring the files in, when not as the install method says; and the location they go into (see `DropLocation`).
+    var method: InstallMethod?
+    var location: DropLocation?
     /// What adding them does once they're in.
-    var then: (AppModel, Set<String>) -> Void
+    var then: (AppModel, Set<String>, AddNote) -> Void
 }
 
 /// New Tag…: the families that get the tag, and the colour the sheet starts with.

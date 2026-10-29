@@ -486,6 +486,30 @@ public struct ActivationEngine: Sendable {
         return result
     }
 
+    /// Copies font files into one of the user's locations, as dropping them on it does when fonts are added by copying, or
+    /// moves them there (see `removeOriginals`). Nothing turns on here: once the scan has read them, they're on or off as the
+    /// location's fonts are. `name` is the location's, for the toast: "Inter copied into “Proofing”".
+    @concurrent
+    public func place(_ paths: [String], into folder: URL, named name: String, moving: Bool = false,
+                      records: ActivationRecords) async -> ActivationResult {
+        var failed: [String] = []
+        var copies: [PlacedCopy] = []
+        for path in Set(paths).sorted() {
+            do {
+                copies.append(try placeCopy(of: path, family: nil, into: folder))
+            } catch {
+                failed.append(path)
+            }
+        }
+        if moving { removeOriginals(of: copies) }
+        let message = Self.message(moving ? "Moved" : "Copied", moving ? "move" : "copy", succeeded: copies.count, failed: failed.count,
+                                   done: FontNames.describe(FontNames.fonts(inFiles: copies.map(\.destination))),
+                                   undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
+        var result = ActivationResult(records: records, succeeded: copies.count, failed: failed, message: message + " into “\(name)”")
+        result.placed = Dictionary(copies.map { ($0.source, $0.destination) }, uniquingKeysWith: { first, _ in first })
+        return result
+    }
+
     /// Takes out the copies macOS didn't turn on: a copy macOS won't use only clutters the Fonts folder. Returns the ones
     /// it kept. Nothing is remembered as a copy of anything: once installed, a font is the user's own, wherever it came
     /// from (`records.installedCopies` only has what earlier versions wrote).
@@ -1090,15 +1114,15 @@ public struct ActivationEngine: Sendable {
         var isNew: Bool
     }
 
-    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in the Font Library (see `installFolder`). It's
-    /// copied into Cicero's staging folder first (a clone, on the same disk) and then moved in, so macOS never sees a
-    /// half-written file. A file of the same name with the same contents is already installed, and so is a copy
+    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in the Font Library (see `installFolder`),
+    /// or into `folder`, a location's. It's copied into Cicero's staging folder first (a clone, on the same disk) and then
+    /// moved in, so macOS never sees a half-written file. A file of the same name with the same contents is already installed, and so is a copy
     /// `records` say was installed from it there before, by whatever name, if it still has the same contents (turned off
     /// since, it's still there); another file of that name gets "Name 2.otf".
-    private func placeCopy(of path: String, family: String?, records: ActivationRecords? = nil) throws -> PlacedCopy {
+    private func placeCopy(of path: String, family: String?, into folder: URL? = nil, records: ActivationRecords? = nil) throws -> PlacedCopy {
         let fm = FileManager.default
         let source = Self.url(path)
-        let folder = installFolder(for: path, family: family)
+        let folder = folder ?? installFolder(for: path, family: family)
         if let records, let earlier = earlierCopy(of: path, family: family, records: records) {
             return PlacedCopy(destination: earlier, source: path, isNew: false)
         }
