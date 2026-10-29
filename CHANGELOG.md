@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - Switching Compare between **Stacked** and **Overlay** no longer moves the first font up or down.
 - A font page’s **Glyphs** no longer lists characters the font doesn’t have, like U+A789 next to its colon, which macOS shows with the font’s colon.
 - A glyph’s popover on a font page no longer covers the glyph when it opens above it, so the glyphs next to it are easier to click.
+- **Clear Font Caches** for all users now asks for your password in Cicero’s name, not “osascript”.
 
 ## 0.11.0
 
