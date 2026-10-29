@@ -782,14 +782,19 @@ struct CaseChange: Equatable {
 }
 
 /// AA, Aa and aa side by side, as one control, each a button rather than a choice that stays chosen. Segments of a set
-/// width, as in `IconSegments`.
+/// width, as in `IconSegments`, from the widest label: macOS 26 cuts AA to "…" below its width plus 12 pt (macOS 15 fits
+/// it in less), and its own measure leaves more room than that, wider than the alignment's segments look beside it.
 struct CaseButtons: NSViewRepresentable {
     let convert: (CaseConversion) -> Void
-    private let segmentWidth: CGFloat = 28
+    /// Room beside the widest label: 2 pt more than macOS 26 needs.
+    private let labelPadding: CGFloat = 14
 
     func makeNSView(context: Context) -> NSSegmentedControl {
         let control = NSSegmentedControl(labels: CaseConversion.allCases.map(\.label), trackingMode: .momentary,
                                          target: context.coordinator, action: #selector(SegmentTarget.choose(_:)))
+        let font = control.font ?? .systemFont(ofSize: NSFont.systemFontSize)
+        let widest = CaseConversion.allCases.map { ($0.label as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        let segmentWidth = (widest + labelPadding).rounded(.up)
         for (index, conversion) in CaseConversion.allCases.enumerated() {
             control.setWidth(segmentWidth, forSegment: index)
             control.setToolTip(conversion.title, forSegment: index)
