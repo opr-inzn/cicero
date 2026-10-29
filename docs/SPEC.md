@@ -465,7 +465,7 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 
 ## Coverage and languages
 
-- For each family's regular upright face: the Unicode scalars it covers (from CoreText's character set), cached on disk by file stamp, computed in the background at low priority after scans.
+- For each family's regular upright face: the Unicode scalars it covers (CoreText's character set, without those the font's cmap table doesn't map to a glyph: CoreText adds some it draws with another glyph, like U+A789 with the colon, U+2010 and U+2011 with the hyphen; `CharacterMap`), cached on disk by file stamp, computed in the background at low priority after scans.
 - Languages from Resources/Languages.json (Hyperglot 0.8.1, Apache 2.0): a language is supported when an orthography's base characters and required marks are all present, fully supported when its auxiliary characters are too. Character-coverage only (no shaping).
 
 ## Character Toolbox

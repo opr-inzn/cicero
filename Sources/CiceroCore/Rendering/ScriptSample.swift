@@ -86,7 +86,7 @@ public final class ScriptSamples: Sendable {
 
     private func sample(for face: FontFace, generation: Int, font: CTFont) -> ScriptSample? {
         if let known = samples.withLock({ $0[face.id] }), known.generation == generation { return known.sample }
-        let sample = ScriptSample(characters: ScalarRanges(characterSet: CTFontCopyCharacterSet(font)), languages: languages.languages)
+        let sample = ScriptSample(characters: CharacterMap.characters(of: font), languages: languages.languages)
         samples.withLock { $0[face.id] = (generation, sample) }
         return sample
     }

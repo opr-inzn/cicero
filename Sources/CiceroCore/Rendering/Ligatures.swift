@@ -121,7 +121,7 @@ public struct LigatureGroup: Identifiable, Sendable {
     private static func forEachCharacter(of font: CTFont, _ body: (UInt32, CGGlyph) -> Bool) {
         var units: [UniChar] = [0, 0]
         var glyphs: [CGGlyph] = [0, 0]
-        for range in ScalarRanges(characterSet: CTFontCopyCharacterSet(font)).ranges {
+        for range in CharacterMap.characters(of: font).ranges {
             for scalar in range {
                 let count: Int
                 if scalar < 0x10000 {
