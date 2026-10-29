@@ -215,6 +215,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   `Text` put them on (ascent and descent to the nearest point, no leading, the advance to the pixel above,
   cells shared out as a stack does); an AppKit view over the row tells clicks, drags, right-clicks and
   tooltips apart by where they are, and `accessibilityRepresentation` gives VoiceOver a button per cell.
+- No GeometryReader over the rows of a lazy stack. One over each glyph row, measuring it for the popover's
+  anchor, left rows in the middle of the font page undrawn on macOS 15 (on screen, with nothing in them);
+  the click gives the clicked cell's frame instead, from the row's AppKit view (`cellPopover`).
 - A row of a lazy stack doesn't hold the whole list it's in. SwiftUI compares every row's inputs whenever
   it updates, and arrays of families compare every family in them unless they're the same array: the
   browser's tiles and rows hold a `FamilyOrder`, equal only to itself, for selecting ranges.

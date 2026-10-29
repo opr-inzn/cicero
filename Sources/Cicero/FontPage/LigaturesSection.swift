@@ -24,6 +24,8 @@ struct LigaturesSection: View {
     let generation: Int
     /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
+    /// Where its cell is in its row, from the click that opened the popover (see `cellPopover`).
+    @State private var popoverCell: CGRect?
 
     private static var spacing: CGFloat { GlyphsSection.spacing }
     private static var inset: CGFloat { GlyphsSection.inset }
@@ -54,15 +56,14 @@ struct LigaturesSection: View {
         let column = popover.flatMap { shown in
             shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
         }.map { $0 - ligatures.startIndex }
-        let anchor = UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1)
         let shown = Array(ligatures)
         // The characters in its tooltip; a long one is scaled down to fit, 2 pt clear of the cell's sides.
-        let actions = GridRowActions(open: { popover = (group.tag, shown[$0].characters) }, menu: { menu(shown[$0], in: group) },
+        let actions = GridRowActions(open: { (popover, popoverCell) = ((group.tag, shown[$0].characters), $1) }, menu: { menu(shown[$0], in: group) },
                                      file: { dragFile(shown[$0]) }, help: { shown[$0].text })
         return GlyphGridRow(cells: shown.map { GridCell(content: .glyph($0.glyph), label: "Ligature of \($0.text)") }, columns: columns,
                             face: face, generation: generation, weight: weight, variations: variations, padding: 2, selected: column,
                             actions: actions)
-        .popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { popover = nil } }), attachmentAnchor: .point(anchor)) {
+        .cellPopover(column: column, columns: columns, cell: popoverCell, close: { popover = nil }) {
             if let column {
                 details(ligatures[ligatures.startIndex + column], in: group)
             }
