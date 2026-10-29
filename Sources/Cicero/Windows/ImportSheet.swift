@@ -20,6 +20,10 @@ struct ImportSheet: View {
     @State private var isRereading = false
     /// The files whose copies are in already (see `findInstalledAlready`).
     @State private var installedAlready: Set<String> = []
+    /// How long the copying has left, from when Import is pressed.
+    @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
+    /// Cicero's Library was chosen here, instead of the Fonts folder, so it can be undone here.
+    @State private var choseFontLibrary = false
     /// The choices' height, and the header's, to fit the sheet to them.
     @State private var contentHeight: CGFloat?
     @State private var headerHeight: CGFloat = 0
@@ -55,7 +59,8 @@ struct ImportSheet: View {
         }
         .frame(width: 600)
         .onAppear { appIsOpen = isAppRunning }
-        .task(id: prompt.id) { await findInstalledAlready() }
+        // Again when the fonts go elsewhere: those in already are looked for where they go.
+        .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findInstalledAlready() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
             if isOtherApp(note) { appIsOpen = isAppRunning }
         }
@@ -153,6 +158,13 @@ struct ImportSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 2)
+                // Counting the files again for every step of the progress would hold up the window.
+                if stage == nil, case let count = copyingCount,
+                   FontLibraryOffer.isShown(count: count, chose: choseFontLibrary, installsIntoFontLibrary: model.data.installsIntoFontLibrary) {
+                    FontLibraryOffer(count: count, chose: $choseFontLibrary)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 4)
+                }
                 if let folder = library.fontFolder {
                     checkbox(fontFolderTitle, detail: fontLibraryDetail(folder), isOn: $choices.fontFolder)
                 }
@@ -273,7 +285,7 @@ struct ImportSheet: View {
             switch stage {
             case .copying(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Copying fonts, \(done.formatted()) of \(total.formatted())")
+                CopyingProgressLine(done: done, total: total, estimate: estimate)
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
                 Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
@@ -286,7 +298,7 @@ struct ImportSheet: View {
         .font(.callout)
         .foregroundStyle(.secondary)
         .monospacedDigit()
-        .frame(maxWidth: 300, alignment: .leading)
+        .frame(maxWidth: 400, alignment: .leading)
     }
 
     private var isCopying: Bool {
@@ -296,9 +308,15 @@ struct ImportSheet: View {
     private func start() {
         stage = .starting
         let choices = choices
+        estimate = CopyTimeEstimate(intoFontsFolder: !model.data.installsIntoFontLibrary)
         task = Task {
             let result = await model.performImport(prompt, choices: choices) { stage in
-                Task { @MainActor in if self.summary == nil { self.stage = stage } }
+                let now = ProcessInfo.processInfo.systemUptime
+                Task { @MainActor in
+                    guard self.summary == nil else { return }
+                    if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
+                    self.stage = stage
+                }
             }
             task = nil
             guard let result else { return dismiss() }
@@ -375,6 +393,15 @@ struct ImportSheet: View {
         // FontBase's own library can't be imported until it has quit.
         let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so they aren’t on twice."
         return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
+    }
+
+    /// How many fonts the import puts into the Fonts folder, as the boxes are ticked.
+    private var copyingCount: Int {
+        let copying = toCopy
+        var count = 0
+        if choices.fontFolder, let folder = library.fontFolder { count += copying.count { $0.hasPrefix(folder + "/") } }
+        if choices.otherFiles { count += library.otherFiles.count(where: copying.contains) }
+        return count
     }
 
     private var classificationsDetail: String {

@@ -154,6 +154,9 @@ extension AppModel {
         var data = data
         let files = LibraryImport.fontFiles(imported, choices: choices, data: &data, locations: locations)
         self.data.showAdobeAppFolders = data.showAdobeAppFolders
+        // The copies are read in one go once they're all in, rather than with each batch.
+        holdScans()
+        defer { releaseScans() }
         let installed = await engine.installOff(files.map(\.source)) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             for path in installed.new { try? FileManager.default.removeItem(atPath: path) }

@@ -316,7 +316,7 @@ public final class LibraryScanner: Sendable {
             let activeURLs = await active
             addActive(activeURLs, to: &found, linked: linkedFolders(input))
             for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
-            confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
+            try confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
             confirmRegistered(&found, records: input.records)
             reach.leaveOut(found)
             find = Find(input: input, found: found, reach: reach, listed: !activeURLs.isEmpty)
@@ -640,11 +640,19 @@ public final class LibraryScanner: Sendable {
 
     /// Files in the Fonts folders are active unless macOS says otherwise, as for one turned off in macOS or
     /// one macOS hasn't noticed yet. Its list leaves out files whose fonts have hidden names, so files missing
-    /// from it are asked about one by one (there are only a few); without a list at all, they count as active.
-    private func confirmFontsFolders(_ found: inout [String: FoundFile], listed: Bool) {
+    /// from it are asked about one by one; without a list at all, they count as active. Those its list of fonts it
+    /// has off names are off without asking: after an import there can be tens of thousands, and asking about
+    /// each keeps fontd busy for seconds. A scan another one replaced stops asking.
+    private func confirmFontsFolders(_ found: inout [String: FoundFile], listed: Bool) throws {
         let unconfirmed = found.filter { $0.value.inFontsFolder && !$0.value.isActive }.keys
-        for path in unconfirmed {
-            found[path]!.isActive = !listed || registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+        guard listed else {
+            for path in unconfirmed { found[path]!.isActive = true }
+            return
+        }
+        let off = unconfirmed.isEmpty ? [] : registrar.offFontPaths()
+        for path in unconfirmed where !off.contains(path) {
+            try Task.checkCancellation()
+            found[path]!.isActive = registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
         }
     }
 

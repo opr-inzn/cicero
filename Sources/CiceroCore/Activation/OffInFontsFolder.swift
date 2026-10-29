@@ -71,8 +71,16 @@ extension ActivationEngine {
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         var placed: [String: String] = [:]
         var new: [String] = []
+        // The copies moved into ~/Library/Fonts, off, and when they were last looked at (see `turnOffAgain`).
+        var intoFontsFolderSoFar: [String] = []
+        var registeredAgain = Set<String>()
+        var lastLook = ContinuousClock.now
         for start in stride(from: 0, to: files.count, by: Self.offBatchSize) {
             if Task.isCancelled { break }
+            if ContinuousClock.now - lastLook > Self.lookAgainEvery {
+                await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
+                lastLook = .now
+            }
             progress(start, files.count)
             // Each staged copy → where it goes in ~/Library/Fonts, and the file it's a copy of.
             var intoFontsFolder: [String: String] = [:]
@@ -113,11 +121,47 @@ extension ActivationEngine {
                 guard let source = sources[staged] else { continue }
                 placed[source] = destination
                 new.append(destination)
+                intoFontsFolderSoFar.append(destination)
             }
             for staged in moved.failed { try? fm.removeItem(atPath: staged) }
         }
+        // Not once cancelled: the copies go again.
+        if !intoFontsFolderSoFar.isEmpty, !Task.isCancelled {
+            await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
+            // And once more for the last ones, which macOS may not have noticed yet.
+            try? await Task.sleep(for: .seconds(3))
+            await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
+        }
         progress(files.count, files.count)
         return (placed, new)
+    }
+
+    /// How often `installOff` looks for copies macOS turned on again, and how many it looks at, at most.
+    static let lookAgainEvery: Duration = .seconds(10)
+    static let lookingAtMost = 500
+
+    /// Turns off again the files among `paths`, in ~/Library/Fonts, that macOS's list of fonts it has off doesn't name any
+    /// more. While it's busy, macOS can notice files that arrived there after `moveIntoFontsFolderOff` turned them off
+    /// (in a macOS 15 VM, one or two batches of 20 in the first minute of an import of 31,209 fonts): it then forgets that
+    /// they're off, and has them on, or not at all until it looks at the folder again, which turns them on. One it has on is
+    /// turned off; one it doesn't have is registered first, as turning off a file macOS doesn't have doesn't stick, but
+    /// only once (`registeredAgain`), so a file the list names by another path isn't turned on and off at every look.
+    /// Looking costs one read of the list, and a question for each file it doesn't name: no more than
+    /// `lookingAtMost` at a time, so a list that names the files by other paths can't have every file asked about, as
+    /// scans used to. An empty list says nothing: the files turned off are on it, unless it can't be read.
+    func turnOffAgain(_ paths: [String], registeredAgain: inout Set<String>) async {
+        guard !paths.isEmpty else { return }
+        let off = registrar.offFontPaths()
+        guard !off.isEmpty else { return }
+        let unlisted = Array(paths.lazy.filter { !off.contains($0) && FileManager.default.fileExists(atPath: $0) }.prefix(Self.lookingAtMost))
+        guard !unlisted.isEmpty else { return }
+        let on = unlisted.filter { registrar.isActive(Self.url($0)) }
+        let unregistered = unlisted.filter { !on.contains($0) && !registeredAgain.contains($0) }
+        registeredAgain.formUnion(unregistered)
+        let taken = unregistered.isEmpty ? [] : await Set(unregistered).subtracting(registerAndConfirm(unregistered, scope: .persistent))
+        let turningOff = on + unregistered.filter(taken.contains)
+        guard !turningOff.isEmpty else { return }
+        _ = await registrar.setEnabled(turningOff.map(Self.url), false)
     }
 
     /// The file `installOff` takes as it is for `path`: one with the same contents where it would copy it (`folder`, else
