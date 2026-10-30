@@ -4,12 +4,15 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- Font files you drop on the window while it shows a folder or a tag join that folder or get that tag. On a location, they’re copied or moved into its folder, as your choice next to **When you add font files** says. Cicero then stays where you are rather than going to **All Fonts**.
-- Switching Compare between **Stacked** and **Overlay** no longer moves the first font up or down.
-- A font page’s **Glyphs** no longer lists characters the font doesn’t have, like U+A789 next to its colon, which macOS shows with the font’s colon.
-- A glyph’s popover on a font page no longer covers the glyph when it opens above it, so the glyphs next to it are easier to click.
-- Importing thousands of fonts into your Fonts folder is faster, keeps every copy inactive, and says how long is left. Above 2,000 fonts, Cicero offers to copy them into **Cicero’s Library** instead, which takes minutes.
-- **Clear Font Caches** for all users now asks for your password in Cicero’s name, not “osascript”.
+This version makes a fundamental change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
+
+- Importing thousands of fonts into your Fonts folder is faster and says how long is left.
+- **Installing and turning on fonts works differently.** Copy, move, ask, or leave under **When you add font files** in **Preferences → General** only runs when you add fonts. Turning a font on just turns it on where it already is.
+- **File → Import from FontBase** copies FontBase’s fonts into your Fonts folder and brings over its collections, favorites and tags, turning on the fonts that were on.
+- Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. If you imported from FontExplorer X before, Cicero offers to do this for you, keeping your folders, tags, ratings and notes.
+- Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
+- Font files you drop on the window while it shows a folder or a tag join that folder or get that tag. On a location, they’re copied or moved into its folder, as your choice next to **When you add font files** says.
+
 
 ## 0.11.0
 
