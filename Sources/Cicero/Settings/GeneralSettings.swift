@@ -79,6 +79,10 @@ struct GeneralSettings: View {
                     Text("Ask before activating more than \(UserData.manyFamilies) families at once")
                     Text("Apps load every font that’s on as they open, so turning on many at once can slow them down.")
                 }
+                Toggle(isOn: $model.data.asksBeforeMovingOutOfSharedFolders) {
+                    Text("Ask before moving fonts out of shared folders")
+                    Text("To turn off a font that an app like InDesign loads from its own folder, Cicero moves the file out. When the folder syncs with a cloud service or is on a server, the file goes away for everyone who shares it.")
+                }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     HStack(spacing: 4) {
                         Text("Auto-activate fonts in Adobe apps")

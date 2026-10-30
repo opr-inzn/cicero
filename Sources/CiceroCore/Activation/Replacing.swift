@@ -172,9 +172,8 @@ extension ActivationEngine {
                 moves[path] = Self.uniqueURL(for: Self.url(replacement.added).lastPathComponent, in: old.deletingLastPathComponent()).path
                 continue
             }
-            let aside = Self.uniqueURL(for: old.lastPathComponent, in: locations.inactiveFolder)
             do {
-                try fm.createDirectory(at: locations.inactiveFolder, withIntermediateDirectories: true)
+                let aside = Self.uniqueURL(for: old.lastPathComponent, in: try locations.inactiveFolderForNewFiles())
                 try Self.move(old, to: aside)
                 waiting[replacement.old] = aside.path
             } catch {
@@ -280,10 +279,9 @@ extension ActivationEngine {
         // Where each waits → (its "Name 2" path, the path meant for it).
         var waiting: [String: (interim: String, original: String)] = [:]
         for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
-            let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: locations.inactiveFolder)
-            guard (try? fm.createDirectory(at: locations.inactiveFolder, withIntermediateDirectories: true)) != nil,
-                  (try? Self.move(Self.url(interim), to: aside)) != nil
-            else { continue }
+            guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
+            let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
+            guard (try? Self.move(Self.url(interim), to: aside)) != nil else { continue }
             waiting[aside.path] = (interim, original)
         }
         guard !waiting.isEmpty else { return [:] }

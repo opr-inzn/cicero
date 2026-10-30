@@ -45,7 +45,7 @@ public final class UserDataStore: Sendable {
         if let legacy = try? Data(contentsOf: legacyURL),
            let object = (try? JSONSerialization.jsonObject(with: legacy)) as? [String: Any] {
             let imported = LegacyImport.userData(from: object)
-            queue.sync { write(imported) }
+            _ = queue.sync { write(imported) }
             return imported
         }
         return .newLibrary
@@ -74,25 +74,40 @@ public final class UserDataStore: Sendable {
         queue.asyncAfter(deadline: .now() + Self.coalescingDelay) { [self] in writePending(for: generation) }
     }
 
-    /// Writes any pending save now; call when the app quits.
-    public func flush() {
-        queue.sync { writePending(for: nil) }
+    /// Writes any pending save now; call when the app quits. Returns false when it couldn't be written. `durably`: onto
+    /// the disk itself too, what an earlier save wrote as well, not only into its cache (see `syncToDisk`).
+    @discardableResult
+    public func flush(durably: Bool = false) -> Bool {
+        queue.sync { writePending(for: nil) && (!durably || Self.syncToDisk(fileURL)) }
     }
 
-    /// Writes what's pending unless a later save has already been scheduled (nil: write regardless).
-    private func writePending(for generation: Int?) {
+    /// Has the disk keep what's written to the file for good, so a power cut can't take it back (F_FULLFSYNC, else
+    /// fsync where the disk can't). Returns false when it couldn't.
+    public static func syncToDisk(_ url: URL) -> Bool {
+        let file = open(url.path, O_RDONLY)
+        guard file >= 0 else { return false }
+        defer { close(file) }
+        return fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0
+    }
+
+    /// Writes what's pending unless a later save has already been scheduled (nil: write regardless). Returns false when
+    /// it couldn't be written.
+    @discardableResult
+    private func writePending(for generation: Int?) -> Bool {
         let data = pending.withLock { pending -> UserData? in
             if let generation, generation != pending.generation { return nil }
             defer { pending.data = nil }
             return pending.data
         }
-        if let data { write(data) }
+        guard let data else { return true }
+        return write(data)
     }
 
-    private func write(_ data: UserData) {
-        guard let encoded = try? Self.encoded(data) else { return }
+    @discardableResult
+    private func write(_ data: UserData) -> Bool {
+        guard let encoded = try? Self.encoded(data) else { return false }
         try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? encoded.write(to: fileURL, options: .atomic)
+        return (try? encoded.write(to: fileURL, options: .atomic)) != nil
     }
 
     /// The JSON the store writes; backups hold the same.

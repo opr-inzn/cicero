@@ -140,7 +140,7 @@ Apps let go of a font as soon as it’s off. Another copy of the same font, in y
 
 ## The Inactive folder
 
-Cicero keeps the files it moves out of app font folders in its Inactive folder, `~/Library/Application Support/Cicero/Inactive`. Up to version 0.10.10 it was called Deactivated; Cicero renames it as it opens.
+Cicero keeps the files it moves out of app font folders in its Inactive folder, `~/Cicero/Inactive`, in your home folder, where you can find them. Up to version 0.11.0 it was `~/Library/Application Support/Cicero/Inactive`, and up to 0.10.10 it was called Deactivated there. Cicero moves what’s in them to `~/Cicero/Inactive` as it opens, with the Date Added the files had, so turning them on still puts them back where they were. A file macOS has on just then, for an app that’s open, waits in the old folder until a later time Cicero opens.
 
 Earlier versions of Cicero also moved fonts there when you turned them off in your Fonts folder. They now go back as Cicero opens, still off: into your Fonts folder, or into [Cicero’s Library](#ciceros-library) when Cicero installs fonts there. macOS turns on any font that arrives in your Fonts folder, so Cicero turns each one off as it lands, which leaves it on for a few hundredths of a second.
 
@@ -194,6 +194,7 @@ The family’s right-click menu has the same choices: **Activate in All Apps**, 
 
 - **On in every app** uses the file where it is. Nothing is copied.
 - **Off everywhere** moves the file into Cicero’s [Inactive folder](#the-inactive-folder) and remembers where it was, because the app would load it otherwise. Turning it on again, or **Use in Adobe Apps Only**, puts it back first.
+- When the folder syncs with iCloud Drive, Dropbox, Google Drive, OneDrive or another cloud service, or is on a server, moving a file out of it takes the file away for everyone who shares the folder. So Cicero asks first: **Move and Deactivate**, **Keep On in Adobe Apps**, which turns the font off in every other app and leaves the file where it is, or **Cancel**. To stop the question, check **Don’t ask again**, or turn off **Ask before moving fonts out of shared folders** in **Preferences → General**.
 - Some app folders, like InDesign’s, are owned by the system, and Cicero can’t move files out of them. Their fonts can’t be turned off everywhere.
 
 ### Your own folder that an app loads

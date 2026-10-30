@@ -119,6 +119,37 @@ extension View {
     /// asks unless a sheet of its own is up, which asks from there.
     func confirmsManyActivations(when isActive: Bool = true) -> some View {
         modifier(ManyActivationConfirmation(isActive: isActive))
+            .modifier(MovingOutConfirmation(isActive: isActive))
+    }
+}
+
+/// Asks whether to turn off fonts whose files would move out of a folder others share (`AppModel.movingOutPrompt`).
+private struct MovingOutConfirmation: ViewModifier {
+    let isActive: Bool
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        // On a view of its own, as the question about turning on many fonts.
+        content.background {
+            Color.clear
+                .alert(
+                    model.movingOutPrompt?.title ?? "",
+                    isPresented: Binding(get: { isActive && model.movingOutPrompt != nil }, set: { if !$0 { model.movingOutPrompt = nil } }),
+                    presenting: model.movingOutPrompt
+                ) { prompt in
+                    Button("Move and Deactivate") { model.confirm(prompt, movingOut: true) }
+                    if let keep = prompt.keepTitle {
+                        Button(keep) { model.confirm(prompt, movingOut: false) }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: { prompt in
+                    Text(prompt.message)
+                }
+                .dialogSuppressionToggle("Don’t ask again", isSuppressed: Binding(
+                    get: { !model.data.asksBeforeMovingOutOfSharedFolders },
+                    set: { model.data.asksBeforeMovingOutOfSharedFolders = !$0 }
+                ))
+        }
     }
 }
 

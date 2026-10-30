@@ -5,9 +5,10 @@ import UniformTypeIdentifiers
 /// moves it, where the fonts it installs go, a folder for each family, when the user chooses so. Fonts in it are
 /// registered where they are, so it's anywhere but a Fonts folder, and turning one off leaves it there.
 extension ActivationEngine {
+    /// Not a file in the Inactive folder, also when the library holds it, as a library in ~/Cicero itself would.
     func isInFontLibrary(_ path: String) -> Bool {
         guard let fontLibrary else { return false }
-        return path.hasPrefix(fontLibrary.path + "/")
+        return path.hasPrefix(fontLibrary.path + "/") && !isInInactiveFolder(path)
     }
 
     func isInInactiveFolder(_ path: String) -> Bool {
@@ -64,6 +65,18 @@ extension ActivationEngine {
         return rmdir(folder) == 0
     }
 
+    /// Removes `folder` and the folders in it that have nothing in them but .DS_Store and such empty folders, as files
+    /// moved out one by one leave them. Returns whether `folder` is gone.
+    @discardableResult
+    static func removeEmptyFolders(_ folder: String) -> Bool {
+        guard isFolder(folder) else { return false }
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? [] {
+            let path = (folder as NSString).appendingPathComponent(name)
+            if isFolder(path) { removeEmptyFolders(path) }
+        }
+        return removeIfEmpty(folder)
+    }
+
     /// Whether a folder has a font file in it, at any depth, not counting hidden ones or what's inside packages, as the
     /// scan reads it: whether the Font Library has fonts to keep listed.
     public static func hasFontFiles(in folder: URL) -> Bool {
@@ -79,9 +92,10 @@ extension ActivationEngine {
     // MARK: Moving the library
 
     /// Moves the Font Library into `destination`, an empty folder (see `refusal`), which it takes the place of: the whole
-    /// folder moves, a rename on the same disk. Its fonts that are on go off for the moment that takes and on again there,
+    /// folder moves, a rename on the same disk, or file by file onto another one. Its fonts that are on go off for the moment that takes and on again there,
     /// and the records follow. When the library was in its first place, ~/Cicero goes too, once nothing is left in it.
-    /// One that can't move stays where it was, as it was, with its path in `failed`.
+    /// One that can't move stays where it was, as it was, with its path in `failed`. A library that holds the Inactive
+    /// folder, as one in ~/Cicero itself does, moves item by item instead, and the Inactive folder stays where it is.
     @concurrent
     public func moveFontLibrary(to destination: URL, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
@@ -92,28 +106,43 @@ extension ActivationEngine {
             return ActivationResult(records: records, succeeded: 0, failed: [], message: "Cicero’s Library moved to \(place)")
         }
         let old = fontLibrary.path, new = destination.path
-        func moved(_ path: String) -> String { path.hasPrefix(old + "/") ? new + path.dropFirst(old.count) : path }
-        let persistent = records.inPlace.filter { $0.hasPrefix(old + "/") }.sorted()
-        let session = records.temporary.keys.filter { $0.hasPrefix(old + "/") }.sorted()
+        let failure = ActivationResult(records: records, succeeded: 0, failed: [old], message: "Couldn’t move Cicero’s Library to \(place)")
+        let held = locations.inactiveFolders.map(\.path).filter { $0.hasPrefix(old + "/") }
+        // Only one right in it, which leaves everything beside it to move.
+        guard held.allSatisfy({ ($0 as NSString).deletingLastPathComponent == old }) else { return failure }
+        func isLibrary(_ path: String) -> Bool { path.hasPrefix(old + "/") && !isInInactiveFolder(path) }
+        func moved(_ path: String) -> String { isLibrary(path) ? new + path.dropFirst(old.count) : path }
+        let persistent = records.inPlace.filter(isLibrary).sorted()
+        let session = records.temporary.keys.filter(isLibrary).sorted()
         func register(_ paths: (String) -> String) async {
             if !persistent.isEmpty { _ = await registrar.register(persistent.map { Self.url(paths($0)) }, scope: .persistent) }
             if !session.isEmpty { _ = await registrar.register(session.map { Self.url(paths($0)) }, scope: .session) }
         }
-        let failure = ActivationResult(records: records, succeeded: 0, failed: [old], message: "Couldn’t move Cicero’s Library to \(place)")
         // The folder chosen goes, for the library to take its place, only when there's nothing in it.
         guard !fm.fileExists(atPath: new) || Self.removeIfEmpty(new) else { return failure }
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
-        do {
-            try fm.moveItem(atPath: old, toPath: new)
-        } catch _ where fm.fileExists(atPath: old) {
-            // Anything there now is what a move to another disk had copied before it stopped.
-            try? fm.removeItem(atPath: new)
-            try? fm.createDirectory(atPath: new, withIntermediateDirectories: true)
-            await register { $0 }
-            return failure
-        } catch {
-            // Gone from where it was, so moved after all.
+        // The whole folder, a rename on the same disk; onto another disk what's in it, file by file (see `moveItems`).
+        var whole = false
+        if held.isEmpty {
+            do {
+                try Self.moveItem(Self.url(old), to: Self.url(new))
+                whole = true
+            } catch let error as POSIXError where error.code == .EXDEV {
+                // Onto another disk.
+            } catch {
+                try? fm.createDirectory(atPath: new, withIntermediateDirectories: true)
+                await register { $0 }
+                return failure
+            }
+        }
+        if !whole {
+            guard Self.moveItems(in: old, to: new, except: Set(held.map { ($0 as NSString).lastPathComponent })) else {
+                if held.isEmpty { try? fm.createDirectory(atPath: new, withIntermediateDirectories: true) }
+                await register { $0 }
+                return failure
+            }
+            if held.isEmpty { Self.removeEmptyFolders(old) }
         }
         records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
         records.inPlace = Set(records.inPlace.map(moved))
@@ -124,6 +153,37 @@ extension ActivationEngine {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
         }
         return ActivationResult(records: records, succeeded: 1, failed: [], message: "Cicero’s Library moved to \(place)")
+    }
+
+    /// Moves what's in `old` into `new`, made for it, but for the items named in `kept` and .DS_Store; all or nothing:
+    /// when one can't move, those that did go back, and `new` goes again. Onto another disk, file by file (see
+    /// `fileMoves`), so a folder is never left half gone; the folders they leave go once they're empty.
+    static func moveItems(in old: String, to new: String, except kept: Set<String>) -> Bool {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: old),
+              (try? fm.createDirectory(atPath: new, withIntermediateDirectories: true)) != nil
+        else { return false }
+        let items = names.sorted().filter { !kept.contains($0) && $0 != ".DS_Store" }.map {
+            (from: url((old as NSString).appendingPathComponent($0)), to: url((new as NSString).appendingPathComponent($0)))
+        }
+        let otherDisk = disk(of: new) != disk(of: old)
+        var done: [(from: URL, to: URL)] = []
+        for (from, to) in otherDisk ? items.flatMap({ fileMoves($0.from, to: $0.to) }) : items {
+            do {
+                try fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try moveItem(from, to: to)
+                done.append((from, to))
+            } catch {
+                for (from, to) in done.reversed() {
+                    try? fm.createDirectory(at: from.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try? moveItem(to, to: from)
+                }
+                removeEmptyFolders(new)
+                return false
+            }
+        }
+        if otherDisk { for item in items { removeEmptyFolders(item.from.path) } }
+        return true
     }
 
     /// Moves a Font Library still in its former first place, ~/Cicero/Font Library, to today's, ~/Cicero/Library, as
@@ -159,8 +219,14 @@ extension ActivationEngine {
         if ([locations.userFonts, locations.allUsersFonts] + locations.systemFonts).contains(where: { isIn($0.path) }) {
             return "macOS turns on every font in a Fonts folder by itself, so Cicero couldn’t turn the library’s fonts off."
         }
-        if [locations.support, locations.caches].contains(where: { isIn($0.path) }) {
+        if [locations.support, locations.caches, locations.inactiveFolder].contains(where: { isIn($0.path) }) {
             return "Cicero keeps that folder for itself."
+        }
+        // An empty one the library would take the place of, which the Inactive folder is in, or would be once made.
+        let inactive = [locations.inactiveFolder.standardizedFileURL.path, locations.inactiveFolder.resolvingSymlinksInPath().path]
+        if inactive.contains(where: { $0.hasPrefix(path + "/") || $0.hasPrefix(resolved + "/") }),
+           (try? fm.contentsOfDirectory(atPath: path))?.allSatisfy({ $0 == ".DS_Store" }) == true {
+            return "Cicero keeps its Inactive folder in “\(folder.lastPathComponent)”. Choose another folder, or make a new one in it."
         }
         if isProtected(path + "/") {
             return "macOS or an app keeps that folder for itself."

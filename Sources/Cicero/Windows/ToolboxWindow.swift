@@ -14,6 +14,8 @@ enum ToolboxTab: String, CaseIterable {
 
 /// Which fonts have every character of a text, and which support a language.
 struct ToolboxWindow: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("toolbox.tab") private var tab: ToolboxTab = .text
 
     var body: some View {
@@ -28,6 +30,9 @@ struct ToolboxWindow: View {
                 ToolbarPicker("View", values: ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
+        // Turning fonts on or off from a font's menu here can ask first, which the Library window does: it comes forward.
+        .onChange(of: model.manyActivationPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
+        .onChange(of: model.movingOutPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
     }
 }
 

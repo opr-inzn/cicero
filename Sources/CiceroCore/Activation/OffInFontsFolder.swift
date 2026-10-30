@@ -245,10 +245,9 @@ extension ActivationEngine {
         try? fm.removeItem(at: turningOffList)
     }
 
-    /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Inactive folder (or the
-    /// former one, while it's waiting to be renamed) go
-    /// where turning them on would put them, and stay off: into their family's folder in Cicero's Library when fonts are
-    /// installed there, else back into ~/Library/Fonts (see `moveIntoFontsFolderOff`). Not one from an app's own folder,
+    /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Inactive folder (or a
+    /// former one, while something in it waits to move) go where turning them on would put them, and stay off: into their
+    /// family's folder in Cicero's Library when fonts are installed there, else back into ~/Library/Fonts (see `moveIntoFontsFolderOff`). Not one from an app's own folder,
     /// which goes back there when it's turned on, nor one that's on for now, nor one CoreText can't read (it would go in and
     /// come out again at every launch). One with the same name and contents as a file already where it goes is a spare
     /// and goes, as turning it on did. Records naming a moved file as the original of a copy follow it. Returns how many
@@ -299,40 +298,208 @@ extension ActivationEngine {
         return (records, placed.count)
     }
 
-    /// At launch: the Inactive folder was called Deactivated up to 0.10.10. The former folder is renamed or, when the
-    /// Inactive folder has anything in it already, what's in it moves in beside that, under names of its own; the records
-    /// follow. Not while a font in it is on for an app folder's open app (one on until Cicero quit is off by now): macOS
-    /// has it from where it is, so the folder waits for a later launch, and meanwhile counts as the Inactive folder too
-    /// (`Locations.inactiveFolders`). Returns whether anything moved.
-    public func moveFormerInactiveFolder(_ records: ActivationRecords) -> (records: ActivationRecords, moved: Bool) {
+    /// Where `moveFormerInactiveFolders` writes down what it's about to move, each item's path → where it goes, until the
+    /// records that follow the moves are saved (see `forgetInactiveFolderMoves`).
+    var inactiveFolderMovesList: URL { locations.support.appendingPathComponent("moving-inactive.json", isDirectory: false) }
+
+    /// Whether a former Inactive folder is there, or moves are written down that the records may not have followed yet:
+    /// `moveFormerInactiveFolders` has something to do.
+    public var hasFormerInactiveFolders: Bool {
         let fm = FileManager.default
-        let former = locations.formerInactiveFolder
+        return fm.fileExists(atPath: inactiveFolderMovesList.path) || locations.formerInactiveFolders.contains { fm.fileExists(atPath: $0.path) }
+    }
+
+    /// At launch: up to 0.11.0 the Inactive folder was in Cicero's support folder, where apps that remove an app delete
+    /// it, and up to 0.10.10 it was called Deactivated there. What's in a former one moves into `Locations.inactiveFolder`,
+    /// ~/Cicero/Inactive: the whole folder, a rename, when that isn't there yet (or is empty), else item by item beside
+    /// what's there, under names of its own (see `uniqueName`). The former folder goes once nothing but .DS_Store is left.
+    /// Not a file on right now (one on for an app folder's open app, or that macOS has registered; one on until Cicero
+    /// quit is off by now): macOS has it from where it is, so it stays, and its folder still counts as an Inactive folder
+    /// (`Locations.inactiveFolders`) until a later launch moves it. Nothing moves when ~/Cicero/Inactive can't be made.
+    ///
+    /// Every move is written down first (`inactiveFolderMovesList`), and the moves of a launch that stopped before its
+    /// records were saved are taken up again, those that happened: the records follow them all. Returns the records and
+    /// the moves, item → where it went; once the records are saved, `forgetInactiveFolderMoves`.
+    @concurrent
+    public func moveFormerInactiveFolders(_ records: ActivationRecords) async -> (records: ActivationRecords, moves: [String: String]) {
+        let fm = FileManager.default
         let folder = locations.inactiveFolder
-        guard fm.fileExists(atPath: former.path) else { return (records, false) }
-        let prefix = former.path + "/"
-        guard !records.temporary.keys.contains(where: { $0.hasPrefix(prefix) }) else { return (records, false) }
         var moves: [String: String] = [:]
-        var renamed = false
-        if !fm.fileExists(atPath: folder.path) || Self.removeIfEmpty(folder.path) {
-            guard (try? fm.moveItem(at: former, to: folder)) != nil else { return (records, false) }
-            renamed = true
-        } else {
-            for name in ((try? fm.contentsOfDirectory(atPath: former.path)) ?? []).sorted() where name != ".DS_Store" {
-                let destination = Self.uniqueURL(for: name, in: folder)
-                if (try? Self.move(former.appendingPathComponent(name), to: destination)) != nil {
-                    moves[former.appendingPathComponent(name).path] = destination.path
+        // What a launch that stopped moved, but maybe never saved the records of.
+        if let data = try? Data(contentsOf: inactiveFolderMovesList), let listed = try? JSONDecoder().decode([String: String].self, from: data) {
+            for (from, to) in listed where Self.exists(to) {
+                // One copied onto another disk whose original was still to go: nothing else had that name.
+                if Self.exists(from), !(Self.isIdenticalCopy(to, of: from) && (try? fm.removeItem(atPath: from)) != nil) { continue }
+                moves[from] = to
+            }
+        }
+        // A copy onto another disk that stopped halfway, under a hidden name nothing reads, in a folder there too.
+        let halfCopies = (fm.enumerator(atPath: folder.path)?.allObjects as? [String] ?? [])
+            .filter { ($0 as NSString).lastPathComponent.hasPrefix(Self.movingPrefix) }
+        for path in halfCopies { try? fm.removeItem(at: folder.appendingPathComponent(path)) }
+        for former in locations.formerInactiveFolders where Self.exists(former.path) {
+            let names = ((try? fm.contentsOfDirectory(atPath: former.path)) ?? []).filter { $0 != ".DS_Store" }.sorted()
+            let staying = Set(names.filter { name in
+                let path = former.appendingPathComponent(name).path
+                return records.temporary.keys.contains { $0 == path || $0.hasPrefix(path + "/") }
+                    || FontFileReader.fontExtensions.contains((name as NSString).pathExtension.lowercased()) && registrar.isActive(Self.url(path))
+            })
+            let movable = names.filter { !staying.contains($0) }
+            if movable.isEmpty {
+                if names.isEmpty { _ = Self.removeIfEmpty(former.path) }
+                continue
+            }
+            // The whole folder, where nothing is in the way.
+            if staying.isEmpty, !Self.exists(folder.path) || Self.removeIfEmpty(folder.path),
+               (try? fm.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil {
+                let planned = Dictionary(uniqueKeysWithValues: names.map { (former.appendingPathComponent($0).path, folder.appendingPathComponent($0).path) })
+                if (try? noteInactiveFolderMoves(moves.merging(planned) { first, _ in first })) != nil,
+                   renamex_np(former.path, folder.path, UInt32(RENAME_EXCL)) == 0 {
+                    moves.merge(planned) { first, _ in first }
+                    continue
                 }
+            }
+            guard (try? fm.createDirectory(at: folder, withIntermediateDirectories: true)) != nil else { continue }
+            var taken = Set(((try? fm.contentsOfDirectory(atPath: folder.path)) ?? []).map(Self.nameKey))
+            // Onto another disk a folder goes file by file (see `fileMoves`).
+            let otherDisk = Self.disk(of: folder.path) != Self.disk(of: former.path)
+            var items: [(from: URL, to: URL)] = []
+            for name in movable {
+                let unique = Self.uniqueName(for: name, taken: &taken)
+                items.append((former.appendingPathComponent(name), folder.appendingPathComponent(unique)))
+            }
+            let planned = otherDisk ? items.flatMap { Self.fileMoves($0.from, to: $0.to) } : items
+            let all = moves.merging(planned.map { ($0.from.path, $0.to.path) }) { first, _ in first }
+            guard (try? noteInactiveFolderMoves(all)) != nil else { continue }
+            for (from, to) in planned {
+                guard (try? fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil,
+                      (try? Self.moveItem(from, to: to)) != nil
+                else { continue }
+                moves[from.path] = to.path
+            }
+            // The folders the files left, and those made for files that couldn't go.
+            for item in items {
+                Self.removeEmptyFolders(item.from.path)
+                Self.removeEmptyFolders(item.to.path)
             }
             _ = Self.removeIfEmpty(former.path)
         }
-        func moved(_ path: String) -> String {
-            if renamed, path.hasPrefix(prefix) { return folder.path + "/" + path.dropFirst(prefix.count) }
-            return moves[path] ?? path
-        }
+        return (Self.records(records, following: moves), moves)
+    }
+
+    /// Once the records `moveFormerInactiveFolders` returned are saved: what it wrote down goes.
+    public func forgetInactiveFolderMoves() {
+        try? FileManager.default.removeItem(at: inactiveFolderMovesList)
+    }
+
+    private func noteInactiveFolderMoves(_ moves: [String: String]) throws {
+        try FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
+        try JSONEncoder().encode(moves).write(to: inactiveFolderMovesList, options: .atomic)
+        // On the disk itself before anything moves, so a power cut can't leave the moves without it.
+        guard UserDataStore.syncToDisk(inactiveFolderMovesList) else { throw POSIXError(.EIO) }
+    }
+
+    /// The records with every path in a moved item (item → where it went) where it is now (see `paths(_:following:)`).
+    static func records(_ records: ActivationRecords, following moves: [String: String]) -> ActivationRecords {
+        guard !moves.isEmpty else { return records }
+        let moved = movedPath(following: moves)
         var records = records
         records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), moved($0.value)) }, uniquingKeysWith: { first, _ in first })
         records.inPlace = Set(records.inPlace.map(moved))
         records.appFolderOrigins = Dictionary(records.appFolderOrigins.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
-        return (records, renamed || !moves.isEmpty)
+        records.temporary = Dictionary(records.temporary.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
+        return records
+    }
+
+    /// Paths where they are after these moves (item → where it went): the item's own, or one in it. The same name in
+    /// another Unicode form counts as the same, as the disk has it (Swift's strings compare so).
+    public static func paths(_ paths: [String], following moves: [String: String]) -> [String] {
+        guard !moves.isEmpty else { return paths }
+        return paths.map(movedPath(following: moves))
+    }
+
+    private static func movedPath(following moves: [String: String]) -> (String) -> String {
+        { path in
+            var item = path, rest = ""
+            while item.count > 1 {
+                if let to = moves[item] { return to + rest }
+                rest = "/" + (item as NSString).lastPathComponent + rest
+                item = (item as NSString).deletingLastPathComponent
+            }
+            return path
+        }
+    }
+
+    /// A name as the disk compares it: letter case ignored, as on the Mac's own disk, and one Unicode form as any.
+    private static func nameKey(_ name: String) -> String { name.lowercased() }
+
+    /// "Name.otf", then "Name 2.otf", "Name 3.otf"…, the first not in `taken` (as `nameKey` has them), which it joins.
+    static func uniqueName(for name: String, taken: inout Set<String>) -> String {
+        let base = (name as NSString).deletingPathExtension, ext = (name as NSString).pathExtension
+        var candidate = name, number = 2
+        while taken.contains(nameKey(candidate)) {
+            candidate = ext.isEmpty ? "\(base) \(number)" : "\(base) \(number).\(ext)"
+            number += 1
+        }
+        taken.insert(nameKey(candidate))
+        return candidate
+    }
+
+    /// Hidden names of items being copied onto another disk, until they're whole.
+    static let movingPrefix = ".cicero-moving-"
+
+    /// Moves an item where nothing is, keeping its Date Added: a rename on the same disk, never over anything. Onto another
+    /// disk a file is copied under a hidden name first, so a copy that stops halfway is never taken for a font, then
+    /// named, and the original goes; one that can't go takes the copy back out, so there's never two. Not a folder, whose
+    /// deleting could stop partway, after some of its files went: those would be only in the copy, and taking it back out
+    /// would lose them. A folder goes onto another disk file by file (see `fileMoves`).
+    static func moveItem(_ from: URL, to: URL) throws {
+        let fm = FileManager.default
+        let added = dateAdded(of: from)
+        if renamex_np(from.path, to.path, UInt32(RENAME_EXCL)) != 0 {
+            let error = errno
+            guard error == EXDEV, !isFolder(from.path) else { throw POSIXError(POSIXErrorCode(rawValue: error) ?? .EIO) }
+            let copy = to.deletingLastPathComponent().appendingPathComponent(movingPrefix + UUID().uuidString)
+            do {
+                try fm.copyItem(at: from, to: copy)
+                guard renamex_np(copy.path, to.path, UInt32(RENAME_EXCL)) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            } catch {
+                try? fm.removeItem(at: copy)
+                throw error
+            }
+            do {
+                try fm.removeItem(at: from)
+            } catch {
+                try? fm.removeItem(at: to)
+                throw error
+            }
+        }
+        if let added { setDateAdded(added, of: to) }
+    }
+
+    /// Moving `from` to `to` file by file, as onto another disk: a folder's items each to the same place in `to`, at any
+    /// depth, but for .DS_Store; anything else, a symbolic link too, is one move. A folder with no files gives none.
+    static func fileMoves(_ from: URL, to: URL) -> [(from: URL, to: URL)] {
+        guard isFolder(from.path) else { return [(from, to)] }
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: from.path)) ?? []).filter { $0 != ".DS_Store" }.sorted()
+        return names.flatMap { fileMoves(from.appendingPathComponent($0), to: to.appendingPathComponent($0)) }
+    }
+
+    /// Whether a folder is at the path, itself, not a symbolic link to one.
+    static func isFolder(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+    }
+
+    /// The disk a file or folder is on, through symbolic links; nil when it isn't there.
+    static func disk(of path: String) -> dev_t? {
+        var info = stat()
+        return stat(path, &info) == 0 ? info.st_dev : nil
+    }
+
+    /// Whether anything is at the path, a symbolic link that leads nowhere too.
+    static func exists(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0
     }
 }

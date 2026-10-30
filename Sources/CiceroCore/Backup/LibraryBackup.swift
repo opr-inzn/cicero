@@ -364,7 +364,7 @@ public struct LibraryBackup: Sendable {
                 break
             }
             progress(index, fonts.count)
-            let target = restoredPath(Self.move(expand(font.path), from: libraries.backup, to: libraries.restored))
+            let target = restoredPath(expand(font.path), libraries: libraries)
             guard Self.isFontFile(target), let source = Self.archivedFile(font.archivePath!, in: contents.folder) else {
                 result.failed += 1
                 continue
@@ -374,8 +374,9 @@ public struct LibraryBackup: Sendable {
                 continue
             }
             // Off in the Fonts folder: off in the Inactive folder until it goes in, off.
-            if font.isOff == true, Self.isFontLocation(target, in: roots), target.hasPrefix(locations.userFonts.path + "/") {
-                let parked = ActivationEngine.uniqueURL(for: (target as NSString).lastPathComponent, in: locations.inactiveFolder).path
+            if font.isOff == true, Self.isFontLocation(target, in: roots), target.hasPrefix(locations.userFonts.path + "/"),
+               let folder = try? locations.inactiveFolderForNewFiles() {
+                let parked = ActivationEngine.uniqueURL(for: (target as NSString).lastPathComponent, in: folder).path
                 if (try? Self.place(source, at: parked)) != nil {
                     result.restored += 1
                     result.restoredPaths.insert(parked)
@@ -434,9 +435,18 @@ public struct LibraryBackup: Sendable {
         return paths.filter { Self.isPlainPath($0) && !ActivationEngine.isProtected($0 + "/") }
     }
 
-    /// A path in the Inactive folder by the name it had up to 0.10.10, Deactivated, in the Inactive folder; any other as it is.
+    /// A path in a former Inactive folder (Cicero's support folder's Inactive up to 0.11.0, Deactivated up to 0.10.10) in
+    /// the Inactive folder, ~/Cicero/Inactive; any other as it is.
     func restoredPath(_ path: String) -> String {
-        Self.move(path, from: locations.formerInactiveFolder.path, to: locations.inactiveFolder.path)
+        locations.formerInactiveFolders.reduce(path) { path, former in Self.move(path, from: former.path, to: locations.inactiveFolder.path) }
+    }
+
+    /// A path in this home folder where it goes back: in the Inactive folder (see `restoredPath(_:)`), or from the backup's
+    /// Font Library into the one restored. One in the Inactive folder stays there, also when the backup's Font Library
+    /// held it, as one in ~/Cicero itself would.
+    private func restoredPath(_ path: String, libraries: (backup: String, restored: String)) -> String {
+        let path = restoredPath(path)
+        return locations.isInInactiveFolder(path) ? path : Self.move(path, from: libraries.backup, to: libraries.restored)
     }
 
     /// The backup's Font Library on this Mac (its path moved to this home folder) and the one its fonts go back into:
@@ -501,7 +511,7 @@ public struct LibraryBackup: Sendable {
         let oldHome = contents.manifest.home
         let libraries = fontLibraries(of: contents, restoringInto: fontLibrary)
         func map(_ path: String) -> String {
-            restoredPath(Self.move(Self.move(path, from: oldHome, to: home.path), from: libraries.backup, to: libraries.restored))
+            restoredPath(Self.move(path, from: oldHome, to: home.path), libraries: libraries)
         }
         func map(_ dictionary: [String: String]) -> [String: String] {
             Dictionary(dictionary.map { (map($0.key), map($0.value)) }, uniquingKeysWith: { first, _ in first })

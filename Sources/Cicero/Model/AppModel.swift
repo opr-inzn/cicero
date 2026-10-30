@@ -184,6 +184,8 @@ final class AppModel {
     var installPrompt: InstallPrompt?
     /// Turning on many families at once, waiting for the user to agree (see `UserData.asksBeforeActivatingMany`).
     var manyActivationPrompt: ManyActivationPrompt?
+    /// Turning off fonts in a shared folder, waiting for the user to say (see `UserData.asksBeforeMovingOutOfSharedFolders`).
+    var movingOutPrompt: MovingOutPrompt?
     /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
     var copySwitchPrompt: CopySwitchRequest?
     /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
@@ -245,6 +247,8 @@ final class AppModel {
     /// Activation, deactivation and trashing run one at a time, so their record changes never overwrite each other.
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var lastScan = Date.distantPast
+    /// While the first scan waits for files to move at launch (see `begin`).
+    @ObservationIgnored private var movingAtLaunch = false
     /// Numbers scans as they start, so results and expectations can tell which came first.
     @ObservationIgnored private var scanCount = 0
     @ObservationIgnored private var revealProgress: Task<Void, Never>?
@@ -323,8 +327,11 @@ final class AppModel {
         // like folders on network disks.
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                // Not while a scan of everything is running, which would start over (a long one never finishing).
-                guard let self, Date().timeIntervalSince(self.lastScan) > 60, self.runningScan.map({ $0.changes != nil }) ?? true else { return }
+                // Not while a scan of everything is running, which would start over (a long one never finishing), nor
+                // while files move at launch, which the scan after them lists.
+                guard let self, !self.movingAtLaunch, Date().timeIntervalSince(self.lastScan) > 60,
+                      self.runningScan.map({ $0.changes != nil }) ?? true
+                else { return }
                 self.rescan(check: true)
             }
         }
@@ -339,11 +346,12 @@ final class AppModel {
         }
         // The first scan waits for the Font Library to be where it is now, so the window doesn't drop its fonts for a moment.
         let migrating = needsFontLibraryMigration
-        // And for the Inactive folder's new name, so its fonts don't drop out of the window for a moment either.
-        let renaming = FileManager.default.fileExists(atPath: locations.formerInactiveFolder.path)
+        // And for the Inactive folder's new place, so its fonts don't drop out of the window for a moment either.
+        let renaming = launchEngine.hasFormerInactiveFolders
+        movingAtLaunch = migrating || renaming
         enqueue { model in
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
-            if renaming { model.data.records = model.engine.moveFormerInactiveFolder(model.data.records).records }
+            if renaming { await model.moveFormerInactiveFolders() }
             await model.engine.finishTurningOff()
             let tidied = await model.engine.tidyInactiveFolder(model.data.records)
             model.data.records = tidied.records
@@ -351,11 +359,22 @@ final class AppModel {
             // Fonts earlier versions turned off by moving them out of the Fonts folder, now that they're turned off there.
             let emptied = await model.engine.emptyInactiveFolder(model.data.records)
             model.data.records = emptied.records
+            model.movingAtLaunch = false
             // The first scan may have listed the files before they went.
             if migrating || renaming || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
         if !migrating && !renaming { rescan(check: true) }
+    }
+
+    /// At launch, without a word: what's in the Inactive folder's former places moves to ~/Cicero/Inactive, and the
+    /// records and added files follow (see `ActivationEngine.moveFormerInactiveFolders`). What it wrote down about the
+    /// moves goes only once they're saved, so a launch that stops in between, or a save that fails, still has them.
+    private func moveFormerInactiveFolders() async {
+        let moved = await engine.moveFormerInactiveFolders(data.records)
+        data.records = moved.records
+        data.fontFiles = ActivationEngine.paths(data.fontFiles, following: moved.moves)
+        if store.flush(durably: true) { engine.forgetInactiveFolderMoves() }
     }
 
     /// Whether the Font Library is still in its former place, ~/Cicero/Font Library, or a library saved before one that
@@ -933,6 +952,58 @@ enum InfoTab: String, CaseIterable {
 struct AdjustedAxes: Equatable {
     let face: FaceID
     var values: [String: Double]
+}
+
+/// Turning off fonts whose files would move out of a folder others share, waiting for the user to say (see
+/// `AppModel.movingOutPrompt(for:)`).
+struct MovingOutPrompt: Identifiable {
+    let id = UUID()
+    /// Everything to turn off.
+    var faces: [LibraryFace]
+    /// Those whose files would move out of a shared folder.
+    var shared: [LibraryFace]
+    /// The folder they're in, when it's one, and who shares it.
+    var folder: (path: String, sharing: FolderSharing)?
+    /// The app that loads them ("Adobe apps", "InDesign"), when it's one.
+    var app: String?
+
+    var title: String {
+        let name = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "shared folders"
+        if shared.count == 1, let face = shared.first {
+            return "Move “\(face.face.familyName) \(face.face.styleName)” out of \(name)?"
+        }
+        return "Move \(shared.count.formatted()) fonts out of \(name)?"
+    }
+
+    var message: String {
+        let one = shared.count == 1
+        // "Adobe apps load", "InDesign loads".
+        let apps = app.map { $0 == "Adobe apps" ? "Adobe apps load" : "\($0) loads" } ?? "The apps they’re for load"
+        let place = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "the folders they’re in"
+        let moving = "\(apps) every font in \(place), so to turn \(one ? "it" : "them") off there too, Cicero moves \(one ? "its file" : "their files") into its Inactive folder."
+        guard let folder else {
+            return moving + " These folders sync with a cloud service or are on a server, so the files also go away for everyone who shares them."
+        }
+        let name = "“\((folder.path as NSString).lastPathComponent)”"
+        let files = one ? "the file also goes" : "the files also go"
+        switch folder.sharing {
+        case .iCloudDrive:
+            return moving + " \(name) is in iCloud Drive, so \(files) away on your other devices and for anyone you share it with."
+        case .cloudService(let service):
+            return moving + " \(name) syncs with \(service ?? "a cloud service"), so \(files) away on the other Macs that share it."
+        case .server(let server):
+            return moving + " \(name) is on the server “\(server)”, so \(files) away for everyone who uses it."
+        }
+    }
+
+    /// What the other choice is called: keeping the shared ones on in their app, where they are. Nil when that does
+    /// nothing, as for fonts on in that app only and nothing else to turn off.
+    var keepTitle: String? {
+        let shared = Set(shared.map(\.id))
+        guard self.shared.contains(where: { $0.position == .on }) || faces.contains(where: { !shared.contains($0.id) }) else { return nil }
+        guard let app else { return "Keep On in Their Apps" }
+        return "Keep On in \(app == "Adobe apps" ? "Adobe Apps" : app)"
+    }
 }
 
 /// Turning on more families at once than `UserData.manyFamilies`.

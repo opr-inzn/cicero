@@ -222,8 +222,8 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         } else {
             model.activateFonts(in: [row])
         }
-        // Asking whether to turn on so many happens in the main window.
-        if model.manyActivationPrompt != nil {
+        // Asking whether to turn on so many, or to move files out of a shared folder, happens in the main window.
+        if model.manyActivationPrompt != nil || model.movingOutPrompt != nil {
             NSApp.bringForward { openWindow?(id: WindowID.main) }
         }
     }

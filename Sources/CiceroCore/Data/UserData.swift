@@ -66,6 +66,9 @@ public struct UserData: Codable, Equatable, Sendable {
     public var asksBeforeActivatingMany = true
     /// How many families at once turning on can be without asking first (see `asksBeforeActivatingMany`).
     public static let manyFamilies = 100
+    /// Ask before turning off fonts an app loads from a folder that syncs with a cloud service or is on a server: their
+    /// files move out of the folder, which takes them away for everyone who shares it (see `ActivationEngine.sharing`).
+    public var asksBeforeMovingOutOfSharedFolders = true
     public var showSystemFonts = true
     /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
     /// as one Proofing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
@@ -177,6 +180,7 @@ public struct UserData: Codable, Equatable, Sendable {
         // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
+        asksBeforeMovingOutOfSharedFolders = try value(.asksBeforeMovingOutOfSharedFolders, d.asksBeforeMovingOutOfSharedFolders)
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
         // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
