@@ -12,6 +12,7 @@ This version makes a fundamental change to how Cicero installs and turns on font
 - Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. If you imported from FontExplorer X before, Cicero offers to do this for you, keeping your folders, tags, ratings and notes.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - Font files you drop on the window while it shows a folder or a tag join that folder or get that tag. On a location, they’re copied or moved into its folder, as your choice next to **When you add font files** says.
+- **Change** next to **Cicero’s Library** takes any folder, such as Downloads: when it has other things in it, Cicero makes a **Cicero Library** folder there. A folder that can’t work says why while you can still choose another, and one in iCloud Drive or another cloud service asks first.
 
 
 ## 0.11.0

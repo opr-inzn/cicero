@@ -143,10 +143,10 @@ extension ActivationEngine {
     }
 
     /// Why the Font Library can't go into a folder, said to the user; nil when it can. Not a Fonts folder, where macOS
-    /// turns on every font by itself, nor Cicero's own folders, macOS's or an app's, nor the library itself or a folder in
-    /// it, nor one the library reads already (`folders`, the user's and the ones apps load). Not iCloud Drive or another
-    /// cloud service's folder either: it can take files off the Mac to make room, and fonts used from there stop working.
-    /// And only an empty folder, so the library holds only what Cicero puts in it.
+    /// turns on every font by itself, nor Cicero's own folders, macOS's or an app's, nor the library itself, the folder
+    /// it's in or a folder in it, nor one the library reads already (`folders`, the user's and the ones apps load). A
+    /// folder with other things in it is fine: the library goes into a new folder there (see `fontLibraryFolder`). So is
+    /// a cloud service's, after a warning (see `cloudService`).
     public static func refusal(forFontLibraryAt folder: URL, current: URL?, folders: [WatchedFolder], locations: Locations) -> String? {
         let fm = FileManager.default
         let path = folder.standardizedFileURL.path
@@ -166,21 +166,50 @@ extension ActivationEngine {
             return "macOS or an app keeps that folder for itself."
         }
         if let current {
-            if path == current.standardizedFileURL.path || resolved == current.resolvingSymlinksInPath().path { return "Cicero’s Library is there already." }
-            if isIn(current.standardizedFileURL.path) || isIn(current.resolvingSymlinksInPath().path) { return "That folder is in Cicero’s Library." }
+            let places = [current.standardizedFileURL, current.resolvingSymlinksInPath()]
+            if places.contains(where: { [path, resolved].contains($0.path) || [path, resolved].contains($0.deletingLastPathComponent().path) }) {
+                return "Cicero’s Library is there already."
+            }
+            if places.contains(where: { isIn($0.path) }) { return "That folder is in Cicero’s Library." }
         }
         if let watched = folders.first(where: { $0.id != WatchedFolder.fontLibraryID && isIn($0.path) }) {
             return "That folder is in \(watched.displayName), which your library reads already. Choose one outside your locations."
         }
-        let synced = (try? folder.resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true
-        if synced || ["/Library/Mobile Documents/", "/Library/CloudStorage/"].contains(where: { (path + "/").contains($0) }) {
-            return "iCloud Drive and other cloud services can take files off this Mac to make room, and fonts used from there stop working. Choose a folder that stays on this Mac."
-        }
-        guard let items = try? fm.contentsOfDirectory(atPath: path) else { return "Cicero can’t read that folder." }
-        guard items.allSatisfy({ $0 == ".DS_Store" }) else {
-            return "Choose an empty folder, or make a new one: Cicero’s Library holds only the fonts Cicero puts in it."
-        }
+        guard (try? fm.contentsOfDirectory(atPath: path)) != nil else { return "Cicero can’t read that folder." }
         guard fm.isWritableFile(atPath: path) else { return "Cicero can’t make changes in that folder." }
         return nil
+    }
+
+    /// A cloud service that keeps a folder's files: one the Font Library may go into only after a warning, since the
+    /// service can take files off the Mac to make room, and fonts used from there can stop working.
+    public enum CloudService: Equatable, Sendable {
+        /// ~/Library/Mobile Documents, or anything iCloud keeps, as Desktop & Documents.
+        case iCloudDrive
+        /// ~/Library/CloudStorage: Dropbox, Google Drive, OneDrive and the like.
+        case other
+    }
+
+    /// The cloud service `folder` syncs with, by its path or the one a symbolic link leads to; nil when it stays on the Mac.
+    public static func cloudService(syncing folder: URL) -> CloudService? {
+        let paths = [folder.standardizedFileURL.path, folder.resolvingSymlinksInPath().path].map { $0 + "/" }
+        if (try? folder.resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true
+            || paths.contains(where: { $0.contains("/Library/Mobile Documents/") }) {
+            return .iCloudDrive
+        }
+        return paths.contains { $0.contains("/Library/CloudStorage/") } ? .other : nil
+    }
+
+    /// The folder the Font Library goes to when the user chooses `folder`: that one, when nothing but .DS_Store is in it,
+    /// as a folder made for the library; otherwise a new "Cicero Library" folder in it ("Cicero Library 2" and so on when
+    /// the name is taken), so the library holds only what Cicero puts in it.
+    public static func fontLibraryFolder(in folder: URL) -> URL {
+        let fm = FileManager.default
+        if let items = try? fm.contentsOfDirectory(atPath: folder.path), items.allSatisfy({ $0 == ".DS_Store" }) { return folder }
+        var name = "Cicero Library", number = 1
+        while (try? fm.attributesOfItem(atPath: folder.appendingPathComponent(name).path)) != nil {
+            number += 1
+            name = "Cicero Library \(number)"
+        }
+        return folder.appendingPathComponent(name, isDirectory: true)
     }
 }
