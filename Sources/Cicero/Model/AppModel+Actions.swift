@@ -70,12 +70,50 @@ extension AppModel {
         deactivate(families.flatMap(\.faces))
     }
 
-    func deactivate(_ faces: [LibraryFace]) {
+    /// Asks first when that moves files out of a folder others share, unless `confirmed` (see `movingOutPrompt(for:)`).
+    func deactivate(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canDeactivate)
         guard !targets.isEmpty else {
             return showToast(faces.contains { $0.state.isActive } ? "These fonts are managed by macOS or another app" : "Nothing to deactivate")
         }
+        if !confirmed, let prompt = movingOutPrompt(for: targets) {
+            return movingOutPrompt = prompt
+        }
         performDeactivation(targets)
+    }
+
+    /// A question for turning off fonts an app loads from a folder that syncs with a cloud service or is on a server,
+    /// while the user wants one: turning one off moves its file out of the folder, for everyone who shares it. Not for
+    /// a folder Cicero can't move files out of, where turning off fails anyway.
+    private func movingOutPrompt(for faces: [LibraryFace]) -> MovingOutPrompt? {
+        guard data.asksBeforeMovingOutOfSharedFolders else { return nil }
+        var sharing: [String: FolderSharing?] = [:]
+        var shared: [(face: LibraryFace, folder: String)] = []
+        for face in faces where ActivationEngine.movesOutOfAppFolder(face, records: data.records) {
+            let folder = (face.face.path as NSString).deletingLastPathComponent
+            if sharing[folder] == nil {
+                sharing[folder] = FileManager.default.isWritableFile(atPath: folder) ? ActivationEngine.sharing(ofFolder: folder) : nil
+            }
+            if sharing[folder] ?? nil != nil { shared.append((face, folder)) }
+        }
+        guard !shared.isEmpty else { return nil }
+        let folders = Set(shared.map(\.folder))
+        let apps = Set(shared.compactMap(\.face.app))
+        return MovingOutPrompt(
+            faces: faces, shared: shared.map(\.face), folder: folders.count == 1 ? folders.first.map { (path: $0, sharing: sharing[$0]!!) } : nil,
+            app: apps.count == 1 ? apps.first.map(FaceState.appDescription) : nil
+        )
+    }
+
+    /// Goes on with turning off fonts in a shared folder as the user chose: all of them, moving the files out
+    /// (`movingOut`), or all but those, which stay on in the app that loads them, where they are.
+    func confirm(_ prompt: MovingOutPrompt, movingOut: Bool) {
+        if movingOut { return deactivate(prompt.faces, confirmed: true) }
+        let shared = Set(prompt.shared.map(\.id))
+        let others = prompt.faces.filter { !shared.contains($0.id) }
+        let keptOn = prompt.shared.filter { $0.position == .on }
+        if !keptOn.isEmpty { useInAppOnly(keptOn) }
+        if !others.isEmpty { deactivate(others, confirmed: true) }
     }
 
     func performDeactivation(_ faces: [LibraryFace]) {
@@ -437,11 +475,14 @@ extension AppModel {
         rescan()
     }
 
-    /// The library's fonts whose files are in these folders.
+    /// The library's fonts whose files are in these folders; not those in the Inactive folder, which is Cicero's, also
+    /// in a folder that holds it.
     func faces(in folders: [WatchedFolder]) -> [LibraryFace] {
         let prefixes = folders.map { $0.path + "/" }
         guard !prefixes.isEmpty else { return [] }
-        return library.families.flatMap(\.faces).filter { face in prefixes.contains { face.face.path.hasPrefix($0) } }
+        return library.families.flatMap(\.faces).filter { face in
+            prefixes.contains { face.face.path.hasPrefix($0) } && !locations.isInInactiveFolder(face.face.path)
+        }
     }
 
     /// Turned on where they are, whatever When you add font files says: moving or copying them would take them out of

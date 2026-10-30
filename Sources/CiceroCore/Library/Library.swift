@@ -26,6 +26,12 @@ public struct Locations: Sendable {
     /// ~/Cicero/Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
     /// By default in the home folder `userFonts` is in, so a test run with another home keeps its own.
     public var defaultFontLibrary: URL
+    /// ~/Cicero/Inactive: fonts Cicero keeps while they're off, those it moved out of an app's own folder, so the app
+    /// stops loading them, and those earlier versions moved out of ~/Library/Fonts, until they go back (see
+    /// `ActivationEngine.emptyInactiveFolder`). In the home folder, where the user sees it, rather than in Application
+    /// Support, which apps that remove an app delete with it. Beside `defaultFontLibrary` by default, so a test run with
+    /// another home keeps its own.
+    public var inactiveFolder: URL
 
     /// ~/Cicero/Font Library, where the Font Library was at first: one still there moves to `defaultFontLibrary` (see
     /// `ActivationEngine.moveFromFormerPlace`).
@@ -34,7 +40,7 @@ public struct Locations: Sendable {
     }
 
     public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
-                adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil) {
+                adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil, inactiveFolder: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
@@ -43,8 +49,11 @@ public struct Locations: Sendable {
         self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
         self.adobeFontsList = adobeFontsList
-        self.defaultFontLibrary = defaultFontLibrary
+        let defaultFontLibrary = defaultFontLibrary
             ?? userFonts.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Cicero/Library", isDirectory: true)
+        self.defaultFontLibrary = defaultFontLibrary
+        self.inactiveFolder = inactiveFolder
+            ?? defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Inactive", isDirectory: true)
     }
 
     public static var standard: Locations {
@@ -69,20 +78,37 @@ public struct Locations: Sendable {
         return URL(fileURLWithPath: String(cString: directory), isDirectory: true)
     }
 
-    /// Fonts Cicero keeps while they're off: those it moved out of an app's own folder, so the app stops loading them, and
-    /// those earlier versions moved out of ~/Library/Fonts, until they go back (see `ActivationEngine.emptyInactiveFolder`).
-    public var inactiveFolder: URL { support.appendingPathComponent("Inactive", isDirectory: true) }
-    /// What the Inactive folder was called up to 0.10.10, until it's renamed (see `ActivationEngine.moveFormerInactiveFolder`).
-    public var formerInactiveFolder: URL { support.appendingPathComponent("Deactivated", isDirectory: true) }
-
-    /// The Inactive folder, and the former one while it's there.
-    public var inactiveFolders: [URL] {
-        FileManager.default.fileExists(atPath: formerInactiveFolder.path) ? [inactiveFolder, formerInactiveFolder] : [inactiveFolder]
+    /// Where the Inactive folder was before, newest first, until what's in them moves to `inactiveFolder` (see
+    /// `ActivationEngine.moveFormerInactiveFolders`): in Cicero's support folder up to 0.11.0, and called Deactivated
+    /// there up to 0.10.10.
+    public var formerInactiveFolders: [URL] {
+        [support.appendingPathComponent("Inactive", isDirectory: true), support.appendingPathComponent("Deactivated", isDirectory: true)]
     }
 
-    /// In the Inactive folder, or the former one.
+    /// The Inactive folder, and each former one while it's there: what's in them is off and listed, and moves out as it
+    /// goes on.
+    public var inactiveFolders: [URL] {
+        [inactiveFolder] + formerInactiveFolders.filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// In the Inactive folder, or a former one.
     public func isInInactiveFolder(_ path: String) -> Bool {
-        [inactiveFolder, formerInactiveFolder].contains { path.hasPrefix($0.path + "/") }
+        ([inactiveFolder] + formerInactiveFolders).contains { path.hasPrefix($0.path + "/") }
+    }
+
+    /// The Inactive folder, made if it isn't there, for a file going in. When it can't be made, as when the home folder
+    /// has a file named Cicero, the former one in Cicero's support folder, so turning a font off still works; a later
+    /// launch moves what's there (see `ActivationEngine.moveFormerInactiveFolders`).
+    public func inactiveFolderForNewFiles() throws -> URL {
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: inactiveFolder, withIntermediateDirectories: true)
+            return inactiveFolder
+        } catch {
+            let former = formerInactiveFolders[0]
+            try fm.createDirectory(at: former, withIntermediateDirectories: true)
+            return former
+        }
     }
 }
 
@@ -561,6 +587,9 @@ public final class LibraryScanner: Sendable {
             }
         }
         let inactive = locations.inactiveFolders.map { WatchedFolder(id: WatchedFolder.inactiveFolderID, path: $0.path) }
+        // A location or the Font Library that holds the Inactive folder, as the home folder or ~/Cicero would, leaves it
+        // out: what's in it is Cicero's, off, and belongs with the folder it came from.
+        let inactivePaths = inactive.flatMap { [$0.path + "/", Self.realPath($0.path) + "/"] }
         for folder in input.folders + inactive {
             // Adobe's folders and Cicero's own are listed only when they're there; the Font Library counts as away when
             // it's on a disk that isn't connected, or one Cicero may not read, like the user's folders.
@@ -571,7 +600,8 @@ public final class LibraryScanner: Sendable {
                 reach.folderPaths.append(folder.path + "/")
                 continue
             }
-            Self.enumerate(folder.url, onlineOnly: { reach.onlineOnly[folder.id, default: []].append($0) }) { path, stamp in
+            let skipped = folder.id == WatchedFolder.inactiveFolderID ? [] : inactivePaths
+            Self.enumerate(folder.url, skipping: skipped, onlineOnly: { reach.onlineOnly[folder.id, default: []].append($0) }) { path, stamp in
                 if found[path] == nil {
                     found[path] = FoundFile(stamp: stamp, isActive: false)
                 }
@@ -673,7 +703,8 @@ public final class LibraryScanner: Sendable {
     /// Paths start with the folder's own path, as the user chose it, even when it goes through a symlink.
     /// With `onlineOnly`, files a cloud service has taken off the Mac go there instead: reading one would
     /// download it.
-    private static func enumerate(_ folder: URL, includingHidden: Bool = false, onlineOnly: ((String) -> Void)? = nil,
+    /// `skipping`: folders (each with a "/" at the end) whose files are left out.
+    private static func enumerate(_ folder: URL, includingHidden: Bool = false, skipping: [String] = [], onlineOnly: ((String) -> Void)? = nil,
                                   _ body: (String, FaceStamp) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
         let chosen = folder.path + "/"
@@ -689,7 +720,9 @@ public final class LibraryScanner: Sendable {
                   let modified = values.contentModificationDate, let size = values.fileSize
             else { continue }
             var path = url.path(percentEncoded: false)
+            if !skipping.isEmpty, skipping.contains(where: path.hasPrefix) { continue }
             if resolved != chosen, path.hasPrefix(resolved) { path = chosen + path.dropFirst(resolved.count) }
+            if !skipping.isEmpty, skipping.contains(where: path.hasPrefix) { continue }
             if let onlineOnly, Reachability.isOnlineOnly(path) {
                 onlineOnly(path)
                 continue

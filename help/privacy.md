@@ -49,8 +49,9 @@ To stop it, open **Preferences → General** and, under **Updates**, turn off **
 
 | Where | What |
 | --- | --- |
-| `~/Library/Application Support/Cicero` | Your folders, smart folders, tags, coverage sets, locations, added fonts and settings, the families you marked not similar, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the **Inactive** folder, and the setup saved before a restore, in **Backups**. |
+| `~/Library/Application Support/Cicero` | Your folders, smart folders, tags, coverage sets, locations, added fonts and settings, the families you marked not similar, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the setup saved before a restore, in **Backups**. |
 | `~/Cicero/Library` | The fonts Cicero installs, when you keep them in [Cicero’s Library](activating.md#ciceros-library), unless you moved it. |
+| `~/Cicero/Inactive` | The fonts Cicero moved out of an app’s own font folder to turn them off there (see [The Inactive folder](activating.md#the-inactive-folder)). |
 | `~/Library/Caches/Cicero` | What Cicero read from your font files, like names, characters and the shapes of their letters, so it doesn’t have to read them again, your font list as Cicero last found it, to show as soon as it opens, and the classifications Apple Intelligence recognized. **Fonts → Rebuild Font List** reads everything again. |
 
 Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way, and so are the random numbers for the usage statistics and the not-similar reports.

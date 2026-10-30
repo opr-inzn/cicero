@@ -1226,9 +1226,7 @@ public struct ActivationEngine: Sendable {
     /// Moves a file out of an app's folder into Cicero's Inactive folder, so the app stops loading it,
     /// and remembers where it was.
     private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: locations.inactiveFolder, withIntermediateDirectories: true)
-        let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: locations.inactiveFolder)
+        let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: try locations.inactiveFolderForNewFiles())
         try Self.move(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
