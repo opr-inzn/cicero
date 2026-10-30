@@ -13,6 +13,13 @@ struct EarlierImportSheet: View {
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
     /// Cicero's Library was chosen in this sheet, so it can be undone here.
     @State private var choseFontLibrary = false
+    /// How many files it copies, counted again when they'd go elsewhere (see `EarlierImportPrompt.copying`).
+    @State private var copying: Int
+
+    init(prompt: EarlierImportPrompt) {
+        self.prompt = prompt
+        _copying = State(initialValue: prompt.copying)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -31,9 +38,9 @@ struct EarlierImportSheet: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
-            if stage == nil, FontLibraryOffer.isShown(count: prompt.files.count, chose: choseFontLibrary,
+            if stage == nil, FontLibraryOffer.isShown(count: copying, chose: choseFontLibrary,
                                                       installsIntoFontLibrary: model.data.installsIntoFontLibrary) {
-                FontLibraryOffer(count: prompt.files.count, chose: $choseFontLibrary)
+                FontLibraryOffer(count: copying, chose: $choseFontLibrary)
             }
             HStack(spacing: 12) {
                 if let stage {
@@ -54,6 +61,14 @@ struct EarlierImportSheet: View {
         .padding(20)
         .frame(width: 520)
         .interactiveDismissDisabled(stage != nil)
+        .task(id: model.data.installsIntoFontLibrary) {
+            guard model.data.installsIntoFontLibrary != prompt.countedForFontLibrary else { return copying = prompt.copying }
+            let engine = model.engine
+            let files = prompt.files
+            let work = Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }
+            let count = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+            if !Task.isCancelled { copying = count }
+        }
     }
 
     private var name: String { model.data.folderNames[prompt.folder.id.uuidString] ?? prompt.folder.displayName }
@@ -61,7 +76,13 @@ struct EarlierImportSheet: View {
     /// What happens: where the files go, what stays on, what's kept, and that the location goes.
     private var detail: String {
         let total = prompt.files.count
-        let files = total == 1 ? "Cicero copies its font file into \(model.installPlace)." : "Cicero copies its \(total.formatted()) font files into \(model.installPlace)."
+        let place = model.installPlace
+        let files = switch copying {
+        case total: total == 1 ? "Cicero copies its font file into \(place)." : "Cicero copies its \(total.formatted()) font files into \(place)."
+        case 0: total == 1 ? "Its font file is in \(place) already." : "Its \(total.formatted()) font files are in \(place) already."
+        case total - 1: "Cicero copies \(copying.formatted()) of its \(total.formatted()) font files into \(place). The other one is there already."
+        default: "Cicero copies \(copying.formatted()) of its \(total.formatted()) font files into \(place). The others are there already."
+        }
         // Which copies are on: as their fonts are now.
         let state = switch prompt.onCount {
         case 0: total == 1 ? " The copy is inactive, as the font is now." : " The copies are inactive, as the fonts are now."
@@ -102,7 +123,7 @@ struct EarlierImportSheet: View {
     }
 
     private func start() {
-        stage = .copying(done: 0, total: prompt.files.count)
+        stage = .copying(done: 0, total: copying)
         estimate = CopyTimeEstimate(intoFontsFolder: !model.data.installsIntoFontLibrary)
         task = Task {
             let copied = await model.copyEarlierImport(prompt) { stage in

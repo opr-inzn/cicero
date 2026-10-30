@@ -58,37 +58,78 @@ extension ActivationEngine {
         return (placed, failed)
     }
 
+    /// What `installOff` does with each of some files, worked out before it copies any, so a sheet can say how many it
+    /// copies and the progress counts only those.
+    public struct CopyPlan: Sendable {
+        /// The files to copy, in the order given, each with the folder it goes into.
+        public var toCopy: [(path: String, folder: URL)] = []
+        /// Each file whose copy is in already (see `installedAlready`) → that copy.
+        public var inAlready: [String: String] = [:]
+        /// Each file the same as one before it in `toCopy`: of the same name and contents, going into the same folder, so
+        /// one copy stands for both, as with "Font.otf" in two of another app's folders. File → that one.
+        public var sameAs: [String: String] = [:]
+    }
+
+    /// Works out what `installOff` does with `files`: takes those in already, copies one of each set of the same file,
+    /// copies the rest. Reads only files whose name is taken where they go (and, for Cicero's Library, each file's
+    /// family), so it's quick unless they're in already.
+    public func copyPlan(_ files: [String]) -> CopyPlan {
+        var plan = CopyPlan()
+        var seen = Set<String>()
+        // Where a file of each name goes (folder/name) → the files to copy there under it.
+        var named: [String: [String]] = [:]
+        for path in files where seen.insert(path).inserted {
+            if Task.isCancelled { break }
+            let folder = installFolder(for: path, family: nil)
+            if let there = installedAlready(path, into: folder) {
+                plan.inAlready[path] = there
+                continue
+            }
+            let key = folder.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
+            if let original = named[key]?.first(where: { Self.isIdenticalCopy(path, of: $0) }) {
+                plan.sameAs[path] = original
+                continue
+            }
+            named[key, default: []].append(path)
+            plan.toCopy.append((path, folder))
+        }
+        return plan
+    }
+
     /// Copies font files in where installing puts them, off, as an import brings in another app's fonts: into
     /// ~/Library/Fonts (see `moveIntoFontsFolderOff`), or their family's folder in Cicero's Library, where a font is on
     /// only while Cicero has it registered. A file with the same contents there already, under its name or a numbered one
     /// ("Name 2.otf", as one of two files of the same name went in), or in ~/Library/Fonts while Cicero's Library is
-    /// used, is taken as it is, on or off: importing again copies nothing twice. Nothing is remembered as a copy of
-    /// anything: the files are the user's own from now on. Returns where each
-    /// file is now, and which of those are new; cancelling stops between batches.
+    /// used, is taken as it is, on or off: importing again copies nothing twice. Of files with the same name and contents,
+    /// one is copied and stands for the others (see `copyPlan`). Nothing is remembered as a copy of anything: the files are
+    /// the user's own from now on. Progress counts the files to copy. Returns where each file is now, and which of those
+    /// are new; cancelling stops between batches.
     @concurrent
     public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async -> (placed: [String: String], new: [String]) {
         let fm = FileManager.default
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
-        var placed: [String: String] = [:]
+        let plan = copyPlan(files)
+        let total = plan.toCopy.count
+        var placed = plan.inAlready
         var new: [String] = []
         // The copies moved into ~/Library/Fonts, off, and when they were last looked at (see `turnOffAgain`).
         var intoFontsFolderSoFar: [String] = []
         var registeredAgain = Set<String>()
         var lastLook = ContinuousClock.now
-        for start in stride(from: 0, to: files.count, by: Self.offBatchSize) {
+        for start in stride(from: 0, to: total, by: Self.offBatchSize) {
             if Task.isCancelled { break }
             if ContinuousClock.now - lastLook > Self.lookAgainEvery {
                 await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
                 lastLook = .now
             }
-            progress(start, files.count)
+            progress(start, total)
             // Each staged copy → where it goes in ~/Library/Fonts, and the file it's a copy of.
             var intoFontsFolder: [String: String] = [:]
             var sources: [String: String] = [:]
-            for path in files[start..<min(start + Self.offBatchSize, files.count)] where placed[path] == nil {
-                let folder = installFolder(for: path, family: nil)
+            for (path, folder) in plan.toCopy[start..<min(start + Self.offBatchSize, total)] {
                 let name = (path as NSString).lastPathComponent
                 let same = folder.appendingPathComponent(name, isDirectory: false)
+                // One that went in since the plan was made.
                 if let there = installedAlready(path, into: folder) {
                     placed[path] = there
                     continue
@@ -132,7 +173,9 @@ extension ActivationEngine {
             try? await Task.sleep(for: .seconds(3))
             await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
         }
-        progress(files.count, files.count)
+        // The same files as those copied take their copies.
+        for (path, original) in plan.sameAs { if let copy = placed[original] { placed[path] = copy } }
+        if total > 0 { progress(total, total) }
         return (placed, new)
     }
 
