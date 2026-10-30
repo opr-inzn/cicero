@@ -18,8 +18,9 @@ struct ImportSheet: View {
     @State private var appIsOpen = false
     /// Reading the library again, as the app left it on quitting.
     @State private var isRereading = false
-    /// The files whose copies are in already (see `findInstalledAlready`).
-    @State private var installedAlready: Set<String> = []
+    /// What importing copies, once `findCopies` has looked (see `Copies`); the last look's while it looks again.
+    @State private var copies: Copies?
+    @State private var isLooking = true
     /// How long the copying has left, from when Import is pressed.
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
     /// Cicero's Library was chosen here, instead of the Fonts folder, so it can be undone here.
@@ -60,7 +61,7 @@ struct ImportSheet: View {
         .frame(width: 600)
         .onAppear { appIsOpen = isAppRunning }
         // Again when the fonts go elsewhere: those in already are looked for where they go.
-        .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findInstalledAlready() }
+        .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
             if isOtherApp(note) { appIsOpen = isAppRunning }
         }
@@ -158,8 +159,9 @@ struct ImportSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 2)
-                // Counting the files again for every step of the progress would hold up the window.
-                if stage == nil, case let count = copyingCount,
+                // Counting the files again for every step of the progress would hold up the window. Not before the first
+                // look has found which are in already: offered for thousands of fonts in already, it would go again.
+                if stage == nil, copies != nil, case let count = copyingCount,
                    FontLibraryOffer.isShown(count: count, chose: choseFontLibrary, installsIntoFontLibrary: model.data.installsIntoFontLibrary) {
                     FontLibraryOffer(count: count, chose: $choseFontLibrary)
                         .padding(.horizontal, 20)
@@ -259,6 +261,9 @@ struct ImportSheet: View {
             } else if isRereading {
                 ProgressView().controlSize(.small)
                 Text("Reading \(appName)’s library").font(.callout).foregroundStyle(.secondary)
+            } else if isLooking, !candidates.isEmpty {
+                ProgressView().controlSize(.small)
+                Text("Looking for fonts in your library already").font(.callout).foregroundStyle(.secondary)
             } else {
                 Text("Your current setup is saved first, in Backups.")
                     .font(.callout)
@@ -395,13 +400,17 @@ struct ImportSheet: View {
         return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
     }
 
-    /// How many fonts the import puts into the Fonts folder, as the boxes are ticked.
+    /// How many font files the import copies in, as the boxes are ticked: as `ActivationEngine.copyPlan` will count them for
+    /// the progress and the summary. Of the same files, one is copied, also where the box of the one the look took is off.
     private var copyingCount: Int {
-        let copying = toCopy
-        var count = 0
-        if choices.fontFolder, let folder = library.fontFolder { count += copying.count { $0.hasPrefix(folder + "/") } }
-        if choices.otherFiles { count += library.otherFiles.count(where: copying.contains) }
-        return count
+        let all = Set(candidates.map(\.path))
+        var picked = Set<String>()
+        if choices.fontFolder, let folder = library.fontFolder { picked.formUnion(all.filter { $0.hasPrefix(folder + "/") }) }
+        if choices.otherFiles { picked.formUnion(library.otherFiles.filter(all.contains)) }
+        let copies = self.copies ?? Copies()
+        let copied = picked.filter { !copies.inAlready.contains($0) && copies.sameAs[$0] == nil }
+        let standingIn = Set(picked.compactMap { copies.sameAs[$0] }.filter { !picked.contains($0) })
+        return copied.count + standingIn.count
     }
 
     private var classificationsDetail: String {
@@ -419,9 +428,10 @@ struct ImportSheet: View {
 
     /// The files importing copies in, as `performImport` will: those Cicero reads already, in a Fonts folder, a location
     /// (like a Font Library an earlier import added) or Added Fonts, stay as they are, and so do those already copied in
-    /// (`installedAlready`).
+    /// and those the same as another one (see `Copies`). All of them until the first look.
     private var toCopy: Set<String> {
-        Set(candidates.map(\.path)).subtracting(installedAlready)
+        let copies = self.copies ?? Copies()
+        return Set(candidates.map(\.path)).subtracting(copies.inAlready).subtracting(copies.sameAs.keys)
     }
 
     /// The files importing would copy in but for those already copied in.
@@ -433,28 +443,48 @@ struct ImportSheet: View {
         return LibraryImport.fontFiles(library, choices: all, data: &data, locations: model.locations)
     }
 
-    /// Finds the files whose copies are where importing would put them already, as an earlier import or the offer to copy
-    /// an earlier import's location in left them, reading them off the main thread.
-    private func findInstalledAlready() async {
-        let engine = model.engine
-        let files = candidates
-        installedAlready = await Task.detached(priority: .userInitiated) {
-            Set(files.filter { engine.installedAlready($0.source) != nil }.map(\.path))
-        }.value
+    /// Of the files importing would copy in, by the other app's paths: those whose copies are where importing would put
+    /// them already, as an earlier import or the offer to copy an earlier import's location in left them, and those the
+    /// same as one before them, whose copy stands for them (see `ActivationEngine.copyPlan`).
+    private struct Copies {
+        var inAlready: Set<String> = []
+        var sameAs: [String: String] = [:]
     }
 
-    /// ", 3 in your library already", or ", in your library already" for all of them.
-    private func alreadyNote(total: Int, copying: Int) -> String {
-        copying >= total ? "" : copying == 0 ? ", in your library already" : ", \((total - copying).formatted()) in your library already"
+    /// Looks for the files in already and the same files, reading them off the main thread.
+    private func findCopies() async {
+        isLooking = true
+        let engine = model.engine
+        let files = candidates
+        let work = Task.detached(priority: .userInitiated) { engine.copyPlan(files.map(\.source)) }
+        let plan = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+        guard !Task.isCancelled else { return }
+        let paths = Dictionary(files.map { ($0.source, $0.path) }, uniquingKeysWith: { first, _ in first })
+        copies = Copies(inAlready: Set(files.filter { plan.inAlready[$0.source] != nil }.map(\.path)),
+                        sameAs: Dictionary(files.compactMap { file in plan.sameAs[file.source].flatMap { paths[$0] }.map { (file.path, $0) } },
+                                           uniquingKeysWith: { first, _ in first }))
+        isLooking = false
+    }
+
+    /// Of `total` files, `copying` copied in and `same` the same as others: ", 3 in your library already", ", in your library
+    /// already" for all of them, ", 2 the same as other files".
+    private func alreadyNote(total: Int, copying: Int, same: Int) -> String {
+        let inAlready = total - copying - same
+        if copying + same == 0, total > 0 { return ", in your library already" }
+        var parts: [String] = []
+        if inAlready > 0 { parts.append("\(inAlready.formatted()) in your library already") }
+        if same > 0 { parts.append(same == 1 ? "1 the same as another file" : "\(same.formatted()) the same as other files") }
+        return parts.isEmpty ? "" : ", " + parts.formatted(.list(type: .and))
     }
 
     private func fontLibraryDetail(_ folder: String) -> String {
         let place = (folder as NSString).abbreviatingWithTildeInPath
         let copying = toCopy.count { $0.hasPrefix(folder + "/") }
+        let same = (copies?.sameAs.keys).map { $0.count { $0.hasPrefix(folder + "/") } } ?? 0
         if let bundled = library.bundledFonts {
-            return "\(place) (\(count(bundled.files.count, "font file")) from the backup\(alreadyNote(total: bundled.files.count, copying: copying)))"
+            return "\(place) (\(count(bundled.files.count, "font file")) from the backup\(alreadyNote(total: bundled.files.count, copying: copying, same: same)))"
         }
-        return "\(place) (\(count(library.fontFolderCount, "font file"))\(alreadyNote(total: library.fontFolderCount, copying: copying)))"
+        return "\(place) (\(count(library.fontFolderCount, "font file"))\(alreadyNote(total: library.fontFolderCount, copying: copying, same: same)))"
     }
 
     /// The folders the other files are in, those with the most first, then how many there are: "~/Desktop/Client and
@@ -465,7 +495,8 @@ struct ImportSheet: View {
             .map { ($0.key as NSString).abbreviatingWithTildeInPath }
         let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
         let copying = library.otherFiles.count(where: toCopy.contains)
-        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying)))"
+        let same = library.otherFiles.count { copies?.sameAs[$0] != nil }
+        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".

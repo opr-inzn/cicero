@@ -8,6 +8,10 @@ struct EarlierImportPrompt: Identifiable {
     let folder: WatchedFolder
     /// The font files in it the library lists.
     let files: [String]
+    /// How many of them are copied: not those in already, and one of the same files (see `ActivationEngine.copyPlan`).
+    let copying: Int
+    /// Where `copying` was counted for: Cicero's Library, or the Fonts folder.
+    let countedForFontLibrary: Bool
     /// How many of those are on where they are.
     let onCount: Int
     /// The smart folders with a rule about the location, which find nothing once it's gone.
@@ -28,7 +32,15 @@ extension AppModel {
         askedAboutEarlierImport = true
         let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
-        earlierImportPrompt = EarlierImportPrompt(folder: folder, files: files, onCount: onCount, smartSets: smartSets)
+        let engine = engine
+        let intoFontLibrary = data.installsIntoFontLibrary
+        Task {
+            // Counted before asking, so the sheet says from the start how many it copies.
+            let copying = await Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }.value
+            guard !isImporting, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
+            earlierImportPrompt = EarlierImportPrompt(folder: folder, files: files, copying: copying, countedForFontLibrary: intoFontLibrary,
+                                                      onCount: onCount, smartSets: smartSets)
+        }
     }
 
     /// On from its file where it is: by Cicero, or by FontExplorer X, which leaves its fonts on after it quits.
