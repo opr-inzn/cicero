@@ -246,8 +246,11 @@ extension AppModel {
         return ActivationEngine.hasFontFiles(in: folder) || data.records.inPlace.contains { $0.hasPrefix(prefix) }
     }
 
-    /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;
-    /// a folder it can't go into is refused, saying why (see `ActivationEngine.refusal`).
+    /// Asks where to keep the Font Library and moves it there, with its fonts, their registrations and the records: into
+    /// the folder chosen when it's empty, else into a new "Cicero Library" folder in it (see
+    /// `ActivationEngine.fontLibraryFolder`). A folder it can't go into is refused while the panel stays open, saying why
+    /// (see `ActivationEngine.refusal`), so another one can be chosen; one a cloud service keeps is used only after a
+    /// warning (see `FontLibraryFolderCheck`).
     func changeFontLibrary() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -255,19 +258,20 @@ extension AppModel {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
-        panel.message = "Choose an empty folder for Cicero’s Library, or make a new one. Its fonts move there."
+        panel.message = "Choose where to keep Cicero’s Library. Its fonts move there, into a new “Cicero Library” folder when the folder you choose has other things in it."
         panel.directoryURL = data.fontLibrary?.url.deletingLastPathComponent()
-        guard panel.runModal() == .OK, let url = panel.url?.standardizedFileURL else { return }
-        if let reason = ActivationEngine.refusal(forFontLibraryAt: url, current: data.fontLibrary?.url, folders: data.scannedFolders(), locations: locations) {
-            let alert = NSAlert()
-            alert.messageText = "Cicero’s Library can’t go into “\(url.lastPathComponent)”."
-            alert.informativeText = reason
-            alert.runModal()
-            return
+        let current = data.fontLibrary?.url, folders = data.scannedFolders(), locations = locations
+        let checker = FontLibraryFolderCheck { url in
+            ActivationEngine.refusal(forFontLibraryAt: url, current: current, folders: folders, locations: locations)
         }
+        panel.delegate = checker
+        let response = panel.runModal()
+        withExtendedLifetime(checker) {}
+        guard response == .OK, let url = panel.url?.standardizedFileURL else { return }
+        let destination = ActivationEngine.fontLibraryFolder(in: url)
         enqueue { model in
-            let result = await model.engine.moveFontLibrary(to: url, records: model.data.records)
-            if result.failed.isEmpty { model.data.fontLibraryPath = url.path }
+            let result = await model.engine.moveFontLibrary(to: destination, records: model.data.records)
+            if result.failed.isEmpty { model.data.fontLibraryPath = destination.path }
             model.finish(result)
         }
     }
@@ -1154,5 +1158,50 @@ extension AppModel {
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
         plan.title = plan.paths.count == 1 ? "1 extra copy" : "\(plan.paths.count) extra copies"
         trashPlan = plan
+    }
+}
+
+/// Checks the folder chosen for Cicero's Library as the open panel's Choose is clicked: one it can't go into is refused
+/// there, the panel saying why and staying open for another one. One a cloud service keeps gets a warning first, as a
+/// sheet on the panel: the service can take files off the Mac to make room, and fonts used from there can stop working.
+/// Choose Another Folder (the default) goes back to the panel; Use Anyway takes it.
+private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
+    let refusal: (URL) -> String?
+
+    init(refusal: @escaping (URL) -> String?) {
+        self.refusal = refusal
+    }
+
+    func panel(_ sender: Any, validate url: URL) throws {
+        let url = url.standardizedFileURL
+        if let reason = refusal(url) {
+            throw NSError(domain: "Cicero", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Cicero’s Library can’t go into “\(url.lastPathComponent)”.",
+                NSLocalizedRecoverySuggestionErrorKey: reason,
+            ])
+        }
+        guard let service = ActivationEngine.cloudService(syncing: url) else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        switch service {
+        case .iCloudDrive:
+            alert.messageText = "“\(url.lastPathComponent)” syncs with iCloud Drive."
+            alert.informativeText = "iCloud Drive can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and choose Keep Downloaded."
+        case .other:
+            alert.messageText = "“\(url.lastPathComponent)” syncs with a cloud service."
+            alert.informativeText = "The service can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and make it available offline."
+        }
+        alert.addButton(withTitle: "Choose Another Folder")
+        alert.addButton(withTitle: "Use Anyway")
+        let response: NSApplication.ModalResponse
+        if let panel = sender as? NSWindow {
+            // A sheet on the panel, waited for here: the panel needs the answer before Choose goes on.
+            alert.beginSheetModal(for: panel) { NSApp.stopModal(withCode: $0) }
+            response = NSApp.runModal(for: alert.window)
+        } else {
+            response = alert.runModal()
+        }
+        // Cancelled, the panel stays open without saying anything.
+        guard response == .alertSecondButtonReturn else { throw CocoaError(.userCancelled) }
     }
 }
