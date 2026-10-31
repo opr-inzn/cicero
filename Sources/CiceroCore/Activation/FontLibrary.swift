@@ -152,7 +152,8 @@ extension ActivationEngine {
             guard Self.moveItems(in: old, to: new, except: Set(move.kept)) else { return await failed() }
             if held.isEmpty { Self.removeEmptyFolders(old) }
         }
-        records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
+        // A copy's original can be in the library too: earlier versions installed copies of a library they listed as a location.
+        records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), moved($0.value)) }, uniquingKeysWith: { first, _ in first })
         records.inPlace = Set(records.inPlace.map(moved))
         records.temporary = Dictionary(records.temporary.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
         if !persistent.isEmpty { _ = await registrar.register(persistent.map { Self.url(moved($0)) }, scope: .persistent) }
