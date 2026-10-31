@@ -311,6 +311,8 @@ extension AppModel {
             let result = await model.engine.moveFontLibrary(to: destination, records: model.data.records)
             if result.failed.isEmpty { model.data.fontLibraryPath = destination.path }
             model.finish(result)
+            // What the move wrote down goes only once the new path is on the disk, so a stop in between still has it.
+            if result.failed.isEmpty, model.store.flush(durably: true) { model.engine.forgetLibraryMove() }
         }
     }
 

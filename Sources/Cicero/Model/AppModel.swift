@@ -348,8 +348,11 @@ final class AppModel {
         let migrating = needsFontLibraryMigration
         // And for the Inactive folder's new place, so its fonts don't drop out of the window for a moment either.
         let renaming = launchEngine.hasFormerInactiveFolders
-        movingAtLaunch = migrating || renaming
+        // And for a move of the library that Cicero stopped in, put back together first (see `ActivationEngine.finishLibraryMove`).
+        let reassembling = launchEngine.hasLibraryMove
+        movingAtLaunch = migrating || renaming || reassembling
         enqueue { model in
+            if reassembling { await model.engine.finishLibraryMove(libraryPath: model.data.fontLibraryPath, records: model.data.records) }
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
             if renaming { await model.moveFormerInactiveFolders() }
             await model.engine.finishTurningOff()
@@ -361,10 +364,10 @@ final class AppModel {
             model.data.records = emptied.records
             model.movingAtLaunch = false
             // The first scan may have listed the files before they went.
-            if migrating || renaming || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
+            if migrating || renaming || reassembling || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
-        if !migrating && !renaming { rescan(check: true) }
+        if !migrating && !renaming && !reassembling { rescan(check: true) }
     }
 
     /// At launch, without a word: what's in the Inactive folder's former places moves to ~/Cicero/Inactive, and the
@@ -396,6 +399,7 @@ final class AppModel {
         if let moved = await engine.moveFromFormerPlace(records: data.records) {
             data.records = moved.records
             data.fontLibraryPath = locations.defaultFontLibrary.path
+            if store.flush(durably: true) { engine.forgetLibraryMove() }
         }
         var checked = data
         checked.keepFormerFontLibraryAsLocation(hasFonts: fontLibraryHasFonts)
