@@ -324,9 +324,10 @@ public struct GlyphSection: Identifiable, Sendable {
         let scripts = GlyphGroup.scripts(of: coverage)
         for range in coverage.ranges {
             for value in range {
-                guard let group = privateUse[value] ?? GlyphGroup.of(value, in: scripts) else { continue }
+                // The block first: one that's full needs no character classified.
                 let block = Self.block(of: value) ?? ""
-                guard perBlock[block, default: 0] < limit, !isEmpty(value) else { continue }
+                guard perBlock[block, default: 0] < limit, let group = privateUse[value] ?? GlyphGroup.of(value, in: scripts), !isEmpty(value)
+                else { continue }
                 perBlock[block, default: 0] += 1
                 buckets[group, default: []].append(value)
             }
