@@ -225,7 +225,7 @@ private struct LanguagesTab: View {
 
     var body: some View {
         HSplitView {
-            list.frame(minWidth: 240, idealWidth: 300, maxWidth: 420, maxHeight: .infinity)
+            list.frame(minWidth: 260, idealWidth: 300, maxWidth: 420, maxHeight: .infinity)
             detail.frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
@@ -265,7 +265,8 @@ private struct LanguagesTab: View {
         // The languages scroll under the search field.
         .fadingTopBar {
             HStack(spacing: 8) {
-                TextField("Search", text: $search, prompt: Text("Language or script, in English or its own language"))
+                // Short enough for the field beside the sort menu at the list's narrowest.
+                TextField("Search", text: $search, prompt: Text("Language or script"))
                     .textFieldStyle(.roundedBorder)
                 Picker("Sort", selection: $sortByName) {
                     Text("Speakers").tag(false)
