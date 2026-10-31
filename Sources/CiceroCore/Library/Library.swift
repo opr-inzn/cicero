@@ -261,6 +261,9 @@ public final class LibraryScanner: Sendable {
         var restored: Library?
         /// The fingerprint of the library last saved for the next launch.
         var savedFingerprint: Int?
+        /// The library `savedLibrary` read, as saved, until a library is saved: fingerprints differ from one launch to the
+        /// next, so the first scan's library is compared with it instead.
+        var onDisk: Library?
         /// Set by `clearCache`: the next scan reads every file it finds again, but keeps what it knows of the
         /// ones out of reach.
         var rereadAll = false
@@ -299,14 +302,19 @@ public final class LibraryScanner: Sendable {
         Signposts.library.withIntervalSignpost("Restore library") {
             guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
             let session = ActivationEngine.currentSession()
+            var asSaved = true
             let library = LibraryCache.decode(data) { state, path, app in
                 guard case .active(.temporary) = state else { return state }
                 if let record = records.temporary[path], record.scope == .whileAppsRun, record.session == session { return state }
+                asSaved = false
                 // What `faceState` says of a file that isn't active.
                 if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
                 return .inactive
             }
-            state.withLock { $0.restored = library }
+            state.withLock { state in
+                state.restored = library
+                state.onDisk = asSaved ? library : nil
+            }
             return library
         }
     }
@@ -488,6 +496,7 @@ public final class LibraryScanner: Sendable {
             $0.dirty = true
             $0.last = nil
             $0.savedFingerprint = nil
+            $0.onDisk = nil
         }
     }
 
@@ -854,17 +863,24 @@ public final class LibraryScanner: Sendable {
         try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)
     }
 
-    /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last. Fingerprints
-    /// differ from one launch to the next, so each launch's first scan saves it again.
+    /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last.
     private func saveLibraryIfNeeded(_ library: Library) {
         let changed = state.withLock { state in
             guard state.savedFingerprint != library.fingerprint else { return false }
             state.savedFingerprint = library.fingerprint
-            return true
+            defer { state.onDisk = nil }
+            return state.onDisk.map { !Self.savesAlike($0, library) } ?? true
         }
         guard changed else { return }
         try? FileManager.default.createDirectory(at: locations.caches, withIntermediateDirectories: true)
         try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)
+    }
+
+    /// Whether the library cache would hold the same for both.
+    private static func savesAlike(_ a: Library, _ b: Library) -> Bool {
+        a.families == b.families && a.unreadableFiles == b.unreadableFiles && a.activePaths == b.activePaths
+            && a.unavailableFolders == b.unavailableFolders && a.onlineOnlyFiles == b.onlineOnlyFiles
+            && a.offlineFamilies == b.offlineFamilies && a.offlinePaths == b.offlinePaths
     }
 
     // MARK: Building
