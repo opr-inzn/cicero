@@ -458,7 +458,8 @@ public struct FeatureGlyph: Hashable, Sendable {
     public static let limit = 3000
 
     /// The face's glyphs that only those features draw, each once, by feature, then character, the case-sensitive forms
-    /// as their characters are listed (see `GlyphSection.signPrecedes`), but the small capitals first, in their letters'
+    /// as their characters are listed (see `GlyphSection.signPrecedes`) and superscripts, subscripts, numerators and
+    /// denominators figures first (see `GlyphSection.valueOrder`), but the small capitals first, in their letters'
     /// order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`), and the localized forms by
     /// language (see `localizedForms`); a glyph a character has too, like a superscript two the font maps U+00B2 to, is
     /// left to the character, and accents' case-sensitive forms are left out. Reads the font's GSUB table; call off the
@@ -519,8 +520,15 @@ public struct FeatureGlyph: Hashable, Sendable {
                 }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
             }
-            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`).
+            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`);
+            // superscripts, subscripts, numerators and denominators as their groups' characters are, figures first (see
+            // `GlyphSection.valueOrder`).
+            let byValue: Set<GlyphGroup> = [.superscripts, .subscripts, .numerators, .denominators]
             let sorted = feature.tag == "case" ? entries.sorted { GlyphSection.signPrecedes($0.character, $1.character) }
+                : byValue.contains(feature.group) ? entries.sorted { a, b in
+                    let (x, y) = (GlyphSection.valueOrder(of: a.character, in: feature.group), GlyphSection.valueOrder(of: b.character, in: feature.group))
+                    return x != y ? x < y : a.glyph < b.glyph
+                }
                 : entries.sorted { $0.character < $1.character }
             let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
             for glyph in sorted + combined where result.count < limit && seen.insert(glyph.glyph).inserted {
