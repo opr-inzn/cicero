@@ -305,6 +305,7 @@ extension ActivationEngine {
         for name in ((try? fm.contentsOfDirectory(atPath: folder)) ?? []) where !kept.contains(name) {
             let path = (folder as NSString).appendingPathComponent(name)
             if name.hasPrefix(movingPrefix) {
+                unlock(url(path))
                 try? fm.removeItem(atPath: path)
             } else if isFolder(path) {
                 removeHalfCopies(in: path, except: [])

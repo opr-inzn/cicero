@@ -336,7 +336,10 @@ extension ActivationEngine {
         // A copy onto another disk that stopped halfway, under a hidden name nothing reads, in a folder there too.
         let halfCopies = (fm.enumerator(atPath: folder.path)?.allObjects as? [String] ?? [])
             .filter { ($0 as NSString).lastPathComponent.hasPrefix(Self.movingPrefix) }
-        for path in halfCopies { try? fm.removeItem(at: folder.appendingPathComponent(path)) }
+        for path in halfCopies {
+            Self.unlock(folder.appendingPathComponent(path))
+            try? fm.removeItem(at: folder.appendingPathComponent(path))
+        }
         for former in locations.formerInactiveFolders where Self.exists(former.path) {
             let names = ((try? fm.contentsOfDirectory(atPath: former.path)) ?? []).filter { $0 != ".DS_Store" }.sorted()
             let staying = Set(names.filter { name in
@@ -464,6 +467,7 @@ extension ActivationEngine {
             let copy = to.deletingLastPathComponent().appendingPathComponent(movingPrefix + UUID().uuidString)
             do {
                 try fm.copyItem(at: from, to: copy)
+                unlock(copy)
                 guard renamex_np(copy.path, to.path, UInt32(RENAME_EXCL)) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             } catch {
                 try? fm.removeItem(at: copy)
@@ -477,6 +481,15 @@ extension ActivationEngine {
             }
         }
         if let added { setDateAdded(added, of: to) }
+    }
+
+    /// Takes Locked off a hidden copy of Cicero's own, which `copyItem` gives its original's flags: locked, it could be
+    /// neither named nor taken back out, and stayed behind at every try. Other flags, like Hidden, stay.
+    static func unlock(_ url: URL) {
+        let locked = UInt32(UF_IMMUTABLE | UF_APPEND)
+        var info = stat()
+        guard lstat(url.path, &info) == 0, info.st_flags & locked != 0 else { return }
+        lchflags(url.path, info.st_flags & ~locked)
     }
 
     /// Moving `from` to `to` file by file, as onto another disk: a folder's items each to the same place in `to`, at any
