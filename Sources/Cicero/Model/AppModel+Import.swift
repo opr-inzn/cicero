@@ -142,13 +142,7 @@ extension AppModel {
         let imported = prompt.library
         isImporting = true
         defer { isImporting = false }
-        let backup = LibraryBackup(locations: locations)
-        let current = data
-        let saved = await Task.detached(priority: .userInitiated) { (try? backup.saveSnapshot(current, named: "Before Import")) != nil }.value
-        guard saved else {
-            showToast("Couldn’t save the current setup first, so nothing was imported")
-            return nil
-        }
+        guard await saveSetupSnapshot(named: "Before Import", nothingWas: "imported") else { return nil }
         // The other app's copies go first, so they aren't on beside Cicero's.
         let removed = choices.removeCopies ? LibraryImport.removeCopies(imported) : 0
         var data = data
@@ -178,7 +172,7 @@ extension AppModel {
             let onFromApp = choices.activate ? model.library.faces(inFiles: copiedFrom).filter { $0.state.source == .otherApp } : []
             if !onFromApp.isEmpty { model.data.records = await model.engine.deactivate(onFromApp, records: model.data.records).records }
             // The library with the copies in it, to match against.
-            let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
+            let input = model.scanInput
             let scanned = try? await model.scanner.scan(input) { progress in
                 switch progress {
                 case .identifying(let done, let total), .updating(let done, let total): stage(.reading(done: done, total: total))

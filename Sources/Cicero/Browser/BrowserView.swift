@@ -16,11 +16,10 @@ struct BrowserView: View {
     }
 
     private var browser: some View {
-        @Bindable var model = model
         let families = model.visibleFamilies
         return Group {
             if families.isEmpty && model.hasScanned {
-                // Just the message on the plain background; an empty table would still draw its rows.
+                // Just the message on the plain background, in place of the empty list, grid or specimens.
                 EmptyBrowser()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.canvas)

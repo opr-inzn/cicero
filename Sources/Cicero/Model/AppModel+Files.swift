@@ -23,9 +23,7 @@ struct AddNote {
 
 extension AppModel {
     /// The kinds of font file Cicero reads, for open panels.
-    static var fontTypes: [UTType] {
-        FontFormat.fileExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
-    }
+    static let fontTypes: [UTType] = FontFormat.fileExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
 
     // MARK: Adding
 
@@ -383,8 +381,7 @@ extension AppModel {
 
     /// The path the way the library has it: through the folder it reads, when `path` reaches a file in it another way,
     /// through a symbolic link, like a shortcut to a synced folder, or in other letter case.
-    func libraryPath(of path: String, folders: [String]? = nil) -> String {
-        let folders = folders ?? readFolders
+    func libraryPath(of path: String, folders: [String]) -> String {
         guard !folders.contains(where: { path.hasPrefix($0 + "/") }), let real = Self.realPath(path) else { return path }
         for folder in folders {
             guard let realFolder = Self.realPath(folder), real.hasPrefix(realFolder + "/") else { continue }

@@ -70,7 +70,8 @@ enum FamilySelection {
 
 /// How a browser view lays out its families, which decides what the arrow keys do.
 enum FamilyLayout {
-    /// Rows under column headers: the list moves the selection with ↑/↓ itself; ←/→ go through the families Quick Look shows.
+    /// Rows under column headers: the list moves the selection with ↑/↓ itself; ←/→ go through the families Quick Look
+    /// shows.
     case list
     /// ↑/↓ move the selection; ←/→ go through the families Quick Look shows.
     case specimens
@@ -108,7 +109,8 @@ extension View {
 }
 
 /// Keyboard handling for the browser: Return and ⌘↓ open, Escape deselects, ⌘A selects all, typing the start of a name
-/// jumps to the first family starting with it (spaces included while typing), Space opens and closes Quick Look, and the arrow keys as the layout has them.
+/// jumps to the first family starting with it (spaces included while typing), Space opens and closes Quick Look, and
+/// the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
     let order: FamilyOrder

@@ -93,23 +93,22 @@ private struct FolderRow: View {
                     .font(.caption)
                     .help("Open Privacy & Security in System Settings, where Files and Folders lets Cicero in")
             }
-        case nil where model.downloads[folder.id] != nil:
-            let progress = model.downloads[folder.id]!
-            Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        case nil where onlineOnly > 0:
-            HStack(spacing: 6) {
-                Label(onlineOnly == 1 ? "1 font file is online only" : "\(onlineOnly.formatted()) font files are online only", systemImage: "icloud.and.arrow.down")
+        case nil:
+            if let progress = model.downloads[folder.id] {
+                Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folder.id) }
-                    .buttonStyle(.link)
-                    .font(.caption)
-                    .help("Download them from the cloud service so they’re listed")
+            } else if onlineOnly > 0 {
+                HStack(spacing: 6) {
+                    Label(onlineOnly == 1 ? "1 font file is online only" : "\(onlineOnly.formatted()) font files are online only", systemImage: "icloud.and.arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folder.id) }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                        .help("Download them from the cloud service so they’re listed")
+                }
             }
-        case nil:
-            EmptyView()
         }
     }
 

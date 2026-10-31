@@ -27,14 +27,8 @@ struct BackupSheet: View {
                 Text("The backup has everything set up in Cicero: folders, smart folders, tags, coverage sets, locations and added fonts, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
                     .foregroundStyle(.secondary)
             }
-            Toggle(isOn: $includeFonts) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Include font files")
-                    Text(fontsDetail).font(.callout).foregroundStyle(.secondary)
-                }
-            }
-            .toggleStyle(.checkbox)
-            .disabled(fonts?.isEmpty == true || progress != nil)
+            DetailToggle("Include font files", detail: fontsDetail, isOn: $includeFonts)
+                .disabled(fonts?.isEmpty == true || progress != nil)
             if let progress {
                 VStack(alignment: .leading, spacing: 4) {
                     switch progress {

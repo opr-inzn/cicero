@@ -153,7 +153,8 @@ struct GlyphsSection: View {
         }
     }
 
-    /// "124 characters", and the ligatures and alternates when there are any: "124 characters · 3 ligatures · 40 alternates".
+    /// "124 characters", and the ligatures and alternates when there are any:
+    /// "124 characters · 3 ligatures · 40 alternates".
     private var count: String {
         let characters = characterCount
         let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
@@ -400,7 +401,7 @@ struct GlyphsSection: View {
         if let glyph = GlyphVectors.glyph(of: scalar, in: font), Self.isCombining(scalar) || Self.takesNoRoom(glyph, in: font) {
             GlyphImage(face: style.face, glyph: glyph, size: size, weight: style.weight, variations: style.variations)
         } else {
-            FontText(text: String(Character(Unicode.Scalar(scalar)!)), face: style.face, size: size, weight: style.weight,
+            FontText(text: Self.text(scalar), face: style.face, size: size, weight: style.weight,
                      variations: style.variations)
                 .foregroundStyle(Color.ink)
         }
@@ -469,15 +470,15 @@ struct GlyphsSection: View {
     /// The ligatures whose characters hold what's typed ("f" finds ff, fi and ffl), with that U+ code, or that are the
     /// character typed.
     private func filtered(_ groups: [LigatureGroup]) -> [LigatureGroup] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return groups }
-        let code = UInt32(trimmed.uppercased().replacingOccurrences(of: "U+", with: "").replacingOccurrences(of: "0X", with: ""), radix: 16)
+        let filter = Filter(query)
+        guard !filter.isEmpty else { return groups }
+        let trimmed = filter.trimmed
         return groups.compactMap { group in
             let matches = group.ligatures.filter { ligature in
                 // Its own character too, like ﬁ or U+FB01.
                 let own = ligatureCharacters[ligature.glyph]
                 return ligature.text.localizedCaseInsensitiveContains(trimmed)
-                    || code.map { ligature.characters.contains($0) || own == $0 } ?? false
+                    || filter.code.map { ligature.characters.contains($0) || own == $0 } ?? false
                     || own.flatMap(Unicode.Scalar.init).map { String(Character($0)) == trimmed } ?? false
             }
             return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches)

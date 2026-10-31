@@ -119,16 +119,6 @@ struct MiniSwitch: View {
     let isEnabled: Bool
     let action: () -> Void
 
-    init(position: SwitchPosition, isEnabled: Bool, action: @escaping () -> Void) {
-        self.position = position
-        self.isEnabled = isEnabled
-        self.action = action
-    }
-
-    init(isOn: Bool, isEnabled: Bool, action: @escaping () -> Void) {
-        self.init(position: isOn ? .on : .off, isEnabled: isEnabled, action: action)
-    }
-
     var body: some View {
         Capsule()
             .fill(fill)
@@ -340,7 +330,7 @@ struct StatusTag: View {
 struct EmptyState<Actions: View>: View {
     let title: LocalizedStringKey
     let systemImage: String
-    var description: Text?
+    let description: Text?
     @ViewBuilder var actions: Actions
 
     init(_ title: LocalizedStringKey, systemImage: String, description: Text? = nil,
@@ -534,6 +524,29 @@ struct ValueField: View {
 
     private static func formatted(_ value: Double, step: Double) -> String {
         String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
+    }
+}
+
+/// A checkbox with a line under its title that says what it does, as the backup, restore and font cache sheets have.
+struct DetailToggle: View {
+    let title: String
+    let detail: String
+    @Binding var isOn: Bool
+
+    init(_ title: String, detail: String, isOn: Binding<Bool>) {
+        self.title = title
+        self.detail = detail
+        _isOn = isOn
+    }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .toggleStyle(.checkbox)
     }
 }
 

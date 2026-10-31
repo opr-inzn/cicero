@@ -175,7 +175,8 @@ private struct RuleRow: View {
         case .folder:
             options(folderOptions, empty: "No locations yet")
         case .status:
-            // Active in Adobe Apps Only also while Proofing is hidden: Adobe Fonts that Adobe apps turned on for themselves are still listed.
+            // Active in Adobe Apps Only also while Proofing is hidden: Adobe Fonts that Adobe apps turned on for
+            // themselves are still listed.
             options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })

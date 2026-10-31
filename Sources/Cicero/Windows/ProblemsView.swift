@@ -1,7 +1,7 @@
 import CiceroCore
 import SwiftUI
 
-/// Conflicts, as the sidebar calls problems now: grouped by kind, each with an explanation, its files and what to do about them.
+/// The Conflicts page: problems grouped by kind, each with an explanation, its files and what to do about them.
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
 
@@ -33,7 +33,8 @@ struct ProblemsView: View {
                     }
                     .frame(maxWidth: 760, alignment: .leading)
                     .padding(24)
-                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its bar sits at the edge.
+                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its
+                    // bar sits at the edge.
                     .frame(maxWidth: .infinity)
                 }
             }

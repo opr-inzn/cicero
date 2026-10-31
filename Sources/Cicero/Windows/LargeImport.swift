@@ -24,7 +24,7 @@ struct FontLibraryOffer: View {
         if model.data.installsIntoFontLibrary {
             notice(icon: Image(systemName: "checkmark.circle.fill"), tint: .green, title: "Copying into Cicero’s Library") {
                 Text("\(Self.about(CopyTimeEstimate.onFastMac(count, intoFontsFolder: false))). Fonts you install later go there too. "
-                    + "You can change this in Settings\u{00A0}→\u{00A0}General.")
+                    + "You can change this in Preferences\u{00A0}→\u{00A0}General.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Use the Fonts Folder") {

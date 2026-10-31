@@ -388,7 +388,6 @@ private struct OverlayLayout: View {
             .padding(.vertical, 5)
             .background(.fill.tertiary, in: .capsule)
     }
-
 }
 
 /// Samples laid out by `layout` that can be dragged to new places among each other. The dragged one follows

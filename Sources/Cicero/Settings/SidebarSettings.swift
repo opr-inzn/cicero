@@ -1,4 +1,3 @@
-import CiceroCore
 import SwiftUI
 
 /// Finder-style checkboxes for every sidebar row and section, in the sidebar's order.

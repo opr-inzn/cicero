@@ -20,8 +20,8 @@ final class QuickLook {
     @ObservationIgnored private var mainWindowObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var panel: QuickLookPanel?
 
-    /// Saved once the user resizes it. (The size under "quickLook.size" was saved on every close, so it was
-    /// the old default, 680 × 620, for most.)
+    /// Saved once the user resizes it, under a key of its own: "quickLook.size" was written on every close, so for most
+    /// it held the old default.
     private static let sizeKey = "quickLook.panelSize"
     static let defaultSize = NSSize(width: 520, height: 440)
 
@@ -465,10 +465,10 @@ private struct FamilyQuickLook: View {
             if count > 1 {
                 HStack(spacing: 6) {
                     Button("Previous", systemImage: "chevron.left") { _ = model.quickLook.step(-1) }
-                        .help("Show the previous font")
+                        .help("Show the previous family")
                     Text("\((index + 1).formatted()) of \(count.formatted())").monospacedDigit()
                     Button("Next", systemImage: "chevron.right") { _ = model.quickLook.step(1) }
-                        .help("Show the next font")
+                        .help("Show the next family")
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)

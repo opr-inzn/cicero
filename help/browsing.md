@@ -184,7 +184,7 @@ The features you choose change the text on that family’s font page, until Cice
 
 ## Try variable axes
 
-A variable font is drawn from its design axes, like **Weight**, **Width**, **Optical Size** or **Slant**, or the designer’s own, like Roboto Flex’s **Grade**. Cicero shows it at its default on each, the origin its styles are drawn from, Optical Size included, at the weight in Preview Options. To move it along them:
+A variable font is drawn from its design axes, like **Weight**, **Width**, **Optical Size** or **Slant**, or the designer’s own, like Roboto Flex’s **Grade**. Cicero shows it at its default on each, the origin its styles are drawn from, Optical Size included. To move it along them:
 
 1. Select a variable family and open the Info panel, or click **Axes** on its font page.
 2. Click **Axes**.

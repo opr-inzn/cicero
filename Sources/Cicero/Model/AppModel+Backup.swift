@@ -77,6 +77,16 @@ extension AppModel {
 
     private var backup: LibraryBackup { LibraryBackup(locations: locations) }
 
+    /// Saves the current setup to the Backups folder before a restore or an import changes it. When that fails, says
+    /// nothing was `done` ("Couldn’t save the current setup first, so nothing was imported") and returns false.
+    func saveSetupSnapshot(named name: String, nothingWas done: String) async -> Bool {
+        let backup = backup
+        let current = data
+        let saved = await Task.detached(priority: .userInitiated) { (try? backup.saveSnapshot(current, named: name)) != nil }.value
+        if !saved { showToast("Couldn’t save the current setup first, so nothing was \(done)") }
+        return saved
+    }
+
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
     }
@@ -121,8 +131,7 @@ extension AppModel {
     func restore(_ contents: BackupContents, settings: Bool, fonts: Bool, progress: @escaping @Sendable (Int, Int) -> Void) async {
         let backup = backup
         let current = data
-        let saved = await Task.detached(priority: .userInitiated) { (try? backup.saveSnapshot(current)) != nil }.value
-        guard saved else { return showToast("Couldn’t save the current setup first, so nothing was restored") }
+        guard await saveSetupSnapshot(named: "Before Restore", nothingWas: "restored") else { return }
 
         // Restoring the settings brings the backup's Font Library, if it has one; otherwise its fonts go into this one.
         let fontLibrary = settings && !contents.userData.fontLibraryPath.isEmpty ? nil : current.fontLibraryPath
@@ -160,7 +169,7 @@ extension AppModel {
             model.data.records = merged.records
             if !merged.reactivate.isEmpty {
                 // macOS doesn't know these registrations; a scan finds the faces of the files just put back.
-                let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
+                let input = model.scanInput
                 if let library = try? await model.scanner.scan(input, progress: { _ in }) {
                     let wanted = Set(merged.reactivate)
                     let faces = library.families.flatMap(\.faces).filter { wanted.contains($0.face.path) && $0.canActivate }
@@ -192,12 +201,14 @@ extension AppModel {
         }
     }
 
-    /// "Restored 4 folders and 3,790 font files; 22 were already there"
+    /// "Restored 4 folders, 2 smart folders and 3,790 font files; 22 were already there"
     private static func restoreSummary(settings: Bool, data: UserData, fonts: FontRestoreResult?) -> String {
         var parts: [String] = []
         if settings {
-            let sets = data.sets.count + data.smartSets.count
-            parts.append(sets == 0 ? "your settings" : sets == 1 ? "1 folder" : "\(sets) folders")
+            let folders = data.sets.count, smart = data.smartSets.count
+            if folders > 0 { parts.append(folders == 1 ? "1 folder" : "\(folders.formatted()) folders") }
+            if smart > 0 { parts.append(smart == 1 ? "1 smart folder" : "\(smart.formatted()) smart folders") }
+            if parts.isEmpty { parts.append("your settings") }
         }
         if let fonts {
             let count = fonts.restored + fonts.fallback

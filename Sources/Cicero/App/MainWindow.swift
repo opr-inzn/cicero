@@ -168,7 +168,7 @@ struct MainWindow: View {
         if !plan.otherFamilies.isEmpty {
             let names = ListFormatter.localizedString(byJoining: Array(plan.otherFamilies.prefix(3))) + (plan.otherFamilies.count > 3 ? " and others" : "")
             if plan.spareCopiesOf != nil {
-                // Problems only removes files whose every font has a copy elsewhere.
+                // Conflicts only removes files whose every font has a copy elsewhere.
                 let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
                 let keep = plan.otherFamilies.count == 1 ? "which keeps its other copies" : "which keep their other copies"
                 parts.append("\(files) \(names), \(keep).")
@@ -182,9 +182,8 @@ struct MainWindow: View {
     }
 }
 
-/// A page of the detail column: room for the Info panel, and files dropped on it.
-/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and while apps that keep a font's
-/// old version are open (`openAppsReplacePrompt`).
+/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and
+/// while apps that keep a font's old version are open (`openAppsReplacePrompt`).
 private struct ReplaceAlerts: ViewModifier {
     @Environment(AppModel.self) private var model
 
@@ -267,6 +266,7 @@ private struct ReplaceAlerts: ViewModifier {
     }
 }
 
+/// A page of the detail column: room for the Info panel, and files dropped on it.
 private struct DetailPage: ViewModifier {
     func body(content: Content) -> some View {
         content
