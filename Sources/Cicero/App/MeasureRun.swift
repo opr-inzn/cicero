@@ -107,6 +107,13 @@ enum MeasureRun {
             await step("rate.clear") { model.setRating(nil, for: [family]) }
         }
 
+        // What one letter saved to the defaults costs the main window, as Compare and the Character Toolbox saved their
+        // text with each letter: SwiftUI draws every view with an @AppStorage again, whatever the key.
+        for end in "Hamburgefonstiv".indices.dropFirst() {
+            await step("defaults.write") { defaults.set(String("Hamburgefonstiv"[..<end]), forKey: "measure.scratch") }
+        }
+        defaults.removeObject(forKey: "measure.scratch")
+
         // In each view: switch to it, type into Preview Options' text one letter at a time, scroll down.
         let text = "Sphinx of black quartz"
         for mode in [BrowserMode.grid, .list, .specimens] {
