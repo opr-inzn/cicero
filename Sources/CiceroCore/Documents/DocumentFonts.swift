@@ -367,8 +367,12 @@ extension DocumentFonts {
     /// The library's face for each font: the one with its PostScript name, else the one whose family and style
     /// names are the document's (ignoring case and spaces), else none.
     public static func match(_ fonts: [DocumentFont], in library: Library) -> [DocumentFontMatch] {
-        let matcher = FontMatcher(library)
-        return fonts.map { font in
+        match(fonts, using: FontMatcher(library))
+    }
+
+    /// The same with a matcher made before for the library, as making one takes a while.
+    public static func match(_ fonts: [DocumentFont], using matcher: FontMatcher) -> [DocumentFontMatch] {
+        fonts.map { font in
             let named = ImportedFont(postScriptName: font.postScriptName, family: font.family, style: font.style)
             let found = matcher.faces(named, defaultStyle: "Regular").first
             let installed = found?.face.state.isActive ?? font.postScriptName.map(isInstalled) ?? false

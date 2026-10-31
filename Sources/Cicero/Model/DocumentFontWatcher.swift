@@ -26,6 +26,8 @@ final class DocumentFontWatcher {
     private var refused: Set<App> = []
     /// What each app's documents used when it was asked last, so the same answer isn't matched again.
     private var lastFonts: [App: [DocumentFont]] = [:]
+    /// The library's fonts by name, made again only when the library changed: making it takes tens of milliseconds.
+    private var matcher: (fingerprint: Int, matcher: FontMatcher)?
     /// Illustrator and Photoshop files read before → when they were last saved then, and their fonts.
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
     /// Often: asking takes a few milliseconds, and costs the app hardly any time.
@@ -91,7 +93,8 @@ final class DocumentFontWatcher {
         guard !Task.isCancelled, answer != lastFonts[app], let model, model.hasScanned else { return }
         lastFonts[app] = answer
         // Ones on for another app's documents or a set too, so they stay on for this one when that app quits.
-        let wanted = DocumentFonts.match(answer, in: model.library).compactMap(\.face).filter { face in
+        if matcher?.fingerprint != model.library.fingerprint { matcher = (model.library.fingerprint, FontMatcher(model.library)) }
+        let wanted = DocumentFonts.match(answer, using: matcher!.matcher).compactMap(\.face).filter { face in
             let forApps = model.data.records.temporary[face.face.path]?.scope == .whileAppsRun
             return (forApps || !face.state.isActive) && face.app == nil && !face.isAdobeFonts
         }
