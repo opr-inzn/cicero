@@ -12,7 +12,7 @@ struct MainWindow: View {
         @Bindable var backup = backup
         NavigationSplitView {
             SidebarView()
-                .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 340)
+                .navigationSplitViewColumnWidth(min: SidebarWidth.minimum, ideal: SidebarWidth.ideal, max: SidebarWidth.maximum)
                 // When it slides out and in, and where it is, for how much room hiding it gives the grid (see `SidebarRoom`).
                 .background { SidebarItemReader() }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { SidebarRoom.shared.sidebar = $0 }

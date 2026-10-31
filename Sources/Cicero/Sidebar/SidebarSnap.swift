@@ -57,7 +57,8 @@ private struct SidebarTitle: ViewModifier {
 /// Finder's sidebar, dragged wider or narrower, stops at the width that shows every title whole once its edge is near
 /// it; so does this one, `distance` either side. AppKit asks the split view's delegate, SwiftUI's split view controller,
 /// where the divider goes at each step of a drag: `splitView:constrainSplitPosition:ofSubviewAt:` is put into its class,
-/// handing on to the one it had, if any, and then moving the divider to that width when it's near.
+/// handing on to the one it had, if any, and then moving the divider to that width when it's near, and keeping it within
+/// `SidebarWidth`'s widths but when it's dragged far enough to hide the sidebar.
 enum SidebarSnap {
     static let distance: CGFloat = 10
     private typealias Constrain = @convention(c) (AnyObject, Selector, NSSplitView, CGFloat, Int) -> CGFloat
@@ -75,10 +76,16 @@ enum SidebarSnap {
         let previous = class_getInstanceMethod(type, selector).map { unsafeBitCast(method_getImplementation($0), to: Constrain.self) }
         let answer: @convention(block) (AnyObject, NSSplitView, CGFloat, Int) -> CGFloat = { delegate, splitView, proposed, index in
             let position = previous?(delegate, selector, splitView, proposed, index) ?? proposed
-            guard index == 0, let fit = objc_getAssociatedObject(splitView, fitKey) as? SidebarFit,
-                  let narrowing = fit.narrowing, let sidebar = splitView.arrangedSubviews.first else { return position }
-            let whole = sidebar.frame.maxX - narrowing
-            return abs(position - whole) < distance ? whole : position
+            // Dragged far enough left to hide the sidebar: left to AppKit, which hides it.
+            guard index == 0, let sidebar = splitView.arrangedSubviews.first,
+                  position >= sidebar.frame.minX + SidebarWidth.minimum / 2 else { return position }
+            var snapped = position
+            if let fit = objc_getAssociatedObject(splitView, fitKey) as? SidebarFit, let narrowing = fit.narrowing {
+                let whole = sidebar.frame.maxX - narrowing
+                if abs(position - whole) < distance { snapped = whole }
+            }
+            // Within the sidebar's widths: AppKit's own limits don't hold a drag.
+            return min(max(snapped, sidebar.frame.minX + SidebarWidth.minimum), sidebar.frame.minX + SidebarWidth.maximum)
         }
         let implementation = imp_implementationWithBlock(answer)
         if !class_addMethod(type, selector, implementation, "d@:@di"),
@@ -91,7 +98,28 @@ enum SidebarSnap {
     }
 }
 
-/// Finds the split view the sidebar is in, from a view inside it, for `SidebarSnap`.
+/// How wide the sidebar is. On macOS 26 a window opened without a saved width gave it less than its minimum (148 pt),
+/// cutting its titles short, and saved that: AppKit is told the limits too, a sidebar narrower goes to its ideal width,
+/// and a drag stays within them (see `SidebarSnap`).
+enum SidebarWidth {
+    static let minimum: CGFloat = 210
+    static let ideal: CGFloat = 240
+    static let maximum: CGFloat = 340
+
+    static func keep(in splitView: NSSplitView) {
+        guard let controller = splitView.delegate as? NSSplitViewController,
+              let item = controller.splitViewItems.first(where: { $0.behavior == .sidebar }) else { return }
+        item.minimumThickness = minimum
+        item.maximumThickness = maximum
+        // Once the window has laid out its columns.
+        DispatchQueue.main.async {
+            guard !item.isCollapsed, let sidebar = splitView.arrangedSubviews.first, sidebar.frame.width < minimum else { return }
+            splitView.setPosition(ideal, ofDividerAt: 0)
+        }
+    }
+}
+
+/// Finds the split view the sidebar is in, from a view inside it, for `SidebarSnap` and `SidebarWidth`.
 struct SidebarSnapReader: NSViewRepresentable {
     let fit: SidebarFit
 
@@ -112,7 +140,10 @@ struct SidebarSnapReader: NSViewRepresentable {
             super.viewDidMoveToWindow()
             var view = superview
             while let current = view, !(current is NSSplitView) { view = current.superview }
-            if let splitView = view as? NSSplitView { SidebarSnap.install(on: splitView, fit: fit) }
+            if let splitView = view as? NSSplitView {
+                SidebarSnap.install(on: splitView, fit: fit)
+                SidebarWidth.keep(in: splitView)
+            }
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
