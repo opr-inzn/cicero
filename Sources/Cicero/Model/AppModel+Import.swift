@@ -151,7 +151,7 @@ extension AppModel {
         // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
-        let installed = await engine.installOff(files.map(\.source)) { done, total in stage(.copying(done: done, total: total)) }
+        let installed = await importEngine.installOff(files.map(\.source)) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
             return nil
@@ -206,6 +206,18 @@ extension AppModel {
 }
 
 extension Library {
+    /// The folders of the files apps load from their own folders, like Adobe's, but Creative Cloud's Adobe Fonts.
+    var appFontFolders: [URL] {
+        var folders = Set<String>()
+        for face in families.lazy.flatMap(\.faces) {
+            for (path, app) in [(face.face.path, face.app)] + face.copies.map({ ($0.face.path, $0.app) })
+            where app != nil && !ActiveSource.isAdobeFonts(path) {
+                folders.insert((path as NSString).deletingLastPathComponent)
+            }
+        }
+        return folders.sorted().map { URL(fileURLWithPath: $0, isDirectory: true) }
+    }
+
     /// The styles in these files, each as that file, also where another copy stands for the style.
     func faces(inFiles paths: Set<String>) -> [LibraryFace] {
         families.flatMap(\.faces).flatMap { face in

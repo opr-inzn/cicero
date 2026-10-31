@@ -63,7 +63,7 @@ struct EarlierImportSheet: View {
         .interactiveDismissDisabled(stage != nil)
         .task(id: model.data.installsIntoFontLibrary) {
             guard model.data.installsIntoFontLibrary != prompt.countedForFontLibrary else { return copying = prompt.copying }
-            let engine = model.engine
+            let engine = model.importEngine
             let files = prompt.files
             let work = Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }
             let count = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }

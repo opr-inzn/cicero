@@ -34,6 +34,13 @@ final class AppModel {
         return engine
     }
 
+    /// The engine an import copies with: a font the library has in an app's own folder is in already too.
+    var importEngine: ActivationEngine {
+        var engine = engine
+        engine.appFontFolders = library.appFontFolders
+        return engine
+    }
+
     // MARK: Library
 
     private(set) var library = Library.empty

@@ -18,6 +18,7 @@ This version makes a fundamental change to how Cicero installs and turns on font
 - If Cicero stops while it moves **Cicero’s Library**, it puts the library back together, with its fonts on, the next time it opens.
 - When macOS is too busy to take some fonts during an import, Cicero tries them again, and says how many it still couldn’t copy.
 - A font file you put into **~/Cicero/Inactive** that your Fonts folder already has goes to the Trash as Cicero opens, rather than being deleted.
+- An import no longer copies a font a second time when Cicero has it in an Adobe apps’ folder or in **~/Cicero/Inactive**. It turns that file on if the font was on in the other app.
 - Turning a font off or on that can’t leave its disk, like one on a read-only server or a Locked file, no longer leaves a copy of it behind.
 - In **Glyphs**, superscripts, subscripts, numerators and denominators start with their figures, and the extra letters older fonts keep at private codes, like their small caps, sit next to the letters they belong to or in their own group.
 
