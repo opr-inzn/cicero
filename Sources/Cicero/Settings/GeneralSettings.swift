@@ -168,7 +168,7 @@ struct GeneralSettings: View {
         return switch model.data.installMethod {
         case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. Microsoft Office can’t use fonts left where they are."
         case .copy: "They’re copied into \(place) and turned on. The originals stay where they are."
-        case .move: "They’re moved into \(place) and turned on. Files in your locations are copied instead."
+        case .move: "They’re moved into \(place) and turned on. Fonts in your locations stay where they are."
         case .inPlace: "They’re listed under Added Fonts where they are, but not turned on. Microsoft Office can’t use them."
         }
     }

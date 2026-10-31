@@ -246,7 +246,7 @@ private struct SidebarContent: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .fixedSize()
-            .help("New folder or smart folder")
+            .help("New folder, smart folder or app folder")
         case .tags:
             plus("New tag") { model.newTag() }
         case .characterSets:

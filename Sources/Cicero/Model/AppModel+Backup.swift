@@ -201,12 +201,14 @@ extension AppModel {
         }
     }
 
-    /// "Restored 4 folders and 3,790 font files; 22 were already there"
+    /// "Restored 4 folders, 2 smart folders and 3,790 font files; 22 were already there"
     private static func restoreSummary(settings: Bool, data: UserData, fonts: FontRestoreResult?) -> String {
         var parts: [String] = []
         if settings {
-            let sets = data.sets.count + data.smartSets.count
-            parts.append(sets == 0 ? "your settings" : sets == 1 ? "1 folder" : "\(sets) folders")
+            let folders = data.sets.count, smart = data.smartSets.count
+            if folders > 0 { parts.append(folders == 1 ? "1 folder" : "\(folders.formatted()) folders") }
+            if smart > 0 { parts.append(smart == 1 ? "1 smart folder" : "\(smart.formatted()) smart folders") }
+            if parts.isEmpty { parts.append("your settings") }
         }
         if let fonts {
             let count = fonts.restored + fonts.fallback
