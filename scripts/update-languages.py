@@ -41,6 +41,11 @@ HYPERGLOT_URL = "https://github.com/rosettatype/hyperglot"
 MIN_PYTHON = (3, 11)
 
 
+def native_name(name):
+    """A language's own name without the stray punctuation some Hyperglot entries end with ("ਪੰਜਾਬੀ,")."""
+    return (name or "").strip().rstrip(",;").strip()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--hyperglot", metavar="VERSION", help="hyperglot version to install (default: newest)")
@@ -112,15 +117,15 @@ def export():
                 row["auxiliary"] = "".join(list_unique(aux))
             if aux_marks:
                 row["auxiliaryMarks"] = "".join(aux_marks)
-            autonym = (ort["autonym"] or "").strip()
-            if autonym and autonym != (lang.autonym or "").strip():
+            autonym = native_name(ort["autonym"])
+            if autonym and autonym != native_name(lang.autonym):
                 row["autonym"] = autonym
             orthographies.append(row)
         if not orthographies:
             continue
         row = {"iso": iso, "name": lang.name, "speakers": lang.speakers, "validity": lang.validity, "status": lang.status}
-        if lang.autonym:
-            row["autonym"] = lang.autonym.strip()
+        if native_name(lang.autonym):
+            row["autonym"] = native_name(lang.autonym)
         row["orthographies"] = orthographies
         rows.append(row)
 
