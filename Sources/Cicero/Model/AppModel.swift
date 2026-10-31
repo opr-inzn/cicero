@@ -976,11 +976,11 @@ struct MovingOutPrompt: Identifiable {
     var app: String?
 
     var title: String {
-        let name = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "shared folders"
+        let name = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "Shared Folders"
         if shared.count == 1, let face = shared.first {
-            return "Move “\(face.face.familyName) \(face.face.styleName)” out of \(name)?"
+            return "Move “\(face.face.familyName) \(face.face.styleName)” Out of \(name)?"
         }
-        return "Move \(shared.count.formatted()) fonts out of \(name)?"
+        return "Move \(shared.count.formatted()) Styles Out of \(name)?"
     }
 
     var message: String {

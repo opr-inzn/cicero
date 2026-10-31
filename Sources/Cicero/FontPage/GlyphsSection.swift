@@ -220,14 +220,14 @@ struct GlyphsSection: View {
                 // where the feature is on, and the page's text where it's pasted (see `SampleGlyph`).
                 VStack {
                     // A localized form in text of its language, any other with its features on.
-                    let drawn = glyph.feature == "locl" ? "in \(glyph.featureName) text" : "with \(glyph.featureNames.formatted(.list(type: .and))) on"
+                    let drawn = glyph.feature == "locl" ? "in \(glyph.featureName) text" : "with \(glyph.featureNames.listed()) on"
                     Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
                         .help("Copies “\(Self.text(glyph.character))”, which shows like this when pasted into the text above, and elsewhere \(drawn)")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())
             case .alternate(let alternate):
-                let names = alternate.featureNames.formatted(.list(type: .or))
+                let names = alternate.featureNames.listed("or")
                 GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
                     .contentShape(.rect)
@@ -385,10 +385,10 @@ struct GlyphsSection: View {
             return GridCell(content: .text(Self.text(scalar)), label: Self.text(scalar))
         case .feature(let glyph):
             return GridCell(content: .glyph(glyph.glyph), isAlternate: cell.isAlternate,
-                            label: "\(Self.text(glyph.character)), \(glyph.featureNames.formatted(.list(type: .and)))")
+                            label: "\(Self.text(glyph.character)), \(glyph.featureNames.listed())")
         case .alternate(let alternate):
             return GridCell(content: .glyph(alternate.glyph), isAlternate: true,
-                            label: "\(Self.text(alternate.character)), \(alternate.featureNames.formatted(.list(type: .or)))")
+                            label: "\(Self.text(alternate.character)), \(alternate.featureNames.listed("or"))")
         }
     }
 

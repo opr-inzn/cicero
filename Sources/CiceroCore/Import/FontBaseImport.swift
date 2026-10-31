@@ -181,7 +181,7 @@ public enum FontBaseImport {
                            unreadable: [FontExplorerImport.UnreadableKind: Int]) {
             if !otherCollections.isEmpty {
                 library.notes.append((otherCollections.count == 1 ? "the collection " : "the collections ")
-                    + otherCollections.map { "“\($0)”" }.formatted(.list(type: .and)))
+                    + otherCollections.map { "“\($0)”" }.listed())
             }
             let automatic = ["fontbase_fontsTagsSystem", "fontbase_fontsTagsCrowd"].contains { !(values[$0]?.properties ?? []).isEmpty }
             if automatic { library.notes.append("the tags FontBase gives fonts itself, like Sans and Script") }
@@ -199,7 +199,7 @@ public enum FontBaseImport {
             }
             let total = notDownloaded.values.reduce(0, +)
             if total > 0 {
-                let providers = notDownloaded.keys.sorted().formatted(.list(type: .and))
+                let providers = notDownloaded.keys.sorted().listed()
                 library.notes.append("\(total.formatted()) \(providers) \(total == 1 ? "font" : "fonts") you haven’t downloaded")
             }
             if missing > 0 {

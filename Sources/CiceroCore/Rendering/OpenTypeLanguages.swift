@@ -9,7 +9,7 @@ public enum OpenTypeLanguages {
 
     /// "Serbian and Macedonian".
     public static func names(of tags: [String]) -> String {
-        tags.map(name(of:)).formatted(.list(type: .and))
+        tags.map(name(of:)).listed()
     }
 
     private static let names = [

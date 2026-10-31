@@ -79,7 +79,7 @@ struct RestoreSheet: View {
             (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]
         let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
-        let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.formatted(.list(type: .and)) + "."
+        let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.listed() + "."
         return inside + " Replaces what’s set up now; the current setup is saved first in ~/Library/Application Support/Cicero/Backups."
     }
 

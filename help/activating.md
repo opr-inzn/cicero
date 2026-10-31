@@ -43,7 +43,7 @@ Turning a font on never copies it. Fonts in your [locations](organizing.md#locat
 
 Choose which one in **Preferences → General**, next to **When you add font files**:
 
-- **Ask each time**: when you [add font files](organizing.md#add-font-files), Cicero asks once for all of them: **Install a Copy** or **Move Into Fonts Folder**, which turn them on, or **Leave Files Where They Are**, which lists them under [Added Fonts](organizing.md#added-fonts) without turning them on. Check **Remember this choice** to stop being asked; you can change it again in Preferences. Turning fonts on never asks: fonts in your [locations](organizing.md#locations) go on where they are, so Microsoft Office can’t use them.
+- **Ask each time**: when you [add font files](organizing.md#add-font-files), Cicero asks once for all of them: **Copy Into Fonts Folder** or **Move Into Fonts Folder**, which turn them on, or **Leave Files Where They Are**, which lists them under [Added Fonts](organizing.md#added-fonts) without turning them on. Check **Remember this choice** to stop being asked; you can change it again in Preferences. Turning fonts on never asks: fonts in your [locations](organizing.md#locations) go on where they are, so Microsoft Office can’t use them.
 - **Copy into ~/Library/Fonts** (the setting at first): font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are copied in and turned on straight away, rather than listed under [Added Fonts](organizing.md#added-fonts).
 - **Move into ~/Library/Fonts**: font files you open in Cicero, drop on its window or choose with **File → Add Fonts** are moved in and turned on, so they’re no longer where they were. The folder they were in stays, even when it’s left empty.
 - **Leave files where they are**: font files you add are listed where they are, under [Added Fonts](organizing.md#added-fonts), without being turned on. Turn them on when you need them: they go on where they are, also if you choose another way here later.
@@ -65,7 +65,7 @@ Microsoft Office apps, like Word and PowerPoint, only use fonts whose files are 
 - fonts turned on temporarily, or by an [app folder](#turn-fonts-on-with-an-app)
 - fonts in [Adobe apps’ folders](#fonts-in-adobe-apps-folders), also when they’re on in every app
 
-To use a font in Office, install it by copying it into your Fonts folder as you add it: choose **Install a Copy** when Cicero asks, or **Copy into ~/Library/Fonts** next to **When you add font files** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. For a font that’s listed where it is, in one of your locations or under Added Fonts, copy its file into `~/Library/Fonts` in the Finder.
+To use a font in Office, install it by copying it into your Fonts folder as you add it: choose **Copy Into Fonts Folder** when Cicero asks, or **Copy into ~/Library/Fonts** next to **When you add font files** in **Preferences → General**, with **Install fonts into Cicero’s Library** off. For a font that’s listed where it is, in one of your locations or under Added Fonts, copy its file into `~/Library/Fonts` in the Finder.
 
 Office also takes up a font only the second time it opens after the font went on, whether it was open or not: quit the app, open it, quit it again and open it once more. That goes for fonts you install any other way too, and for turning a font off: Office still lists it the next time it opens, and lets go of it the time after.
 
@@ -165,7 +165,7 @@ Adobe apps can also turn on Adobe Fonts by themselves, for instance for a docume
 
 Creative Cloud turns these fonts on and off, so their switches don’t move. To change them, click **Manage in Adobe Fonts** on the font page, or choose it from the family’s right-click menu. It opens the family’s page on the Adobe Fonts website, where you turn its styles on and off. Creative Cloud then adds them to your Mac or takes them away, and Cicero’s lists follow. Cicero finds the page in the list Creative Cloud keeps of your fonts. When it can’t, the button says **Manage in Creative Cloud** and opens the Creative Cloud app. For all of them at once, right-click **Adobe Fonts** under **Locations** and choose **Manage in Creative Cloud**.
 
-A font you also have yourself is listed as your copy, which you turn on and off as usual. A copy from Adobe Fonts never makes yours a spare one, which [Conflicts](problems.md) would offer to remove: Creative Cloud takes its copy away when the font is turned off there. While both are on, [Installed Twice](problems.md#installed-twice) lists them, with **Remove in Adobe Fonts…** for the copy from Adobe Fonts.
+A font you also have yourself is listed as your copy, which you turn on and off as usual. A copy from Adobe Fonts never makes yours a spare one, which [Conflicts](problems.md) would offer to remove: Creative Cloud takes its copy away when the font is turned off there. While both are on, [Installed Twice](problems.md#installed-twice) lists them, with **Remove in Adobe Fonts** for the copy from Adobe Fonts.
 
 ## Fonts in Adobe apps’ folders
 

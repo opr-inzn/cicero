@@ -226,8 +226,7 @@ extension AppModel {
     /// Where files are, each place once: "in your Fonts folder and in Clients".
     func places(of paths: [String]) -> String {
         let places = paths.map(placeName).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        guard places.count > 1 else { return places.first ?? "" }
-        return places.dropLast().joined(separator: ", ") + " and " + places.last!
+        return places.listed()
     }
 
     /// Cicero's copies that Replace just sends to the Trash for an added family, as its file in Cicero's Library takes the
@@ -319,7 +318,7 @@ extension AppModel {
     // MARK: Trash
 
     func requestTrash(_ families: [Family]) {
-        let title = families.count == 1 ? "“\(families[0].name)”" : "\(families.count) families"
+        let title = families.count == 1 ? "“\(families[0].name)”" : "\(families.count) Families"
         requestTrash(families.flatMap(\.faces), removing: families.map(\.id), title: title)
     }
 
@@ -630,7 +629,7 @@ extension AppModel {
     /// the install method is Ask.
     func activateFonts(in rows: [SidebarRow]) {
         let faces = faces(in: rows.map(\.item))
-        let names = rows.map { "“\($0.title)”" }.formatted(.list(type: .and))
+        let names = rows.map { "“\($0.title)”" }.listed()
         guard !faces.isEmpty else { return showToast("There are no fonts in \(names)") }
         activate(faces, title: names)
     }
@@ -823,7 +822,7 @@ extension AppModel {
         if selectedItems.count > 1 {
             return rows(inList: sidebarList(of: item))
                 .filter { selectedItems.contains($0.item) && $0.item != .problems }
-                .map(\.title).formatted(.list(type: .and))
+                .map(\.title).listed()
         }
         if let row = libraryRows.first(where: { $0.item == item }) { return row.title }
         for section in SidebarSection.allCases {
@@ -883,7 +882,7 @@ extension AppModel {
         if !hidden.isEmpty { hide(hidden.map(\.key)) }
 
         func names(_ rows: [SidebarRow], _ noun: String) -> String {
-            rows.count > 3 ? "\(rows.count) \(noun)" : rows.map(\.title).formatted(.list(type: .and))
+            rows.count > 3 ? "\(rows.count) \(noun)" : rows.map(\.title).listed()
         }
         let deletedNoun = deleted.allSatisfy { if case .tag = $0.item { true } else { false } } ? "tags" : "folders"
         let message = [
@@ -1130,7 +1129,7 @@ extension AppModel {
         if failures > 0 {
             showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures) cache items to the Trash")
         } else if !trashed.isEmpty && !clearedSystem {
-            showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash")
+            showToast("Moved the \(trashed.listed()) font caches to the Trash")
         }
         if clearedSystem || !trashed.isEmpty { rebuildFontList() }
         return clearedSystem
@@ -1204,7 +1203,7 @@ extension AppModel {
         var seen = Set<String>()
         let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
-        plan.title = plan.paths.count == 1 ? "1 extra copy" : "\(plan.paths.count) extra copies"
+        plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count) Extra Copies"
         trashPlan = plan
     }
 }
@@ -1233,10 +1232,10 @@ private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
         alert.alertStyle = .warning
         switch service {
         case .iCloudDrive:
-            alert.messageText = "“\(url.lastPathComponent)” syncs with iCloud Drive."
+            alert.messageText = "“\(url.lastPathComponent)” Syncs With iCloud Drive"
             alert.informativeText = "iCloud Drive can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and choose Keep Downloaded."
         case .other:
-            alert.messageText = "“\(url.lastPathComponent)” syncs with a cloud service."
+            alert.messageText = "“\(url.lastPathComponent)” Syncs With a Cloud Service"
             alert.informativeText = "The service can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and make it available offline."
         }
         alert.addButton(withTitle: "Choose Another Folder")

@@ -36,7 +36,7 @@ struct FontLibraryOffer: View {
         } else {
             let fontsFolder = CopyTimeEstimate.onFastMac(count, intoFontsFolder: true)
             let busy = fontsFolder >= 600 ? "or hours on a busy Mac" : "or much longer on a busy Mac"
-            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.formatted()) fonts can take a long time") {
+            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.formatted()) font files can take a long time") {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 2) {
                     GridRow {
                         Text("Into your Fonts folder").foregroundStyle(.secondary)

@@ -222,7 +222,7 @@ final class AppSetWatcher {
             guard let id = app.bundleIdentifier, ids.contains(id), seen.insert(id).inserted else { continue }
             names.append(app.localizedName ?? id)
         }
-        return names.formatted(.list(type: .and))
+        return names.listed()
     }
 
     private static func onForAppSets(_ records: ActivationRecords) -> Set<String> {

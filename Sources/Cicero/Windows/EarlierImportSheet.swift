@@ -31,7 +31,7 @@ struct EarlierImportSheet: View {
                 if !prompt.smartSets.isEmpty {
                     Label(prompt.smartSets.count == 1
                           ? "The smart folder “\(prompt.smartSets[0])” lists the fonts in this location. Without the location, it will be empty."
-                          : "The smart folders \(prompt.smartSets.map { "“\($0)”" }.formatted(.list(type: .and))) list the fonts in this location. "
+                          : "The smart folders \(prompt.smartSets.map { "“\($0)”" }.listed()) list the fonts in this location. "
                               + "Without the location, they will be empty.",
                           systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.secondary)

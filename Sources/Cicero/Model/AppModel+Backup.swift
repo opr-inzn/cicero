@@ -224,7 +224,7 @@ extension AppModel {
         if let fonts, fonts.failed > 0 {
             notes.append("\(fonts.failed.formatted()) couldn’t be written")
         }
-        return (["Restored " + parts.formatted(.list(type: .and))] + notes).joined(separator: "; ")
+        return (["Restored " + parts.listed()] + notes).joined(separator: "; ")
     }
 }
 

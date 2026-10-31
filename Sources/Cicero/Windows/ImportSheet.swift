@@ -193,7 +193,7 @@ struct ImportSheet: View {
                     if smart.unsupported.isEmpty {
                         checkbox(smart.name, detail: rulesDetail(smart), isOn: member(smart.id, of: \.smartSets))
                     } else {
-                        checkbox(smart.name, detail: "Cicero has no rule for \(smart.unsupported.formatted(.list(type: .and))).",
+                        checkbox(smart.name, detail: "Cicero has no rule for \(smart.unsupported.listed()).",
                                  isOn: .constant(false))
                             .disabled(true)
                     }
@@ -204,10 +204,10 @@ struct ImportSheet: View {
             || !library.history.isEmpty || !library.active.isEmpty {
             section(prompt.source == .fontBase ? "Tags and Activations" : "Tags, Classifications, Ratings and Activations") {
                 if !library.tags.isEmpty, prompt.source == .fontBase {
-                    checkbox("Tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the tag.",
+                    checkbox("Tags", detail: "\(library.tags.map(\.name).listed()), given to each family whose styles have the tag.",
                              isOn: $choices.tags)
                 } else if !library.tags.isEmpty {
-                    checkbox("Labels as tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the label.",
+                    checkbox("Labels as tags", detail: "\(library.tags.map(\.name).listed()), given to each family whose styles have the label.",
                              isOn: $choices.tags)
                 }
                 if !library.classifications.isEmpty {
@@ -414,7 +414,7 @@ struct ImportSheet: View {
 
     private var classificationsDetail: String {
         let own = Array(Set(library.classifications.filter { $0.builtIn == nil }.map(\.name))).sorted()
-        let yours = own.isEmpty ? "" : " Your own, \(own.map { "“\($0)”" }.formatted(.list(type: .and))), come along."
+        let yours = own.isEmpty ? "" : " Your own, \(own.map { "“\($0)”" }.listed()), come along."
         return "\(count(library.classifications.count, "classified style")). A family goes in the classification most of its styles have, "
             + "unless you’ve chosen one for it." + yours
     }
@@ -473,7 +473,7 @@ struct ImportSheet: View {
         var parts: [String] = []
         if inAlready > 0 { parts.append("\(inAlready.formatted()) in your library already") }
         if same > 0 { parts.append(same == 1 ? "1 the same as another file" : "\(same.formatted()) the same as other files") }
-        return parts.isEmpty ? "" : ", " + parts.formatted(.list(type: .and))
+        return parts.isEmpty ? "" : ", " + parts.listed()
     }
 
     private func fontLibraryDetail(_ folder: String) -> String {
@@ -495,7 +495,7 @@ struct ImportSheet: View {
         let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
         let copying = library.otherFiles.count(where: toCopy.contains)
         let same = library.otherFiles.count { copies?.sameAs[$0] != nil }
-        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
+        return "\(named.listed()) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".
@@ -503,10 +503,10 @@ struct ImportSheet: View {
         var parts: [String] = []
         if !set.families.isEmpty { parts.append(count(set.families.count, "family", "families")) }
         if !set.fonts.isEmpty { parts.append(count(set.fonts.count, "style")) }
-        let contents = parts.isEmpty ? "Empty" : parts.formatted(.list(type: .and))
+        let contents = parts.isEmpty ? "Empty" : parts.listed()
         guard !set.apps.isEmpty else { return contents }
         let apps = set.apps.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }
-        return "For \(apps.formatted(.list(type: .and))) · \(contents)"
+        return "For \(apps.listed()) · \(contents)"
     }
 
     private func rulesDetail(_ smart: ImportedSmartSet) -> String {
@@ -557,7 +557,7 @@ struct ImportSheet: View {
             (summary.tags, labels ? "label as a tag" : "tag", labels ? "labels as tags" : "tags"),
         ]
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1, $0.2) }
-        if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
+        if !made.isEmpty { lines.append(made.listed() + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) copied into \(model.installPlace).") }
         if summary.notCopied > 0 {
             lines.append("\(count(summary.notCopied, "font file")) couldn’t be copied. Import again to try \(summary.notCopied == 1 ? "it" : "them") again.")
@@ -587,13 +587,13 @@ struct ImportSheet: View {
             lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(kinds) \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
         }
         if !summary.emptySets.isEmpty {
-            lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.formatted(.list(type: .and))), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")
+            lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.listed()), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")
         }
         if !summary.skippedSmartSets.isEmpty {
-            lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.formatted(.list(type: .and))), whose rules name sets or labels that didn’t come along.")
+            lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.listed()), whose rules name sets or labels that didn’t come along.")
         }
         if !summary.missingApps.isEmpty {
-            lines.append("Not on this Mac, so their app folders are without them: \(summary.missingApps.formatted(.list(type: .and))).")
+            lines.append("Not on this Mac, so their app folders are without them: \(summary.missingApps.listed()).")
         }
         return lines
     }

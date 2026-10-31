@@ -309,7 +309,7 @@ private struct PreferredTag: View {
     }
 
     static func help(_ names: [String]) -> String {
-        "Apps that ask for \(ListFormatter.localizedString(byJoining: names)) get this font."
+        "Apps that ask for \(names.listed()) get this font."
     }
 }
 

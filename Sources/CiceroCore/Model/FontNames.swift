@@ -45,3 +45,13 @@ public enum FontNames {
         }
     }
 }
+
+extension Sequence where Element == String {
+    /// "Inter", "Inter and Roboto", "Inter, Roboto and Lato", in English as the app is: macOS's own list format follows
+    /// the Mac's language, so it said "Inter, Roboto und Lato" in an English sentence on a German Mac.
+    public func listed(_ conjunction: String = "and") -> String {
+        let items = Array(self)
+        guard let last = items.last, items.count > 1 else { return items.first ?? "" }
+        return items.dropLast().joined(separator: ", ") + " \(conjunction) " + last
+    }
+}

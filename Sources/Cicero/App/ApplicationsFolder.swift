@@ -46,7 +46,7 @@ enum ApplicationsFolder {
     /// the moved copy. The prompt for Open at Login has no "Don’t ask again": the user just asked for it.
     static func offerToMove(forOpenAtLogin: Bool) {
         let alert = NSAlert()
-        alert.messageText = "Move Cicero to the Applications folder?"
+        alert.messageText = "Move Cicero to the Applications Folder?"
         alert.informativeText = "App folders, opening at login and updates work only when Cicero is in the Applications folder."
         alert.addButton(withTitle: "Move to Applications Folder")
         alert.addButton(withTitle: "Do Not Move")
@@ -63,7 +63,7 @@ enum ApplicationsFolder {
             try move(forOpenAtLogin: forOpenAtLogin)
         } catch {
             let failure = NSAlert()
-            failure.messageText = "Couldn’t move Cicero to the Applications folder."
+            failure.messageText = "Couldn’t Move Cicero to the Applications Folder"
             failure.informativeText = error.localizedDescription
             failure.runModal()
         }

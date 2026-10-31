@@ -22,8 +22,8 @@ Each card is one family, like “Active from 2 files” or “3 styles active fr
 
 - **Deactivate** turns off a copy Cicero can turn off. See [Turn fonts off](activating.md#turn-fonts-off) for what happens to its file.
 - **Remove Copy** moves a copy Cicero can’t turn off to the Trash, when every style in it has another copy.
-- **Remove in Adobe Fonts…** is there for a copy from [Adobe Fonts](activating.md#adobe-fonts), which only Creative Cloud turns off. It opens the family’s page on the Adobe Fonts website, where you remove it. Creative Cloud then takes its copy away, and your own stays on.
-- A folder’s row has **Deactivate** or **Remove Copies** for all its files at once, when every style keeps a copy outside that folder, or **Remove in Adobe Fonts…** for copies from Adobe Fonts.
+- **Remove in Adobe Fonts** is there for a copy from [Adobe Fonts](activating.md#adobe-fonts), which only Creative Cloud turns off. It opens the family’s page on the Adobe Fonts website, where you remove it. Creative Cloud then takes its copy away, and your own stays on.
+- A folder’s row has **Deactivate** or **Remove Copies** for all its files at once, when every style keeps a copy outside that folder, or **Remove in Adobe Fonts** for copies from Adobe Fonts.
 - A green **Newest** tag marks the folder or file with the highest version, when all the others are older. It’s usually the one to keep.
 
 ## Missing Files
