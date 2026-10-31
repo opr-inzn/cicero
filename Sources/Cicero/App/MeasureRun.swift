@@ -111,6 +111,11 @@ enum MeasureRun {
         let text = "Sphinx of black quartz"
         for mode in [BrowserMode.grid, .list, .specimens] {
             await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+            // A rating while this view shows: the list makes its rows again for each change of user data.
+            for family in picks.prefix(3) {
+                await step("rate.\(mode.rawValue)", detail: family.name) { model.setRating(4, for: [family]) }
+                await step("rate.\(mode.rawValue)", detail: family.name) { model.setRating(nil, for: [family]) }
+            }
             for end in text.indices.dropFirst() where text[text.index(before: end)] != " " {
                 await step("type.\(mode.rawValue)") { preview.sampleText = String(text[..<end]) }
             }
