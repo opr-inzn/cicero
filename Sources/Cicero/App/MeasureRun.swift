@@ -49,6 +49,16 @@ enum MeasureRun {
         // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
         // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
         let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
+        // scroll: 15 pages down and back in each view, twice.
+        if only == "scroll" {
+            for _ in 0..<2 {
+                for mode in [BrowserMode.grid, .list, .specimens] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    await scroll(mode: mode)
+                }
+            }
+            return
+        }
         if only == "mode" || only == "mode-scrolled" {
             for _ in 0..<(only == "mode" ? 10 : 5) {
                 for mode in [BrowserMode.list, .specimens, .grid] {
@@ -77,6 +87,8 @@ enum MeasureRun {
             guard await until(seconds: 2, { applied != nil && model.appliedSearch == query }), let settle = applied else { continue }
             let settled = await settle.wait()
             Measurements.record("search", ms: settled.ms, detail: "\(query): \(model.visibleFamilies.count)")
+            Measurements.record("search.work", ms: settled.workMs)
+            Measurements.record("search.longest", ms: settled.longestMs)
             await step("search.clear") { model.searchText = "" }
         }
         model.searchApplies = nil
@@ -150,6 +162,8 @@ enum MeasureRun {
         let settled = await settle.wait()
         Measurements.signposter.endInterval("Step", signpost)
         Measurements.record(name, ms: settled.ms, detail: settled.timedOut ? "\(detail) (limit)" : detail)
+        Measurements.record("\(name).work", ms: settled.workMs, detail: detail)
+        Measurements.record("\(name).longest", ms: settled.longestMs, detail: detail)
     }
 
     /// Records the time since the process started, until the main thread is quiet.
@@ -179,12 +193,18 @@ final class MainSettle {
         var ms: Double
         var end: ContinuousClock.Instant
         var timedOut: Bool
+        /// The main thread's time in turns over 1 ms, and its longest turn: what an animation's many short turns add
+        /// up to, and the most a click or a key press would have waited meanwhile.
+        var workMs: Double
+        var longestMs: Double
     }
 
     private let start: ContinuousClock.Instant
     private var wake: ContinuousClock.Instant?
     private var lastBusyEnd: ContinuousClock.Instant
     private var sawTurn = false
+    private var work: Duration = .zero
+    private var longest: Duration = .zero
     private var observer: CFRunLoopObserver?
 
     private init() {
@@ -214,8 +234,13 @@ final class MainSettle {
         if activity == .afterWaiting {
             wake = now
         } else {
-            // The turn watching began in has no wake of its own: it counts as busy.
-            if wake.map({ now - $0 > .milliseconds(1) }) ?? true { lastBusyEnd = now }
+            // The turn watching began in has no wake of its own: it counts as busy, from the start.
+            let turn = now - (wake ?? start)
+            if wake == nil || turn > .milliseconds(1) {
+                lastBusyEnd = now
+                work += turn
+                longest = max(longest, turn)
+            }
             wake = nil
             sawTurn = true
         }
@@ -236,7 +261,8 @@ final class MainSettle {
                 break
             }
         }
-        return Result(ms: (lastBusyEnd - start).milliseconds, end: lastBusyEnd, timedOut: timedOut)
+        return Result(ms: (lastBusyEnd - start).milliseconds, end: lastBusyEnd, timedOut: timedOut,
+                      workMs: work.milliseconds, longestMs: longest.milliseconds)
     }
 }
 #endif
