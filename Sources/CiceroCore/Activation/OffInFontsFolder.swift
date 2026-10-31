@@ -102,10 +102,12 @@ extension ActivationEngine {
     /// ("Name 2.otf", as one of two files of the same name went in), or in ~/Library/Fonts while Cicero's Library is
     /// used, is taken as it is, on or off: importing again copies nothing twice. Of files with the same name and contents,
     /// one is copied and stands for the others (see `copyPlan`). Nothing is remembered as a copy of anything: the files are
-    /// the user's own from now on. Progress counts the files to copy. Returns where each file is now, and which of those
-    /// are new; cancelling stops between batches.
+    /// the user's own from now on. Those macOS didn't show off in time, as it can while it's busy, are tried once more at
+    /// the end, with longer to wait (`retryWait`). Progress counts the files to copy. Returns where each file is now,
+    /// which of those are new, and the files that didn't go in; cancelling stops between batches.
     @concurrent
-    public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async -> (placed: [String: String], new: [String]) {
+    public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async
+        -> (placed: [String: String], new: [String], failed: [String]) {
         let fm = FileManager.default
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         let plan = copyPlan(files)
@@ -116,6 +118,8 @@ extension ActivationEngine {
         var intoFontsFolderSoFar: [String] = []
         var registeredAgain = Set<String>()
         var lastLook = ContinuousClock.now
+        // Staged copies macOS didn't take in time → where they go in ~/Library/Fonts, and the file each is a copy of.
+        var again: [String: (destination: String, source: String)] = [:]
         for start in stride(from: 0, to: total, by: Self.offBatchSize) {
             if Task.isCancelled { break }
             if ContinuousClock.now - lastLook > Self.lookAgainEvery {
@@ -164,8 +168,22 @@ extension ActivationEngine {
                 new.append(destination)
                 intoFontsFolderSoFar.append(destination)
             }
-            for staged in moved.failed { try? fm.removeItem(atPath: staged) }
+            for staged in moved.failed {
+                if let source = sources[staged], let destination = intoFontsFolder[staged] { again[staged] = (destination, source) }
+            }
         }
+        if !again.isEmpty, !Task.isCancelled {
+            var patient = self
+            patient.confirmationWait = max(confirmationWait, Self.retryWait)
+            let moved = await patient.moveIntoFontsFolderOff(again.mapValues(\.destination))
+            for (staged, destination) in moved.placed {
+                guard let source = again[staged]?.source else { continue }
+                placed[source] = destination
+                new.append(destination)
+                intoFontsFolderSoFar.append(destination)
+            }
+        }
+        for staged in again.keys { try? fm.removeItem(atPath: staged) }
         // Not once cancelled: the copies go again.
         if !intoFontsFolderSoFar.isEmpty, !Task.isCancelled {
             await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
@@ -176,8 +194,14 @@ extension ActivationEngine {
         // The same files as those copied take their copies.
         for (path, original) in plan.sameAs { if let copy = placed[original] { placed[path] = copy } }
         if total > 0 { progress(total, total) }
-        return (placed, new)
+        var seen = Set<String>()
+        let failed = Task.isCancelled ? [] : files.filter { placed[$0] == nil && seen.insert($0).inserted }
+        return (placed, new, failed)
     }
+
+    /// How long macOS gets to show the files `installOff` tries once more on: a busy Mac took over the 2 seconds the
+    /// first time gives (`confirmationWait`).
+    static let retryWait: Duration = .seconds(10)
 
     /// How often `installOff` looks for copies macOS turned on again, and how many it looks at, at most.
     static let lookAgainEvery: Duration = .seconds(10)
@@ -250,8 +274,8 @@ extension ActivationEngine {
     /// their family's folder in Cicero's Library when fonts are installed there, else back into ~/Library/Fonts (see
     /// `moveIntoFontsFolderOff`). Not one from an app's own folder, which goes back there when it's turned on, nor one
     /// that's on for now, nor one CoreText can't read (it would go in and come out again at every launch). One with the
-    /// same name and contents as a file already where it goes is a spare and goes, as turning it on did. Records naming
-    /// a moved file as the original of a copy follow it. Returns how many files moved or went.
+    /// same name and contents as a file already where it goes goes to the Trash. Records naming a moved file as the
+    /// original of a copy follow it. Returns how many files moved or went.
     public func emptyInactiveFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, moved: Int) {
         let fm = FileManager.default
         let all = locations.inactiveFolders.flatMap { folder in
@@ -271,8 +295,9 @@ extension ActivationEngine {
         for path in files {
             let destination = installFolder(for: path, family: nil)
             let same = destination.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
-            if Self.isIdenticalCopy(same, of: path), (try? fm.removeItem(atPath: path)) != nil {
-                placed[path] = same
+            if Self.isIdenticalCopy(same, of: path) {
+                // To the Trash, as the user may have put it there; one the Trash won't take stays, rather than going in twice.
+                if (try? trash(Self.url(path))) != nil { placed[path] = same }
                 continue
             }
             if destination == locations.userFonts {

@@ -559,6 +559,9 @@ struct ImportSheet: View {
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1, $0.2) }
         if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) copied into \(model.installPlace).") }
+        if summary.notCopied > 0 {
+            lines.append("\(count(summary.notCopied, "font file")) couldn’t be copied. Import again to try \(summary.notCopied == 1 ? "it" : "them") again.")
+        }
         if summary.activated > 0 {
             lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).")
             if prompt.source == .fontBase {

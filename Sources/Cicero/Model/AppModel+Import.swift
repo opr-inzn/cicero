@@ -185,6 +185,7 @@ extension AppModel {
             let copies = Set(installed.placed.values)
             faces = faces.map { $0.copy(among: copies) }
             result.fonts = installed.new.count
+            result.notCopied = installed.failed.count
             result.removedCopies = removed
             if result.sets + result.applicationSets + result.smartSets > 0 { updated.sidebar.hidden.remove(SidebarSection.sets.key) }
             if result.tags > 0 { updated.sidebar.hidden.remove(SidebarSection.tags.key) }
