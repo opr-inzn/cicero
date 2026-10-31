@@ -43,6 +43,9 @@ struct CiceroApp: App {
                     model.start()
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
+                    #if CICERO_MEASURE
+                    MeasureRun.startIfAsked(model: model, preview: preview)
+                    #endif
                 }
                 // Fonts opened from the Finder (Open With, or a double-click when Cicero opens fonts): SwiftUI
                 // hands the first of them here and the others to the delegate.

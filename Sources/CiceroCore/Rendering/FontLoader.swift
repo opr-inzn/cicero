@@ -260,6 +260,11 @@ public final class FontLoader: Sendable {
 
     private func fileDescriptors(at path: String) -> FileDescriptors {
         if let cached = state.withLock({ $0.descriptors[path] }) { return cached }
+        #if CICERO_MEASURE
+        // On the main thread, as a view draws, the app performance runs count it.
+        let measuring = Thread.isMainThread ? Measurements.begin("mainThreadFileRead") : nil
+        defer { measuring?.end(detail: path) }
+        #endif
         let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
         state.withLock { state in
             state.descriptors[path] = descriptors

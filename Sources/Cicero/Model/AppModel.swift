@@ -292,6 +292,13 @@ final class AppModel {
     @ObservationIgnored var listReturnPage: String?
     /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
+    #if CICERO_MEASURE
+    /// How many libraries coverage and measurements finished with, so the app performance runs (`MeasureRun`) start
+    /// their steps once the background work after a scan is done.
+    @ObservationIgnored private(set) var measuredLibraries = 0
+    /// Called just before a search typed applies, after its pause: the app performance runs time it from there.
+    @ObservationIgnored var searchApplies: (() -> Void)?
+    #endif
 
     init() {
         let locations = Locations.standard
@@ -582,6 +589,10 @@ final class AppModel {
     private func apply(_ new: Library, scan id: Int) {
         let signpost = Signposts.library.beginInterval("Apply")
         defer { Signposts.library.endInterval("Apply", signpost) }
+        #if CICERO_MEASURE
+        let measuring = Measurements.begin("apply")
+        defer { measuring.end(detail: "\(library.families.count) families") }
+        #endif
         // The library restored at launch always gives way to the first scan's, and prefetches, coverage and problems
         // start from that one.
         let first = !hasScanned
@@ -643,6 +654,9 @@ final class AppModel {
             self.coverageProgress = nil
             self.coverageRevision &+= 1
             self.characterSetLookup.reset()
+            #if CICERO_MEASURE
+            Measurements.record("coverage.done", ms: Measurements.sinceProcessStart, detail: "\(families.count) families")
+            #endif
             self.updateMeasurements()
         }
     }
@@ -668,6 +682,10 @@ final class AppModel {
             self.measurementProgress = nil
             self.measurementRevision &+= 1
             self.refreshLetterGuesses()
+            #if CICERO_MEASURE
+            self.measuredLibraries += 1
+            Measurements.record("measurements.done", ms: Measurements.sinceProcessStart, detail: "\(families.count) families")
+            #endif
         }
     }
 
@@ -713,6 +731,9 @@ final class AppModel {
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled, let self, self.appliedSearch != self.searchText else { return }
+            #if CICERO_MEASURE
+            self.searchApplies?()
+            #endif
             self.appliedSearch = self.searchText
             // A family's whole name, as when it's chosen from the suggestions: that family, selected and in view.
             let name = SearchQuery(self.searchText).text
