@@ -66,14 +66,14 @@ enum FontFileReader {
         // would also hold the optical size CoreText picks for its point size.)
         let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
             .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
-        let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), CTFontTableOptions(rawValue: 0)) as Data?
+        let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), []) as Data?
         let entries = variationAxes(of: font, fvar: fvar, known: &knownAxes)
         for entry in entries {
             guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let defaultValue = entry[kCTFontVariationAxisDefaultValueKey as String] as? Double
             else { continue }
-            if identifier != weightAxisTag, abs((instance[identifier] ?? defaultValue) - defaultValue) > 0.01 { isAtOrigin = false }
-            if identifier == weightAxisTag,
+            if identifier != AxisTag.weight, abs((instance[identifier] ?? defaultValue) - defaultValue) > 0.01 { isAtOrigin = false }
+            if identifier == AxisTag.weight,
                let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
                let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double {
                 axis = WeightAxis(minimum: minimum, maximum: maximum, defaultValue: defaultValue)
@@ -83,11 +83,11 @@ enum FontFileReader {
             let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
             axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
         }
-        let os2 = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), CTFontTableOptions(rawValue: 0)) as Data?
-        let head = CTFontCopyTable(font, CTFontTableTag(kCTFontTableHead), CTFontTableOptions(rawValue: 0)) as Data?
+        let os2 = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), []) as Data?
+        let head = CTFontCopyTable(font, CTFontTableTag(kCTFontTableHead), []) as Data?
         let familyClass = Int((symbolic.rawValue >> 28) & 0xF)
         let isMonospaced = symbolic.contains(.monoSpaceTrait)
-        let features = OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), CTFontTableOptions(rawValue: 0)) as Data?))
+        let features = OpenTypeFeatures(tags: featureTags(CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data?))
         let face = FontFace(
             id: id, postScriptName: postScriptName, familyName: familyName, styleName: styleName, fullName: fullName,
             weight: weightClass(of: font, os2: os2),
@@ -110,7 +110,7 @@ enum FontFileReader {
             features: features,
             figures: figures(of: font, features: features),
             localizedFamilyNames: LocalizedNames.familyNames(
-                CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), CTFontTableOptions(rawValue: 0)) as Data?, besides: familyName
+                CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), []) as Data?, besides: familyName
             )
         )
         return ReadFace(face: face, fvar: fvar, isAddedDefault: instance.isEmpty && fvar.map(leavesDefaultUnnamed) == true)
@@ -140,7 +140,7 @@ enum FontFileReader {
         if features.contains(.oldStyleFigures) || tall > 0 && small < 0.8 * tall && descending >= 3 {
             figures.insert(.oldStyle)
         }
-        guard CTFontCopyTable(font, CTFontTableTag(morxTag), CTFontTableOptions(rawValue: 0)) != nil else { return figures }
+        guard CTFontCopyTable(font, CTFontTableTag(morxTag), []) != nil else { return figures }
         for type in CTFontCopyFeatures(font) as? [[String: Any]] ?? [] {
             let selectors = (type[kCTFontFeatureTypeSelectorsKey as String] as? [[String: Any]] ?? [])
                 .compactMap { $0[kCTFontFeatureSelectorIdentifierKey as String] as? Int }
@@ -241,7 +241,6 @@ enum FontFileReader {
         return Date(timeIntervalSince1970: TimeInterval(seconds) - 2_082_844_800)
     }
 
-    private static let weightAxisTag: UInt32 = 0x7767_6874  // 'wght'
 
     private static func name(_ key: CFString, of font: CTFont) -> String? {
         guard let value = CTFontCopyName(font, key) as String? else { return nil }

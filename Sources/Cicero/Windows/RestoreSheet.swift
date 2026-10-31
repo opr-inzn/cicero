@@ -31,9 +31,9 @@ struct RestoreSheet: View {
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 10) {
-                option("Folders, locations and settings", isOn: $settings, detail: settingsDetail)
+                DetailToggle("Folders, locations and settings", detail: settingsDetail, isOn: $settings)
                 if includesFonts {
-                    option("Font files", isOn: $fonts, detail: fontsDetail)
+                    DetailToggle("Font files", detail: fontsDetail, isOn: $fonts)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -70,16 +70,6 @@ struct RestoreSheet: View {
         .onDisappear { contents.discard() }
     }
 
-    private func option(_ title: String, isOn: Binding<Bool>, detail: String) -> some View {
-        Toggle(isOn: isOn) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-            }
-        }
-        .toggleStyle(.checkbox)
-    }
-
     /// "4 folders, 2 smart folders, 7 tags, 3 locations, 12 added fonts and 1 character set." and what restoring them does.
     private var settingsDetail: String {
         let data = contents.userData
@@ -89,12 +79,12 @@ struct RestoreSheet: View {
             (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]
         let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
-        let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.formatted(.list(type: .and)) + "."
-        return inside + " Replaces what’s set up now; the current setup is saved first in ~/Library/Application Support/Cicero/Backups."
+        let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.listed() + "."
+        return inside + " Replaces what’s set up now; the current setup is saved first, in ~/Library/Application Support/Cicero/Backups."
     }
 
     private var fontsDetail: String {
-        "\(contents.fontCount.formatted()) files. Puts each file back where it was, unless one is already there."
+        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.formatted()) files"). Puts each file back where it was, unless one is already there."
     }
 
     private func restore() {

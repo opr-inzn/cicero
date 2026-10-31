@@ -53,18 +53,23 @@ public enum CharacterMap {
                 let ends = start + 14, starts = ends + doubled + 2, deltas = starts + doubled, offsets = deltas + doubled
                 guard reader.u16(offsets + doubled - 2) != nil else { continue }
                 read = true
+                // Each code once, from the segment that has it first: a damaged table's overlapping segments could
+                // otherwise add up to billions.
+                var next = 0
                 for segment in 0..<doubled / 2 {
-                    guard let last = reader.u16(ends + segment * 2), let first = reader.u16(starts + segment * 2),
+                    guard let last = reader.u16(ends + segment * 2), let segmentStart = reader.u16(starts + segment * 2),
                           let delta = reader.u16(deltas + segment * 2), let rangeOffset = reader.u16(offsets + segment * 2),
-                          first <= last
+                          max(segmentStart, next) <= last
                     else { continue }
+                    let first = max(segmentStart, next)
+                    next = last + 1
                     for code in first...last {
                         let glyph: Int
                         if rangeOffset == 0 {
                             glyph = (code + delta) & 0xFFFF
                         } else {
                             // The offset counts from where it's stored, into the glyph ID array after the segments.
-                            guard let id = reader.u16(offsets + segment * 2 + rangeOffset + (code - first) * 2), id != 0 else { continue }
+                            guard let id = reader.u16(offsets + segment * 2 + rangeOffset + (code - segmentStart) * 2), id != 0 else { continue }
                             glyph = (id + delta) & 0xFFFF
                         }
                         if glyph != 0 { add(code, code) }

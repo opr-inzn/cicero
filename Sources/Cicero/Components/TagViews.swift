@@ -57,7 +57,7 @@ struct TagDots: View {
                 }
             }
             .accessibilityElement()
-            .accessibilityLabel(colors.map(\.title).formatted(.list(type: .and)))
+            .accessibilityLabel(colors.map(\.title).listed())
         }
     }
 }

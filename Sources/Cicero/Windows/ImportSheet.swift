@@ -2,10 +2,10 @@ import CiceroCore
 import SwiftUI
 
 /// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts
-/// (copied in), its sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as notes),
-/// activation history and the fonts that were on; Font Book's collections; or FontBase's fonts (copied in), collections,
-/// tags and the fonts that were on. Then progress while it's brought in, and what came over. A library its app writes to while it's open
-/// waits for the app to quit, and is read again then.
+/// (copied in), its sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as
+/// notes), activation history and the fonts that were on; Font Book's collections; or FontBase's fonts (copied in),
+/// collections, tags and the fonts that were on. Then progress while it's brought in, and what came over. A library its
+/// app writes to while it's open waits for the app to quit, and is read again then.
 struct ImportSheet: View {
     @State private var prompt: ImportPrompt
     @Environment(AppModel.self) private var model
@@ -193,7 +193,7 @@ struct ImportSheet: View {
                     if smart.unsupported.isEmpty {
                         checkbox(smart.name, detail: rulesDetail(smart), isOn: member(smart.id, of: \.smartSets))
                     } else {
-                        checkbox(smart.name, detail: "Cicero has no rule for \(smart.unsupported.formatted(.list(type: .and))).",
+                        checkbox(smart.name, detail: "Cicero has no rule for \(smart.unsupported.listed()).",
                                  isOn: .constant(false))
                             .disabled(true)
                     }
@@ -204,10 +204,10 @@ struct ImportSheet: View {
             || !library.history.isEmpty || !library.active.isEmpty {
             section(prompt.source == .fontBase ? "Tags and Activations" : "Tags, Classifications, Ratings and Activations") {
                 if !library.tags.isEmpty, prompt.source == .fontBase {
-                    checkbox("Tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the tag.",
+                    checkbox("Tags", detail: "\(library.tags.map(\.name).listed()), given to each family whose styles have the tag.",
                              isOn: $choices.tags)
                 } else if !library.tags.isEmpty {
-                    checkbox("Labels as tags", detail: "\(library.tags.map(\.name).formatted(.list(type: .and))), given to each family whose styles have the label.",
+                    checkbox("Labels as tags", detail: "\(library.tags.map(\.name).listed()), given to each family whose styles have the label.",
                              isOn: $choices.tags)
                 }
                 if !library.classifications.isEmpty {
@@ -222,7 +222,7 @@ struct ImportSheet: View {
                              isOn: $choices.comments)
                 }
                 if !library.history.isEmpty {
-                    checkbox("Activation history", detail: "How often each family was activated, and when last, for the Times Activated and Last Activated rules.",
+                    checkbox("Activation history", detail: "How often each family was activated, and when it was last activated. Smart folders can use this.",
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {
@@ -265,7 +265,7 @@ struct ImportSheet: View {
                 ProgressView().controlSize(.small)
                 Text("Looking for fonts in your library already").font(.callout).foregroundStyle(.secondary)
             } else {
-                Text("Your current setup is saved first, in Backups.")
+                Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -377,8 +377,7 @@ struct ImportSheet: View {
         )
     }
 
-    /// Enough for every section and row, before it scrolls: the title and the buttons, each section's title and the
-    /// space after it, each row's two lines, and the line about what isn't imported.
+    /// Whether anything is ticked that the library has.
     private var hasChoice: Bool {
         (choices.fontFolder && library.fontFolder != nil) || (choices.otherFiles && !library.otherFiles.isEmpty)
             || !choices.sets.isEmpty || !choices.smartSets.isEmpty
@@ -387,12 +386,12 @@ struct ImportSheet: View {
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
     }
 
-    /// Whether Office can use them, and why to quit the other app first.
     /// How the copies come in: inactive, unless the ones that were active are turned on again.
     private var copiedState: String {
         !library.active.isEmpty && choices.activate ? "inactive except the ones that were active" : "inactive"
     }
 
+    /// Whether Office can use them, and why to quit the other app first.
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         // FontBase's own library can't be imported until it has quit.
@@ -415,7 +414,7 @@ struct ImportSheet: View {
 
     private var classificationsDetail: String {
         let own = Array(Set(library.classifications.filter { $0.builtIn == nil }.map(\.name))).sorted()
-        let yours = own.isEmpty ? "" : " Your own, \(own.map { "“\($0)”" }.formatted(.list(type: .and))), come along."
+        let yours = own.isEmpty ? "" : " Your own, \(own.map { "“\($0)”" }.listed()), come along."
         return "\(count(library.classifications.count, "classified style")). A family goes in the classification most of its styles have, "
             + "unless you’ve chosen one for it." + yours
     }
@@ -474,7 +473,7 @@ struct ImportSheet: View {
         var parts: [String] = []
         if inAlready > 0 { parts.append("\(inAlready.formatted()) in your library already") }
         if same > 0 { parts.append(same == 1 ? "1 the same as another file" : "\(same.formatted()) the same as other files") }
-        return parts.isEmpty ? "" : ", " + parts.formatted(.list(type: .and))
+        return parts.isEmpty ? "" : ", " + parts.listed()
     }
 
     private func fontLibraryDetail(_ folder: String) -> String {
@@ -496,7 +495,7 @@ struct ImportSheet: View {
         let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
         let copying = library.otherFiles.count(where: toCopy.contains)
         let same = library.otherFiles.count { copies?.sameAs[$0] != nil }
-        return "\(named.formatted(.list(type: .and))) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
+        return "\(named.listed()) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
     }
 
     /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".
@@ -504,10 +503,10 @@ struct ImportSheet: View {
         var parts: [String] = []
         if !set.families.isEmpty { parts.append(count(set.families.count, "family", "families")) }
         if !set.fonts.isEmpty { parts.append(count(set.fonts.count, "style")) }
-        let contents = parts.isEmpty ? "Empty" : parts.formatted(.list(type: .and))
+        let contents = parts.isEmpty ? "Empty" : parts.listed()
         guard !set.apps.isEmpty else { return contents }
         let apps = set.apps.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }
-        return "For \(apps.formatted(.list(type: .and))) · \(contents)"
+        return "For \(apps.listed()) · \(contents)"
     }
 
     private func rulesDetail(_ smart: ImportedSmartSet) -> String {
@@ -558,8 +557,11 @@ struct ImportSheet: View {
             (summary.tags, labels ? "label as a tag" : "tag", labels ? "labels as tags" : "tags"),
         ]
         let made = kinds.filter { $0.0 > 0 }.map { count($0.0, $0.1, $0.2) }
-        if !made.isEmpty { lines.append(made.formatted(.list(type: .and)) + ".") }
+        if !made.isEmpty { lines.append(made.listed() + ".") }
         if summary.fonts > 0 { lines.append("\(count(summary.fonts, "font file")) copied into \(model.installPlace).") }
+        if summary.notCopied > 0 {
+            lines.append("\(count(summary.notCopied, "font file")) couldn’t be copied. Import again to try \(summary.notCopied == 1 ? "it" : "them") again.")
+        }
         if summary.activated > 0 {
             lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).")
             if prompt.source == .fontBase {
@@ -567,7 +569,7 @@ struct ImportSheet: View {
             }
         }
         if summary.removedCopies > 0 {
-            lines.append("\(count(summary.removedCopies, "copy", "copies")) \(appName) left in the Fonts folder moved to the Trash.")
+            lines.append("\(count(summary.removedCopies, "copy", "copies")) \(appName) left in your Fonts folder moved to the Trash.")
         }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
         if summary.classifiedFamilies > 0 { lines.append("\(count(summary.classifiedFamilies, "family", "families")) classified.") }
@@ -585,13 +587,13 @@ struct ImportSheet: View {
             lines.append("\(count(summary.notFound, "font")) in \(appName)’s \(kinds) \(summary.notFound == 1 ? "isn’t" : "aren’t") in your library.")
         }
         if !summary.emptySets.isEmpty {
-            lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.formatted(.list(type: .and))), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")
+            lines.append("Not imported: \(summary.emptySets.map { "“\($0)”" }.listed()), as none of \(summary.emptySets.count == 1 ? "its" : "their") fonts are in your library.")
         }
         if !summary.skippedSmartSets.isEmpty {
-            lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.formatted(.list(type: .and))), whose rules name sets or labels that didn’t come along.")
+            lines.append("Not imported: \(summary.skippedSmartSets.map { "“\($0)”" }.listed()), whose rules name sets or labels that didn’t come along.")
         }
         if !summary.missingApps.isEmpty {
-            lines.append("Not on this Mac, so their app folders are without them: \(summary.missingApps.formatted(.list(type: .and))).")
+            lines.append("Not on this Mac, so their app folders are without them: \(summary.missingApps.listed()).")
         }
         return lines
     }

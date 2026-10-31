@@ -133,7 +133,7 @@ final class AppSetWatcher {
             if !result.failed.isEmpty {
                 model.showToast(result.message)
             } else if result.succeeded > 0 {
-                model.showToast("Activated fonts for \(self.appNames(wanting: wanted))")
+                model.showToast("\(FontNames.describe(on) ?? "Fonts") activated for \(self.appNames(wanting: wanted))")
             }
             // The engine has waited for macOS, so a scan now sees what the sync did.
             let scan = model.rescan()
@@ -222,7 +222,7 @@ final class AppSetWatcher {
             guard let id = app.bundleIdentifier, ids.contains(id), seen.insert(id).inserted else { continue }
             names.append(app.localizedName ?? id)
         }
-        return names.formatted(.list(type: .and))
+        return names.listed()
     }
 
     private static func onForAppSets(_ records: ActivationRecords) -> Set<String> {

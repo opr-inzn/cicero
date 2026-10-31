@@ -78,8 +78,8 @@ struct MainWindow: View {
         } message: { request in
             let styles = request.plan.alsoTurnsOff
             let shown = styles.count > 6 ? Array(styles.prefix(5)) + ["\(styles.count - 5) more"] : styles
-            let named = shown.count > 1 ? shown.dropLast().joined(separator: ", ") + " and " + shown.last! : shown.joined()
-            Text("A file that goes off holds \(named) too. \(styles.count == 1 ? "It goes" : "They go") off with it.")
+            let named = shown.listed()
+            Text("The file that turns off also holds \(named). \(styles.count == 1 ? "It turns" : "They turn") off too.")
         }
         .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",
@@ -166,9 +166,9 @@ struct MainWindow: View {
             ? "1 font file will be removed from your Mac and turned off in every app."
             : "\(plan.paths.count) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be removed from your Mac and turned off in every app."]
         if !plan.otherFamilies.isEmpty {
-            let names = ListFormatter.localizedString(byJoining: Array(plan.otherFamilies.prefix(3))) + (plan.otherFamilies.count > 3 ? " and others" : "")
+            let names = plan.otherFamilies.count > 3 ? plan.otherFamilies.prefix(3).joined(separator: ", ") + " and others" : plan.otherFamilies.listed()
             if plan.spareCopiesOf != nil {
-                // Problems only removes files whose every font has a copy elsewhere.
+                // Conflicts only removes files whose every font has a copy elsewhere.
                 let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
                 let keep = plan.otherFamilies.count == 1 ? "which keeps its other copies" : "which keep their other copies"
                 parts.append("\(files) \(names), \(keep).")
@@ -182,9 +182,8 @@ struct MainWindow: View {
     }
 }
 
-/// A page of the detail column: room for the Info panel, and files dropped on it.
-/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and while apps that keep a font's
-/// old version are open (`openAppsReplacePrompt`).
+/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and
+/// while apps that keep a font's old version are open (`openAppsReplacePrompt`).
 private struct ReplaceAlerts: ViewModifier {
     @Environment(AppModel.self) private var model
 
@@ -198,7 +197,7 @@ private struct ReplaceAlerts: ViewModifier {
                 Button("Replace") { model.replaceEverywhere(prompt) }
                     .keyboardShortcut(.defaultAction)
                 // Once the alert has gone, so the sheet isn't lost on its way out.
-                Button("Choose for Each…") { Task { model.duplicatePrompt = prompt } }
+                Button("Choose for Each") { Task { model.duplicatePrompt = prompt } }
                 Button("Cancel", role: .cancel) {}
             } message: { prompt in
                 Text(replaceMessage(prompt))
@@ -218,18 +217,13 @@ private struct ReplaceAlerts: ViewModifier {
 
     /// "Replace Fonts While InDesign Is Open?", "…While InDesign and Photoshop Are Open?".
     static func openAppsTitle(_ prompt: OpenAppsReplacePrompt) -> String {
-        "Replace Fonts While \(list(prompt.apps)) \(prompt.apps.count == 1 ? "Is" : "Are") Open?"
+        "Replace Fonts While \(prompt.apps.listed()) \(prompt.apps.count == 1 ? "Is" : "Are") Open?"
     }
 
     static func openAppsMessage(_ prompt: OpenAppsReplacePrompt) -> String {
         prompt.apps.count == 1
             ? "\(prompt.apps[0]) keeps the old version until it restarts, and documents open in it can show wrong letters. Quit it first, or restart it afterwards."
-            : "\(list(prompt.apps)) keep the old version until they restart, and documents open in them can show wrong letters. Quit them first, or restart them afterwards."
-    }
-
-    /// "InDesign", "InDesign and Photoshop", "InDesign, Illustrator and Photoshop".
-    static func list(_ names: [String]) -> String {
-        names.count > 1 ? names.dropLast().joined(separator: ", ") + " and " + names.last! : names.joined()
+            : "\(prompt.apps.listed()) keep the old version until they restart, and documents open in them can show wrong letters. Quit them first, or restart them afterwards."
     }
 
     /// "Replace Helvetica in 2 Places?", "Replace Helvetica in Clients?", or for several families "Replace Fonts in More
@@ -246,9 +240,8 @@ private struct ReplaceAlerts: ViewModifier {
 
     /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
     /// For one file: "Helvetica is in Clients. The file goes to the Trash, and the added one takes its place."
-    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…goes to the Trash. The added one takes the place
-    /// of each, except Cicero’s copy of Helvetica in your Fonts folder: Helvetica is off, so the one in Cicero’s Library is
-    /// enough."
+    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…takes its place. Cicero’s copy of Helvetica in
+    /// your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
     private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
         let several = prompt.duplicates.filter(model.warnsBeforeReplacing)
         var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
@@ -259,14 +252,14 @@ private struct ReplaceAlerts: ViewModifier {
             return (lines + ["\(files) to the Trash, and the added one takes its place."]).joined(separator: " ")
         }
         let families = spare.map(\.0)
-        let off = families.count == 1 ? "\(families[0]) is off" : "they’re off"
-        let except = spare.reduce(0) { $0 + $1.1 } == 1
-            ? "Cicero’s copy of \(families[0]) in your Fonts folder: \(off), so the one in Cicero’s Library is enough."
-            : "Cicero’s copies of \(Self.list(families)) in your Fonts folder: \(off), so the ones in Cicero’s Library are enough."
-        return (lines + ["Each of these files goes to the Trash. The added one takes the place of each, except " + except]).joined(separator: " ")
+        let spares = spare.reduce(0) { $0 + $1.1 } == 1
+            ? "Cicero’s copy of \(families[0]) in your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
+            : "Cicero’s copies of \(families.listed()) in your Fonts folder only go to the Trash, as the added ones in Cicero’s Library take over."
+        return (lines + ["Each of these files goes to the Trash, and the added one takes its place.", spares]).joined(separator: " ")
     }
 }
 
+/// A page of the detail column: room for the Info panel, and files dropped on it.
 private struct DetailPage: ViewModifier {
     func body(content: Content) -> some View {
         content

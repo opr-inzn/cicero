@@ -501,12 +501,12 @@ public struct LibraryBackup: Sendable {
         try fm.copyItem(at: source, to: target)
     }
 
-    /// The backup's user data with every path moved from the home folder it was made in to this
-    /// one. Temporary activations are over. Records are kept only about font files in font locations
-    /// (`fontLocations`) or among the files the user added, installed copies only in ~/Library/Fonts and files kept out of an app's folder
-    /// only in Cicero's Inactive folder: activating moves such a file back to the folder its record
-    /// names. The rest are merged by `mergedRecords`. The Font Library is the backup's unless `fontLibrary` says where
-    /// it's to be, as this Mac's when only fonts are restored: the paths in the backup's move there.
+    /// The backup's user data with every path moved from the home folder it was made in to this one. Temporary
+    /// activations are over. Records are kept only about font files in font locations (`fontLocations`) or among the
+    /// files the user added, installed copies only in ~/Library/Fonts and files kept out of an app's folder only in
+    /// Cicero's Inactive folder: activating moves such a file back to the folder its record names. The rest are merged
+    /// by `mergedRecords`. The Font Library is the backup's unless `fontLibrary` says where it's to be, as this Mac's
+    /// when only fonts are restored: the paths in the backup's move there.
     public func userData(from contents: BackupContents, fontLibrary: String? = nil) -> UserData {
         let oldHome = contents.manifest.home
         let libraries = fontLibraries(of: contents, restoringInto: fontLibrary)

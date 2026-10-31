@@ -96,11 +96,17 @@ extension ActivationEngine {
     /// and the records follow. When the library was in its first place, ~/Cicero goes too, once nothing is left in it.
     /// One that can't move stays where it was, as it was, with its path in `failed`. A library that holds the Inactive
     /// folder, as one in ~/Cicero itself does, moves item by item instead, and the Inactive folder stays where it is.
+    ///
+    /// The move is written down first (`libraryMoveJournal`), onto the disk itself, before anything goes off, so a launch
+    /// after Cicero stopped halfway can put the library back together (see `finishLibraryMove`). It stays written down
+    /// when the move ends: once the new path is saved, `forgetLibraryMove`. A move written down earlier that couldn't
+    /// finish yet is finished first.
     @concurrent
     public func moveFontLibrary(to destination: URL, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
         var records = records
         let place = (destination.path as NSString).abbreviatingWithTildeInPath
+        if let fontLibrary, hasLibraryMove { _ = await finishLibraryMove(libraryPath: fontLibrary.path, records: records) }
         guard let fontLibrary, fm.fileExists(atPath: fontLibrary.path) else {
             // Nothing in it yet: it's just somewhere else from now on.
             return ActivationResult(records: records, succeeded: 0, failed: [], message: "Cicero’s Library moved to \(place)")
@@ -114,12 +120,20 @@ extension ActivationEngine {
         func moved(_ path: String) -> String { isLibrary(path) ? new + path.dropFirst(old.count) : path }
         let persistent = records.inPlace.filter(isLibrary).sorted()
         let session = records.temporary.keys.filter(isLibrary).sorted()
-        func register(_ paths: (String) -> String) async {
-            if !persistent.isEmpty { _ = await registrar.register(persistent.map { Self.url(paths($0)) }, scope: .persistent) }
-            if !session.isEmpty { _ = await registrar.register(session.map { Self.url(paths($0)) }, scope: .session) }
-        }
         // The folder chosen goes, for the library to take its place, only when there's nothing in it.
-        guard !fm.fileExists(atPath: new) || Self.removeIfEmpty(new) else { return failure }
+        let newWasThere = Self.exists(new)
+        if newWasThere {
+            guard let items = try? fm.contentsOfDirectory(atPath: new), items.allSatisfy({ $0 == ".DS_Store" }) else { return failure }
+        }
+        let move = LibraryMove(old: old, new: new, kept: held.map { ($0 as NSString).lastPathComponent }.sorted(),
+                               newWasThere: newWasThere, persistent: persistent, session: session)
+        guard (try? noteLibraryMove(move)) != nil else { return failure }
+        // What's left of it put back as it was, and the journal gone once nothing is left to put back.
+        func failed() async -> ActivationResult {
+            _ = await finishLibraryMove(libraryPath: old, records: records)
+            return failure
+        }
+        guard !newWasThere || Self.removeIfEmpty(new) else { return await failed() }
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
         // The whole folder, a rename on the same disk; onto another disk what's in it, file by file (see `moveItems`).
@@ -131,23 +145,19 @@ extension ActivationEngine {
             } catch let error as POSIXError where error.code == .EXDEV {
                 // Onto another disk.
             } catch {
-                try? fm.createDirectory(atPath: new, withIntermediateDirectories: true)
-                await register { $0 }
-                return failure
+                return await failed()
             }
         }
         if !whole {
-            guard Self.moveItems(in: old, to: new, except: Set(held.map { ($0 as NSString).lastPathComponent })) else {
-                if held.isEmpty { try? fm.createDirectory(atPath: new, withIntermediateDirectories: true) }
-                await register { $0 }
-                return failure
-            }
+            guard Self.moveItems(in: old, to: new, except: Set(move.kept)) else { return await failed() }
             if held.isEmpty { Self.removeEmptyFolders(old) }
         }
-        records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
+        // A copy's original can be in the library too: earlier versions installed copies of a library they listed as a location.
+        records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), moved($0.value)) }, uniquingKeysWith: { first, _ in first })
         records.inPlace = Set(records.inPlace.map(moved))
         records.temporary = Dictionary(records.temporary.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
-        await register(moved)
+        if !persistent.isEmpty { _ = await registrar.register(persistent.map { Self.url(moved($0)) }, scope: .persistent) }
+        if !session.isEmpty { _ = await registrar.register(session.map { Self.url(moved($0)) }, scope: .session) }
         let firstPlaces = [locations.defaultFontLibrary, locations.formerDefaultFontLibrary].map(\.standardizedFileURL.path)
         if firstPlaces.contains(fontLibrary.standardizedFileURL.path) {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
@@ -184,6 +194,132 @@ extension ActivationEngine {
         }
         if otherDisk { for item in items { removeEmptyFolders(item.from.path) } }
         return true
+    }
+
+    // MARK: A move that stopped
+
+    /// Where `moveFontLibrary` writes down the move it's about to make (see `LibraryMove`), until the new path is saved
+    /// (see `forgetLibraryMove`).
+    var libraryMoveJournal: URL { locations.support.appendingPathComponent("moving-library.json", isDirectory: false) }
+
+    /// Whether a move of the library is written down that may not have ended, or been saved: `finishLibraryMove` has
+    /// something to do.
+    public var hasLibraryMove: Bool { FileManager.default.fileExists(atPath: libraryMoveJournal.path) }
+
+    func noteLibraryMove(_ move: LibraryMove) throws {
+        try FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
+        try JSONEncoder().encode(move).write(to: libraryMoveJournal, options: .atomic)
+        // On the disk itself before anything goes off, so a power cut can't leave the move without it.
+        guard UserDataStore.syncToDisk(libraryMoveJournal) else { throw POSIXError(.EIO) }
+    }
+
+    /// Once the path `moveFontLibrary` moved the library to is saved: what it wrote down goes.
+    public func forgetLibraryMove() {
+        try? FileManager.default.removeItem(at: libraryMoveJournal)
+    }
+
+    /// At launch, before the first scan, with the library's saved path and records: a move of the library that is still
+    /// written down (see `moveFontLibrary`) didn't end, or wasn't saved, when Cicero stopped. Saved in the old place, it
+    /// goes back: what's on in the new place goes off, everything in the new folder goes back to its place in the old one
+    /// (one that's there already, the same, goes; a different one goes beside it, as "Name 2"), the hidden half copies
+    /// go, so does the folder the move made (an empty folder chosen is there again), and the fonts that were on are on
+    /// again from the old place, those the records still have on. Saved in the new place, the move had ended: only half
+    /// copies go. Either way nothing is asked or said. Returns whether that's all done, and the journal gone: not while
+    /// a disk isn't there or a file couldn't go back, for the next launch to try again; meanwhile the fonts still in
+    /// the old place are on, and those that aren't show as missing.
+    @concurrent
+    @discardableResult
+    public func finishLibraryMove(libraryPath: String, records: ActivationRecords) async -> Bool {
+        guard let data = try? Data(contentsOf: libraryMoveJournal), let move = try? JSONDecoder().decode(LibraryMove.self, from: data) else {
+            forgetLibraryMove()
+            return true
+        }
+        func standard(_ path: String) -> String { URL(fileURLWithPath: path).standardizedFileURL.path }
+        let saved = standard(libraryPath)
+        let done: Bool
+        if saved == standard(move.new) {
+            done = Self.diskIsThere(move.new)
+            if done { Self.removeHalfCopies(in: move.new, except: []) }
+        } else if saved == standard(move.old) {
+            done = await undo(move, records: records)
+        } else {
+            // From a move long ago; the library has moved since.
+            done = true
+        }
+        if done { forgetLibraryMove() }
+        return done
+    }
+
+    private func undo(_ move: LibraryMove, records: ActivationRecords) async -> Bool {
+        let fm = FileManager.default
+        let old = move.old, new = move.new
+        guard Self.diskIsThere(old) else { return false }
+        func moved(_ path: String) -> String { new + path.dropFirst(old.count) }
+        func isOn(_ path: String) -> Bool { Self.exists(path) && registrar.isActive(Self.url(path)) }
+        var complete = Self.diskIsThere(new)
+        if complete {
+            // On in the new place: the move ended, but the new path wasn't saved.
+            let persistent = move.persistent.map(moved).filter(isOn), session = move.session.map(moved).filter(isOn)
+            if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
+            if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
+            // Copies cut short on their way back, at a launch that stopped too.
+            Self.removeHalfCopies(in: old, except: Set(move.kept))
+            Self.removeHalfCopies(in: new, except: [])
+            if Self.isFolder(new) {
+                // The whole folder, where nothing of the library is left in the old place; else file by file.
+                let whole = (!Self.exists(old) || Self.removeIfEmpty(old))
+                    && (try? fm.createDirectory(atPath: (old as NSString).deletingLastPathComponent, withIntermediateDirectories: true)) != nil
+                    && renamex_np(new, old, UInt32(RENAME_EXCL)) == 0
+                if !whole {
+                    for (from, to) in Self.fileMoves(Self.url(new), to: Self.url(old)) {
+                        if Self.exists(to.path) {
+                            // Copied, but the original wasn't gone yet.
+                            if ActivationEngine.isIdenticalCopy(from.path, of: to.path), (try? fm.removeItem(at: from)) != nil { continue }
+                        }
+                        let target = Self.exists(to.path) ? Self.uniqueURL(for: to.lastPathComponent, in: to.deletingLastPathComponent()) : to
+                        do {
+                            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                            try Self.moveItem(from, to: target)
+                        } catch {
+                            complete = false
+                        }
+                    }
+                    Self.removeEmptyFolders(new)
+                }
+            }
+            if move.newWasThere { try? fm.createDirectory(atPath: new, withIntermediateDirectories: true) }
+        }
+        // On again from the old place, those the records still have on.
+        func lost(_ path: String) -> Bool { Self.exists(path) && !registrar.isActive(Self.url(path)) }
+        let persistent = move.persistent.filter { records.inPlace.contains($0) && lost($0) }
+        let session = move.session.filter { records.temporary[$0] != nil && lost($0) }
+        if !persistent.isEmpty { _ = await registrar.register(persistent.map(Self.url), scope: .persistent) }
+        if !session.isEmpty { _ = await registrar.register(session.map(Self.url), scope: .session) }
+        return complete
+    }
+
+    /// Takes away the hidden copies cut short (see `movingPrefix`) in a folder, at any depth, but for the items in it
+    /// named in `kept`.
+    static func removeHalfCopies(in folder: String, except kept: Set<String>) {
+        let fm = FileManager.default
+        for name in ((try? fm.contentsOfDirectory(atPath: folder)) ?? []) where !kept.contains(name) {
+            let path = (folder as NSString).appendingPathComponent(name)
+            if name.hasPrefix(movingPrefix) {
+                unlock(url(path))
+                try? fm.removeItem(atPath: path)
+            } else if isFolder(path) {
+                removeHalfCopies(in: path, except: [])
+            }
+        }
+    }
+
+    /// Whether the disk a path is on is there: one in /Volumes must be mounted, not just a folder left there.
+    static func diskIsThere(_ path: String) -> Bool {
+        let parts = (URL(fileURLWithPath: path).standardizedFileURL.path as NSString).pathComponents
+        guard parts.count > 2, parts[1] == "Volumes" else { return true }
+        let volume = "/Volumes/" + parts[2]
+        guard let disk = disk(of: volume) else { return false }
+        return disk != Self.disk(of: "/Volumes")
     }
 
     /// Moves a Font Library still in its former first place, ~/Cicero/Font Library, to today's, ~/Cicero/Library, as
@@ -278,4 +414,17 @@ extension ActivationEngine {
         }
         return folder.appendingPathComponent(name, isDirectory: true)
     }
+}
+
+/// A move of Cicero's Library as `ActivationEngine.moveFontLibrary` writes it down before it starts.
+struct LibraryMove: Codable, Equatable, Sendable {
+    var old: String
+    var new: String
+    /// The items in `old` that stay there: the Inactive folder, when the library holds it.
+    var kept: [String]
+    /// Whether `new` was there, an empty folder chosen, which the library takes the place of.
+    var newWasThere: Bool
+    /// The library's fonts on for good, and for the session, when the move began, in the old place.
+    var persistent: [String]
+    var session: [String]
 }

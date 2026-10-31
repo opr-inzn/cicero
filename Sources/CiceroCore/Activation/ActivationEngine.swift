@@ -37,6 +37,9 @@ extension FontRegistrar {
 public struct CoreTextRegistrar: FontRegistrar {
     public init() {}
 
+    /// How long fontd gets for files before they count as failed: a few seconds more for many.
+    private static func fontdTimeout(for count: Int) -> TimeInterval { 15 + 0.05 * Double(count) }
+
     /// Returns once fontd has registered the files and told every app, so they're usable the moment this
     /// returns. Files turned off in macOS stay off when registered again, so those are turned back on, and so is a
     /// new file registered for good that's off: one put where a file turned off was a moment ago is, until fontd
@@ -96,7 +99,7 @@ public struct CoreTextRegistrar: FontRegistrar {
                 Self.setEnabledNow(urls, enabled)
                 resume()
             }
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 15 + 0.05 * Double(urls.count), execute: resume)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.fontdTimeout(for: urls.count), execute: resume)
         }
         var pending = urls.filter { Self.isActive($0) != enabled }
         let deadline = ContinuousClock.now + .seconds(1)
@@ -201,7 +204,7 @@ public struct CoreTextRegistrar: FontRegistrar {
                 if done { collector.finish() }
                 return true
             }
-            let timeout = 15 + 0.05 * Double(urls.count)
+            let timeout = Self.fontdTimeout(for: urls.count)
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
                 guard collector.isWaiting else { return }
                 // Asking about each file takes fontd too, which may not answer either: then, a while later, every
@@ -351,12 +354,11 @@ public struct ActivationEngine: Sendable {
     /// user added one at a time) are moved there instead (see `removeOriginals`), and the rest copied. A copy an earlier
     /// version installed goes on again while it's the same as its file; once the file has changed, the file goes on
     /// instead, where it is with `.inPlace`, the old copy left off, or copied in its place with `.copy` and `.move` (see
-    /// `currentVersion`). Files from Cicero's Inactive folder, which only keeps
-    /// fonts while they're off, are always moved, whatever `method` is. Faces from
-    /// app-only folders and from the Font Library are always registered in place, the former after going back into
-    /// the folder if Cicero moved them out; faces in a Fonts folder that are off (turned off there, by Cicero or Font
-    /// Book) are turned on there, and so is a copy installed before and turned off since. Temporarily active faces are
-    /// made permanent.
+    /// `currentVersion`). Files from Cicero's Inactive folder, which only keeps fonts while they're off, are always
+    /// moved, whatever `method` is. Faces from app-only folders and from the Font Library are always registered in
+    /// place, the former after going back into the folder if Cicero moved them out; faces in a Fonts folder that are off
+    /// (turned off there, by Cicero or Font Book) are turned on there, and so is a copy installed before and turned off
+    /// since. Temporarily active faces are made permanent.
     ///
     /// Copies are registered too: left alone, they reach apps only when macOS notices the file, seconds
     /// later. A file counts as activated once macOS reports it active, so it's usable in every app as
@@ -449,14 +451,6 @@ public struct ActivationEngine: Sendable {
             records.installedCopies[copy.destination] = nil
         }
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
-    }
-
-    /// Whether `activate` does the same with the face whatever the install method: it turns one from an app's own folder, a
-    /// Fonts folder or Cicero's Library on where it is, and moves one from the Inactive folder where turning it on puts it,
-    /// so there's nothing to ask.
-    public func ignoresInstallMethod(_ face: LibraryFace) -> Bool {
-        let path = face.face.path
-        return face.app != nil || isInsideFontsFolder(path) || isInFontLibrary(path) || isInInactiveFolder(path)
     }
 
     /// Copies font files into ~/Library/Fonts and turns them on, as opening files the library doesn't have does when
@@ -650,6 +644,12 @@ public struct ActivationEngine: Sendable {
     /// them off until they're turned on again. Faces an app loads from its own folder leave that folder for Cicero's
     /// Inactive folder, so they're off in the app too.
     @concurrent
+    /// Takes files off for good, and those that won't go off that way for this session at least; returns those that stay on.
+    private func unregisterPersistent(_ paths: [String]) async -> Set<String> {
+        let stuck = await registrar.unregister(paths.map(Self.url), scope: .persistent)
+        return stuck.isEmpty ? stuck : await registrar.unregister(stuck.sorted().map(Self.url), scope: .session)
+    }
+
     public func deactivate(_ faces: [LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var moved: [String: String] = [:]
         return await deactivate(faces, records: records, moved: &moved)
@@ -737,10 +737,7 @@ public struct ActivationEngine: Sendable {
             }
         }
         if !persistent.isEmpty {
-            var stuck = await registrar.unregister(persistent.map(Self.url), scope: .persistent)
-            if !stuck.isEmpty {
-                stuck = await registrar.unregister(stuck.sorted().map(Self.url), scope: .session)
-            }
+            let stuck = await unregisterPersistent(persistent)
             for path in persistent {
                 if stuck.contains(path) {
                     failed.append(path)
@@ -796,10 +793,7 @@ public struct ActivationEngine: Sendable {
             }
         }
         if !persistent.isEmpty {
-            var stuck = await registrar.unregister(persistent.map(Self.url), scope: .persistent)
-            if !stuck.isEmpty {
-                stuck = await registrar.unregister(stuck.sorted().map(Self.url), scope: .session)
-            }
+            let stuck = await unregisterPersistent(persistent)
             for path in persistent where !stuck.contains(path) { records.inPlace.remove(path) }
             failed += persistent.filter(stuck.contains)
         }
@@ -857,7 +851,7 @@ public struct ActivationEngine: Sendable {
             .filter { !families.contains($0.id) && $0.faces.contains { set.contains($0.face.path) || $0.otherCopies.contains(where: set.contains) } }
             .map(\.id)
         return TrashPlan(
-            title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) files",
+            title: allowed.count == 1 ? "“\((allowed[0] as NSString).lastPathComponent)”" : "\(allowed.count) Files",
             paths: allowed, otherFamilies: otherFamilies, protectedCount: paths.count - allowed.count, removedFamilies: [],
             includesCopies: false, spareCopiesOf: library
         )
@@ -1114,11 +1108,12 @@ public struct ActivationEngine: Sendable {
         var isNew: Bool
     }
 
-    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in the Font Library (see `installFolder`),
-    /// or into `folder`, a location's. It's copied into Cicero's staging folder first (a clone, on the same disk) and then
-    /// moved in, so macOS never sees a half-written file. A file of the same name with the same contents is already installed, and so is a copy
-    /// `records` say was installed from it there before, by whatever name, if it still has the same contents (turned off
-    /// since, it's still there); another file of that name gets "Name 2.otf".
+    /// Puts a copy of a file into ~/Library/Fonts, or into the folder of `family` in the Font Library (see
+    /// `installFolder`), or into `folder`, a location's. It's copied into Cicero's staging folder first (a clone, on
+    /// the same disk) and then moved in, so macOS never sees a half-written file. A file of the same name with the same
+    /// contents is already installed, and so is a copy `records` say was installed from it there before, by whatever
+    /// name, if it still has the same contents (turned off since, it's still there); another file of that name gets
+    /// "Name 2.otf".
     private func placeCopy(of path: String, family: String?, into folder: URL? = nil, records: ActivationRecords? = nil) throws -> PlacedCopy {
         let fm = FileManager.default
         let source = Self.url(path)
@@ -1129,7 +1124,7 @@ public struct ActivationEngine: Sendable {
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = source.lastPathComponent
         let first = folder.appendingPathComponent(name, isDirectory: false)
-        if fm.fileExists(atPath: first.path), Self.size(of: first) == Self.size(of: source), fm.contentsEqual(atPath: first.path, andPath: path) {
+        if Self.isIdenticalCopy(first.path, of: path) {
             return PlacedCopy(destination: first.path, source: path, isNew: false)
         }
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
@@ -1227,7 +1222,7 @@ public struct ActivationEngine: Sendable {
     /// and remembers where it was.
     private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
         let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-        try Self.move(Self.url(path), to: destination)
+        try Self.moveItem(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
 
@@ -1239,7 +1234,7 @@ public struct ActivationEngine: Sendable {
         let destination = FileManager.default.fileExists(atPath: origin)
             ? Self.uniqueURL(for: original.lastPathComponent, in: original.deletingLastPathComponent())
             : original
-        try Self.move(Self.url(path), to: destination)
+        try Self.moveItem(Self.url(path), to: destination)
         records.appFolderOrigins[path] = nil
         return destination.path
     }
@@ -1268,14 +1263,6 @@ public struct ActivationEngine: Sendable {
         return FileManager.default.contentsEqual(atPath: path, andPath: original)
     }
 
-    /// Moves a file and gives it back its Date Added, which macOS sets anew for a file moved into another folder: a font
-    /// Cicero turns off or on, or puts into the Font Library, arrives no more than it did before (see `Family.lastAdded`).
-    static func move(_ source: URL, to destination: URL) throws {
-        let added = dateAdded(of: source)
-        try FileManager.default.moveItem(at: source, to: destination)
-        if let added { setDateAdded(added, of: destination) }
-    }
-
     /// Finder's Date Added, where the disk keeps one.
     static func dateAdded(of url: URL) -> Date? {
         try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate
@@ -1302,10 +1289,6 @@ public struct ActivationEngine: Sendable {
             number += 1
         }
         return candidate
-    }
-
-    private static func size(of url: URL) -> Int? {
-        try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
     }
 
     /// "Inter Bold activated", "Inter activated", "Inter and Roboto activated" or "12 families activated", naming the

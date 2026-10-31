@@ -49,7 +49,6 @@ public final class FontLoader: Sendable {
     }
 
     /// The 'wght' axis.
-    private static let weightAxisID = 0x7767_6874
 
     public init() {}
 
@@ -102,7 +101,7 @@ public final class FontLoader: Sendable {
     private static func descriptor(_ descriptor: CTFontDescriptor, weight: Double?,
                                    variations: [(key: String, value: Double)]) -> CTFontDescriptor {
         var values = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:]
-        if let weight { values[NSNumber(value: weightAxisID)] = NSNumber(value: weight) }
+        if let weight { values[NSNumber(value: AxisTag.weight)] = NSNumber(value: weight) }
         for (tag, value) in variations { values[NSNumber(value: AxisTag.identifier(tag))] = NSNumber(value: value) }
         let axes = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAxesAttribute) as? [[String: Any]] ?? []
         let defaults = axes.reduce(into: [NSNumber: NSNumber]()) { defaults, axis in
@@ -272,6 +271,8 @@ public final class FontLoader: Sendable {
 
 /// An axis's four-character tag, and the number CoreText knows it by: 'wght' is 0x77676874.
 enum AxisTag {
+    static let weight: UInt32 = 0x7767_6874
+
     static func string(_ identifier: UInt32) -> String {
         String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .isoLatin1) ?? ""
     }

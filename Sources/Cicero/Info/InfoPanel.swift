@@ -142,13 +142,13 @@ private struct InfoPanel: View {
             FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
         } else {
             let count = model.selectedIDs.count
-            EmptyState(count > 1 ? "\(count) Fonts Selected" : "No Selection", systemImage: "info.circle",
-                       description: Text("Select a single font to see its info."))
+            EmptyState(count > 1 ? "\(count) Families Selected" : "No Selection", systemImage: "info.circle",
+                       description: Text("Select a single family to see its info."))
         }
     }
 }
 
-/// Describes the style being previewed (the regular one at the default weight).
+/// The family's name and the Info, Features and Axes tabs, for the style nearest the preview weight.
 private struct FamilyInfo: View {
     @Environment(AppModel.self) private var model
     let family: Family

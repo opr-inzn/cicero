@@ -76,9 +76,8 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         }
     }
 
-    /// As tall as its lines, laid out at the width it's offered, and the room above and below them. An invisible
-    /// SwiftUI copy of the text used to set the height, but it broke some lines elsewhere, so at some sizes the last
-    /// line was cut off.
+    /// As tall as its lines, laid out at the width it's offered, and the room above and below them. Not sized by a hidden
+    /// SwiftUI copy of the text: that broke some lines elsewhere, so at some sizes the last line was cut off.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
         guard let width = proposal.width, width.isFinite, let manager = view.textLayoutManager, let container = view.textContainer
         else { return nil }
@@ -304,8 +303,8 @@ private final class SampleTextView: NSTextView {
     }
 
     /// The selection in another case, or the whole text with nothing selected, as one step to undo, selected afterwards
-    /// if it was before. ß in capitals is ẞ where `font` has it, SS where it doesn't. Pasted glyphs stay marked where their characters are the same, as figures are; a letter in
-    /// another case is another glyph.
+    /// if it was before. ß in capitals is ẞ where `font` has it, SS where it doesn't. Pasted glyphs stay marked where
+    /// their characters are the same, as figures are; a letter in another case is another glyph.
     func convert(_ conversion: CaseConversion, in font: CTFont) {
         guard let storage = textStorage else { return }
         let selected = selectedRange()

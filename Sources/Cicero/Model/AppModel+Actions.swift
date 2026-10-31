@@ -87,20 +87,23 @@ extension AppModel {
     /// a folder Cicero can't move files out of, where turning off fails anyway.
     private func movingOutPrompt(for faces: [LibraryFace]) -> MovingOutPrompt? {
         guard data.asksBeforeMovingOutOfSharedFolders else { return nil }
-        var sharing: [String: FolderSharing?] = [:]
+        var checked: Set<String> = []
+        var sharing: [String: FolderSharing] = [:]
         var shared: [(face: LibraryFace, folder: String)] = []
         for face in faces where ActivationEngine.movesOutOfAppFolder(face, records: data.records) {
             let folder = (face.face.path as NSString).deletingLastPathComponent
-            if sharing[folder] == nil {
-                sharing[folder] = FileManager.default.isWritableFile(atPath: folder) ? ActivationEngine.sharing(ofFolder: folder) : nil
+            if checked.insert(folder).inserted, FileManager.default.isWritableFile(atPath: folder),
+               let found = ActivationEngine.sharing(ofFolder: folder) {
+                sharing[folder] = found
             }
-            if sharing[folder] ?? nil != nil { shared.append((face, folder)) }
+            if sharing[folder] != nil { shared.append((face, folder)) }
         }
         guard !shared.isEmpty else { return nil }
         let folders = Set(shared.map(\.folder))
         let apps = Set(shared.compactMap(\.face.app))
         return MovingOutPrompt(
-            faces: faces, shared: shared.map(\.face), folder: folders.count == 1 ? folders.first.map { (path: $0, sharing: sharing[$0]!!) } : nil,
+            faces: faces, shared: shared.map(\.face),
+            folder: folders.count == 1 ? folders.first.flatMap { path in sharing[path].map { (path: path, sharing: $0) } } : nil,
             app: apps.count == 1 ? apps.first.map(FaceState.appDescription) : nil
         )
     }
@@ -192,10 +195,6 @@ extension AppModel {
     }
 
     func confirmCopySwitch(_ request: CopySwitchRequest) {
-        performCopySwitch(request)
-    }
-
-    func performCopySwitch(_ request: CopySwitchRequest) {
         let operation = expect(request.plan.styles, at: .on)
         enqueue { model in
             var result = await model.engine.switchCopies(request.plan.switches, method: .inPlace, records: model.data.records)
@@ -227,8 +226,7 @@ extension AppModel {
     /// Where files are, each place once: "in your Fonts folder and in Clients".
     func places(of paths: [String]) -> String {
         let places = paths.map(placeName).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        guard places.count > 1 else { return places.first ?? "" }
-        return places.dropLast().joined(separator: ", ") + " and " + places.last!
+        return places.listed()
     }
 
     /// Cicero's copies that Replace just sends to the Trash for an added family, as its file in Cicero's Library takes the
@@ -250,8 +248,9 @@ extension AppModel {
         }
     }
 
-    /// The sheet's warning for a family replaced in more than one place, or in one of the user's own folders: "Replaces 2 files: in your Fonts folder and in
-    /// Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts folder goes to the Trash".
+    /// The sheet's warning for a family replaced in more than one place, or in one of the user's own folders: "Replaces 2
+    /// files: in your Fonts folder and in Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts
+    /// folder goes to the Trash".
     func replaceWarning(_ duplicate: AddedDuplicate) -> String {
         let spare = spareCopies(duplicate)
         let replaced = duplicate.replacements.map(\.old).filter { !spare.contains($0) }
@@ -296,7 +295,7 @@ extension AppModel {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
-        panel.message = "Choose where to keep Cicero’s Library. Its fonts move there, into a new “Cicero Library” folder when the folder you choose has other things in it."
+        panel.message = "Choose where Cicero’s Library goes. In a folder with other files, it goes into a new “Cicero Library” folder."
         panel.directoryURL = data.fontLibrary?.url.deletingLastPathComponent()
         let current = data.fontLibrary?.url, folders = data.scannedFolders(), locations = locations
         let checker = FontLibraryFolderCheck { url in
@@ -311,13 +310,15 @@ extension AppModel {
             let result = await model.engine.moveFontLibrary(to: destination, records: model.data.records)
             if result.failed.isEmpty { model.data.fontLibraryPath = destination.path }
             model.finish(result)
+            // What the move wrote down goes only once the new path is on the disk, so a stop in between still has it.
+            if result.failed.isEmpty, model.store.flush(durably: true) { model.engine.forgetLibraryMove() }
         }
     }
 
     // MARK: Trash
 
     func requestTrash(_ families: [Family]) {
-        let title = families.count == 1 ? "“\(families[0].name)”" : "\(families.count) families"
+        let title = families.count == 1 ? "“\(families[0].name)”" : "\(families.count) Families"
         requestTrash(families.flatMap(\.faces), removing: families.map(\.id), title: title)
     }
 
@@ -413,13 +414,18 @@ extension AppModel {
     /// Several at once with one rescan, as Settings → Locations removes the selected ones.
     func removeFolders(_ ids: Set<UUID>) {
         turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
+        forgetFolders(ids)
+        rescan()
+    }
+
+    /// Takes locations out of the library's data: their sidebar rows, names and selection go with them.
+    func forgetFolders(_ ids: Set<UUID>) {
         data.folders.removeAll { ids.contains($0.id) }
         for id in ids {
             data.sidebar.forget("folder.\(id)")
             data.folderNames[id.uuidString] = nil
         }
         deselect { item in ids.contains { item == .folder($0) } }
-        rescan()
     }
 
     /// Why a watched folder's fonts are out of reach, if they are.
@@ -623,7 +629,7 @@ extension AppModel {
     /// the install method is Ask.
     func activateFonts(in rows: [SidebarRow]) {
         let faces = faces(in: rows.map(\.item))
-        let names = rows.map { "“\($0.title)”" }.formatted(.list(type: .and))
+        let names = rows.map { "“\($0.title)”" }.listed()
         guard !faces.isEmpty else { return showToast("There are no fonts in \(names)") }
         activate(faces, title: names)
     }
@@ -816,7 +822,7 @@ extension AppModel {
         if selectedItems.count > 1 {
             return rows(inList: sidebarList(of: item))
                 .filter { selectedItems.contains($0.item) && $0.item != .problems }
-                .map(\.title).formatted(.list(type: .and))
+                .map(\.title).listed()
         }
         if let row = libraryRows.first(where: { $0.item == item }) { return row.title }
         for section in SidebarSection.allCases {
@@ -876,7 +882,7 @@ extension AppModel {
         if !hidden.isEmpty { hide(hidden.map(\.key)) }
 
         func names(_ rows: [SidebarRow], _ noun: String) -> String {
-            rows.count > 3 ? "\(rows.count) \(noun)" : rows.map(\.title).formatted(.list(type: .and))
+            rows.count > 3 ? "\(rows.count) \(noun)" : rows.map(\.title).listed()
         }
         let deletedNoun = deleted.allSatisfy { if case .tag = $0.item { true } else { false } } ? "tags" : "folders"
         let message = [
@@ -906,7 +912,7 @@ extension AppModel {
         let items = sidebarSelection(items, from: selectedItems)
         guard let any = items.first else { selection = nil; return }
         let list = sidebarList(of: any)
-        // The one selected before when it's still there, else the first. Problems has no fonts to show,
+        // The one selected before when it's still there, else the first. Conflicts has no fonts to show,
         // so it's never the one among several.
         let candidates = items.count > 1 ? items.subtracting([.problems]) : items
         let primary = selection.flatMap { candidates.contains($0) ? $0 : nil }
@@ -1039,7 +1045,7 @@ extension AppModel {
             compareEntries.append(CompareEntry(familyID: name, tint: nextCompareTint))
         }
         if added.count < new.count {
-            showToast("Compare holds up to \(Self.compareLimit) fonts")
+            showToast("Compare holds up to \(Self.compareLimit) styles")
         }
         return !added.isEmpty
     }
@@ -1123,7 +1129,7 @@ extension AppModel {
         if failures > 0 {
             showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures) cache items to the Trash")
         } else if !trashed.isEmpty && !clearedSystem {
-            showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash")
+            showToast("Moved the \(trashed.listed()) font caches to the Trash")
         }
         if clearedSystem || !trashed.isEmpty { rebuildFontList() }
         return clearedSystem
@@ -1197,7 +1203,7 @@ extension AppModel {
         var seen = Set<String>()
         let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
-        plan.title = plan.paths.count == 1 ? "1 extra copy" : "\(plan.paths.count) extra copies"
+        plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count) Extra Copies"
         trashPlan = plan
     }
 }
@@ -1226,10 +1232,10 @@ private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
         alert.alertStyle = .warning
         switch service {
         case .iCloudDrive:
-            alert.messageText = "“\(url.lastPathComponent)” syncs with iCloud Drive."
+            alert.messageText = "“\(url.lastPathComponent)” Syncs With iCloud Drive"
             alert.informativeText = "iCloud Drive can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and choose Keep Downloaded."
         case .other:
-            alert.messageText = "“\(url.lastPathComponent)” syncs with a cloud service."
+            alert.messageText = "“\(url.lastPathComponent)” Syncs With a Cloud Service"
             alert.informativeText = "The service can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and make it available offline."
         }
         alert.addButton(withTitle: "Choose Another Folder")

@@ -26,7 +26,7 @@ private struct FontCacheSheetModifier: ViewModifier {
             } content: {
                 FontCacheSheet { clearedSystemCaches = $0 }
             }
-            .alert("Font caches cleared", isPresented: $isOfferingRestart) {
+            .alert("Font Caches Cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
                     if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart") }
                 }
@@ -66,11 +66,11 @@ struct FontCacheSheet: View {
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 10) {
-                option("macOS (my account)", isOn: $currentUser, detail: "Removes your account’s font caches and restarts the font service.")
-                option("macOS (all users)", isOn: $allUsers, detail: "Needs an administrator password.")
-                option("Adobe apps", isOn: includes(.adobe), detail: adobeDetail)
+                DetailToggle("macOS (your account)", detail: "Removes your account’s font caches and restarts the font service.", isOn: $currentUser)
+                DetailToggle("macOS (all users)", detail: "Needs an administrator password.", isOn: $allUsers)
+                DetailToggle("Adobe apps", detail: adobeDetail, isOn: includes(.adobe))
                     .disabled(runningApps[.adobe] != nil || adobeCaches?.isEmpty == true)
-                option("Microsoft Office", isOn: includes(.office), detail: officeDetail)
+                DetailToggle("Microsoft Office", detail: officeDetail, isOn: includes(.office))
                     .disabled(runningApps[.office] != nil)
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -100,16 +100,6 @@ struct FontCacheSheet: View {
             }
             runningApps = names
         }
-    }
-
-    private func option(_ title: String, isOn: Binding<Bool>, detail: String) -> some View {
-        Toggle(isOn: isOn) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-            }
-        }
-        .toggleStyle(.checkbox)
     }
 
     private func includes(_ app: AppFontCaches.App) -> Binding<Bool> {

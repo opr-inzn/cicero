@@ -23,9 +23,7 @@ struct AddNote {
 
 extension AppModel {
     /// The kinds of font file Cicero reads, for open panels.
-    static var fontTypes: [UTType] {
-        FontFormat.fileExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
-    }
+    static let fontTypes: [UTType] = FontFormat.fileExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
 
     // MARK: Adding
 
@@ -132,8 +130,8 @@ extension AppModel {
         if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
             guard documents.isEmpty, imports.isEmpty else { return }
-            // "WOFF2 can’t be installed", or "Web fonts can’t be installed" for both kinds.
-            if !webFonts.isEmpty { return showToast("\(webFonts.count == 1 ? webFonts.first! : "Web fonts") can’t be installed") }
+            // "Cicero doesn’t use web fonts like WOFF2", or "… like WOFF and WOFF2" for both kinds.
+            if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
         if !folders.isEmpty {
@@ -383,8 +381,7 @@ extension AppModel {
 
     /// The path the way the library has it: through the folder it reads, when `path` reaches a file in it another way,
     /// through a symbolic link, like a shortcut to a synced folder, or in other letter case.
-    func libraryPath(of path: String, folders: [String]? = nil) -> String {
-        let folders = folders ?? readFolders
+    func libraryPath(of path: String, folders: [String]) -> String {
         guard !folders.contains(where: { path.hasPrefix($0 + "/") }), let real = Self.realPath(path) else { return path }
         for folder in folders {
             guard let realFolder = Self.realPath(folder), real.hasPrefix(realFolder + "/") else { continue }

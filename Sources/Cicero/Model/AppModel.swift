@@ -62,8 +62,7 @@ final class AppModel {
     private(set) var foundryNames: [String] = []
     /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
-    /// Cicero's own folder items that have fonts now (Proofing, Adobe Fonts while shown, Added Fonts, Inactive): the sidebar
-    /// lists them.
+    /// Cicero's own folder items that have fonts now (Proofing, Adobe Fonts while shown, Added Fonts): the sidebar lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
     /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
     var downloads: [UUID: DownloadProgress] = [:]
@@ -87,7 +86,7 @@ final class AppModel {
                 || data.showCreativeCloudFonts != oldValue.showCreativeCloudFonts {
                 refreshGroups()
             }
-            if !data.showSystemFonts { deselect { $0 == .system } }
+            if !data.showSystemFonts, oldValue.showSystemFonts { deselect { $0 == .system } }
             if data.customCharacterSets != oldValue.customCharacterSets { characterSetLookup.reset() }
             if data.tags != oldValue.tags || data.familyTags != oldValue.familyTags || data.tagColors != oldValue.tagColors {
                 refreshTagDots()
@@ -348,8 +347,11 @@ final class AppModel {
         let migrating = needsFontLibraryMigration
         // And for the Inactive folder's new place, so its fonts don't drop out of the window for a moment either.
         let renaming = launchEngine.hasFormerInactiveFolders
-        movingAtLaunch = migrating || renaming
+        // And for a move of the library that Cicero stopped in, put back together first (see `ActivationEngine.finishLibraryMove`).
+        let reassembling = launchEngine.hasLibraryMove
+        movingAtLaunch = migrating || renaming || reassembling
         enqueue { model in
+            if reassembling { await model.engine.finishLibraryMove(libraryPath: model.data.fontLibraryPath, records: model.data.records) }
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
             if renaming { await model.moveFormerInactiveFolders() }
             await model.engine.finishTurningOff()
@@ -361,10 +363,10 @@ final class AppModel {
             model.data.records = emptied.records
             model.movingAtLaunch = false
             // The first scan may have listed the files before they went.
-            if migrating || renaming || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
+            if migrating || renaming || reassembling || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
-        if !migrating && !renaming { rescan(check: true) }
+        if !migrating && !renaming && !reassembling { rescan(check: true) }
     }
 
     /// At launch, without a word: what's in the Inactive folder's former places moves to ~/Cicero/Inactive, and the
@@ -396,6 +398,7 @@ final class AppModel {
         if let moved = await engine.moveFromFormerPlace(records: data.records) {
             data.records = moved.records
             data.fontLibraryPath = locations.defaultFontLibrary.path
+            if store.flush(durably: true) { engine.forgetLibraryMove() }
         }
         var checked = data
         checked.keepFormerFontLibraryAsLocation(hasFonts: fontLibraryHasFonts)
@@ -431,6 +434,11 @@ final class AppModel {
 
     // MARK: Scanning
 
+    /// What a scan reads now: the library's folders, its added files and the activation records.
+    var scanInput: ScanInput {
+        ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
+    }
+
     /// Returns the scan's number. With `changes`, only those files are looked at again (see `LibraryScanner.scan`).
     /// A `check` is a scan Cicero starts by itself to see whether anything changed: at launch, when it becomes active,
     /// when fonts change. While the window lists fonts, its capsule doesn't say it's finding them, only that it reads
@@ -455,7 +463,7 @@ final class AppModel {
         scanCount += 1
         let id = scanCount
         runningScan = (id, changes, check)
-        let input = ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
+        let input = scanInput
         // The Fonts folders too, so a font dropped into one shows without waiting for macOS to register it.
         let fontsFolders = [locations.userFonts.path, locations.allUsersFonts.path]
         folderWatcher.watch(fontsFolders + input.folders.map(\.path), files: input.files, hidden: [locations.adobeFontsInAdobeApps?.path].compactMap { $0 })
@@ -968,11 +976,11 @@ struct MovingOutPrompt: Identifiable {
     var app: String?
 
     var title: String {
-        let name = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "shared folders"
+        let name = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "Shared Folders"
         if shared.count == 1, let face = shared.first {
-            return "Move “\(face.face.familyName) \(face.face.styleName)” out of \(name)?"
+            return "Move “\(face.face.familyName) \(face.face.styleName)” Out of \(name)?"
         }
-        return "Move \(shared.count.formatted()) fonts out of \(name)?"
+        return "Move \(shared.count.formatted()) Styles Out of \(name)?"
     }
 
     var message: String {
@@ -1054,7 +1062,6 @@ struct CopySwitchRequest: Identifiable {
     var plan: CopySwitchPlan
 }
 
-/// Font files being added, some of them with fonts the library has already (see `AppModel.addCheckingDuplicates`).
 /// Replacing fonts while InDesign, Illustrator or Photoshop is open (see `AppModel.openAppsKeepingFonts`): the apps, and
 /// what Replace goes on with.
 struct OpenAppsReplacePrompt: Identifiable {
@@ -1063,6 +1070,7 @@ struct OpenAppsReplacePrompt: Identifiable {
     var replace: (AppModel) -> Void
 }
 
+/// Font files being added, some of them with fonts the library has already (see `AppModel.addCheckingDuplicates`).
 struct DuplicatePrompt: Identifiable {
     let id = UUID()
     var paths: [String]

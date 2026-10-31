@@ -3,14 +3,13 @@ import CiceroCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
-/// choices are in Settings → Sidebar. Sections and groups stay open or closed as they were, and open and close
-/// the same way while editing, so a long one like Foundries can be closed to get past it. Edit and Done switch
-/// at once: animated, hundreds of rows coming and going ran into each other. Rows drag to a new place within their section (or character set
-/// group), several at once when they're selected together, and the rows they pass slide apart to open a
-/// gap where they'll land; dropped outside the sidebar, locations, folders and tags are removed and other rows hidden,
-/// as Finder's sidebar removes them.
-/// Group titles drag onto each other; sections stay in their order.
+/// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same choices are in
+/// Settings → Sidebar. Sections and groups stay open or closed as they were, and open and close the same way while
+/// editing, so a long one like Foundries can be closed to get past it. Edit and Done switch at once: animated, hundreds
+/// of rows coming and going ran into each other. Rows drag to a new place within their section (or character set
+/// group), several at once when they're selected together, and the rows they pass slide apart to open a gap where
+/// they'll land; dropped outside the sidebar, locations, folders and tags are removed and other rows hidden, as
+/// Finder's sidebar removes them. Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     /// What the list shows selected while the browser hasn't taken it yet (see `select`).
@@ -247,7 +246,7 @@ private struct SidebarContent: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .fixedSize()
-            .help("New folder or smart folder")
+            .help("New folder, smart folder or app folder")
         case .tags:
             plus("New tag") { model.newTag() }
         case .characterSets:
@@ -738,8 +737,9 @@ private struct OutlineViewSetup: NSViewRepresentable {
 }
 
 /// The rows a drag in the sidebar has, and what dropping them outside it does: locations, folders and tags are removed,
-/// other rows hidden (`AppModel.dragOutOfSidebar`), as Finder's sidebar removes them. While the pointer is outside, it has Finder's ×, the disappearing-item cursor. Escape,
-/// or a drop back in the list, keeps them. Their picture never slides back to where they were.
+/// other rows hidden (`AppModel.dragOutOfSidebar`), as Finder's sidebar removes them. While the pointer is outside, it
+/// has Finder's ×, the disappearing-item cursor. Escape, or a drop back in the list, keeps them. Their picture never
+/// slides back to where they were.
 final class SidebarDrag {
     /// Removes or hides rows dropped outside the sidebar (`AppModel.dragOutOfSidebar`).
     var hide: ([SidebarRow]) -> Void = { _ in }
@@ -801,10 +801,6 @@ final class SidebarDrag {
         }
     }
 
-    /// A row's symbol and title, in the label colour, where the list draws them in a row `size` big: what's dragged,
-    /// as faded as Finder's sidebar rows are. The list's own picture of the row had a white symbol beside black
-    /// text on macOS 26. The sizes are a sidebar row's, measured: 11, 13 and 15 pt type for small, medium and large
-    /// rows, the symbol starting a few points in.
     /// Draws a picture once, a second after the sidebar appears: the first one SwiftUI draws takes 80 ms, which,
     /// on a row's first drag, left its place empty a frame before the picture came, as the second's doesn't.
     static func prepare(in outline: NSOutlineView) {
@@ -815,6 +811,10 @@ final class SidebarDrag {
         }
     }
 
+    /// A row's symbol and title, in the label colour, where the list draws them in a row `size` big: what's dragged,
+    /// as faded as Finder's sidebar rows are. The list's own picture of the row had a white symbol beside black
+    /// text on macOS 26. The sizes are a sidebar row's, measured: 11, 13 and 15 pt type for small, medium and large
+    /// rows, the symbol starting a few points in.
     private static func picture(of row: SidebarRow, size: NSSize, in outline: NSOutlineView) -> NSImage? {
         let (fontSize, leading): (CGFloat, CGFloat) = switch outline.effectiveRowSizeStyle {
         case .small: (11, 3.5)

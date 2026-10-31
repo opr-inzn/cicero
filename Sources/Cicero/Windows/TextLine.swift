@@ -15,8 +15,6 @@ struct TextLine {
     let descent: CGFloat
     /// How far its glyphs reach above the baseline.
     let inkAscent: CGFloat
-    let xHeight: CGFloat
-    let capHeight: CGFloat
 
     init(_ text: String, font: CTFont, kerning: Double) {
         var attributes: [NSAttributedString.Key: Any] = [
@@ -32,8 +30,6 @@ struct TextLine {
         ascent = max(CTFontGetAscent(font), ink.maxY.rounded(.up))
         descent = max(CTFontGetDescent(font), -ink.minY.rounded(.down))
         inkAscent = ink.maxY.rounded(.up)
-        xHeight = CTFontGetXHeight(font)
-        capHeight = CTFontGetCapHeight(font)
     }
 
     func draw(in context: CGContext, baselineAt origin: CGPoint, color: CGColor) {

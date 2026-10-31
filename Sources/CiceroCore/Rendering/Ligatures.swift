@@ -119,24 +119,41 @@ public struct LigatureGroup: Identifiable, Sendable {
 
     /// The font's characters and their glyphs, in code point order, while `body` says to go on.
     private static func forEachCharacter(of font: CTFont, _ body: (UInt32, CGGlyph) -> Bool) {
-        var units: [UniChar] = [0, 0]
-        var glyphs: [CGGlyph] = [0, 0]
-        for range in CharacterMap.characters(of: font).ranges {
-            for scalar in range {
-                let count: Int
+        // Up to a thousand characters at a time, one call each: one call per character took most of the time.
+        var scalars: [UInt32] = []
+        var units: [UniChar] = []
+        var glyphs: [CGGlyph] = []
+        func flush() -> Bool {
+            defer { scalars.removeAll(keepingCapacity: true) }
+            guard !scalars.isEmpty else { return true }
+            units.removeAll(keepingCapacity: true)
+            for scalar in scalars {
                 if scalar < 0x10000 {
-                    units[0] = UniChar(scalar)
-                    count = 1
+                    units.append(UniChar(scalar))
                 } else {
                     let value = scalar - 0x10000
-                    units[0] = UniChar(0xD800 + (value >> 10))
-                    units[1] = UniChar(0xDC00 + (value & 0x3FF))
-                    count = 2
+                    units.append(UniChar(0xD800 + (value >> 10)))
+                    units.append(UniChar(0xDC00 + (value & 0x3FF)))
                 }
-                guard CTFontGetGlyphsForCharacters(font, units, &glyphs, count) else { continue }
-                if !body(scalar, glyphs[0]) { return }
+            }
+            glyphs = [CGGlyph](repeating: 0, count: units.count)
+            CTFontGetGlyphsForCharacters(font, units, &glyphs, units.count)
+            // A character the font has no glyph for gets 0, as asking for it alone fails.
+            var index = 0
+            for scalar in scalars {
+                let glyph = glyphs[index]
+                index += scalar < 0x10000 ? 1 : 2
+                if glyph != 0, !body(scalar, glyph) { return false }
+            }
+            return true
+        }
+        for range in CharacterMap.characters(of: font).ranges {
+            for scalar in range {
+                scalars.append(scalar)
+                if scalars.count == 1024, !flush() { return }
             }
         }
+        _ = flush()
     }
 }
 
@@ -395,6 +412,8 @@ enum GSUBSubstitutions {
                 for range in 0..<count {
                     let at = start + 4 + range * 6
                     guard let first = u16(at), let last = u16(at + 2), let index = u16(at + 4), first <= last else { continue }
+                    // No more than a font has glyphs: a damaged table's ranges could otherwise add up to billions.
+                    guard glyphs.count + (last - first + 1) <= 0x10000 else { break }
                     for glyph in first...last { glyphs.append((index + glyph - first, CGGlyph(glyph))) }
                 }
                 return glyphs.sorted { $0.index < $1.index }.map(\.glyph)
@@ -458,7 +477,8 @@ public struct FeatureGlyph: Hashable, Sendable {
     public static let limit = 3000
 
     /// The face's glyphs that only those features draw, each once, by feature, then character, the case-sensitive forms
-    /// as their characters are listed (see `GlyphSection.signPrecedes`), but the small capitals first, in their letters'
+    /// as their characters are listed (see `GlyphSection.signPrecedes`) and superscripts, subscripts, numerators and
+    /// denominators figures first (see `GlyphSection.valueOrder`), but the small capitals first, in their letters'
     /// order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`), and the localized forms by
     /// language (see `localizedForms`); a glyph a character has too, like a superscript two the font maps U+00B2 to, is
     /// left to the character, and accents' case-sensitive forms are left out. Reads the font's GSUB table; call off the
@@ -519,8 +539,15 @@ public struct FeatureGlyph: Hashable, Sendable {
                 }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
             }
-            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`).
+            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`);
+            // superscripts, subscripts, numerators and denominators as their groups' characters are, figures first (see
+            // `GlyphSection.valueOrder`).
+            let byValue: Set<GlyphGroup> = [.superscripts, .subscripts, .numerators, .denominators]
             let sorted = feature.tag == "case" ? entries.sorted { GlyphSection.signPrecedes($0.character, $1.character) }
+                : byValue.contains(feature.group) ? entries.sorted { a, b in
+                    let (x, y) = (GlyphSection.valueOrder(of: a.character, in: feature.group), GlyphSection.valueOrder(of: b.character, in: feature.group))
+                    return x != y ? x < y : a.glyph < b.glyph
+                }
                 : entries.sorted { $0.character < $1.character }
             let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
             for glyph in sorted + combined where result.count < limit && seen.insert(glyph.glyph).inserted {

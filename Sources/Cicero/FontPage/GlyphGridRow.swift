@@ -308,7 +308,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
     }
 
     /// The cell at a point in the view; none in the gaps between cells.
-    func index(at point: CGPoint) -> Int? {
+    private func index(at point: CGPoint) -> Int? {
         frames.firstIndex { $0.contains(point) }
     }
 
@@ -316,7 +316,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
         convert(event.locationInWindow, from: nil)
     }
 
-    /// A click on a cell counts in a window in the background too, as a cell's tap did when it was a view of its own.
+    /// A click on a cell counts in a window in the background too, as a tap on a SwiftUI view does.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         event.map { index(at: point(of: $0)) != nil } ?? false
     }

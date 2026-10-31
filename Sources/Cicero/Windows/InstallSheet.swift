@@ -29,7 +29,7 @@ struct InstallSheet: View {
                                    : "Moves the files \(into). The folders they were in stay.") { choose(.move) }
                     }
                 } else {
-                    option("Install a Copy", icon: "doc.on.doc",
+                    option(model.data.installsIntoFontLibrary ? "Copy Into Cicero’s Library" : "Copy Into Fonts Folder", icon: "doc.on.doc",
                            detail: one ? "Copies the file into \(model.installPlace) and turns it on. The original stays where it is."
                                : "Copies the files into \(model.installPlace) and turns them on. The originals stay where they are.") { choose(.copy) }
                     if prompt.offersMove {
@@ -162,7 +162,7 @@ private struct ManyActivationConfirmation: ViewModifier {
         content.background {
             Color.clear
                 .alert(
-                    model.manyActivationPrompt.map { "Activate \($0.families.formatted()) families?" } ?? "",
+                    model.manyActivationPrompt.map { "Activate \($0.families.formatted()) Families?" } ?? "",
                     isPresented: Binding(get: { isActive && model.manyActivationPrompt != nil }, set: { if !$0 { model.manyActivationPrompt = nil } }),
                     presenting: model.manyActivationPrompt
                 ) { prompt in

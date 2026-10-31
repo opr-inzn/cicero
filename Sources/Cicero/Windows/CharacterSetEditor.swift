@@ -103,7 +103,7 @@ private struct CoverageSetDeletion: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            sets.count == 1 ? "Delete the coverage set “\(sets[0].name)”?" : "Delete \(sets.count) coverage sets?",
+            sets.count == 1 ? "Delete the Coverage Set “\(sets[0].name)”?" : "Delete \(sets.count) Coverage Sets?",
             isPresented: Binding(get: { !sets.isEmpty }, set: { if !$0 { sets = [] } }),
             presenting: sets
         ) { sets in

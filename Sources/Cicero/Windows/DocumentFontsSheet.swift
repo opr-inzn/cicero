@@ -41,7 +41,7 @@ struct DocumentFontsSheet: View {
                         model.showInLibrary(report)
                         dismiss()
                     }
-                    .help("Shows the document’s fonts that are in your library in the main window, each set in itself")
+                    .help("Shows the document’s fonts from your library in the main window")
                 }
                 Button("Activate All") { model.activateAll(in: report) }
                     .disabled(off.isEmpty)
@@ -149,10 +149,10 @@ struct DocumentFontsSheet: View {
         }
     }
 
-    /// "12 fonts · 8 active · 2 in Adobe apps · 1 inactive · 1 missing", as the rest of the app says it: one count for
+    /// "12 styles · 8 active · 2 in Adobe apps · 1 inactive · 1 missing", as the rest of the app says it: one count for
     /// each app the fonts are on in only, in the order the rows have them.
     private func summary(_ total: Int, active: Int, inApps: [String], inactive: Int, missing: Int) -> String {
-        var parts = [total == 1 ? "1 font" : "\(total) fonts", "\(active) active"]
+        var parts = [total == 1 ? "1 style" : "\(total) styles", "\(active) active"]
         var apps: [String] = []
         for app in inApps where !apps.contains(app) { apps.append(app) }
         parts += apps.map { app in "\(inApps.count { $0 == app }) in \(app)" }

@@ -2,7 +2,7 @@ import CiceroCore
 import SwiftUI
 
 /// One row of the font list, with its sortable values worked out up front.
-nonisolated struct FontRow: Identifiable, Sendable {
+nonisolated struct FontRow: Identifiable, Equatable, Sendable {
     let family: Family
     let name: String
     let foundry: String
@@ -78,7 +78,7 @@ enum CoverageSource {
 }
 
 /// What a character set column says about a family.
-nonisolated enum CoverageCell: Sendable {
+nonisolated enum CoverageCell: Equatable, Sendable {
     /// The largest set of the series the family has, as the column names it, and its place in the series.
     case largest(String, level: Int)
     /// How many of the set's characters the family lacks, of how many; a family with none of them has no cell.

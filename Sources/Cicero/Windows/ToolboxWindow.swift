@@ -104,7 +104,7 @@ private struct TextTab: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
-                Text("Include fonts missing up to \(maxMissing) \(maxMissing == 1 ? "character" : "characters")")
+                Text("Missing characters allowed: \(maxMissing)")
             }
             Toggle("Active only", isOn: $activatedOnly)
             Spacer()
@@ -265,7 +265,7 @@ private struct LanguagesTab: View {
         // The languages scroll under the search field.
         .fadingTopBar {
             HStack(spacing: 8) {
-                TextField("Search", text: $search, prompt: Text("Language, autonym or script"))
+                TextField("Search", text: $search, prompt: Text("Language or script, in English or its own language"))
                     .textFieldStyle(.roundedBorder)
                 Picker("Sort", selection: $sortByName) {
                     Text("Speakers").tag(false)

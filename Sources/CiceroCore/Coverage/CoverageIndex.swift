@@ -151,9 +151,9 @@ public final class CoverageIndex: Sendable {
         return FaceCoverage(scalars: scalars, order: languages.order, bits: languages.support(in: scalars))
     }
 
-    /// The scalars the face's file says it covers (see `CharacterMap`), but those whose glyphs draw nothing, like a trial font's empty
-    /// ones (see `EmptyGlyphs`); an installed font of the same name when the file can't be read, and nothing when
-    /// neither exists.
+    /// The scalars the face's file says it covers (see `CharacterMap`), but those whose glyphs draw nothing, like a
+    /// trial font's empty ones (see `EmptyGlyphs`); an installed font of the same name when the file can't be read,
+    /// and nothing when neither exists.
     static func scalars(of face: FontFace) -> ScalarRanges {
         let descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)

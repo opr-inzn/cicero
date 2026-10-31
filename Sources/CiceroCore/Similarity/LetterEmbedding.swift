@@ -7,9 +7,9 @@ import Synchronization
 /// What a face's letters look like as `dimensions` numbers, from a small model that learned it from Google Fonts'
 /// families (scripts/embedding): it looks at the letters and their advances as `LetterImages` draws them (and the
 /// words it sets in strips and the large letters, for a model that takes them), and faces that look alike, scripts,
-/// stencils and outlines too, come out close together. The numbers have a length of 1, so
-/// two faces are 0 apart when alike and up to 2 when not. Next to the letter measurements in `SimilarFonts`. The model also says
-/// which of `classifications` the face is likely to be, for the families nothing in their files classifies.
+/// stencils and outlines too, come out close together. The numbers have a length of 1, so two faces are 0 apart when
+/// alike and up to 2 when not. Next to the letter measurements in `SimilarFonts`. The model also says which of
+/// `classifications` the face is likely to be, for the families nothing in their files classifies.
 public final class LetterEmbedding: Sendable {
     private let url: URL
     /// Loaded when first asked, which takes a fifth of a second, so in the background; it answers one question at a
@@ -65,7 +65,6 @@ public final class LetterEmbedding: Sendable {
         vDSP.convertElements(of: drawn.details, to: &large)
         large = vDSP.divide(large, 255)
         let found = model.withLock { state -> Reading? in
-            if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
             guard case .loaded(let model) = state else { return nil }
             let shape = [1, LetterImages.letters.count, LetterImages.size, LetterImages.size] as [NSNumber]
             guard let input = try? MLMultiArray(shape: shape, dataType: .float32),

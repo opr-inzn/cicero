@@ -85,7 +85,7 @@ Right-click a location in the sidebar:
 
 - **Rename Location**: gives it a name of your own in Cicero, in the sidebar, Preferences and Conflicts. The folder on disk keeps its name, so apps that load fonts from it still find it. **Proofing**, **Adobe Fonts** and **Added Fonts** can be renamed too. Leave the name empty to go back to the folder’s own.
 - **Reveal in Finder**
-- **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
+- **Fonts in This Location**: **Inactive**, the usual choice, where its fonts are off until you turn them on; **Active**, where Cicero keeps them all on (see [Keep a location’s fonts on](activating.md#keep-a-locations-fonts-on)); or active in an app that loads them by itself, like **Active in Adobe Apps** (see [Your own folder that an app loads](activating.md#your-own-folder-that-an-app-loads)).
 - **Remove Location from Library**: Cicero stops listing it. The files stay where they are. Dragging the location out of the sidebar does the same, with **Undo** in the note at the bottom of the window. To remove several at once, select them in the sidebar and right-click one of them, or select them in **Preferences → Locations** and click **−**.
 - **Export Fonts**: copies its fonts into a folder or a ZIP archive. See [Export fonts](export-and-backup.md#export-fonts).
 

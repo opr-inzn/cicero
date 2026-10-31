@@ -24,7 +24,7 @@ struct FontLibraryOffer: View {
         if model.data.installsIntoFontLibrary {
             notice(icon: Image(systemName: "checkmark.circle.fill"), tint: .green, title: "Copying into Cicero’s Library") {
                 Text("\(Self.about(CopyTimeEstimate.onFastMac(count, intoFontsFolder: false))). Fonts you install later go there too. "
-                    + "You can change this in Settings\u{00A0}→\u{00A0}General.")
+                    + "You can change this in Preferences\u{00A0}→\u{00A0}General.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Use the Fonts Folder") {
@@ -36,7 +36,7 @@ struct FontLibraryOffer: View {
         } else {
             let fontsFolder = CopyTimeEstimate.onFastMac(count, intoFontsFolder: true)
             let busy = fontsFolder >= 600 ? "or hours on a busy Mac" : "or much longer on a busy Mac"
-            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.formatted()) fonts can take a long time") {
+            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.formatted()) font files can take a long time") {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 2) {
                     GridRow {
                         Text("Into your Fonts folder").foregroundStyle(.secondary)

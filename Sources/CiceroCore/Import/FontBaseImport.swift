@@ -66,7 +66,7 @@ public enum FontBaseImport {
         func library(copies: URL?) -> ImportedLibrary {
             var library = ImportedLibrary(source: .fontBase)
             let root = rootFolder()
-            let realRoot = Self.realPath(root)
+            let realRoot = LibraryScanner.realPath(root)
 
             // Each file by its path under the folder, and where it is on this Mac: under the folder, or, through a
             // symbolic link, elsewhere.
@@ -97,7 +97,7 @@ public enum FontBaseImport {
                     unreadable[FontExplorerImport.UnreadableKind(extension: ext), default: 0] += 1
                     continue
                 }
-                let real = Self.realPath(path)
+                let real = LibraryScanner.realPath(path)
                 if real.hasPrefix(realRoot + "/") {
                     located[relative] = path
                     inFolder.append(path)
@@ -181,7 +181,7 @@ public enum FontBaseImport {
                            unreadable: [FontExplorerImport.UnreadableKind: Int]) {
             if !otherCollections.isEmpty {
                 library.notes.append((otherCollections.count == 1 ? "the collection " : "the collections ")
-                    + otherCollections.map { "“\($0)”" }.formatted(.list(type: .and)))
+                    + otherCollections.map { "“\($0)”" }.listed())
             }
             let automatic = ["fontbase_fontsTagsSystem", "fontbase_fontsTagsCrowd"].contains { !(values[$0]?.properties ?? []).isEmpty }
             if automatic { library.notes.append("the tags FontBase gives fonts itself, like Sans and Script") }
@@ -199,7 +199,7 @@ public enum FontBaseImport {
             }
             let total = notDownloaded.values.reduce(0, +)
             if total > 0 {
-                let providers = notDownloaded.keys.sorted().formatted(.list(type: .and))
+                let providers = notDownloaded.keys.sorted().listed()
                 library.notes.append("\(total.formatted()) \(providers) \(total == 1 ? "font" : "fonts") you haven’t downloaded")
             }
             if missing > 0 {
@@ -217,12 +217,6 @@ public enum FontBaseImport {
                 if oldHome != home { root = home + root.dropFirst(oldHome.count) }
             }
             return root
-        }
-
-        static func realPath(_ path: String) -> String {
-            guard let resolved = realpath(path, nil) else { return path }
-            defer { free(resolved) }
-            return String(cString: resolved)
         }
     }
 }

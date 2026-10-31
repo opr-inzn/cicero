@@ -32,3 +32,17 @@ enum FontFiles {
         CTFontCopyFontDescriptor(CTFontCreateWithName(postScriptName as CFString, 0, nil))
     }
 }
+
+extension CTFont {
+    /// The glyph the font maps a character to; nil for one it has none for.
+    func glyph(for character: Character) -> CGGlyph? {
+        var units = Array(String(character).utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: units.count)
+        return CTFontGetGlyphsForCharacters(self, &units, &glyphs, units.count) && glyphs[0] != 0 ? glyphs[0] : nil
+    }
+
+    /// The same for a Unicode scalar's value; nil for one that isn't a character.
+    func glyph(for scalar: UInt32) -> CGGlyph? {
+        Unicode.Scalar(scalar).flatMap { glyph(for: Character($0)) }
+    }
+}

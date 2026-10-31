@@ -119,16 +119,6 @@ struct MiniSwitch: View {
     let isEnabled: Bool
     let action: () -> Void
 
-    init(position: SwitchPosition, isEnabled: Bool, action: @escaping () -> Void) {
-        self.position = position
-        self.isEnabled = isEnabled
-        self.action = action
-    }
-
-    init(isOn: Bool, isEnabled: Bool, action: @escaping () -> Void) {
-        self.init(position: isOn ? .on : .off, isEnabled: isEnabled, action: action)
-    }
-
     var body: some View {
         Capsule()
             .fill(fill)
@@ -315,7 +305,7 @@ struct StatusTag: View {
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
         case .system: return ("System", .secondary, nil)
-        case .partial: return ("Partly active", .orange, nil)
+        case .partial: return ("Partly Active", .orange, nil)
         case .appOnly(let app): return (app == "Adobe" ? "Proofing" : app, .red, nil)
         case .active, .inactive: return nil
         }
@@ -324,7 +314,7 @@ struct StatusTag: View {
     private var help: String {
         switch (family.temporaryScope, family.state) {
         case (.untilQuit, _): "Active until Cicero quits"
-        case (.whileAppsRun, _): "Active while an app it’s set up for is open"
+        case (.whileAppsRun, _): "Active while its app is open"
         case (nil, .appOnly) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud. Active in Adobe apps only."
         case (nil, _) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud"
         case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load fonts from by themselves"
@@ -340,7 +330,7 @@ struct StatusTag: View {
 struct EmptyState<Actions: View>: View {
     let title: LocalizedStringKey
     let systemImage: String
-    var description: Text?
+    let description: Text?
     @ViewBuilder var actions: Actions
 
     init(_ title: LocalizedStringKey, systemImage: String, description: Text? = nil,
@@ -537,6 +527,29 @@ struct ValueField: View {
     }
 }
 
+/// A checkbox with a line under its title that says what it does, as the backup, restore and font cache sheets have.
+struct DetailToggle: View {
+    let title: String
+    let detail: String
+    @Binding var isOn: Bool
+
+    init(_ title: String, detail: String, isOn: Binding<Bool>) {
+        self.title = title
+        self.detail = detail
+        _isOn = isOn
+    }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .toggleStyle(.checkbox)
+    }
+}
+
 /// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
 struct StillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -653,7 +666,7 @@ struct FolderActivationPicker: View {
         )) {
             Text("Inactive").tag("")
             Text("Active").tag(Self.active)
-            Text("Active in Adobe apps").tag("Adobe")
+            Text("Active in Adobe Apps").tag("Adobe")
             // One typed in, or InDesign from before there was Active in Specific App.
             if let app = folder.appName, app != "Adobe" {
                 Text("Active in \(FaceState.appDescription(app))").tag(app)
@@ -1021,7 +1034,7 @@ private struct PreviewOptions: View {
                     } set: {
                         preview.size = min(max(GridScale.chosen(drawing: $0, factor: factor), PreviewSettings.sizes.lowerBound), PreviewSettings.sizes.upperBound)
                     }, range: GridScale.drawn(PreviewSettings.sizes.lowerBound, factor: factor)...GridScale.drawn(PreviewSettings.sizes.upperBound, factor: factor), unit: " pt")
-                    .help("The grid’s size while the sidebar is hidden or the Info panel open: \(Int(preview.size)) pt with the sidebar shown and the panel closed")
+                    .help("The size the grid shows now. With the sidebar shown and the Info panel closed, it’s \(Int(preview.size)) pt.")
                 } else {
                     row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
                 }

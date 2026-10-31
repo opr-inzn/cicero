@@ -167,7 +167,9 @@ struct CiceroCommands: Commands {
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
                 .keyboardShortcut(opensSelection ? KeyboardShortcut("o") : KeyboardShortcut(.downArrow))
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
-            Button("Show Info", systemImage: "info.circle") { model.toggleInfo() }
+            // What ⌘I does: it closes the panel only from the Info tab, else it shows that tab.
+            let hidesInfo = model.isInfoPresented && model.infoTab == .info
+            Button(hidesInfo ? "Hide Info" : "Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
             Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look", systemImage: "eye") { model.quickLook.toggle() }
                 .keyboardShortcut("y", modifiers: .command)

@@ -5,7 +5,7 @@ import Foundation
 public enum DuplicateHandling: String, Codable, CaseIterable, Sendable {
     /// Ask, family by family, in a sheet.
     case ask
-    /// List or install it beside the library's copy, as Cicero did before there was a choice.
+    /// List or install it beside the library's copy.
     case addCopy
     /// Leave it out.
     case skip

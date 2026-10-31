@@ -39,7 +39,7 @@ struct ItemReplacement {
     /// Moves the finished item into place, after moving the one it replaces to the Trash.
     func commit(trash: (URL) throws -> Void) throws {
         try Self.check(destination, keeping: kept)
-        if Self.exists(destination.path) { try trash(destination) }
+        if ActivationEngine.exists(destination.path) { try trash(destination) }
         try FileManager.default.moveItem(at: staged, to: destination)
     }
 
@@ -52,8 +52,8 @@ struct ItemReplacement {
     /// or the path symbolic links lead to.
     static func check(_ destination: URL, keeping kept: [String]) throws {
         let path = destination.standardizedFileURL.path
-        guard exists(path) else { return }
-        let forms = Set([path, realPath(path)])
+        guard ActivationEngine.exists(path) else { return }
+        let forms = Set([path, LibraryScanner.realPath(path)])
         func holds(_ item: String) -> Bool { forms.contains { item == $0 || item.hasPrefix($0 + "/") } }
         var resolvedFolders: [String: String] = [:]
         for item in kept {
@@ -62,7 +62,7 @@ struct ItemReplacement {
             if let known = resolvedFolders[parent] {
                 resolved = known
             } else {
-                resolved = realPath(parent)
+                resolved = LibraryScanner.realPath(parent)
                 resolvedFolders[parent] = resolved
             }
             if holds(item) || holds(resolved + "/" + (item as NSString).lastPathComponent) {
@@ -71,18 +71,5 @@ struct ItemReplacement {
                 throw KeptItemError(name: destination.lastPathComponent, isFolder: isFolder.boolValue)
             }
         }
-    }
-
-    /// Whether anything is at the path, a symbolic link that leads nowhere included.
-    private static func exists(_ path: String) -> Bool {
-        var info = stat()
-        return lstat(path, &info) == 0
-    }
-
-    /// The path with every symbolic link resolved; the path itself when it doesn't exist.
-    private static func realPath(_ path: String) -> String {
-        guard let resolved = realpath(path, nil) else { return path }
-        defer { free(resolved) }
-        return String(cString: resolved)
     }
 }

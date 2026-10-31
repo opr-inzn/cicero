@@ -2,9 +2,8 @@ import CiceroCore
 import CoreText
 
 /// What a font page lists under its styles for one face: its characters and the glyphs its features draw, by group,
-/// and the ligatures it makes. A character
-/// whose glyph a ligature feature makes, like ﬁ, which fonts usually give U+FB01 (Alphabetic Presentation Forms) too, is
-/// listed once, as a ligature, which says the character.
+/// and the ligatures it makes. A character whose glyph a ligature feature makes, like ﬁ, which fonts usually give
+/// U+FB01 (Alphabetic Presentation Forms) too, is listed once, as a ligature, which says the character.
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
     /// The characters and feature glyphs by group, but characters listed as ligatures.
@@ -149,7 +148,7 @@ final class PageContents {
         // The coverage has only the characters the font draws, and those with nothing to draw that it has; of those, the
         // page shows the ones it draws something for anyway.
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
-                                             privateUse: GlyphSection.privateUseGroups(in: font, coverage: scalars),
+                                             privateUse: GlyphSection.privateUseNames(in: font, coverage: scalars),
                                              leavingOut: { smallCaps.contains($0) || EmptyGlyphs.isInvisible($0) && empty.drawsNothing(for: $0) })
         return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font, generation: version)
     }

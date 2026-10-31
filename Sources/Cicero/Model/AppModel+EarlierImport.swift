@@ -56,15 +56,7 @@ extension AppModel {
     func copyEarlierImport(_ prompt: EarlierImportPrompt, stage: @escaping @Sendable (ImportStage) -> Void) async -> Int? {
         isImporting = true
         defer { isImporting = false }
-        let backup = LibraryBackup(locations: locations)
-        let current = data
-        let saved = await Task.detached(priority: .userInitiated) {
-            (try? backup.saveSnapshot(current, named: "Before Copying FontExplorer X’s Fonts")) != nil
-        }.value
-        guard saved else {
-            showToast("Couldn’t save the current setup first, so nothing was copied")
-            return nil
-        }
+        guard await saveSetupSnapshot(named: "Before Copying FontExplorer X’s Fonts", nothingWas: "copied") else { return nil }
         // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
@@ -89,12 +81,9 @@ extension AppModel {
                 let result = await model.engine.deactivate(on, records: model.data.records)
                 model.data.records = result.records
             }
-            model.data.folders.removeAll { $0.id == folder.id }
-            model.data.sidebar.forget("folder.\(folder.id)")
-            model.data.folderNames[folder.id.uuidString] = nil
-            model.deselect { $0 == .folder(folder.id) }
+            model.forgetFolders([folder.id])
             // The library with the copies in it and without the location, for the copies' faces.
-            let input = ScanInput(folders: model.data.scannedFolders(), files: model.data.fontFiles, records: model.data.records)
+            let input = model.scanInput
             let scanned = try? await model.scanner.scan(input) { progress in
                 switch progress {
                 case .identifying(let done, let total), .updating(let done, let total): stage(.reading(done: done, total: total))

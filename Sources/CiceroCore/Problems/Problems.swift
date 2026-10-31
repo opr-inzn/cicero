@@ -27,7 +27,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .installedTwice:
             "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
         case .sharedNames:
-            "Each of these fonts has its own main PostScript name (name ID 6), but variable fonts also give each named style a PostScript name of its own, and some use just “Bold” or “Light”. When two fonts use the same one, macOS gives it to only one of them, and a document set in the other may open in the wrong font. Usually there’s nothing to do; if it happens, turn off the font you don’t need or get an updated version."
+            "Some fonts, often variable ones, give each style a short name of its own, like “Bold”. When two fonts that are on use the same name, macOS gives it to only one of them, and a document can open in the wrong font. Usually there’s nothing to do. If it happens, turn off the font you don’t need, or get a newer version."
         case .missing:
             "Cicero remembers these files, but they’re gone. Fonts used where they were stop working when their files move or their disk is unplugged."
         case .unreadable:
@@ -97,7 +97,7 @@ public enum ProblemFix: Hashable, Sendable {
         case .forgetInPlace, .forgetInstalledCopy: "Forget"
         case .removeFromSet: "Remove from Folder"
         case .installCopy: "Install a Copy Instead"
-        case .removeFromAdobeFonts: "Remove in Adobe Fonts…"
+        case .removeFromAdobeFonts: "Remove in Adobe Fonts"
         }
     }
 
@@ -231,7 +231,7 @@ public enum ProblemDetector {
         func detail(of path: String) -> String {
             if library.activePaths.contains(path) {
                 switch LibraryScanner.activeSource(of: path, locations: locations, records: data.records) {
-                case .macOS: return "Comes with macOS"
+                case .macOS: return "Installed with macOS"
                 case .allUsers: return "Installed for all users"
                 case .app: return "Comes with an app"
                 case .adobeFonts: return "Adobe Fonts"
@@ -446,13 +446,13 @@ public enum ProblemDetector {
                 }
             }
             func ordered(_ styles: [(name: String, rank: Int)]) -> String {
-                joined(abridged(styles.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }.map(\.name)))
+                abridged(styles.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }.map(\.name)).listed()
             }
             let problemFiles = files.map { path, file in
                 // Getting only some of its names, a file says which: "Preferred" alone would read as all of them.
                 let isPartly = !file.won.isEmpty && file.won.count < file.names.count
                 return ProblemFile(path: path, version: nil, modified: nil, detail: context.detail(of: path),
-                                   title: joined(sorted(file.families)), note: ordered(file.styles), preferredFor: file.won,
+                                   title: sorted(file.families).listed(), note: ordered(file.styles), preferredFor: file.won,
                                    preferredStyles: isPartly ? ordered(file.wonStyles) : nil)
             }.sorted { a, b in
                 let order = a.title!.localizedStandardCompare(b.title!)
@@ -462,14 +462,14 @@ public enum ProblemDetector {
             let families = sorted(Array(component))
             var summary = names.count == 1
                 ? "One style in each has the same PostScript name, \(names[0])."
-                : "Some of their styles have the same PostScript names: \(joined(abridged(names)))."
+                : "Some of their styles have the same PostScript names: \(abridged(names).listed())."
             let winners = problemFiles.filter { !$0.preferredFor.isEmpty }
             if winners.map(\.preferredFor.count).reduce(0, +) == names.count {
-                summary += " macOS gives \(names.count == 1 ? "that name" : "those names") to \(joined(winners.map { $0.title! }))."
+                summary += " macOS gives \(names.count == 1 ? "that name" : "those names") to \(winners.map { $0.title! }.listed())."
             }
             return Problem(
                 id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
-                title: joined(families.count > 4 ? Array(families.prefix(3)) + ["\(families.count - 3) more"] : families),
+                title: (families.count > 4 ? Array(families.prefix(3)) + ["\(families.count - 3) more"] : families).listed(),
                 summary: summary, files: problemFiles, fixes: [],
                 fileFixes: Dictionary(uniqueKeysWithValues: problemFiles.map { file in
                     (file.path, [ProblemFix.reveal([file.path])] + (files[file.path]!.id.map { [.deactivate([$0])] } ?? []))
@@ -524,11 +524,6 @@ public enum ProblemDetector {
         return min(a, b)
     }
 
-    /// "A and B", "A, B and C".
-    private static func joined(_ items: [String]) -> String {
-        guard items.count > 1 else { return items.joined() }
-        return items.dropLast().joined(separator: ", ") + " and " + items.last!
-    }
 
     // MARK: Duplicates
 
@@ -658,8 +653,12 @@ public enum ProblemDetector {
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
+        // Every file in a folder is on that folder's disk: its volume is asked about once.
+        var volumes: [String: String?] = [:]
+        var families: [String: Family]?
         for path in context.data.records.inPlace.sorted() where !(fontLibrary.map(path.hasPrefix) ?? false) {
-            if !FileManager.default.fileExists(atPath: path), let place = context.unreachable(path) {
+            let exists = FileManager.default.fileExists(atPath: path)
+            if !exists, let place = context.unreachable(path) {
                 problems.append(Problem(
                     id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
                     summary: "Used where it is, \(place).",
@@ -669,8 +668,18 @@ public enum ProblemDetector {
                 ))
                 continue
             }
-            guard let volume = externalVolumeName(of: path) else { continue }
-            let family = context.library.families.first { $0.faces.contains { $0.face.path == path } }
+            // A missing file has no volume.
+            guard exists else { continue }
+            let folder = (path as NSString).deletingLastPathComponent
+            if volumes[folder] == nil { volumes[folder] = .some(externalVolumeName(of: path)) }
+            guard let volume = volumes[folder] ?? nil else { continue }
+            if families == nil {
+                families = [:]
+                for family in context.library.families {
+                    for face in family.faces where families?[face.face.path] == nil { families?[face.face.path] = family }
+                }
+            }
+            let family = families?[path]
             problems.append(Problem(
                 id: "external.\(path)", kind: .external, title: family?.name ?? (path as NSString).lastPathComponent,
                 summary: "Used where it is, on “\(volume)”.",

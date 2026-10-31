@@ -25,10 +25,10 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        // Folders and Sets until sets took the name Folders.
+        // `folders` and `sets` are keys in the user's sidebar data (`SidebarPreferences.order`), so the cases can't follow
+        // the titles.
         case .folders: "Locations"
         case .sets: "Folders"
-        // The license tags to begin with; called License in 1.5 to 1.5.2, when a family had one.
         case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"

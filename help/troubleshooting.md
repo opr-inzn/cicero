@@ -6,7 +6,7 @@
 
 Go through these in order:
 
-1. **Is the font on?** Find it in Cicero and look at its switch. A family tagged **Partly active** has some styles off; open its font page to see which.
+1. **Is the font on?** Find it in Cicero and look at its switch. A family tagged **Partly Active** has some styles off; open its font page to see which.
 2. **Is it on in every app?** A font tagged **Proofing** or with an app’s name is on in that app only. Click its switch to turn it on everywhere. One tagged **Adobe Fonts** with its switch halfway is on in Adobe apps only: turn it on in Creative Cloud to use it everywhere (see [Adobe Fonts](activating.md#adobe-fonts)). See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders).
 3. **Was it on just for a while?** Fonts turned on temporarily go off when Cicero quits. Fonts from an [app folder](activating.md#turn-fonts-on-with-an-app) are only on while one of the folder’s apps is open and Cicero is running.
 4. **Is it Microsoft Office?** Office apps, like Word and PowerPoint, only use fonts copied into your Fonts folder, not fonts used where they are, and only from the second time they open after the font went on. See [Fonts in Microsoft Office](activating.md#fonts-in-microsoft-office).
@@ -20,7 +20,7 @@ macOS and some apps keep lists of fonts that can go stale after fonts change. Fo
 
 1. Choose **Fonts → Clear Font Caches**, or click **Clear** next to **macOS, Adobe and Office font caches** in **Preferences → General**.
 2. Check the caches to clear:
-   - **macOS (my account):** removes your account’s font caches and restarts the font service.
+   - **macOS (your account):** removes your account’s font caches and restarts the font service.
    - **macOS (all users):** the same for every account on the Mac. It needs an administrator password.
    - **Adobe apps:** moves the font caches Adobe apps keep to the Trash, and says how big they are. Quit Adobe apps first; while one is open, this says “Quit” and the app’s name, and you can’t check it.
    - **Microsoft Office:** moves Office’s font caches to the Trash. macOS asks for your permission before Cicero looks inside Office’s folders. Quit Office apps first.
@@ -33,7 +33,7 @@ The apps rebuild their caches the next time they open. Clearing the macOS caches
 Cicero follows changes by itself: it looks again when fonts are turned on or off, by any app, when files come or go in your locations, and when you come back to Cicero after a while. If its list still looks out of date:
 
 - **Fonts → Rescan Library** (⌘R) looks through your fonts again. It’s quick, because Cicero remembers what it read from each file.
-- **Fonts → Rebuild Font List**, or **Rebuild** next to **Library** in **Preferences → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
+- **Fonts → Rebuild Font List**, or **Rebuild Font List** next to **Library** in **Preferences → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
 
 ## A font won’t turn off
 

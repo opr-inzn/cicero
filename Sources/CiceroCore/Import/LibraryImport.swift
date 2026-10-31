@@ -34,6 +34,8 @@ public struct ImportChoices: Equatable, Sendable {
 public struct ImportSummary: Equatable, Sendable {
     /// Font files copied in: the Font Library's and the others. Not those already there with the same name and contents.
     public var fonts = 0
+    /// Font files that didn't go in, as when macOS was too busy to take them: importing again tries them again.
+    public var notCopied = 0
     /// Sets made, or that had the name of one and got fonts or apps from it. What a set had already isn't counted, so
     /// importing again counts nothing.
     public var sets = 0
@@ -113,10 +115,10 @@ public enum LibraryImport {
         }
     }
 
-    /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the library, which has
-    /// the other app's fonts by now, at the paths their copies have (`paths`, the other app's → the copy's); and gives
-    /// the styles to turn on, when chosen. Apps of application sets are looked for where they were, then by name in
-    /// `appFolders`.
+    /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the
+    /// library, which has the other app's fonts by now, at the paths their copies have (`paths`, the other app's → the
+    /// copy's); and gives the styles to turn on, when chosen. Apps of application sets are looked for where they were,
+    /// then by name in `appFolders`.
     public static func apply(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, library: Library,
                              paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders)
         -> (summary: ImportSummary, activate: [LibraryFace]) {

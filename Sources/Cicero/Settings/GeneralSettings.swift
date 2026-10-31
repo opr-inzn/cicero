@@ -42,7 +42,7 @@ struct GeneralSettings: View {
             Section("Installation") {
                 Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
                     Text("Install fonts into Cicero’s Library")
-                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
+                    Text("Instead of putting the installed fonts into your Fonts folder, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
@@ -101,7 +101,7 @@ struct GeneralSettings: View {
                 // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     Text("Show fonts installed for proofing in Adobe apps")
-                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                    Text("Lists the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them. [How to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Classify fonts automatically")
@@ -111,7 +111,7 @@ struct GeneralSettings: View {
             Section("Maintenance") {
                 LabeledContent("Library") {
                     HStack {
-                        Button("Rebuild") { model.rebuildFontList() }
+                        Button("Rebuild Font List") { model.rebuildFontList() }
                         Button("Back Up") { isBackingUp = true }
                         Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
@@ -164,11 +164,11 @@ struct GeneralSettings: View {
     }
 
     private var addingExplanation: String {
-        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
+        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder"
         return switch model.data.installMethod {
         case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. Microsoft Office can’t use fonts left where they are."
         case .copy: "They’re copied into \(place) and turned on. The originals stay where they are."
-        case .move: "They’re moved into \(place) and turned on. Files in your locations are copied instead."
+        case .move: "They’re moved into \(place) and turned on. Fonts in your locations stay where they are."
         case .inPlace: "They’re listed under Added Fonts where they are, but not turned on. Microsoft Office can’t use them."
         }
     }

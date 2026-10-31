@@ -82,8 +82,10 @@ public struct Locations: Sendable {
     /// `ActivationEngine.moveFormerInactiveFolders`): in Cicero's support folder up to 0.11.0, and called Deactivated
     /// there up to 0.10.10.
     public var formerInactiveFolders: [URL] {
-        [support.appendingPathComponent("Inactive", isDirectory: true), support.appendingPathComponent("Deactivated", isDirectory: true)]
+        Self.formerInactiveNames.map { support.appendingPathComponent($0, isDirectory: true) }
     }
+
+    private static let formerInactiveNames = ["Inactive", "Deactivated"]
 
     /// The Inactive folder, and each former one while it's there: what's in them is off and listed, and moves out as it
     /// goes on.
@@ -93,7 +95,10 @@ public struct Locations: Sendable {
 
     /// In the Inactive folder, or a former one.
     public func isInInactiveFolder(_ path: String) -> Bool {
-        ([inactiveFolder] + formerInactiveFolders).contains { path.hasPrefix($0.path + "/") }
+        // The former folders' paths without making their URLs: scans ask for every file.
+        if path.hasPrefix(inactiveFolder.path + "/") { return true }
+        let support = self.support.path + "/"
+        return path.hasPrefix(support) && Self.formerInactiveNames.contains { path.hasPrefix(support + $0 + "/") }
     }
 
     /// The Inactive folder, made if it isn't there, for a file going in. When it can't be made, as when the home folder
@@ -227,7 +232,6 @@ public struct ScanInput: Equatable, Sendable {
     }
 }
 
-
 /// Finds every font file (CoreText's active fonts, macOS's font folders, ~/Library/Fonts, /Library/Fonts, the
 /// watched folders, the files added one at a time and Cicero's Inactive folder), reads new or changed files,
 /// and builds a `Library`.
@@ -259,6 +263,9 @@ public final class LibraryScanner: Sendable {
         var restored: Library?
         /// The fingerprint of the library last saved for the next launch.
         var savedFingerprint: Int?
+        /// The library `savedLibrary` read, as saved, until a library is saved: fingerprints differ from one launch to the
+        /// next, so the first scan's library is compared with it instead.
+        var onDisk: Library?
         /// Set by `clearCache`: the next scan reads every file it finds again, but keeps what it knows of the
         /// ones out of reach.
         var rereadAll = false
@@ -297,14 +304,19 @@ public final class LibraryScanner: Sendable {
         Signposts.library.withIntervalSignpost("Restore library") {
             guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
             let session = ActivationEngine.currentSession()
+            var asSaved = true
             let library = LibraryCache.decode(data) { state, path, app in
                 guard case .active(.temporary) = state else { return state }
                 if let record = records.temporary[path], record.scope == .whileAppsRun, record.session == session { return state }
+                asSaved = false
                 // What `faceState` says of a file that isn't active.
                 if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
                 return .inactive
             }
-            state.withLock { $0.restored = library }
+            state.withLock { state in
+                state.restored = library
+                state.onDisk = asSaved ? library : nil
+            }
             return library
         }
     }
@@ -486,6 +498,7 @@ public final class LibraryScanner: Sendable {
             $0.dirty = true
             $0.last = nil
             $0.savedFingerprint = nil
+            $0.onDisk = nil
         }
     }
 
@@ -731,7 +744,8 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// The path with every symlink resolved, as the enumerator reports files (e.g. /private/var for /var).
+    /// The path with every symlink resolved, as the enumerator and FSEvents report files (e.g. /private/var for /var); as
+    /// it is when it doesn't exist.
     static func realPath(_ path: String) -> String {
         guard let resolved = realpath(path, nil) else { return path }
         defer { free(resolved) }
@@ -832,8 +846,7 @@ public final class LibraryScanner: Sendable {
     private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach) -> [String: CachedFile] {
         state.withLock { state in
             let before = state.files.count
-            // Not web fonts that versions before 1.6 read, in a folder that's out of reach now.
-            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) && Self.isFontFile($0.key) }
+            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
             state.files.merge(parsed) { _, new in new }
             if !parsed.isEmpty || state.files.count != before { state.dirty = true }
             return state.files
@@ -852,17 +865,24 @@ public final class LibraryScanner: Sendable {
         try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)
     }
 
-    /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last. Fingerprints
-    /// differ from one launch to the next, so each launch's first scan saves it again.
+    /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last.
     private func saveLibraryIfNeeded(_ library: Library) {
         let changed = state.withLock { state in
             guard state.savedFingerprint != library.fingerprint else { return false }
             state.savedFingerprint = library.fingerprint
-            return true
+            defer { state.onDisk = nil }
+            return state.onDisk.map { !Self.savesAlike($0, library) } ?? true
         }
         guard changed else { return }
         try? FileManager.default.createDirectory(at: locations.caches, withIntermediateDirectories: true)
         try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)
+    }
+
+    /// Whether the library cache would hold the same for both.
+    private static func savesAlike(_ a: Library, _ b: Library) -> Bool {
+        a.families == b.families && a.unreadableFiles == b.unreadableFiles && a.activePaths == b.activePaths
+            && a.unavailableFolders == b.unavailableFolders && a.onlineOnlyFiles == b.onlineOnlyFiles
+            && a.offlineFamilies == b.offlineFamilies && a.offlinePaths == b.offlinePaths
     }
 
     // MARK: Building
@@ -1008,9 +1028,9 @@ public final class LibraryScanner: Sendable {
         return nil
     }
 
-    /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate — then by path.
-    /// Adobe Fonts only Adobe apps load come last: they stand for a font only when the library has no other copy of it,
-    /// so one of the user's own stays theirs to switch.
+    /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate —
+    /// then by path. Adobe Fonts only Adobe apps load come last: they stand for a font only when the library has no
+    /// other copy of it, so one of the user's own stays theirs to switch.
     private static func precedes(_ a: Candidate, _ b: Candidate) -> Bool {
         let rankA = rank(a), rankB = rank(b)
         if rankA != rankB { return rankA < rankB }

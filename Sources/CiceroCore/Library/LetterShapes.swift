@@ -33,19 +33,13 @@ enum LetterShapes {
         return nil
     }
 
-    static func glyph(_ font: CTFont, _ character: Character) -> CGGlyph? {
-        var characters = Array(String(character).utf16)
-        var glyph: CGGlyph = 0
-        return CTFontGetGlyphsForCharacters(font, &characters, &glyph, 1) && glyph != 0 ? glyph : nil
-    }
-
     /// Whether a drawn i, m and W are exactly as wide (I, M and W, without lowercase), as in a monospaced style
     /// the font doesn't flag as one. Fonts in three widths have i and m alike, and unfinished ones letters that
     /// aren't drawn yet, all as wide.
     static func isMonospaced(_ font: CTFont) -> Bool {
         func drawn(_ characters: [Character]) -> [CGGlyph]? {
             let glyphs = characters.compactMap { character -> CGGlyph? in
-                guard let glyph = glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
+                guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
                       !path.boundingBoxOfPath.isEmpty else { return nil }
                 return glyph
             }
@@ -66,7 +60,7 @@ enum LetterShapes {
         case unclear
 
         init(_ font: CTFont, _ character: Character, slant: CGFloat) {
-            if LetterShapes.glyph(font, character) == nil {
+            if font.glyph(for: character) == nil {
                 self = .missing
             } else if let letter = Letter(font, character, slant: slant) {
                 self = .measured(letter)
@@ -88,7 +82,7 @@ enum LetterShapes {
         init?(_ font: CTFont, _ character: Character, slant: CGFloat) {
             // In thousandths of an em, whatever size the font was made at.
             var scale = CGAffineTransform(scaleX: 1000 / CTFontGetSize(font), y: 1000 / CTFontGetSize(font))
-            guard let glyph = LetterShapes.glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, &scale) else { return nil }
+            guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, &scale) else { return nil }
             let box = path.boundingBoxOfPath
             guard box.height > 50, box.width > 0 else { return nil }
             let outline = Outline(path.flattened(threshold: 1))

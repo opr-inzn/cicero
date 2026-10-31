@@ -60,10 +60,6 @@ public enum AppFontCaches {
             case .office: ["com.microsoft.Word", "com.microsoft.Excel", "com.microsoft.Powerpoint", "com.microsoft.Outlook", "com.microsoft.onenote.mac"]
             }
         }
-
-        /// Office keeps its caches inside its app containers. Looking there makes macOS ask whether
-        /// Cicero may access other apps' data, so only look when the user chooses to clear them.
-        public var isGuardedByMacOS: Bool { self == .office }
     }
 
     public struct Found: Sendable {
@@ -96,6 +92,8 @@ public enum AppFontCaches {
             // Acrobat names these with a literal backslash.
             "Library/Application Support/Adobe/Acrobat/DC/ProtectedView\\\\Adobe{Sys,Com,CMap}Fnt*.lst",
         ]
+        // Office keeps its caches in its app containers. Looking there makes macOS ask whether Cicero may access other
+        // apps' data, so the sheet looks only when the user chooses Office.
         case .office: [
             "Library/Group Containers/UBF8T346G9.Office/FontCache",
             "Library/Containers/com.microsoft.{Word,Excel,Powerpoint,Outlook,onenote.mac}/Data/Library/Application Support/Microsoft/{FontCache,FontPreviewCache}",

@@ -15,7 +15,7 @@ public struct UserData: Codable, Equatable, Sendable {
     public var missingFontFiles: [String: Date] = [:]
     public var sets: [FontSet] = []
     public var smartSets: [SmartSet] = []
-    /// Tags, in the order they were made; the license tags to begin with (see `licenseTags`). From 1.5 to 1.6 they were
+    /// Tags, in the order they were made; the license tags to begin with (see `licenseTags`). From 0.5 to 0.6 they were
     /// license statuses, one to a family; a family can have any number again.
     public var tags: [String] = []
     /// Family name → its tags (see `tags`).
@@ -32,10 +32,10 @@ public struct UserData: Codable, Equatable, Sendable {
     public var notSimilar: [String: [String]] = [:]
     /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
-    /// False only for libraries saved before there were license tags (license statuses, as they were in 1.5), which get
+    /// False only for libraries saved before there were license tags (license statuses, as they were in 0.5), which get
     /// them once as they load (see `updateLicenseTags`).
     public var licenseStatusesAdded = true
-    /// False only for libraries saved by 1.9.1 or before, which started with `formerLicenseTags` too, and lose them once
+    /// False only for libraries saved by 0.9.1 or before, which started with `formerLicenseTags` too, and lose them once
     /// as they load (see `updateLicenseTags`).
     public var formerLicenseTagsRemoved = true
     /// False only for libraries saved before a Font Library that fonts aren't installed into became one of the user's
@@ -77,8 +77,8 @@ public struct UserData: Codable, Equatable, Sendable {
     /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
     /// the key `showAdobeAppFolders` was saved as before.
     public var showCreativeCloudFonts = true
-    /// Turn on the fonts the documents open in InDesign, Illustrator and Photoshop use, while the app is open. Off until the user
-    /// turns it on, as macOS then asks whether Cicero may control each app.
+    /// Turn on the fonts the documents open in InDesign, Illustrator and Photoshop use, while the app is open. Off
+    /// until the user turns it on, as macOS then asks whether Cicero may control each app.
     public var activatesDocumentFonts = false
     public var records = ActivationRecords()
 
@@ -98,7 +98,7 @@ public struct UserData: Codable, Equatable, Sendable {
         ("Licensed", .green), ("Unlicensed", .red), ("Open Source", .blue), ("Trial", .orange),
     ]
 
-    /// The license tags a library started with up to 1.9.1, besides `licenseTags`.
+    /// The license tags a library started with up to 0.9.1, besides `licenseTags`.
     public static let formerLicenseTags: [(name: String, color: TagColor)] = [
         ("Licensed + Non-Commercial", .sand), ("Partially Licensed", .yellow), ("Public Domain", .purple),
     ]
@@ -143,7 +143,7 @@ public struct UserData: Codable, Equatable, Sendable {
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
         folderNames = try value(.folderNames, d.folderNames)
-        // Web fonts, which versions before 1.6 added, are no longer read.
+        // Web fonts, which versions before 0.6 added, are no longer read.
         fontFiles = try value(.fontFiles, d.fontFiles).filter { FontFormat.fileExtensions.contains(($0 as NSString).pathExtension.lowercased()) }
         missingFontFiles = try value(.missingFontFiles, d.missingFontFiles)
         sets = try value(.sets, d.sets)
@@ -158,7 +158,7 @@ public struct UserData: Codable, Equatable, Sendable {
         activations = try value(.activations, d.activations)
         // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
-        // Missing in files from 1.9.1 and before, which are yet to lose the former license tags.
+        // Missing in files from 0.9.1 and before, which are yet to lose the former license tags.
         formerLicenseTagsRemoved = try value(.formerLicenseTagsRemoved, false)
         fontLibraryLocationChecked = try value(.fontLibraryLocationChecked, false)
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)

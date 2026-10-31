@@ -49,7 +49,7 @@ struct LanguagesRow: View {
     }
 
     private func summary(_ languages: [Language]) -> String {
-        let sample = ListFormatter.localizedString(byJoining: languages.prefix(5).map(\.name))
+        let sample = languages.prefix(5).map(\.name).listed()
         return languages.count <= 5 ? sample : "\(languages.count) languages, including \(sample)"
     }
 }
@@ -109,7 +109,7 @@ struct CharacterSetsRow: View {
             Text("Coverage").font(.caption).foregroundStyle(.secondary)
             if let ranges = loaded?.value {
                 let has = supported(by: ranges)
-                Text(has.isEmpty ? "None" : ListFormatter.localizedString(byJoining: has.map(\.name)))
+                Text(has.isEmpty ? "None" : has.map(\.name).listed())
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -265,7 +265,7 @@ struct UnicodeBlocksRow: View {
             if let coverage = loaded?.value {
                 let complete = coverage.filter { $0.has == $0.block.scalars.count }.map(\.block.name)
                 let partial = coverage.count { $0.has > 0 && $0.has < $0.block.scalars.count }
-                Text(complete.isEmpty ? "None complete" : "Complete: " + ListFormatter.localizedString(byJoining: complete))
+                Text(complete.isEmpty ? "None complete" : "Complete: " + complete.listed())
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)

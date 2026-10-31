@@ -55,9 +55,7 @@ public struct FontExportPlan: Sendable {
         self.protectedCount = protectedCount
     }
 
-    public var familyCount: Int { exportedFamilies.count }
     public var isEmpty: Bool { items.isEmpty }
-    public var fileCount: Int { items.reduce(0) { $0 + $1.paths.count } }
 
     /// "Exported Inter", "Exported Inter and Roboto" or "Exported 12 families", with a note about files left out, for a
     /// toast.
@@ -131,7 +129,7 @@ public struct FontExporter: Sendable {
             for path in item.paths {
                 try Task.checkCancellation()
                 let source = URL(fileURLWithPath: path, isDirectory: false)
-                try fm.copyItem(at: source, to: uniqueURL(for: source.lastPathComponent, in: target))
+                try fm.copyItem(at: source, to: ActivationEngine.uniqueURL(for: source.lastPathComponent, in: target))
             }
         }
     }
@@ -140,18 +138,4 @@ public struct FontExporter: Sendable {
     static func folderName(for family: String) -> String {
         family.replacingOccurrences(of: "/", with: ":")
     }
-}
-
-/// "Name.otf", then "Name 2.otf", "Name 3.otf"…
-func uniqueURL(for name: String, in folder: URL) -> URL {
-    let fm = FileManager.default
-    let base = (name as NSString).deletingPathExtension
-    let ext = (name as NSString).pathExtension
-    var candidate = folder.appendingPathComponent(name, isDirectory: false)
-    var number = 2
-    while fm.fileExists(atPath: candidate.path) {
-        candidate = folder.appendingPathComponent(ext.isEmpty ? "\(base) \(number)" : "\(base) \(number).\(ext)", isDirectory: false)
-        number += 1
-    }
-    return candidate
 }

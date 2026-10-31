@@ -555,7 +555,7 @@ private struct Reader {
             if let count = unreadable[kind] { library.notes.append(kind.describe(count)) }
         }
         if !unreadableSets.isEmpty {
-            let names = unreadableSets.map { "“\($0)”" }.formatted(.list(type: .and))
+            let names = unreadableSets.map { "“\($0)”" }.listed()
             library.notes.append("the \(unreadableSets.count == 1 ? "set" : "sets") \(names), whose fonts Cicero can’t use")
         }
         // The Font Library by where it was looked for, so it can be put there and imported again.
