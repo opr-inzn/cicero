@@ -39,11 +39,25 @@ enum MeasureRun {
         guard await until(minutes: 60, { model.measuredLibraries > 0 }) else { return Measurements.count("run.failed", detail: "not indexed") }
         await launchStep("launch.indexed")
         _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(30))
+        if ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"] == "launch" { return }
 
         let defaults = UserDefaults.standard
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
         model.selection = .all
         _ = await MainSettle.wait()
+
+        // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
+        // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
+        let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
+        if only == "mode" || only == "mode-scrolled" {
+            for _ in 0..<(only == "mode" ? 10 : 5) {
+                for mode in [BrowserMode.list, .specimens, .grid] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    if only == "mode-scrolled" { await scroll(mode: mode) }
+                }
+            }
+            return
+        }
 
         // Sidebar items, each twice.
         let location = model.data.folders.first.map { SidebarItem.folder($0.id) }
@@ -129,9 +143,12 @@ enum MeasureRun {
 
     /// Does `change`, then records how long the main thread took to be quiet again.
     private static func step(_ name: String, detail: String = "", _ change: () -> Void) async {
+        // A signpost per step, so a profile's samples can be matched to it (`Step`, its name and detail in the message).
+        let signpost = Measurements.signposter.beginInterval("Step", "\(name, privacy: .public) \(detail, privacy: .public)")
         let settle = MainSettle.begin()
         change()
         let settled = await settle.wait()
+        Measurements.signposter.endInterval("Step", signpost)
         Measurements.record(name, ms: settled.ms, detail: settled.timedOut ? "\(detail) (limit)" : detail)
     }
 
