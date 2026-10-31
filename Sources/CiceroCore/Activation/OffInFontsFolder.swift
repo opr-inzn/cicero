@@ -32,7 +32,7 @@ extension ActivationEngine {
                 do {
                     try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try noteTurningOff(moved.map(\.to) + [destination.path])
-                    try Self.move(Self.url(from), to: destination)
+                    try Self.moveItem(Self.url(from), to: destination)
                     moved.append((from, destination.path))
                 } catch {
                     failed.append(from)
@@ -50,7 +50,7 @@ extension ActivationEngine {
                 }
                 // macOS would turn on one it didn't take as soon as it noticed it, and one that won't go off is on.
                 if stillOn.contains(to) { _ = await registrar.unregister([Self.url(to)], scope: .persistent) }
-                try? Self.move(Self.url(to), to: Self.url(from))
+                try? Self.moveItem(Self.url(to), to: Self.url(from))
                 failed.append(from)
             }
             try? fm.removeItem(at: turningOffList)
@@ -283,7 +283,7 @@ extension ActivationEngine {
             let target = Self.uniqueURL(for: (path as NSString).lastPathComponent, in: destination)
             do {
                 try fm.createDirectory(at: destination, withIntermediateDirectories: true)
-                try Self.move(Self.url(path), to: target)
+                try Self.moveItem(Self.url(path), to: target)
                 placed[path] = target.path
             } catch {
                 continue
@@ -448,11 +448,13 @@ extension ActivationEngine {
     /// Hidden names of items being copied onto another disk, until they're whole.
     static let movingPrefix = ".cicero-moving-"
 
-    /// Moves an item where nothing is, keeping its Date Added: a rename on the same disk, never over anything. Onto another
-    /// disk a file is copied under a hidden name first, so a copy that stops halfway is never taken for a font, then
-    /// named, and the original goes; one that can't go takes the copy back out, so there's never two. Not a folder, whose
-    /// deleting could stop partway, after some of its files went: those would be only in the copy, and taking it back out
-    /// would lose them. A folder goes onto another disk file by file (see `fileMoves`).
+    /// Moves an item where nothing is, keeping its Date Added, which macOS sets anew for a file moved into another folder,
+    /// so a font Cicero turns off or on arrives no more than it did before (see `Family.lastAdded`): a rename on the same
+    /// disk, never over anything. Onto another disk a file is copied under a hidden name first, so a copy that stops
+    /// halfway is never taken for a font, then named, and the original goes; one that can't go, on a read-only disk or
+    /// Locked, takes the copy back out, so there's never two. Not a folder, whose deleting could stop partway, after some
+    /// of its files went: those would be only in the copy, and taking it back out would lose them. A folder goes onto
+    /// another disk file by file (see `fileMoves`).
     static func moveItem(_ from: URL, to: URL) throws {
         let fm = FileManager.default
         let added = dateAdded(of: from)

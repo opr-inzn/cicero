@@ -15,6 +15,7 @@ This version makes a fundamental change to how Cicero installs and turns on font
 - Fonts you turn off in Adobe apps’ folders now wait in **~/Cicero/Inactive**, where you can see them, rather than in Application Support. Cicero moves them there as it opens, and asks before moving a font out of a folder that syncs with a cloud service or is on a server.
 - **Change** next to **Cicero’s Library** takes any folder, such as Downloads: when it has other things in it, Cicero makes a **Cicero Library** folder there. A folder that can’t work says why while you can still choose another, and one in iCloud Drive or another cloud service asks first.
 - Moving **Cicero’s Library** to another disk no longer loses fonts when a file in it can’t be deleted: the library stays where it was, whole.
+- Turning a font off or on that can’t leave its disk, like one on a read-only server or a Locked file, no longer leaves a copy of it behind.
 - In **Glyphs**, superscripts, subscripts, numerators and denominators start with their figures, and the extra letters older fonts keep at private codes, like their small caps, sit next to the letters they belong to or in their own group.
 
 

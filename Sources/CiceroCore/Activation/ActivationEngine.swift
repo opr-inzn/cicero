@@ -1227,7 +1227,7 @@ public struct ActivationEngine: Sendable {
     /// and remembers where it was.
     private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
         let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-        try Self.move(Self.url(path), to: destination)
+        try Self.moveItem(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
 
@@ -1239,7 +1239,7 @@ public struct ActivationEngine: Sendable {
         let destination = FileManager.default.fileExists(atPath: origin)
             ? Self.uniqueURL(for: original.lastPathComponent, in: original.deletingLastPathComponent())
             : original
-        try Self.move(Self.url(path), to: destination)
+        try Self.moveItem(Self.url(path), to: destination)
         records.appFolderOrigins[path] = nil
         return destination.path
     }
@@ -1266,14 +1266,6 @@ public struct ActivationEngine: Sendable {
               (copy.st_flags | source.st_flags) & UInt32(SF_DATALESS) == 0
         else { return false }
         return FileManager.default.contentsEqual(atPath: path, andPath: original)
-    }
-
-    /// Moves a file and gives it back its Date Added, which macOS sets anew for a file moved into another folder: a font
-    /// Cicero turns off or on, or puts into the Font Library, arrives no more than it did before (see `Family.lastAdded`).
-    static func move(_ source: URL, to destination: URL) throws {
-        let added = dateAdded(of: source)
-        try FileManager.default.moveItem(at: source, to: destination)
-        if let added { setDateAdded(added, of: destination) }
     }
 
     /// Finder's Date Added, where the disk keeps one.

@@ -174,7 +174,7 @@ extension ActivationEngine {
             }
             do {
                 let aside = Self.uniqueURL(for: old.lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-                try Self.move(old, to: aside)
+                try Self.moveItem(old, to: aside)
                 waiting[replacement.old] = aside.path
             } catch {
                 try? fm.removeItem(atPath: path)
@@ -281,7 +281,7 @@ extension ActivationEngine {
         for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
             guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
             let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
-            guard (try? Self.move(Self.url(interim), to: aside)) != nil else { continue }
+            guard (try? Self.moveItem(Self.url(interim), to: aside)) != nil else { continue }
             waiting[aside.path] = (interim, original)
         }
         guard !waiting.isEmpty else { return [:] }
