@@ -19,6 +19,12 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
     /// 0 for none.
     let rating: Int
     let tags: [TagColor]
+    /// Its place in the list, for the stripes: set by `AppModel.fontRows` once sorted.
+    var position = 0
+    /// Its place in the library, which keeps its families in the Finder order of the names they show (`Library.sorted`):
+    /// what the Name column sorts by. A localizedStandard sort of the names, the same order, took about 60 ms at
+    /// 20,000 families each time the rows were made, as after every rating.
+    let libraryPosition: Int
 
     var id: String { family.id }
 
@@ -34,6 +40,7 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
     @MainActor init(_ family: Family, coverage sources: [(FontListColumn, CoverageSource)], model: AppModel) {
         self.family = family
         name = family.name
+        libraryPosition = model.library.position(of: family.id) ?? .max
         foundry = model.foundryName(of: family) ?? ""
         styles = family.faces.count
         classification = model.classificationName(of: family)
@@ -46,22 +53,23 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         }
         var coverage: [FontListColumn: CoverageCell] = [:]
         for (column, source) in sources {
-            switch source {
-            case .series(let series):
-                if let set = model.largestSet(in: series, for: family) {
-                    coverage[column] = .largest(Self.label(set, in: series), level: set.level)
-                }
-            case .set(let set):
-                if let missing = model.missingCount(set, family), missing < set.scalars.count {
-                    coverage[column] = .missing(missing, of: set.scalars.count)
-                }
-            }
+            coverage[column] = Self.cell(source, for: family, model: model)
         }
         self.coverage = coverage
         added = family.dateAdded ?? .distantPast
         year = family.year ?? 0
         rating = model.rating(of: family) ?? 0
         tags = model.tagColors(of: family)
+    }
+
+    /// What a character set column says about the family; nil while it's being checked, or when it has none of the set.
+    @MainActor static func cell(_ source: CoverageSource, for family: Family, model: AppModel) -> CoverageCell? {
+        switch source {
+        case .series(let series):
+            model.largestSet(in: series, for: family).map { .largest(label($0, in: series), level: $0.level) }
+        case .set(let set):
+            model.missingCount(set, family).flatMap { $0 < set.scalars.count ? .missing($0, of: set.scalars.count) : nil }
+        }
     }
 
     /// A set's name under its series' column: Latin M, AL 3, and Plus for GF Latin Plus.
@@ -199,7 +207,7 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
     var comparator: KeyPathComparator<FontRow>? {
         switch self {
         case .status: KeyPathComparator(\.activation)
-        case .name: KeyPathComparator(\.name, comparator: .localizedStandard)
+        case .name: KeyPathComparator(\.libraryPosition)
         case .preview: nil
         case .styles: KeyPathComparator(\.styles)
         case .classification: KeyPathComparator(\.classification)
@@ -241,13 +249,15 @@ struct FontList: View {
         let columns = shownColumns
         // A column that's been turned off, or whose set was deleted, no longer sorts the list.
         let sort: FontListColumn? = model.hasOwnOrder && keepsOwnOrder ? nil : columns.contains(sortColumn) ? sortColumn : .name
-        let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], columns: columns)
+        let sortsByCoverage = sort.map { $0.isSeries || $0.isSingleSet } ?? false
+        let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], coverageColumns: sortsByCoverage ? sort.map { [$0] } ?? [] : [])
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        FontListRow(row: row, columns: columns, widths: widths, isStriped: !index.isMultiple(of: 2),
+                    // The rows themselves, not Array(rows.enumerated()), which copied every row at each update.
+                    ForEach(rows) { row in
+                        FontListRow(row: row, columns: columns, widths: widths, isStriped: !row.position.isMultiple(of: 2),
                                     isSelected: model.selectedIDs.contains(row.id), model: model)
                             .modifier(FamilyItem(family: row.family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                     }
@@ -280,7 +290,7 @@ struct FontList: View {
     }
 
     private func order(_ column: FontListColumn) -> [KeyPathComparator<FontRow>] {
-        var comparator = column.comparator ?? KeyPathComparator(\FontRow.name, comparator: .localizedStandard)
+        var comparator = column.comparator ?? KeyPathComparator(\FontRow.libraryPosition)
         comparator.order = ascending ? .forward : .reverse
         return [comparator]
     }
@@ -591,11 +601,11 @@ private struct FontListRow: View {
                 Text(Rating.stars(row.rating)).foregroundStyle(.secondary).lineLimit(1).accessibilityLabel(Rating.description(row.rating))
             }
         case .series:
-            if case .largest(let name, _) = row.coverage[column] {
+            if case .largest(let name, _) = model.coverageCell(column, of: row) {
                 Text(name).foregroundStyle(.secondary).lineLimit(1)
             }
         case .characterSet:
-            switch row.coverage[column] {
+            switch model.coverageCell(column, of: row) {
             case .missing(0, _):
                 Image(systemName: "checkmark").foregroundStyle(.secondary).accessibilityLabel("Has all of \(column.title(model))")
             case .missing(let missing, _):

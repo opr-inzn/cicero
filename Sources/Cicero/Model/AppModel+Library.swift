@@ -223,27 +223,23 @@ extension AppModel {
         )
     }
 
-    /// The font list's rows for `visibleFamilies`, sorted, with what the shown character set columns say, and
-    /// their families in that order. Cached: making and sorting thousands of rows takes tens of milliseconds,
-    /// and the table asks again on every update, a click included.
-    func fontRows(sortedBy order: [KeyPathComparator<FontRow>], columns: [FontListColumn]) -> (rows: [FontRow], families: [Family]) {
-        let key = FontRowsKey(visible: visibleKey, order: order, columns: columns)
+    /// The font list's rows for `visibleFamilies`, sorted, each with its position, and their families in that order.
+    /// Cached: making and sorting thousands of rows takes tens of milliseconds, and the table asks again on every
+    /// update, a click included. A row says what a character set column does only for `coverageColumns`, the one the
+    /// list is sorted by, if any: worked out for every family, the columns were most of the time it took to make the
+    /// rows (0.3 s of 0.4 at 20,000 families). The rows on screen ask for the others as they draw (`coverageCell`).
+    func fontRows(sortedBy order: [KeyPathComparator<FontRow>], coverageColumns: [FontListColumn]) -> (rows: [FontRow], families: [Family]) {
+        let key = FontRowsKey(visible: visibleKey, order: order, columns: coverageColumns)
         if let cached = fontRowsCache, cached.key == key { return (cached.rows, cached.families) }
-        let custom = customCharacterSets
-        let sources: [(FontListColumn, CoverageSource)] = columns.compactMap { column in
-            switch column {
-            case .series(let id): characterSetSeries(id).map { (column, CoverageSource.series($0)) }
-            case .characterSet(let id): (custom.first { $0.id == id } ?? characterSetCatalog.definition(id)).map { (column, CoverageSource.set($0)) }
-            default: nil
-            }
-        }
+        let sources = coverageColumns.compactMap { column in coverageSource(of: column).map { (column, $0) } }
         // No order keeps the families' own, as for similar fonts, the closest first.
         #if CICERO_MEASURE
         let measuring = Measurements.begin("fontRows")
         defer { measuring.end(detail: "\(visibleFamilies.count) rows") }
         #endif
         let unsorted = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }
-        let rows = order.isEmpty ? unsorted : unsorted.sorted(using: order)
+        var rows = order.isEmpty ? unsorted : unsorted.sorted(using: order)
+        for index in rows.indices { rows[index].position = index }
         let families = rows.map(\.family)
         fontRowsCache = (key, rows, families)
         return (rows, families)
@@ -563,6 +559,23 @@ extension AppModel {
     }
 
     /// The largest set of a series (Latin S–XL, Adobe Latin, GF Latin…) the family has.
+    /// What a character set column reads its rows from; nil for other columns, or a set that's gone.
+    func coverageSource(of column: FontListColumn) -> CoverageSource? {
+        switch column {
+        case .series(let id): characterSetSeries(id).map(CoverageSource.series)
+        case .characterSet(let id): (customCharacterSets.first { $0.id == id } ?? characterSetCatalog.definition(id)).map(CoverageSource.set)
+        default: nil
+        }
+    }
+
+    /// What a character set column says about a family, as its row draws: from the row when the list is sorted by the
+    /// column, else worked out now (and kept, see `CharacterSetLookup`). Reads `coverageRevision`, so the row draws
+    /// again as coverage changes.
+    func coverageCell(_ column: FontListColumn, of row: FontRow) -> CoverageCell? {
+        if let cell = row.coverage[column] { return cell }
+        return coverageSource(of: column).flatMap { FontRow.cell($0, for: row.family, model: self) }
+    }
+
     func largestSet(in series: CharacterSetSeries, for family: Family) -> CharacterSetDefinition? {
         characterSetLookup.largest(series, family: family.id, revision: coverageRevision) { set in
             self.missingCount(set, family)
