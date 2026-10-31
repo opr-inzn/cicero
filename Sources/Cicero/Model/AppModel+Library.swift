@@ -130,13 +130,19 @@ extension AppModel {
     /// The selection in the browser, or the open family on a font page.
     var selectedFamilies: [Family] {
         if let open = openFamily { return [open] }
-        return library.families.filter { selectedIDs.contains($0.id) }
+        return inLibraryOrder(selectedIDs)
     }
 
     /// Right-click targets: the whole selection when the clicked family is part of it.
     func targets(for family: Family) -> [Family] {
         guard selectedIDs.contains(family.id), selectedIDs.count > 1 else { return [family] }
-        return library.families.filter { selectedIDs.contains($0.id) }
+        return inLibraryOrder(selectedIDs)
+    }
+
+    /// The library's families with these IDs, in its order. Found by its index, not by a pass over every family,
+    /// which took about 30 ms at 20,000 families each time the menus asked for the selection.
+    private func inLibraryOrder(_ ids: Set<String>) -> [Family] {
+        ids.compactMap { library.position(of: $0) }.sorted().map { library.families[$0] }
     }
 
     /// The family the Info panel describes.

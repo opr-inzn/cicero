@@ -369,8 +369,18 @@ public enum ActiveSource: Hashable, Sendable {
     /// Whether a file is Creative Cloud's, from Adobe Fonts: those it turned on for every app, and those Adobe apps
     /// turned on for themselves. Creative Cloud alone turns them on and off, and moves them.
     public static func isAdobeFonts(_ path: String) -> Bool {
-        path.contains("/Adobe/CoreSync/")
+        // Bytes, with memmem: String.contains compares characters, about 2 µs a path, which was half of reading the
+        // saved library of 50,000 faces at launch (and the generic firstRange(of:) on bytes is slower still). The
+        // marker is ASCII, so bytes find it where characters do (but after a folder name that begins with a combining
+        // mark, which no folder of fonts has). A string without contiguous UTF-8, a bridged one, is asked as before.
+        path.utf8.withContiguousStorageIfAvailable { bytes in
+            coreSyncMarker.withUnsafeBufferPointer { marker in
+                memmem(bytes.baseAddress, bytes.count, marker.baseAddress, marker.count) != nil
+            }
+        } ?? path.contains("/Adobe/CoreSync/")
     }
+
+    private static let coreSyncMarker = Array("/Adobe/CoreSync/".utf8)
 }
 
 public enum FaceState: Hashable, Sendable {

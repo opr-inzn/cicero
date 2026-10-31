@@ -146,6 +146,9 @@ public struct Library: Sendable {
     /// Font files added one at a time that are gone for good (see `Reachability.isGone`), for the user's list of them
     /// to drop. Looked for off the main thread, as a file on a server that stopped answering can take a while.
     public let goneFiles: Set<String>
+    /// Whether any face is on until Cicero quits (Activate Temporarily), worked out once with the snapshot: the sidebar
+    /// asks as it draws, and a pass over every face took about 30 ms at 20,000 families.
+    public let hasFacesOnUntilQuit: Bool
 
     public init(families: [Family], unreadableFiles: [String], activePaths: Set<String>, fingerprint: Int, changedPaths: Set<String> = [],
                 unavailableFolders: [UUID: FolderAvailability] = [:], onlineOnlyFiles: [UUID: [String]] = [:], offlineFamilies: Set<String> = [],
@@ -161,8 +164,13 @@ public struct Library: Sendable {
         self.offlinePaths = offlinePaths
         self.goneFiles = goneFiles
         var index: [String: Int] = [:]
-        for (position, family) in families.enumerated() { index[family.id] = position }
+        var onUntilQuit = false
+        for (position, family) in families.enumerated() {
+            index[family.id] = position
+            if !onUntilQuit { onUntilQuit = family.faces.contains { $0.state == .active(.temporary(.untilQuit)) } }
+        }
         self.index = index
+        hasFacesOnUntilQuit = onUntilQuit
         search = families.concurrentMap { family in
             var names = [family.id], others = [family.manufacturer ?? ""]
             if family.name != family.id { names.append(family.name) }
