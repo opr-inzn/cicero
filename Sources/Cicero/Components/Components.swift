@@ -305,7 +305,7 @@ struct StatusTag: View {
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
         case .system: return ("System", .secondary, nil)
-        case .partial: return ("Partly active", .orange, nil)
+        case .partial: return ("Partly Active", .orange, nil)
         case .appOnly(let app): return (app == "Adobe" ? "Proofing" : app, .red, nil)
         case .active, .inactive: return nil
         }
@@ -314,7 +314,7 @@ struct StatusTag: View {
     private var help: String {
         switch (family.temporaryScope, family.state) {
         case (.untilQuit, _): "Active until Cicero quits"
-        case (.whileAppsRun, _): "Active while an app it’s set up for is open"
+        case (.whileAppsRun, _): "Active while its app is open"
         case (nil, .appOnly) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud. Active in Adobe apps only."
         case (nil, _) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud"
         case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load fonts from by themselves"
@@ -666,7 +666,7 @@ struct FolderActivationPicker: View {
         )) {
             Text("Inactive").tag("")
             Text("Active").tag(Self.active)
-            Text("Active in Adobe apps").tag("Adobe")
+            Text("Active in Adobe Apps").tag("Adobe")
             // One typed in, or InDesign from before there was Active in Specific App.
             if let app = folder.appName, app != "Adobe" {
                 Text("Active in \(FaceState.appDescription(app))").tag(app)

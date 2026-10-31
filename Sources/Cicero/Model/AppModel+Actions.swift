@@ -1045,7 +1045,7 @@ extension AppModel {
             compareEntries.append(CompareEntry(familyID: name, tint: nextCompareTint))
         }
         if added.count < new.count {
-            showToast("Compare holds up to \(Self.compareLimit) fonts")
+            showToast("Compare holds up to \(Self.compareLimit) styles")
         }
         return !added.isEmpty
     }

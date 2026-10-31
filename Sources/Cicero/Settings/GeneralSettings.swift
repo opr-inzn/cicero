@@ -42,7 +42,7 @@ struct GeneralSettings: View {
             Section("Installation") {
                 Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
                     Text("Install fonts into Cicero’s Library")
-                    Text("Instead of putting the installed fonts into ~/Library/Fonts, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
+                    Text("Instead of putting the installed fonts into your Fonts folder, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
@@ -164,7 +164,7 @@ struct GeneralSettings: View {
     }
 
     private var addingExplanation: String {
-        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your user Fonts folder"
+        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder"
         return switch model.data.installMethod {
         case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. Microsoft Office can’t use fonts left where they are."
         case .copy: "They’re copied into \(place) and turned on. The originals stay where they are."

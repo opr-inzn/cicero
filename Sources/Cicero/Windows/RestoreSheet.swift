@@ -80,11 +80,11 @@ struct RestoreSheet: View {
         ]
         let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
         let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.listed() + "."
-        return inside + " Replaces what’s set up now; the current setup is saved first in ~/Library/Application Support/Cicero/Backups."
+        return inside + " Replaces what’s set up now; the current setup is saved first, in ~/Library/Application Support/Cicero/Backups."
     }
 
     private var fontsDetail: String {
-        "\(contents.fontCount.formatted()) files. Puts each file back where it was, unless one is already there."
+        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.formatted()) files"). Puts each file back where it was, unless one is already there."
     }
 
     private func restore() {

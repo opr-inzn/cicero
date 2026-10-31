@@ -24,7 +24,7 @@ struct BackupSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Back Up Library").font(.title2.bold())
-                Text("The backup has everything set up in Cicero: folders, smart folders, tags, coverage sets, locations and added fonts, foundry names, the sidebar, and the settings for activation, system fonts and Adobe fonts.")
+                Text("The backup has everything set up in Cicero: folders, smart folders, tags, coverage sets, locations and added fonts, foundry names, the sidebar, and the settings for activation, system fonts, Adobe Fonts and Proofing.")
                     .foregroundStyle(.secondary)
             }
             DetailToggle("Include font files", detail: fontsDetail, isOn: $includeFonts)
@@ -65,7 +65,7 @@ struct BackupSheet: View {
         guard let fonts else { return "Counting" }
         if fonts.isEmpty { return "There are no font files in your library." }
         let size = fonts.reduce(Int64(0)) { $0 + $1.size }
-        return "\(fonts.count.formatted()) files, \(size.formatted(.byteCount(style: .file)))"
+        return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.formatted()) files"), \(size.formatted(.byteCount(style: .file)))"
     }
 
     private func backUp() {
@@ -85,7 +85,7 @@ struct BackupSheet: View {
                     Task { @MainActor in progress = step }
                 }
                 NSWorkspace.shared.activateFileViewerSelecting([destination])
-                model.showToast(include ? "Backed up your library and \(fonts.count.formatted()) font files" : "Backed up your library")
+                model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.formatted()) font files")" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {
                 dismiss()

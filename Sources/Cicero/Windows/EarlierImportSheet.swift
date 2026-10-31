@@ -46,7 +46,7 @@ struct EarlierImportSheet: View {
                 if let stage {
                     progress(stage)
                 } else {
-                    Text("Your current setup is saved first, in Backups.").font(.callout).foregroundStyle(.secondary)
+                    Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(stage == nil ? "Not Now" : "Cancel", role: .cancel) {
@@ -88,7 +88,7 @@ struct EarlierImportSheet: View {
         case 0: total == 1 ? " The copy is inactive, as the font is now." : " The copies are inactive, as the fonts are now."
         case total: total == 1 ? " The font is active now, and its copy will be too." : " The fonts are active now, and their copies will be too."
         case 1: " The font that’s active now will be active as its copy; the others come in inactive."
-        default: " The \(prompt.onCount.formatted()) fonts that are active now will be active as their copies; the others come in inactive."
+        default: " The \(prompt.onCount.formatted()) styles that are active now will be active as their copies; the others come in inactive."
         }
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         return "\(files)\(state)\(office) Your folders, tags, ratings and notes stay as they are. "

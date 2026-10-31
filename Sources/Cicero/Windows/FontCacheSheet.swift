@@ -66,7 +66,7 @@ struct FontCacheSheet: View {
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 10) {
-                DetailToggle("macOS (my account)", detail: "Removes your account’s font caches and restarts the font service.", isOn: $currentUser)
+                DetailToggle("macOS (your account)", detail: "Removes your account’s font caches and restarts the font service.", isOn: $currentUser)
                 DetailToggle("macOS (all users)", detail: "Needs an administrator password.", isOn: $allUsers)
                 DetailToggle("Adobe apps", detail: adobeDetail, isOn: includes(.adobe))
                     .disabled(runningApps[.adobe] != nil || adobeCaches?.isEmpty == true)

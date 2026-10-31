@@ -79,7 +79,7 @@ struct MainWindow: View {
             let styles = request.plan.alsoTurnsOff
             let shown = styles.count > 6 ? Array(styles.prefix(5)) + ["\(styles.count - 5) more"] : styles
             let named = shown.listed()
-            Text("A file that goes off holds \(named) too. \(styles.count == 1 ? "It goes" : "They go") off with it.")
+            Text("The file that turns off also holds \(named). \(styles.count == 1 ? "It turns" : "They turn") off too.")
         }
         .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",

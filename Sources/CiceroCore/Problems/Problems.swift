@@ -231,7 +231,7 @@ public enum ProblemDetector {
         func detail(of path: String) -> String {
             if library.activePaths.contains(path) {
                 switch LibraryScanner.activeSource(of: path, locations: locations, records: data.records) {
-                case .macOS: return "Comes with macOS"
+                case .macOS: return "Installed with macOS"
                 case .allUsers: return "Installed for all users"
                 case .app: return "Comes with an app"
                 case .adobeFonts: return "Adobe Fonts"

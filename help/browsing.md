@@ -59,12 +59,12 @@ Small capsules next to a family’s name tell you more about its state:
 
 | Tag | Means |
 | --- | --- |
-| System | Comes with macOS |
-| Partly active | Some of its styles are on, others aren’t |
+| System | Installed with macOS |
+| Partly Active | Some of its styles are on, others aren’t |
 | Proofing (or an app’s name) | On only in Adobe apps (or that app), from a folder they load by themselves, where type designers put fonts to test them. See [Fonts in Adobe apps’ folders](activating.md#fonts-in-adobe-apps-folders) |
 | Adobe Fonts | From Adobe Fonts, managed in Creative Cloud: on in every app, or in Adobe apps only when its switch sits halfway. See [Adobe Fonts](activating.md#adobe-fonts) |
 | Temporary (with a clock) | On until Cicero quits. See [Turn a font on just for now](activating.md#turn-a-font-on-just-for-now) |
-| App Folder (with an app) | On while an app it’s set up for is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
+| App Folder (with an app) | On while its app is open. See [Turn fonts on with an app](activating.md#turn-fonts-on-with-an-app) |
 
 A green **Variable** tag, with the symbol of sliders, marks a variable family, in the list, grid and specimens alike. Hold the pointer over it to see its axes, like “Variable: Weight, Width, Optical Size”, and move them in the Info panel’s [Axes](#try-variable-axes) tab.
 
@@ -222,6 +222,6 @@ Each font is in its regular style at first. To compare another, click the style 
 
 To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
 
-Compare holds up to 12 fonts, one for each color. Once it’s full, take one out to add another.
+Compare holds up to 12 styles, one for each color. Once it’s full, take one out to add another.
 
 To add fonts, drag families from the main window into the Compare window, or select one family and choose **Fonts → Compare**, or right-click it and choose **Add to Compare**: it joins the fonts already there. To take one out, click its remove button. Choosing **Compare** with several families selected starts over with them.

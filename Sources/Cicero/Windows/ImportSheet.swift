@@ -265,7 +265,7 @@ struct ImportSheet: View {
                 ProgressView().controlSize(.small)
                 Text("Looking for fonts in your library already").font(.callout).foregroundStyle(.secondary)
             } else {
-                Text("Your current setup is saved first, in Backups.")
+                Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -569,7 +569,7 @@ struct ImportSheet: View {
             }
         }
         if summary.removedCopies > 0 {
-            lines.append("\(count(summary.removedCopies, "copy", "copies")) \(appName) left in the Fonts folder moved to the Trash.")
+            lines.append("\(count(summary.removedCopies, "copy", "copies")) \(appName) left in your Fonts folder moved to the Trash.")
         }
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
         if summary.classifiedFamilies > 0 { lines.append("\(count(summary.classifiedFamilies, "family", "families")) classified.") }
