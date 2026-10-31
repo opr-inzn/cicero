@@ -31,9 +31,9 @@ struct RestoreSheet: View {
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 10) {
-                option("Folders, locations and settings", isOn: $settings, detail: settingsDetail)
+                DetailToggle("Folders, locations and settings", detail: settingsDetail, isOn: $settings)
                 if includesFonts {
-                    option("Font files", isOn: $fonts, detail: fontsDetail)
+                    DetailToggle("Font files", detail: fontsDetail, isOn: $fonts)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -68,16 +68,6 @@ struct RestoreSheet: View {
         .padding(20)
         .frame(width: 520)
         .onDisappear { contents.discard() }
-    }
-
-    private func option(_ title: String, isOn: Binding<Bool>, detail: String) -> some View {
-        Toggle(isOn: isOn) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-            }
-        }
-        .toggleStyle(.checkbox)
     }
 
     /// "4 folders, 2 smart folders, 7 tags, 3 locations, 12 added fonts and 1 character set." and what restoring them does.
