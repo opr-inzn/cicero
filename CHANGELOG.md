@@ -2,7 +2,7 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.11.0
 
 This version makes a change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
 
@@ -13,17 +13,6 @@ This version makes a change to how Cicero installs and turns on fonts, and where
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
 - You can now keep **Cicero’s Library** in any folder, such as Downloads: click **Change** next to it in **Preferences → General**. In a folder with other files, Cicero makes a **Cicero Library** folder. It says when a folder can’t work, and asks first before using iCloud Drive or another cloud service.
 
-
-## 0.11.0
-
-This version makes a fundamental change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
-
-- **Installing and turning on fonts works differently.** Copy, move, ask, or leave under **When you add font files** in **Preferences → General** only runs when you add fonts. Turning a font on just turns it on where it already is.
-- Microsoft Office only uses fonts in your **~/Library/Fonts** folder. If you use **Ask each time** and need your fonts in Word or PowerPoint, switch to **Copy into ~/Library/Fonts** in **Preferences → General**.
-- **File → Import from FontBase** copies FontBase’s fonts into your Fonts folder and brings over its collections, favorites and tags, turning on the fonts that were on.
-- Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. If you imported from FontExplorer X before, Cicero offers to do this for you, keeping your folders, tags, ratings and notes.
-- Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
-- Fixes to how Cicero looks on macOS 15.
 
 ## 0.10.13
 
