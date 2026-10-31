@@ -44,9 +44,9 @@ extension AppModel {
     }
 
     /// Leaves the families out of this one's similar fonts, and it out of theirs, as the user says they don't look like
-    /// it; the lists are that much shorter, as no other takes their places. Kept in the user's data, and, while usage statistics are on, reported to improve
-    /// similar fonts, with the list as it was (see `SimilarReports`), once the toast's Undo has passed, so a mark undone is
-    /// never sent.
+    /// it; the lists are that much shorter, as no other takes their places. Kept in the user's data, and, while usage
+    /// statistics are on, reported to improve similar fonts, with the list as it was (see `SimilarReports`), once the
+    /// toast's Undo has passed, so a mark undone is never sent.
     func markNotSimilar(_ others: [Family], to family: Family) {
         let marked = data.notSimilar[family.id] ?? []
         let added = others.map(\.id).filter { $0 != family.id && !marked.contains($0) }

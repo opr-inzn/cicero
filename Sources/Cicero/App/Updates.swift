@@ -4,7 +4,7 @@ import Sparkle
 
 /// Updates through Sparkle. While the user leaves it on (Settings → General), Sparkle reads the appcast
 /// on GitHub as Cicero opens and once a day while it stays open (SUFeedURL in Info.plist); Cicero →
-/// Check for Updates… reads it now. Nothing else is sent: Sparkle's system profile is off. Updates are
+/// Check for Updates reads it now. Nothing else is sent: Sparkle's system profile is off. Updates are
 /// checked against SUPublicEDKey.
 @Observable
 final class Updates {
