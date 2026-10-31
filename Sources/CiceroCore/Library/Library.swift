@@ -82,8 +82,10 @@ public struct Locations: Sendable {
     /// `ActivationEngine.moveFormerInactiveFolders`): in Cicero's support folder up to 0.11.0, and called Deactivated
     /// there up to 0.10.10.
     public var formerInactiveFolders: [URL] {
-        [support.appendingPathComponent("Inactive", isDirectory: true), support.appendingPathComponent("Deactivated", isDirectory: true)]
+        Self.formerInactiveNames.map { support.appendingPathComponent($0, isDirectory: true) }
     }
+
+    private static let formerInactiveNames = ["Inactive", "Deactivated"]
 
     /// The Inactive folder, and each former one while it's there: what's in them is off and listed, and moves out as it
     /// goes on.
@@ -96,7 +98,7 @@ public struct Locations: Sendable {
         // The former folders' paths without making their URLs: scans ask for every file.
         if path.hasPrefix(inactiveFolder.path + "/") { return true }
         let support = self.support.path + "/"
-        return path.hasPrefix(support) && (path.hasPrefix(support + "Inactive/") || path.hasPrefix(support + "Deactivated/"))
+        return path.hasPrefix(support) && Self.formerInactiveNames.contains { path.hasPrefix(support + $0 + "/") }
     }
 
     /// The Inactive folder, made if it isn't there, for a file going in. When it can't be made, as when the home folder
