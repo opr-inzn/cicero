@@ -93,7 +93,10 @@ public struct Locations: Sendable {
 
     /// In the Inactive folder, or a former one.
     public func isInInactiveFolder(_ path: String) -> Bool {
-        ([inactiveFolder] + formerInactiveFolders).contains { path.hasPrefix($0.path + "/") }
+        // The former folders' paths without making their URLs: scans ask for every file.
+        if path.hasPrefix(inactiveFolder.path + "/") { return true }
+        let support = self.support.path + "/"
+        return path.hasPrefix(support) && (path.hasPrefix(support + "Inactive/") || path.hasPrefix(support + "Deactivated/"))
     }
 
     /// The Inactive folder, made if it isn't there, for a file going in. When it can't be made, as when the home folder
