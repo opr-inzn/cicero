@@ -11,7 +11,7 @@ This version makes a change to how Cicero installs and turns on fonts, and where
 - **File → Import from FontBase** copies FontBase’s fonts into your Fonts folder and brings over its collections, favorites and tags, turning on the fonts that were on.
 - Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. If you imported from FontExplorer X before, Cicero offers to do this for you, keeping your folders, tags, ratings and notes.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
-- **Change** next to **Cicero’s Library** takes any folder, such as Downloads: when it has other things in it, Cicero makes a **Cicero Library** folder there. A folder that can’t work says why while you can still choose another, and one in iCloud Drive or another cloud service asks first.
+- You can now keep **Cicero’s Library** in any folder, such as Downloads: click **Change** next to it in **Preferences → General**. In a folder with other files, Cicero makes a **Cicero Library** folder. It says when a folder can’t work, and asks first before using iCloud Drive or another cloud service.
 
 
 ## 0.11.0
