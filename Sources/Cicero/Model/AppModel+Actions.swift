@@ -87,20 +87,23 @@ extension AppModel {
     /// a folder Cicero can't move files out of, where turning off fails anyway.
     private func movingOutPrompt(for faces: [LibraryFace]) -> MovingOutPrompt? {
         guard data.asksBeforeMovingOutOfSharedFolders else { return nil }
-        var sharing: [String: FolderSharing?] = [:]
+        var checked: Set<String> = []
+        var sharing: [String: FolderSharing] = [:]
         var shared: [(face: LibraryFace, folder: String)] = []
         for face in faces where ActivationEngine.movesOutOfAppFolder(face, records: data.records) {
             let folder = (face.face.path as NSString).deletingLastPathComponent
-            if sharing[folder] == nil {
-                sharing[folder] = FileManager.default.isWritableFile(atPath: folder) ? ActivationEngine.sharing(ofFolder: folder) : nil
+            if checked.insert(folder).inserted, FileManager.default.isWritableFile(atPath: folder),
+               let found = ActivationEngine.sharing(ofFolder: folder) {
+                sharing[folder] = found
             }
-            if sharing[folder] ?? nil != nil { shared.append((face, folder)) }
+            if sharing[folder] != nil { shared.append((face, folder)) }
         }
         guard !shared.isEmpty else { return nil }
         let folders = Set(shared.map(\.folder))
         let apps = Set(shared.compactMap(\.face.app))
         return MovingOutPrompt(
-            faces: faces, shared: shared.map(\.face), folder: folders.count == 1 ? folders.first.map { (path: $0, sharing: sharing[$0]!!) } : nil,
+            faces: faces, shared: shared.map(\.face),
+            folder: folders.count == 1 ? folders.first.flatMap { path in sharing[path].map { (path: path, sharing: $0) } } : nil,
             app: apps.count == 1 ? apps.first.map(FaceState.appDescription) : nil
         )
     }
@@ -192,10 +195,6 @@ extension AppModel {
     }
 
     func confirmCopySwitch(_ request: CopySwitchRequest) {
-        performCopySwitch(request)
-    }
-
-    func performCopySwitch(_ request: CopySwitchRequest) {
         let operation = expect(request.plan.styles, at: .on)
         enqueue { model in
             var result = await model.engine.switchCopies(request.plan.switches, method: .inPlace, records: model.data.records)
@@ -250,8 +249,9 @@ extension AppModel {
         }
     }
 
-    /// The sheet's warning for a family replaced in more than one place, or in one of the user's own folders: "Replaces 2 files: in your Fonts folder and in
-    /// Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts folder goes to the Trash".
+    /// The sheet's warning for a family replaced in more than one place, or in one of the user's own folders: "Replaces 2
+    /// files: in your Fonts folder and in Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts
+    /// folder goes to the Trash".
     func replaceWarning(_ duplicate: AddedDuplicate) -> String {
         let spare = spareCopies(duplicate)
         let replaced = duplicate.replacements.map(\.old).filter { !spare.contains($0) }
@@ -413,13 +413,18 @@ extension AppModel {
     /// Several at once with one rescan, as Settings → Locations removes the selected ones.
     func removeFolders(_ ids: Set<UUID>) {
         turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
+        forgetFolders(ids)
+        rescan()
+    }
+
+    /// Takes locations out of the library's data: their sidebar rows, names and selection go with them.
+    func forgetFolders(_ ids: Set<UUID>) {
         data.folders.removeAll { ids.contains($0.id) }
         for id in ids {
             data.sidebar.forget("folder.\(id)")
             data.folderNames[id.uuidString] = nil
         }
         deselect { item in ids.contains { item == .folder($0) } }
-        rescan()
     }
 
     /// Why a watched folder's fonts are out of reach, if they are.
@@ -906,7 +911,7 @@ extension AppModel {
         let items = sidebarSelection(items, from: selectedItems)
         guard let any = items.first else { selection = nil; return }
         let list = sidebarList(of: any)
-        // The one selected before when it's still there, else the first. Problems has no fonts to show,
+        // The one selected before when it's still there, else the first. Conflicts has no fonts to show,
         // so it's never the one among several.
         let candidates = items.count > 1 ? items.subtracting([.problems]) : items
         let primary = selection.flatMap { candidates.contains($0) ? $0 : nil }

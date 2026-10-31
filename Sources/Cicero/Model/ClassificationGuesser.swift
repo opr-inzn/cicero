@@ -28,7 +28,7 @@ final class ClassificationGuesser {
     init(caches: URL) {
         url = caches.appendingPathComponent("classification-guesses.json", isDirectory: false)
         let saved = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
-        guesses = saved?.version == Self.version ? saved!.guesses : [:]
+        guesses = saved.flatMap { $0.version == Self.version ? $0.guesses : nil } ?? [:]
     }
 
     /// Whether the model can answer. macOS 15 has none that apps can ask.
