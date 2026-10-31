@@ -658,8 +658,12 @@ public enum ProblemDetector {
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
+        // Every file in a folder is on that folder's disk: its volume is asked about once.
+        var volumes: [String: String?] = [:]
+        var families: [String: Family]?
         for path in context.data.records.inPlace.sorted() where !(fontLibrary.map(path.hasPrefix) ?? false) {
-            if !FileManager.default.fileExists(atPath: path), let place = context.unreachable(path) {
+            let exists = FileManager.default.fileExists(atPath: path)
+            if !exists, let place = context.unreachable(path) {
                 problems.append(Problem(
                     id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
                     summary: "Used where it is, \(place).",
@@ -669,8 +673,18 @@ public enum ProblemDetector {
                 ))
                 continue
             }
-            guard let volume = externalVolumeName(of: path) else { continue }
-            let family = context.library.families.first { $0.faces.contains { $0.face.path == path } }
+            // A missing file has no volume.
+            guard exists else { continue }
+            let folder = (path as NSString).deletingLastPathComponent
+            if volumes[folder] == nil { volumes[folder] = .some(externalVolumeName(of: path)) }
+            guard let volume = volumes[folder] ?? nil else { continue }
+            if families == nil {
+                families = [:]
+                for family in context.library.families {
+                    for face in family.faces where families?[face.face.path] == nil { families?[face.face.path] = family }
+                }
+            }
+            let family = families?[path]
             problems.append(Problem(
                 id: "external.\(path)", kind: .external, title: family?.name ?? (path as NSString).lastPathComponent,
                 summary: "Used where it is, on “\(volume)”.",
