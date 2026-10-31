@@ -39,11 +39,12 @@ public final class FolderWatcher: @unchecked Sendable {
         guard watched != self.watched else { return }
         stop()
         self.watched = watched
-        folders = (paths + hidden).map { Self.realPath($0) + "/" }
-        hiddenFolders = hidden.map { Self.realPath($0) + "/" }
-        fileFolders = parents.map { Self.realPath($0) + "/" }
-        self.files = Set(files.map(Self.realPath))
-        aliases = Set(watched).map { (Self.realPath($0) + "/", $0 + "/") }.sorted { $0.resolved.count > $1.resolved.count }
+        // Every symlink resolved, as FSEvents reports paths (e.g. /private/var for /var).
+        folders = (paths + hidden).map { LibraryScanner.realPath($0) + "/" }
+        hiddenFolders = hidden.map { LibraryScanner.realPath($0) + "/" }
+        fileFolders = parents.map { LibraryScanner.realPath($0) + "/" }
+        self.files = Set(files.map(LibraryScanner.realPath))
+        aliases = Set(watched).map { (LibraryScanner.realPath($0) + "/", $0 + "/") }.sorted { $0.resolved.count > $1.resolved.count }
         guard !watched.isEmpty else { return }
         var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
         let callback: FSEventStreamCallback = { _, info, count, eventPaths, eventFlags, _ in
@@ -103,13 +104,5 @@ public final class FolderWatcher: @unchecked Sendable {
               let alias = aliases.first(where: { path.hasPrefix($0.resolved) })
         else { return nil }
         return alias.given + path.dropFirst(alias.resolved.count)
-    }
-
-    /// The path with every symlink resolved, as FSEvents reports it (e.g. /private/var for /var); as it is
-    /// when it doesn't exist.
-    private static func realPath(_ path: String) -> String {
-        guard let resolved = realpath(path, nil) else { return path }
-        defer { free(resolved) }
-        return String(cString: resolved)
     }
 }

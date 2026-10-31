@@ -58,7 +58,7 @@ enum LetterImages {
     /// large letters only with `details`, for a model that looks at them.
     static func draw(_ font: CTFont, strips withStrips: Bool = false, details withDetails: Bool = false) -> Drawn? {
         let font = inThousandths(font)
-        let glyphs = letters.map { glyph(font, $0) }
+        let glyphs = letters.map { font.glyph(for: $0) }
         let paths = glyphs.map { glyph -> CGPath? in
             guard let glyph, let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty else { return nil }
             return path
@@ -69,7 +69,7 @@ enum LetterImages {
             let top = path.boundingBoxOfPath.maxY
             return top > 0 ? top : nil
         }
-        let x = glyph(font, "x").flatMap { CTFontCreatePathForGlyph(font, $0, nil) }.map(\.boundingBoxOfPath.maxY)
+        let x = font.glyph(for: Character("x")).flatMap { CTFontCreatePathForGlyph(font, $0, nil) }.map(\.boundingBoxOfPath.maxY)
         guard let xHeight = [x, CTFontGetXHeight(font), height("n"), height("o")].compactMap({ $0 }).first(where: { $0 > 0 }),
               let capHeight = [height("H"), CTFontGetCapHeight(font), xHeight / 0.7].compactMap({ $0 }).first(where: { $0 > 0 })
         else { return nil }
@@ -117,7 +117,7 @@ enum LetterImages {
         context.setAllowsAntialiasing(true)
         context.setShouldAntialias(true)
         for (position, character) in detailLetters.enumerated() {
-            guard let glyph = glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty
+            guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty
             else { continue }
             context.setFillColor(gray: 0, alpha: 1)
             context.fill(CGRect(x: 0, y: 0, width: detailSize, height: detailSize))
@@ -150,7 +150,7 @@ enum LetterImages {
             let line = CGMutablePath()
             var pen = stripMargin
             for character in word {
-                guard var glyph = glyph(font, character) else { continue }
+                guard var glyph = font.glyph(for: character) else { continue }
                 var placed = CGAffineTransform(translationX: pen, y: baseline).scaledBy(x: scale, y: scale)
                 if let path = CTFontCreatePathForGlyph(font, glyph, &placed) { line.addPath(path) }
                 var advance = CGSize.zero
@@ -172,11 +172,5 @@ enum LetterImages {
     static func inThousandths(_ font: CTFont) -> CTFont {
         let ownSize = CTFontDescriptorCreateWithAttributes([kCTFontOpticalSizeAttribute: "none"] as CFDictionary)
         return CTFontCreateCopyWithAttributes(font, 1000, nil, ownSize)
-    }
-
-    private static func glyph(_ font: CTFont, _ character: Character) -> CGGlyph? {
-        var characters = Array(String(character).utf16)
-        var glyph: CGGlyph = 0
-        return CTFontGetGlyphsForCharacters(font, &characters, &glyph, 1) && glyph != 0 ? glyph : nil
     }
 }

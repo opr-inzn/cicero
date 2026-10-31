@@ -78,7 +78,7 @@ public final class ScriptSamples: Sendable {
         // Before the font, so a sample from a file that changed meanwhile is worked out again next time.
         let generation = FontLoader.shared.generation(of: face.path)
         let font = FontLoader.shared.font(face, size: 12)
-        guard ScriptSample.isNeeded(for: text, has: { Self.has($0, font) }),
+        guard ScriptSample.isNeeded(for: text, has: { font.glyph(for: Character($0)) != nil }),
               let sample = sample(for: face, generation: generation, font: font)
         else { return text }
         return long ? sample.long : sample.short
@@ -89,11 +89,5 @@ public final class ScriptSamples: Sendable {
         let sample = ScriptSample(characters: CharacterMap.characters(of: font), languages: languages.languages)
         samples.withLock { $0[face.id] = (generation, sample) }
         return sample
-    }
-
-    private static func has(_ scalar: Unicode.Scalar, _ font: CTFont) -> Bool {
-        var units = Array(String(Character(scalar)).utf16)
-        var glyphs = [CGGlyph](repeating: 0, count: units.count)
-        return CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count) && glyphs[0] != 0
     }
 }

@@ -30,7 +30,7 @@ public final class UserDataStore: Sendable {
         return fm.fileExists(atPath: fileURL.path) || fm.fileExists(atPath: legacyURL.path)
     }
 
-    /// A library from before there were license tags gets them, and one from 1.9.1 or before loses the former ones it
+    /// A library from before there were license tags gets them, and one from 0.9.1 or before loses the former ones it
     /// never used (see `UserData.updateLicenseTags`).
     public func load() -> UserData {
         if let data = try? Data(contentsOf: fileURL) {

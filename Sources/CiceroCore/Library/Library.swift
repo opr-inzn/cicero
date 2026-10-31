@@ -227,7 +227,6 @@ public struct ScanInput: Equatable, Sendable {
     }
 }
 
-
 /// Finds every font file (CoreText's active fonts, macOS's font folders, ~/Library/Fonts, /Library/Fonts, the
 /// watched folders, the files added one at a time and Cicero's Inactive folder), reads new or changed files,
 /// and builds a `Library`.
@@ -731,7 +730,8 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// The path with every symlink resolved, as the enumerator reports files (e.g. /private/var for /var).
+    /// The path with every symlink resolved, as the enumerator and FSEvents report files (e.g. /private/var for /var); as
+    /// it is when it doesn't exist.
     static func realPath(_ path: String) -> String {
         guard let resolved = realpath(path, nil) else { return path }
         defer { free(resolved) }
@@ -832,8 +832,7 @@ public final class LibraryScanner: Sendable {
     private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach) -> [String: CachedFile] {
         state.withLock { state in
             let before = state.files.count
-            // Not web fonts that versions before 1.6 read, in a folder that's out of reach now.
-            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) && Self.isFontFile($0.key) }
+            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
             state.files.merge(parsed) { _, new in new }
             if !parsed.isEmpty || state.files.count != before { state.dirty = true }
             return state.files
@@ -1008,9 +1007,9 @@ public final class LibraryScanner: Sendable {
         return nil
     }
 
-    /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate — then by path.
-    /// Adobe Fonts only Adobe apps load come last: they stand for a font only when the library has no other copy of it,
-    /// so one of the user's own stays theirs to switch.
+    /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate —
+    /// then by path. Adobe Fonts only Adobe apps load come last: they stand for a font only when the library has no
+    /// other copy of it, so one of the user's own stays theirs to switch.
     private static func precedes(_ a: Candidate, _ b: Candidate) -> Bool {
         let rankA = rank(a), rankB = rank(b)
         if rankA != rankB { return rankA < rankB }

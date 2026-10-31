@@ -134,7 +134,7 @@ extension ActivationEngine {
                     placed[path] = there
                     continue
                 }
-                // Copied next to where it goes first, so a Fonts folder never has half a file.
+                // Copied into Cicero's staging folder first and moved in from there, so a Fonts folder never has half a file.
                 let staged = staging.appendingPathComponent(UUID().uuidString + "-" + name, isDirectory: false)
                 do {
                     try fm.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -190,8 +190,8 @@ extension ActivationEngine {
     /// turned off; one it doesn't have is registered first, as turning off a file macOS doesn't have doesn't stick, but
     /// only once (`registeredAgain`), so a file the list names by another path isn't turned on and off at every look.
     /// Looking costs one read of the list, and a question for each file it doesn't name: no more than
-    /// `lookingAtMost` at a time, so a list that names the files by other paths can't have every file asked about, as
-    /// scans used to. An empty list says nothing: the files turned off are on it, unless it can't be read.
+    /// `lookingAtMost` at a time, so a list that names the files by other paths can't have every file asked about. An
+    /// empty list says nothing: the files turned off are on it, unless it can't be read.
     func turnOffAgain(_ paths: [String], registeredAgain: inout Set<String>) async {
         guard !paths.isEmpty else { return }
         let off = registrar.offFontPaths()
@@ -245,13 +245,13 @@ extension ActivationEngine {
         try? fm.removeItem(at: turningOffList)
     }
 
-    /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Inactive folder (or a
-    /// former one, while something in it waits to move) go where turning them on would put them, and stay off: into their
-    /// family's folder in Cicero's Library when fonts are installed there, else back into ~/Library/Fonts (see `moveIntoFontsFolderOff`). Not one from an app's own folder,
-    /// which goes back there when it's turned on, nor one that's on for now, nor one CoreText can't read (it would go in and
-    /// come out again at every launch). One with the same name and contents as a file already where it goes is a spare
-    /// and goes, as turning it on did. Records naming a moved file as the original of a copy follow it. Returns how many
-    /// files moved or went.
+    /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Inactive folder (or
+    /// a former one, while something in it waits to move) go where turning them on would put them, and stay off: into
+    /// their family's folder in Cicero's Library when fonts are installed there, else back into ~/Library/Fonts (see
+    /// `moveIntoFontsFolderOff`). Not one from an app's own folder, which goes back there when it's turned on, nor one
+    /// that's on for now, nor one CoreText can't read (it would go in and come out again at every launch). One with the
+    /// same name and contents as a file already where it goes is a spare and goes, as turning it on did. Records naming
+    /// a moved file as the original of a copy follow it. Returns how many files moved or went.
     public func emptyInactiveFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, moved: Int) {
         let fm = FileManager.default
         let all = locations.inactiveFolders.flatMap { folder in

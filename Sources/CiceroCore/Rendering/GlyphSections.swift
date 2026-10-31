@@ -43,7 +43,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .numerators: "Numerators"
         case .denominators: "Denominators"
         case .ordinals: "Ordinals"
-        case .caseSensitiveForms: "Case Sensitive Forms"
+        case .caseSensitiveForms: "Case-Sensitive Forms"
         case .arrows: "Arrows"
         case .script(let name): name
         case .localizedForms: "Localized Forms"
@@ -419,9 +419,9 @@ public struct GlyphSection: Identifiable, Sendable {
 
     /// Where a punctuation mark, symbol or operator goes in its group, as type designers list them: punctuation,
     /// dashes, brackets, quotes, symbols, operators, then geometric shapes, each kind those `signs` has in its order,
-    /// then the others by code point. So . , : ; … ! ? come before # * / \, brackets in pairs, quotes from low to
-    /// high, then @ & ¶ § © ®, and + − × ÷ = ≠ with % ‰ last; code point order scattered them over Unicode's blocks,
-    /// ! " # % & first.
+    /// then the others by code point. So . , : ; … ! ? come before # * / \, brackets in pairs, quotes from low to high,
+    /// then @ & ¶ § © ®, and + − × ÷ = ≠ with % ‰ last; code point order scattered them over Unicode's blocks, ! " # %
+    /// & first.
     static func signOrder(of value: UInt32) -> (Int, Int, UInt32) {
         if let place = signPlaces[value] { return (place.kind, place.index, value) }
         return (signKind(of: value).rawValue, .max, value)
@@ -439,9 +439,9 @@ public struct GlyphSection: Identifiable, Sendable {
     /// The signs of the Latin character sets, each kind's common ones first, as type designers list them, then the
     /// others by code point: . , : ; … ! ¡ ? ¿ · •, an inverted mark after its own; the hyphen, en and em dash, then
     /// the low lines; parentheses, then the other brackets; quotes from low to high, double before single, then
-    /// guillemets and straight quotes; @ & ¶ § © ® ℗ ™ ° ′ ″ | ¦ † ‡; the arithmetic signs and comparisons, % ‰ ‱
-    /// last; and shapes by kind, circles, diamonds, squares, then triangles, filled before outlined and large before
-    /// small, triangles pointing up, right, down, then left.
+    /// guillemets and straight quotes; @ & ¶ § © ® ℗ ™ ° ′ ″ | ¦ † ‡; the arithmetic signs and comparisons, % ‰ ‱ last;
+    /// and shapes by kind, circles, diamonds, squares, then triangles, filled before outlined and large before small,
+    /// triangles pointing up, right, down, then left.
     private static let signs: [(SignKind, String)] = [
         (.punctuation, ".,:;…!¡?¿·•#*/\\‖‼‾‿"),
         // Hyphen-minus, en and em dash, hyphen, non-breaking hyphen, figure dash, horizontal bar, then the low lines.
@@ -484,7 +484,7 @@ public struct GlyphSection: Identifiable, Sendable {
         var named: [UInt32: (base: String, suffixes: [Substring], isLigature: Bool)] = [:]
         for range in coverage.ranges where range.upperBound >= 0xE000 {
             for value in range where Unicode.Scalar(value)?.properties.generalCategory == .privateUse {
-                guard let glyph = Self.glyph(of: value, in: font), let name = CTFontCopyNameForGlyph(font, glyph) as String? else { continue }
+                guard let glyph = font.glyph(for: value), let name = CTFontCopyNameForGlyph(font, glyph) as String? else { continue }
                 let parts = name.split(separator: ".")
                 guard let components = parts.first?.split(separator: "_"), let base = components.first else { continue }
                 named[value] = (String(base), Array(parts.dropFirst()), components.count > 1)
@@ -538,17 +538,10 @@ public struct GlyphSection: Identifiable, Sendable {
         var found: Set<UInt32> = []
         for range in coverage.ranges where range.upperBound >= 0xE000 {
             for value in range where Unicode.Scalar(value)?.properties.generalCategory == .privateUse {
-                if let glyph = Self.glyph(of: value, in: font), glyphs.contains(glyph) { found.insert(value) }
+                if let glyph = font.glyph(for: value), glyphs.contains(glyph) { found.insert(value) }
             }
         }
         return found
-    }
-
-    private static func glyph(of value: UInt32, in font: CTFont) -> CGGlyph? {
-        guard let scalar = Unicode.Scalar(value) else { return nil }
-        var units = Array(String(Character(scalar)).utf16)
-        var glyphs = [CGGlyph](repeating: 0, count: units.count)
-        return CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count) && glyphs[0] != 0 ? glyphs[0] : nil
     }
 
     /// The character a glyph name like uni0E34 or u1F600 says, its first in a ligature's uni0066006C: uni and groups of

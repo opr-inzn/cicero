@@ -113,10 +113,10 @@ public enum LibraryImport {
         }
     }
 
-    /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the library, which has
-    /// the other app's fonts by now, at the paths their copies have (`paths`, the other app's → the copy's); and gives
-    /// the styles to turn on, when chosen. Apps of application sets are looked for where they were, then by name in
-    /// `appFolders`.
+    /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the
+    /// library, which has the other app's fonts by now, at the paths their copies have (`paths`, the other app's → the
+    /// copy's); and gives the styles to turn on, when chosen. Apps of application sets are looked for where they were,
+    /// then by name in `appFolders`.
     public static func apply(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, library: Library,
                              paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders)
         -> (summary: ImportSummary, activate: [LibraryFace]) {

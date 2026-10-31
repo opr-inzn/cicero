@@ -46,7 +46,7 @@ enum LibraryCache {
         writer.write(Array(library.activePaths))
         writer.write(UInt32(library.unavailableFolders.count))
         for (id, availability) in library.unavailableFolders {
-            // A disk that isn't connected is saved as not found, as 1.5.2 reads it, with its name at the end.
+            // Not found and disconnected share tag 0; a disconnected disk's name comes after the offline paths.
             let tag: UInt8 = switch availability {
             case .notFound, .disconnected: 0
             case .noAccess: 1
@@ -60,7 +60,6 @@ enum LibraryCache {
             writer.write(paths)
         }
         writer.write(Array(library.offlineFamilies))
-        // Last, so 1.5.2, which stops reading before them, still reads the rest.
         writer.write(Array(library.offlinePaths))
         let disconnected = library.unavailableFolders.compactMap { id, availability in
             if case .disconnected(let volume) = availability { (id, volume) } else { nil }
@@ -130,13 +129,10 @@ enum LibraryCache {
                     onlineOnly[id] = try reader.strings()
                 }
                 let offline = Set(try reader.strings())
-                // Missing from a library 1.5.2 saved.
-                let offlinePaths = reader.isAtEnd ? [] : Set(try reader.strings())
-                if !reader.isAtEnd {
-                    for _ in 0..<Int(try reader.u32()) {
-                        let id = try reader.uuid()
-                        unavailable[id] = .disconnected(try reader.string())
-                    }
+                let offlinePaths = Set(try reader.strings())
+                for _ in 0..<Int(try reader.u32()) {
+                    let id = try reader.uuid()
+                    unavailable[id] = .disconnected(try reader.string())
                 }
                 return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: fingerprint,
                                unavailableFolders: unavailable, onlineOnlyFiles: onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths)

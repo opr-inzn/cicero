@@ -66,7 +66,7 @@ public enum FontBaseImport {
         func library(copies: URL?) -> ImportedLibrary {
             var library = ImportedLibrary(source: .fontBase)
             let root = rootFolder()
-            let realRoot = Self.realPath(root)
+            let realRoot = LibraryScanner.realPath(root)
 
             // Each file by its path under the folder, and where it is on this Mac: under the folder, or, through a
             // symbolic link, elsewhere.
@@ -97,7 +97,7 @@ public enum FontBaseImport {
                     unreadable[FontExplorerImport.UnreadableKind(extension: ext), default: 0] += 1
                     continue
                 }
-                let real = Self.realPath(path)
+                let real = LibraryScanner.realPath(path)
                 if real.hasPrefix(realRoot + "/") {
                     located[relative] = path
                     inFolder.append(path)
@@ -217,12 +217,6 @@ public enum FontBaseImport {
                 if oldHome != home { root = home + root.dropFirst(oldHome.count) }
             }
             return root
-        }
-
-        static func realPath(_ path: String) -> String {
-            guard let resolved = realpath(path, nil) else { return path }
-            defer { free(resolved) }
-            return String(cString: resolved)
         }
     }
 }

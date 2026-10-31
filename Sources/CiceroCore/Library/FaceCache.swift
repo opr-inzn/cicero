@@ -181,9 +181,6 @@ struct ByteReader {
         self.buffer = buffer
     }
 
-    /// Whether everything has been read.
-    var isAtEnd: Bool { offset >= buffer.count }
-
     private mutating func take(_ count: Int) throws -> Int {
         guard count >= 0, offset + count <= buffer.count else { throw Truncated() }
         defer { offset += count }

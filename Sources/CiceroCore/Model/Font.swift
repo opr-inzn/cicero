@@ -522,10 +522,11 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
 public struct Family: Identifiable, Hashable, Sendable {
     /// The family name, as the fonts give it; the user's data knows the family by it.
     public let id: String
-    /// The name to show: the family's in the Mac's language, when its fonts have one (ヒラギノ角ゴシック for Hiragino Sans
-    /// on a Mac in Japanese), else `id`.
+    /// The name to show: the family's in the Mac's language, when its fonts have one (ヒラギノ角ゴシック for Hiragino Sans on a
+    /// Mac in Japanese), else `id`.
     public let name: String
-    /// Sorted by weight, then upright before italic, then style name.
+    /// In `LibraryScanner.stylePrecedes`' order: lightest first, then along the designer's own axes, narrowest first,
+    /// the other registered axes, and each upright before its italic.
     public let faces: [LibraryFace]
     public let state: FamilyState
     /// Watched folders (and Cicero's Inactive folder) that contain the family.

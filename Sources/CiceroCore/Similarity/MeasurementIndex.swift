@@ -127,13 +127,12 @@ public final class MeasurementIndex: Sendable {
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         guard CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 0, nil)) as String == face.postScriptName else { return nil }
         if let axis = face.weightAxis {
-            descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: Self.weightAxisID), min(max(400, axis.minimum), axis.maximum))
+            descriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: AxisTag.weight), min(max(400, axis.minimum), axis.maximum))
         }
         return CTFontCreateWithFontDescriptor(descriptor, 0, nil)
     }
 
     /// The 'wght' axis.
-    private static let weightAxisID = 0x7767_6874
 
     // MARK: - Disk cache
 

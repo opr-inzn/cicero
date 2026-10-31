@@ -165,7 +165,7 @@ private struct Letter {
     private let edges: [(CGPoint, CGPoint)]
 
     init?(_ font: CTFont, _ character: Character) {
-        guard let glyph = LetterShapes.glyph(font, character), let path = CTFontCreatePathForGlyph(font, glyph, nil) else { return nil }
+        guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, nil) else { return nil }
         let box = path.boundingBoxOfPath
         guard box.width > 1, box.height > 1 else { return nil }
         let flat = path.flattened(threshold: 1)

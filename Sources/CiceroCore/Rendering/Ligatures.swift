@@ -395,6 +395,8 @@ enum GSUBSubstitutions {
                 for range in 0..<count {
                     let at = start + 4 + range * 6
                     guard let first = u16(at), let last = u16(at + 2), let index = u16(at + 4), first <= last else { continue }
+                    // No more than a font has glyphs: a damaged table's ranges could otherwise add up to billions.
+                    guard glyphs.count + (last - first + 1) <= 0x10000 else { break }
                     for glyph in first...last { glyphs.append((index + glyph - first, CGGlyph(glyph))) }
                 }
                 return glyphs.sorted { $0.index < $1.index }.map(\.glyph)
