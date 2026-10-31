@@ -150,7 +150,7 @@ extension AppModel {
                 var data = restored
                 // This Mac's activation state, merged below.
                 data.records = model.data.records
-                // A backup from before there were license tags gets them, and one from 1.9.1 or before loses the former
+                // A backup from before there were license tags gets them, and one from 0.9.1 or before loses the former
                 // ones it never used, as a library from then does as it loads.
                 data.updateLicenseTags()
                 // And one from before a Font Library that fonts aren't installed into became a location, as it does too.
