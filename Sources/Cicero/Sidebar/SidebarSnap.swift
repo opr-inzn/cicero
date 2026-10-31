@@ -78,7 +78,7 @@ enum SidebarSnap {
             let position = previous?(delegate, selector, splitView, proposed, index) ?? proposed
             // Dragged far enough left to hide the sidebar: left to AppKit, which hides it.
             guard index == 0, let sidebar = splitView.arrangedSubviews.first,
-                  position >= sidebar.frame.minX + SidebarWidth.minimum / 2 else { return position }
+                  position >= sidebar.frame.minX + SidebarWidth.hiding else { return position }
             var snapped = position
             if let fit = objc_getAssociatedObject(splitView, fitKey) as? SidebarFit, let narrowing = fit.narrowing {
                 let whole = sidebar.frame.maxX - narrowing
@@ -105,6 +105,9 @@ enum SidebarWidth {
     static let minimum: CGFloat = 210
     static let ideal: CGFloat = 240
     static let maximum: CGFloat = 340
+    /// A drag that ends this close to the window's edge hides the sidebar. AppKit hides it only below about 75 pt and
+    /// leaves it at its own 148 pt above that, so everything from here up stops at `minimum` instead.
+    static let hiding: CGFloat = 60
 
     static func keep(in splitView: NSSplitView) {
         guard let controller = splitView.delegate as? NSSplitViewController,
