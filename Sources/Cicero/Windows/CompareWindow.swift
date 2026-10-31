@@ -31,8 +31,9 @@ struct CompareWindow: View {
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
     @AppStorage("compare.size") private var size = 72.0
-    /// Its own, so typing here leaves the previews in the main window as they are.
-    @AppStorage("compare.text") private var text = ""
+    /// Its own, so typing here leaves the previews in the main window as they are; saved soon, not with each letter.
+    @Bindable private var savedText = SavedSoon.compareText
+    private var text: String { savedText.value }
     /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
     @State private var read: Set<String> = []
     @State private var isAdding = false
@@ -108,7 +109,7 @@ struct CompareWindow: View {
                               help: "One row per font, or every font over each other")
             }
             ToolbarCapsule {
-                PreviewOptionsButton(own: OwnPreviewOptions(text: $text, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
+                PreviewOptionsButton(own: OwnPreviewOptions(text: $savedText.value, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
             }
         }
     }

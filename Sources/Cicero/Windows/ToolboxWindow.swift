@@ -50,7 +50,9 @@ private struct TextTab: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     @Environment(\.openWindow) private var openWindow
-    @AppStorage("toolbox.text") private var text = ""
+    /// Saved soon, not with each letter.
+    @Bindable private var savedText = SavedSoon.toolboxText
+    private var text: String { savedText.value }
     @AppStorage("toolbox.maxMissing") private var maxMissing = 0
     @AppStorage("toolbox.activatedOnly") private var activatedOnly = false
     @State private var matches: [TextMatch] = []
@@ -100,7 +102,7 @@ private struct TextTab: View {
 
     private var controls: some View {
         HStack(spacing: 16) {
-            TextField("Text", text: $text, prompt: Text("Type or paste text"))
+            TextField("Text", text: $savedText.value, prompt: Text("Type or paste text"))
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
