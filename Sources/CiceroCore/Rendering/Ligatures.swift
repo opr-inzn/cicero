@@ -119,24 +119,41 @@ public struct LigatureGroup: Identifiable, Sendable {
 
     /// The font's characters and their glyphs, in code point order, while `body` says to go on.
     private static func forEachCharacter(of font: CTFont, _ body: (UInt32, CGGlyph) -> Bool) {
-        var units: [UniChar] = [0, 0]
-        var glyphs: [CGGlyph] = [0, 0]
-        for range in CharacterMap.characters(of: font).ranges {
-            for scalar in range {
-                let count: Int
+        // Up to a thousand characters at a time, one call each: one call per character took most of the time.
+        var scalars: [UInt32] = []
+        var units: [UniChar] = []
+        var glyphs: [CGGlyph] = []
+        func flush() -> Bool {
+            defer { scalars.removeAll(keepingCapacity: true) }
+            guard !scalars.isEmpty else { return true }
+            units.removeAll(keepingCapacity: true)
+            for scalar in scalars {
                 if scalar < 0x10000 {
-                    units[0] = UniChar(scalar)
-                    count = 1
+                    units.append(UniChar(scalar))
                 } else {
                     let value = scalar - 0x10000
-                    units[0] = UniChar(0xD800 + (value >> 10))
-                    units[1] = UniChar(0xDC00 + (value & 0x3FF))
-                    count = 2
+                    units.append(UniChar(0xD800 + (value >> 10)))
+                    units.append(UniChar(0xDC00 + (value & 0x3FF)))
                 }
-                guard CTFontGetGlyphsForCharacters(font, units, &glyphs, count) else { continue }
-                if !body(scalar, glyphs[0]) { return }
+            }
+            glyphs = [CGGlyph](repeating: 0, count: units.count)
+            CTFontGetGlyphsForCharacters(font, units, &glyphs, units.count)
+            // A character the font has no glyph for gets 0, as asking for it alone fails.
+            var index = 0
+            for scalar in scalars {
+                let glyph = glyphs[index]
+                index += scalar < 0x10000 ? 1 : 2
+                if glyph != 0, !body(scalar, glyph) { return false }
+            }
+            return true
+        }
+        for range in CharacterMap.characters(of: font).ranges {
+            for scalar in range {
+                scalars.append(scalar)
+                if scalars.count == 1024, !flush() { return }
             }
         }
+        _ = flush()
     }
 }
 
