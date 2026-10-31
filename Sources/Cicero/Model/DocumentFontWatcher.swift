@@ -96,7 +96,10 @@ final class DocumentFontWatcher {
         if matcher?.fingerprint != model.library.fingerprint { matcher = (model.library.fingerprint, FontMatcher(model.library)) }
         let wanted = DocumentFonts.match(answer, using: matcher!.matcher).compactMap(\.face).filter { face in
             let forApps = model.data.records.temporary[face.face.path]?.scope == .whileAppsRun
-            return (forApps || !face.state.isActive) && face.app == nil && !face.isAdobeFonts
+            // Not one in an app's own folder, which that app loads already, but one turned off out of it into the
+            // Inactive folder: the document can't have it otherwise.
+            let parked = model.data.records.appFolderOrigins[face.face.path] != nil
+            return (forApps || !face.state.isActive) && (face.app == nil || parked) && !face.isAdobeFonts
         }
         if !wanted.isEmpty { model.appSets.request(Set(wanted.map(\.face.postScriptName)), for: app.rawValue) }
     }
