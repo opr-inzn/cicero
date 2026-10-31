@@ -318,7 +318,7 @@ struct SidebarItemReader: NSViewRepresentable {
 /// got fewer. While the sidebar hidden or the Info panel open makes the tiles wider or narrower, every sample is bigger or
 /// smaller by as much (see `GridScale`), so all of them keep their sizes to one another, rather than the wider ones being
 /// held at their tiles' edges.
-struct SampleFit {
+struct SampleFit: Equatable {
     var width: CGFloat
     var factor: CGFloat
 
