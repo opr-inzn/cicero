@@ -33,7 +33,7 @@ The apps rebuild their caches the next time they open. Clearing the macOS caches
 Cicero follows changes by itself: it looks again when fonts are turned on or off, by any app, when files come or go in your locations, and when you come back to Cicero after a while. If its list still looks out of date:
 
 - **Fonts → Rescan Library** (⌘R) looks through your fonts again. It’s quick, because Cicero remembers what it read from each file.
-- **Fonts → Rebuild Font List**, or **Rebuild** next to **Library** in **Preferences → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
+- **Fonts → Rebuild Font List**, or **Rebuild Font List** next to **Library** in **Preferences → General**, forgets what Cicero remembered and reads every font file again. It takes longer. Use it when a font’s details look wrong.
 
 ## A font won’t turn off
 

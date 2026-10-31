@@ -377,8 +377,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   types), dropped from the Finder on the browser or a font page (outlined while files from outside Cicero are over
   it), and opened from the Finder: Info.plist declares the font types (Viewer, rank Default), and the main window
   scene handles external events. URLs arriving within 150 ms of each other are one batch; before the first scan
-  they wait for it. A batch with nothing to add says so: “WOFF2 can’t be installed” (“WOFF …”, or “Web fonts can’t be
-  installed” for both kinds) for web fonts, else “That isn’t a font Cicero can read”. `fontFiles` loses web fonts
+  they wait for it. A batch with nothing to add says so: “Cicero doesn’t use web fonts like WOFF2” (“… like WOFF and
+  WOFF2” for both kinds) for web fonts, else “That isn’t a font Cicero can read”. `fontFiles` loses web fonts
   that versions before 0.6 added when it's read.
 - A dropped or opened folder is added as a watched folder, under Locations. A font file the library lists already (a face's file or
   other copy, or in the Fonts folders, the Inactive folder or a watched folder) is just shown; any other goes
@@ -403,8 +403,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   with Replace, a batch with a family it can't be done for shows the sheet, and one with a family replaced in more
   than one place first an alert (`replacePrompt`): "Replace Helvetica in 2 Places?" / "Replace Fonts in More Than One
   Place?", "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one
-  takes its place." (with such a copy: "…goes to the Trash. The added one takes the place of each, except Cicero’s copy of
-  Helvetica in your Fonts folder: Helvetica is off, so the one in Cicero’s Library is enough."), Replace (default), Choose for Each (the sheet), Cancel. Saved choices from before ("useAdded",
+  takes its place." (with such a copy: "…takes its place. Cicero’s copy of Helvetica in your Fonts folder only goes to the
+  Trash, as the added one in Cicero’s Library takes over."), Replace (default), Choose for Each (the sheet), Cancel. Saved choices from before ("useAdded",
   which turned the library's copy off, and "keepNewer") read as Ask, so nothing goes to the Trash unchosen. Skipped: a
   file only of skipped families stays out, the browser shows the library's copies, and the toast says "Skipped
   Helvetica, already in your library" / "Skipped 3 families already in your library". Replace
@@ -492,8 +492,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 - The field and controls of each tab, and the language above its fonts, are bars the lists scroll under, fading out
   just below them (`fadingTopBar`: the window's background, then an 18 pt fade; the system's soft edge reaches less far
   than these bars). Section titles in the lists scroll with the rows.
-- Text: a field; lists families with every character (sample = the text in each font), count, "Include fonts missing up to N" stepper, "Active only"; shows missing characters per row; double-click opens the family in the main window.
-- Languages: search (language, autonym or script), sort by speakers or name, list with speakers; selecting shows the language's characters and two sections: Fully Supported, Base Characters Only.
+- Text: a field; lists families with every character (sample = the text in each font), count, "Missing characters allowed: N" stepper, "Active only"; shows missing characters per row; double-click opens the family in the main window.
+- Languages: search (language or script, in English or its own language), sort by speakers or name, list with speakers; selecting shows the language's characters and two sections: Fully Supported, Base Characters Only.
 
 ## Compare
 

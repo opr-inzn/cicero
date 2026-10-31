@@ -41,7 +41,7 @@ struct DocumentFontsSheet: View {
                         model.showInLibrary(report)
                         dismiss()
                     }
-                    .help("Shows the document’s fonts that are in your library in the main window, each set in itself")
+                    .help("Shows the document’s fonts from your library in the main window")
                 }
                 Button("Activate All") { model.activateAll(in: report) }
                     .disabled(off.isEmpty)

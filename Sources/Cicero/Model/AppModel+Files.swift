@@ -130,8 +130,8 @@ extension AppModel {
         if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
             guard documents.isEmpty, imports.isEmpty else { return }
-            // "WOFF2 can’t be installed", or "Web fonts can’t be installed" for both kinds.
-            if !webFonts.isEmpty { return showToast("\(webFonts.count == 1 ? webFonts.first! : "Web fonts") can’t be installed") }
+            // "Cicero doesn’t use web fonts like WOFF2", or "… like WOFF and WOFF2" for both kinds.
+            if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
         if !folders.isEmpty {

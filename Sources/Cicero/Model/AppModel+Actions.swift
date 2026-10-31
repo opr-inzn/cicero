@@ -295,7 +295,7 @@ extension AppModel {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
-        panel.message = "Choose where to keep Cicero’s Library. Its fonts move there, into a new “Cicero Library” folder when the folder you choose has other things in it."
+        panel.message = "Choose where Cicero’s Library goes. In a folder with other files, it goes into a new “Cicero Library” folder."
         panel.directoryURL = data.fontLibrary?.url.deletingLastPathComponent()
         let current = data.fontLibrary?.url, folders = data.scannedFolders(), locations = locations
         let checker = FontLibraryFolderCheck { url in

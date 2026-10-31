@@ -1034,7 +1034,7 @@ private struct PreviewOptions: View {
                     } set: {
                         preview.size = min(max(GridScale.chosen(drawing: $0, factor: factor), PreviewSettings.sizes.lowerBound), PreviewSettings.sizes.upperBound)
                     }, range: GridScale.drawn(PreviewSettings.sizes.lowerBound, factor: factor)...GridScale.drawn(PreviewSettings.sizes.upperBound, factor: factor), unit: " pt")
-                    .help("The grid’s size while the sidebar is hidden or the Info panel open: \(Int(preview.size)) pt with the sidebar shown and the panel closed")
+                    .help("The size the grid shows now. With the sidebar shown and the Info panel closed, it’s \(Int(preview.size)) pt.")
                 } else {
                     row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
                 }

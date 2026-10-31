@@ -240,9 +240,8 @@ private struct ReplaceAlerts: ViewModifier {
 
     /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
     /// For one file: "Helvetica is in Clients. The file goes to the Trash, and the added one takes its place."
-    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…goes to the Trash. The added one takes the place
-    /// of each, except Cicero’s copy of Helvetica in your Fonts folder: Helvetica is off, so the one in Cicero’s Library is
-    /// enough."
+    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…takes its place. Cicero’s copy of Helvetica in
+    /// your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
     private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
         let several = prompt.duplicates.filter(model.warnsBeforeReplacing)
         var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
@@ -253,11 +252,10 @@ private struct ReplaceAlerts: ViewModifier {
             return (lines + ["\(files) to the Trash, and the added one takes its place."]).joined(separator: " ")
         }
         let families = spare.map(\.0)
-        let off = families.count == 1 ? "\(families[0]) is off" : "they’re off"
-        let except = spare.reduce(0) { $0 + $1.1 } == 1
-            ? "Cicero’s copy of \(families[0]) in your Fonts folder: \(off), so the one in Cicero’s Library is enough."
-            : "Cicero’s copies of \(families.listed()) in your Fonts folder: \(off), so the ones in Cicero’s Library are enough."
-        return (lines + ["Each of these files goes to the Trash. The added one takes the place of each, except " + except]).joined(separator: " ")
+        let spares = spare.reduce(0) { $0 + $1.1 } == 1
+            ? "Cicero’s copy of \(families[0]) in your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
+            : "Cicero’s copies of \(families.listed()) in your Fonts folder only go to the Trash, as the added ones in Cicero’s Library take over."
+        return (lines + ["Each of these files goes to the Trash, and the added one takes its place.", spares]).joined(separator: " ")
     }
 }
 

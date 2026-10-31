@@ -27,7 +27,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .installedTwice:
             "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
         case .sharedNames:
-            "Each of these fonts has its own main PostScript name (name ID 6), but variable fonts also give each named style a PostScript name of its own, and some use just “Bold” or “Light”. When two fonts use the same one, macOS gives it to only one of them, and a document set in the other may open in the wrong font. Usually there’s nothing to do; if it happens, turn off the font you don’t need or get an updated version."
+            "Some fonts, often variable ones, give each style a short name of its own, like “Bold”. When two fonts that are on use the same name, macOS gives it to only one of them, and a document can open in the wrong font. Usually there’s nothing to do. If it happens, turn off the font you don’t need, or get a newer version."
         case .missing:
             "Cicero remembers these files, but they’re gone. Fonts used where they were stop working when their files move or their disk is unplugged."
         case .unreadable:

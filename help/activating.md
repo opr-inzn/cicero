@@ -211,7 +211,7 @@ To see which fonts a document needs, and turn on the ones you have:
    - **Active in Adobe apps** (a red check): it’s in a folder Adobe apps load fonts from by themselves, so only they have it, like the fonts you [proof in Adobe apps](#fonts-in-adobe-apps-folders). Click **Activate in All Apps** to turn it on everywhere.
    - **Inactive** (a dashed circle): it’s in your library but inactive. Click **Activate**.
    - **Missing** (an orange triangle): it isn’t in your library. To add it, find its file and [add it](organizing.md#add-font-files) as any font file; the font then shows as active or inactive.
-3. **Activate All** turns on every font of the document that’s in your library. **Show in Library** shows those fonts in the main window, each set in itself, with everything you can do there as with any list; **Done** in the bar above them takes you back.
+3. **Activate All** turns on every font of the document that’s in your library. **Show in Library** shows those fonts in the main window, with everything you can do there as with any list; **Done** in the bar above them takes you back.
 
 Cicero reads PDFs, IDML files, InDesign documents (`.indd`, `.indt`), Illustrator files (`.ai`) and Photoshop files (`.psd`, `.psb`), without opening them in the app that made them, and nothing leaves your Mac. It finds a font by its PostScript name, or by its family and style.
 

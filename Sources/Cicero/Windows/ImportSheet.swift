@@ -222,7 +222,7 @@ struct ImportSheet: View {
                              isOn: $choices.comments)
                 }
                 if !library.history.isEmpty {
-                    checkbox("Activation history", detail: "How often each family was activated, and when last, for the Times Activated and Last Activated rules.",
+                    checkbox("Activation history", detail: "How often each family was activated, and when it was last activated. Smart folders can use this.",
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {

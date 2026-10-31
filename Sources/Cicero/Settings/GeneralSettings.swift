@@ -101,7 +101,7 @@ struct GeneralSettings: View {
                 // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     Text("Show fonts installed for proofing in Adobe apps")
-                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                    Text("Lists the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them. [How to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Classify fonts automatically")
@@ -111,7 +111,7 @@ struct GeneralSettings: View {
             Section("Maintenance") {
                 LabeledContent("Library") {
                     HStack {
-                        Button("Rebuild") { model.rebuildFontList() }
+                        Button("Rebuild Font List") { model.rebuildFontList() }
                         Button("Back Up") { isBackingUp = true }
                         Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
