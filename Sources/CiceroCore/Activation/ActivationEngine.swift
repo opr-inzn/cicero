@@ -334,6 +334,9 @@ public struct ActivationEngine: Sendable {
     /// Fonts Cicero installs go into `fontLibrary`, a folder for each family, and are registered there, rather than copied
     /// into ~/Library/Fonts.
     public var installsIntoFontLibrary = false
+    /// The folders apps load fonts from by themselves, like Adobe's, where the library has fonts: an import takes a file
+    /// there as in already, as it does one in the Inactive folder (see `installedAlready`).
+    public var appFontFolders: [URL] = []
     /// How long a file macOS took without an error may take to show as on (see `registerAndConfirm`). Tests that have
     /// files stay off on purpose make it shorter.
     public var confirmationWait: Duration = .seconds(2)

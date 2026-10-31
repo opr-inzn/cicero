@@ -99,8 +99,8 @@ extension ActivationEngine {
     /// Copies font files in where installing puts them, off, as an import brings in another app's fonts: into
     /// ~/Library/Fonts (see `moveIntoFontsFolderOff`), or their family's folder in Cicero's Library, where a font is on
     /// only while Cicero has it registered. A file with the same contents there already, under its name or a numbered one
-    /// ("Name 2.otf", as one of two files of the same name went in), or in ~/Library/Fonts while Cicero's Library is
-    /// used, is taken as it is, on or off: importing again copies nothing twice. Of files with the same name and contents,
+    /// ("Name 2.otf", as one of two files of the same name went in), or elsewhere Cicero has it (see `installedAlready`),
+    /// is taken as it is, on or off: importing again copies nothing twice. Of files with the same name and contents,
     /// one is copied and stands for the others (see `copyPlan`). Nothing is remembered as a copy of anything: the files are
     /// the user's own from now on. Those macOS didn't show off in time, as it can while it's busy, are tried once more at
     /// the end, with longer to wait (`retryWait`). Progress counts the files to copy. Returns where each file is now,
@@ -232,11 +232,14 @@ extension ActivationEngine {
     }
 
     /// The file `installOff` takes as it is for `path`: one with the same contents where it would copy it (`folder`, else
-    /// where installing puts it), or in ~/Library/Fonts while Cicero's Library is used. Nil when it would copy it.
+    /// where installing puts it), in ~/Library/Fonts while Cicero's Library is used, in an app's own folder
+    /// (`appFontFolders`), or in the Inactive folder, where one waits that was turned off in an app's folder: a copy
+    /// would have the font twice, on beside the one Proofing lists. Nil when it would copy it.
     public func installedAlready(_ path: String, into folder: URL? = nil) -> String? {
         let folder = folder ?? installFolder(for: path, family: nil)
         let name = (path as NSString).lastPathComponent
-        let looked = folder == locations.userFonts ? [folder] : [folder, locations.userFonts]
+        let installed = folder == locations.userFonts ? [folder] : [folder, locations.userFonts]
+        let looked = installed + locations.inactiveFolders + appFontFolders
         return looked.lazy.compactMap { Self.identicalFile(to: path, named: name, in: $0) }.first
     }
 

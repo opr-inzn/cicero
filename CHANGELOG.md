@@ -4,22 +4,14 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-This version makes a fundamental change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
+This version makes a change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
 
 - Importing thousands of fonts into your Fonts folder is faster and says how long is left.
 - **Installing and turning on fonts works differently.** Copy, move, ask, or leave under **When you add font files** in **Preferences → General** only runs when you add fonts. Turning a font on just turns it on where it already is.
 - **File → Import from FontBase** copies FontBase’s fonts into your Fonts folder and brings over its collections, favorites and tags, turning on the fonts that were on.
 - Importing from FontExplorer X copies its fonts into your Fonts folder, or Cicero’s Library when you use it, rather than adding its Font Library as a location. If you imported from FontExplorer X before, Cicero offers to do this for you, keeping your folders, tags, ratings and notes.
 - Copy font files or folders in the Finder and paste them into Cicero’s window (⌘V) to add them, as if you’d dropped them there.
-- Font files you drop on the window while it shows a folder or a tag join that folder or get that tag. On a location, they’re copied or moved into its folder, as your choice next to **When you add font files** says.
-- Fonts you turn off in Adobe apps’ folders now wait in **~/Cicero/Inactive**, where you can see them, rather than in Application Support. Cicero moves them there as it opens, and asks before moving a font out of a folder that syncs with a cloud service or is on a server.
 - **Change** next to **Cicero’s Library** takes any folder, such as Downloads: when it has other things in it, Cicero makes a **Cicero Library** folder there. A folder that can’t work says why while you can still choose another, and one in iCloud Drive or another cloud service asks first.
-- Moving **Cicero’s Library** to another disk no longer loses fonts when a file in it can’t be deleted: the library stays where it was, whole.
-- If Cicero stops while it moves **Cicero’s Library**, it puts the library back together, with its fonts on, the next time it opens.
-- When macOS is too busy to take some fonts during an import, Cicero tries them again, and says how many it still couldn’t copy.
-- A font file you put into **~/Cicero/Inactive** that your Fonts folder already has goes to the Trash as Cicero opens, rather than being deleted.
-- Turning a font off or on that can’t leave its disk, like one on a read-only server or a Locked file, no longer leaves a copy of it behind.
-- In **Glyphs**, superscripts, subscripts, numerators and denominators start with their figures, and the extra letters older fonts keep at private codes, like their small caps, sit next to the letters they belong to or in their own group.
 
 
 ## 0.11.0

@@ -32,7 +32,7 @@ extension AppModel {
         askedAboutEarlierImport = true
         let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
-        let engine = engine
+        let engine = importEngine
         let intoFontLibrary = data.installsIntoFontLibrary
         Task {
             // Counted before asking, so the sheet says from the start how many it copies.
@@ -60,7 +60,7 @@ extension AppModel {
         // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
-        let installed = await engine.installOff(prompt.files) { done, total in stage(.copying(done: done, total: total)) }
+        let installed = await importEngine.installOff(prompt.files) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
             return nil

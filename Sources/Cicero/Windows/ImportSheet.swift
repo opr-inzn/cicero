@@ -453,7 +453,7 @@ struct ImportSheet: View {
     /// Looks for the files in already and the same files, reading them off the main thread.
     private func findCopies() async {
         isLooking = true
-        let engine = model.engine
+        let engine = model.importEngine
         let files = candidates
         let work = Task.detached(priority: .userInitiated) { engine.copyPlan(files.map(\.source)) }
         let plan = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
