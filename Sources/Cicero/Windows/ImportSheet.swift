@@ -2,10 +2,10 @@ import CiceroCore
 import SwiftUI
 
 /// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts
-/// (copied in), its sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as notes),
-/// activation history and the fonts that were on; Font Book's collections; or FontBase's fonts (copied in), collections,
-/// tags and the fonts that were on. Then progress while it's brought in, and what came over. A library its app writes to while it's open
-/// waits for the app to quit, and is read again then.
+/// (copied in), its sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as
+/// notes), activation history and the fonts that were on; Font Book's collections; or FontBase's fonts (copied in),
+/// collections, tags and the fonts that were on. Then progress while it's brought in, and what came over. A library its
+/// app writes to while it's open waits for the app to quit, and is read again then.
 struct ImportSheet: View {
     @State private var prompt: ImportPrompt
     @Environment(AppModel.self) private var model
@@ -377,8 +377,7 @@ struct ImportSheet: View {
         )
     }
 
-    /// Enough for every section and row, before it scrolls: the title and the buttons, each section's title and the
-    /// space after it, each row's two lines, and the line about what isn't imported.
+    /// Whether anything is ticked that the library has.
     private var hasChoice: Bool {
         (choices.fontFolder && library.fontFolder != nil) || (choices.otherFiles && !library.otherFiles.isEmpty)
             || !choices.sets.isEmpty || !choices.smartSets.isEmpty
@@ -387,12 +386,12 @@ struct ImportSheet: View {
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
     }
 
-    /// Whether Office can use them, and why to quit the other app first.
     /// How the copies come in: inactive, unless the ones that were active are turned on again.
     private var copiedState: String {
         !library.active.isEmpty && choices.activate ? "inactive except the ones that were active" : "inactive"
     }
 
+    /// Whether Office can use them, and why to quit the other app first.
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         // FontBase's own library can't be imported until it has quit.

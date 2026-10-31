@@ -8,9 +8,9 @@ import SwiftUI
 /// cells in the page's stack, under a header per feature like a group's.
 struct LigaturesSection: View {
     @Environment(AppModel.self) private var model
-    /// The style the page's text is set in, at its weight.
     /// The family's ID, for the ligatures copied (see `SampleGlyph`).
     let family: String
+    /// The style the page's text is set in, at its weight.
     let face: FontFace
     let weight: Double
     /// Axes moved in the Info panel, by tag.

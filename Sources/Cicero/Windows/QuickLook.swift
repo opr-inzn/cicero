@@ -20,8 +20,8 @@ final class QuickLook {
     @ObservationIgnored private var mainWindowObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var panel: QuickLookPanel?
 
-    /// Saved once the user resizes it. (The size under "quickLook.size" was saved on every close, so it was
-    /// the old default, 680 × 620, for most.)
+    /// Saved once the user resizes it, under a key of its own: "quickLook.size" was written on every close, so for most
+    /// it held the old default.
     private static let sizeKey = "quickLook.panelSize"
     static let defaultSize = NSSize(width: 520, height: 440)
 

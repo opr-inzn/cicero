@@ -148,7 +148,7 @@ private struct InfoPanel: View {
     }
 }
 
-/// Describes the style being previewed (the regular one at the default weight).
+/// The family's name and the Info, Features and Axes tabs, for the style nearest the preview weight.
 private struct FamilyInfo: View {
     @Environment(AppModel.self) private var model
     let family: Family

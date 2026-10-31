@@ -86,8 +86,8 @@ struct FontPage: View {
         .focusEffectDisabled()
         .defaultFocus($focused, true)
         .navigationTitle(family.name)
-        // No Preview Options: the page has its own size and alignment, and takes the rest (text in the styles
-        // list, weight, spacing) from the browser's.
+        // No Preview Options: the page has its own size, tracking and alignment, and takes the weight and the
+        // leading from the browser's.
         .toolbar { ToolbarCapsule { InfoButton() } }
         .onExitCommand { model.openFamilyID = nil }
     }
@@ -360,16 +360,17 @@ private struct AxesButton: View {
     }
 }
 
-/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment, case and Axes buttons.
-/// On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the menu: with the
-/// Info panel open, a narrow window has too little for all of them. On one row, the sliders share the width the row leaves,
-/// as long as each other, but past `longestSlider` each, up to `groupGap` more goes either side of them first, so they
-/// stand as a group between the menu and the buttons; on a row of their own, they share all of it. Either way the last
-/// value or button ends where the row does. Each slider's symbol, slider and value are 8 pt apart, the group 32 pt from
-/// the menu and the buttons, everything else 16: a value's field is as wide as its widest value, so the room after a
-/// shorter one adds to the 16 pt to the next symbol, and 16 pt either side of the group looked narrower than that. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
-/// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider, a
-/// third of a second.
+/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment, case and Axes
+/// buttons. On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the
+/// menu: with the Info panel open, a narrow window has too little for all of them. On one row, the sliders share the
+/// width the row leaves, as long as each other, but past `longestSlider` each, up to `groupGap` more goes either side
+/// of them first, so they stand as a group between the menu and the buttons; on a row of their own, they share all of
+/// it. Either way the last value or button ends where the row does. Each slider's symbol, slider and value are 8 pt
+/// apart, the group 32 pt from the menu and the buttons, everything else 16: a value's field is as wide as its widest
+/// value, so the room after a shorter one adds to the 16 pt to the next symbol, and 16 pt either side of the group
+/// looked narrower than that. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
+/// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider,
+/// a third of a second.
 private struct TesterControls: Layout {
     enum Role {
         case menu, label, slider, value, button
