@@ -2,11 +2,16 @@
 # Writes build/appcast.xml, the feed Sparkle reads for updates, for build/Cicero-<version>.dmg (made by
 # release.sh). The DMG is signed with the EdDSA key whose public half is SUPublicEDKey in Info.plist, and
 # that version's section of CHANGELOG.md becomes the release notes. publish.sh runs this and uploads the
-# feed with the DMG, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml (SUFeedURL)
-# always describes the latest version.
+# feed to the latest stable release, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml
+# (SUFeedURL) always describes the latest version.
+#
+# A stable version (0.12.0) is the feed's only item. A beta (0.12.0b1) goes in Sparkle's "beta" channel, which only
+# users who turned on Get beta versions are offered, next to the stable item of the feed published now, so everyone
+# else is still offered that.
 #   ./scripts/make-appcast.sh             the DMG of the version in Resources/Info.plist
 #   ./scripts/make-appcast.sh <dmg>       another DMG of that version
-#   SPARKLE_KEY_FILE  sign with the private key in this file instead of the keychain's "cicero" account
+#   SPARKLE_KEY_FILE       sign with the private key in this file instead of the keychain's "cicero" account
+#   CICERO_FEED_URL        read the published feed from here instead of GitHub (for tests; a file:// URL works)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -40,6 +45,24 @@ fi
 [[ "$ENCLOSURE_SIGNATURE" =~ ^sparkle:edSignature=\"[^\"]+\"\ length=\"[0-9]+\"$ ]] ||
     { echo "Unexpected output from sign_update: $ENCLOSURE_SIGNATURE" >&2; exit 1; }
 
+CHANNEL=
+STABLE_ITEMS=
+if [[ "$VERSION" =~ b[0-9]+$ ]]; then
+    CHANNEL=$'\n            <sparkle:channel>beta</sparkle:channel>'
+    FEED_URL=${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}
+    PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL") ||
+        { echo "Couldn't read the published feed at $FEED_URL; a beta's feed must keep the stable version." >&2; exit 1; }
+    # Its items in no channel, as they are: their signatures sign the DMGs, not the feed. Former betas go.
+    STABLE_ITEMS=$(awk '
+        /<item>/ { item = ""; inside = 1 }
+        inside { item = item $0 "\n" }
+        /<\/item>/ { if (item !~ /<sparkle:channel>/) printf "%s", item; inside = 0 }
+    ' <<<"$PUBLISHED")
+    [[ "$STABLE_ITEMS" == *"<sparkle:version>"* ]] ||
+        { echo "The published feed has no stable version to keep; publish a stable version first." >&2; exit 1; }
+    STABLE_ITEMS+=$'\n'
+fi
+
 # Sparkle (2.9 and later) shows Markdown notes as they are; only "]]>" would end the CDATA section.
 APPCAST=build/appcast.xml
 cat >"$APPCAST" <<EOF
@@ -54,15 +77,15 @@ cat >"$APPCAST" <<EOF
             <title>Cicero $VERSION</title>
             <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
             <sparkle:version>$BUILD</sparkle:version>
-            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>$CHANNEL
             <sparkle:minimumSystemVersion>$MINIMUM_SYSTEM</sparkle:minimumSystemVersion>
             <description sparkle:format="markdown"><![CDATA[
 ${NOTES//]]>/]]]]><![CDATA[>}
 ]]></description>
             <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
         </item>
-    </channel>
+$STABLE_ITEMS    </channel>
 </rss>
 EOF
 xmllint --noout "$APPCAST"
-echo "Built $APPCAST"
+echo "Built $APPCAST${CHANNEL:+ (a beta, with the published stable version)}"

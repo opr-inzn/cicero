@@ -2,6 +2,7 @@
 # Builds an Apple silicon, Developer ID–signed, notarized and stapled build/Cicero-<version>.dmg.
 #   ./scripts/release.sh          release the version in Resources/Info.plist
 #   ./scripts/release.sh 1.1      set the version (and bump the build number) first
+#   ./scripts/release.sh 1.1b1    the same for a beta: the version, "b" and the beta build (see publish.sh)
 #
 # One-time setup on the Mac that releases:
 #   1. A "Developer ID Application" certificate in the login keychain (Xcode → Settings → Accounts →

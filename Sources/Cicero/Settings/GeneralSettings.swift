@@ -121,6 +121,10 @@ struct GeneralSettings: View {
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
+                Toggle(isOn: $updates.getsBetas) {
+                    Text("Get beta versions")
+                    Text("Beta versions get new features sooner, and can have more bugs. Back up your library first. When you turn this off, Cicero keeps the beta until the next version, because it doesn’t install older versions.")
+                }
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
                     Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac. When you mark a family not similar, it sends Cicero’s website the names of the families in that list and the measurements of their letters, to improve similar fonts. No font files are sent.")
