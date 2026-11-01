@@ -24,6 +24,9 @@ struct MainWindow: View {
                 set: { model.openFamilyID = $0.last }
             )) {
                 BrowserView()
+                    // Here rather than in BrowserView, so switching its view doesn't make the toolbar again (see
+                    // `BrowserToolbar`).
+                    .toolbar { BrowserToolbar() }
                     .modifier(DetailPage())
                     // A page of its own for each family, so one opened from another's, as from Similar, starts at the
                     // top, as from the browser, rather than scrolled where the other was.
