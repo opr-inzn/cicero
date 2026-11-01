@@ -62,6 +62,12 @@ enum MeasureRun {
             Measurements.flush()
             kill(getpid(), SIGKILL)
         }
+        // undo, in a VM only (Tests/E2E/app-perf/guest-undo.sh): Undo after turning fonts on and off, and after Move to
+        // Trash, with the ways putting back can fail; a "check" line, PASS or FAIL, for each thing checked.
+        if only == "undo" {
+            await checkUndo(model: model)
+            return
+        }
         // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
         // (Tests/E2E/app-perf/screens.sh).
         if only == "screens" {
@@ -179,6 +185,97 @@ enum MeasureRun {
         }
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
         _ = await MainSettle.wait()
+    }
+
+    // MARK: Undo
+
+    private static func check(_ passed: Bool, _ what: String) {
+        Measurements.count("check", detail: "\(passed ? "PASS" : "FAIL")  \(what)")
+    }
+
+    /// Waits for the queued operations, then for the scans they started to end and the window to be quiet.
+    private static func settled(_ model: AppModel) async {
+        await model.enqueued { _ in }
+        let ended = model.endedScans
+        _ = await until(seconds: 20) { model.endedScans > ended }
+        _ = await MainSettle.wait(quiet: .milliseconds(300))
+    }
+
+    private static func position(_ model: AppModel, _ id: String) -> SwitchPosition? { model.family(id)?.position }
+
+    private static func checkUndo(model: AppModel) async {
+        guard let location = model.data.folders.first?.id else { return check(false, "a location to test with") }
+        let off = model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }
+        guard off.count >= 6 else { return check(false, "six families off in the location (\(off.count))") }
+        let (one, two, three, four, five, six) = (off[0].id, off[1].id, off[2].id, off[3].id, off[4].id, off[5].id)
+
+        // A. Turning on and off.
+        model.activate([off[0]])
+        await settled(model)
+        check(position(model, one) == .on, "turning on \(one) turns it on")
+        check(model.toastUndo != nil, "its toast has an Undo")
+        model.undoToast()
+        await settled(model)
+        check(position(model, one) == .off, "Undo turns \(one) off again")
+
+        model.activate([off[1]])
+        await settled(model)
+        if let family = model.family(two) { model.deactivate([family]) }
+        await settled(model)
+        check(position(model, two) == .off, "turning \(two) off turns it off")
+        model.undoToast()
+        await settled(model)
+        check(position(model, two) == .on, "Undo turns \(two) on again")
+
+        // B. Move to Trash: three on, with a tag, a rating, a note and a folder; four off, in the folder too.
+        model.activate([off[2]])
+        await settled(model)
+        var data = model.data
+        if !data.tags.contains("Client") { data.tags.append("Client") }
+        data.familyTags[three] = ["Client"]
+        data.familyRatings[three] = 4
+        data.familyNotes[three] = "For the client"
+        let folder = FontSet(name: "Project", families: [three, four])
+        data.sets.append(folder)
+        model.data = data
+        let families = [three, four, five, six].compactMap(model.family)
+        let paths = { (id: String) in model.family(id).map { $0.faces.map(\.face.path) } ?? [] }
+        let (threePaths, fourPaths, fivePaths, sixPaths) = (paths(three), paths(four), paths(five), paths(six))
+        guard let plan = model.engine.trashPlan(for: families.flatMap(\.faces), removing: families.map(\.id), in: model.library, title: "Test") else {
+            return check(false, "a plan to move the families to the Trash")
+        }
+        model.moveToTrash(plan)
+        await settled(model)
+        let fm = FileManager.default
+        check((threePaths + fourPaths).allSatisfy { !fm.fileExists(atPath: $0) }, "Move to Trash takes the files away")
+        check(model.data.familyRatings[three] == nil && model.data.familyNotes[three] == nil, "and forgets the rating and the note")
+        guard let undo = model.toastUndo else { return check(false, "Move to Trash's toast has an Undo") }
+        check(true, "Move to Trash's toast has an Undo")
+
+        // The ways putting back can fail: five's file gone from the Trash, another file where six's was, four's folder gone.
+        // By the places Move to Trash recorded: listing the Trash takes Full Disk Access, which a test copy hasn't.
+        let trashed = fivePaths.compactMap { model.lastTrashed[$0] }
+        for path in trashed { try? fm.removeItem(atPath: path) }
+        check(!trashed.isEmpty && trashed.allSatisfy { !fm.fileExists(atPath: $0) }, "five's files taken out of the Trash (\(trashed.count))")
+        let standIn = sixPaths.first ?? ""
+        fm.createFile(atPath: standIn, contents: Data("stand-in".utf8))
+        let fourFolder = (fourPaths.first.map { ($0 as NSString).deletingLastPathComponent }) ?? ""
+        try? fm.removeItem(atPath: fourFolder)
+        check(!fm.fileExists(atPath: fourFolder), "four's folder taken away")
+
+        undo()
+        await settled(model)
+        check((threePaths + fourPaths).allSatisfy { fm.fileExists(atPath: $0) }, "Undo puts three's and four's files back, four's folder made again")
+        check(position(model, three) == .on, "three is on again")
+        check(position(model, four) == .off, "four is off, as it was")
+        check(model.data.familyTags[three] == ["Client"] && model.data.familyRatings[three] == 4
+              && model.data.familyNotes[three] == "For the client", "three's tag, rating and note are back")
+        let project = model.data.sets.first { $0.id == folder.id }
+        check(project?.families.contains(three) == true && project?.families.contains(four) == true, "three and four are in the folder again")
+        check(fivePaths.allSatisfy { !fm.fileExists(atPath: $0) }, "five, no longer in the Trash, stays away")
+        check((try? String(contentsOfFile: standIn, encoding: .utf8)) == "stand-in", "the file where six was is left as it is")
+        let message = model.toast ?? ""
+        check(message.contains("no longer in the Trash") && message.contains("where another file is now"), "the toast says what didn't go back: \(message)")
     }
 
     /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
