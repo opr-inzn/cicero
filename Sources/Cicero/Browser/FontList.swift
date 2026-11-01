@@ -7,6 +7,8 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
     /// its many fields, which was a quarter of making 20,000 rows again after a rating.
     private let box: FamilyBox
     var family: Family { box.family }
+    /// Kept apart: read through `family`, each id copied the family, and SwiftUI reads every row's id at each update.
+    let id: String
     let name: String
     let foundry: String
     let styles: Int
@@ -29,7 +31,6 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
     /// 20,000 families each time the rows were made, as after every rating.
     let libraryPosition: Int
 
-    var id: String { family.id }
 
     /// A character set column's place to sort by: further along the series, or more of the set; −1 for none.
     subscript(rank column: FontListColumn) -> Int {
@@ -61,6 +62,7 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
 
     @MainActor init(_ family: Family, coverage sources: [(FontListColumn, CoverageSource)], inputs: Inputs, model: AppModel) {
         box = FamilyBox(family)
+        id = family.id
         name = family.name
         libraryPosition = inputs.library.position(of: family.id) ?? .max
         foundry = inputs.foundryName(family) ?? ""

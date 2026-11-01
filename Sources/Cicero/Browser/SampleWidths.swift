@@ -47,6 +47,9 @@ final class SampleWidths {
 
     /// Measures the library's samples, unless `inputs` says they're those measured last, and returns `listRatio` for them:
     /// as it was, should it be cancelled or have no sample to measure.
+    /// Whether `inputs` are those measured last, so there's nothing to make samples for.
+    func hasMeasured(_ inputs: Int) -> Bool { inputs == measuredInputs }
+
     func measure(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
         guard inputs != measuredInputs else { return listRatio }
         guard let ratio = await Self.listRatio(samples, scriptSamples: scriptSamples), !Task.isCancelled else { return listRatio }

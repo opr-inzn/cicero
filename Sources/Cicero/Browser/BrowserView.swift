@@ -64,9 +64,10 @@ struct BrowserView: View {
         if let progress = model.coverageProgress, dependsOnCoverage {
             return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
         }
-        var parts = [count, "\(families.count(where: \.hasActive).formatted()) active"]
+        let counts = model.visibleCounts
+        var parts = [count, "\(counts.active.formatted()) active"]
         // On in one app only (like Adobe's fonts folder): neither active nor inactive, so counted apart.
-        let apps = families.compactMap { if case .appOnly(let app) = $0.state { app } else { nil } }
+        let apps = counts.appOnly
         if !apps.isEmpty {
             let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
             parts.append("\(apps.count.formatted()) in \(place)")

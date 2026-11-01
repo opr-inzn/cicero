@@ -217,6 +217,18 @@ extension AppModel {
         return families
     }
 
+    /// How many of `visibleFamilies` are active, and the apps of those on in one app only, for the browser's subtitle:
+    /// worked out once per list, not with each update of the browser, a pass over every family it lists.
+    var visibleCounts: (active: Int, appOnly: [String]) {
+        let key = visibleKey
+        if let cached = visibleCountsCache, cached.key == key { return (cached.active, cached.appOnly) }
+        let families = visibleFamilies
+        let active = families.count(where: \.hasActive)
+        let appOnly = families.compactMap { if case .appOnly(let app) = $0.state { app } else { nil } }
+        visibleCountsCache = (key, active, appOnly)
+        return (active, appOnly)
+    }
+
     private var visibleKey: VisibleKey {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
