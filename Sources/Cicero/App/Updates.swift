@@ -57,9 +57,10 @@ final class Updates {
 private nonisolated final class Channels: NSObject, SPUUpdaterDelegate {
     static let key = "getsBetaUpdates"
 
-    /// The setting, or, before the user sets it, whether this version is a beta ("0.12.0b1").
+    /// The setting, or, before the user sets it, whether this version is a beta ("0.12.0b1"). Read with `bool(forKey:)`,
+    /// which also takes "YES" and "NO", as given on the command line (`-getsBetaUpdates YES`).
     static var getsBetas: Bool {
-        if let saved = UserDefaults.standard.object(forKey: key) as? Bool { return saved }
+        if UserDefaults.standard.object(forKey: key) != nil { return UserDefaults.standard.bool(forKey: key) }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         return version.wholeMatch(of: /[0-9.]+b[0-9]+/) != nil
     }
