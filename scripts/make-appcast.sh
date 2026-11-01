@@ -5,9 +5,10 @@
 # feed to the latest stable release, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml
 # (SUFeedURL) always describes the latest version.
 #
-# A stable version (0.12.0) is the feed's only item. A beta (0.12.0b1) goes in Sparkle's "beta" channel, which only
-# users who turned on Get beta versions are offered, next to the stable item of the feed published now, so everyone
-# else is still offered that.
+# A beta (0.12.0b1) goes in Sparkle's "beta" channel, which only the beta track is offered, next to the stable item of
+# the feed published now, so the stable track is still offered that; former betas go. A stable version (0.11.1) keeps
+# the published beta while that beta is of a newer version (0.12.0b2), so the beta track still has it; the stable
+# version the beta leads to (0.12.0) is the feed's only item.
 #   ./scripts/make-appcast.sh             the DMG of the version in Resources/Info.plist
 #   ./scripts/make-appcast.sh <dmg>       another DMG of that version
 #   SPARKLE_KEY_FILE       sign with the private key in this file instead of the keychain's "cicero" account
@@ -45,22 +46,30 @@ fi
 [[ "$ENCLOSURE_SIGNATURE" =~ ^sparkle:edSignature=\"[^\"]+\"\ length=\"[0-9]+\"$ ]] ||
     { echo "Unexpected output from sign_update: $ENCLOSURE_SIGNATURE" >&2; exit 1; }
 
+# The items of the published feed to keep, as they are: their signatures sign the DMGs, not the feed.
 CHANNEL=
-STABLE_ITEMS=
+KEPT_ITEMS=
+FEED_URL=${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}
+items() { awk '/<item>/{b=""; i=1} i{b=b $0 "\n"} /<\/item>/{printf "%s%c", b, 0; i=0}' <<<"$1"; }
 if [[ "$VERSION" =~ b[0-9]+$ ]]; then
     CHANNEL=$'\n            <sparkle:channel>beta</sparkle:channel>'
-    FEED_URL=${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}
     PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL") ||
         { echo "Couldn't read the published feed at $FEED_URL; a beta's feed must keep the stable version." >&2; exit 1; }
-    # Its items in no channel, as they are: their signatures sign the DMGs, not the feed. Former betas go.
-    STABLE_ITEMS=$(awk '
-        /<item>/ { item = ""; inside = 1 }
-        inside { item = item $0 "\n" }
-        /<\/item>/ { if (item !~ /<sparkle:channel>/) printf "%s", item; inside = 0 }
-    ' <<<"$PUBLISHED")
-    [[ "$STABLE_ITEMS" == *"<sparkle:version>"* ]] ||
+    while IFS= read -r -d '' item; do
+        [[ "$item" == *"<sparkle:channel>"* ]] || KEPT_ITEMS+="$item"
+    done < <(items "$PUBLISHED")
+    [[ "$KEPT_ITEMS" == *"<sparkle:version>"* ]] ||
         { echo "The published feed has no stable version to keep; publish a stable version first." >&2; exit 1; }
-    STABLE_ITEMS+=$'\n'
+elif PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL" 2>/dev/null); then
+    # A beta of a newer version than this one stays: 0.12.0b2 after 0.11.1, not after 0.12.0.
+    while IFS= read -r -d '' item; do
+        [[ "$item" == *"<sparkle:channel>beta</sparkle:channel>"* ]] || continue
+        BASE=$(sed -n 's|.*<sparkle:shortVersionString>\(.*\)b[0-9]*</sparkle:shortVersionString>.*|\1|p' <<<"$item")
+        [[ -n "$BASE" && "$BASE" != "$VERSION" && "$(printf '%s\n%s\n' "$VERSION" "$BASE" | sort -V | tail -1)" == "$BASE" ]] &&
+            KEPT_ITEMS+="$item"
+    done < <(items "$PUBLISHED")
+else
+    echo "Couldn't read the published feed at $FEED_URL, so no beta is kept in it." >&2
 fi
 
 # Sparkle (2.9 and later) shows Markdown notes as they are; only "]]>" would end the CDATA section.
@@ -84,8 +93,8 @@ ${NOTES//]]>/]]]]><![CDATA[>}
 ]]></description>
             <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
         </item>
-$STABLE_ITEMS    </channel>
+$KEPT_ITEMS    </channel>
 </rss>
 EOF
 xmllint --noout "$APPCAST"
-echo "Built $APPCAST${CHANNEL:+ (a beta, with the published stable version)}"
+echo "Built $APPCAST$( [[ -n "$KEPT_ITEMS" ]] && echo ", keeping $(grep -c '<item>' <<<"$KEPT_ITEMS") published item(s)")"

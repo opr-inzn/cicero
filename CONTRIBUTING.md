@@ -16,8 +16,8 @@ When a beta is ready, `beta` is merged into `main` and released as the stable ve
 ## Versions
 
 - A stable release is `<major>.<minor>.<patch>`, for example `0.12.0`.
-- A beta release is that version followed by `b` and the beta build: `0.12.0b1`, `0.12.0b2`, and so on, up to the stable `0.12.0`.
-- The build number (`CFBundleVersion`) goes up with every release, beta or stable, because updates go by the build number.
+- A beta release is that version followed by `b` and the beta's number: `0.12.0b1`, `0.12.0b2`, and so on, up to the stable `0.12.0`.
+- The build number (`CFBundleVersion`) of a stable release counts on in whole numbers: 62, 63, 64. A beta's build is the latest stable build, a dot and the beta's number: `0.12.0b1` after build 62 is `62.1`. Updates go by the build number, so betas fit between two stable builds and never take the next stable one.
 
 ## Building
 

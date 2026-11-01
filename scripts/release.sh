@@ -2,7 +2,8 @@
 # Builds an Apple silicon, Developer ID–signed, notarized and stapled build/Cicero-<version>.dmg.
 #   ./scripts/release.sh          release the version in Resources/Info.plist
 #   ./scripts/release.sh 1.1      set the version (and bump the build number) first
-#   ./scripts/release.sh 1.1b1    the same for a beta: the version, "b" and the beta build (see publish.sh)
+#   ./scripts/release.sh 1.1b1    the same for a beta: the version, "b" and the beta's number; its build is the latest
+#                                 stable build and that number (62.1), see check-version.sh
 #
 # One-time setup on the Mac that releases:
 #   1. A "Developer ID Application" certificate in the login keychain (Xcode → Settings → Accounts →
@@ -32,7 +33,19 @@ fi
 
 if [[ $# -ge 1 ]]; then
     plutil -replace CFBundleShortVersionString -string "$1" Resources/Info.plist
-    BUILD=$(( $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' Resources/Info.plist) + 1 ))
+    # A stable version takes the next whole number after the build here (62 or 62.3 → 63); a beta takes the latest
+    # published stable build and its beta number (0.12.0b2 → 62.2). See check-version.sh.
+    CURRENT=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' Resources/Info.plist)
+    if [[ "$1" =~ b([0-9]+)$ ]]; then
+        N=${BASH_REMATCH[1]}
+        FEED_TEXT=$(curl -fsSL --max-time 30 "${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}") ||
+            { echo "Couldn't read the published feed for the latest stable build." >&2; exit 1; }
+        STABLE=$(awk '/<item>/{b=""} {b=b $0} /<\/item>/{if (b !~ /<sparkle:channel>/) print b}' <<<"$FEED_TEXT" |
+            sed -n 's|.*<sparkle:version>\([0-9.]*\)</sparkle:version>.*|\1|p' | sort -V | tail -1)
+        BUILD="$STABLE.$N"
+    else
+        BUILD=$(( ${CURRENT%%.*} + 1 ))
+    fi
     plutil -replace CFBundleVersion -string "$BUILD" Resources/Info.plist
 fi
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)

@@ -2,11 +2,11 @@ import CryptoKit
 import Foundation
 import Security
 
-/// Going back from a beta to an older stable version, which Sparkle won't do: its installer refuses any build older than
-/// the one running. The checks are Sparkle's: the DMG's EdDSA signature against SUPublicEDKey, and the app in it signed
+/// Switching to a version with an older build, the latest of the track the user moved to, which Sparkle won't do: its
+/// installer refuses any build older than the one running. The checks are Sparkle's: the DMG's EdDSA signature against SUPublicEDKey, and the app in it signed
 /// by the same team as this one (or validly signed at all, for a build signed ad hoc). The new app is copied next to this
 /// one first, so the swap after quitting is two renames in one folder.
-enum GoingBack {
+enum VersionSwitch {
     enum Failure: LocalizedError {
         case cannotWrite(String), download, signature, mount, noApp, wrongApp, codeSignature, copy, helper
 
@@ -26,10 +26,10 @@ enum GoingBack {
     }
 
     /// Label of the launchd job that swaps the apps; launchd keeps it running after Cicero quits.
-    static let helperLabel = "com.maximilianinzinger.Cicero.going-back"
+    static let helperLabel = "com.maximilianinzinger.Cicero.switch-version"
 
-    /// Downloads `stable`, checks it and copies its app next to this one, under a hidden name; returns that copy.
-    static func stage(_ stable: Updates.StableVersion, step: @MainActor (String) -> Void) async throws -> URL {
+    /// Downloads `release`, checks it and copies its app next to this one, under a hidden name; returns that copy.
+    static func stage(_ release: Updates.Release, step: @MainActor (String) -> Void) async throws -> URL {
         let current = Bundle.main.bundleURL
         let folder = current.deletingLastPathComponent()
         let fm = FileManager.default
@@ -37,12 +37,12 @@ enum GoingBack {
             throw Failure.cannotWrite(folder.path)
         }
 
-        let work = fm.temporaryDirectory.appendingPathComponent("Cicero going back \(UUID().uuidString)", isDirectory: true)
+        let work = fm.temporaryDirectory.appendingPathComponent("Cicero switching \(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
         let dmg = work.appendingPathComponent("Cicero.dmg")
         do {
-            let (downloaded, response) = try await URLSession.shared.download(from: stable.url)
+            let (downloaded, response) = try await URLSession.shared.download(from: release.url)
             guard (response as? HTTPURLResponse)?.statusCode ?? 200 == 200 else { throw Failure.download }
             try fm.moveItem(at: downloaded, to: dmg)
         } catch let failure as Failure {
@@ -51,8 +51,8 @@ enum GoingBack {
             throw Failure.download
         }
 
-        step("Checking Cicero \(stable.version)…")
-        try await Task.detached(priority: .userInitiated) { try verifySignature(of: dmg, signature: stable.signature) }.value
+        step("Checking Cicero \(release.version)…")
+        try await Task.detached(priority: .userInitiated) { try verifySignature(of: dmg, signature: release.signature) }.value
 
         let mount = work.appendingPathComponent("mount", isDirectory: true)
         try fm.createDirectory(at: mount, withIntermediateDirectories: true)
@@ -61,7 +61,7 @@ enum GoingBack {
         // Detached before `work` goes, which the mount point is in.
         let staged: Result<URL, Error>
         do {
-            staged = .success(try await stage(from: mount, stable: stable, next: current, step: step))
+            staged = .success(try await stage(from: mount, release: release, next: current, step: step))
         } catch {
             staged = .failure(error)
         }
@@ -70,19 +70,19 @@ enum GoingBack {
     }
 
     /// The checks of the app in the mounted DMG, and its copy next to `current`.
-    private static func stage(from mount: URL, stable: Updates.StableVersion, next current: URL,
+    private static func stage(from mount: URL, release: Updates.Release, next current: URL,
                               step: @MainActor (String) -> Void) async throws -> URL {
         let fm = FileManager.default
         guard let app = (try? fm.contentsOfDirectory(at: mount, includingPropertiesForKeys: nil))?.first(where: {
             $0.pathExtension == "app" && Bundle(url: $0)?.bundleIdentifier == Bundle.main.bundleIdentifier
         }) else { throw Failure.noApp }
-        guard Bundle(url: app)?.object(forInfoDictionaryKey: "CFBundleVersion") as? String == String(stable.build)
+        guard Bundle(url: app)?.object(forInfoDictionaryKey: "CFBundleVersion") as? String == release.build
         else { throw Failure.wrongApp }
         try await Task.detached(priority: .userInitiated) { try verifyCodeSignature(of: app, like: current) }.value
 
-        step("Copying Cicero \(stable.version)…")
+        step("Copying Cicero \(release.version)…")
         let staged = current.deletingLastPathComponent()
-            .appendingPathComponent(".Cicero \(stable.version) \(UUID().uuidString).app", isDirectory: true)
+            .appendingPathComponent(".Cicero \(release.version) \(UUID().uuidString).app", isDirectory: true)
         guard await run("/usr/bin/ditto", [app.path, staged.path]) else {
             try? fm.removeItem(at: staged)
             throw Failure.copy
@@ -116,7 +116,7 @@ enum GoingBack {
         launchctl.waitUntilExit()
         let submit = Process()
         submit.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        submit.arguments = ["submit", "-l", helperLabel, "--", "/bin/sh", "-c", script, "going-back",
+        submit.arguments = ["submit", "-l", helperLabel, "--", "/bin/sh", "-c", script, "switch-version",
                             pid, current.path, staged.path, helperLabel]
         do { try submit.run() } catch { throw Failure.helper }
         submit.waitUntilExit()

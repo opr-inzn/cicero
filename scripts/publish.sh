@@ -8,8 +8,8 @@
 # A stable version (0.12.0) is published from main and becomes the latest release. A beta (0.12.0b1) is published
 # from beta as a pre-release, which GitHub never makes the latest, so the download link stays on the stable version;
 # its feed, the stable version and the beta, replaces the one of the latest release, which every copy reads.
-# A stable fix published while a beta is out has the higher build number, so beta users get it too, without the
-# beta's changes: publish a beta with the fix (merge main into beta) soon after.
+# A stable fix published while a beta is out keeps the beta in the feed (see make-appcast.sh); beta users get the fix
+# with the next beta (merge main into beta), as the beta track is offered only betas.
 #   ./scripts/publish.sh                  publish the version in Resources/Info.plist
 #   ./scripts/publish.sh --allow-unsigned publish even if the DMG isn't notarized
 set -euo pipefail

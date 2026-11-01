@@ -15,7 +15,7 @@ struct GeneralSettings: View {
     @State private var restoring: BackupContents?
 
     private var updateStatus: String {
-        if let goingBack = updates.goingBack { return goingBack }
+        if let switching = updates.switching { return switching }
         switch updates.status {
         case .idle: return updates.isBeta ? "Beta version." : "Stable version."
         case .checking: return "Checking for updates…"
@@ -23,16 +23,29 @@ struct GeneralSettings: View {
         case .failed(let message): return "Couldn’t check for updates: \(message)"
         case .upToDate:
             if updates.isBeta, updates.track == .stable { return "Up to date. The next stable version replaces this beta." }
+            if !updates.isBeta, updates.track == .beta { return "Up to date. The next beta replaces this version." }
             return "Up to date."
         }
     }
 
-    /// Saves the setup, then goes back; nothing happens when the setup can't be saved (the toast says so).
-    private func goBack(to stable: Updates.StableVersion) {
+    /// Saves the setup, then switches; nothing happens when the setup can't be saved (the toast says so).
+    private func switchTo(_ release: Updates.Release) {
         Task {
-            guard await model.saveSetupSnapshot(named: "Before Going Back to \(stable.version)", nothingWas: "changed") else { return }
-            await updates.goBack(to: stable)
+            guard await model.saveSetupSnapshot(named: "Before Switching to \(release.version)", nothingWas: "changed") else { return }
+            await updates.switchTo(release)
         }
+    }
+
+    /// The question when the new track has nothing newer: back to a stable version, or over to a beta.
+    private func switchTitle(_ release: Updates.Release) -> String {
+        release.isBeta ? "Switch to Cicero \(release.version)?" : "Go back to Cicero \(release.version)?"
+    }
+
+    private func switchMessage(_ release: Updates.Release) -> String {
+        let steps = "Cicero saves your setup to its Backups folder, replaces this version with Cicero \(release.version), and opens it again."
+        return release.isBeta
+            ? "No beta is newer than this version. The latest beta has new features, but may not have every fix this version has. \(steps)"
+            : "No stable version is newer than this beta. \(steps) Anything this beta added to your setup that \(release.version) doesn’t know may be lost; the saved setup keeps it."
     }
 
     var body: some View {
@@ -144,10 +157,10 @@ struct GeneralSettings: View {
                 LabeledContent {
                     if case .available = updates.status {
                         Button("Update…") { updates.checkForUpdates() }
-                            .disabled(!updates.canCheckForUpdates || updates.goingBack != nil)
+                            .disabled(!updates.canCheckForUpdates || updates.switching != nil)
                     } else {
                         Button("Check Now") { updates.checkForUpdates() }
-                            .disabled(!updates.canCheckForUpdates || updates.goingBack != nil)
+                            .disabled(!updates.canCheckForUpdates || updates.switching != nil)
                     }
                 } label: {
                     Text("Version \(updates.version) (\(updates.build))")
@@ -168,24 +181,24 @@ struct GeneralSettings: View {
         }
         .formStyle(.grouped)
         .confirmationDialog(
-            "Go back to Cicero \(updates.stableToGoBackTo?.version ?? "")?",
-            isPresented: Binding(get: { updates.stableToGoBackTo != nil }, set: { if !$0 { updates.stableToGoBackTo = nil } }),
-            presenting: updates.stableToGoBackTo
-        ) { stable in
-            Button("Go Back to \(stable.version)") { goBack(to: stable) }
-            Button("Wait for the Next Stable Version", role: .cancel) {}
-        } message: { stable in
-            Text("No stable version is newer than this beta. Cicero saves your setup to its Backups folder, replaces this beta with Cicero \(stable.version), and opens it again. Anything this beta added to your setup that \(stable.version) doesn’t know may be lost; the saved setup keeps it.")
+            updates.switchOffer.map(switchTitle) ?? "",
+            isPresented: Binding(get: { updates.switchOffer != nil }, set: { if !$0 { updates.switchOffer = nil } }),
+            presenting: updates.switchOffer
+        ) { release in
+            Button(release.isBeta ? "Switch to \(release.version)" : "Go Back to \(release.version)") { switchTo(release) }
+            Button(release.isBeta ? "Wait for the Next Beta" : "Wait for the Next Stable Version", role: .cancel) {}
+        } message: { release in
+            Text(switchMessage(release))
         }
         .alert(
-            "Couldn’t go back to Cicero \(updates.goingBackFailure?.stable.version ?? "")",
-            isPresented: Binding(get: { updates.goingBackFailure != nil }, set: { if !$0 { updates.goingBackFailure = nil } }),
-            presenting: updates.goingBackFailure
+            "Couldn’t switch to Cicero \(updates.switchFailure?.release.version ?? "")",
+            isPresented: Binding(get: { updates.switchFailure != nil }, set: { if !$0 { updates.switchFailure = nil } }),
+            presenting: updates.switchFailure
         ) { failure in
-            Button("Download \(failure.stable.version)") { NSWorkspace.shared.open(failure.stable.url) }
+            Button("Download \(failure.release.version)") { NSWorkspace.shared.open(failure.release.url) }
             Button("OK", role: .cancel) {}
         } message: { failure in
-            Text("\(failure.message) This beta stays. You can download Cicero \(failure.stable.version) and put it in place of this one yourself.")
+            Text("\(failure.message) This version stays. You can download Cicero \(failure.release.version) and put it in place of this one yourself.")
         }
         .onChange(of: appearance) { appearance.apply() }
         .onChange(of: sharesUsageStatistics) {
