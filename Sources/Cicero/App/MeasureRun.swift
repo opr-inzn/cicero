@@ -338,6 +338,32 @@ enum MeasureRun {
         check(position(model, a) == .on, "\(a), on before, is on")
         check(position(model, b) == .off, "\(b), off before, is off again, though macOS turned it on as it came back")
 
+        // Again, with b's file in the Trash made into one macOS won't take: it must stay in the Trash, off, and the toast
+        // say so; a still comes back on.
+        let again = [a, b].compactMap(model.family)
+        guard let plan2 = model.engine.trashPlan(for: again.flatMap(\.faces), removing: again.map(\.id), in: model.library, title: "Test") else {
+            return check(false, "a plan to move \(a) and \(b) to the Trash again")
+        }
+        model.moveToTrash(plan2)
+        await settled(model)
+        let bTrash = bPaths.compactMap { model.lastTrashed[$0] }
+        check(bTrash.count == bPaths.count, "\(b)'s places in the Trash recorded (\(bTrash.count) of \(bPaths.count))")
+        for path in bTrash { try? Data(repeating: 0x2A, count: 4096).write(to: URL(fileURLWithPath: path)) }
+        guard let undo2 = model.toastUndo else { return check(false, "the second Move to Trash's toast has an Undo") }
+        let started = ContinuousClock.now
+        undo2()
+        await settled(model)
+        _ = await until(seconds: 15) { position(model, a) == .on }
+        let took = (ContinuousClock.now - started).milliseconds
+        check(bPaths.allSatisfy { !FileManager.default.fileExists(atPath: $0) }, "\(b), which macOS won't take, isn't in the Fonts folder")
+        check(!bTrash.isEmpty && bTrash.allSatisfy { FileManager.default.fileExists(atPath: $0) }, "\(b)'s file is still in the Trash, where it was")
+        check(aPaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } && position(model, a) == .on, "\(a) is back, on")
+        check(!FileManager.default.fileExists(atPath: model.locations.support.appendingPathComponent("turning-off.json").path), "no list of files turning off left behind")
+        let message = model.toast ?? ""
+        check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved", "the toast: \(message)")
+        check(took < 15_000, "Undo took \(Int(took)) ms")
+        Measurements.count("refusedInTrash", detail: bTrash.joined(separator: "|"))
+
         // On until Cicero quits, from off in the Fonts folder; the script looks once Cicero has gone.
         if let family = model.family(c) { model.deactivate([family]) }
         await settled(model)
