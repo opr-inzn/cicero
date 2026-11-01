@@ -10,7 +10,7 @@ which would draw a light line along every face's edge. Instead each letter has a
 seen as a bevel, light where it faces the light, which keeps the letters crisp at the sizes Finder and the Dock show the
 icon at. Nothing casts a shadow. Writes the layers of Resources/AppIcon.icon, whose icon.json colours the faces and
 floors (the walls bring their own), with the faces' gradients spanning them, and, with --web, the website's icon.svg
-and Mark.astro too.
+and Mark.astro too. Run scripts/make-beta-icon.py after it, for the beta icon.
 
     scripts/make-icon.py path/to/Mischief-Regular.woff2 [--web path/to/cicero-website] [--preview out.svg]
 

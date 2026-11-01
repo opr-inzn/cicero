@@ -35,6 +35,12 @@ if [[ "$BUILT_SDK" != "$(xcrun --sdk macosx --show-sdk-version)" ]]; then
     exit 1
 fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# A beta (a version like 0.12.0b1) is called Cicero (Beta) in the menu bar, the Dock and the Finder's Get Info. The
+# bundle stays Cicero.app, so updates replace it in place, whichever track it's on.
+if [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)" == *b* ]]; then
+    plutil -replace CFBundleName -string "Cicero (Beta)" "$APP/Contents/Info.plist"
+    plutil -replace CFBundleDisplayName -string "Cicero (Beta)" "$APP/Contents/Info.plist"
+fi
 # Language data from Hyperglot (see scripts/update-languages.py) and its license.
 cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"
 # Built-in character sets (see scripts/update-character-sets.py) and their licenses.
@@ -55,8 +61,16 @@ xcrun coremlcompiler compile Resources/LetterEmbedding.mlpackage "$APP/Contents/
 
 # Compile the Icon Composer icon into Assets.car plus an AppIcon.icns fallback.
 # actool runs through a helper process, so it needs absolute paths.
-PARTIAL="$(mktemp -d)/partial.plist"
-xcrun actool "$PWD/Resources/AppIcon.icon" --compile "$PWD/$APP/Contents/Resources" \
+WORK="$(mktemp -d)"
+PARTIAL="$WORK/partial.plist"
+ICON="$PWD/Resources/AppIcon.icon"
+# A beta (a version like 0.12.0b1) has its own icon: the cube as a blueprint
+# (see scripts/make-beta-icon.py). actool names the icon after its file, so it is copied to AppIcon.icon first.
+if [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)" == *b* ]]; then
+    cp -R Resources/AppIconBeta.icon "$WORK/AppIcon.icon"
+    ICON="$WORK/AppIcon.icon"
+fi
+xcrun actool "$ICON" --compile "$PWD/$APP/Contents/Resources" \
     --platform macosx --minimum-deployment-target 15.0 --app-icon AppIcon \
     --output-partial-info-plist "$PARTIAL" >/dev/null
 
