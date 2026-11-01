@@ -280,9 +280,6 @@ struct Tag: View {
     let tint: Color
     /// A symbol before the text.
     var systemImage: String?
-    /// Filled with the tint, the text in black, rather than tinted: for a label that isn't a status, like BETA,
-    /// so it stands out and never reads as one.
-    var isFilled = false
 
     var body: some View {
         HStack(spacing: 2.5) {
@@ -304,8 +301,8 @@ struct Tag: View {
         // to 1.7 pt does it; 1.6 keeps away from both ends.
         .padding(.top, 1.6)
         .padding(.bottom, 1.9)
-        .background(tint.opacity(isFilled ? 1 : 0.14), in: .capsule)
-        .foregroundStyle(isFilled ? Color.black : tint.opacity(0.9))
+        .background(tint.opacity(0.14), in: .capsule)
+        .foregroundStyle(tint.opacity(0.9))
         .fixedSize()
     }
 
