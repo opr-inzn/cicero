@@ -50,6 +50,20 @@ enum MeasureRun {
         // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
         // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
         let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
+        // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
+        // (Tests/E2E/app-perf/screens.sh).
+        if only == "screens" {
+            Measurements.count("screen", detail: "browser")
+            Measurements.flush()
+            try? await Task.sleep(for: .seconds(3))
+            if let family = model.visibleFamilies.first { model.openFamilyID = family.id }
+            _ = await MainSettle.wait()
+            Measurements.count("screen", detail: "page")
+            Measurements.flush()
+            try? await Task.sleep(for: .seconds(3))
+            model.openFamilyID = nil
+            return
+        }
         // scroll: 15 pages down and back in each view, twice.
         if only == "scroll" {
             for _ in 0..<2 {
