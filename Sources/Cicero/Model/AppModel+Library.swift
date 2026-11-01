@@ -1,22 +1,6 @@
 import Foundation
 import CiceroCore
 
-enum SidebarItem: Hashable {
-    case all, active, inactive, system, problems
-    /// Families with a style that arrived on the Mac in the last `AppModel.recentDays` days.
-    case recent
-    /// Families with a style on until Cicero quits (Activate Temporarily); not application sets'.
-    case temporary
-    case folder(UUID)
-    case set(UUID)
-    case smartSet(UUID)
-    case tag(String)
-    case foundry(String)
-    /// By name: a built-in classification under the name the user gave it, or one of theirs.
-    case classification(String)
-    case characterSet(String)
-}
-
 enum SidebarSection: String, CaseIterable, Identifiable {
     case folders, sets, tags, foundries, classifications, characterSets
 
@@ -103,11 +87,6 @@ struct FontRowsKey: Equatable {
     var coverageRevision: Int
 }
 
-extension LibraryFace {
-    /// On until Cicero quits, from Activate Temporarily.
-    var isOnUntilQuit: Bool { state == .active(.temporary(.untilQuit)) }
-}
-
 extension Classification {
     var icon: String {
         switch self {
@@ -159,15 +138,7 @@ extension AppModel {
     }
 
     /// `foundryName(of:)` for many families: the user's names are read once, not for every family.
-    func foundryNamer() -> (Family) -> String? {
-        let overrides = data.foundryOverrides
-        let renames = data.foundryRenames
-        return { family in
-            if let override = overrides[family.id] { return override }
-            guard let raw = family.manufacturer else { return nil }
-            return renames[raw] ?? raw
-        }
-    }
+    func foundryNamer() -> (Family) -> String? { data.foundryNamer() }
 
     /// The OpenType features chosen for the family in the Info panel, and those for the figures the search's tokens ask
     /// for where the panel doesn't set the same (see `searchFeatures`).
@@ -302,7 +273,7 @@ extension AppModel {
     }
 
     /// How many days a family stays in Recents.
-    static let recentDays = 7
+    static let recentDays = FamilyFilters.recentDays
 
     /// Whether the browser lists its families in an order of its own, which the list keeps until a column's header is
     /// clicked: similar fonts, the closest first, and Recents, the latest first.
@@ -340,207 +311,33 @@ extension AppModel {
         return (0...2).flatMap { rank in zip(found, ranks).filter { $0.1 == rank }.map(\.0) }
     }
 
-    /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the
-    /// user's note, the foundry and classification the family is shown in, a built-in classification by its usual
-    /// words too, and its tags; and by the search field's tokens (see `Family.matches`).
+    /// The rules of the search, the sidebar items and smart folders, from the core (see `FamilyFilters`), with the
+    /// guessed classifications and the coverage the app remembers.
+    var familyFilters: FamilyFilters {
+        let guess = classificationGuess()
+        return FamilyFilters(
+            library: library, data: data, classificationGuess: { guess($0)?.classification },
+            coverage: CoverageAnswers(
+                characterSet: { [unowned self] in self.characterSet($0) },
+                missingCount: { [unowned self] in self.missingCount($0, $1) },
+                supports: { [unowned self] in self.supports($0, language: $1) }
+            )
+        )
+    }
+
+    /// A test for whether families match a search (see `FamilyFilters.searchMatcher`).
     private func searchMatcher(_ search: SearchQuery, tokens: [SearchToken] = []) -> (Family) -> Bool {
-        guard !search.isEmpty else { return tokens.isEmpty ? { _ in true } : { $0.matches(tokens) } }
-        let library = library, data = data
-        let notes = data.familyNotes.mapValues { $0.lowercased() }
-        let foundryName = foundryNamer(), classificationName = classificationNamer()
-        var classificationTerms: [String: [String]] = [:]
-        for name in data.classifications { classificationTerms[name] = [name.lowercased()] }
-        for classification in Classification.allCases {
-            let shown = name(of: classification)
-            classificationTerms[shown] = [shown.lowercased()] + classification.searchTerms
-        }
-        return { family in
-            guard tokens.isEmpty || family.matches(tokens) else { return false }
-            let foundry = foundryName(family).flatMap { $0 == family.manufacturer ? nil : $0.lowercased() }
-            let classification = classificationName(family)
-            let terms = (classificationTerms[classification] ?? [classification.lowercased()]) + data.tags(of: family.id).map { $0.lowercased() }
-            return library.matches(family, search: search, note: notes[family.id], texts: foundry.map { [$0] } ?? [], terms: terms)
-        }
+        familyFilters.searchMatcher(search, tokens: tokens)
     }
 
     /// A test for one sidebar item, with anything expensive looked up once.
     func filter(for item: SidebarItem) -> (Family) -> Bool {
-        switch item {
-        case .all: return { _ in true }
-        case .active: return { $0.hasActive }
-        case .inactive: return { family in family.faces.contains { $0.state == .inactive } }
-        case .system: return { $0.state == .system }
-        case .temporary: return { $0.faces.contains(where: \.isOnUntilQuit) }
-        case .recent:
-            let cutoff = Date.now.addingTimeInterval(-Double(Self.recentDays) * 86_400)
-            return { $0.lastAdded.map { $0 > cutoff } ?? false }
-        case .problems: return { _ in false }
-        case .folder(let id): return { $0.folderIDs.contains(id) }
-        case .set(let id):
-            // Families it has only some styles of too.
-            let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])
-            return { members.contains($0.id) }
-        case .smartSet(let id):
-            guard let smartSet = data.smartSets.first(where: { $0.id == id }) else { return { _ in false } }
-            return matcher(for: smartSet)
-        case .tag(let name):
-            let tagged = Set(data.familyTags.filter { $0.value.contains(name) }.keys)
-            return { tagged.contains($0.id) }
-        case .foundry(let name):
-            let foundryName = foundryNamer()
-            return { foundryName($0) == name }
-        case .classification(let name):
-            let classificationName = classificationNamer()
-            return { classificationName($0) == name }
-        case .characterSet(let id):
-            guard let set = characterSet(id) else { return { _ in false } }
-            return { self.has(set, $0) == true }
-        }
+        familyFilters.filter(for: item)
     }
-
-    // MARK: Smart sets
 
     /// A test for many families at once: set and folder rules resolve their members once.
     func matcher(for smartSet: SmartSet) -> (Family) -> Bool {
-        let checks = smartSet.rules.map(check(for:))
-        guard !checks.isEmpty else { return { _ in false } }
-        return smartSet.matchAll ? { family in checks.allSatisfy { $0(family) } } : { family in checks.contains { $0(family) } }
-    }
-
-    private func check(for rule: SmartRule) -> (Family) -> Bool {
-        let value = rule.value
-        let negate = rule.comparison == .isNot
-        func compare(_ test: @escaping (Family) -> Bool) -> (Family) -> Bool {
-            negate ? { !test($0) } : test
-        }
-        switch rule.field {
-        case .name:
-            // The fonts' own name, or the one in the Mac's language a family shows.
-            let lower = value.lowercased()
-            func names(_ family: Family) -> [String] {
-                family.name == family.id ? [family.id.lowercased()] : [family.id.lowercased(), family.name.lowercased()]
-            }
-            switch rule.comparison {
-            case .contains: return { family in lower.isEmpty || names(family).contains { $0.contains(lower) } }
-            case .doesNotContain: return { family in lower.isEmpty || !names(family).contains { $0.contains(lower) } }
-            case .beginsWith: return { family in names(family).contains { $0.hasPrefix(lower) } }
-            default: return { family in names(family).contains(lower) }
-            }
-        case .foundry:
-            if rule.comparison == .contains {
-                let lower = value.lowercased()
-                return { (self.foundryName(of: $0) ?? "").lowercased().contains(lower) }
-            }
-            return compare { self.foundryName(of: $0) == value }
-        case .designer:
-            // Any style's: a family's styles may credit different designers, or some of them none.
-            let lower = value.lowercased()
-            func designers(_ family: Family) -> [String] { family.faces.compactMap { $0.face.designer?.lowercased() } }
-            switch rule.comparison {
-            case .contains: return { family in lower.isEmpty || designers(family).contains { $0.contains(lower) } }
-            case .doesNotContain: return { family in lower.isEmpty || !designers(family).contains { $0.contains(lower) } }
-            default: return { family in designers(family).contains(lower) }
-            }
-        case .classification:
-            let classificationName = classificationNamer()
-            return compare { classificationName($0) == value }
-        case .tag:
-            let tagged = Set(data.familyTags.filter { $0.value.contains(value) }.keys)
-            return compare { tagged.contains($0.id) }
-        case .note:
-            // Without text: whether the family has a note at all, as Has Note says, for sets made before there was one.
-            let lower = value.lowercased()
-            let notes = data.familyNotes.mapValues { $0.lowercased() }
-            let contains = rule.comparison != .doesNotContain
-            return { family in
-                guard let note = notes[family.id] else { return !contains }
-                return (lower.isEmpty || note.contains(lower)) == contains
-            }
-        case .hasNote:
-            let noted = data.familyNotes
-            return compare { noted[$0.id] != nil }
-        case .rating:
-            // No rating is 0 stars.
-            let ratings = data.familyRatings
-            let stars = Int(value) ?? 0
-            switch rule.comparison {
-            case .greaterThan: return { ratings[$0.id, default: 0] > stars }
-            case .lessThan: return { ratings[$0.id, default: 0] < stars }
-            default: return compare { ratings[$0.id, default: 0] == stars }
-            }
-        case .set:
-            let members = Set(data.sets.first { $0.id.uuidString == value }?.memberFamilies ?? [])
-            return compare { members.contains($0.id) }
-        case .folder:
-            let id = UUID(uuidString: value)
-            return compare { id.map($0.folderIDs.contains) ?? false }
-        case .status:
-            return compare { family in
-                switch (family.state, value) {
-                case (.active, "active"), (.system, "active"), (.partial, "partial"), (.inactive, "inactive"),
-                     (.appOnly, "appOnly"), (.system, "system"): true
-                default: false
-                }
-            }
-        case .kind:
-            return compare { family in
-                switch value {
-                case "variable": family.isVariable
-                case "monospaced": family.isMonospaced
-                case "italics": family.hasItalics
-                default: false
-                }
-            }
-        case .format:
-            return compare { $0.format.rawValue == value }
-        case .styles:
-            let number = Int(value) ?? 0
-            switch rule.comparison {
-            case .greaterThan: return { $0.faces.count > number }
-            case .lessThan: return { $0.faces.count < number }
-            default: return { $0.faces.count == number }
-            }
-        case .feature:
-            guard let feature = OpenTypeFeature(rawValue: value) else { return { _ in false } }
-            return compare { $0.features.contains(feature) }
-        case .embedding:
-            return compare { $0.embedding?.rawValue == value }
-        case .language:
-            return { family in
-                guard let supported = self.supports(family, language: value) else { return false }
-                return supported != negate
-            }
-        case .characterSet:
-            guard let set = characterSet(value) else { return { _ in false } }
-            return { family in
-                guard let has = self.has(set, family) else { return false }
-                return has != negate
-            }
-        case .added:
-            let cutoff = Date().addingTimeInterval(-Double(Int(value) ?? 0) * 86_400)
-            let recent = rule.comparison != .notInLast
-            return { family in
-                guard let added = family.dateAdded else { return false }
-                return (added > cutoff) == recent
-            }
-        case .timesActivated:
-            let activations = data.activations
-            let number = Int(value) ?? 0
-            switch rule.comparison {
-            case .greaterThan: return { activations[$0.id]?.count ?? 0 > number }
-            case .lessThan: return { activations[$0.id]?.count ?? 0 < number }
-            default: return { activations[$0.id]?.count ?? 0 == number }
-            }
-        case .lastActivated:
-            // A family never turned on since Cicero began counting wasn't turned on in the last days either.
-            let activations = data.activations
-            let cutoff = Date().addingTimeInterval(-Double(Int(value) ?? 0) * 86_400)
-            let recent = rule.comparison != .notInLast
-            return { family in
-                guard let last = activations[family.id]?.last else { return !recent }
-                return (last > cutoff) == recent
-            }
-        }
+        familyFilters.matcher(for: smartSet)
     }
 
     // MARK: Coverage
