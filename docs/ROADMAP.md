@@ -14,8 +14,7 @@ least sure now.
 **How.** The small model that looks at the letters learned from open-source families, four fifths of them, with the
 rest kept back to test it. Train it on all of them, and on more text serifs and grotesques, where more examples made the
 most difference. Judge its lists against the current ones on a library of fonts it has never seen, family by family; it
-replaces the current model only when its lists are picked more often. Families marked Not Similar show where lists go
-wrong.
+replaces the current model only when its lists are picked more often.
 
 **Open.**
 - Whether a second model, trained another way, makes better lists alongside the first: so far it helps the six on a

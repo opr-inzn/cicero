@@ -107,7 +107,6 @@ struct GeneralSettings: View {
             Section("Maintenance") {
                 LabeledContent("Library") {
                     HStack {
-                        Button("Rebuild Font List") { model.rebuildFontList() }
                         Button("Back Up") { isBackingUp = true }
                         Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
@@ -123,7 +122,7 @@ struct GeneralSettings: View {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
-                    Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac. When you mark a family not similar, it sends Cicero’s website the names of the families in that list and the measurements of their letters, to improve similar fonts. No font files are sent.")
+                    Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac.")
                 }
             }
         }
@@ -132,7 +131,6 @@ struct GeneralSettings: View {
         .onChange(of: sharesUsageStatistics) {
             guard !sharesUsageStatistics else { return }
             UsageStatistics.forgetID()
-            SimilarReports.forgetID()
         }
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)

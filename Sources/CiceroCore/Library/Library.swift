@@ -222,7 +222,7 @@ public enum ScanProgress: Sendable, Equatable {
     /// Reading files, new ones for the most part.
     case identifying(done: Int, total: Int)
     /// Reading files again that the library on screen has already, most of them: changed ones, or every file after an
-    /// update that learns more from each, or after Rebuild Font List.
+    /// update that learns more from each, or after Rebuild Library.
     case updating(done: Int, total: Int)
 }
 

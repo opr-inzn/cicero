@@ -20,8 +20,6 @@ public struct SimilarFonts: Sendable {
     private let sizes: [OpticalSize?]
     /// `design(of:)` each family's name.
     private let designs: [String]
-    /// A design → the designs the user said don't look like it, either way round.
-    private let unlike: [String: Set<String>]
     /// `steps`, in the order of the measures.
     private let scales: [Float]
     private let weights: [Float]
@@ -126,11 +124,8 @@ public struct SimilarFonts: Sendable {
     ///   - embeddings: a family's regular style's (see `LetterEmbedding`); when given and weighted, families without
     ///     one are left out.
     ///   - classification: nil for one without.
-    ///   - notSimilar: family name → the families the user said don't look like it (`UserData.notSimilar`): left out of
-    ///     its list, it out of theirs, and every copy of either (`design(of:)`) too, with nothing in their places, so the
-    ///     list is that much shorter.
     public init(families: [Family], measurements: (Family) -> LetterMeasurements?, embeddings: ((Family) -> [Float]?)? = nil,
-                classification: (Family) -> String?, notSimilar: [String: [String]] = [:],
+                classification: (Family) -> String?,
                 weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
                 embeddingWeight: Float = SimilarFonts.embeddingWeight, otherClassification: Float = SimilarFonts.otherClassification) {
         let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
@@ -153,15 +148,6 @@ public struct SimilarFonts: Sendable {
         self.classifications = classifications
         self.sizes = sizes
         self.designs = designs
-        var unlike: [String: Set<String>] = [:]
-        for (family, others) in notSimilar {
-            let design = Self.design(of: family)
-            for other in others.map(Self.design(of:)) where other != design {
-                unlike[design, default: []].insert(other)
-                unlike[other, default: []].insert(design)
-            }
-        }
-        self.unlike = unlike
         scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
@@ -191,8 +177,7 @@ public struct SimilarFonts: Sendable {
             found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        // The nearest copy of each design and none of the family's own; those the user said don't look like it go after,
-        // with nothing in their places, so marking one doesn't bring in the next.
+        // The nearest copy of each design and none of the family's own.
         var listed: Set = [designs[reference]], nearest: [(index: Int, distance: Float)] = []
         for entry in found where listed.insert(designs[entry.index]).inserted {
             nearest.append(entry)
@@ -204,8 +189,7 @@ public struct SimilarFonts: Sendable {
             let ordered = named.filter { sizes[$0.index] == own } + named.filter { sizes[$0.index] != own }
             for (slot, entry) in zip(slots, ordered) { nearest[slot] = entry }
         }
-        let unliked = unlike[designs[reference], default: []]
-        return nearest.prefix(limit).filter { !unliked.contains(designs[$0.index]) }.map { (ids[$0.index], $0.distance) }
+        return nearest.prefix(limit).map { (ids[$0.index], $0.distance) }
     }
 
     /// How many steps apart a measure one family has and the other hasn't counts as.
