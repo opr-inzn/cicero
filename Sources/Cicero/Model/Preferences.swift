@@ -16,17 +16,18 @@ final class PreviewSettings {
     /// Leading, in percent of the size, wherever it's set; a larger leading saved before 200 % was the most comes down to it.
     static let lineSpacings: ClosedRange<Double> = 80...200
 
-    /// Empty means each family's own name.
-    var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
+    /// Empty means each family's own name. Saved a moment after typing stops (`SavedSoon`), as the size and line
+    /// spacing are after a slider stops.
+    var sampleText: String { didSet { SavedSoon.set(sampleText, forKey: Keys.sampleText) } }
     /// Preview texts saved with Save as Preset, in the order saved: Presets lists them before `presets`.
     var savedPresets: [String] { didSet { defaults.set(savedPresets, forKey: Keys.savedPresets) } }
-    var size: Double { didSet { defaults.set(size, forKey: Keys.size) } }
+    var size: Double { didSet { SavedSoon.set(size, forKey: Keys.size) } }
     /// What previews show a family in, where a search names no style: its regular style, the one nearest 400. Preview
     /// Options had a Weight slider up to 0.10.2; what it saved is forgotten.
     let weight = 400.0
     /// Line height in percent of the size, wherever a sample runs over several lines; 120 is what layout apps
     /// call automatic leading.
-    var lineSpacing: Double { didSet { defaults.set(lineSpacing, forKey: Keys.lineSpacing) } }
+    var lineSpacing: Double { didSet { SavedSoon.set(lineSpacing, forKey: Keys.lineSpacing) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
 
@@ -63,6 +64,58 @@ final class PreviewSettings {
     func lineHeight(at size: Double) -> Double {
         size * lineSpacing / 100
     }
+}
+
+/// Saves to the user defaults a second after the last change and as Cicero quits, rather than with each change. SwiftUI
+/// draws every view with an `@AppStorage` again whenever anything is saved to the defaults, whatever the key, so each
+/// letter typed in Preview Options, Compare or the Character Toolbox, and each step of a size slider, drew the browser
+/// again, and Settings and Compare where they were open. What's waiting is only in memory: read it from where it's
+/// kept (`PreviewSettings`, `SavedSoon.Value`), never from the defaults. The font page's tester does the same
+/// (`TesterTextStore`).
+enum SavedSoon {
+    private static var pending: [String: Any] = [:]
+    private static var save: Task<Void, Never>?
+    private static var observesQuit = false
+
+    static func set(_ value: Any, forKey key: String) {
+        pending[key] = value
+        if !observesQuit {
+            observesQuit = true
+            NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { flush() }
+            }
+        }
+        save?.cancel()
+        save = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            flush()
+        }
+    }
+
+    static func flush() {
+        save?.cancel()
+        save = nil
+        let values = pending
+        pending = [:]
+        for (key, value) in values { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    /// A value kept in the defaults and saved soon, for a view that would otherwise have it as an `@AppStorage`.
+    @Observable
+    final class Value<Stored> {
+        @ObservationIgnored let key: String
+        var value: Stored { didSet { SavedSoon.set(value, forKey: key) } }
+
+        init(_ key: String, default value: Stored) {
+            self.key = key
+            self.value = UserDefaults.standard.object(forKey: key) as? Stored ?? value
+        }
+    }
+
+    /// Compare's text and the Character Toolbox's.
+    static let compareText = Value("compare.text", default: "")
+    static let toolboxText = Value("toolbox.text", default: "")
 }
 
 /// Left, centred or right, for a font page's text.

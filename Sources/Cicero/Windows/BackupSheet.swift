@@ -24,7 +24,7 @@ struct BackupSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Back Up Library").font(.title2.bold())
-                Text("The backup has everything set up in Cicero: folders, smart folders, tags, coverage sets, locations and added fonts, foundry names, the sidebar, and the settings for activation, system fonts, Adobe Fonts and Proofing.")
+                Text("The backup has everything set up in Cicero: folders, smart folders, tags, ratings and notes, coverage sets, locations and added fonts, foundry names, the sidebar, and the settings for activation, system fonts, Adobe Fonts and Proofing.")
                     .foregroundStyle(.secondary)
             }
             DetailToggle("Include font files", detail: fontsDetail, isOn: $includeFonts)

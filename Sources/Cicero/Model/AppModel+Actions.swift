@@ -765,9 +765,7 @@ extension AppModel {
     }
 
     /// Whether any font is on until Cicero quits.
-    var hasTemporaryFonts: Bool {
-        library.families.contains { $0.faces.contains(where: \.isOnUntilQuit) }
-    }
+    var hasTemporaryFonts: Bool { library.hasFacesOnUntilQuit }
 
     /// A section's rows in the user's order. Character sets are in groups, ordered in `characterSetGroups`.
     func rows(for section: SidebarSection) -> [SidebarRow] {

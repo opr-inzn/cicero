@@ -50,7 +50,6 @@ struct BrowserView: View {
         .onChange(of: model.selectedIDs, initial: true) { preparePage() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
-        .toolbar { toolbar }
     }
 
     /// A family selected on its own is the one a double-click or Return opens: its page's ligatures and characters
@@ -65,9 +64,10 @@ struct BrowserView: View {
         if let progress = model.coverageProgress, dependsOnCoverage {
             return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
         }
-        var parts = [count, "\(families.count(where: \.hasActive).formatted()) active"]
+        let counts = model.visibleCounts
+        var parts = [count, "\(counts.active.formatted()) active"]
         // On in one app only (like Adobe's fonts folder): neither active nor inactive, so counted apart.
-        let apps = families.compactMap { if case .appOnly(let app) = $0.state { app } else { nil } }
+        let apps = counts.appOnly
         if !apps.isEmpty {
             let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
             parts.append("\(apps.count.formatted()) in \(place)")
@@ -76,23 +76,29 @@ struct BrowserView: View {
     }
 
     /// Whether the list can still grow while coverage is being worked out.
-    private var dependsOnCoverage: Bool {
-        switch model.selection {
-        case .characterSet: true
-        case .smartSet(let id):
-            model.data.smartSets.first { $0.id == id }?.rules.contains { $0.field == .language || $0.field == .characterSet } ?? false
-        default: false
-        }
-    }
+    private var dependsOnCoverage: Bool { model.listDependsOnCoverage }
 
-    @ToolbarContentBuilder
-    private var toolbar: some ToolbarContent {
-        ToolbarCapsule {
-            ToolbarPicker("View", values: BrowserMode.allCases, selection: $mode, title: \.title, symbol: \.icon,
-                          help: "Show as a list, a grid or specimens")
-        }
+}
+
+/// The browser's toolbar items: its view picker, Preview Options and Info. Declared on the browser from outside it
+/// (`MainWindow`), not in its body: there, under the view a switch swaps, they made SwiftUI make the whole toolbar again
+/// with each switch (`ToolbarBridge.preferencesDidChange`), 40–65 ms of the switch's main-thread work, and the glass of
+/// the items settling for most of a second after. On the split view they'd stand 8 pt further from the search field.
+struct BrowserToolbar: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarCapsule { BrowserModePicker() }
         ToolbarCapsule { PreviewOptionsButton() }
         ToolbarCapsule { InfoButton() }
+    }
+}
+
+/// The browser's List, Grid and Specimens picker, with the setting of its own, as the browser has.
+private struct BrowserModePicker: View {
+    @AppStorage("browser.mode") private var mode: BrowserMode = .grid
+
+    var body: some View {
+        ToolbarPicker("View", values: BrowserMode.allCases, selection: $mode, title: \.title, symbol: \.icon,
+                      help: "Show as a list, a grid or specimens")
     }
 }
 

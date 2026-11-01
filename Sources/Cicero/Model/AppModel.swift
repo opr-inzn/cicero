@@ -282,6 +282,7 @@ final class AppModel {
     /// A scan of everything a while after a file came or went in a Fonts folder, to see what macOS made of it.
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
+    @ObservationIgnored var visibleCountsCache: (key: VisibleKey, active: Int, appOnly: [String])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
@@ -298,6 +299,8 @@ final class AppModel {
     @ObservationIgnored private(set) var measuredLibraries = 0
     /// Called just before a search typed applies, after its pause: the app performance runs time it from there.
     @ObservationIgnored var searchApplies: (() -> Void)?
+    /// How many scans ended, applied or not, so the app performance runs can wait for the one a step started.
+    @ObservationIgnored private(set) var endedScans = 0
     #endif
 
     init() {
@@ -532,6 +535,9 @@ final class AppModel {
     }
 
     private func endScan(_ id: Int) {
+        #if CICERO_MEASURE
+        endedScans += 1
+        #endif
         if scanCount == id {
             revealProgress?.cancel()
             progressDue = false

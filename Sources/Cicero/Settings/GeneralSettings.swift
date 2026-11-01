@@ -84,11 +84,7 @@ struct GeneralSettings: View {
                     Text("To turn off a font that an app like InDesign loads from its own folder, Cicero moves the file out. When the folder syncs with a cloud service or is on a server, the file goes away for everyone who shares it.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
-                    HStack(spacing: 4) {
-                        Text("Auto-activate fonts in Adobe apps")
-                        Tag(text: "BETA", tint: .yellow, isFilled: true)
-                            .help("New, and still being tried out with each app")
-                    }
+                    Text("Auto-activate fonts in Adobe apps")
                     Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it. Use with caution.")
                 }
             }

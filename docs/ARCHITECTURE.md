@@ -131,7 +131,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   and the hidden copy that sizes it agree. Not SwiftUI's `TextEditor`, which, like `Text`, cuts glyphs off at
   the font's ascent and descent: `SampleEditor`'s layout fragments (`UnclippedFragment`) widen their rendering
   surface to the glyphs' ink, and `FontText` draws through `UnclippedText`, a text renderer whose display
-  padding gives room above and below. About one font in ten draws past its own descent.
+  padding gives room above and below. About one font in ten draws past its own descent. The font list's previews
+  are `FontLine`s instead: one CoreText line in a `Canvas`, cut with a "…" as `Text` cuts a line, without TextKit's
+  layout for each row, its baseline where `Text`'s is (a rule measured from SwiftUI for all 703 font families of a
+  Mac) and the canvas wider and taller than the cell by as far as the font's glyphs reach, so nothing is cut off.
 - Files come in through `AppModel.open` (`Model/AppModel+Files.swift`): from the Finder (Info.plist declares the
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from

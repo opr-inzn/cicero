@@ -146,6 +146,11 @@ struct FontGrid: View {
     /// the text with them.
     private func measureSamples(_ inputs: Int) async {
         let text = sampleText
+        // Measured already, as each time the grid shows again: no samples to make, which took 20 ms at 20,000 families.
+        if SampleWidths.shared.hasMeasured(inputs) {
+            shown = Shown(text: text, ratio: SampleWidths.shared.listRatio)
+            return
+        }
         let samples = model.library.families.filter(model.data.lists).map { family in
             let (style, weight) = family.previewStyle(for: SearchQuery(""), weight: preview.weight)
             return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: model.variations(for: family, face: style.id), features: [])

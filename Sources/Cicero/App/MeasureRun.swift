@@ -2,6 +2,7 @@
 #if CICERO_MEASURE
 import AppKit
 import CiceroCore
+import CoreText
 
 /// The app performance runs' scenario (Tests/E2E/app-perf): with `CICERO_MEASURE=<file>` and `CICERO_MEASURE_RUN=1`,
 /// Cicero times its launch, then types, searches, picks sidebar items, opens font pages, scrolls and rates by itself,
@@ -39,11 +40,59 @@ enum MeasureRun {
         guard await until(minutes: 60, { model.measuredLibraries > 0 }) else { return Measurements.count("run.failed", detail: "not indexed") }
         await launchStep("launch.indexed")
         _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(30))
+        if ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"] == "launch" { return }
 
         let defaults = UserDefaults.standard
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
         model.selection = .all
         _ = await MainSettle.wait()
+
+        // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
+        // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
+        let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
+        // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
+        // (Tests/E2E/app-perf/screens.sh).
+        if only == "screens" {
+            // CICERO_MEASURE_MODE: the view to show (list, grid or specimens); CICERO_MEASURE_SEARCH: a search first.
+            let environment = ProcessInfo.processInfo.environment
+            if let mode = environment["CICERO_MEASURE_MODE"].flatMap(BrowserMode.init(rawValue:)) {
+                defaults.set(mode.rawValue, forKey: "browser.mode")
+            }
+            if let query = environment["CICERO_MEASURE_SEARCH"], !query.isEmpty {
+                model.searchText = query
+                _ = await until(seconds: 3, { model.appliedSearch == query })
+            }
+            _ = await MainSettle.wait(quiet: .milliseconds(500))
+            Measurements.count("screen", detail: "browser")
+            Measurements.flush()
+            try? await Task.sleep(for: .seconds(3))
+            if let family = model.visibleFamilies.first { model.openFamilyID = family.id }
+            _ = await MainSettle.wait()
+            Measurements.count("screen", detail: "page")
+            Measurements.flush()
+            try? await Task.sleep(for: .seconds(3))
+            model.openFamilyID = nil
+            return
+        }
+        // scroll: 15 pages down and back in each view, twice.
+        if only == "scroll" {
+            for _ in 0..<2 {
+                for mode in [BrowserMode.grid, .list, .specimens] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    await scroll(mode: mode)
+                }
+            }
+            return
+        }
+        if only == "mode" || only == "mode-scrolled" {
+            for _ in 0..<(only == "mode" ? 10 : 5) {
+                for mode in [BrowserMode.list, .specimens, .grid] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    if only == "mode-scrolled" { await scroll(mode: mode) }
+                }
+            }
+            return
+        }
 
         // Sidebar items, each twice.
         let location = model.data.folders.first.map { SidebarItem.folder($0.id) }
@@ -63,6 +112,8 @@ enum MeasureRun {
             guard await until(seconds: 2, { applied != nil && model.appliedSearch == query }), let settle = applied else { continue }
             let settled = await settle.wait()
             Measurements.record("search", ms: settled.ms, detail: "\(query): \(model.visibleFamilies.count)")
+            Measurements.record("search.work", ms: settled.workMs)
+            Measurements.record("search.longest", ms: settled.longestMs)
             await step("search.clear") { model.searchText = "" }
         }
         model.searchApplies = nil
@@ -81,10 +132,33 @@ enum MeasureRun {
             await step("rate.clear") { model.setRating(nil, for: [family]) }
         }
 
+        // CoreText's fonts-changed notification, as another app (Font Book, Creative Cloud) turning fonts on or off sends
+        // it: Cicero scans everything again. Nothing changed, so the scan applies nothing; timed until it ends.
+        for _ in 0..<3 {
+            let ended = model.endedScans
+            let start = ContinuousClock.now
+            NotificationCenter.default.post(name: Notification.Name(kCTFontManagerRegisteredFontsChangedNotification as String), object: nil)
+            guard await until(seconds: 60, { model.endedScans > ended }) else { break }
+            Measurements.record("fontsChanged", ms: (ContinuousClock.now - start).milliseconds)
+            _ = await MainSettle.wait()
+        }
+
+        // What one letter saved to the defaults costs the main window, as Compare and the Character Toolbox saved their
+        // text with each letter: SwiftUI draws every view with an @AppStorage again, whatever the key.
+        for end in "Hamburgefonstiv".indices.dropFirst() {
+            await step("defaults.write") { defaults.set(String("Hamburgefonstiv"[..<end]), forKey: "measure.scratch") }
+        }
+        defaults.removeObject(forKey: "measure.scratch")
+
         // In each view: switch to it, type into Preview Options' text one letter at a time, scroll down.
         let text = "Sphinx of black quartz"
         for mode in [BrowserMode.grid, .list, .specimens] {
             await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+            // A rating while this view shows: the list makes its rows again for each change of user data.
+            for family in picks.prefix(3) {
+                await step("rate.\(mode.rawValue)", detail: family.name) { model.setRating(4, for: [family]) }
+                await step("rate.\(mode.rawValue)", detail: family.name) { model.setRating(nil, for: [family]) }
+            }
             for end in text.indices.dropFirst() where text[text.index(before: end)] != " " {
                 await step("type.\(mode.rawValue)") { preview.sampleText = String(text[..<end]) }
             }
@@ -95,11 +169,13 @@ enum MeasureRun {
         _ = await MainSettle.wait()
     }
 
-    /// Scrolls the browser down a page at a time, 15 pages, then back to the top.
+    /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
     private static func scroll(mode: BrowserMode) async {
         guard let scrollView = browserScrollView() else { return Measurements.count("scroll.unavailable", detail: mode.rawValue) }
         let clip = scrollView.contentView
-        for page in 1...15 {
+        // CICERO_MEASURE_PAGES: how many pages, 15 unless it says.
+        let pages = Int(ProcessInfo.processInfo.environment["CICERO_MEASURE_PAGES"] ?? "") ?? 15
+        for page in 1...max(1, pages) {
             let height = clip.bounds.height
             let maxY = max(0, (scrollView.documentView?.frame.height ?? 0) - height)
             let y = min(maxY, clip.bounds.origin.y + height)
@@ -129,10 +205,15 @@ enum MeasureRun {
 
     /// Does `change`, then records how long the main thread took to be quiet again.
     private static func step(_ name: String, detail: String = "", _ change: () -> Void) async {
+        // A signpost per step, so a profile's samples can be matched to it (`Step`, its name and detail in the message).
+        let signpost = Measurements.signposter.beginInterval("Step", "\(name, privacy: .public) \(detail, privacy: .public)")
         let settle = MainSettle.begin()
         change()
         let settled = await settle.wait()
+        Measurements.signposter.endInterval("Step", signpost)
         Measurements.record(name, ms: settled.ms, detail: settled.timedOut ? "\(detail) (limit)" : detail)
+        Measurements.record("\(name).work", ms: settled.workMs, detail: detail)
+        Measurements.record("\(name).longest", ms: settled.longestMs, detail: detail)
     }
 
     /// Records the time since the process started, until the main thread is quiet.
@@ -162,12 +243,18 @@ final class MainSettle {
         var ms: Double
         var end: ContinuousClock.Instant
         var timedOut: Bool
+        /// The main thread's time in turns over 1 ms, and its longest turn: what an animation's many short turns add
+        /// up to, and the most a click or a key press would have waited meanwhile.
+        var workMs: Double
+        var longestMs: Double
     }
 
     private let start: ContinuousClock.Instant
     private var wake: ContinuousClock.Instant?
     private var lastBusyEnd: ContinuousClock.Instant
     private var sawTurn = false
+    private var work: Duration = .zero
+    private var longest: Duration = .zero
     private var observer: CFRunLoopObserver?
 
     private init() {
@@ -197,8 +284,13 @@ final class MainSettle {
         if activity == .afterWaiting {
             wake = now
         } else {
-            // The turn watching began in has no wake of its own: it counts as busy.
-            if wake.map({ now - $0 > .milliseconds(1) }) ?? true { lastBusyEnd = now }
+            // The turn watching began in has no wake of its own: it counts as busy, from the start.
+            let turn = now - (wake ?? start)
+            if wake == nil || turn > .milliseconds(1) {
+                lastBusyEnd = now
+                work += turn
+                longest = max(longest, turn)
+            }
             wake = nil
             sawTurn = true
         }
@@ -219,7 +311,8 @@ final class MainSettle {
                 break
             }
         }
-        return Result(ms: (lastBusyEnd - start).milliseconds, end: lastBusyEnd, timedOut: timedOut)
+        return Result(ms: (lastBusyEnd - start).milliseconds, end: lastBusyEnd, timedOut: timedOut,
+                      workMs: work.milliseconds, longestMs: longest.milliseconds)
     }
 }
 #endif
