@@ -27,7 +27,7 @@ extension AppModel {
         let operation = expect(faces, at: .on)
         enqueue { model in
             let result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
-            model.finish(result, operation: operation)
+            model.finish(result, operation: operation, undo: model.undo(turning: faces, on: false, failed: result.failed))
         }
     }
 
@@ -45,7 +45,7 @@ extension AppModel {
         let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, records: model.data.records)
-            model.finish(result, operation: operation)
+            model.finish(result, operation: operation, undo: model.undo(turning: targets, on: false, failed: result.failed))
         }
     }
 
@@ -123,7 +123,7 @@ extension AppModel {
         let operation = expect(faces, at: .off)
         enqueue { model in
             let result = await model.engine.deactivate(faces, records: model.data.records)
-            model.finish(result, operation: operation)
+            model.finish(result, operation: operation, undo: model.undo(turning: faces, on: true, failed: result.failed))
         }
     }
 
@@ -161,12 +161,34 @@ extension AppModel {
     }
 
     /// The engine has waited for macOS, so a scan now sees what the operation did.
-    func finish(_ result: ActivationResult, operation: Int? = nil) {
+    func finish(_ result: ActivationResult, operation: Int? = nil, undo: (() -> Void)? = nil) {
         data.records = result.records
         forgetInstalledAddedFiles()
-        showToast(result.message)
+        showToast(result.message, undo: undo)
         let scan = rescan()
         if let operation { settle(operation, after: scan) }
+    }
+
+    /// The toast's Undo for an operation that turned `faces` off (`on` true: turns them on again) or on: the styles it
+    /// changed, those whose files didn't fail, found again in the library as it is when Undo is clicked, turned back the
+    /// usual way, so a font that went out of an app's folder goes back into it, and one turned on for now goes off.
+    /// Nil when it changed none.
+    func undo(turning faces: [LibraryFace], on: Bool, failed: [String]) -> (() -> Void)? {
+        let failed = Set(failed)
+        let ids = Set(faces.filter { !failed.contains($0.face.path) }.map(\.id))
+        guard !ids.isEmpty else { return nil }
+        return { [weak self] in
+            guard let self else { return }
+            let families = self.library.families.filter { $0.faces.contains { ids.contains($0.id) } }
+            let current = families.flatMap(\.faces).filter { ids.contains($0.id) }
+            guard !current.isEmpty else { return }
+            if on {
+                self.activate(current, title: Self.title(for: families), confirmed: true)
+            } else {
+                // Asking first, as ever, before moving a file out of a folder others share.
+                self.deactivate(current)
+            }
+        }
     }
 
     static func title(for families: [Family]) -> String {
