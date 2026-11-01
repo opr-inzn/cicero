@@ -255,7 +255,8 @@ extension AppModel {
         let measuring = Measurements.begin("fontRows")
         defer { measuring.end(detail: "\(visibleFamilies.count) rows") }
         #endif
-        let unsorted = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }
+        let inputs = FontRow.Inputs(self)
+        let unsorted = visibleFamilies.map { FontRow($0, coverage: sources, inputs: inputs, model: self) }
         var rows = order.isEmpty ? unsorted : unsorted.sorted(using: order)
         for index in rows.indices { rows[index].position = index }
         let families = rows.map(\.family)

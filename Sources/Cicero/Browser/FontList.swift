@@ -3,7 +3,10 @@ import SwiftUI
 
 /// One row of the font list, with its sortable values worked out up front.
 nonisolated struct FontRow: Identifiable, Equatable, Sendable {
-    let family: Family
+    /// The family, in a box: the rows are copied as they're made and sorted, and a copy of a `Family` retains each of
+    /// its many fields, which was a quarter of making 20,000 rows again after a rating.
+    private let box: FamilyBox
+    var family: Family { box.family }
     let name: String
     let foundry: String
     let styles: Int
@@ -37,13 +40,32 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         }
     }
 
-    @MainActor init(_ family: Family, coverage sources: [(FontListColumn, CoverageSource)], model: AppModel) {
-        self.family = family
+    /// What the rows are made from, read from the model once for all of them: each read of an observed property goes
+    /// through observation, and `foundryName(of:)` and `classificationName(of:)` make their namers again each time.
+    /// Together, about half of making 20,000 rows.
+    struct Inputs {
+        let library: Library
+        let foundryName: (Family) -> String?
+        let classificationName: (Family) -> String
+        let ratings: [String: Int]
+        let tagDots: [String: [TagColor]]
+
+        @MainActor init(_ model: AppModel) {
+            library = model.library
+            foundryName = model.foundryNamer()
+            classificationName = model.classificationNamer()
+            ratings = model.data.familyRatings
+            tagDots = model.tagDots
+        }
+    }
+
+    @MainActor init(_ family: Family, coverage sources: [(FontListColumn, CoverageSource)], inputs: Inputs, model: AppModel) {
+        box = FamilyBox(family)
         name = family.name
-        libraryPosition = model.library.position(of: family.id) ?? .max
-        foundry = model.foundryName(of: family) ?? ""
+        libraryPosition = inputs.library.position(of: family.id) ?? .max
+        foundry = inputs.foundryName(family) ?? ""
         styles = family.faces.count
-        classification = model.classificationName(of: family)
+        classification = inputs.classificationName(family)
         format = family.format.rawValue
         activation = switch family.state {
         case .active, .system: 0
@@ -58,8 +80,8 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         self.coverage = coverage
         added = family.dateAdded ?? .distantPast
         year = family.year ?? 0
-        rating = model.rating(of: family) ?? 0
-        tags = model.tagColors(of: family)
+        rating = inputs.ratings[family.id] ?? 0
+        tags = inputs.tagDots[family.id] ?? []
     }
 
     /// What a character set column says about the family; nil while it's being checked, or when it has none of the set.
@@ -77,6 +99,15 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         if series.id == CharacterSetCatalog.adobeSeriesID { return set.name.replacingOccurrences(of: "Adobe Latin", with: "AL") }
         return set.name.hasPrefix(series.name + " ") ? String(set.name.dropFirst(series.name.count + 1)) : set.name
     }
+}
+
+/// A row's family, shared by the row's copies (see `FontRow`).
+nonisolated final class FamilyBox: Equatable, Sendable {
+    let family: Family
+
+    init(_ family: Family) { self.family = family }
+
+    static func == (lhs: FamilyBox, rhs: FamilyBox) -> Bool { lhs === rhs || lhs.family == rhs.family }
 }
 
 /// What a character set column reads its rows from.
