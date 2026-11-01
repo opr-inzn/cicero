@@ -186,7 +186,9 @@ struct GeneralSettings: View {
             presenting: updates.switchOffer
         ) { release in
             Button(release.isBeta ? "Switch to \(release.version)" : "Go Back to \(release.version)") { switchTo(release) }
-            Button(release.isBeta ? "Wait for the Next Beta" : "Wait for the Next Stable Version", role: .cancel) {}
+            // Cancel is the default: switching replaces the app, so Return shouldn't do it.
+            Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
         } message: { release in
             Text(switchMessage(release))
         }
