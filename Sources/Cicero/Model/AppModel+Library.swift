@@ -200,7 +200,11 @@ extension AppModel {
     var visibleFamilies: [Family] {
         let key = visibleKey
         if let cached = visibleCache, cached.key == key { return cached.families }
+        #if CICERO_MEASURE
+        let families = Measurements.time("visibleFamilies") { computeVisibleFamilies() }
+        #else
         let families = computeVisibleFamilies()
+        #endif
         visibleCache = (key, families)
         return families
     }
@@ -228,6 +232,10 @@ extension AppModel {
             }
         }
         // No order keeps the families' own, as for similar fonts, the closest first.
+        #if CICERO_MEASURE
+        let measuring = Measurements.begin("fontRows")
+        defer { measuring.end(detail: "\(visibleFamilies.count) rows") }
+        #endif
         let unsorted = visibleFamilies.map { FontRow($0, coverage: sources, model: self) }
         let rows = order.isEmpty ? unsorted : unsorted.sorted(using: order)
         let families = rows.map(\.family)

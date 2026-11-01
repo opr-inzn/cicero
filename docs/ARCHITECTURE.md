@@ -49,6 +49,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
 - **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
   (copy, register, confirm), scans (find, parse, build, save cache), restoring the saved library, applying a library, and coverage,
   for timing them in Instruments.
+- **Measurements** (`Measurements.swift`): the app performance runs' timings (Tests/E2E/app-perf), compiled only into
+  their builds (`-D CICERO_MEASURE`, `MEASURE=1 scripts/build-app.sh`), never into one for users: `build-app.sh`
+  refuses a binary without `MEASURE=1` that has them. Signpost intervals in an App category (list rebuilds, font files
+  read on the main thread), and, while `CICERO_MEASURE` names a file, a JSON line per timing there and a watchdog
+  thread that records every main-thread stall over 250 ms. Each hook in the app is inside `#if CICERO_MEASURE` too.
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
@@ -152,6 +157,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   moving the selection the panel shows. `QuickLookHost`, in the main window, hands it the window (centred over, closed
   with, out of the way of its sheets) and the selection's changes. The panel is made once, ordered out when
   closed, and draws nothing then; a font file nothing has read yet is read off the main thread first.
+- `MeasureRun` (`App/`, only with `-D CICERO_MEASURE`) is the app performance runs' scenario: with `CICERO_MEASURE_RUN=1` too, it times the launch,
+  then picks sidebar items, searches, opens font pages, rates, switches views, types and scrolls by itself, each step
+  until the main thread has been quiet for 100 ms (`MainSettle`, run-loop observers after Core Animation's commit),
+  and quits. It drives the model as the views' bindings do and never turns a font on or off.
 - `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates and the
   automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
   binary has no Info.plist with the feed. With the switch on, it checks right after starting the updater,
