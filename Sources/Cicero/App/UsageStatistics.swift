@@ -16,7 +16,7 @@ enum UsageStatistics {
     /// Cicero's app in TelemetryDeck, from its dashboard. Nothing is sent while it's empty.
     private nonisolated static let appID = "E1677081-90F9-4658-91F1-B9C63EFDAEAD"
 
-    /// Whether Share usage statistics is on, as it is at first. Not-similar reports go with it (see `SimilarReports`).
+    /// Whether Share usage statistics is on, as it is at first.
     static var isOn: Bool {
         UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? true
     }
@@ -80,7 +80,7 @@ enum UsageStatistics {
     }
 
     /// Whether this copy was built with build-app.sh, signed ad hoc and so without a team, unlike a release.
-    /// TelemetryDeck keeps test signals apart from the others, and the website test reports (see `SimilarReports`).
+    /// TelemetryDeck keeps test signals apart from the others.
     nonisolated static var isTestBuild: Bool {
         var code: SecCode?
         var staticCode: SecStaticCode?

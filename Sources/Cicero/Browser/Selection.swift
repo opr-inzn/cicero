@@ -299,7 +299,7 @@ struct FamilyItem: ViewModifier {
                 if NSApp.currentEvent?.clickCount == 2 { model.openFamilyID = family.id }
             }
             .contextMenu {
-                FamilyMenu(families: model.targets(for: family), model: model, similarTo: model.similarFamilyID.flatMap(model.family))
+                FamilyMenu(families: model.targets(for: family), model: model)
             }
             // The whole selection when the family is part of it, as for the menu.
             .fontDrag { FontDrag(families: model.targets(for: family).map(\.id)) } preview: {

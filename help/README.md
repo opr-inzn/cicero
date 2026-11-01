@@ -21,7 +21,7 @@ New to Cicero? Start with [Getting started](getting-started.md). To open this gu
 7. **[Export, backup and restore](export-and-backup.md)**\
    [Export fonts](export-and-backup.md#export-fonts) · [Back up](export-and-backup.md#back-up-your-library) · [Restore](export-and-backup.md#restore-a-backup)
 8. **[Troubleshooting](troubleshooting.md)**\
-   [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font) · [Font caches](troubleshooting.md#clear-the-font-caches) · [Rebuild Font List](troubleshooting.md#rescan-or-rebuild-the-font-list) · [FAQ](troubleshooting.md#questions-and-answers)
+   [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font) · [Font caches](troubleshooting.md#clear-the-font-caches) · [Rebuild Library](troubleshooting.md#rescan-or-rebuild-the-library) · [FAQ](troubleshooting.md#questions-and-answers)
 9. **[Keyboard shortcuts](keyboard-shortcuts.md)**
 10. **[Privacy](privacy.md)**
 

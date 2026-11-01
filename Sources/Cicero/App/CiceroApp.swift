@@ -198,7 +198,7 @@ struct CiceroCommands: Commands {
             Divider()
             Button("Rescan Library", systemImage: "arrow.clockwise") { model.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
-            Button("Rebuild Font List", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
+            Button("Rebuild Library", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
             Button("Clear Font Caches", systemImage: "eraser") { model.isClearingCaches = true }
         }
         // The user guide, the project's pages on GitHub and the privacy policy on the website, opened in the

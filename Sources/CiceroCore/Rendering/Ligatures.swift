@@ -141,8 +141,12 @@ public struct LigatureGroup: Identifiable, Sendable {
             // A character the font has no glyph for gets 0, as asking for it alone fails.
             var index = 0
             for scalar in scalars {
-                let glyph = glyphs[index]
+                var glyph = glyphs[index]
                 index += scalar < 0x10000 ? 1 : 2
+                // Right after another character, CoreText reads a variation selector as part of a variation sequence
+                // with it, and gives it no glyph of its own (0xFFFF); alone, it gets the one the font has for it, as
+                // Cambria Math has for U+FE00.
+                if isVariationSelector(scalar) { glyph = self.glyph(for: scalar, in: font) }
                 if glyph != 0, !body(scalar, glyph) { return false }
             }
             return true
@@ -154,6 +158,20 @@ public struct LigatureGroup: Identifiable, Sendable {
             }
         }
         _ = flush()
+    }
+
+    /// The variation selectors: Mongolian's free ones, VS1–VS16 and VS17–VS256.
+    private static func isVariationSelector(_ scalar: UInt32) -> Bool {
+        (0x180B...0x180D).contains(scalar) || scalar == 0x180F || (0xFE00...0xFE0F).contains(scalar) || (0xE0100...0xE01EF).contains(scalar)
+    }
+
+    /// The glyph for one character, asked for alone; 0 for none.
+    private static func glyph(for scalar: UInt32, in font: CTFont) -> CGGlyph {
+        var units: [UniChar] = scalar < 0x10000 ? [UniChar(scalar)]
+            : [UniChar(0xD800 + ((scalar - 0x10000) >> 10)), UniChar(0xDC00 + ((scalar - 0x10000) & 0x3FF))]
+        var glyphs: [CGGlyph] = [0, 0]
+        guard CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count) else { return 0 }
+        return glyphs[0]
     }
 }
 

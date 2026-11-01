@@ -2,14 +2,13 @@
 
 [Cicero Help](README.md) › Privacy
 
-Cicero has no accounts and no ads. To count how many people use it, it sends a short note each time it opens, and when you mark a family not similar to another, it reports which, to improve similar fonts. One switch turns off both, and your marks then stay on your Mac. Apart from those reports, nothing about your fonts leaves your Mac.
+Cicero has no accounts and no ads. To count how many people use it, it sends a short note each time it opens, and one switch turns that off. Nothing about your fonts leaves your Mac.
 
 The full [privacy policy](https://cicero.maximilianinzinger.com/privacy), for Cicero and its website, is on the website. **Help → Privacy Policy** opens it.
 
 ## When Cicero goes online
 
 - **Each time it opens**, to count how many people use Cicero, while **Share usage statistics** is on, under **Updates** in **Preferences → General**. It’s on at first. See [Usage statistics](#usage-statistics).
-- **When you mark a family not similar**, to report it, while **Share usage statistics** is on, as above. See [Not-similar reports](#not-similar-reports).
 - **To check GitHub for a new version** of Cicero, and to download it when you choose to install it. Cicero checks by itself, each time it opens and once a day while it stays open, as long as **Check for updates automatically** is on, under **Updates** in **Preferences → General**. It’s on at first. Turn it off, and Cicero only checks when you choose **Cicero → Check for Updates**
 
 ## Apple Intelligence
@@ -30,31 +29,18 @@ The first time, it also sends a second note saying your Mac is new, with that da
 
 That’s all: not your name, your Mac’s name, where you are or anything about your fonts. TelemetryDeck sees your IP address, as any website does, but doesn’t store it, and hashes the number again before it keeps it. The code that sends the note is in [UsageStatistics.swift](https://github.com/opr-inzn/cicero/blob/main/Sources/Cicero/App/UsageStatistics.swift).
 
-To stop it, open **Preferences → General** and, under **Updates**, turn off **Share usage statistics**. Cicero sends nothing more, no [not-similar reports](#not-similar-reports) either, and forgets the random number; if you turn it on again, it makes a new one.
-
-## Not-similar reports
-
-When you mark a family [not similar](browsing.md#find-similar-fonts) to the one it was listed for, Cicero sends its website a report, so that a later version can tell such families apart. It waits until **Undo** is gone, so a mark you undo isn’t sent. The report holds:
-
-- the name of the family the list was for, and the names of the families in that list as you saw it, the one you marked among them, with the name of the style Cicero measured each by and its foundry and classification as Cicero shows them
-- the numbers Cicero worked out from their letters on your Mac, to compare them: the measurements, like how tall the lowercase is and how heavy the strokes are, the 128 numbers its model sees in them, and how far apart Cicero found them
-- Cicero’s version and build number, the version of macOS, and which version of the measurements and the model the numbers come from
-- a random number Cicero made on your Mac, hashed, so that several reports from one Mac count as one person’s
-
-That’s all: not the font files, not pictures of the letters, not your name, your Mac’s name or the rest of your library. Cicero sends at most 20 reports a day; families you mark after that stay out of your lists all the same, on your Mac. The website keeps each report, with the time it arrived but not your IP address, to improve similar fonts. The code that sends it is in [SimilarReports.swift](https://github.com/opr-inzn/cicero/blob/main/Sources/Cicero/App/SimilarReports.swift).
-
-To stop it, open **Preferences → General** and, under **Updates**, turn off **Share usage statistics**, which stops the [usage statistics](#usage-statistics) too. Marking a family not similar then only takes it out of the list, on your Mac: Cicero sends nothing, and forgets the random number.
+To stop it, open **Preferences → General** and, under **Updates**, turn off **Share usage statistics**. Cicero sends nothing more, and forgets the random number; if you turn it on again, it makes a new one.
 
 ## What Cicero keeps on your Mac
 
 | Where | What |
 | --- | --- |
-| `~/Library/Application Support/Cicero` | Your folders, smart folders, tags, coverage sets, locations, added fonts and settings, the families you marked not similar, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the setup saved before a restore, in **Backups**. |
+| `~/Library/Application Support/Cicero` | Your folders, smart folders, tags, coverage sets, locations, added fonts and settings, and a note of the fonts Cicero turned on, so it can turn them off correctly. Also the setup saved before a restore, in **Backups**. |
 | `~/Cicero/Library` | The fonts Cicero installs, when you keep them in [Cicero’s Library](activating.md#ciceros-library), unless you moved it. |
 | `~/Cicero/Inactive` | The fonts Cicero moved out of an app’s own font folder to turn them off there (see [The Inactive folder](activating.md#the-inactive-folder)). |
-| `~/Library/Caches/Cicero` | What Cicero read from your font files, like names, characters and the shapes of their letters, so it doesn’t have to read them again, your font list as Cicero last found it, to show as soon as it opens, and the classifications Apple Intelligence recognized. **Fonts → Rebuild Font List** reads everything again. |
+| `~/Library/Caches/Cicero` | What Cicero read from your font files, like names, characters and the shapes of their letters, so it doesn’t have to read them again, your font list as Cicero last found it, to show as soon as it opens, and the classifications Apple Intelligence recognized. **Fonts → Rebuild Library** reads everything again. |
 
-Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way, and so are the random numbers for the usage statistics and the not-similar reports.
+Cicero’s preferences, like the appearance and the preview options, are kept the usual macOS way, and so is the random number for the usage statistics.
 
 Backups and exports are files you make yourself and save where you choose. Cicero doesn’t send them anywhere.
 
