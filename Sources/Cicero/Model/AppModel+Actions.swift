@@ -353,14 +353,104 @@ extension AppModel {
     }
 
     func moveToTrash(_ plan: TrashPlan) {
+        // Things as they are, for the toast's Undo (see `putBack`).
+        let before = TrashUndo(plan: plan, data: data, library: library)
         enqueue { model in
             let result = await model.engine.moveToTrash(plan, records: model.data.records)
             model.data.records = result.records
             if result.failed.isEmpty {
                 for name in plan.removedFamilies { model.forget(family: name) }
             }
-            model.showToast(result.message)
+            let trashed = result.trashed
+            #if CICERO_MEASURE
+            model.lastTrashed = trashed
+            #endif
+            model.showToast(result.message, undo: trashed.isEmpty ? nil : { [weak model] in model?.putBack(trashed, as: before) })
             model.rescan()
+        }
+    }
+
+    /// Move to Trash's Undo: puts the files back where they were, never over a file that's there now; what Cicero
+    /// knew about where they came from (copies installed from others, files moved out of an app's folder); the folders,
+    /// tags, rating, note, activation count and foundry name of the families it forgot, where nothing took their
+    /// place since; and, once a scan has read them, each file on or off as it was: on where it is, or until Cicero
+    /// quits, and off again in the Fonts folder, where macOS turns a file that comes back on by itself.
+    func putBack(_ trashed: [String: String], as before: TrashUndo) {
+        enqueue { model in
+            let outcome = model.engine.putBack(trashed)
+            let back = Set(outcome.back)
+            var records = model.data.records
+            for path in back {
+                if let origin = before.data.records.installedCopies[path] { records.installedCopies[path] = origin }
+                if let origin = before.data.records.appFolderOrigins[path] { records.appFolderOrigins[path] = origin }
+            }
+            model.data.records = records
+            model.restore(families: before.removedFamilies, from: before.data)
+            if !back.isEmpty, let library = try? await model.scanner.scan(model.scanInput, progress: { _ in }) {
+                let faces = library.families.flatMap(\.faces).filter { back.contains($0.face.path) }
+                let on = faces.filter { before.on.contains($0.face.path) && $0.canActivate }
+                if !on.isEmpty { model.data.records = await model.engine.activate(on, method: .inPlace, records: model.data.records).records }
+                let forNow = faces.filter { before.onForNow.contains($0.face.path) && $0.canActivateTemporarily }
+                if !forNow.isEmpty { model.data.records = await model.engine.activateTemporarily(forNow, records: model.data.records).records }
+                let off = faces.filter { before.off.contains($0.face.path) && $0.state.isActive && $0.canDeactivate }
+                if !off.isEmpty { model.data.records = await model.engine.deactivate(off, records: model.data.records).records }
+            }
+            model.rescan()
+            model.showToast(Self.putBackMessage(back: back.count, problems: outcome.problems))
+        }
+    }
+
+    /// The families' folders, tags, rating, note, activation count and foundry name as `before` had them, where they
+    /// have none now: the user may have given one again since.
+    private func restore(families names: [String], from before: UserData) {
+        var data = self.data
+        for name in names {
+            for old in before.sets where old.families.contains(name) || old.styles[name] != nil {
+                guard let index = data.sets.firstIndex(where: { $0.id == old.id }) else { continue }
+                if old.families.contains(name), !data.sets[index].families.contains(name) { data.sets[index].families.append(name) }
+                if let styles = old.styles[name], data.sets[index].styles[name] == nil { data.sets[index].styles[name] = styles }
+            }
+            if data.familyTags[name] == nil { data.familyTags[name] = before.familyTags[name] }
+            if data.familyRatings[name] == nil { data.familyRatings[name] = before.familyRatings[name] }
+            if data.familyNotes[name] == nil { data.familyNotes[name] = before.familyNotes[name] }
+            if data.activations[name] == nil { data.activations[name] = before.activations[name] }
+            if data.foundryOverrides[name] == nil { data.foundryOverrides[name] = before.foundryOverrides[name] }
+        }
+        self.data = data
+    }
+
+    static func putBackMessage(back: Int, problems: [String: ActivationEngine.PutBackProblem]) -> String {
+        guard !problems.isEmpty else { return back == 1 ? "Put back from the Trash" : "Put back \(back) files from the Trash" }
+        let gone = problems.values.count { $0 == .notInTrash }, taken = problems.values.count { $0 == .pathTaken }
+        let reasons = [gone > 0 ? "\(gone) no longer in the Trash" : nil, taken > 0 ? "\(taken) where another file is now" : nil,
+                       problems.count - gone - taken > 0 ? "\(problems.count - gone - taken) couldn’t be moved" : nil].compactMap { $0 }
+        let lead = back == 0 ? (problems.count == 1 ? "Couldn’t put the file back" : "Couldn’t put the files back")
+            : "Put back \(back) of \(back + problems.count) files"
+        return lead + ": " + reasons.joined(separator: ", ")
+    }
+
+    /// What Move to Trash's Undo needs of things before the move: the user's data, and how each file was on or off.
+    struct TrashUndo {
+        let data: UserData
+        let removedFamilies: [String]
+        /// On for good (where it is, in the Fonts folder, as an installed copy), until Cicero quits, and off.
+        let on: Set<String>
+        let onForNow: Set<String>
+        let off: Set<String>
+
+        init(plan: TrashPlan, data: UserData, library: Library) {
+            self.data = data
+            removedFamilies = plan.removedFamilies
+            let paths = Set(plan.paths)
+            var on: Set<String> = [], onForNow: Set<String> = [], off: Set<String> = []
+            for face in library.families.lazy.flatMap(\.faces) where paths.contains(face.face.path) {
+                switch face.position {
+                case .on: if face.isOnUntilQuit { onForNow.insert(face.face.path) } else { on.insert(face.face.path) }
+                case .off: off.insert(face.face.path)
+                case .app: break
+                }
+            }
+            (self.on, self.onForNow, self.off) = (on, onForNow, off)
         }
     }
 

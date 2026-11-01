@@ -305,6 +305,8 @@ final class AppModel {
     @ObservationIgnored var searchApplies: (() -> Void)?
     /// How many scans ended, applied or not, so the app performance runs can wait for the one a step started.
     @ObservationIgnored private(set) var endedScans = 0
+    /// Where the last Move to Trash put each file, for the Undo scenario: listing the Trash takes Full Disk Access.
+    @ObservationIgnored var lastTrashed: [String: String] = [:]
     #endif
 
     init() {
