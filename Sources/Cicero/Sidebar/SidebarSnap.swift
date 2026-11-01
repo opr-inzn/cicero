@@ -88,7 +88,8 @@ enum SidebarSnap {
             return min(max(snapped, sidebar.frame.minX + SidebarWidth.minimum), sidebar.frame.minX + SidebarWidth.maximum)
         }
         let implementation = imp_implementationWithBlock(answer)
-        if !class_addMethod(type, selector, implementation, "d@:@di"),
+        // CGFloat, the split view, CGFloat, NSInteger: what NSSplitViewDelegate's method takes and returns.
+        if !class_addMethod(type, selector, implementation, "d@:@dq"),
            let method = class_getInstanceMethod(type, selector) {
             method_setImplementation(method, implementation)
         }

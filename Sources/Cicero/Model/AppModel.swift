@@ -84,6 +84,10 @@ final class AppModel {
         didSet {
             guard data != oldValue else { return }
             store.save(data)
+            // The activation records at once, not a moment later with whatever else changes: macOS has the change
+            // already, and a Cicero that stopped in that moment (killed, crashed, the Mac switched off) would find fonts
+            // on that it didn't know it had turned on, and those on until it quits left on.
+            if data.records != oldValue.records { store.flush() }
             // No list of families depends on the sidebar's choices: opening a section, or moving or hiding a
             // row, leaves the browser's list as it is instead of making and sorting it again.
             if data.sidebar == oldValue.sidebar || data.differs(besidesSidebar: oldValue) { dataRevision &+= 1 }
@@ -121,9 +125,12 @@ final class AppModel {
         }
     }
     static let guessesClassificationsKey = "classification.guessesFromNames"
-    /// Whether to ask, as the window opens, if Cicero should classify fonts automatically: at the first launch, until
-    /// it's answered. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
+    /// Whether to ask if Cicero should classify fonts automatically: from the first launch, until it's answered. The
+    /// sidebar's Classifications has an Organize row meanwhile, which asks (see `showsGuessingQuestion`), rather than an
+    /// alert as the window first opens. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
     private(set) var asksAboutGuessing = false
+    /// Whether the question is showing, from a click on the sidebar’s Organize row.
+    var showsGuessingQuestion = false
     static let asksAboutGuessingKey = "classification.asksAboutGuessing"
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
@@ -301,6 +308,8 @@ final class AppModel {
     @ObservationIgnored var searchApplies: (() -> Void)?
     /// How many scans ended, applied or not, so the app performance runs can wait for the one a step started.
     @ObservationIgnored private(set) var endedScans = 0
+    /// Where the last Move to Trash put each file, for the Undo scenario: listing the Trash takes Full Disk Access.
+    @ObservationIgnored var lastTrashed: [String: String] = [:]
     #endif
 
     init() {
@@ -444,7 +453,15 @@ final class AppModel {
     }
 
     private func prepareToQuit() {
+        #if CICERO_MEASURE
+        let measuring = Measurements.begin("quit.endUntilQuit")
+        let untilQuit = data.records.temporary.values.count { $0.scope == .untilQuit }
+        #endif
         data.records = engine.endUntilQuit(data.records)
+        #if CICERO_MEASURE
+        measuring.end(detail: "\(untilQuit) files")
+        Measurements.flush()
+        #endif
         store.flush()
         scanner.flush()
     }
@@ -892,11 +909,13 @@ final class AppModel {
         refreshGroups()
     }
 
-    /// Answers the first launch's question: whether to classify fonts automatically from now on.
+    /// Answers the Organize row’s question: whether to classify fonts automatically from now on. Either answer takes
+    /// the row away.
     func answerGuessing(_ guesses: Bool) {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Self.asksAboutGuessingKey)
         defaults.set(guesses, forKey: Self.guessesClassificationsKey)
+        showsGuessingQuestion = false
         asksAboutGuessing = false
         guessesClassifications = guesses
     }

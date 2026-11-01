@@ -94,8 +94,8 @@ struct MainWindow: View {
         } message: { plan in
             Text(Self.trashMessage(plan))
         }
-        // At the first launch, before anything is guessed.
-        .alert("Classify Your Fonts Automatically?", isPresented: Binding(get: { model.asksAboutGuessing }, set: { _ in })) {
+        // From the sidebar's Organize row, until it's answered.
+        .alert("Classify Your Fonts Automatically?", isPresented: Binding(get: { model.showsGuessingQuestion }, set: { _ in })) {
             // Side by side, Not Now in grey and Classify in the accent colour, the one Return chooses: a longer title, like
             // Don't Classify, and the alert stacks them.
             Button("Classify") { model.answerGuessing(true) }

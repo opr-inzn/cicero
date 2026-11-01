@@ -300,7 +300,7 @@ extension ActivationEngine {
             let same = destination.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
             if Self.isIdenticalCopy(same, of: path) {
                 // To the Trash, as the user may have put it there; one the Trash won't take stays, rather than going in twice.
-                if (try? trash(Self.url(path))) != nil { placed[path] = same }
+                if didTrash(Self.url(path)) { placed[path] = same }
                 continue
             }
             if destination == locations.userFonts {

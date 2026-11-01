@@ -6,8 +6,8 @@ import AppKit
 /// `quaternaryLabelColor`. AppKit's `drawWithFrame:inView:`, which draws every token and calls that method, gives
 /// SwiftUI's class AppKit's method back the first time it draws one of its tokens, so even the first token shows
 /// tinted, and a `tokenTintColor` from the highlight colour (`highlightTint`; with no tint, AppKit's tokens take the
-/// accent colour). SwiftUI's class still places the title. When either class or a method isn't there, the tokens
-/// stay grey.
+/// accent colour). SwiftUI's class still places the title. When either class or a method isn't there, or
+/// `tokenTintColor` is no longer a method returning an object, the tokens stay grey.
 enum SearchTokenTint {
     private typealias Draw = @convention(c) (NSCell, Selector, NSRect, NSView) -> Void
     private static var isInstalled = false
@@ -23,7 +23,10 @@ enum SearchTokenTint {
         guard let appKitCell = NSClassFromString("NSTokenAttachmentCell"),
               let appKitDrawToken = class_getInstanceMethod(appKitCell, drawToken),
               let appKitTint = class_getInstanceMethod(appKitCell, tint),
-              let appKitDraw = class_getInstanceMethod(appKitCell, draw) else { return }
+              let appKitDraw = class_getInstanceMethod(appKitCell, draw),
+              // The private method still returns an object and takes nothing, as the block standing in for it does:
+              // called some other way, the block would crash.
+              Self.returnsObjectOnly(appKitTint) else { return }
         let highlight: @convention(block) (NSCell) -> NSColor = { _ in highlightTint() }
         let tintImplementation = imp_implementationWithBlock(highlight)
         let appKit = unsafeBitCast(method_getImplementation(appKitDraw), to: Draw.self)
@@ -40,6 +43,13 @@ enum SearchTokenTint {
         if !class_addMethod(appKitCell, draw, implementation, method_getTypeEncoding(appKitDraw)) {
             method_setImplementation(appKitDraw, implementation)
         }
+    }
+
+    /// Whether a method returns an object and takes no arguments but `self` and `_cmd`, as `tokenTintColor` does.
+    private static func returnsObjectOnly(_ method: Method) -> Bool {
+        let returned = method_copyReturnType(method)
+        defer { free(returned) }
+        return String(cString: returned) == "@" && method_getNumberOfArguments(method) == 2
     }
 
     /// The highlight colour as Light mode has it, 2.2 times as saturated: AppKit lays a token's tint over the field

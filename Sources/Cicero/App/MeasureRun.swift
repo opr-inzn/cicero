@@ -50,6 +50,43 @@ enum MeasureRun {
         // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
         // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
         let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
+        // activate-kill, in a VM only (Tests/E2E/app-perf/guest-kill.sh): turns three families of the first location on,
+        // waits for the operation to end, and kills Cicero at once, so what it saved by then is what the user data has.
+        // The one scenario that turns fonts on.
+        if only == "activate-kill" {
+            guard let location = model.data.folders.first?.id else { return Measurements.count("run.failed", detail: "no location") }
+            let families = Array(model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }.prefix(3))
+            model.activate(families)
+            await model.enqueued { _ in }
+            Measurements.count("activated", detail: families.map(\.name).joined(separator: ", "))
+            Measurements.flush()
+            kill(getpid(), SIGKILL)
+        }
+        // quit-temp, in a VM only (Tests/E2E/app-perf/guest-quit.sh): turns CICERO_MEASURE_COUNT families of the first
+        // location on until Cicero quits, then quits, which times turning them off again (quit.endUntilQuit).
+        if only == "quit-temp" {
+            guard let location = model.data.folders.first?.id else { return Measurements.count("run.failed", detail: "no location") }
+            let count = Int(ProcessInfo.processInfo.environment["CICERO_MEASURE_COUNT"] ?? "") ?? 3
+            let families = Array(model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }.prefix(count))
+            model.activateTemporarily(families.flatMap(\.faces), confirmed: true)
+            await settled(model)
+            let on = families.filter { model.family($0.id)?.position == .on }.count
+            Measurements.count("onUntilQuit", detail: "\(on) of \(families.count) families on")
+            return
+        }
+        // fonts-folder, in a VM's own account only (Tests/E2E/app-perf/guest-fonts-folder.sh), with the families
+        // CICERO_MEASURE_FAMILIES names in its ~/Library/Fonts: turning off there and Undo, Move to Trash and Undo, and
+        // the third on until Cicero quits, which the script checks is off once Cicero has gone.
+        if only == "fonts-folder" {
+            await checkFontsFolder(model: model)
+            return
+        }
+        // undo, in a VM only (Tests/E2E/app-perf/guest-undo.sh): Undo after turning fonts on and off, and after Move to
+        // Trash, with the ways putting back can fail; a "check" line, PASS or FAIL, for each thing checked.
+        if only == "undo" {
+            await checkUndo(model: model)
+            return
+        }
         // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
         // (Tests/E2E/app-perf/screens.sh).
         if only == "screens" {
@@ -167,6 +204,173 @@ enum MeasureRun {
         }
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
         _ = await MainSettle.wait()
+    }
+
+    // MARK: Undo
+
+    private static func check(_ passed: Bool, _ what: String) {
+        Measurements.count("check", detail: "\(passed ? "PASS" : "FAIL")  \(what)")
+    }
+
+    /// Waits for the queued operations, then for the scans they started to end and the window to be quiet.
+    private static func settled(_ model: AppModel) async {
+        await model.enqueued { _ in }
+        let ended = model.endedScans
+        _ = await until(seconds: 20) { model.endedScans > ended }
+        _ = await MainSettle.wait(quiet: .milliseconds(300))
+    }
+
+    private static func position(_ model: AppModel, _ id: String) -> SwitchPosition? { model.family(id)?.position }
+
+    private static func checkUndo(model: AppModel) async {
+        guard let location = model.data.folders.first?.id else { return check(false, "a location to test with") }
+        let off = model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }
+        guard off.count >= 6 else { return check(false, "six families off in the location (\(off.count))") }
+        let (one, two, three, four, five, six) = (off[0].id, off[1].id, off[2].id, off[3].id, off[4].id, off[5].id)
+
+        // A. Turning on and off.
+        model.activate([off[0]])
+        await settled(model)
+        check(position(model, one) == .on, "turning on \(one) turns it on")
+        check(model.toastUndo != nil, "its toast has an Undo")
+        model.undoToast()
+        await settled(model)
+        check(position(model, one) == .off, "Undo turns \(one) off again")
+
+        model.activate([off[1]])
+        await settled(model)
+        if let family = model.family(two) { model.deactivate([family]) }
+        await settled(model)
+        check(position(model, two) == .off, "turning \(two) off turns it off")
+        model.undoToast()
+        await settled(model)
+        check(position(model, two) == .on, "Undo turns \(two) on again")
+
+        // B. Move to Trash: three on, with a tag, a rating, a note and a folder; four off, in the folder too.
+        model.activate([off[2]])
+        await settled(model)
+        var data = model.data
+        if !data.tags.contains("Client") { data.tags.append("Client") }
+        data.familyTags[three] = ["Client"]
+        data.familyRatings[three] = 4
+        data.familyNotes[three] = "For the client"
+        let folder = FontSet(name: "Project", families: [three, four])
+        data.sets.append(folder)
+        model.data = data
+        let families = [three, four, five, six].compactMap(model.family)
+        let paths = { (id: String) in model.family(id).map { $0.faces.map(\.face.path) } ?? [] }
+        let (threePaths, fourPaths, fivePaths, sixPaths) = (paths(three), paths(four), paths(five), paths(six))
+        guard let plan = model.engine.trashPlan(for: families.flatMap(\.faces), removing: families.map(\.id), in: model.library, title: "Test") else {
+            return check(false, "a plan to move the families to the Trash")
+        }
+        model.moveToTrash(plan)
+        await settled(model)
+        let fm = FileManager.default
+        check((threePaths + fourPaths).allSatisfy { !fm.fileExists(atPath: $0) }, "Move to Trash takes the files away")
+        check(model.data.familyRatings[three] == nil && model.data.familyNotes[three] == nil, "and forgets the rating and the note")
+        guard let undo = model.toastUndo else { return check(false, "Move to Trash's toast has an Undo") }
+        check(true, "Move to Trash's toast has an Undo")
+
+        // The ways putting back can fail: five's file gone from the Trash, another file where six's was, four's folder gone.
+        // By the places Move to Trash recorded: listing the Trash takes Full Disk Access, which a test copy hasn't.
+        let trashed = fivePaths.compactMap { model.lastTrashed[$0] }
+        for path in trashed { try? fm.removeItem(atPath: path) }
+        check(!trashed.isEmpty && trashed.allSatisfy { !fm.fileExists(atPath: $0) }, "five's files taken out of the Trash (\(trashed.count))")
+        let standIn = sixPaths.first ?? ""
+        fm.createFile(atPath: standIn, contents: Data("stand-in".utf8))
+        let fourFolder = (fourPaths.first.map { ($0 as NSString).deletingLastPathComponent }) ?? ""
+        try? fm.removeItem(atPath: fourFolder)
+        check(!fm.fileExists(atPath: fourFolder), "four's folder taken away")
+
+        undo()
+        await settled(model)
+        check((threePaths + fourPaths).allSatisfy { fm.fileExists(atPath: $0) }, "Undo puts three's and four's files back, four's folder made again")
+        check(position(model, three) == .on, "three is on again")
+        check(position(model, four) == .off, "four is off, as it was")
+        check(model.data.familyTags[three] == ["Client"] && model.data.familyRatings[three] == 4
+              && model.data.familyNotes[three] == "For the client", "three's tag, rating and note are back")
+        let project = model.data.sets.first { $0.id == folder.id }
+        check(project?.families.contains(three) == true && project?.families.contains(four) == true, "three and four are in the folder again")
+        check(fivePaths.allSatisfy { !fm.fileExists(atPath: $0) }, "five, no longer in the Trash, stays away")
+        check((try? String(contentsOfFile: standIn, encoding: .utf8)) == "stand-in", "the file where six was is left as it is")
+        let message = model.toast ?? ""
+        check(message.contains("no longer in the Trash") && message.contains("where another file is now"), "the toast says what didn't go back: \(message)")
+    }
+
+    private static func checkFontsFolder(model: AppModel) async {
+        let names = (ProcessInfo.processInfo.environment["CICERO_MEASURE_FAMILIES"] ?? "").split(separator: ",").map(String.init)
+        let fonts = model.locations.userFonts.path + "/"
+        _ = await until(seconds: 30) { names.allSatisfy { model.family($0)?.position == .on } }
+        let families = names.compactMap(model.family)
+        guard families.count == 3 else { return check(false, "the three families in the Fonts folder (\(families.count))") }
+        let (a, b, c) = (names[0], names[1], names[2])
+        check(families.allSatisfy { $0.faces.allSatisfy { $0.face.path.hasPrefix(fonts) } && $0.position == .on },
+              "the three families are in ~/Library/Fonts, on")
+        let paths = { (id: String) in model.family(id).map { $0.faces.map(\.face.path) } ?? [] }
+
+        // Turning off in the Fonts folder, where the file stays, and Undo.
+        if let family = model.family(b) { model.deactivate([family]) }
+        await settled(model)
+        check(position(model, b) == .off && paths(b).allSatisfy { FileManager.default.fileExists(atPath: $0) },
+              "turning \(b) off in the Fonts folder leaves its files there, off")
+        model.undoToast()
+        await settled(model)
+        check(position(model, b) == .on, "Undo turns \(b) on again")
+
+        // Move to Trash with one on and one off in the Fonts folder, and Undo.
+        if let family = model.family(b) { model.deactivate([family]) }
+        await settled(model)
+        check(position(model, b) == .off, "\(b) off again before the Trash")
+        let (aPaths, bPaths) = (paths(a), paths(b))
+        let pair = [a, b].compactMap(model.family)
+        guard let plan = model.engine.trashPlan(for: pair.flatMap(\.faces), removing: pair.map(\.id), in: model.library, title: "Test") else {
+            return check(false, "a plan to move \(a) and \(b) to the Trash")
+        }
+        model.moveToTrash(plan)
+        await settled(model)
+        check((aPaths + bPaths).allSatisfy { !FileManager.default.fileExists(atPath: $0) }, "Move to Trash takes their files out of the Fonts folder")
+        guard let undo = model.toastUndo else { return check(false, "Move to Trash's toast has an Undo") }
+        undo()
+        await settled(model)
+        // macOS turns a file that comes back to the Fonts folder on by itself: give it the time it takes, then look again.
+        _ = await until(seconds: 15) { position(model, b) == .off && position(model, a) == .on }
+        check((aPaths + bPaths).allSatisfy { FileManager.default.fileExists(atPath: $0) }, "Undo puts their files back in the Fonts folder")
+        check(position(model, a) == .on, "\(a), on before, is on")
+        check(position(model, b) == .off, "\(b), off before, is off again, though macOS turned it on as it came back")
+
+        // Again, with b's file in the Trash made into one macOS won't take: it must stay in the Trash, off, and the toast
+        // say so; a still comes back on.
+        let again = [a, b].compactMap(model.family)
+        guard let plan2 = model.engine.trashPlan(for: again.flatMap(\.faces), removing: again.map(\.id), in: model.library, title: "Test") else {
+            return check(false, "a plan to move \(a) and \(b) to the Trash again")
+        }
+        model.moveToTrash(plan2)
+        await settled(model)
+        let bTrash = bPaths.compactMap { model.lastTrashed[$0] }
+        check(bTrash.count == bPaths.count, "\(b)'s places in the Trash recorded (\(bTrash.count) of \(bPaths.count))")
+        for path in bTrash { try? Data(repeating: 0x2A, count: 4096).write(to: URL(fileURLWithPath: path)) }
+        guard let undo2 = model.toastUndo else { return check(false, "the second Move to Trash's toast has an Undo") }
+        let started = ContinuousClock.now
+        undo2()
+        await settled(model)
+        _ = await until(seconds: 15) { position(model, a) == .on }
+        let took = (ContinuousClock.now - started).milliseconds
+        check(bPaths.allSatisfy { !FileManager.default.fileExists(atPath: $0) }, "\(b), which macOS won't take, isn't in the Fonts folder")
+        check(!bTrash.isEmpty && bTrash.allSatisfy { FileManager.default.fileExists(atPath: $0) }, "\(b)'s file is still in the Trash, where it was")
+        check(aPaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } && position(model, a) == .on, "\(a) is back, on")
+        check(!FileManager.default.fileExists(atPath: model.locations.support.appendingPathComponent("turning-off.json").path), "no list of files turning off left behind")
+        let message = model.toast ?? ""
+        check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved", "the toast: \(message)")
+        check(took < 15_000, "Undo took \(Int(took)) ms")
+        Measurements.count("refusedInTrash", detail: bTrash.joined(separator: "|"))
+
+        // On until Cicero quits, from off in the Fonts folder; the script looks once Cicero has gone.
+        if let family = model.family(c) { model.deactivate([family]) }
+        await settled(model)
+        if let family = model.family(c) { model.activateTemporarily(family.faces, confirmed: true) }
+        await settled(model)
+        check(position(model, c) == .on && model.family(c)?.faces.allSatisfy(\.isOnUntilQuit) == true, "\(c) on until Cicero quits")
+        Measurements.count("quitting", detail: paths(c).joined(separator: "|"))
     }
 
     /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
