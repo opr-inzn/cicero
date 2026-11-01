@@ -14,6 +14,27 @@ struct GeneralSettings: View {
     @State private var isBackingUp = false
     @State private var restoring: BackupContents?
 
+    private var updateStatus: String {
+        if let goingBack = updates.goingBack { return goingBack }
+        switch updates.status {
+        case .idle: return updates.isBeta ? "Beta version." : "Stable version."
+        case .checking: return "Checking for updates…"
+        case .available(let version): return "Cicero \(version) is available."
+        case .failed(let message): return "Couldn’t check for updates: \(message)"
+        case .upToDate:
+            if updates.isBeta, updates.track == .stable { return "Up to date. The next stable version replaces this beta." }
+            return "Up to date."
+        }
+    }
+
+    /// Saves the setup, then goes back; nothing happens when the setup can't be saved (the toast says so).
+    private func goBack(to stable: Updates.StableVersion) {
+        Task {
+            guard await model.saveSetupSnapshot(named: "Before Going Back to \(stable.version)", nothingWas: "changed") else { return }
+            await updates.goBack(to: stable)
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
         @Bindable var updates = updates
@@ -120,11 +141,25 @@ struct GeneralSettings: View {
                 .formRowCentered()
             }
             Section("Updates") {
-                Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
-                Toggle(isOn: $updates.getsBetas) {
-                    Text("Get beta versions")
-                    Text("Beta versions get new features sooner, and can have more bugs. Back up your library first. When you turn this off, Cicero keeps the beta until the next version, because it doesn’t install older versions.")
+                LabeledContent {
+                    if case .available = updates.status {
+                        Button("Update…") { updates.checkForUpdates() }
+                            .disabled(!updates.canCheckForUpdates || updates.goingBack != nil)
+                    } else {
+                        Button("Check Now") { updates.checkForUpdates() }
+                            .disabled(!updates.canCheckForUpdates || updates.goingBack != nil)
+                    }
+                } label: {
+                    Text("Version \(updates.version) (\(updates.build))")
+                    Text(updateStatus)
                 }
+                LabeledContent {
+                    PopUpPicker(options: Updates.Track.allCases.map { (title: $0.title, value: $0) }, selection: $updates.track,
+                                accessibilityLabel: "Update track")
+                } label: {
+                    Text("Update track")
+                }
+                Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
                     Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac. When you mark a family not similar, it sends Cicero’s website the names of the families in that list and the measurements of their letters, to improve similar fonts. No font files are sent.")
@@ -132,6 +167,26 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .confirmationDialog(
+            "Go back to Cicero \(updates.stableToGoBackTo?.version ?? "")?",
+            isPresented: Binding(get: { updates.stableToGoBackTo != nil }, set: { if !$0 { updates.stableToGoBackTo = nil } }),
+            presenting: updates.stableToGoBackTo
+        ) { stable in
+            Button("Go Back to \(stable.version)") { goBack(to: stable) }
+            Button("Wait for the Next Stable Version", role: .cancel) {}
+        } message: { stable in
+            Text("No stable version is newer than this beta. Cicero saves your setup to its Backups folder, replaces this beta with Cicero \(stable.version), and opens it again. Anything this beta added to your setup that \(stable.version) doesn’t know may be lost; the saved setup keeps it.")
+        }
+        .alert(
+            "Couldn’t go back to Cicero \(updates.goingBackFailure?.stable.version ?? "")",
+            isPresented: Binding(get: { updates.goingBackFailure != nil }, set: { if !$0 { updates.goingBackFailure = nil } }),
+            presenting: updates.goingBackFailure
+        ) { failure in
+            Button("Download \(failure.stable.version)") { NSWorkspace.shared.open(failure.stable.url) }
+            Button("OK", role: .cancel) {}
+        } message: { failure in
+            Text("\(failure.message) This beta stays. You can download Cicero \(failure.stable.version) and put it in place of this one yourself.")
+        }
         .onChange(of: appearance) { appearance.apply() }
         .onChange(of: sharesUsageStatistics) {
             guard !sharesUsageStatistics else { return }

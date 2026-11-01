@@ -764,6 +764,8 @@ struct FolderActivationPicker: View {
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value
+    /// The name VoiceOver reads, since the label beside it in a form isn't linked to it.
+    var accessibilityLabel: String?
 
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -780,6 +782,7 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
             button.addItems(withTitles: titles)
         }
         button.selectItem(at: options.firstIndex { $0.value == selection } ?? -1)
+        button.setAccessibilityLabel(accessibilityLabel)
         context.coordinator.onChoose = { index in selection = options[index].value }
     }
 

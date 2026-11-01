@@ -151,7 +151,8 @@ Cicero checks for new versions each time it opens and once a day while it stays 
 
 - To check now, choose **Cicero → Check for Updates**
 - To stop checking by itself, open **Preferences → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
-- To try new features sooner, turn on **Get beta versions** under **Updates**. Betas can have more bugs, so back up your library first (**Preferences → General → Back Up**). It’s off at first, and on at first in a beta. When you turn it off, you keep the beta until the next stable version, because Cicero doesn’t install older versions
+- **Preferences → General → Updates** shows your version and whether it’s up to date. **Check Now** checks at once, and **Update…** installs a version it found
+- To try new features sooner, set **Update track** to **Beta**. Betas can have more bugs, so back up your library first (**Preferences → General → Back Up**). A beta is called **Cicero (Beta)** and has a blue icon. Set it back to **Stable** to leave the beta: you get the next stable version when there is one. If there isn’t one yet, Cicero offers to go back to the latest stable version. It saves your setup to its Backups folder first, replaces the beta, and opens again
 
 Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). **Help → Release Notes** opens it, so you can see what changed in each version.
 
