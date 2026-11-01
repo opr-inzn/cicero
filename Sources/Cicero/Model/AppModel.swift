@@ -84,6 +84,10 @@ final class AppModel {
         didSet {
             guard data != oldValue else { return }
             store.save(data)
+            // The activation records at once, not a moment later with whatever else changes: macOS has the change
+            // already, and a Cicero that stopped in that moment (killed, crashed, the Mac switched off) would find fonts
+            // on that it didn't know it had turned on, and those on until it quits left on.
+            if data.records != oldValue.records { store.flush() }
             // No list of families depends on the sidebar's choices: opening a section, or moving or hiding a
             // row, leaves the browser's list as it is instead of making and sorting it again.
             if data.sidebar == oldValue.sidebar || data.differs(besidesSidebar: oldValue) { dataRevision &+= 1 }
