@@ -68,6 +68,89 @@ struct FontText: View {
     }
 }
 
+/// One line of text in a font face, drawn with CoreText, for the font list's previews: as `FontText` sets it with a line
+/// limit of one, a "…" where it doesn't fit, but without SwiftUI's text layout, which for each row went through TextKit
+/// to size the text and again to draw it. Typing in Preview Options with the list showing took about 30 % less, and a
+/// switch to the list 25–40 ms less (measured in a VM, 2026-11-01). As tall as `height` for layout, with room above
+/// and below for glyphs reaching past the font's ascent and descent, as `UnclippedText` gives; the baseline where
+/// `Text`'s is (see `line`). A file on a server is read off the main thread first, as for `FontText`.
+struct FontLine: View {
+    let text: String
+    let face: FontFace
+    let size: Double
+    var weight: Double = 400
+    var variations: [String: Double] = [:]
+    var features: [FeatureSetting] = []
+    let height: CGFloat
+    @State private var readPath: String?
+    /// Read so the line draws again in the other appearance, in its colour.
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let text = text.isEmpty ? " " : text
+            let scheme = colorScheme
+            let scale = displayScale
+            let line = Self.line(of: font, in: height, scale: scale)
+            // From the line's top, less the room above it, to its bottom and the room below, and at least the row: a
+            // line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
+            let room = UnclippedText(font: font).room
+            let top = min(0, line.top - room.top), bottom = max(height, line.top + line.height + room.bottom)
+            // At the sides too, where Text doesn't cut glyphs off either, as Zapfino's Z reaching left of the line's start:
+            // as far as the font's glyphs reach. Only for drawing: the line is cut to the column's width.
+            let box = CTFontGetBoundingBox(font)
+            let left = max(0, -box.minX).rounded(.up), right = max(0, box.maxX).rounded(.up)
+            Canvas { context, size in
+                _ = scheme
+                Self.draw(text, font: font, in: &context, x: left, width: size.width - left - right, baseline: line.baseline - top)
+            }
+            .frame(height: bottom - top)
+            .padding(.top, top)
+            .padding(.bottom, height - bottom)
+            .padding(.leading, -left)
+            .padding(.trailing, -right)
+            .accessibilityElement()
+            .accessibilityLabel(text)
+        } else {
+            Color.clear
+                .frame(height: height)
+                .task(id: face.path) {
+                    await FontLoader.shared.read(face.path)
+                    readPath = face.path
+                }
+        }
+    }
+
+    /// Where `Text` puts its line in a frame of `height`, from the frame's top: the ascent rounded to a whole point, the
+    /// line as tall as that and the descent, down to a whole pixel, centred, its top down to a whole pixel, the leading
+    /// split above and below so it doesn't count. Measured: SwiftUI's baseline in a 22 pt frame for each of the 703
+    /// font families on a Mac with macOS 26, at 2x, every one as this says (a probe of Text in an NSHostingView).
+    private static func line(of font: CTFont, in height: CGFloat, scale: CGFloat) -> (top: CGFloat, height: CGFloat, baseline: CGFloat) {
+        let pixel = { (value: CGFloat) in (value * scale).rounded(.down) / scale }
+        let ascent = CTFontGetAscent(font).rounded()
+        let line = pixel(ascent + CTFontGetDescent(font))
+        let top = pixel((height - line) / 2)
+        return (top, line, top + ascent)
+    }
+
+    private static func draw(_ text: String, font: CTFont, in context: inout GraphicsContext, x: CGFloat, width: CGFloat, baseline: CGFloat) {
+        let color = Color.ink.resolve(in: context.environment).cgColor
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+        let ellipsis = CTLineCreateWithAttributedString(NSAttributedString(string: "…", attributes: attributes))
+        let drawn = CTLineCreateTruncatedLine(line, Double(width), .end, ellipsis) ?? line
+        context.withCGContext { cg in
+            cg.textMatrix = .identity
+            cg.translateBy(x: x, y: baseline)
+            cg.scaleBy(x: 1, y: -1)
+            cg.textPosition = .zero
+            CTLineDraw(drawn, cg)
+        }
+    }
+}
+
 /// Its content once the font files it draws from have been read, so making their fonts never reads a file on the main
 /// thread: at once when they're on the Mac's own disks or were read before, as almost all are; for files on a server,
 /// or online only, once they've been read in the background, with empty room in its place meanwhile (see

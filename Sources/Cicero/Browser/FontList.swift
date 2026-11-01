@@ -611,14 +611,13 @@ private struct FontListRow: View {
             }
         case .preview:
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
-            FontText(
-                text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face,
-                size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures
-            )
-            .foregroundStyle(Color.ink)
             // Every row the same height, however tall the font's glyphs, which may run over its edges rather
             // than be cut off.
-            .frame(height: 22)
+            FontLine(
+                text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face,
+                size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
+                height: 22
+            )
         case .styles:
             Text(row.styles, format: .number).monospacedDigit().foregroundStyle(.secondary)
         case .classification:
