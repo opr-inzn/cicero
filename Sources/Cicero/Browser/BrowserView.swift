@@ -76,14 +76,7 @@ struct BrowserView: View {
     }
 
     /// Whether the list can still grow while coverage is being worked out.
-    private var dependsOnCoverage: Bool {
-        switch model.selection {
-        case .characterSet: true
-        case .smartSet(let id):
-            model.data.smartSets.first { $0.id == id }?.rules.contains { $0.field == .language || $0.field == .characterSet } ?? false
-        default: false
-        }
-    }
+    private var dependsOnCoverage: Bool { model.listDependsOnCoverage }
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {

@@ -99,6 +99,8 @@ struct FontRowsKey: Equatable {
     var visible: VisibleKey
     var order: [KeyPathComparator<FontRow>]
     var columns: [FontListColumn]
+    /// Coverage as it was, for rows sorted by a character set column; 0 otherwise.
+    var coverageRevision: Int
 }
 
 extension LibraryFace {
@@ -218,9 +220,24 @@ extension AppModel {
     private var visibleKey: VisibleKey {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
-            dataRevision: dataRevision, coverageRevision: coverageRevision, guessRevision: guessRevision,
+            dataRevision: dataRevision, coverageRevision: listDependsOnCoverage ? coverageRevision : 0, guessRevision: guessRevision,
             similar: similarFamilyID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
+    }
+
+    /// Whether the selected items' families can change as coverage is worked out: a character set, or a smart folder with
+    /// a language or character set rule. Other lists aren't made again as coverage comes in, every 200 faces while it's
+    /// worked out after a scan: at 20,000 families, each time took about 20 ms, and the grid was drawn again too. The
+    /// font list's character set columns follow coverage by themselves (`coverageCell`).
+    var listDependsOnCoverage: Bool {
+        selectedItems.contains { item in
+            switch item {
+            case .characterSet: true
+            case .smartSet(let id):
+                data.smartSets.first { $0.id == id }?.rules.contains { $0.field == .language || $0.field == .characterSet } ?? false
+            default: false
+            }
+        }
     }
 
     /// The font list's rows for `visibleFamilies`, sorted, each with its position, and their families in that order.
@@ -229,7 +246,8 @@ extension AppModel {
     /// list is sorted by, if any: worked out for every family, the columns were most of the time it took to make the
     /// rows (0.3 s of 0.4 at 20,000 families). The rows on screen ask for the others as they draw (`coverageCell`).
     func fontRows(sortedBy order: [KeyPathComparator<FontRow>], coverageColumns: [FontListColumn]) -> (rows: [FontRow], families: [Family]) {
-        let key = FontRowsKey(visible: visibleKey, order: order, columns: coverageColumns)
+        let key = FontRowsKey(visible: visibleKey, order: order, columns: coverageColumns,
+                              coverageRevision: coverageColumns.isEmpty ? 0 : coverageRevision)
         if let cached = fontRowsCache, cached.key == key { return (cached.rows, cached.families) }
         let sources = coverageColumns.compactMap { column in coverageSource(of: column).map { (column, $0) } }
         // No order keeps the families' own, as for similar fonts, the closest first.
