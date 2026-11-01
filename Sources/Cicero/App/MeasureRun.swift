@@ -50,6 +50,18 @@ enum MeasureRun {
         // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
         // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
         let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
+        // activate-kill, in a VM only (Tests/E2E/app-perf/guest-kill.sh): turns three families of the first location on,
+        // waits for the operation to end, and kills Cicero at once, so what it saved by then is what the user data has.
+        // The one scenario that turns fonts on.
+        if only == "activate-kill" {
+            guard let location = model.data.folders.first?.id else { return Measurements.count("run.failed", detail: "no location") }
+            let families = Array(model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }.prefix(3))
+            model.activate(families)
+            await model.enqueued { _ in }
+            Measurements.count("activated", detail: families.map(\.name).joined(separator: ", "))
+            Measurements.flush()
+            kill(getpid(), SIGKILL)
+        }
         // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
         // (Tests/E2E/app-perf/screens.sh).
         if only == "screens" {
