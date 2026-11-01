@@ -450,7 +450,15 @@ final class AppModel {
     }
 
     private func prepareToQuit() {
+        #if CICERO_MEASURE
+        let measuring = Measurements.begin("quit.endUntilQuit")
+        let untilQuit = data.records.temporary.values.count { $0.scope == .untilQuit }
+        #endif
         data.records = engine.endUntilQuit(data.records)
+        #if CICERO_MEASURE
+        measuring.end(detail: "\(untilQuit) files")
+        Measurements.flush()
+        #endif
         store.flush()
         scanner.flush()
     }

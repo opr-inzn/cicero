@@ -62,6 +62,18 @@ enum MeasureRun {
             Measurements.flush()
             kill(getpid(), SIGKILL)
         }
+        // quit-temp, in a VM only (Tests/E2E/app-perf/guest-quit.sh): turns CICERO_MEASURE_COUNT families of the first
+        // location on until Cicero quits, then quits, which times turning them off again (quit.endUntilQuit).
+        if only == "quit-temp" {
+            guard let location = model.data.folders.first?.id else { return Measurements.count("run.failed", detail: "no location") }
+            let count = Int(ProcessInfo.processInfo.environment["CICERO_MEASURE_COUNT"] ?? "") ?? 3
+            let families = Array(model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }.prefix(count))
+            model.activateTemporarily(families.flatMap(\.faces), confirmed: true)
+            await settled(model)
+            let on = families.filter { model.family($0.id)?.position == .on }.count
+            Measurements.count("onUntilQuit", detail: "\(on) of \(families.count) families on")
+            return
+        }
         // undo, in a VM only (Tests/E2E/app-perf/guest-undo.sh): Undo after turning fonts on and off, and after Move to
         // Trash, with the ways putting back can fail; a "check" line, PASS or FAIL, for each thing checked.
         if only == "undo" {
