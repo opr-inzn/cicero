@@ -35,7 +35,7 @@ The test suite isn’t in the public repository, so you can’t run it from a cl
 
 ## AI assistance
 
-Using AI tools such as Claude Code or Codex is completely fine, and you don’t need to disclose it. What matters is that you understand the code you send and that you tested it.
+Using AI tools such as Claude Code or Codex is completely fine, and you don’t need to disclose it. What matters to me is that you are specific about how you tested it, and what you did not test: which macOS version, how big the font library was, any performance impact, etc.
 
 ## Release notes
 
