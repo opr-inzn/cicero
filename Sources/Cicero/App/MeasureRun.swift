@@ -2,6 +2,7 @@
 #if CICERO_MEASURE
 import AppKit
 import CiceroCore
+import CoreText
 
 /// The app performance runs' scenario (Tests/E2E/app-perf): with `CICERO_MEASURE=<file>` and `CICERO_MEASURE_RUN=1`,
 /// Cicero times its launch, then types, searches, picks sidebar items, opens font pages, scrolls and rates by itself,
@@ -105,6 +106,17 @@ enum MeasureRun {
         for family in picks {
             await step("rate", detail: family.name) { model.setRating(3, for: [family]) }
             await step("rate.clear") { model.setRating(nil, for: [family]) }
+        }
+
+        // CoreText's fonts-changed notification, as another app (Font Book, Creative Cloud) turning fonts on or off sends
+        // it: Cicero scans everything again. Nothing changed, so the scan applies nothing; timed until it ends.
+        for _ in 0..<3 {
+            let ended = model.endedScans
+            let start = ContinuousClock.now
+            NotificationCenter.default.post(name: Notification.Name(kCTFontManagerRegisteredFontsChangedNotification as String), object: nil)
+            guard await until(seconds: 60, { model.endedScans > ended }) else { break }
+            Measurements.record("fontsChanged", ms: (ContinuousClock.now - start).milliseconds)
+            _ = await MainSettle.wait()
         }
 
         // What one letter saved to the defaults costs the main window, as Compare and the Character Toolbox saved their

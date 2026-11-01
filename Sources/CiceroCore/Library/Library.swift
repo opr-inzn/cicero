@@ -344,6 +344,10 @@ public final class LibraryScanner: Sendable {
         let signposter = Signposts.library
         let scan = signposter.beginInterval("Scan")
         defer { signposter.endInterval("Scan", scan) }
+        #if CICERO_MEASURE
+        let measuring = Measurements.begin("scan")
+        defer { measuring.end(detail: changes == nil ? "full" : "\(changes!.count) changed") }
+        #endif
         progress(.finding)
         let (number, last, rereadAll) = state.withLock { state in
             state.scans += 1
@@ -868,6 +872,10 @@ public final class LibraryScanner: Sendable {
             return state.files
         }
         guard let snapshot else { return }
+        #if CICERO_MEASURE
+        let measuring = Measurements.begin("cacheSave")
+        defer { measuring.end(detail: "\(snapshot.count) files") }
+        #endif
         let fm = FileManager.default
         try? fm.createDirectory(at: locations.caches, withIntermediateDirectories: true)
         try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)

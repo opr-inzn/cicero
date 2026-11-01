@@ -192,6 +192,10 @@ public final class FontLoader: Sendable {
         guard fstat(fd, &info) == 0, info.st_size > 0 else { return }
         var advice = radvisory(ra_offset: 0, ra_count: Int32(min(info.st_size, Int64(Int32.max))))
         _ = fcntl(fd, F_RDADVISE, &advice)
+        #if CICERO_MEASURE
+        // How much the read-ahead asks for, in MB (as the "ms" of the line): what a cap on it would save.
+        Measurements.record("readAhead.mb", ms: Double(info.st_size) / 1_048_576, detail: path)
+        #endif
     }
 
     /// Keeps descriptors read elsewhere: the scanner reads every new file. It reads one only when it's new or changed, so

@@ -298,6 +298,8 @@ final class AppModel {
     @ObservationIgnored private(set) var measuredLibraries = 0
     /// Called just before a search typed applies, after its pause: the app performance runs time it from there.
     @ObservationIgnored var searchApplies: (() -> Void)?
+    /// How many scans ended, applied or not, so the app performance runs can wait for the one a step started.
+    @ObservationIgnored private(set) var endedScans = 0
     #endif
 
     init() {
@@ -532,6 +534,9 @@ final class AppModel {
     }
 
     private func endScan(_ id: Int) {
+        #if CICERO_MEASURE
+        endedScans += 1
+        #endif
         if scanCount == id {
             revealProgress?.cancel()
             progressDue = false
