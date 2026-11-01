@@ -125,9 +125,12 @@ final class AppModel {
         }
     }
     static let guessesClassificationsKey = "classification.guessesFromNames"
-    /// Whether to ask, as the window opens, if Cicero should classify fonts automatically: at the first launch, until
-    /// it's answered. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
+    /// Whether to ask if Cicero should classify fonts automatically: from the first launch, until it's answered. The
+    /// sidebar's Classifications has an Organize row meanwhile, which asks (see `showsGuessingQuestion`), rather than an
+    /// alert as the window first opens. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
     private(set) var asksAboutGuessing = false
+    /// Whether the question is showing, from a click on the sidebar’s Organize row.
+    var showsGuessingQuestion = false
     static let asksAboutGuessingKey = "classification.asksAboutGuessing"
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
@@ -906,11 +909,13 @@ final class AppModel {
         refreshGroups()
     }
 
-    /// Answers the first launch's question: whether to classify fonts automatically from now on.
+    /// Answers the Organize row’s question: whether to classify fonts automatically from now on. Either answer takes
+    /// the row away.
     func answerGuessing(_ guesses: Bool) {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Self.asksAboutGuessingKey)
         defaults.set(guesses, forKey: Self.guessesClassificationsKey)
+        showsGuessingQuestion = false
         asksAboutGuessing = false
         guessesClassifications = guesses
     }

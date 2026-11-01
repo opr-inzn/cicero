@@ -93,6 +93,9 @@ private struct SidebarContent: View {
                 // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside (see `SectionHeader`).
                 Section {
                     if model.isExpanded(section) {
+                        if section == .classifications && model.asksAboutGuessing && !editing {
+                            OrganizeRow()
+                        }
                         if section == .characterSets {
                             characterSetGroups(groups)
                         } else {
@@ -551,6 +554,27 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
 final class SidebarHighlight {
     var selected: Set<SidebarItem> = []
     var dropTarget: SidebarItem?
+}
+
+/// At the top of Classifications until the user answers whether Cicero should classify fonts automatically: a click asks
+/// (see `AppModel.showsGuessingQuestion`), and either answer takes it away. In the accent colour, title and symbol both,
+/// and heavier, as an offer rather than a list of families: it can’t be selected, moved or hidden.
+private struct OrganizeRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button { model.showsGuessingQuestion = true } label: {
+            Label { Text("Organize").fontWeight(.semibold).foregroundStyle(.tint) } icon: {
+                // 1.5 pt to the right: the thin symbol sits that far from its title more than the other rows' do.
+                Image(systemName: "sparkles").foregroundStyle(.tint).offset(x: 1.5)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .selectionDisabled()
+        .help("Let Cicero classify fonts that don’t say what they are")
+    }
 }
 
 /// A row's title and symbol: in the accent colour while it's selected, white on it while families are over it.
