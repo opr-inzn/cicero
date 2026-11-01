@@ -74,6 +74,13 @@ enum MeasureRun {
             Measurements.count("onUntilQuit", detail: "\(on) of \(families.count) families on")
             return
         }
+        // fonts-folder, in a VM's own account only (Tests/E2E/app-perf/guest-fonts-folder.sh), with the families
+        // CICERO_MEASURE_FAMILIES names in its ~/Library/Fonts: turning off there and Undo, Move to Trash and Undo, and
+        // the third on until Cicero quits, which the script checks is off once Cicero has gone.
+        if only == "fonts-folder" {
+            await checkFontsFolder(model: model)
+            return
+        }
         // undo, in a VM only (Tests/E2E/app-perf/guest-undo.sh): Undo after turning fonts on and off, and after Move to
         // Trash, with the ways putting back can fail; a "check" line, PASS or FAIL, for each thing checked.
         if only == "undo" {
@@ -288,6 +295,56 @@ enum MeasureRun {
         check((try? String(contentsOfFile: standIn, encoding: .utf8)) == "stand-in", "the file where six was is left as it is")
         let message = model.toast ?? ""
         check(message.contains("no longer in the Trash") && message.contains("where another file is now"), "the toast says what didn't go back: \(message)")
+    }
+
+    private static func checkFontsFolder(model: AppModel) async {
+        let names = (ProcessInfo.processInfo.environment["CICERO_MEASURE_FAMILIES"] ?? "").split(separator: ",").map(String.init)
+        let fonts = model.locations.userFonts.path + "/"
+        _ = await until(seconds: 30) { names.allSatisfy { model.family($0)?.position == .on } }
+        let families = names.compactMap(model.family)
+        guard families.count == 3 else { return check(false, "the three families in the Fonts folder (\(families.count))") }
+        let (a, b, c) = (names[0], names[1], names[2])
+        check(families.allSatisfy { $0.faces.allSatisfy { $0.face.path.hasPrefix(fonts) } && $0.position == .on },
+              "the three families are in ~/Library/Fonts, on")
+        let paths = { (id: String) in model.family(id).map { $0.faces.map(\.face.path) } ?? [] }
+
+        // Turning off in the Fonts folder, where the file stays, and Undo.
+        if let family = model.family(b) { model.deactivate([family]) }
+        await settled(model)
+        check(position(model, b) == .off && paths(b).allSatisfy { FileManager.default.fileExists(atPath: $0) },
+              "turning \(b) off in the Fonts folder leaves its files there, off")
+        model.undoToast()
+        await settled(model)
+        check(position(model, b) == .on, "Undo turns \(b) on again")
+
+        // Move to Trash with one on and one off in the Fonts folder, and Undo.
+        if let family = model.family(b) { model.deactivate([family]) }
+        await settled(model)
+        check(position(model, b) == .off, "\(b) off again before the Trash")
+        let (aPaths, bPaths) = (paths(a), paths(b))
+        let pair = [a, b].compactMap(model.family)
+        guard let plan = model.engine.trashPlan(for: pair.flatMap(\.faces), removing: pair.map(\.id), in: model.library, title: "Test") else {
+            return check(false, "a plan to move \(a) and \(b) to the Trash")
+        }
+        model.moveToTrash(plan)
+        await settled(model)
+        check((aPaths + bPaths).allSatisfy { !FileManager.default.fileExists(atPath: $0) }, "Move to Trash takes their files out of the Fonts folder")
+        guard let undo = model.toastUndo else { return check(false, "Move to Trash's toast has an Undo") }
+        undo()
+        await settled(model)
+        // macOS turns a file that comes back to the Fonts folder on by itself: give it the time it takes, then look again.
+        _ = await until(seconds: 15) { position(model, b) == .off && position(model, a) == .on }
+        check((aPaths + bPaths).allSatisfy { FileManager.default.fileExists(atPath: $0) }, "Undo puts their files back in the Fonts folder")
+        check(position(model, a) == .on, "\(a), on before, is on")
+        check(position(model, b) == .off, "\(b), off before, is off again, though macOS turned it on as it came back")
+
+        // On until Cicero quits, from off in the Fonts folder; the script looks once Cicero has gone.
+        if let family = model.family(c) { model.deactivate([family]) }
+        await settled(model)
+        if let family = model.family(c) { model.activateTemporarily(family.faces, confirmed: true) }
+        await settled(model)
+        check(position(model, c) == .on && model.family(c)?.faces.allSatisfy(\.isOnUntilQuit) == true, "\(c) on until Cicero quits")
+        Measurements.count("quitting", detail: paths(c).joined(separator: "|"))
     }
 
     /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
