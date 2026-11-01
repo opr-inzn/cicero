@@ -9,16 +9,7 @@ extension AppModel {
     /// Makes a tag in the colour (nil: none) and gives it to the families, which keep the ones they have. A name that's
     /// taken gives them that tag, in the colour it has.
     func addTag(named name: String, color: TagColor?, to families: [Family] = []) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        var data = data
-        if !data.tags.contains(trimmed) {
-            data.tags.append(trimmed)
-            data.tagColors[trimmed] = color
-            data.sidebar.hidden.remove(SidebarSection.tags.key)
-        }
-        Self.setTag(trimmed, true, for: families, in: &data)
-        self.data = data
+        data.addTag(named: name, color: color, to: families.map(\.id))
     }
 
     func renameTag(_ old: String, to new: String) {
@@ -74,16 +65,7 @@ extension AppModel {
 
     /// Gives the families the tag, or takes it off them; each keeps its other tags.
     func setTag(_ tag: String, _ isOn: Bool, for families: [Family]) {
-        Self.setTag(tag, isOn, for: families, in: &data)
-    }
-
-    private static func setTag(_ tag: String, _ isOn: Bool, for families: [Family], in data: inout UserData) {
-        for family in families {
-            var tags = data.familyTags[family.id] ?? []
-            if isOn, !tags.contains(tag) { tags.append(tag) }
-            if !isOn { tags.removeAll { $0 == tag } }
-            data.familyTags[family.id] = tags.isEmpty ? nil : tags
-        }
+        data.setTag(tag, isOn, for: families.map(\.id))
     }
 
     /// Takes every tag off the families.

@@ -313,7 +313,7 @@ extension AppModel {
             }
             // An added file Cicero installed leaves Added Fonts: the copy is the font now.
             model.data.fontFiles.removeAll { copies[$0] != nil }
-            model.forgetInstalledAddedFiles()
+            model.data.forgetInstalledAddedFiles()
             let message = (messages + [skipNote]).filter { !$0.isEmpty }.joined(separator: ". ")
             let found = shown.union(copies.values).union(existing).union(replaced)
             // Nothing to show when nothing went in: the toast says so.
@@ -348,15 +348,6 @@ extension AppModel {
     private static func skipNote(_ skipped: [AddedDuplicate]) -> String {
         guard let names = FontNames.describe(families: skipped.map(\.family)) else { return "" }
         return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
-    }
-
-    /// Added files an earlier version installed a copy of leave Added Fonts: the copy in ~/Library/Fonts is the font in
-    /// the library now, in All Fonts like any installed font, and what Reveal in Finder shows. For the records earlier
-    /// versions wrote, before the scan after an operation.
-    func forgetInstalledAddedFiles() {
-        let installed = Set(data.records.installedCopies.values)
-        guard data.fontFiles.contains(where: installed.contains) else { return }
-        data.fontFiles.removeAll(where: installed.contains)
     }
 
     /// Whether the library lists a file already, or will by itself: one of its faces or their other copies is

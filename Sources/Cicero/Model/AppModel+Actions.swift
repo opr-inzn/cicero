@@ -51,10 +51,7 @@ extension AppModel {
 
     /// A question for turning on more than `UserData.manyFamilies` families at once, while the user wants one.
     private func manyActivationPrompt(for faces: [LibraryFace], title: String, temporarily: Bool) -> ManyActivationPrompt? {
-        guard data.asksBeforeActivatingMany else { return nil }
-        let families = Set(faces.map(\.face.familyName)).count
-        guard families > UserData.manyFamilies else { return nil }
-        return ManyActivationPrompt(title: title, faces: faces, families: families, temporarily: temporarily)
+        ActivationQuestions.many(for: faces, title: title, temporarily: temporarily, data: data)
     }
 
     /// Goes on with an activation the user agreed to.
@@ -82,30 +79,10 @@ extension AppModel {
         performDeactivation(targets)
     }
 
-    /// A question for turning off fonts an app loads from a folder that syncs with a cloud service or is on a server,
-    /// while the user wants one: turning one off moves its file out of the folder, for everyone who shares it. Not for
-    /// a folder Cicero can't move files out of, where turning off fails anyway.
+    /// A question for turning off fonts whose files would move out of a folder others share (see
+    /// `ActivationQuestions.movingOut`).
     private func movingOutPrompt(for faces: [LibraryFace]) -> MovingOutPrompt? {
-        guard data.asksBeforeMovingOutOfSharedFolders else { return nil }
-        var checked: Set<String> = []
-        var sharing: [String: FolderSharing] = [:]
-        var shared: [(face: LibraryFace, folder: String)] = []
-        for face in faces where ActivationEngine.movesOutOfAppFolder(face, records: data.records) {
-            let folder = (face.face.path as NSString).deletingLastPathComponent
-            if checked.insert(folder).inserted, FileManager.default.isWritableFile(atPath: folder),
-               let found = ActivationEngine.sharing(ofFolder: folder) {
-                sharing[folder] = found
-            }
-            if sharing[folder] != nil { shared.append((face, folder)) }
-        }
-        guard !shared.isEmpty else { return nil }
-        let folders = Set(shared.map(\.folder))
-        let apps = Set(shared.compactMap(\.face.app))
-        return MovingOutPrompt(
-            faces: faces, shared: shared.map(\.face),
-            folder: folders.count == 1 ? folders.first.flatMap { path in sharing[path].map { (path: path, sharing: $0) } } : nil,
-            app: apps.count == 1 ? apps.first.map(FaceState.appDescription) : nil
-        )
+        ActivationQuestions.movingOut(for: faces, data: data)
     }
 
     /// Goes on with turning off fonts in a shared folder as the user chose: all of them, moving the files out
@@ -162,8 +139,10 @@ extension AppModel {
 
     /// The engine has waited for macOS, so a scan now sees what the operation did.
     func finish(_ result: ActivationResult, operation: Int? = nil, undo: (() -> Void)? = nil) {
+        var data = data
         data.records = result.records
-        forgetInstalledAddedFiles()
+        data.forgetInstalledAddedFiles()
+        self.data = data
         showToast(result.message, undo: undo)
         let scan = rescan()
         if let operation { settle(operation, after: scan) }
@@ -663,10 +642,7 @@ extension AppModel {
     // MARK: Sets
 
     func addSet(named name: String, with families: [Family] = [], styles: [String: [String]] = [:]) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        data.sets.append(FontSet(name: trimmed, families: families.map(\.id), styles: styles))
-        data.sidebar.hidden.remove(SidebarSection.sets.key)
+        data.addSet(named: name, families: families.map(\.id), styles: styles)
     }
 
     func renameSet(_ id: UUID, to name: String) {
@@ -693,12 +669,7 @@ extension AppModel {
 
     /// Puts the families in the set whole, in place of the styles of them it had, or takes them out with their styles.
     func setMembership(_ member: Bool, for families: [Family], in setID: UUID) {
-        guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
-        if member {
-            data.sets[index].add(families: families.map(\.id))
-        } else {
-            data.sets[index].remove(families: Set(families.map(\.id)))
-        }
+        data.setMembership(member, for: families.map(\.id), in: setID)
     }
 
     /// Whether the set has the style, on its own or with its whole family.

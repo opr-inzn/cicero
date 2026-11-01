@@ -14,13 +14,11 @@ enum ClassificationGuessSource {
 /// user gave them.
 extension AppModel {
     /// Every classification, for menus: the built-in ones under their names, then the user's.
-    var classificationNames: [String] {
-        Classification.allCases.map(name(of:)) + data.classifications
-    }
+    var classificationNames: [String] { data.classificationNames }
 
     /// A built-in classification's name, as the user renamed it.
     func name(of classification: Classification) -> String {
-        data.classificationRenames[classification.rawValue] ?? classification.rawValue
+        data.name(of: classification)
     }
 
     func classificationName(of family: Family) -> String {
@@ -29,14 +27,8 @@ extension AppModel {
 
     /// `classificationName(of:)` for many families: the user's choices are read once, not for every family.
     func classificationNamer() -> (Family) -> String {
-        let overrides = data.classificationOverrides
-        let renames = data.classificationRenames
         let guess = classificationGuess()
-        return { family in
-            if let override = overrides[family.id] { return override }
-            let classification = guess(family)?.classification ?? family.classification
-            return renames[classification.rawValue] ?? classification.rawValue
-        }
+        return data.classificationNamer { guess($0)?.classification }
     }
 
     /// The classification Automatic puts a family in: the one its fonts suggest, or the guess.
