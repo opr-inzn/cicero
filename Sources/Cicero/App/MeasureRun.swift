@@ -53,6 +53,16 @@ enum MeasureRun {
         // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
         // (Tests/E2E/app-perf/screens.sh).
         if only == "screens" {
+            // CICERO_MEASURE_MODE: the view to show (list, grid or specimens); CICERO_MEASURE_SEARCH: a search first.
+            let environment = ProcessInfo.processInfo.environment
+            if let mode = environment["CICERO_MEASURE_MODE"].flatMap(BrowserMode.init(rawValue:)) {
+                defaults.set(mode.rawValue, forKey: "browser.mode")
+            }
+            if let query = environment["CICERO_MEASURE_SEARCH"], !query.isEmpty {
+                model.searchText = query
+                _ = await until(seconds: 3, { model.appliedSearch == query })
+            }
+            _ = await MainSettle.wait(quiet: .milliseconds(500))
             Measurements.count("screen", detail: "browser")
             Measurements.flush()
             try? await Task.sleep(for: .seconds(3))
