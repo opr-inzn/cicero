@@ -190,13 +190,19 @@ public final class FontLoader: Sendable {
         defer { close(fd) }
         var info = stat()
         guard fstat(fd, &info) == 0, info.st_size > 0 else { return }
-        var advice = radvisory(ra_offset: 0, ra_count: Int32(min(info.st_size, Int64(Int32.max))))
+        // At most the first 32 MB: a few big files, the emoji font's 183 MB above all, were most of what launches read
+        // ahead (506 of 634 MB with macOS 26's fonts), filling the page cache other apps use. A preview draws a few
+        // glyphs; the rest of such a file is read as it's drawn.
+        let count = min(info.st_size, Self.mostReadAhead)
+        var advice = radvisory(ra_offset: 0, ra_count: Int32(count))
         _ = fcntl(fd, F_RDADVISE, &advice)
         #if CICERO_MEASURE
-        // How much the read-ahead asks for, in MB (as the "ms" of the line): what a cap on it would save.
-        Measurements.record("readAhead.mb", ms: Double(info.st_size) / 1_048_576, detail: path)
+        // How much the read-ahead asks for, in MB (as the "ms" of the line).
+        Measurements.record("readAhead.mb", ms: Double(count) / 1_048_576, detail: path)
         #endif
     }
+
+    private static let mostReadAhead: Int64 = 32 << 20
 
     /// Keeps descriptors read elsewhere: the scanner reads every new file. It reads one only when it's new or changed, so
     /// fonts made from the path before are out of date, like the stand-in for a file that was moved away and back: the
