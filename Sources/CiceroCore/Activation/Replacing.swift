@@ -55,7 +55,7 @@ extension ActivationEngine {
                 continue
             }
             do {
-                try trash(old)
+                _ = try trash(old)
             } catch {
                 try? fm.removeItem(at: staged)
                 failed.append(replacement.old)
@@ -88,7 +88,7 @@ extension ActivationEngine {
         }
         // Once its original has the added file, the copy goes; while it doesn't, the copy stays as it was.
         for (replacement, original) in spare {
-            guard done.contains(where: { $0.old == original }), (try? trash(Self.url(replacement.old))) != nil else {
+            guard done.contains(where: { $0.old == original }), didTrash(Self.url(replacement.old)) else {
                 failed.append(replacement.old)
                 continue
             }
@@ -201,7 +201,7 @@ extension ActivationEngine {
                 failed.append(replacement.old)
                 continue
             }
-            if (try? trash(Self.url(aside ?? replacement.old))) != nil {
+            if didTrash(Self.url(aside ?? replacement.old)) {
                 done.append(replacement)
                 if new != replacement.old { placed[replacement.old] = new }
                 if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
@@ -241,7 +241,7 @@ extension ActivationEngine {
                 continue
             }
             do {
-                try trash(old)
+                _ = try trash(old)
                 done.append(replacement)
                 placed[replacement.old] = new.path
             } catch {

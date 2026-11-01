@@ -278,6 +278,9 @@ public struct ActivationResult: Sendable {
     /// For `replace`: added files that went in as "Name 2.otf" only because macOS hadn't let go of the old file yet → the
     /// path they're meant for (see `renameBack`).
     public var renameLater: [String: String] = [:]
+    /// For `moveToTrash`: where each file went in the Trash, by the path it had; not those an administrator's password
+    /// moved, whose place there isn't known (see `putBack`).
+    public var trashed: [String: String] = [:]
 
     public init(records: ActivationRecords, succeeded: Int, failed: [String], message: String) {
         self.records = records
@@ -324,7 +327,13 @@ public struct ActivationEngine: Sendable {
     let locations: Locations
     let registrar: any FontRegistrar
     /// Moves a file to the Trash. Tests replace it so they don't fill the user's Trash.
-    public var trash: @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+    /// Moves a file to the Trash and returns where it went there, which may be under another name; nil when that isn't
+    /// known, as for tests that remove the file instead (see `putBack`).
+    public var trash: @Sendable (URL) throws -> URL? = { url in
+        var location: NSURL?
+        try FileManager.default.trashItem(at: url, resultingItemURL: &location)
+        return location as URL?
+    }
     /// Moves files `trash` wasn't allowed to move, after macOS asks for an administrator's password, and returns
     /// the paths that went. Tests replace it so no password is asked for.
     public var trashAsAdministrator: @Sendable ([URL]) async -> Set<String> = { await AdministratorTrash.move($0) }
@@ -404,7 +413,7 @@ public struct ActivationEngine: Sendable {
         }
         // Unregistering isn't needed: they're off. A new file where one turned off was a moment ago is turned on as it's
         // registered (see `CoreTextRegistrar.register`).
-        for path in toCopy.flatMap({ outdatedCopies(of: $0.path, records: records) }) where (try? trash(Self.url(path))) != nil {
+        for path in toCopy.flatMap({ outdatedCopies(of: $0.path, records: records) }) where didTrash(Self.url(path)) {
             records.installedCopies[path] = nil
             removeEmptyFolders(around: path)
         }
@@ -716,7 +725,7 @@ public struct ActivationEngine: Sendable {
         if !spares.isEmpty {
             _ = await registrar.unregister(spares.map(Self.url), scope: .persistent)
             for path in spares {
-                if (try? trash(Self.url(path))) != nil {
+                if didTrash(Self.url(path)) {
                     records.installedCopies[path] = nil
                     removeEmptyFolders(around: path)
                     succeeded += 1
@@ -882,6 +891,7 @@ public struct ActivationEngine: Sendable {
         if !session.isEmpty {
             _ = await registrar.unregister(session.map(Self.url), scope: .session)
         }
+        var inTrash: [String: String] = [:]
         func trashed(_ path: String) {
             records.installedCopies[path] = nil
             records.inPlace.remove(path)
@@ -893,7 +903,7 @@ public struct ActivationEngine: Sendable {
         var forbidden: [String] = []
         for path in plan.paths {
             do {
-                try trash(Self.url(path))
+                if let location = try trash(Self.url(path)) { inTrash[path] = location.path }
                 trashed(path)
             } catch CocoaError.fileWriteNoPermission where !Self.isLocked(path) {
                 forbidden.append(path)
@@ -920,7 +930,51 @@ public struct ActivationEngine: Sendable {
         } else {
             message = "Couldn’t move \(failed.count) of \(succeeded + failed.count) files to the Trash"
         }
-        return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
+        var result = ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
+        result.trashed = inTrash
+        return result
+    }
+
+    /// Why a file Move to Trash moved didn't go back (see `putBack`).
+    public enum PutBackProblem: Sendable, Equatable {
+        /// It isn't where it went in the Trash any more: the Trash was emptied, or it was put back or moved.
+        case notInTrash
+        /// Another file is at its path now, which is never written over.
+        case pathTaken
+        /// Moving it failed.
+        case failed
+    }
+
+    /// Puts files back where Move to Trash took them from, for its Undo: `trashed` is each file's path → where it went
+    /// in the Trash (`ActivationResult.trashed`). Never writes over a file at the path now; makes the file's folder again
+    /// when it's gone, as a family's folder in the Font Library that was taken away once empty. What Cicero records about
+    /// the files, and turning them on or off again, is the caller's.
+    public func putBack(_ trashed: [String: String]) -> (back: [String], problems: [String: PutBackProblem]) {
+        let fm = FileManager.default
+        var back: [String] = []
+        var problems: [String: PutBackProblem] = [:]
+        for (path, location) in trashed.sorted(by: { $0.key < $1.key }) {
+            guard Self.exists(location) else { problems[path] = .notInTrash; continue }
+            guard !Self.exists(path) else { problems[path] = .pathTaken; continue }
+            do {
+                try fm.createDirectory(at: Self.url(path).deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fm.moveItem(at: Self.url(location), to: Self.url(path))
+                back.append(path)
+            } catch {
+                problems[path] = .failed
+            }
+        }
+        return (back, problems)
+    }
+
+    /// Whether `trash` took the file, wherever it went.
+    func didTrash(_ url: URL) -> Bool {
+        do {
+            _ = try trash(url)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Stops using files registered in place (e.g. ones whose files are gone) and forgets them.
