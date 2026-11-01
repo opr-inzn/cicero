@@ -377,7 +377,7 @@ extension AppModel {
     /// quits, and off again in the Fonts folder, where macOS turns a file that comes back on by itself.
     func putBack(_ trashed: [String: String], as before: TrashUndo) {
         enqueue { model in
-            let outcome = model.engine.putBack(trashed)
+            let outcome = await model.engine.putBack(trashed, off: before.off)
             let back = Set(outcome.back)
             var records = model.data.records
             for path in back {

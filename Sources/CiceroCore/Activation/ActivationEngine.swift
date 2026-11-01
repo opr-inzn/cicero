@@ -948,20 +948,34 @@ public struct ActivationEngine: Sendable {
     /// Puts files back where Move to Trash took them from, for its Undo: `trashed` is each file's path → where it went
     /// in the Trash (`ActivationResult.trashed`). Never writes over a file at the path now; makes the file's folder again
     /// when it's gone, as a family's folder in the Font Library that was taken away once empty. What Cicero records about
-    /// the files, and turning them on or off again, is the caller's.
-    public func putBack(_ trashed: [String: String]) -> (back: [String], problems: [String: PutBackProblem]) {
+    /// the files, and turning them on or off again, is the caller's, except for those in `off` that go back into a Fonts
+    /// folder: macOS turns on whatever arrives in one, and turning a file off before macOS has it doesn't stick, so those
+    /// go back through `moveIntoFontsFolderOff`, off. One that won't stay off there stays in the Trash.
+    public func putBack(_ trashed: [String: String], off: Set<String> = []) async -> (back: [String], problems: [String: PutBackProblem]) {
         let fm = FileManager.default
         var back: [String] = []
         var problems: [String: PutBackProblem] = [:]
+        // Where each goes in the Trash → its path, for those going back into a Fonts folder off.
+        var offInFontsFolder: [String: String] = [:]
         for (path, location) in trashed.sorted(by: { $0.key < $1.key }) {
             guard Self.exists(location) else { problems[path] = .notInTrash; continue }
             guard !Self.exists(path) else { problems[path] = .pathTaken; continue }
+            if off.contains(path), isInsideFontsFolder(path) {
+                offInFontsFolder[location] = path
+                continue
+            }
             do {
                 try fm.createDirectory(at: Self.url(path).deletingLastPathComponent(), withIntermediateDirectories: true)
                 try fm.moveItem(at: Self.url(location), to: Self.url(path))
                 back.append(path)
             } catch {
                 problems[path] = .failed
+            }
+        }
+        if !offInFontsFolder.isEmpty {
+            let placed = await moveIntoFontsFolderOff(offInFontsFolder, exactly: true).placed
+            for (location, path) in offInFontsFolder.sorted(by: { $0.value < $1.value }) {
+                if placed[location] != nil { back.append(path) } else { problems[path] = .failed }
             }
         }
         return (back, problems)
