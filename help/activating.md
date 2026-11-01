@@ -10,6 +10,8 @@ A font counts as activated once macOS says it is. So when the message at the bot
 
 A switch moves the moment you click it and stays there while Cicero works. If something goes wrong, it moves back and a message says what happened. While a switch is moving, clicking it again does nothing.
 
+Turned on or off the wrong fonts? Click **Undo** in the message at the bottom of the window, within a few seconds, and Cicero turns them back.
+
 ## Turn a font on
 
 Any of these work:
@@ -265,7 +267,9 @@ To delete fonts, not just turn them off:
 
 Cicero turns the fonts off in every app and moves their files to the Trash, copies in other folders included. If a file also holds other families, as a font collection can, the alert names them. The families also leave the folders you put them in.
 
-Files that come with macOS or an app always stay where they are. You can put files back from the Trash in the Finder.
+Files that come with macOS or an app always stay where they are.
+
+Changed your mind? Click **Undo** in the message at the bottom of the window, within a few seconds. Cicero puts the files back where they were, turns on again the fonts that were on, and gives the families back their folders, tags, rating and note. A file that’s no longer in the Trash, or whose place another file has taken since, stays where it is, and the message says so. Later, you can still put files back from the Trash in the Finder, but Cicero won’t turn them on or give back what it knew about them.
 
 ## Find a font’s files
 
