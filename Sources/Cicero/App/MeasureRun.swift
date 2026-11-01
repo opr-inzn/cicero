@@ -159,11 +159,13 @@ enum MeasureRun {
         _ = await MainSettle.wait()
     }
 
-    /// Scrolls the browser down a page at a time, 15 pages, then back to the top.
+    /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
     private static func scroll(mode: BrowserMode) async {
         guard let scrollView = browserScrollView() else { return Measurements.count("scroll.unavailable", detail: mode.rawValue) }
         let clip = scrollView.contentView
-        for page in 1...15 {
+        // CICERO_MEASURE_PAGES: how many pages, 15 unless it says.
+        let pages = Int(ProcessInfo.processInfo.environment["CICERO_MEASURE_PAGES"] ?? "") ?? 15
+        for page in 1...max(1, pages) {
             let height = clip.bounds.height
             let maxY = max(0, (scrollView.documentView?.frame.height ?? 0) - height)
             let y = min(maxY, clip.bounds.origin.y + height)
