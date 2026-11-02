@@ -25,6 +25,9 @@ struct CiceroApp: App {
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
                 menuBarItem.start()
+                if LaunchWait.showedMessage {
+                    DispatchQueue.main.async { menuBarItem.openWindow?(id: WindowID.main) }
+                }
             }
         }
     }

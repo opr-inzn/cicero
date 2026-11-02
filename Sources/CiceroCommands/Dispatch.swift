@@ -6,30 +6,32 @@ import Foundation
 /// it's closed, the command makes it itself, holding `AppLock` so a Cicero that starts meanwhile waits for it.
 @MainActor
 public enum WriteDispatcher {
-    /// How long a Cicero that's open may go without taking the lock before the command takes it for one that can't
-    /// (a version from before the command could write).
+    /// How long a Cicero that's open may leave the lock free before the command takes it for one that can't (a
+    /// version from before the command could write). A Cicero that's starting, or that waited for another command,
+    /// takes it within moments.
     static let startingCicero: TimeInterval = 15
     /// How long the command waits for another `cicero` command's change.
     static let otherCommand: Duration = .seconds(60)
 
     public static func perform(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
         let support = environment.locations.support
-        let start = Date.now
+        var freeSince: Date?
         while true {
             if let lock = AppLock.take(support: support) {
-                guard let app = runningApp(environment) else {
+                guard runningApp(environment) != nil else {
                     defer { lock.release() }
                     return try await closed(request, environment: environment)
                 }
                 lock.release()
-                let starting = app.launchDate.map { Date.now.timeIntervalSince($0) < startingCicero } ?? false
-                if !starting || Date.now.timeIntervalSince(start) > startingCicero {
+                let since = freeSince ?? .now
+                if Date.now.timeIntervalSince(since) > startingCicero {
                     throw CommandError(.failed, "This version of Cicero doesn’t take changes from the cicero command. Update Cicero, or quit it to make the change from here.")
                 }
-                // Cicero is starting, and takes the lock in a moment.
+                freeSince = since
                 try await Task.sleep(for: .milliseconds(200))
                 continue
             }
+            freeSince = nil
             if runningApp(environment) != nil {
                 guard let answer = try await Requests.send(request, support: support) else { continue }
                 if let error = CommandError(answer: answer) { throw error }

@@ -321,7 +321,7 @@ final class AppModel {
         scanner = LibraryScanner(locations: locations)
         store = UserDataStore(locations: locations)
         // One writer at a time: a cicero command making a change while Cicero was closed finishes first.
-        appLock = AppLock.wait(support: locations.support, timeout: .seconds(30))
+        appLock = LaunchWait.lock(support: locations.support)
         launchEngine = ActivationEngine(locations: locations)
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         scriptSamples = ScriptSamples(languages: languages)
