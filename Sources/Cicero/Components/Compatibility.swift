@@ -84,11 +84,14 @@ private struct FreshScrollEdges: ViewModifier {
 
 extension View {
     /// Takes drops of `T`. `isOver` hears as a drag comes over and leaves; with `fromOutsideOnly`, drags from Cicero's
-    /// own windows don't count, which macOS 15 can't tell.
+    /// own windows don't count, neither over it nor dropped, which macOS 15 can't tell.
     @ViewBuilder func drops<T: Transferable>(of type: T.Type, fromOutsideOnly: Bool = false, isOver: ((Bool) -> Void)? = nil,
                                              perform action: @escaping ([T]) -> Void) -> some View {
         if #available(macOS 26, *) {
-            let destination = dropDestination(for: type) { items, _ in action(items) }
+            let destination = dropDestination(for: type) { items, session in
+                if fromOutsideOnly, session.localSession != nil { return }
+                action(items)
+            }
             if let isOver {
                 destination.onDropSessionUpdated { session in
                     switch session.phase {

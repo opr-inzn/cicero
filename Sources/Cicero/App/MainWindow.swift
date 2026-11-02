@@ -283,6 +283,10 @@ private struct FileDrop: ViewModifier {
             // From outside Cicero: families dragged within the window are names, not files.
             .drops(of: URL.self, fromOutsideOnly: true, isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
+                // A glyph dragged off a font page and let go over it again, as when the user changes their mind: no
+                // toast saying it isn't a font. macOS 15 doesn't say the drag is Cicero's own, so its file is left out.
+                let urls = urls.filter { !GlyphVectors.isDragFile($0) }
+                guard !urls.isEmpty else { return }
                 model.open(urls, into: model.targetForAddedFiles)
             }
             // While the grid, the list or the page has the focus; elsewhere `AppDelegate` takes ⌘V.
