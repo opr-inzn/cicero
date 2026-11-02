@@ -75,9 +75,20 @@ func answer(_ common: CommonOptions, text: (JSON) -> String, _ work: () async th
     }
 }
 
+/// With `rescan`, Cicero scans first while it's open; while it's closed, the command does, holding the lock (see
+/// `WriteDispatcher`). When neither can (an old Cicero, or one not answering), the command scans and saves nothing.
 func load(_ common: CommonOptions, _ shown: ShownOptions, rescan: Bool = false) async throws -> LibraryContext {
     let start = ContinuousClock.now
-    let context = try await LibraryContext.load(.current(), rescan: rescan, shown: shown.shown)
+    let environment = ToolEnvironment.current()
+    var scansHere = false
+    if rescan {
+        do {
+            _ = try await WriteDispatcher.perform(WriteRequest(.rescan), environment: environment)
+        } catch let error as CommandError where error.code != .unreadableUserData {
+            scansHere = true
+        }
+    }
+    let context = try await LibraryContext.load(environment, rescan: scansHere, shown: shown.shown, savesScan: false)
     if common.debug {
         FileHandle.standardError.write(Data("Read the library (\(context.library.families.count) families) in \(ContinuousClock.now - start).\n".utf8))
     }
@@ -103,7 +114,7 @@ struct Status: AsyncParsableCommand {
     @Flag(help: "Every style’s details.")
     var allStyles = false
 
-    @Flag(help: "Scan the font folders first. While Cicero is open, Cicero saves its own scans, so this scan isn’t saved.")
+    @Flag(help: "Scan the font folders first: Cicero does, while it’s open.")
     var rescan = false
 
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions

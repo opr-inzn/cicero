@@ -53,6 +53,7 @@ public enum WriteDispatcher {
     /// With Cicero closed and the lock held: the library scanned first when fonts turn on or off, so the files are where
     /// the change finds them, and again after, so the saved library has what changed.
     private static func closed(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
+        try repairIfNeeded(environment)
         let context = request.command.needsLibrary
             ? try await LibraryContext.load(environment, rescan: request.command.activates, shown: request.shown)
             : LibraryContext(library: .empty, data: try LibraryContext.loadUserData(environment), shown: request.shown, environment: environment)
@@ -60,6 +61,20 @@ public enum WriteDispatcher {
         let answer = try await WriteRunner.run(request, in: context, writer: writer)
         if writer.activated { _ = try? await LibraryContext.load(environment, rescan: true) }
         return answer
+    }
+}
+
+extension WriteDispatcher {
+    /// Repairs the records after a command that stopped while it turned fonts on or off (see `ActivationJournal`), with
+    /// the lock held.
+    static func repairIfNeeded(_ environment: ToolEnvironment) throws {
+        let support = environment.locations.support
+        guard let journal = ActivationJournal.read(support: support) else { return }
+        var data = try LibraryContext.loadUserData(environment)
+        data.records = journal.repair(data.records, registrar: environment.registrar, locations: environment.locations)
+        let store = UserDataStore(locations: environment.locations)
+        store.save(data)
+        if store.flush(durably: true) { ActivationJournal.remove(support: support) }
     }
 }
 
@@ -96,23 +111,38 @@ final class ClosedAppWriter: Writer {
     }
 
     func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult {
+        let journal = begin(faces, turningOn: true)
         let result = await engine.activate(faces, method: .inPlace, records: data.records)
-        finish(result)
+        finish(result, journal: journal)
         return result
     }
 
     func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
+        let journal = begin(faces, turningOn: false)
         let result = await engine.deactivate(faces, records: data.records)
-        finish(result)
+        finish(result, journal: journal)
         return result
     }
 
-    /// As the app's `finish`: the records saved, and added files a copy was installed of forgotten.
-    private func finish(_ result: ActivationResult) {
+    func rescan() async {
+        _ = try? await LibraryContext.load(environment, rescan: true)
+    }
+
+    /// What's about to turn, written down first (see `ActivationJournal`); false when it couldn't be.
+    private func begin(_ faces: [LibraryFace], turningOn: Bool) -> Bool {
+        let journal = ActivationJournal(turningOn: turningOn, paths: faces.map(\.face.path))
+        return (try? journal.write(support: environment.locations.support)) != nil
+    }
+
+    /// As the app's `finish`: the records saved, and added files a copy was installed of forgotten; then the journal goes.
+    private func finish(_ result: ActivationResult, journal: Bool) {
         activated = true
+        // For the end-to-end test of a command that stops here, before the records are saved.
+        if ProcessInfo.processInfo.environment["CICERO_STOP_BEFORE_RECORDS"] == "1" { exit(9) }
         update { data in
             data.records = result.records
             data.forgetInstalledAddedFiles()
         }
+        if journal { ActivationJournal.remove(support: environment.locations.support) }
     }
 }

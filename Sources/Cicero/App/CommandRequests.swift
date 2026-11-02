@@ -111,6 +111,13 @@ final class AppRequestWriter: Writer {
         }
     }
 
+    /// A scan of everything, as when Cicero becomes active, finished (or replaced by a later one that finished) before
+    /// the answer, so the command reads what it found.
+    func rescan() async {
+        let id = model.rescan()
+        while model.lastEndedScan < id { try? await Task.sleep(for: .milliseconds(100)) }
+    }
+
     func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
         let operation = model.expect(faces, at: .off)
         return await withCheckedContinuation { continuation in

@@ -47,14 +47,16 @@ public final class LibraryContext: @unchecked Sendable {
     /// The guessed classification of a family nothing in its files classifies, as the app has it.
     public let classificationGuess: (Family) -> Classification?
 
-    /// Loads everything; `rescan` scans first. `shown` shows or hides fonts other than as Cicero's settings do.
-    public static func load(_ environment: ToolEnvironment, rescan: Bool = false, shown: ShownFonts = ShownFonts()) async throws -> LibraryContext {
+    /// Loads everything; `rescan` scans first, saving what it finds while Cicero is closed, unless not `savesScan` (for a
+    /// command that doesn't hold `AppLock`). `shown` shows or hides fonts other than as Cicero's settings do.
+    public static func load(_ environment: ToolEnvironment, rescan: Bool = false, shown: ShownFonts = ShownFonts(),
+                            savesScan: Bool = true) async throws -> LibraryContext {
         let saved = try loadUserData(environment)
         let data = shown.applied(to: saved)
         // The saved library has the proofing fonts as Cicero's setting has them; the other way needs a scan of its own.
         let proofingDiffers = data.showAdobeAppFolders != saved.showAdobeAppFolders && !environment.appFontFolders.isEmpty
         let scans = rescan || proofingDiffers
-        let saves = scans && !proofingDiffers && !isAppOpen(environment)
+        let saves = savesScan && scans && !proofingDiffers && !isAppOpen(environment)
         let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar, saves: saves)
         let languages = environment.resources.map { LanguageCatalog(contentsOf: $0.appendingPathComponent("Languages.json")) }
         let coverage = languages.map { CoverageIndex(caches: environment.locations.caches, languages: $0) }

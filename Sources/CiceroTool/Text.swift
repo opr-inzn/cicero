@@ -260,6 +260,7 @@ extension Text {
         case .folderCreate: ("Made the folder", "There’s a folder called")
         case .folderAdd: ("Put in the folder", "In the folder already")
         case .folderRemove: ("Took out of the folder", "Not in the folder")
+        case .rescan: ("Scanned", "")
         }
         var lines: [String] = []
         let changed = strings(answer["changed"]), unchanged = strings(answer["unchanged"])
