@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- If the `cicero` command is making a change when Cicero opens, Cicero waits until it’s done and says so, however long that takes. Before, it opened after 30 seconds without waiting more.
+
 ## 0.12.0b1
 
 This is Cicero’s first beta: new features come here first, before they’re finished. Thank you for trying it.
