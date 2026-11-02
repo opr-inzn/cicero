@@ -565,8 +565,8 @@ private struct OrganizeRow: View {
     var body: some View {
         Button { model.showsGuessingQuestion = true } label: {
             Label { Text("Organize").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
-                // 1.5 pt to the right: the thin symbol sits that far from its title more than the other rows' do.
-                Image(systemName: "sparkles").foregroundStyle(Color.solar).offset(x: 1.5)
+                // Not sparkles, which are Ornamental's: a letter under a magnifying glass, as Cicero looks at the letters.
+                Image(systemName: "character.magnify").foregroundStyle(Color.solar)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
