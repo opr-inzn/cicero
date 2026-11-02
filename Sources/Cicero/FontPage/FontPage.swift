@@ -86,8 +86,8 @@ struct FontPage: View {
         .focusEffectDisabled()
         .defaultFocus($focused, true)
         .navigationTitle(family.name)
-        // No Preview Options: the page has its own size, tracking and alignment, and takes the weight and the
-        // leading from the browser's.
+        // No Preview Options: the page has its own size, tracking and alignment, and takes the weight from the
+        // browser's. Its Leading, `PreviewSettings.lineSpacing`, is shared by every font page.
         .toolbar { ToolbarCapsule { InfoButton() } }
         .onExitCommand { model.openFamilyID = nil }
     }
@@ -283,7 +283,7 @@ private struct TypeTester: View {
         }
     }
 
-    /// The text's size and tracking, and its leading, which is Preview Options' too.
+    /// The text's size, tracking and leading.
     @ViewBuilder
     private var sliders: some View {
         slider("Size", symbol: "textformat", $size, range: 12...240, unit: " pt")
@@ -291,7 +291,7 @@ private struct TypeTester: View {
             .help("The space added between letters, in percent of the em, on top of the font’s kerning")
         slider("Leading", symbol: "arrow.up.and.down.text.horizontal",
                Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
-            .help("The distance between lines, in percent of the size; the same as Leading in Preview Options")
+            .help("The distance between lines, in percent of the size")
     }
 
     /// A symbol for a label, as in a layout app's character panel, with the word as its tooltip, a slider that narrows

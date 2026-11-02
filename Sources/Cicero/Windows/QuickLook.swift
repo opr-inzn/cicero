@@ -438,8 +438,8 @@ private struct FamilyQuickLook: View {
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
 
-    /// On the left. The sample text with Preview Options' leading; the alphabet, three lines of letters rather than
-    /// text, always 120 % of its size apart, so a high Leading set for the text doesn't spread them out.
+    /// On the left. The sample text with the font's own line spacing, on every macOS, whatever the font page's Leading
+    /// is; the alphabet, three lines of letters rather than text, 120 % of its size apart.
     private func sample(scale: Double) -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
@@ -454,7 +454,7 @@ private struct FamilyQuickLook: View {
                 }
             } else {
                 QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56 * scale,
-                              variations: variations, lineLimit: nil, lineHeight: preview.lineHeight(at: 56 * scale))
+                              variations: variations, lineLimit: nil)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

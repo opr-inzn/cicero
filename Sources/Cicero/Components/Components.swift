@@ -1038,7 +1038,7 @@ struct FlowLayout: Layout {
 }
 
 /// A text and size of a window's own, as Compare has, in place of the previews', so the window leaves the previews
-/// as they are. It sets each sample on one line: its Preview Options have no Leading.
+/// as they are.
 struct OwnPreviewOptions {
     var text: Binding<String>
     /// What the window shows while the text is empty.
@@ -1047,7 +1047,8 @@ struct OwnPreviewOptions {
     var sizeRange: ClosedRange<Double>
 }
 
-/// The toolbar button with sample text, size and leading.
+/// The toolbar button with sample text and size. No Leading: the list, grid and specimens set each sample on one line,
+/// and Quick Look sets its sample with the font's own line spacing.
 struct PreviewOptionsButton: View {
     var own: OwnPreviewOptions?
     @State private var isPresented = false
@@ -1059,7 +1060,7 @@ struct PreviewOptionsButton: View {
             Label("Preview Options", systemImage: "textformat.size")
         }
         .toolbarButtonStyle()
-        .help(own == nil ? "Preview text, size and leading" : "Preview text and size")
+        .help("Preview text and size")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(own: own) }
     }
 }
@@ -1122,10 +1123,6 @@ private struct PreviewOptions: View {
                     .help("The size the grid shows now. With the sidebar shown and the Info panel closed, it’s \(Int(preview.size)) pt.")
                 } else {
                     row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
-                }
-                if own == nil {
-                    row("Leading", $preview.lineSpacing, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
-                        .help("The distance between lines, in percent of the size, where a sample runs over several lines")
                 }
             }
         }

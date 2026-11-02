@@ -13,7 +13,7 @@ final class PreviewSettings {
     static let tileSample = "Aa Gg 123"
     /// Preview Options' Size; a smaller size saved before 24 pt was the least goes up to it.
     static let sizes: ClosedRange<Double> = 24...200
-    /// Leading, in percent of the size, wherever it's set; a larger leading saved before 200 % was the most comes down to it.
+    /// The font page's Leading, in percent of the size; a larger leading saved before 200 % was the most comes down to it.
     static let lineSpacings: ClosedRange<Double> = 80...200
 
     /// Empty means each family's own name. Saved a moment after typing stops (`SavedSoon`), as the size and line
@@ -25,8 +25,8 @@ final class PreviewSettings {
     /// What previews show a family in, where a search names no style: its regular style, the one nearest 400. Preview
     /// Options had a Weight slider up to 0.10.2; what it saved is forgotten.
     let weight = 400.0
-    /// Line height in percent of the size, wherever a sample runs over several lines; 120 is what layout apps
-    /// call automatic leading.
+    /// The font page's line height, in percent of the size; 120 is what layout apps call automatic leading. Every
+    /// font page shares it. Preview Options had it up to 0.11.0, and Quick Look used it.
     var lineSpacing: Double { didSet { SavedSoon.set(lineSpacing, forKey: Keys.lineSpacing) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
@@ -58,11 +58,6 @@ final class PreviewSettings {
 
     func text(for family: Family) -> String {
         sampleText.isEmpty ? family.name : sampleText
-    }
-
-    /// The distance from one line's baseline to the next at a size, in points.
-    func lineHeight(at size: Double) -> Double {
-        size * lineSpacing / 100
     }
 }
 
