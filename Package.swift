@@ -29,7 +29,7 @@ let package = Package(
         // The app. Everything in it runs on the main actor unless it says otherwise.
         .executableTarget(
             name: "Cicero",
-            dependencies: ["CiceroCore", .product(name: "Sparkle", package: "Sparkle")],
+            dependencies: ["CiceroCore", "CiceroCommands", .product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/Cicero",
             swiftSettings: [.defaultIsolation(MainActor.self)],
             // Sparkle.framework is embedded in Contents/Frameworks.

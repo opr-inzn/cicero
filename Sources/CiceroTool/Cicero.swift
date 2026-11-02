@@ -6,13 +6,14 @@ import Foundation
 struct Cicero: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cicero",
-        abstract: "Find and check the fonts in Cicero’s library.",
+        abstract: "Find, check and change the fonts in Cicero’s library.",
         discussion: """
-            Reads what Cicero saved: it works while Cicero is closed too, and never opens it. Add --json for answers \
-            that scripts and agents read; their fields are in the help page.
+            Works while Cicero is closed too, and never opens it. Finding and checking read what Cicero saved. \
+            Changes go through Cicero while it’s open, so you see them at once; while it’s closed, the command \
+            makes them itself. Add --json for answers that scripts and agents read; their fields are in the help page.
             """,
         version: Version.text,
-        subcommands: [Status.self, Find.self, CoverageCheck.self, List.self]
+        subcommands: [Status.self, Find.self, CoverageCheck.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self]
     )
 }
 
@@ -269,6 +270,190 @@ struct List: AsyncParsableCommand {
             options.limit = limit
             options.offset = offset
             return try ListCommand.run(what, options: options, in: try await load(common, hidden))
+        }
+    }
+}
+
+// MARK: Changes
+
+/// Makes a change and prints what it did. A change that asks first asks in the terminal (y/N), unless --yes answers
+/// it; without a terminal, or with --json, it stops with `needsConfirmation` and the question.
+func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts = ShownFonts()) async throws {
+    try await answer(common, text: { Text.changes(command, $0) }) {
+        var request = WriteRequest(command, confirmed: common.yes, shown: shown)
+        while true {
+            do {
+                return try await WriteDispatcher.perform(request, environment: .current())
+            } catch let error as CommandError where error.code == .needsConfirmation && !request.confirmed && !common.json
+                && isatty(STDIN_FILENO) == 1 && isatty(STDERR_FILENO) == 1 {
+                let question = error.question.map { "\($0.title)\n\($0.message)\n" } ?? error.message + "\n"
+                FileHandle.standardError.write(Data((question + "Go on? [y/N] ").utf8))
+                guard let reply = readLine()?.trimmingCharacters(in: .whitespaces).lowercased(), ["y", "yes"].contains(reply) else {
+                    throw CommandError(.needsConfirmation, "Nothing changed.")
+                }
+                request.confirmed = true
+            }
+        }
+    }
+}
+
+struct Activate: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Turn on families, a folder’s fonts or a tag’s families.",
+        discussion: "Fonts go on where they are, as when you turn them on in Cicero.",
+        aliases: ["on"]
+    )
+
+    @Argument(help: "Families’ names.")
+    var families: [String] = []
+
+    @Option(help: "Every font in this folder.")
+    var folder: String?
+
+    @Option(help: "Every family with this tag.")
+    var tag: String?
+
+    @Flag(help: "Until Cicero quits. Only while Cicero is open.")
+    var untilQuit = false
+
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+    @OptionGroup var common: CommonOptions
+
+    func run() async throws {
+        try await write(.activate(families: families, folder: folder, tag: tag, untilQuit: untilQuit), common, hidden.shown)
+    }
+}
+
+struct Deactivate: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Turn off families, a folder’s fonts or a tag’s families.",
+        aliases: ["off"]
+    )
+
+    @Argument(help: "Families’ names.")
+    var families: [String] = []
+
+    @Option(help: "Every font in this folder.")
+    var folder: String?
+
+    @Option(help: "Every family with this tag.")
+    var tag: String?
+
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+    @OptionGroup var common: CommonOptions
+
+    func run() async throws {
+        try await write(.deactivate(families: families, folder: folder, tag: tag), common, hidden.shown)
+    }
+}
+
+struct Tag: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Make a tag, or give one to families or take it off them.",
+        subcommands: [Create.self, Add.self, Remove.self]
+    )
+
+    struct Create: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Make a tag. Nothing changes when there’s one of that name.")
+
+        @Argument(help: "The tag’s name.")
+        var name: String
+
+        @Option(help: ArgumentHelp("red, orange, yellow, green, blue, purple, gray or sand. Without it, the first colour no tag has.", valueName: "colour"))
+        var color: String?
+
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.tagCreate(name: name, color: color), common)
+        }
+    }
+
+    struct Add: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Give families a tag.")
+
+        @Argument(help: "The tag.")
+        var tag: String
+
+        @Argument(help: "Families’ names.")
+        var families: [String] = []
+
+        @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.tagAdd(tag: tag, families: families), common, hidden.shown)
+        }
+    }
+
+    struct Remove: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Take a tag off families.")
+
+        @Argument(help: "The tag.")
+        var tag: String
+
+        @Argument(help: "Families’ names.")
+        var families: [String] = []
+
+        @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.tagRemove(tag: tag, families: families), common, hidden.shown)
+        }
+    }
+}
+
+struct Folder: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Make a folder, or put families in one or take them out.",
+        subcommands: [Create.self, Add.self, Remove.self]
+    )
+
+    struct Create: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Make a folder. Nothing changes when there’s one of that name.")
+
+        @Argument(help: "The folder’s name.")
+        var name: String
+
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.folderCreate(name: name), common)
+        }
+    }
+
+    struct Add: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Put families in a folder, every style of them.")
+
+        @Argument(help: "The folder: its name or id.")
+        var folder: String
+
+        @Argument(help: "Families’ names.")
+        var families: [String] = []
+
+        @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.folderAdd(folder: folder, families: families), common, hidden.shown)
+        }
+    }
+
+    struct Remove: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Take families out of a folder.")
+
+        @Argument(help: "The folder: its name or id.")
+        var folder: String
+
+        @Argument(help: "Families’ names.")
+        var families: [String] = []
+
+        @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.folderRemove(folder: folder, families: families), common, hidden.shown)
         }
     }
 }

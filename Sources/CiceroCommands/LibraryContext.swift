@@ -4,7 +4,7 @@ import Foundation
 
 /// Fonts Cicero's settings hide or show, which one command shows or hides instead; nil keeps Cicero's setting. It never
 /// changes the setting.
-public struct ShownFonts: Sendable, Equatable {
+public struct ShownFonts: Codable, Sendable, Equatable {
     /// Those that come with macOS (Show system fonts).
     public var systemFonts: Bool?
     /// Adobe Fonts from Creative Cloud (Show fonts from Creative Cloud).
@@ -35,7 +35,10 @@ public struct ShownFonts: Sendable, Equatable {
 /// caches itself, and would write over the tool's or keep showing its own.
 public final class LibraryContext: @unchecked Sendable {
     public let environment: ToolEnvironment
+    /// The user's data, with the fonts the command's flags show or hide (see `ShownFonts`).
     public let data: UserData
+    /// The user's data as saved, with Cicero's own settings: what a change starts from.
+    public let savedData: UserData
     public let library: Library
     /// When the library was last scanned (saved by a scan).
     public let lastScan: Date?
@@ -88,14 +91,22 @@ public final class LibraryContext: @unchecked Sendable {
             letters: ClassificationGuesses.letters(of: library.families, measurements: measurements),
             guessing: ClassificationGuesses.isGuessing(environment.defaults)
         )
-        return LibraryContext(environment: environment, data: data, library: library, lastScan: lastScan, characterSets: characterSets,
-                              coverage: coverage, classificationGuess: { rule($0)?.classification })
+        return LibraryContext(environment: environment, data: data, savedData: saved, library: library, lastScan: lastScan,
+                              characterSets: characterSets, coverage: coverage, classificationGuess: { rule($0)?.classification })
     }
 
-    init(environment: ToolEnvironment, data: UserData, library: Library, lastScan: Date?, characterSets: CharacterSetCatalog?,
-         coverage: CoverageIndex?, classificationGuess: @escaping (Family) -> Classification?) {
+    /// Cicero's own library and data, for the changes the command asks it to make (see `Requests`): names are looked up
+    /// in what its window shows.
+    public convenience init(library: Library, data: UserData, shown: ShownFonts, environment: ToolEnvironment) {
+        self.init(environment: environment, data: shown.applied(to: data), savedData: data, library: library, lastScan: nil,
+                  characterSets: nil, coverage: nil, classificationGuess: { _ in nil })
+    }
+
+    init(environment: ToolEnvironment, data: UserData, savedData: UserData, library: Library, lastScan: Date?,
+         characterSets: CharacterSetCatalog?, coverage: CoverageIndex?, classificationGuess: @escaping (Family) -> Classification?) {
         self.environment = environment
         self.data = data
+        self.savedData = savedData
         self.library = library
         self.lastScan = lastScan
         self.characterSets = characterSets
