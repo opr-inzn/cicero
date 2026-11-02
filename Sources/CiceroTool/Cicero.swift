@@ -105,10 +105,10 @@ struct Status: AsyncParsableCommand {
             """
     )
 
-    @Argument(help: "A family’s name.")
+    @Argument(help: "A family’s name.", completion: .families)
     var family: String?
 
-    @Option(help: ArgumentHelp("One style’s details: its name or PostScript name.", valueName: "style"))
+    @Option(help: ArgumentHelp("One style’s details: its name or PostScript name.", valueName: "style"), completion: .names(.styles))
     var style: String?
 
     @Flag(help: "Every style’s details.")
@@ -135,10 +135,10 @@ struct Status: AsyncParsableCommand {
 
 /// The options of `find` and `list families`.
 struct FindArguments: ParsableArguments {
-    @Option(help: "Families of this foundry.")
+    @Option(help: "Families of this foundry.", completion: .names(.foundries))
     var foundry: String?
 
-    @Option(name: .customLong("class"), help: "Families of this classification.")
+    @Option(name: .customLong("class"), help: "Families of this classification.", completion: .names(.classes))
     var classification: String?
 
     @Option(help: ArgumentHelp("Released in a year, or between years: 2019, 2015..2020, 2015.., ..2020.", valueName: "years"))
@@ -150,19 +150,19 @@ struct FindArguments: ParsableArguments {
     @Option(help: "Families whose regular style has every character of this text.")
     var text: String?
 
-    @Option(help: ArgumentHelp("Families whose regular style has every character of this coverage set (see cicero list coverage).", valueName: "id"))
+    @Option(help: ArgumentHelp("Families whose regular style has every character of this coverage set (see cicero list coverage).", valueName: "id"), completion: .names(.coverage))
     var set: String?
 
     @Option(help: ArgumentHelp("With --text or --set: families may lack up to this many characters.", valueName: "n"))
     var missing: Int?
 
-    @Option(help: "Families with this tag.")
+    @Option(help: "Families with this tag.", completion: .tags)
     var tag: String?
 
-    @Option(help: "Families in this folder.")
+    @Option(help: "Families in this folder.", completion: .folders)
     var folder: String?
 
-    @Option(help: "Families in this location: its name or path.")
+    @Option(help: "Families in this location: its name or path.", completion: .names(.locations))
     var location: String?
 
     @Flag(help: "Families with a style on.")
@@ -176,7 +176,7 @@ struct FindArguments: ParsableArguments {
 
     @Option(name: .customLong("filter"), help: ArgumentHelp(
         "Families with a style that is this: italic, bold or another weight (thin … black, or 100 … 900), condensed, extended, variable, tnum, onum. Give it more than once for more.",
-        valueName: "word"))
+        valueName: "word"), completion: .styleWords)
     var filters: [String] = []
 
     @Option(help: "How many families to show; 0 for all.")
@@ -237,10 +237,10 @@ struct CoverageCheck: AsyncParsableCommand {
         discussion: "Cicero checks each family’s regular style."
     )
 
-    @Argument(help: "A family’s name.")
+    @Argument(help: "A family’s name.", completion: .families)
     var family: String
 
-    @Option(help: ArgumentHelp("A coverage set (see cicero list coverage).", valueName: "id"))
+    @Option(help: ArgumentHelp("A coverage set (see cicero list coverage).", valueName: "id"), completion: .names(.coverage))
     var set: String?
 
     @Option(help: "Some text.")
@@ -315,13 +315,13 @@ struct Activate: AsyncParsableCommand {
         aliases: ["on"]
     )
 
-    @Argument(help: "Families’ names.")
+    @Argument(help: "Families’ names.", completion: .families)
     var families: [String] = []
 
-    @Option(help: "Every font in this folder.")
+    @Option(help: "Every font in this folder.", completion: .folders)
     var folder: String?
 
-    @Option(help: "Every family with this tag.")
+    @Option(help: "Every family with this tag.", completion: .tags)
     var tag: String?
 
     @Flag(help: "Until Cicero quits. Only while Cicero is open.")
@@ -341,13 +341,13 @@ struct Deactivate: AsyncParsableCommand {
         aliases: ["off"]
     )
 
-    @Argument(help: "Families’ names.")
+    @Argument(help: "Families’ names.", completion: .families)
     var families: [String] = []
 
-    @Option(help: "Every font in this folder.")
+    @Option(help: "Every font in this folder.", completion: .folders)
     var folder: String?
 
-    @Option(help: "Every family with this tag.")
+    @Option(help: "Every family with this tag.", completion: .tags)
     var tag: String?
 
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
@@ -370,7 +370,7 @@ struct Tag: AsyncParsableCommand {
         @Argument(help: "The tag’s name.")
         var name: String
 
-        @Option(help: ArgumentHelp("red, orange, yellow, green, blue, purple, gray or sand. Without it, the first colour no tag has.", valueName: "colour"))
+        @Option(help: ArgumentHelp("red, orange, yellow, green, blue, purple, gray or sand. Without it, the first colour no tag has.", valueName: "colour"), completion: .colors)
         var color: String?
 
         @OptionGroup var common: CommonOptions
@@ -383,10 +383,10 @@ struct Tag: AsyncParsableCommand {
     struct Add: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Give families a tag.")
 
-        @Argument(help: "The tag.")
+        @Argument(help: "The tag.", completion: .tags)
         var tag: String
 
-        @Argument(help: "Families’ names.")
+        @Argument(help: "Families’ names.", completion: .families)
         var families: [String] = []
 
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
@@ -400,10 +400,10 @@ struct Tag: AsyncParsableCommand {
     struct Remove: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Take a tag off families.")
 
-        @Argument(help: "The tag.")
+        @Argument(help: "The tag.", completion: .tags)
         var tag: String
 
-        @Argument(help: "Families’ names.")
+        @Argument(help: "Families’ names.", completion: .families)
         var families: [String] = []
 
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
@@ -437,10 +437,10 @@ struct Folder: AsyncParsableCommand {
     struct Add: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Put families in a folder, every style of them.")
 
-        @Argument(help: "The folder: its name or id.")
+        @Argument(help: "The folder: its name or id.", completion: .folders)
         var folder: String
 
-        @Argument(help: "Families’ names.")
+        @Argument(help: "Families’ names.", completion: .families)
         var families: [String] = []
 
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
@@ -454,10 +454,10 @@ struct Folder: AsyncParsableCommand {
     struct Remove: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Take families out of a folder.")
 
-        @Argument(help: "The folder: its name or id.")
+        @Argument(help: "The folder: its name or id.", completion: .folders)
         var folder: String
 
-        @Argument(help: "Families’ names.")
+        @Argument(help: "Families’ names.", completion: .families)
         var families: [String] = []
 
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions

@@ -2,6 +2,10 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
+## Unreleased
+
+- **Tab completion** for the Cicero CLI in Terminal: commands, options, and the names of your families, styles, tags and folders. If you installed the CLI before, choose **Cicero → Install Cicero CLI** once more.
+
 ## 0.12.0b1
 
 This is Cicero’s first beta: new features come here first, before they’re finished. Thank you for trying it.
