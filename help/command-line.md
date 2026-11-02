@@ -1,18 +1,19 @@
-# The cicero command
+# The cicero CLI
 
-[Cicero Help](README.md) › The cicero command
+[Cicero Help](README.md) › The cicero CLI
 
-The `cicero` command finds, checks and changes the fonts in Cicero’s library from Terminal, from scripts and from AI agents like Claude Code or Codex. It answers the way Cicero’s window does: the same search, the same classifications, foundries, tags and folders.
+The `cicero` CLI (command-line tool) finds, checks and changes the fonts in Cicero’s library from Terminal, from scripts and from AI agents like Claude Code or Codex. It answers the way Cicero’s window does: the same search, the same classifications, foundries, tags and folders.
 
 It works while Cicero is closed too, and it never opens Cicero. It turns fonts on and off, and gives families tags and puts them in folders.
 
-## Install the command
+## Install the CLI
 
-1. Choose **Cicero → Install Command-Line**. Cicero needs to be in your Applications folder.
-2. Enter your administrator password if macOS asks for it. Cicero puts a link to the command in `/usr/local/bin`.
-3. Open Terminal and type `cicero --help`.
+1. Choose **Cicero → Install cicero CLI**. Cicero needs to be in your Applications folder.
+2. Enter your administrator password if macOS asks for it. Cicero puts a link to the CLI in `/usr/local/bin`.
+3. Cicero says when the CLI is installed, and the menu item then reads **cicero CLI Installed**.
+4. Open Terminal and type `cicero --help`.
 
-The command is inside Cicero (`Cicero.app/Contents/Helpers/cicero`), so it updates with Cicero.
+The CLI is inside Cicero (`Cicero.app/Contents/Helpers/cicero`), so it updates with Cicero.
 
 ## What it can do
 
