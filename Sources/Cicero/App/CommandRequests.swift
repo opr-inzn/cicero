@@ -92,6 +92,11 @@ final class AppRequestWriter: Writer {
     var data: UserData { model.data }
     var isApp: Bool { true }
 
+    func renameTag(_ old: String, to new: String) { model.renameTag(old, to: new) }
+    func deleteTags(_ names: Set<String>) { model.deleteTags(names) }
+    func renameFolder(_ id: UUID, to name: String) { model.renameSet(id, to: name) }
+    func deleteFolders(_ ids: Set<UUID>) { model.deleteSets(ids) }
+
     func update(_ change: (inout UserData) -> Void) {
         var data = model.data
         change(&data)

@@ -258,9 +258,13 @@ extension Text {
         case .tagCreate: ("Made the tag", "There’s a tag called")
         case .tagAdd: ("Gave the tag to", "Had the tag already")
         case .tagRemove: ("Took the tag off", "Didn’t have the tag")
+        case .tagRename: ("Renamed the tag to", "The tag is called that already")
+        case .tagDelete: ("Deleted", "")
         case .folderCreate: ("Made the folder", "There’s a folder called")
         case .folderAdd: ("Put in the folder", "In the folder already")
         case .folderRemove: ("Took out of the folder", "Not in the folder")
+        case .folderRename: ("Renamed the folder to", "The folder is called that already")
+        case .folderDelete: ("Deleted", "")
         case .rescan: ("Scanned", "")
         }
         var lines: [String] = []
