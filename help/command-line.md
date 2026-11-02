@@ -36,7 +36,7 @@ autoload -Uz compinit && compinit
 | `cicero status Inter --style Bold` | The same, and one style’s details: version, designer, license, embedding, coverage. A style name or a PostScript name (`Inter-Bold`) |
 | `cicero status Inter --all-styles` | Every style’s details |
 | `cicero find garamond` | Families, found as Cicero’s search field finds them: in names, foundries, designers, classifications, tags and notes |
-| `cicero coverage Inter --set adobe-latin-3` | Whether a family has every character of a [coverage set](character-sets.md), and which it lacks |
+| `cicero coverage Inter --set adobe-latin-3` | Whether a family has every character of a [coverage set](character-sets.md), and which it lacks. Exit code 3 when it lacks some |
 | `cicero coverage Inter --text "Grüße, Łódź"` | The same for some text |
 | `cicero list families` | Every family. Also `tags`, `folders`, `locations`, `foundries`, and `coverage` (the coverage sets and their ids) |
 | `cicero activate Inter Roboto` | Turns the families on (also `cicero on`) |
@@ -158,10 +158,12 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 | Exit code | `code` | |
 |---|---|---|
 | 0 | | it worked |
-| 1 | `invalidArgument`, `unreadableUserData`, `appNotOpen`, `failed` | something in the command is wrong, Cicero’s data can’t be read, `--until-quit` while Cicero is closed, or something else went wrong |
+| 1 | `invalidArgument`, `unreadableUserData`, `appNotOpen`, `failed` | something in the command is wrong (an unknown option or a missing name too), Cicero’s data can’t be read, `--until-quit` while Cicero is closed, or something else went wrong |
 | 2 | `notFound`, `ambiguous` | no family, style, tag, folder or set of that name (`suggestions` has near names), or more than one (`suggestions` says which) |
 | 4 | `needsConfirmation` | the change asks first; nothing changed. Ask the user, then run it again with `--yes` |
 | 5 | `busy` | Cicero is open but didn’t take the change within 5 seconds, or another `cicero` command was making one; nothing changed |
+
+`coverage` exits with 3 when the family lacks characters. It isn’t an error: the answer is the same as with 0, with `"covered": false`. A script can ask `if cicero coverage Inter --set adobe-latin-3 > /dev/null` without reading the JSON.
 
 ## Questions
 
