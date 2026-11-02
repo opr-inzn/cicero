@@ -43,7 +43,22 @@ final class AppModel {
 
     // MARK: Library
 
-    private(set) var library = Library.empty
+    /// The library on screen. Until a scan has built one, the one the last scan saved, read in the background from the
+    /// start of the launch (see `restoreLibrary`): the first thing asking for it waits for the rest of the reading.
+    private(set) var library: Library {
+        get {
+            access(keyPath: \.library)
+            if restoring != nil { finishRestoring() }
+            return storedLibrary
+        }
+        set {
+            if restoring != nil { finishRestoring() }
+            withMutation(keyPath: \.library) { storedLibrary = newValue }
+        }
+    }
+    @ObservationIgnored private var storedLibrary = Library.empty
+    /// The saved library being read, until `library` is first asked for.
+    @ObservationIgnored private var restoring: SavedLibraryRead?
     private(set) var hasScanned = false
     /// nil when not scanning.
     private(set) var scanProgress: ScanProgress?
@@ -276,16 +291,18 @@ final class AppModel {
     @ObservationIgnored private var operationCount = 0
     @ObservationIgnored private var expectations: [Expectation] = []
     @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] changed in
-        MainActor.assumeIsolated { self?.fontsChanged(changed) }
+        MainActor.assumeIsolated { self?.fontsChanged(changed.map(ScanScope.files) ?? .everything) }
     }
-    /// The files that changed since the last scan started, for the next one to look at instead of every folder;
-    /// nil when it has to look at everything.
-    @ObservationIgnored private var pendingChanges: Set<String>? = []
-    /// The running scan's number, the files it looks at (nil for all of them), and whether it's a check (see `rescan`).
-    @ObservationIgnored private var runningScan: (id: Int, changes: Set<String>?, check: Bool)?
-    /// Files a watched folder said changed while a scan of everything was running, looked at again once it's done
+    /// What changed since the last scan started, for the next one to look at instead of every folder; nil for nothing.
+    @ObservationIgnored private var pendingScope: ScanScope?
+    /// The running scan's number, what it looks at, and whether it's a check (see `rescan`).
+    @ObservationIgnored private var runningScan: (id: Int, scope: ScanScope, check: Bool)?
+    /// Files a watched folder said changed while a scan of every folder was running, looked at again once it's done
     /// (see `rescan`).
     @ObservationIgnored private var changedDuringScan: Set<String> = []
+    /// Whether fonts were turned on or off while a scan of every folder was running, which may have asked fontd before:
+    /// it's asked again once the scan is done (see `rescan`).
+    @ObservationIgnored private var fontdChangedDuringScan = false
     /// A scan of everything a while after a file came or went in a Fonts folder, to see what macOS made of it.
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
@@ -355,7 +372,7 @@ final class AppModel {
                 // Not while a scan of everything is running, which would start over (a long one never finishing), nor
                 // while files move at launch, which the scan after them lists.
                 guard let self, !self.movingAtLaunch, Date().timeIntervalSince(self.lastScan) > 60,
-                      self.runningScan.map({ $0.changes != nil }) ?? true
+                      self.runningScan.map({ $0.scope != .everything }) ?? true
                 else { return }
                 self.rescan(check: true)
             }
@@ -367,7 +384,7 @@ final class AppModel {
         center.addObserver(
             forName: Notification.Name(kCTFontManagerRegisteredFontsChangedNotification as String), object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.fontsChanged() }
+            MainActor.assumeIsolated { self?.fontsChanged(.fontd(except: [])) }
         }
         // The first scan waits for the Font Library to be where it is now, so the window doesn't drop its fonts for a moment.
         let migrating = needsFontLibraryMigration
@@ -439,12 +456,27 @@ final class AppModel {
     }
 
     /// The library as the last scan found it, so the window opens with the fonts in it rather than empty until
-    /// this launch's first scan, which replaces it (see `apply`).
+    /// this launch's first scan, which replaces it (see `apply`). Read off the main thread while AppKit and SwiftUI make
+    /// the app and its window, which took longer: at 20,000 families the reading took 120 ms of the main thread before.
     private func restoreLibrary() {
-        guard let saved = scanner.savedLibrary(records: data.records) else { return }
-        library = saved
-        // What the browser shows first, then everything else.
-        FontLoader.shared.prefetch((visibleFamilies + saved.families).map(\.regular.face))
+        let scanner = scanner, records = data.records
+        restoring = SavedLibraryRead { scanner.savedLibrary(records: records) }
+    }
+
+    private func finishRestoring() {
+        guard let read = restoring else { return }
+        restoring = nil
+        #if CICERO_MEASURE
+        let waiting = ContinuousClock.now
+        #endif
+        let saved = read.wait()
+        #if CICERO_MEASURE
+        Measurements.record("restore.wait", ms: (ContinuousClock.now - waiting).milliseconds, detail: "\(saved?.families.count ?? 0) families")
+        #endif
+        guard let saved else { return }
+        withMutation(keyPath: \.library) { storedLibrary = saved }
+        // What the browser shows first; the rest as it comes into view (see `ReadAhead`).
+        FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
     }
 
     /// Adobe's font folders used to be added to the user's folders; the Proofing switch covers them now.
@@ -479,24 +511,38 @@ final class AppModel {
     /// files, as nothing on screen changes otherwise.
     @discardableResult
     func rescan(changes: Set<String>? = nil, check: Bool = false) -> Int {
-        // Files that change while a scan of everything runs are looked at once it's done, rather than starting it over:
-        // a long one would never finish while a folder kept changing, and it may not have got to them yet.
-        if let changes, let running = runningScan, running.changes == nil {
-            pendingChanges = []
-            changedDuringScan.formUnion(changes)
+        rescan(changes.map(ScanScope.files) ?? .everything, check: check)
+    }
+
+    @discardableResult
+    private func rescan(_ scope: ScanScope, check: Bool) -> Int {
+        // Files that change while a scan of every folder runs are looked at once it's done, rather than starting it over:
+        // a long one would never finish while a folder kept changing, and it may not have got to them yet. Fonts turned
+        // on or off meanwhile too: fontd is asked again then.
+        if let running = runningScan, running.scope.walksFolders, !scope.walksAll {
+            pendingScope = nil
+            switch scope {
+            case .files(let changes): changedDuringScan.formUnion(changes)
+            case .fontd(let except):
+                changedDuringScan.formUnion(except)
+                fontdChangedDuringScan = true
+            case .everything: break
+            }
             return running.id
         }
         // A scan this one replaces is cancelled, so this one looks at whatever that one would have.
-        var changes = changes.map { $0.union(changedDuringScan) }
+        var scope = scope.adding(.files(changedDuringScan))
+        if fontdChangedDuringScan { scope = scope.adding(.fontd(except: [])) }
         changedDuringScan = []
-        if let running = runningScan { changes = running.changes.flatMap { looked in changes?.union(looked) } }
+        fontdChangedDuringScan = false
+        if let running = runningScan { scope = scope.adding(running.scope) }
         let check = check && runningScan?.check != false
-        pendingChanges = []
+        pendingScope = nil
         scanTask?.cancel()
-        if changes == nil { lastScan = Date() }
+        if scope == .everything { lastScan = Date() }
         scanCount += 1
         let id = scanCount
-        runningScan = (id, changes, check)
+        runningScan = (id, scope, check)
         let input = scanInput
         // The Fonts folders too, so a font dropped into one shows without waiting for macOS to register it.
         let fontsFolders = [locations.userFonts.path, locations.allUsersFonts.path]
@@ -520,9 +566,17 @@ final class AppModel {
                 self.showProgress(check: check)
             }
         }
+        // A scan started at launch waits for the saved library to be read: the scanner compares the first library it
+        // builds with that one (`LibraryScanner.savedLibrary`).
+        let restoring = restoring
         scanTask = Task { [weak self] in
+            await restoring?.finished()
             do {
-                let library = try await scanner.scan(input, changes: changes, progress: report)
+                let library = switch scope {
+                case .everything: try await scanner.scan(input, progress: report)
+                case .files(let changes): try await scanner.scan(input, changes: changes, progress: report)
+                case .fontd(let except): try await scanner.scan(input, keepingWalksExcept: except, progress: report)
+                }
                 // A scan that was replaced can finish anyway, even after the one that replaced it: what it found is out of date.
                 guard !Task.isCancelled else { return }
                 self?.finishScan(id)
@@ -548,7 +602,7 @@ final class AppModel {
     private func finishScan(_ id: Int) {
         guard runningScan?.id == id else { return }
         runningScan = nil
-        if !changedDuringScan.isEmpty { scheduleRescan(after: 0) }
+        if !changedDuringScan.isEmpty || fontdChangedDuringScan { scheduleRescan(after: 0) }
     }
 
     private func endScan(_ id: Int) {
@@ -568,15 +622,20 @@ final class AppModel {
     /// CoreText's fonts-changed notification, or font files coming or going in a watched folder.
     /// During an operation (whose own changes set these off) they wait for the scan the operation starts
     /// when it finishes; `enqueue` scans afterwards when it started none.
-    /// `changed` are the files a watched folder says changed, nil for anything. Those few are looked at again
-    /// almost at once; anything else waits a little, as CoreText's notifications tend to come in bursts.
-    private func fontsChanged(_ changed: Set<String>? = nil) {
+    /// `scope`: the files a watched folder says changed, or everything when it can't say, which are looked at again
+    /// almost at once; or, after CoreText's notice, fontd's list without walking the watched folders again (see
+    /// `ScanScope.fontd`), which waits a little, as CoreText's notifications tend to come in bursts.
+    private func fontsChanged(_ scope: ScanScope) {
         if runningOperations > 0 {
             if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
             return
         }
-        if let changed, let pending = pendingChanges { pendingChanges = pending.union(changed) } else { pendingChanges = nil }
-        scheduleRescan(after: pendingChanges == nil ? 0.3 : 0.05)
+        var scope = scope
+        // Now and then every folder is walked again anyway, for whatever no watcher saw.
+        if case .fontd = scope, Date().timeIntervalSince(lastScan) > ScanScope.walkEvery { scope = .everything }
+        pendingScope = pendingScope.map { $0.adding(scope) } ?? scope
+        scheduleRescan(after: pendingScope?.isFilesOnly == true ? 0.05 : 0.3)
+        let changed: Set<String>? = if case .files(let changed) = scope { changed } else { nil }
         // A font put in a Fonts folder shows as on at once, though macOS takes a few seconds to turn it on and
         // says so with a notification that scans everything; this scan comes in case it says nothing, as
         // when it doesn't take the font.
@@ -586,7 +645,7 @@ final class AppModel {
             fontsFolderCheck = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
-                self?.fontsChanged()
+                self?.fontsChanged(.fontd(except: []))
             }
         }
     }
@@ -597,7 +656,7 @@ final class AppModel {
         rescanTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled, let self else { return }
-            self.rescan(changes: self.pendingChanges, check: true)
+            self.rescan(self.pendingScope ?? .files([]), check: true)
         }
     }
 
@@ -606,6 +665,7 @@ final class AppModel {
         scanner.clearCache()
         coverage.clearCache()
         measurements.clearCache()
+        SampleWidths.shared.clearSaved()
         rescan()
     }
 
@@ -638,8 +698,8 @@ final class AppModel {
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
         FontLoader.shared.invalidate(paths: new.changedPaths)
         pageContents.forget(paths: new.changedPaths)
-        // What the browser shows first, then everything else.
-        FontLoader.shared.prefetch((visibleFamilies + new.families).map(\.regular.face))
+        // What the browser shows first; the rest as it comes into view (see `ReadAhead`).
+        FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
         updateCoverage()
         updateProblems()
     }
@@ -1150,4 +1210,68 @@ struct TextPrompt: Identifiable {
     var initialText: String
     var confirmTitle: String
     var action: (String) -> Void
+}
+
+/// What a scan looks at (see `AppModel.rescan`).
+enum ScanScope: Equatable {
+    /// Every folder, walked again, and fontd's list.
+    case everything
+    /// Only these files, which a watched folder said changed.
+    case files(Set<String>)
+    /// fontd's list again, after CoreText's fonts-changed notice: the folders FSEvents watches as the last scan walked
+    /// them, except those holding these files (see `LibraryScanner.scan`).
+    case fontd(except: Set<String>)
+
+    /// How often, at most, a fonts-changed notice goes without walking every folder again: for whatever no watcher saw.
+    #if CICERO_MEASURE
+    static let walkEvery = ProcessInfo.processInfo.environment["CICERO_MEASURE_WALK_EVERY"].flatMap(TimeInterval.init) ?? 10 * 60
+    #else
+    static let walkEvery: TimeInterval = 10 * 60
+    #endif
+
+    /// Whether the scan walks folders (at least those nothing watches), so files that change meanwhile wait for it.
+    var walksFolders: Bool { !isFilesOnly }
+    var walksAll: Bool { self == .everything }
+    var isFilesOnly: Bool { if case .files = self { true } else { false } }
+
+    /// A scan that looks at what either looks at.
+    func adding(_ other: ScanScope) -> ScanScope {
+        switch (self, other) {
+        case (.everything, _), (_, .everything): .everything
+        case let (.files(a), .files(b)): .files(a.union(b))
+        case let (.fontd(a), .fontd(b)): .fontd(except: a.union(b))
+        case let (.fontd(a), .files(b)), let (.files(b), .fontd(a)): .fontd(except: a.union(b))
+        }
+    }
+}
+
+/// The library the last scan saved, read on a thread of its own (see `AppModel.restoreLibrary`).
+nonisolated final class SavedLibraryRead: @unchecked Sendable {
+    private let done = DispatchSemaphore(value: 0)
+    /// Written once before `done` is signalled, read only after waiting for it.
+    private var library: Library?
+
+    init(_ read: @escaping @Sendable () -> Library?) {
+        DispatchQueue.global(qos: .userInteractive).async { [self] in
+            library = read()
+            done.signal()
+        }
+    }
+
+    /// The library, once it's read.
+    nonisolated func wait() -> Library? {
+        done.wait()
+        done.signal()
+        return library
+    }
+
+    /// Waits for the reading without holding up a thread of Swift's own.
+    nonisolated func finished() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                _ = wait()
+                continuation.resume()
+            }
+        }
+    }
 }
