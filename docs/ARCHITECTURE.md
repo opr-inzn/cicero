@@ -1,11 +1,14 @@
 # Architecture
 
-Cicero is a SwiftPM package with two targets and a test target, which stays out of the public
-repository. Its one dependency is Sparkle (a binary framework, used by the app target only) for updates.
+Cicero is a SwiftPM package with four targets and a test target, which stays out of the public
+repository. Its dependencies are Sparkle (a binary framework, used by the app target only) for updates, and Swift
+Argument Parser for the `cicero` command's arguments.
 
 ```
-Sources/CiceroCore   fonts, the library, activation, coverage, user data — no UI
-Sources/Cicero       the app (SwiftUI); everything runs on the main actor by default
+Sources/CiceroCore      fonts, the library, activation, coverage, user data — no UI
+Sources/CiceroCommands  the cicero command's commands, as functions from input to a JSON value
+Sources/CiceroTool      the cicero command (product cicero-tool): arguments, --json, text for people
+Sources/Cicero          the app (SwiftUI); everything runs on the main actor by default
 Tests/CiceroCoreTests
 ```
 
@@ -107,6 +110,22 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   fonts named by file, PostScript name or family and style, sets, smart sets with their rules already in Cicero's
   terms, labels as tags, ratings, comments, activation history. `LibraryImport` adds the other app's fonts to the user data,
   then, once a scan has read them, matches the rest to the library and adds it, only ever adding.
+
+## The cicero command
+
+- **CiceroCommands**: each command is a function that takes its options and a `LibraryContext` and returns a `JSON`
+  value (an ordered object, so `schema` comes first and fields stay where the contract puts them; a nil field is left
+  out) or throws a `CommandError` (code, message, near names, exit code). Commands never print. `LibraryContext` loads
+  what the app saved: user-data.json (strictly: an unreadable file stops the command rather than being set aside),
+  `LibraryScanner.savedLibraryAsNow` (the saved library, each face on or off as macOS has it now, without a scan),
+  `CoverageIndex.loadSaved`, `MeasurementIndex.loadSaved` and `ClassificationGuesses` for the guessed classes, then
+  answers with the core's `FamilyFilters` and `UserData` rules, as the app does. `Names` finds what a typed name means,
+  or the near names. `Describer` makes families and styles into the contract's JSON, reading what the caches don't keep
+  (URLs, license, copyright, axis ranges) from the files. `ToolEnvironment` says where Cicero's files are; environment
+  variables move them for the tests, and `CICERO_FAKE_REGISTRAR` gives a list of active files in place of macOS.
+- **CiceroTool**: Swift Argument Parser commands that call those functions and print the value, as JSON with `--json`,
+  else as text (`Text`). Built as `cicero-tool`; `build-app.sh` puts it in `Contents/Helpers/cicero` and signs it.
+- The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Command-Line Tool).
 
 ## The app
 
