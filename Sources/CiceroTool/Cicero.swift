@@ -15,6 +15,35 @@ struct Cicero: AsyncParsableCommand {
         version: Version.text,
         subcommands: [Status.self, Find.self, CoverageCheck.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self]
     )
+
+    /// ArgumentParser's own `main`, except when the command line is wrong (an unknown option, a missing name): that's
+    /// `invalidArgument`, exit 1, answered in JSON with `--json`, as for every other error. ArgumentParser would answer
+    /// in text and exit 64.
+    static func main() async {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        var command: ParsableCommand
+        do {
+            command = try parseAsRoot(arguments)
+        } catch {
+            guard exitCode(for: error) == .validationFailure else { Self.exit(withError: error) }
+            // `--json` before a `--`, after which every word is a name.
+            if arguments.prefix(while: { $0 != "--" }).contains("--json") {
+                print(CommandError(.invalidArgument, message(for: error)).json.text())
+            } else {
+                FileHandle.standardError.write(Data((fullMessage(for: error) + "\n").utf8))
+            }
+            Self.exit(withError: ExitCode(CommandError.Code.invalidArgument.exitCode))
+        }
+        do {
+            if var command = command as? AsyncParsableCommand {
+                try await command.run()
+            } else {
+                try command.run()
+            }
+        } catch {
+            Self.exit(withError: error)
+        }
+    }
 }
 
 enum Version {
@@ -53,11 +82,14 @@ struct ShownOptions: ParsableArguments {
     var shown: ShownFonts { ShownFonts(systemFonts: systemFonts, adobeFonts: adobeFonts, proofingFonts: proofingFonts) }
 }
 
-/// Runs a command's work and prints its answer, or its error, as text or JSON. Exits with the error's code.
-func answer(_ common: CommonOptions, text: (JSON) -> String, _ work: () async throws -> JSON) async throws {
+/// Runs a command's work and prints its answer, or its error, as text or JSON. Exits with the error's code, or with the
+/// answer's own `exitCode` (as `coverage` does when characters are missing).
+func answer(_ common: CommonOptions, text: (JSON) -> String, exitCode: (JSON) -> Int32 = { _ in 0 },
+            _ work: () async throws -> JSON) async throws {
     let start = ContinuousClock.now
+    let result: JSON
     do {
-        let result = try await work()
+        result = try await work()
         print(common.json ? result.text() : text(result))
         if common.debug { FileHandle.standardError.write(Data("Took \(ContinuousClock.now - start).\n".utf8)) }
     } catch let error as CommandError {
@@ -73,6 +105,8 @@ func answer(_ common: CommonOptions, text: (JSON) -> String, _ work: () async th
         }
         throw ExitCode(error.code.exitCode)
     }
+    let code = exitCode(result)
+    if code != 0 { throw ExitCode(code) }
 }
 
 /// With `rescan`, Cicero scans first while it's open; while it's closed, the command does, holding the lock (see
@@ -250,7 +284,8 @@ struct CoverageCheck: AsyncParsableCommand {
     @OptionGroup var common: CommonOptions
 
     func run() async throws {
-        try await answer(common, text: Text.coverageCheck) {
+        // 3 when characters are missing, as `diff` exits 1 when files differ: a script can ask without reading the JSON.
+        try await answer(common, text: Text.coverageCheck, exitCode: { Text.bool($0["covered"]) == false ? 3 : 0 }) {
             try await CoverageCommand.run(family: family, set: set, text: text, in: try await load(common, hidden))
         }
     }

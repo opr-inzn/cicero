@@ -36,10 +36,11 @@ enum Text {
         "\(number(count)) \(count == 1 ? one : many)"
     }
 
-    /// An ISO 8601 date in the Mac's time zone, to the minute.
+    /// An ISO 8601 date in the Mac's time zone, to the minute, as the Mac's settings write dates and times: with AM or
+    /// PM where the clock has 12 hours.
     static func date(_ value: JSON?) -> String? {
         guard let text = string(value), let date = try? Date(text, strategy: .iso8601) else { return nil }
-        return date.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+        return date.formatted(date: .numeric, time: .shortened)
     }
 
     static func number(_ value: JSON?) -> String {
