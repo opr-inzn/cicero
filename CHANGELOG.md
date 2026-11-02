@@ -4,13 +4,13 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- **Cicero → Install cicero CLI** says when it’s done, and then reads **cicero CLI Installed**.
+- **Cicero → Install Cicero CLI** says when it’s done, and then reads **Cicero CLI Installed**.
 
 ## 0.12.0b1
 
 This is Cicero’s first beta: new features come here first, before they’re finished. Thank you for trying it.
 
-- **The `cicero` CLI** finds, checks and turns on your fonts, and tags them and puts them in folders, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install cicero CLI**, then type `cicero --help`. See [The cicero CLI](help/command-line.md).
+- **The Cicero CLI** finds, checks and turns on your fonts, and tags them and puts them in folders, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. See [The Cicero CLI](help/command-line.md).
 - **Undo** in the message after you turn fonts on or off, or move them to the Trash.
 - Choose betas or stable versions under **Update track** in **Preferences → General**, and go back to the stable version at any time.
 - Large libraries open faster, and lists scroll and update more smoothly.
