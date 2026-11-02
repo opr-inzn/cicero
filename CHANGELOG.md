@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- **Tab completion** for the Cicero CLI in Terminal: commands, options, and the names of your families, styles, tags and folders. If you installed the CLI before, choose **Cicero → Install Cicero CLI** once more.
+- **Tab completion** for the Cicero CLI in Terminal: commands, options, and the names of your families, styles, tags and folders. If you installed the CLI before, choose **Cicero → Install Cicero CLI** once more. When Tab completion is off in Terminal, as macOS has it, Cicero offers to turn it on.
 
 ## 0.12.0b1
 

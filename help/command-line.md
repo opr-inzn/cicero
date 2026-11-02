@@ -21,11 +21,13 @@ If you installed the CLI with an earlier beta, the menu item reads **Install Cic
 
 In Terminal, press Tab to complete what you type: commands (`cicero fi` becomes `cicero find`), options, and names from your library: families, styles, tags, folders, locations, foundries, classifications and coverage sets. Press Tab twice to see every choice. `cicero status Hel` and Tab shows the families whose names start with “Hel”.
 
-Tab completion works in zsh, the shell Terminal uses unless you changed it. If Tab doesn’t complete, zsh’s completion is off: add this line to the file `.zshrc` in your home folder, then open a new Terminal window.
+Tab completion works in zsh, the shell Terminal uses unless you changed it. macOS has zsh’s completion off. When it’s off on your Mac, Cicero says so after it installs the CLI: click **Turn On Tab Completion**, and Cicero adds this line at the end of the file `.zshrc` in your home folder. Then open a new Terminal window.
 
 ```
-autoload -Uz compinit && compinit
+autoload -Uz compinit && compinit -i
 ```
+
+To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line yourself. To turn it off, take the line out of `.zshrc`.
 
 ## What it can do
 
