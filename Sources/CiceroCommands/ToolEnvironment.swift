@@ -14,6 +14,8 @@ import Foundation
 /// - `CICERO_FAKE_REGISTRAR`: a file listing the font files macOS has active, one path a line, in place of asking
 ///   macOS; the tool then never changes the Mac's fonts.
 /// - `CICERO_NOW`: what "now" is (ISO 8601), for Recents.
+/// - `CICERO_PROOFING_DIRS`: the folders Adobe apps load fonts from by themselves (the proofing fonts), separated by
+///   colons, in place of those on the Mac.
 public struct ToolEnvironment: @unchecked Sendable {
     public var locations: Locations
     /// The app's settings (`UserDefaults` is thread-safe).
@@ -24,6 +26,11 @@ public struct ToolEnvironment: @unchecked Sendable {
     public var now: Date
     /// The app's bundle ID, to tell whether it's open.
     public var appBundleID: String
+    /// The folders Adobe apps load fonts from by themselves; nil for those on the Mac (`WatchedFolder.appFontFolders`).
+    public var proofingFolders: [WatchedFolder]?
+
+    /// The folders Adobe apps load fonts from by themselves.
+    public var appFontFolders: [WatchedFolder] { proofingFolders ?? WatchedFolder.appFontFolders() }
 
     public init(locations: Locations, defaults: UserDefaults, resources: URL?, registrar: any FontRegistrar, now: Date = .now,
                 appBundleID: String = ToolEnvironment.bundleID) {
@@ -52,10 +59,14 @@ public struct ToolEnvironment: @unchecked Sendable {
         let registrar: any FontRegistrar = variables["CICERO_FAKE_REGISTRAR"].flatMap { $0.isEmpty ? nil : ListedRegistrar(file: $0) }
             ?? CoreTextRegistrar()
         let now = variables["CICERO_NOW"].flatMap { try? Date($0, strategy: .iso8601) } ?? .now
-        return ToolEnvironment(
+        var environment = ToolEnvironment(
             locations: locations, defaults: UserDefaults(suiteName: domain) ?? .standard,
             resources: folder("CICERO_RESOURCES") ?? bundledResources(), registrar: registrar, now: now, appBundleID: domain
         )
+        environment.proofingFolders = variables["CICERO_PROOFING_DIRS"].map { list in
+            list.split(separator: ":").map { WatchedFolder(id: WatchedFolder.adobeAppsID, path: String($0), appName: "Adobe") }
+        }
+        return environment
     }
 
     /// Cicero.app/Contents/Resources, from the tool in Cicero.app/Contents/Helpers, also through a link to it (as in

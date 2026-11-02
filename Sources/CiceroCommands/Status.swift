@@ -11,6 +11,7 @@ public enum StatusCommand {
         answer.set("styleCount", families.reduce(0) { $0 + $1.faces.count })
         answer.set("activeFamilyCount", families.count(where: \.hasActive))
         answer.set("lastScan", context.lastScan)
+        answer.set("hidden", context.hidden)
         answer.set("locations", ListCommand.locations(context))
         let problems = ProblemDetector.detect(in: context.library, data: context.data, locations: context.environment.locations)
         answer.set("problems", problems.map { problem -> JSON in

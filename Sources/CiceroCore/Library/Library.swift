@@ -253,6 +253,8 @@ public final class LibraryScanner: Sendable {
     private let state = Mutex(State())
     /// Writes the caches in the order scans finish.
     private let saving: DispatchQueue
+    /// Whether scans write their caches; false for a reader that scans while Cicero is open, which writes them itself.
+    private let saves: Bool
 
     private struct State {
         var files: [String: CachedFile] = [:]
@@ -297,9 +299,11 @@ public final class LibraryScanner: Sendable {
         self.init(locations: locations, registrar: CoreTextRegistrar())
     }
 
-    /// `registrar` supplies the system's active font files; tests pass a fake.
-    public init(locations: Locations, registrar: any FontRegistrar) {
+    /// `registrar` supplies the system's active font files; tests pass a fake. With `saves` false, scans read the
+    /// caches but never write them.
+    public init(locations: Locations, registrar: any FontRegistrar, saves: Bool = true) {
         self.locations = locations
+        self.saves = saves
         saving = DispatchQueue(label: "com.maximilianinzinger.Cicero.library-save", qos: .utility)
         self.registrar = registrar
         cacheURL = locations.caches.appendingPathComponent("faces.cache", isDirectory: false)
@@ -894,6 +898,7 @@ public final class LibraryScanner: Sendable {
     }
 
     private func saveCacheIfNeeded() {
+        guard saves else { return }
         let snapshot: [String: CachedFile]? = state.withLock { state in
             guard state.dirty else { return nil }
             state.dirty = false
@@ -911,6 +916,7 @@ public final class LibraryScanner: Sendable {
 
     /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last.
     private func saveLibraryIfNeeded(_ library: Library) {
+        guard saves else { return }
         let changed = state.withLock { state in
             guard state.savedFingerprint != library.fingerprint else { return false }
             state.savedFingerprint = library.fingerprint

@@ -229,9 +229,9 @@ public struct UserData: Codable, Equatable, Sendable {
     }
 
     /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown, and the Font Library
-    /// while fonts are installed into it.
-    public func scannedFolders() -> [WatchedFolder] {
-        folders + (showAdobeAppFolders ? WatchedFolder.appFontFolders() : []) + [fontLibrary].compactMap(\.self)
+    /// while fonts are installed into it. `appFolders`: the folders Adobe apps load by themselves, which tests give.
+    public func scannedFolders(appFolders: @autoclosure () -> [WatchedFolder] = WatchedFolder.appFontFolders()) -> [WatchedFolder] {
+        folders + (showAdobeAppFolders ? appFolders() : []) + [fontLibrary].compactMap(\.self)
     }
 
     /// Cicero's Font Library as a folder the scan reads, while fonts are installed into it. Otherwise its folder is a
