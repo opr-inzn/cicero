@@ -293,7 +293,28 @@ public final class LibraryScanner: Sendable {
         var reach: OutOfReach
         /// Whether fontd gave its list of active files (see `confirmFontsFolders`).
         var listed: Bool
+        /// The walks of the folders FSEvents watches, as this find walked or replayed them, for a scan after a
+        /// fonts-changed notice to replay (see `scan`).
+        var walks: [WalkKey: Walk] = [:]
     }
+
+    /// A folder as `enumerate` walked it.
+    struct WalkKey: Hashable, Sendable {
+        var path: String
+        var includingHidden: Bool
+        var skipping: [String]
+    }
+
+    /// What `enumerate` found in a folder, in the order it found it.
+    struct Walk: Sendable {
+        var files: [(path: String, stamp: FaceStamp)] = []
+        var onlineOnly: [String] = []
+    }
+
+    #if CICERO_MEASURE
+    /// What the last scan to end looked at, for the app performance runs' checks (`MeasureRun`).
+    public static let lastScanDetail = Mutex("")
+    #endif
 
     public convenience init(locations: Locations) {
         self.init(locations: locations, registrar: CoreTextRegistrar())
@@ -371,14 +392,24 @@ public final class LibraryScanner: Sendable {
     /// only those are looked at again, which takes a few milliseconds instead of a walk through every folder
     /// and fontd's whole list, which can take seconds on a busy Mac. It scans everything when the input
     /// changed or a change needs it, such as a file in a folder whose fonts are online only.
+    /// With `keepingWalksExcept` (and no `changes`), as after CoreText's fonts-changed notice, which says only that fonts
+    /// were turned on or off: fontd is asked again, and the folders FSEvents watches aren't walked again but replayed as
+    /// the last scan walked them, which took 1.9 s at 20,000 families; except those holding these files, the ones on a
+    /// server (FSEvents doesn't hear of other Macs' changes), and all of them when the input changed or the last scan
+    /// walked none. macOS's own font folders and the Inactive folders, which nothing watches, are walked again.
     @concurrent
-    public func scan(_ input: ScanInput, changes: Set<String>? = nil, progress: @escaping @Sendable (ScanProgress) -> Void) async throws -> Library {
+    public func scan(_ input: ScanInput, changes: Set<String>? = nil, keepingWalksExcept kept: Set<String>? = nil,
+                     progress: @escaping @Sendable (ScanProgress) -> Void) async throws -> Library {
         let signposter = Signposts.library
         let scan = signposter.beginInterval("Scan")
         defer { signposter.endInterval("Scan", scan) }
         #if CICERO_MEASURE
         let measuring = Measurements.begin("scan")
-        defer { measuring.end(detail: changes == nil ? "full" : "\(changes!.count) changed") }
+        var detail = changes.map { "\($0.count) changed" } ?? "full"
+        defer {
+            measuring.end(detail: detail)
+            Self.lastScanDetail.withLock { [detail] in $0 = detail }
+        }
         #endif
         progress(.finding)
         let (number, last, rereadAll) = state.withLock { state in
@@ -394,14 +425,18 @@ public final class LibraryScanner: Sendable {
             // Asking fontd for the active files takes ~100 ms, as long as walking the folders; do both at once.
             let registrar = registrar
             async let active = Self.activeFontURLs(registrar)
-            var (found, reach) = enumerateFolders(input)
+            let replaying = changes == nil && kept != nil && !rereadAll && last?.input == input ? last?.walks : nil
+            var (found, reach, walks, replayed) = enumerateFolders(input, replaying: replaying, except: kept ?? [])
+            #if CICERO_MEASURE
+            if kept != nil { detail = "fontd, \(replayed) of \(walks.count) folders replayed" }
+            #endif
             let activeURLs = await active
             addActive(activeURLs, to: &found, linked: linkedFolders(input))
             for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
             try confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
             confirmRegistered(&found, records: input.records)
             reach.leaveOut(found)
-            find = Find(input: input, found: found, reach: reach, listed: !activeURLs.isEmpty)
+            find = Find(input: input, found: found, reach: reach, listed: !activeURLs.isEmpty, walks: walks)
         }
         state.withLock { state in
             guard number > state.lastFindScan else { return }
@@ -518,7 +553,9 @@ public final class LibraryScanner: Sendable {
         // An added file the last scan of everything found gone that's back isn't gone any more.
         var reach = last.reach
         reach.goneFiles = reach.goneFiles.filter { found[$0] == nil }
-        return Find(input: input, found: found, reach: reach, listed: last.listed)
+        // The walks of the folders holding these files are out of date: the next scan after a notice walks them again.
+        let walks = last.walks.filter { key, _ in !Self.holds(key.path, any: changes) }
+        return Find(input: input, found: found, reach: reach, listed: last.listed, walks: walks)
     }
 
     /// Whether `enumerate` lists a file under a folder: none of the folders between them, nor the file, is
@@ -627,12 +664,46 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    private func enumerateFolders(_ input: ScanInput) -> ([String: FoundFile], OutOfReach) {
+    /// Whether any of `paths` is in the folder at `path`, by its path as given or with its symlinks resolved.
+    private static func holds(_ path: String, any paths: Set<String>) -> Bool {
+        guard !paths.isEmpty else { return false }
+        let given = path + "/", resolved = realPath(path) + "/"
+        return paths.contains { $0.hasPrefix(given) || $0.hasPrefix(resolved) }
+    }
+
+    /// Walks every folder scanned. The folders FSEvents watches (the Fonts folders, the input's folders, Adobe's) are
+    /// replayed from `replaying` where it has them, unless on a server or holding a file in `except`; the walks of those
+    /// folders are returned for the next scan, with how many were replayed.
+    private func enumerateFolders(_ input: ScanInput, replaying: [WalkKey: Walk]? = nil, except: Set<String> = [])
+        -> ([String: FoundFile], OutOfReach, [WalkKey: Walk], Int) {
         var found: [String: FoundFile] = [:]
         found.reserveCapacity(4096)
         var reach = OutOfReach()
+        var walks: [WalkKey: Walk] = [:]
+        var replayed = 0
+        func walk(_ folder: URL, includingHidden: Bool = false, skipping: [String] = [], onlineOnly: ((String) -> Void)? = nil,
+                  _ body: (String, FaceStamp) -> Void) {
+            let key = WalkKey(path: folder.path, includingHidden: includingHidden, skipping: skipping)
+            if let kept = replaying?[key], Reachability.isOnLocalDisk(folder.path), !Self.holds(folder.path, any: except) {
+                for file in kept.files { body(file.path, file.stamp) }
+                if let onlineOnly { kept.onlineOnly.forEach(onlineOnly) }
+                walks[key] = kept
+                replayed += 1
+                return
+            }
+            var walked = Walk()
+            let report = onlineOnly.map { report in { (path: String) in
+                walked.onlineOnly.append(path)
+                report(path)
+            } }
+            Self.enumerate(folder, includingHidden: includingHidden, skipping: skipping, onlineOnly: report) { path, stamp in
+                walked.files.append((path, stamp))
+                body(path, stamp)
+            }
+            walks[key] = walked
+        }
         for folder in [locations.userFonts, locations.allUsersFonts] {
-            Self.enumerate(folder) { path, stamp in
+            walk(folder) { path, stamp in
                 found[path] = FoundFile(stamp: stamp, isActive: false, inFontsFolder: true)
             }
         }
@@ -658,17 +729,24 @@ public final class LibraryScanner: Sendable {
                 continue
             }
             let skipped = folder.id == WatchedFolder.inactiveFolderID ? [] : inactivePaths
-            Self.enumerate(folder.url, skipping: skipped, onlineOnly: { reach.onlineOnly[folder.id, default: []].append($0) }) { path, stamp in
+            let add = { (path: String, stamp: FaceStamp) in
                 if found[path] == nil {
                     found[path] = FoundFile(stamp: stamp, isActive: false)
                 }
                 found[path]!.folderIDs.append(folder.id)
                 if found[path]!.appName == nil { found[path]!.appName = folder.appName }
             }
+            let onlineOnly = { (path: String) in reach.onlineOnly[folder.id, default: []].append(path) }
+            // The Inactive folders aren't watched: always walked.
+            if folder.id == WatchedFolder.inactiveFolderID {
+                Self.enumerate(folder.url, skipping: skipped, onlineOnly: onlineOnly, add)
+            } else {
+                walk(folder.url, skipping: skipped, onlineOnly: onlineOnly, add)
+            }
         }
         // Adobe Fonts that Adobe apps turned on for themselves are on in those apps, and Creative Cloud's to switch.
         if let folder = locations.adobeFontsInAdobeApps {
-            Self.enumerate(folder, includingHidden: true) { path, stamp in
+            walk(folder, includingHidden: true) { path, stamp in
                 if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
                 found[path]!.appName = "Adobe"
             }
@@ -696,7 +774,7 @@ public final class LibraryScanner: Sendable {
             found[path]!.appName = folder.appName
         }
         reach.onlineOnlyPaths = Set(reach.onlineOnly.values.joined())
-        return (found, reach)
+        return (found, reach, walks, replayed)
     }
 
     private func addActive(_ urls: [URL], to found: inout [String: FoundFile], linked: [(real: String, chosen: String)]) {

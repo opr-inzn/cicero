@@ -249,11 +249,17 @@ extension AppModel {
 
     private func computeVisibleFamilies() -> [Family] {
         let query = SearchQuery(appliedSearch)
-        let found = listedFamilies(where: searchMatcher(query, tokens: searchTokens))
+        var found = listedFamilies(where: searchMatcher(query, tokens: searchTokens))
         // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
-        guard found.isEmpty, !query.isEmpty else { return found }
-        return listedFamilies(where: searchMatcher(query.anywhereInNames, tokens: searchTokens))
+        if found.isEmpty, !query.isEmpty { found = listedFamilies(where: searchMatcher(query.anywhereInNames, tokens: searchTokens)) }
+        // A new list's first screens, read ahead before its tiles ask (see `ReadAhead`).
+        FontLoader.shared.prefetch(found.prefix(Self.readAheadNewList).map(\.regular.face))
+        return found
     }
+
+    /// How many of the browser's first families a scan reads ahead, and a new list (a search, a sidebar item).
+    static let readAheadFirst = 200
+    static let readAheadNewList = 60
 
     /// The families the sidebar selection lists, or Show Similar Fonts, or Show in Library, that `matches`.
     private func listedFamilies(where matches: (Family) -> Bool) -> [Family] {

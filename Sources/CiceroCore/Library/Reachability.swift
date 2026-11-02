@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Why a watched folder's fonts are out of reach for now.
 public enum FolderAvailability: Hashable, Sendable {
@@ -55,21 +56,34 @@ public enum Reachability {
     /// Whether a path is on one of the Mac's own disks rather than on a server, going by the list of mounted disks macOS
     /// keeps, which asks none of them: a server that stopped answering holds up whatever asks it anything.
     public static func isOnLocalDisk(_ path: String) -> Bool {
-        let count = getfsstat(nil, 0, MNT_NOWAIT)
-        guard count > 0 else { return true }
-        var mounts: [statfs] = Array(repeating: .init(), count: Int(count))
-        let listed = getfsstat(&mounts, Int32(MemoryLayout<statfs>.stride * mounts.count), MNT_NOWAIT)
-        guard listed > 0 else { return true }
         var closest = (length: 0, isLocal: true)
-        for var mount in mounts.prefix(Int(listed)) {
-            let point = withUnsafeBytes(of: &mount.f_mntonname) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
-            let prefix = point.hasSuffix("/") ? point : point + "/"
-            if path.hasPrefix(prefix), prefix.count > closest.length {
-                closest = (prefix.count, mount.f_flags & UInt32(MNT_LOCAL) != 0)
-            }
+        for mount in mounts() where mount.prefix.count > closest.length && path.hasPrefix(mount.prefix) {
+            closest = (mount.prefix.count, mount.isLocal)
         }
         return closest.isLocal
     }
+
+    /// The mounted disks, each mount point with a "/" at the end, as macOS last listed them: listed again once the list
+    /// is 2 s old. Measuring the grid's samples asks for each file, and listing every mount each time took seconds of
+    /// CPU at 20,000 families on a Mac with many (simulator runtimes are disks too).
+    private static func mounts() -> [(prefix: String, isLocal: Bool)] {
+        let now = ContinuousClock.now
+        if let listed = mountList.withLock({ $0 }), now - listed.at < .seconds(2) { return listed.mounts }
+        let count = getfsstat(nil, 0, MNT_NOWAIT)
+        guard count > 0 else { return [] }
+        var entries: [statfs] = Array(repeating: .init(), count: Int(count))
+        let listed = getfsstat(&entries, Int32(MemoryLayout<statfs>.stride * entries.count), MNT_NOWAIT)
+        guard listed > 0 else { return [] }
+        let mounts = entries.prefix(Int(listed)).map { entry in
+            var entry = entry
+            let point = withUnsafeBytes(of: &entry.f_mntonname) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+            return (prefix: point.hasSuffix("/") ? point : point + "/", isLocal: entry.f_flags & UInt32(MNT_LOCAL) != 0)
+        }
+        mountList.withLock { $0 = (now, mounts) }
+        return mounts
+    }
+
+    private static let mountList = Mutex<(at: ContinuousClock.Instant, mounts: [(prefix: String, isLocal: Bool)])?>(nil)
 
     /// Whether a cloud service has taken the file's contents off the Mac. Reading it would download it.
     public static func isOnlineOnly(_ path: String) -> Bool {

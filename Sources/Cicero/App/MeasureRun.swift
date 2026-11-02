@@ -81,6 +81,11 @@ enum MeasureRun {
             await checkFontsFolder(model: model)
             return
         }
+        // warm-launch (Tests/E2E/warm-launch/run.sh): saved sample widths and the scans after a fonts-changed notice.
+        if only == "warm-launch" {
+            await checkWarmLaunch(model: model)
+            return
+        }
         // undo, in a VM only (Tests/E2E/app-perf/guest-undo.sh): Undo after turning fonts on and off, and after Move to
         // Trash, with the ways putting back can fail; a "check" line, PASS or FAIL, for each thing checked.
         if only == "undo" {
@@ -204,6 +209,97 @@ enum MeasureRun {
         }
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
         _ = await MainSettle.wait()
+    }
+
+    // MARK: Warm launch
+
+    /// CICERO_MEASURE_PHASE 1, a first launch: the grid's sample widths are measured and saved. 2, the next launch: none
+    /// is measured; a fonts-changed notice replays every watched folder's walk; a font file added to the first location,
+    /// changed or removed shows, is measured alone, and its folder is walked again at the next notice. 3, with
+    /// CICERO_MEASURE_WALK_EVERY=0: a notice walks every folder. CICERO_MEASURE_EXTRA: a font file to add.
+    private static func checkWarmLaunch(model: AppModel) async {
+        let environment = ProcessInfo.processInfo.environment
+        let phase = environment["CICERO_MEASURE_PHASE"] ?? "1"
+        let widths = SampleWidths.shared
+        // The grid measures the samples of the library restored at launch, then of the first scan's.
+        _ = await until(seconds: 60) { !widths.measuredLog.isEmpty }
+        _ = await MainSettle.wait(quiet: .seconds(2), limit: .seconds(60))
+        let log = widths.measuredLog
+        Measurements.count("widths", detail: log.map { "\($0.new)/\($0.all)" }.joined(separator: " "))
+
+        func notice() async -> String {
+            let ended = model.endedScans
+            NotificationCenter.default.post(name: Notification.Name(kCTFontManagerRegisteredFontsChangedNotification as String), object: nil)
+            _ = await until(seconds: 60) { model.endedScans > ended }
+            _ = await MainSettle.wait(quiet: .milliseconds(500))
+            return LibraryScanner.lastScanDetail.withLock { $0 }
+        }
+        /// "fontd, 3 of 4 folders replayed" → (3, 4).
+        func replayed(_ detail: String) -> (Int, Int)? {
+            let words = detail.split(separator: " ")
+            guard detail.hasPrefix("fontd,"), words.count >= 4, let done = Int(words[1]), let all = Int(words[3]) else { return nil }
+            return (done, all)
+        }
+        func names() -> Set<String> { Set(model.library.families.map(\.name)) }
+        func has(_ path: String) -> Bool { model.library.families.contains { $0.faces.contains { $0.face.path == path } } }
+
+        switch phase {
+        case "1":
+            check(log.contains { $0.new > 0 }, "a first launch measures the samples (\(log.map(\.new)))")
+            try? await Task.sleep(for: .seconds(4))
+            check(FileManager.default.fileExists(atPath: SampleWidths.savedURL.path), "the widths are saved")
+        case "2":
+            check(!log.isEmpty && log.allSatisfy { $0.new == 0 }, "a warm launch measures no sample (\(log.map(\.new)))")
+            let listed = model.library.families.filter(model.data.lists).count
+            check(log.last.map { $0.all == listed } ?? false, "it knows every family's sample (\(log.last?.all ?? 0) of \(listed))")
+
+            let before = names()
+            let first = await notice()
+            let counts = replayed(first)
+            check(counts.map { $0.0 == $0.1 && $0.1 > 0 } ?? false, "a notice replays every watched folder (\(first))")
+            check(names() == before, "the families are the same after it (\(before.count) → \(names().count))")
+
+            guard let folder = model.data.folders.first?.path, let extra = environment["CICERO_MEASURE_EXTRA"] else {
+                return check(false, "a location and a file to add")
+            }
+            // Into the location's own folder: a new folder would make FSEvents say only that something changed in it,
+            // which walks every folder again.
+            let added = folder + "/" + (extra as NSString).lastPathComponent
+            var measured = widths.measuredLog.count
+            try? FileManager.default.copyItem(atPath: extra, toPath: added)
+            check(await until(seconds: 20) { has(added) }, "a file added to the location shows")
+            _ = await until(seconds: 20) { widths.measuredLog.count > measured }
+            _ = await MainSettle.wait(quiet: .seconds(1))
+            check(widths.measuredLog.last?.new == 1, "only its sample is measured (\(widths.measuredLog.last.map(\.new) ?? -1))")
+
+            let second = await notice()
+            let after = replayed(second)
+            check(after.map { $0.0 == $0.1 - 1 } ?? false, "the next notice walks its folder again, replays the rest (\(second))")
+            check(has(added), "the added file stays after it")
+
+            // A file saved again: its sample is measured again.
+            measured = widths.measuredLog.count
+            guard let existing = model.library.families.first(where: { family in
+                family.folderIDs.contains(model.data.folders[0].id) && !family.faces.contains { $0.face.path == added }
+            })?.faces.first?.face.path else { return check(false, "a family of the location") }
+            try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: existing)
+            _ = await until(seconds: 20) { widths.measuredLog.count > measured }
+            _ = await MainSettle.wait(quiet: .seconds(1))
+            check(widths.measuredLog.last?.new == 1, "a file saved again is measured again (\(widths.measuredLog.last.map(\.new) ?? -1))")
+            let afterSave = await notice()
+            check(replayed(afterSave).map { $0.0 == $0.1 - 1 } ?? false, "so is the next notice after it (\(afterSave))")
+
+            try? FileManager.default.removeItem(atPath: added)
+            check(await until(seconds: 20) { !has(added) }, "a file removed from the location goes")
+            let third = await notice()
+            check(!has(added), "it stays gone after the next notice (\(third))")
+            check(names() == before, "the families are those before (\(before.count) → \(names().count))")
+        case "3":
+            let detail = await notice()
+            check(detail == "full", "a notice walks every folder once the last walk is older than CICERO_MEASURE_WALK_EVERY (\(detail))")
+        default:
+            check(false, "phase \(phase)")
+        }
     }
 
     // MARK: Undo

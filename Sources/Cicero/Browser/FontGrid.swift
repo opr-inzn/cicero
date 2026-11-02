@@ -100,6 +100,7 @@ struct FontGrid: View {
                     ForEach(families) { family in
                         Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                            .onAppear { ReadAhead.around(family, in: families) }
                     }
                 }
                 .scrollTargetLayout()

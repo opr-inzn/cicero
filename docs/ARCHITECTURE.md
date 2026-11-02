@@ -30,9 +30,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   scan that's replaced nor quitting loses what was read; its progress says it updates rather than identifies when most
   of the files it reads are in the library on screen (the last one built, else the one restored at launch). A `fingerprint`
   lets the app skip rescans that changed nothing. `LibraryCache` saves each library a scan builds that differs from the
-  last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window. `FolderWatcher` (FSEvents) says when font files come or go
+  last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window, on a thread of its own from the start of the launch
+  (`SavedLibraryRead`): the first thing asking for `AppModel.library`, and the first scan, wait for the rest of it. `FolderWatcher` (FSEvents) says when font files come or go
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
-  only for that file.
+  only for that file. The walks of the watched folders travel with the scan's find (`Find.walks`), so a scan after
+  CoreText's fonts-changed notice replays them instead of walking again.
 - **Data** (`Data/`): `UserData` is everything the user set up (watched folders, added font files, sets and smart sets, which the
   UI calls folders and smart folders, tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
   `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
@@ -71,7 +73,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   fixed steps, weighted, and by the embedding's distance. The app keeps one `SimilarFonts` for the listed families
   and makes it again when the library, the measurements or the user's data change.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
-  preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
+  preview) and prefetches them four files at a time: after a scan the browser's first 200 families, for a new list
+  (a search, a sidebar item) its first 60, and in the grid and the list the families around those coming into view,
+  mostly after them (`ReadAhead`), not every family (4.7 s of CPU at each launch at 20,000 families); specimens
   prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead
   (`F_RDADVISE`), glyphs included, not just the tables a descriptor needs. It keeps
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
