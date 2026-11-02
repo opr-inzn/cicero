@@ -96,7 +96,8 @@ public struct ToolEnvironment: @unchecked Sendable {
     public var userDataURL: URL { locations.support.appendingPathComponent("user-data.json", isDirectory: false) }
 }
 
-/// macOS's active font files as a list in a file, for tests: nothing is ever registered or unregistered.
+/// macOS's active font files as a list in a file, for tests: turning a font on or off adds its path to the list or takes
+/// it out, and nothing reaches macOS.
 struct ListedRegistrar: FontRegistrar {
     let file: String
 
@@ -109,11 +110,22 @@ struct ListedRegistrar: FontRegistrar {
         return Set(text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
     }
 
-    func register(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> { Set(urls.map { $0.path(percentEncoded: false) }) }
-    func unregister(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> { Set(urls.map { $0.path(percentEncoded: false) }) }
-    func unregisterNow(_ urls: [URL], scope: CTFontManagerScope) {}
-    func setEnabled(_ urls: [URL], _ enabled: Bool) async -> Set<String> { Set(urls.map { $0.path(percentEncoded: false) }) }
-    func disableNow(_ urls: [URL]) {}
+    private func write(_ paths: Set<String>) {
+        try? Data((paths.sorted().joined(separator: "\n") + "\n").utf8).write(to: URL(fileURLWithPath: file), options: .atomic)
+    }
+
+    /// Nothing fails.
+    private func change(_ urls: [URL], on: Bool) -> Set<String> {
+        let changed = Set(urls.map { $0.path(percentEncoded: false) })
+        write(on ? paths.union(changed) : paths.subtracting(changed))
+        return []
+    }
+
+    func register(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> { change(urls, on: true) }
+    func unregister(_ urls: [URL], scope: CTFontManagerScope) async -> Set<String> { change(urls, on: false) }
+    func unregisterNow(_ urls: [URL], scope: CTFontManagerScope) { _ = change(urls, on: false) }
+    func setEnabled(_ urls: [URL], _ enabled: Bool) async -> Set<String> { change(urls, on: enabled) }
+    func disableNow(_ urls: [URL]) { _ = change(urls, on: false) }
     func waitUntilForgotten(_ paths: [String], timeout: Duration, every: Duration) async -> Set<String> { [] }
     func activeFontURLs() -> [URL] { paths.sorted().map { URL(fileURLWithPath: $0, isDirectory: false) } }
     func isActive(_ url: URL) -> Bool { paths.contains(url.path(percentEncoded: false)) }

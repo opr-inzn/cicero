@@ -36,6 +36,12 @@ public struct CommandError: Error, Sendable {
         public var kind: String
         public var title: String
         public var message: String
+
+        public init(kind: String, title: String, message: String) {
+            self.kind = kind
+            self.title = title
+            self.message = message
+        }
     }
 
     public var code: Code

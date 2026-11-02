@@ -2,9 +2,9 @@
 
 [Cicero Help](README.md) › The cicero command
 
-The `cicero` command finds and checks the fonts in Cicero’s library from Terminal, from scripts and from AI agents like Claude Code or Codex. It answers the way Cicero’s window does: the same search, the same classifications, foundries, tags and folders.
+The `cicero` command finds, checks and changes the fonts in Cicero’s library from Terminal, from scripts and from AI agents like Claude Code or Codex. It answers the way Cicero’s window does: the same search, the same classifications, foundries, tags and folders.
 
-It reads what Cicero saved, so it works while Cicero is closed too, and it never opens Cicero. This version only reads: it doesn’t turn fonts on or off, and it doesn’t change tags or folders.
+It works while Cicero is closed too, and it never opens Cicero. It turns fonts on and off, and gives families tags and puts them in folders.
 
 ## Install the command
 
@@ -26,6 +26,10 @@ The command is inside Cicero (`Cicero.app/Contents/Helpers/cicero`), so it updat
 | `cicero coverage Inter --set adobe-latin-3` | Whether a family has every character of a [coverage set](character-sets.md), and which it lacks |
 | `cicero coverage Inter --text "Grüße, Łódź"` | The same for some text |
 | `cicero list families` | Every family. Also `tags`, `folders`, `locations`, `foundries`, and `coverage` (the coverage sets and their ids) |
+| `cicero activate Inter Roboto` | Turns the families on (also `cicero on`) |
+| `cicero deactivate Inter` | Turns them off (also `cicero off`) |
+| `cicero tag add Licensed Inter` | Gives families a tag. Also `tag create` and `tag remove` |
+| `cicero folder add "Client A" Inter` | Puts families in a folder. Also `folder create` and `folder remove` |
 
 Names don’t need capitals: `cicero status inter` works. When a name isn’t quite right, the command says which names are near.
 
@@ -64,11 +68,29 @@ The command shows the fonts Cicero’s window shows. When **Settings → General
 
 For example, `cicero status Helvetica --system-fonts`. The options don’t change Cicero’s settings. When `--proofing-fonts` or `--no-proofing-fonts` asks for the opposite of Cicero’s setting, the command looks through your fonts first, which takes a few seconds more.
 
+### Change
+
+| Command | Does |
+|---|---|
+| `cicero activate <families…>`, `--folder "Client A"`, `--tag Licensed` | turns on every style of the families, a folder’s fonts or the families with a tag, where they are, as Cicero does |
+| `cicero activate … --until-quit` | until Cicero quits. Only while Cicero is open |
+| `cicero deactivate <families…>`, `--folder`, `--tag` | turns them off |
+| `cicero tag create Proofs --color blue` | makes a tag; without `--color`, in the first colour no tag has. Nothing changes when there’s a tag of that name |
+| `cicero tag add Proofs <families…>`, `tag remove` | gives families the tag, or takes it off them |
+| `cicero folder create "Client A"` | makes a folder. Nothing changes when there’s a folder of that name |
+| `cicero folder add "Client A" <families…>`, `folder remove` | puts every style of the families in the folder, or takes them out |
+
+Names must be exact, but capitals don’t matter. When a name isn’t right, nothing changes, and the command says which names are near.
+
+**While Cicero is open,** Cicero makes the change, so you see it in its window at once. Fonts you turn on or off from the command get a message in Cicero’s window with **Undo**. **While Cicero is closed,** the command makes the change itself, and Cicero has it when it opens.
+
+**Questions:** Cicero asks before it turns on more than 100 families at once, and before it moves fonts out of a folder others share (see [Activating fonts](activating.md)). The command asks the same question in Terminal: type `y` to go on. Add `--yes` to answer yes. A script or agent without a terminal gets the question in the answer (exit code 4), and nothing changes until it asks again with `--yes`.
+
 ## How up to date it is
 
-- The list of families is the one Cicero saved the last time it looked through your fonts. `cicero status` says when that was. Cicero looks again by itself while it’s open. `cicero status --rescan` looks through your fonts first. While Cicero is closed, it saves what it finds, as Cicero would at its next launch. While Cicero is open, it doesn’t save it, because Cicero saves its own.
+- The list of families is the one Cicero saved the last time it looked through your fonts. `cicero status` says when that was. Cicero looks again by itself while it’s open. `cicero status --rescan` looks through your fonts first: while Cicero is open, Cicero does it and saves what it finds; while Cicero is closed, the command does it and saves it, as Cicero would at its next launch.
 - Whether a font is on or off is what macOS says at the moment you run the command.
-- What you change in Cicero is in the command’s answers a moment later.
+- What you change in Cicero is in the command’s answers a moment later. What you change with the command is in its answers at once.
 
 ## For scripts and agents
 
@@ -106,6 +128,10 @@ Add `--json` to any command. Every answer is one JSON object with `"schema": 1` 
 
 With `--style` or `--all-styles`, a style also has `version`, `released`, `designer`, `designerURL`, `manufacturer`, `manufacturerURL`, `vendorID`, `copyright`, `license`, `licenseURL`, `fsType` and, for the regular style, `coverage`.
 
+### A change
+
+Every change answers `{ "schema": 1, "changed": ["Inter"], "unchanged": ["Roboto"], "failed": [] }`: the families (or the tag or folder it made) that changed, those that were as asked already, and each file that couldn’t be turned on or off, as `{ "family", "path", "reason" }`.
+
 ### Other answers
 
 - `status`: `familyCount`, `styleCount`, `activeFamilyCount`, `lastScan`, `hidden` (the fonts this answer leaves out: `systemFonts`, `adobeFonts`, `proofingFonts`), `locations` (`id`, `name`, `path`), `problems` (`kind`: `installedTwice`, `missing`, `unreadable`, `external`, `duplicates` or `sharedNames`; `message`; `paths`).
@@ -114,19 +140,29 @@ With `--style` or `--all-styles`, a style also has `version`, `released`, `desig
 
 ### Errors
 
-An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "suggestions": ["Inter"] } }`, and the command exits with:
+An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "suggestions": ["Inter"] } }`, and the command exits with the codes below. A question adds `"question": { "kind": "manyFamilies", "title": "Activate 120 Families?", "message": "…" }` (`kind` is `manyFamilies` or `movingOutOfSharedFolder`).
 
 | Exit code | `code` | |
 |---|---|---|
 | 0 | | it worked |
-| 1 | `invalidArgument`, `unreadableUserData`, `failed` | something in the command is wrong, Cicero’s data can’t be read, or something else went wrong |
+| 1 | `invalidArgument`, `unreadableUserData`, `appNotOpen`, `failed` | something in the command is wrong, Cicero’s data can’t be read, `--until-quit` while Cicero is closed, or something else went wrong |
 | 2 | `notFound`, `ambiguous` | no family, style, tag, folder or set of that name (`suggestions` has near names), or more than one (`suggestions` says which) |
+| 4 | `needsConfirmation` | the change asks first; nothing changed. Ask the user, then run it again with `--yes` |
+| 5 | `busy` | Cicero is open but didn’t take the change within 5 seconds, or another `cicero` command was making one; nothing changed |
 
 ## Questions
 
 ### Does the command change anything?
 
-No. It only reads what Cicero saved. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
+Only `activate`, `deactivate`, `tag` and `folder` change things. The other commands only read what Cicero saved. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
+
+### What if the command stops while it turns fonts on or off?
+
+If the command stops in the middle, for example because you press Control-C or the Mac switches off, some fonts can be on or off without Cicero knowing it. The next `cicero` change, or Cicero when it opens, puts this right. It doesn’t turn fonts on or off again. It notes which fonts are on and off now.
+
+### Can the command and Cicero change things at the same time?
+
+No. Only one of them changes Cicero’s data at a time. While Cicero is open, the command asks Cicero to make the change. While Cicero is closed, the command makes it, and a Cicero that opens meanwhile waits until it’s done.
 
 ### Why doesn’t it find a font that comes with macOS?
 

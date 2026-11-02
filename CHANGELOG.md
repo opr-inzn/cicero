@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## Unreleased
 
-- **The `cicero` command** finds and checks your fonts from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Command-Line Tool**, then type `cicero --help`. See [The cicero command](help/command-line.md).
+- **The `cicero` command** finds, checks and turns on your fonts, and tags them and puts them in folders, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Command-Line Tool**, then type `cicero --help`. See [The cicero command](help/command-line.md).
 
 ## 0.11.0
 
