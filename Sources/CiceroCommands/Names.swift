@@ -23,8 +23,8 @@ public enum Names {
                                suggestions: found.map(\.id))
         }
         if let hidden = context.library.families.first(where: { fold($0.id) == key || fold($0.name) == key }) {
-            let why = hidden.state == .system ? "comes with macOS" : "is from Adobe Fonts"
-            throw CommandError(.notFound, "\(hidden.id) \(why), and Cicero is set to hide those fonts. Show them in Cicero’s Settings to see them here.")
+            let (why, flag) = hidden.state == .system ? ("comes with macOS", "--system-fonts") : ("is from Adobe Fonts", "--adobe-fonts")
+            throw CommandError(.notFound, "\(hidden.id) \(why), and Cicero is set to hide those fonts. Add \(flag) to see it here.")
         }
         throw CommandError(.notFound, "No family is called “\(typed)”.", suggestions: suggestions(for: typed, among: families.flatMap { family in
             family.name == family.id ? [family.id] : [family.id, family.name]

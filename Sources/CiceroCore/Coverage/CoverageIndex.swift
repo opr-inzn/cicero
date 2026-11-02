@@ -73,11 +73,11 @@ public final class CoverageIndex: Sendable {
 
     /// Computes what's missing at low priority; cheap when nothing changed. `progress` reports
     /// (done, total) only when there's work. Cancellable. The cache is written afterwards, without
-    /// holding up the lists waiting for the results.
-    public func update(_ families: [Family], progress: @escaping @Sendable (Int, Int) -> Void) async {
+    /// holding up the lists waiting for the results; with `saves` false, it isn't written (see `loadSaved`).
+    public func update(_ families: [Family], saves: Bool = true, progress: @escaping @Sendable (Int, Int) -> Void) async {
         let signpost = Signposts.library.beginInterval("Coverage")
         defer { Signposts.library.endInterval("Coverage", signpost) }
-        loadIfNeeded()
+        loadIfNeeded(removingOldFile: saves)
         let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
@@ -105,7 +105,7 @@ public final class CoverageIndex: Sendable {
             }
         }
         // What to keep is decided now, against these families; only the writing waits.
-        if let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
+        if saves, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
             saveQueue.async { self.write(entries) }
         }
     }

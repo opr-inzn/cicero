@@ -2,9 +2,37 @@ import AppKit
 import CiceroCore
 import Foundation
 
+/// Fonts Cicero's settings hide or show, which one command shows or hides instead; nil keeps Cicero's setting. It never
+/// changes the setting.
+public struct ShownFonts: Sendable, Equatable {
+    /// Those that come with macOS (Show system fonts).
+    public var systemFonts: Bool?
+    /// Adobe Fonts from Creative Cloud (Show fonts from Creative Cloud).
+    public var adobeFonts: Bool?
+    /// Those in the folders Adobe apps load by themselves (Show fonts installed for proofing in Adobe apps).
+    public var proofingFonts: Bool?
+
+    public init(systemFonts: Bool? = nil, adobeFonts: Bool? = nil, proofingFonts: Bool? = nil) {
+        self.systemFonts = systemFonts
+        self.adobeFonts = adobeFonts
+        self.proofingFonts = proofingFonts
+    }
+
+    /// The user's data with these in place of Cicero's settings.
+    func applied(to data: UserData) -> UserData {
+        var data = data
+        if let systemFonts { data.showSystemFonts = systemFonts }
+        if let adobeFonts { data.showCreativeCloudFonts = adobeFonts }
+        if let proofingFonts { data.showAdobeAppFolders = proofingFonts }
+        return data
+    }
+}
+
 /// What the read commands read, as Cicero saved it: the user's data, the library the last scan saved with each face on
 /// or off as macOS has it now, the coverage worked out so far and the guessed classifications. Reads never scan
-/// unless asked to (`rescan`), and never write but for what a rescan finds.
+/// unless asked to (`rescan`), or unless the proofing fonts are to be shown or hidden other than as the saved library
+/// was scanned. Only a scan as Cicero makes it, while Cicero is closed, is saved: while it's open, Cicero writes its
+/// caches itself, and would write over the tool's or keep showing its own.
 public final class LibraryContext: @unchecked Sendable {
     public let environment: ToolEnvironment
     public let data: UserData
@@ -16,23 +44,26 @@ public final class LibraryContext: @unchecked Sendable {
     /// The guessed classification of a family nothing in its files classifies, as the app has it.
     public let classificationGuess: (Family) -> Classification?
 
-    /// Loads everything; `rescan` scans first, which only a closed app lets the tool do.
-    public static func load(_ environment: ToolEnvironment, rescan: Bool = false) async throws -> LibraryContext {
-        let data = try loadUserData(environment)
-        let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar)
+    /// Loads everything; `rescan` scans first. `shown` shows or hides fonts other than as Cicero's settings do.
+    public static func load(_ environment: ToolEnvironment, rescan: Bool = false, shown: ShownFonts = ShownFonts()) async throws -> LibraryContext {
+        let saved = try loadUserData(environment)
+        let data = shown.applied(to: saved)
+        // The saved library has the proofing fonts as Cicero's setting has them; the other way needs a scan of its own.
+        let proofingDiffers = data.showAdobeAppFolders != saved.showAdobeAppFolders && !environment.appFontFolders.isEmpty
+        let scans = rescan || proofingDiffers
+        let saves = scans && !proofingDiffers && !isAppOpen(environment)
+        let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar, saves: saves)
         let languages = environment.resources.map { LanguageCatalog(contentsOf: $0.appendingPathComponent("Languages.json")) }
         let coverage = languages.map { CoverageIndex(caches: environment.locations.caches, languages: $0) }
         let library: Library
         let lastScan: Date?
-        if rescan {
-            if isAppOpen(environment) {
-                throw CommandError(.busy, "Cicero is open, and it scans by itself. Quit Cicero to rescan from here, or leave out --rescan.")
-            }
-            library = try await scanner.scan(ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)) { _ in }
-            scanner.flush()
-            if let coverage {
-                await coverage.update(library.families.filter(data.lists)) { _, _ in }
-                coverage.waitForSave()
+        if scans {
+            library = try await scanner.scan(ScanInput(folders: data.scannedFolders(appFolders: environment.appFontFolders), files: data.fontFiles, records: data.records)) { _ in }
+            if saves {
+                scanner.flush()
+                // As the app keeps it: the families its settings list.
+                await coverage?.update(library.families.filter(saved.lists)) { _, _ in }
+                coverage?.waitForSave()
             }
             lastScan = environment.now
         } else {
@@ -43,6 +74,12 @@ public final class LibraryContext: @unchecked Sendable {
             lastScan = saved.lastSaved
         }
         coverage?.loadSaved()
+        // The coverage the saved cache can lack: of what a scan that isn't saved found, and of fonts Cicero hides that
+        // this command shows. Worked out now, and not saved.
+        let showsMore = (data.showSystemFonts && !saved.showSystemFonts) || (data.showCreativeCloudFonts && !saved.showCreativeCloudFonts)
+        if (scans && !saves) || showsMore {
+            await coverage?.update(library.families.filter(data.lists), saves: false) { _, _ in }
+        }
         let characterSets = environment.resources.map { CharacterSetCatalog(contentsOf: $0.appendingPathComponent("CharacterSets.json")) }
         let measurements = MeasurementIndex(caches: environment.locations.caches)
         measurements.loadSaved()
@@ -94,6 +131,12 @@ public final class LibraryContext: @unchecked Sendable {
     }
 
     // MARK: What the app shows
+
+    /// The fonts this command hides, by Cicero's settings or its own flags: `systemFonts`, `adobeFonts`, `proofingFonts`.
+    public var hidden: [String] {
+        [("systemFonts", data.showSystemFonts), ("adobeFonts", data.showCreativeCloudFonts), ("proofingFonts", data.showAdobeAppFolders)]
+            .filter { !$0.1 }.map(\.0)
+    }
 
     /// The families the app lists: not those that come with macOS or from Creative Cloud while they're hidden.
     public lazy var listedFamilies: [Family] = library.families.filter(data.lists)

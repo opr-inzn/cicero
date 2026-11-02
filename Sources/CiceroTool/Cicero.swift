@@ -38,6 +38,20 @@ struct CommonOptions: ParsableArguments {
     var debug = false
 }
 
+/// Fonts Cicero's settings hide or show, which one command shows or hides instead. They never change the settings.
+struct ShownOptions: ParsableArguments {
+    @Flag(inversion: .prefixedNo, help: "Show or hide the fonts that come with macOS. Without it, as in Cicero’s settings.")
+    var systemFonts: Bool?
+
+    @Flag(inversion: .prefixedNo, help: "Show or hide Adobe Fonts from Creative Cloud. Without it, as in Cicero’s settings.")
+    var adobeFonts: Bool?
+
+    @Flag(inversion: .prefixedNo, help: "Show or hide the fonts installed for proofing in Adobe apps. Without it, as in Cicero’s settings; otherwise the command scans first, which takes longer.")
+    var proofingFonts: Bool?
+
+    var shown: ShownFonts { ShownFonts(systemFonts: systemFonts, adobeFonts: adobeFonts, proofingFonts: proofingFonts) }
+}
+
 /// Runs a command's work and prints its answer, or its error, as text or JSON. Exits with the error's code.
 func answer(_ common: CommonOptions, text: (JSON) -> String, _ work: () async throws -> JSON) async throws {
     let start = ContinuousClock.now
@@ -60,9 +74,9 @@ func answer(_ common: CommonOptions, text: (JSON) -> String, _ work: () async th
     }
 }
 
-func load(_ common: CommonOptions, rescan: Bool = false) async throws -> LibraryContext {
+func load(_ common: CommonOptions, _ shown: ShownOptions, rescan: Bool = false) async throws -> LibraryContext {
     let start = ContinuousClock.now
-    let context = try await LibraryContext.load(.current(), rescan: rescan)
+    let context = try await LibraryContext.load(.current(), rescan: rescan, shown: shown.shown)
     if common.debug {
         FileHandle.standardError.write(Data("Read the library (\(context.library.families.count) families) in \(ContinuousClock.now - start).\n".utf8))
     }
@@ -88,14 +102,16 @@ struct Status: AsyncParsableCommand {
     @Flag(help: "Every style’s details.")
     var allStyles = false
 
-    @Flag(help: "Scan the font folders first. Only while Cicero is closed.")
+    @Flag(help: "Scan the font folders first. While Cicero is open, Cicero saves its own scans, so this scan isn’t saved.")
     var rescan = false
+
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
 
     @OptionGroup var common: CommonOptions
 
     func run() async throws {
         try await answer(common, text: Text.status) {
-            let context = try await load(common, rescan: rescan)
+            let context = try await load(common, hidden, rescan: rescan)
             guard let family else {
                 if style != nil || allStyles { throw CommandError(.invalidArgument, "--style and --all-styles go with a family.") }
                 return StatusCommand.library(in: context)
@@ -192,11 +208,12 @@ struct Find: AsyncParsableCommand {
     var words: [String] = []
 
     @OptionGroup var find: FindArguments
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
     func run() async throws {
         try await answer(common, text: Text.families) {
-            try FindCommand.run(find.options(words: words), in: try await load(common))
+            try FindCommand.run(find.options(words: words), in: try await load(common, hidden))
         }
     }
 }
@@ -217,11 +234,12 @@ struct CoverageCheck: AsyncParsableCommand {
     @Option(help: "Some text.")
     var text: String?
 
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
     func run() async throws {
         try await answer(common, text: Text.coverageCheck) {
-            try await CoverageCommand.run(family: family, set: set, text: text, in: try await load(common))
+            try await CoverageCommand.run(family: family, set: set, text: text, in: try await load(common, hidden))
         }
     }
 }
@@ -242,6 +260,7 @@ struct List: AsyncParsableCommand {
     @Option(help: "How many families to skip.")
     var offset = 0
 
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
     func run() async throws {
@@ -249,7 +268,7 @@ struct List: AsyncParsableCommand {
             var options = FindOptions()
             options.limit = limit
             options.offset = offset
-            return try ListCommand.run(what, options: options, in: try await load(common))
+            return try ListCommand.run(what, options: options, in: try await load(common, hidden))
         }
     }
 }

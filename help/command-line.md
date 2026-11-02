@@ -52,9 +52,21 @@ For example, `cicero find --class serif --filter italic --set adobe-latin-3 --ta
 
 Coverage is the coverage of each family’s regular style, as everywhere in Cicero.
 
+### Fonts Cicero hides
+
+The command shows the fonts Cicero’s window shows. When **Settings → General** hides fonts that come with macOS, fonts from Creative Cloud or fonts installed for proofing in Adobe apps, the command hides them too. Add these to any command to show them, or `--no-…` to hide them, only for that command:
+
+| Option | Shows |
+|---|---|
+| `--system-fonts`, `--no-system-fonts` | the fonts that come with macOS |
+| `--adobe-fonts`, `--no-adobe-fonts` | Adobe Fonts, from Creative Cloud |
+| `--proofing-fonts`, `--no-proofing-fonts` | the fonts installed for proofing in Adobe apps |
+
+For example, `cicero status Helvetica --system-fonts`. The options don’t change Cicero’s settings. When `--proofing-fonts` or `--no-proofing-fonts` asks for the opposite of Cicero’s setting, the command looks through your fonts first, which takes a few seconds more.
+
 ## How up to date it is
 
-- The list of families is the one Cicero saved the last time it looked through your fonts. `cicero status` says when that was. Cicero looks again by itself while it’s open; while it’s closed, `cicero status --rescan` looks through your fonts first.
+- The list of families is the one Cicero saved the last time it looked through your fonts. `cicero status` says when that was. Cicero looks again by itself while it’s open. `cicero status --rescan` looks through your fonts first. While Cicero is closed, it saves what it finds, as Cicero would at its next launch. While Cicero is open, it doesn’t save it, because Cicero saves its own.
 - Whether a font is on or off is what macOS says at the moment you run the command.
 - What you change in Cicero is in the command’s answers a moment later.
 
@@ -96,7 +108,7 @@ With `--style` or `--all-styles`, a style also has `version`, `released`, `desig
 
 ### Other answers
 
-- `status`: `familyCount`, `styleCount`, `activeFamilyCount`, `lastScan`, `locations` (`id`, `name`, `path`), `problems` (`kind`: `installedTwice`, `missing`, `unreadable`, `external`, `duplicates` or `sharedNames`; `message`; `paths`).
+- `status`: `familyCount`, `styleCount`, `activeFamilyCount`, `lastScan`, `hidden` (the fonts this answer leaves out: `systemFonts`, `adobeFonts`, `proofingFonts`), `locations` (`id`, `name`, `path`), `problems` (`kind`: `installedTwice`, `missing`, `unreadable`, `external`, `duplicates` or `sharedNames`; `message`; `paths`).
 - `coverage`: `family`, `style`, `set` or `text`, `covered`, `missingCount`, `missing` (`character`, `unicode` like `"U+0151"`).
 - `list tags`: `name`, `color`, `familyCount`. `list folders`: `id`, `name`, `familyCount`. `list locations`: `id`, `name`, `path`. `list foundries`: `name`, `familyCount`. `list coverage`: `id`, `name`, `group` (`latin`, `adobeLatin`, `google`, `unicode`, `custom`), `characterCount`.
 
@@ -109,17 +121,16 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 | 0 | | it worked |
 | 1 | `invalidArgument`, `unreadableUserData`, `failed` | something in the command is wrong, Cicero’s data can’t be read, or something else went wrong |
 | 2 | `notFound`, `ambiguous` | no family, style, tag, folder or set of that name (`suggestions` has near names), or more than one (`suggestions` says which) |
-| 5 | `busy` | `--rescan` while Cicero is open: Cicero looks through your fonts by itself |
 
 ## Questions
 
 ### Does the command change anything?
 
-No. It only reads what Cicero saved. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch.
+No. It only reads what Cicero saved. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
 
 ### Why doesn’t it find a font that comes with macOS?
 
-When **Show system fonts** is off in **Preferences → General**, the command leaves those fonts out too, as Cicero’s window does. It says so when you ask for one by name.
+When **Show system fonts** is off in **Settings → General**, the command leaves those fonts out too, as Cicero’s window does. It says so when you ask for one by name. Add `--system-fonts` to see them (see [Fonts Cicero hides](#fonts-cicero-hides)).
 
 ### How do I remove the command?
 

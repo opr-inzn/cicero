@@ -109,6 +109,8 @@ enum Text {
                 + "\(number(int(answer["activeFamilyCount"]) ?? 0)) with a style on.",
         ]
         if let scan = date(answer["lastScan"]) { lines.append("Last scanned \(scan).") }
+        let hidden = strings(answer["hidden"]).compactMap { ["systemFonts": "system fonts", "adobeFonts": "Adobe Fonts", "proofingFonts": "fonts for proofing in Adobe apps"][$0] }
+        if !hidden.isEmpty { lines.append("Hidden: \(hidden.joined(separator: ", ")).") }
         let locations = array(answer["locations"])
         lines.append("")
         lines.append(locations.isEmpty ? "No locations." : "Locations:")
