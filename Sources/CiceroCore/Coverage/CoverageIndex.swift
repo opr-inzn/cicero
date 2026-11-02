@@ -73,11 +73,11 @@ public final class CoverageIndex: Sendable {
 
     /// Computes what's missing at low priority; cheap when nothing changed. `progress` reports
     /// (done, total) only when there's work. Cancellable. The cache is written afterwards, without
-    /// holding up the lists waiting for the results.
-    public func update(_ families: [Family], progress: @escaping @Sendable (Int, Int) -> Void) async {
+    /// holding up the lists waiting for the results; with `saves` false, it isn't written (see `loadSaved`).
+    public func update(_ families: [Family], saves: Bool = true, progress: @escaping @Sendable (Int, Int) -> Void) async {
         let signpost = Signposts.library.beginInterval("Coverage")
         defer { Signposts.library.endInterval("Coverage", signpost) }
-        loadIfNeeded()
+        loadIfNeeded(removingOldFile: saves)
         let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
@@ -105,7 +105,7 @@ public final class CoverageIndex: Sendable {
             }
         }
         // What to keep is decided now, against these families; only the writing waits.
-        if let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
+        if saves, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
             saveQueue.async { self.write(entries) }
         }
     }
@@ -130,6 +130,11 @@ public final class CoverageIndex: Sendable {
         return coverage
     }
 
+    /// Reads the cache, as `update` does first, for a reader that only looks coverage up, like the `cicero` tool.
+    public func loadSaved() {
+        loadIfNeeded(removingOldFile: false)
+    }
+
     public func clearCache() {
         state.withLock {
             $0.entries = [:]
@@ -140,7 +145,7 @@ public final class CoverageIndex: Sendable {
     }
 
     /// Waits for the cache to be written.
-    func waitForSave() {
+    public func waitForSave() {
         saveQueue.sync {}
     }
 
@@ -164,11 +169,13 @@ public final class CoverageIndex: Sendable {
 
     // MARK: - Disk cache
 
-    private func loadIfNeeded() {
+    /// `removingOldFile`: the cache of the version before goes, as the app reads this one; a reader that only looks
+    /// coverage up leaves the app's files as they are.
+    private func loadIfNeeded(removingOldFile: Bool = true) {
         state.withLock { state in
             guard !state.loaded else { return }
             state.loaded = true
-            try? FileManager.default.removeItem(at: oldFile)
+            if removingOldFile { try? FileManager.default.removeItem(at: oldFile) }
             guard let data = try? Data(contentsOf: file),
                   let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
                   cache.language == languages.dataVersion

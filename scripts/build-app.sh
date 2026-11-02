@@ -19,8 +19,11 @@ BIN_DIR="$("${BUILD[@]}" --show-bin-path)"
 
 APP=build/Cicero.app
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks" "$APP/Contents/Helpers"
 cp "$BIN_DIR/Cicero" "$APP/Contents/MacOS/Cicero"
+# The cicero command-line tool. Not in Contents/MacOS: on a disk that ignores case, cicero is Cicero, the app. It reads
+# CharacterSets.json and Languages.json from Contents/Resources, and Sparkle updates it with the app.
+cp "$BIN_DIR/cicero-tool" "$APP/Contents/Helpers/cicero"
 # The measurements are only in a binary built with them, never in one built for users: their types' symbols, and the
 # scenario's environment variable (a string long enough to be stored as text; LC_ALL=C and -a, or grep stops at the
 # first bytes that aren't UTF-8).
@@ -84,6 +87,7 @@ fi
 for CODE in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
     "${SIGN[@]}" "$CODE"
 done
+"${SIGN[@]}" --identifier com.maximilianinzinger.Cicero.cli "$APP/Contents/Helpers/cicero"
 "${SIGN[@]}" --entitlements Resources/Cicero.entitlements "$APP"
 codesign --verify --deep --strict "$APP"
 

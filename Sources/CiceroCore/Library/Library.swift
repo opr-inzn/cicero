@@ -253,6 +253,8 @@ public final class LibraryScanner: Sendable {
     private let state = Mutex(State())
     /// Writes the caches in the order scans finish.
     private let saving: DispatchQueue
+    /// Whether scans write their caches; false for a reader that scans while Cicero is open, which writes them itself.
+    private let saves: Bool
 
     private struct State {
         var files: [String: CachedFile] = [:]
@@ -297,9 +299,11 @@ public final class LibraryScanner: Sendable {
         self.init(locations: locations, registrar: CoreTextRegistrar())
     }
 
-    /// `registrar` supplies the system's active font files; tests pass a fake.
-    public init(locations: Locations, registrar: any FontRegistrar) {
+    /// `registrar` supplies the system's active font files; tests pass a fake. With `saves` false, scans read the
+    /// caches but never write them.
+    public init(locations: Locations, registrar: any FontRegistrar, saves: Bool = true) {
         self.locations = locations
+        self.saves = saves
         saving = DispatchQueue(label: "com.maximilianinzinger.Cicero.library-save", qos: .utility)
         self.registrar = registrar
         cacheURL = locations.caches.appendingPathComponent("faces.cache", isDirectory: false)
@@ -327,6 +331,34 @@ public final class LibraryScanner: Sendable {
             }
             return library
         }
+    }
+
+    /// The library the last scan saved, with each face on or off as macOS has it now, for a reader that doesn't scan,
+    /// like the `cicero` tool; nil when there's none. What macOS lists as active is on, and so is a file in macOS's own
+    /// folders, or in a Fonts folder unless macOS has it off; a file Cicero registered that the list leaves out is asked
+    /// about, as a scan does. `lastSaved` is when the library was saved.
+    public func savedLibraryAsNow(records: ActivationRecords) -> (library: Library, lastSaved: Date?)? {
+        guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
+        let saved = (try? FileManager.default.attributesOfItem(atPath: libraryURL.path))?[.modificationDate] as? Date
+        let listed = Set(registrar.activeFontURLs().map { $0.path(percentEncoded: false) })
+        var off: Set<String>?
+        let locations = locations
+        let registrar = registrar
+        let fontsFolders = [locations.userFonts.path + "/", locations.allUsersFonts.path + "/"]
+        let systemFolders = locations.systemFonts.map { $0.path + "/" }
+        let library = LibraryCache.decode(data) { _, path, app in
+            var active = listed.contains(path) || systemFolders.contains { path.hasPrefix($0) }
+            if !active, fontsFolders.contains(where: { path.hasPrefix($0) }) {
+                if off == nil { off = registrar.offFontPaths() }
+                let offPaths = off!
+                active = !offPaths.contains(path) && registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+            } else if !active, records.inPlace.contains(path) || records.temporary[path] != nil {
+                active = registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+            }
+            let file = FoundFile(stamp: FaceStamp(modified: .distantPast, size: 0), isActive: active, appName: app)
+            return Self.faceState(of: path, file: file, locations: locations, records: records)
+        }
+        return library.map { ($0, saved) }
     }
 
     /// Writes what was read from files and not saved yet, by a scan still reading too, and waits for the caches being
@@ -866,6 +898,7 @@ public final class LibraryScanner: Sendable {
     }
 
     private func saveCacheIfNeeded() {
+        guard saves else { return }
         let snapshot: [String: CachedFile]? = state.withLock { state in
             guard state.dirty else { return nil }
             state.dirty = false
@@ -883,6 +916,7 @@ public final class LibraryScanner: Sendable {
 
     /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last.
     private func saveLibraryIfNeeded(_ library: Library) {
+        guard saves else { return }
         let changed = state.withLock { state in
             guard state.savedFingerprint != library.fingerprint else { return false }
             state.savedFingerprint = library.fingerprint
