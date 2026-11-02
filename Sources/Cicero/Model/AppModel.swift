@@ -54,10 +54,8 @@ final class AppModel {
     /// `.unclassified` where it couldn't tell.
     private(set) var classificationGuesses: [String: Classification] = [:]
     /// Family → the classification the model sees in its letters, for the families nothing in their files
-    /// classifies, where it's at least `letterGuessLikelihood` sure (see `MeasurementIndex.classification`).
+    /// classifies, where it's at least `ClassificationGuesses.letterLikelihood` sure (see `MeasurementIndex.classification`).
     private(set) var letterGuesses: [String: Classification] = [:]
-    /// How sure the model must be of a classification for it to count: a wrong classification is worse than none.
-    static let letterGuessLikelihood: Float = 0.7
     /// Bumped whenever guesses arrive or go; cached lists depend on it.
     private(set) var guessRevision = 0
     /// nil when coverage is up to date.
@@ -124,14 +122,14 @@ final class AppModel {
             guessesChanged()
         }
     }
-    static let guessesClassificationsKey = "classification.guessesFromNames"
+    static let guessesClassificationsKey = ClassificationGuesses.guessingKey
     /// Whether to ask if Cicero should classify fonts automatically: from the first launch, until it's answered. The
     /// sidebar's Classifications has an Organize row meanwhile, which asks (see `showsGuessingQuestion`), rather than an
     /// alert as the window first opens. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
     private(set) var asksAboutGuessing = false
     /// Whether the question is showing, from a click on the sidebar’s Organize row.
     var showsGuessingQuestion = false
-    static let asksAboutGuessingKey = "classification.asksAboutGuessing"
+    static let asksAboutGuessingKey = ClassificationGuesses.askingKey
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
     private(set) var tagDots: [String: [TagColor]] = [:]
@@ -923,11 +921,7 @@ final class AppModel {
     /// The classifications the model sees in the letters of the families nothing in their files classifies. They
     /// count only while guessing is on (see `classificationGuess`), but are kept, as the measurements are, either way.
     private func refreshLetterGuesses() {
-        var found: [String: Classification] = [:]
-        for family in library.families where family.classification == .unclassified && !family.mixesSerifAndSans {
-            guard let seen = measurements.classification(of: family.regular.face.id), seen.likelihood >= Self.letterGuessLikelihood else { continue }
-            found[family.id] = seen.classification
-        }
+        let found = ClassificationGuesses.letters(of: library.families, measurements: measurements)
         guard found != letterGuesses else { return }
         letterGuesses = found
         guard guessesClassifications else { return }

@@ -52,6 +52,17 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         }
     }
 
+    /// The token a word names, as the `cicero` tool's `--filter` takes it: one of the words the suggestions find a token
+    /// by ("bold", "italic", "condensed", "tnum"), ignoring case, or a weight on the OS/2 scale ("700"); nil for
+    /// another. Words for a kind of token only ("weight", "width", "numbers") name none.
+    public static func named(_ word: String) -> SearchToken? {
+        let word = word.trimmingCharacters(in: .whitespaces).lowercased()
+        if let weight = Int(word), weights.contains(where: { $0.weight == weight }) { return .weight(weight) }
+        let kinds: Set<String> = ["weight", "width", "numbers", "numerals"]
+        guard !kinds.contains(word) else { return nil }
+        return all.first { $0.words.contains(word) }
+    }
+
     /// Tokens of a kind take each other's place: a style has one weight and one width.
     private var kind: Int {
         switch self {
