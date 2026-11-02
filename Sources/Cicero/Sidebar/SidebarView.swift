@@ -557,16 +557,16 @@ final class SidebarHighlight {
 }
 
 /// At the top of Classifications until the user answers whether Cicero should classify fonts automatically: a click asks
-/// (see `AppModel.showsGuessingQuestion`), and either answer takes it away. In the accent colour, title and symbol both,
-/// and heavier, as an offer rather than a list of families: it can’t be selected, moved or hidden.
+/// (see `AppModel.showsGuessingQuestion`), and either answer takes it away. In solar orange (`Color.solar`), title and
+/// symbol both, and heavier, as an offer rather than a list of families: it can’t be selected, moved or hidden.
 private struct OrganizeRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Button { model.showsGuessingQuestion = true } label: {
-            Label { Text("Organize").fontWeight(.semibold).foregroundStyle(.tint) } icon: {
+            Label { Text("Organize").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
                 // 1.5 pt to the right: the thin symbol sits that far from its title more than the other rows' do.
-                Image(systemName: "sparkles").foregroundStyle(.tint).offset(x: 1.5)
+                Image(systemName: "sparkles").foregroundStyle(Color.solar).offset(x: 1.5)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())

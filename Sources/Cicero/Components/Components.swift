@@ -18,6 +18,8 @@ extension Color {
             ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
             : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
     })
+    /// Solar, the sidebar's Organize row's: an orange, HSL 22° 100% 52%, the same in light and dark mode.
+    static let solar = Color(nsColor: NSColor(srgbRed: 1, green: 0.392, blue: 0.04, alpha: 1))
 }
 
 /// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
