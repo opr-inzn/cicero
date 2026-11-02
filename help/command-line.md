@@ -40,6 +40,7 @@ To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line
 | `cicero find garamond` | Families, found as Cicero’s search field finds them: in names, foundries, designers, classifications, tags and notes. Also in the fonts’ licenses and descriptions (`cicero find rosettatype.com`), which the search field doesn’t look in yet |
 | `cicero coverage Inter --set adobe-latin-3` | Whether a family has every character of a [coverage set](character-sets.md), and which it lacks. Exit code 3 when it lacks some |
 | `cicero coverage Inter --text "Grüße, Łódź"` | The same for some text |
+| `cicero compare Inter "Source Sans 3" --text "Ορθόδοξοι υπότιτλοι" --png out.png` | A picture of the same text in each family, under its name, for you or an AI agent to look at (see [Compare](#compare)) |
 | `cicero list families` | Every family. Also `tags`, `folders`, `locations`, `foundries`, and `coverage` (the coverage sets and their ids) |
 | `cicero activate Inter Roboto` | Turns the families on (also `cicero on`) |
 | `cicero deactivate Inter` | Turns them off (also `cicero off`) |
@@ -72,6 +73,22 @@ Add any of these to `cicero find`, with or without words:
 For example, `cicero find --class serif --filter italic --set adobe-latin-3 --tag Licensed` lists the licensed serif families that have italics and all of Adobe Latin 3.
 
 Coverage is the coverage of each family’s regular style, as everywhere in Cicero.
+
+### Compare
+
+`cicero compare` draws the families you name in one PNG picture, one under the other, each under a small label with its name. An AI agent can look at the picture when it helps you choose fonts, and not only read their data.
+
+| Option | Does |
+|---|---|
+| `--text "Grüße, Łódź"` | draws this text. Without it, “Sphinx of black quartz, judge my vow.” A line break in the text starts a new line |
+| `--all-styles` | draws every style of the families, not only the regular style |
+| `--size 72` | the letters’ size in pixels, from 6 to 400 (48 at first) |
+| `--width 1600` | the picture’s width in pixels, from 200 to 8000 (1200 at first). Long text goes on to the next line |
+| `--png ~/Desktop/fonts.png` | where to put the picture. Without it, the picture goes in a temporary folder, and the command says where |
+
+Instead of a family, you can name one style: by its PostScript name (`Inter-Bold`), its full name, or the family’s name and the style’s name (`"Inter Bold"`). Up to 50 styles fit in one picture.
+
+Cicero draws each font from its file, on or off. **When a font doesn’t have a character of the text, Cicero draws a red box in its place,** not the character from another font, and the label says in red which characters the font lacks. When Cicero can’t read a font’s file, the label says so and nothing is drawn for that font.
 
 ### Fonts Cicero hides
 
@@ -159,6 +176,7 @@ Every change answers `{ "schema": 1, "changed": ["Inter"], "unchanged": ["Roboto
 
 - `status`: `familyCount`, `styleCount`, `activeFamilyCount`, `lastScan`, `hidden` (the fonts this answer leaves out: `systemFonts`, `adobeFonts`, `proofingFonts`), `locations` (`id`, `name`, `path`), `problems` (`kind`: `installedTwice`, `missing`, `unreadable`, `external`, `duplicates` or `sharedNames`; `message`; `paths`).
 - `coverage`: `family`, `style`, `set` or `text`, `covered`, `missingCount`, `missing` (`character`, `unicode` like `"U+0151"`).
+- `compare`: `png` (the picture’s full path), `width` and `height` (in pixels), `text`, `size`, and `samples`, from the top of the picture: `family`, `style`, `postScriptName`, `path`, `missingCount`, `missing` (as for `coverage`), and `unreadable: true` when Cicero can’t read the font’s file.
 - `list tags`: `name`, `color`, `familyCount`. `list folders`: `id`, `name`, `familyCount`. `list locations`: `id`, `name`, `path`. `list foundries`: `name`, `familyCount`. `list coverage`: `id`, `name`, `group` (`latin`, `adobeLatin`, `google`, `unicode`, `custom`), `characterCount`.
 
 ### Errors
@@ -168,7 +186,7 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 | Exit code | `code` | |
 |---|---|---|
 | 0 | | it worked |
-| 1 | `invalidArgument`, `unreadableUserData`, `appNotOpen`, `failed` | something in the command is wrong (an unknown option or a missing name too), Cicero’s data can’t be read, `--until-quit` while Cicero is closed, or something else went wrong |
+| 1 | `invalidArgument`, `unreadableUserData`, `appNotOpen`, `failed` | something in the command is wrong (an unknown option or a missing name too), Cicero’s data can’t be read, `--until-quit` while Cicero is closed, or something else went wrong (like a `--png` folder that isn’t there) |
 | 2 | `notFound`, `ambiguous` | no family, style, tag, folder or set of that name (`suggestions` has near names), or more than one (`suggestions` says which) |
 | 4 | `needsConfirmation` | the change asks first; nothing changed. Ask the user, then run it again with `--yes` |
 | 5 | `busy` | Cicero is open but didn’t take the change within 5 seconds, or another `cicero` command was making one; nothing changed |
@@ -179,7 +197,7 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 
 ### Does the command change anything?
 
-Only `activate`, `deactivate`, `tag` and `folder` change things. The other commands only read what Cicero saved. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
+Only `activate`, `deactivate`, `tag` and `folder` change things. The other commands only read what Cicero saved. `compare` writes only its picture. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
 
 ### What if the command stops while it turns fonts on or off?
 
