@@ -25,7 +25,7 @@ public enum WriteDispatcher {
                 lock.release()
                 let since = freeSince ?? .now
                 if Date.now.timeIntervalSince(since) > startingCicero {
-                    throw CommandError(.failed, "This version of Cicero doesn’t take changes from the cicero command. Update Cicero, or quit it to make the change from here.")
+                    throw CommandError(.failed, "This version of Cicero doesn’t take changes from the cicero CLI. Update Cicero, or quit it to make the change from here.")
                 }
                 freeSince = since
                 try await Task.sleep(for: .milliseconds(200))
@@ -39,7 +39,7 @@ public enum WriteDispatcher {
             }
             // Another cicero command is making a change.
             guard let lock = AppLock.wait(support: support, timeout: otherCommand) else {
-                throw CommandError(.busy, "Another cicero command is making a change. Nothing changed. Try again in a moment.")
+                throw CommandError(.busy, "The cicero CLI is making another change. Nothing changed. Try again in a moment.")
             }
             lock.release()
         }

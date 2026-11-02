@@ -107,7 +107,12 @@ struct CiceroCommands: Commands {
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
                 .disabled(!updates.canCheckForUpdates)
-            Button("Install Command-Line", systemImage: "terminal") { CommandLineTool.install(model: model) }
+            // Says when it's done, as installing shows nothing else to see (see CommandLineTool).
+            if CommandLineTool.State.shared.installed {
+                Button("cicero CLI Installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
+            } else {
+                Button("Install cicero CLI", systemImage: "terminal") { CommandLineTool.install(model: model) }
+            }
         }
         CommandGroup(after: .newItem) {
             Button("Add Fonts", systemImage: "doc.badge.plus") { model.presentAddFontsPanel() }
