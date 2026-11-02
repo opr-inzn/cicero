@@ -55,10 +55,17 @@ enum GlyphVectors {
         outline.flatMap { temporaryFile($0.fileName(style: style, fallback: fallback), Data($0.svg.utf8)) }
     }
 
+    /// Whether a file is one `temporaryFile` made, for a glyph copied or dragged.
+    static func isDragFile(_ url: URL) -> Bool {
+        url.isFileURL && url.standardizedFileURL.resolvingSymlinksInPath().path
+            .hasPrefix(filesFolder.standardizedFileURL.resolvingSymlinksInPath().path + "/")
+    }
+
+    private static var filesFolder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("Glyphs", isDirectory: true) }
+
     /// A file of its own in a new temporary folder, so it can have the name given: what's copied or dragged.
     private static func temporaryFile(_ name: String, _ data: Data) -> URL? {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Glyphs", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = filesFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let file = folder.appendingPathComponent(name)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
