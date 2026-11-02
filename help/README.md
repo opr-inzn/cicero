@@ -22,7 +22,7 @@ New to Cicero? Start with [Getting started](getting-started.md). To open this gu
    [Export fonts](export-and-backup.md#export-fonts) · [Back up](export-and-backup.md#back-up-your-library) · [Restore](export-and-backup.md#restore-a-backup)
 8. **[Troubleshooting](troubleshooting.md)**\
    [An app doesn’t see a font](troubleshooting.md#an-app-doesnt-see-a-font) · [Font caches](troubleshooting.md#clear-the-font-caches) · [Rebuild Library](troubleshooting.md#rescan-or-rebuild-the-library) · [FAQ](troubleshooting.md#questions-and-answers)
-9. **[The cicero CLI](command-line.md)**\
+9. **[The Cicero CLI](command-line.md)**\
    [Install it](command-line.md#install-the-command) · [What it can do](command-line.md#what-it-can-do) · [Find](command-line.md#find) · [For scripts and agents](command-line.md#for-scripts-and-agents)
 10. **[Keyboard shortcuts](keyboard-shortcuts.md)**
 11. **[Privacy](privacy.md)**

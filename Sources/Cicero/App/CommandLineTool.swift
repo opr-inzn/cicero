@@ -3,7 +3,7 @@ import CiceroCore
 import Observation
 
 /// The `cicero` command-line tool, in the bundle at Contents/Helpers/cicero, so it's always the app's own version.
-/// Install cicero CLI links it into /usr/local/bin, which Terminal's search path has, with an administrator's
+/// Install Cicero CLI links it into /usr/local/bin, which Terminal's search path has, with an administrator's
 /// password when that folder needs one. The menu item says when it's installed, and installing ends with a dialog, not a
 /// toast: the item is used from the menu bar, often with no Library window open to show one.
 enum CommandLineTool {
@@ -46,14 +46,14 @@ enum CommandLineTool {
     /// Links the tool into /usr/local/bin, asking first to replace a file there that isn't a link to it, and from a copy
     /// outside the Applications folder, which a link would stop working for once it's moved or the disk image goes.
     static func install(model: AppModel) {
-        guard let tool else { return model.showToast("This build of Cicero has no cicero CLI") }
+        guard let tool else { return model.showToast("This build of Cicero has no Cicero CLI") }
         guard ApplicationsFolder.isInApplicationsFolder else {
             return ApplicationsFolder.offerToMove(forOpenAtLogin: false)
         }
         if linked == tool.path { return showInstalled() }
         if FileManager.default.fileExists(atPath: link.path) || linked != nil {
             let alert = NSAlert()
-            alert.messageText = "Replace the cicero CLI?"
+            alert.messageText = "Replace the Cicero CLI?"
             alert.informativeText = "\(link.path) is there already\(linked.map { ", a link to \($0)" } ?? ""). Replace it with this Cicero’s CLI?"
             alert.addButton(withTitle: "Replace")
             alert.addButton(withTitle: "Cancel")
@@ -68,7 +68,7 @@ enum CommandLineTool {
             case .failed:
                 let alert = NSAlert()
                 alert.alertStyle = .warning
-                alert.messageText = "Couldn’t install the cicero CLI"
+                alert.messageText = "Couldn’t install the Cicero CLI"
                 alert.informativeText = "Cicero couldn’t put a link to it in \(link.deletingLastPathComponent().path)."
                 NSApp.activate()
                 alert.runModal()
@@ -79,7 +79,7 @@ enum CommandLineTool {
     /// The dialog after installing, and when it's chosen again once installed.
     private static func showInstalled() {
         let alert = NSAlert()
-        alert.messageText = "The cicero CLI is installed"
+        alert.messageText = "The Cicero CLI is installed"
         alert.informativeText = "In Terminal, type cicero --help."
         NSApp.activate()
         alert.runModal()
@@ -97,7 +97,7 @@ enum CommandLineTool {
             try? fm.createSymbolicLink(at: link, withDestinationURL: tool)
         } else {
             let script = "/bin/mkdir -p \(quoted(folder)) && /bin/ln -sfn \(quoted(tool.path)) \(quoted(link.path))"
-            let source = "do shell script \(literal(script)) with prompt \(literal("Cicero wants to install the cicero CLI in \(folder).")) with administrator privileges"
+            let source = "do shell script \(literal(script)) with prompt \(literal("Cicero wants to install the Cicero CLI in \(folder).")) with administrator privileges"
             let cancelled = await MainActor.run {
                 var error: NSDictionary?
                 _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
