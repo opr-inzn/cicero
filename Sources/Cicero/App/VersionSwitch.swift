@@ -51,7 +51,7 @@ enum VersionSwitch {
             throw Failure.download
         }
 
-        step("Checking Cicero \(release.version)…")
+        step("Checking Cicero \(release.version)")
         try await Task.detached(priority: .userInitiated) { try verifySignature(of: dmg, signature: release.signature) }.value
 
         let mount = work.appendingPathComponent("mount", isDirectory: true)
@@ -80,7 +80,7 @@ enum VersionSwitch {
         else { throw Failure.wrongApp }
         try await Task.detached(priority: .userInitiated) { try verifyCodeSignature(of: app, like: current) }.value
 
-        step("Copying Cicero \(release.version)…")
+        step("Copying Cicero \(release.version)")
         let staged = current.deletingLastPathComponent()
             .appendingPathComponent(".Cicero \(release.version) \(UUID().uuidString).app", isDirectory: true)
         guard await run("/usr/bin/ditto", [app.path, staged.path]) else {

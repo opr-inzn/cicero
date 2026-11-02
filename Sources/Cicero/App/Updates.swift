@@ -144,10 +144,10 @@ final class Updates {
     /// Replaces this version with `release` once Cicero quits, and quits; the caller saves the setup first. On failure,
     /// says why in `switchFailure`, and Cicero stays as it is.
     func switchTo(_ release: Release) async {
-        switching = "Downloading Cicero \(release.version)…"
+        switching = "Downloading Cicero \(release.version)"
         do {
             let staged = try await VersionSwitch.stage(release) { [weak self] step in self?.switching = step }
-            switching = "Opening Cicero \(release.version)…"
+            switching = "Opening Cicero \(release.version)"
             try VersionSwitch.replaceAfterQuit(current: Bundle.main.bundleURL, with: staged)
             NSApp.terminate(nil)
         } catch {
@@ -208,7 +208,8 @@ private nonisolated final class Channels: NSObject, SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        let version = item.displayVersionString
+        // With its build, as the Version row has this one's: a replaced beta keeps its version ("0.12.0b1 (62.2)").
+        let version = "\(item.displayVersionString) (\(item.versionString))"
         MainActor.assumeIsolated { owner?.found(version) }
     }
 

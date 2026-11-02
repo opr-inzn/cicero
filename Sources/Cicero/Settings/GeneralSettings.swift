@@ -18,7 +18,7 @@ struct GeneralSettings: View {
         if let switching = updates.switching { return switching }
         switch updates.status {
         case .idle: return updates.isBeta ? "Beta version." : "Stable version."
-        case .checking: return "Checking for updates…"
+        case .checking: return "Checking for updates"
         case .available(let version): return "Cicero \(version) is available."
         case .failed(let message): return "Couldn’t check for updates: \(message)"
         case .upToDate:
@@ -155,7 +155,7 @@ struct GeneralSettings: View {
             Section("Updates") {
                 LabeledContent {
                     if case .available = updates.status {
-                        Button("Update…") { updates.checkForUpdates() }
+                        Button("Update") { updates.checkForUpdates() }
                             .disabled(!updates.canCheckForUpdates || updates.switching != nil)
                     } else {
                         Button("Check Now") { updates.checkForUpdates() }
