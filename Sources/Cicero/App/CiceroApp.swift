@@ -99,7 +99,8 @@ struct CiceroCommands: Commands {
         // The menu bar's commands are made at launch and have these even while no window is open.
         let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
         CommandGroup(replacing: .appInfo) {
-            Button("About Cicero", systemImage: "info.circle") {
+            // "About Cicero (Beta)" in a beta, as the bundle's name is (see build-app.sh).
+            Button("About \(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Cicero")", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
