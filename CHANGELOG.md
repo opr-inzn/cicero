@@ -2,9 +2,15 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
+## 0.12.0b1
 
-- **The `cicero` command** finds, checks and turns on your fonts, and tags them and puts them in folders, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Command-Line Tool**, then type `cicero --help`. See [The cicero command](help/command-line.md).
+This is Cicero’s first beta: new features come here first, before they’re finished. Thank you for trying it.
+
+- **The `cicero` command** finds, checks and turns on your fonts, and tags them and puts them in folders, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Command-Line**, then type `cicero --help`. See [The cicero command](help/command-line.md).
+- **Undo** in the message after you turn fonts on or off, or move them to the Trash.
+- Choose betas or stable versions under **Update track** in **Preferences → General**, and go back to the stable version at any time.
+- Large libraries open faster, and lists scroll and update more smoothly.
+- Cicero asks about classifying fonts automatically in the sidebar’s **Organize** row, not in an alert at the first launch. **Not Similar** is gone, and **Rebuild Font List** is now **Rebuild Library**.
 
 ## 0.11.0
 
