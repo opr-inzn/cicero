@@ -395,8 +395,8 @@ struct Deactivate: AsyncParsableCommand {
 
 struct Tag: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Make a tag, or give one to families or take it off them.",
-        subcommands: [Create.self, Add.self, Remove.self]
+        abstract: "Make, rename or delete a tag, or give one to families or take it off them.",
+        subcommands: [Create.self, Add.self, Remove.self, Rename.self, Delete.self]
     )
 
     struct Create: AsyncParsableCommand {
@@ -448,12 +448,47 @@ struct Tag: AsyncParsableCommand {
             try await write(.tagRemove(tag: tag, families: families), common, hidden.shown)
         }
     }
+
+    struct Rename: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Rename a tag.",
+            discussion: "The families that have it keep it, under the new name, and so do smart folders’ rules."
+        )
+
+        @Argument(help: "The tag.", completion: .tags)
+        var tag: String
+
+        @Argument(help: "Its new name.")
+        var name: String
+
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.tagRename(tag: tag, name: name), common)
+        }
+    }
+
+    struct Delete: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Delete tags.",
+            discussion: "Takes them off every family and out of smart folders’ rules, as Delete Tag in Cicero does. The fonts stay."
+        )
+
+        @Argument(help: "The tags.", completion: .tags)
+        var tags: [String] = []
+
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.tagDelete(tags: tags), common)
+        }
+    }
 }
 
 struct Folder: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Make a folder, or put families in one or take them out.",
-        subcommands: [Create.self, Add.self, Remove.self]
+        abstract: "Make, rename or delete a folder, or put families in one or take them out.",
+        subcommands: [Create.self, Add.self, Remove.self, Rename.self, Delete.self]
     )
 
     struct Create: AsyncParsableCommand {
@@ -500,6 +535,38 @@ struct Folder: AsyncParsableCommand {
 
         func run() async throws {
             try await write(.folderRemove(folder: folder, families: families), common, hidden.shown)
+        }
+    }
+
+    struct Rename: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Rename a folder. Its fonts stay in it.")
+
+        @Argument(help: "The folder: its name or id.", completion: .folders)
+        var folder: String
+
+        @Argument(help: "Its new name.")
+        var name: String
+
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.folderRename(folder: folder, name: name), common)
+        }
+    }
+
+    struct Delete: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Delete folders.",
+            discussion: "As Delete Folder in Cicero: the fonts stay in the library, and stay on or off as they are."
+        )
+
+        @Argument(help: "The folders: their names or ids.", completion: .folders)
+        var folders: [String] = []
+
+        @OptionGroup var common: CommonOptions
+
+        func run() async throws {
+            try await write(.folderDelete(folders: folders), common)
         }
     }
 }

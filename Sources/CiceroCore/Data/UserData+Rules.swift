@@ -72,6 +72,43 @@ extension UserData {
         }
     }
 
+    /// Renames the tag everywhere it's used: on families, its colour, smart folders' rules and the sidebar's order. False,
+    /// and nothing changes, when there's no such tag, or the name is empty, the same, or another tag's.
+    @discardableResult
+    public mutating func renameTag(_ old: String, to new: String) -> Bool {
+        let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != old, !tags.contains(trimmed), let index = tags.firstIndex(of: old) else { return false }
+        tags[index] = trimmed
+        let color = tagColors.removeValue(forKey: old)
+        tagColors[trimmed] = color
+        for (family, names) in familyTags where names.contains(old) {
+            familyTags[family] = names.map { $0 == old ? trimmed : $0 }
+        }
+        for set in smartSets.indices {
+            for rule in smartSets[set].rules.indices where smartSets[set].rules[rule].field == .tag && smartSets[set].rules[rule].value == old {
+                smartSets[set].rules[rule].value = trimmed
+            }
+        }
+        sidebar.rename("tag.\(old)", to: "tag.\(trimmed)")
+        return true
+    }
+
+    /// Takes the tags off every family, and out of smart folders' rules and the sidebar.
+    public mutating func deleteTags(_ names: Set<String>) {
+        tags.removeAll(where: names.contains)
+        for (family, tags) in familyTags where tags.contains(where: names.contains) {
+            let left = tags.filter { !names.contains($0) }
+            familyTags[family] = left.isEmpty ? nil : left
+        }
+        for index in smartSets.indices {
+            smartSets[index].rules.removeAll { $0.field == .tag && names.contains($0.value) }
+        }
+        for name in names {
+            tagColors[name] = nil
+            sidebar.forget("tag.\(name)")
+        }
+    }
+
     // MARK: Folders (sets)
 
     /// Makes a folder with the families, whole, and the styles of others; nil for an empty name. Folders can share a
@@ -97,6 +134,26 @@ extension UserData {
             sets[index].remove(families: Set(families))
         }
         return true
+    }
+
+    /// Renames the folder; it keeps its families and styles, and smart folders' rules name it by its id. False when
+    /// there's no such folder, or the name is empty. Folders can share a name, as in the app.
+    @discardableResult
+    public mutating func renameSet(_ id: UUID, to name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = sets.firstIndex(where: { $0.id == id }) else { return false }
+        sets[index].name = trimmed
+        return true
+    }
+
+    /// Deletes the folders, and takes them out of smart folders' rules and the sidebar. Their fonts stay in the library.
+    public mutating func deleteSets(_ ids: Set<UUID>) {
+        let values = Set(ids.map(\.uuidString))
+        sets.removeAll { ids.contains($0.id) }
+        for id in ids { sidebar.forget("set.\(id)") }
+        for index in smartSets.indices {
+            smartSets[index].rules.removeAll { $0.field == .set && values.contains($0.value) }
+        }
     }
 
     // MARK: After an activation

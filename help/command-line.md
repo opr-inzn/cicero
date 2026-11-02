@@ -43,8 +43,8 @@ To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line
 | `cicero list families` | Every family. Also `tags`, `folders`, `locations`, `foundries`, and `coverage` (the coverage sets and their ids) |
 | `cicero activate Inter Roboto` | Turns the families on (also `cicero on`) |
 | `cicero deactivate Inter` | Turns them off (also `cicero off`) |
-| `cicero tag add Licensed Inter` | Gives families a tag. Also `tag create` and `tag remove` |
-| `cicero folder add "Client A" Inter` | Puts families in a folder. Also `folder create` and `folder remove` |
+| `cicero tag add Licensed Inter` | Gives families a tag. Also `tag create`, `tag remove`, `tag rename` and `tag delete` |
+| `cicero folder add "Client A" Inter` | Puts families in a folder. Also `folder create`, `folder remove`, `folder rename` and `folder delete` |
 
 Names don’t need capitals: `cicero status inter` works. When a name isn’t quite right, the command says which names are near.
 
@@ -92,10 +92,16 @@ For example, `cicero status Helvetica --system-fonts`. The options don’t chang
 | `cicero deactivate <families…>`, `--folder`, `--tag` | turns them off |
 | `cicero tag create Proofs --color blue` | makes a tag; without `--color`, in the first colour no tag has. Nothing changes when there’s a tag of that name |
 | `cicero tag add Proofs <families…>`, `tag remove` | gives families the tag, or takes it off them |
+| `cicero tag rename Proofs "Proofs 2026"` | renames a tag. The families that have it keep it. Stops when another tag has that name |
+| `cicero tag delete Proofs <tags…>` | deletes tags: they come off every family. The fonts stay |
 | `cicero folder create "Client A"` | makes a folder. Nothing changes when there’s a folder of that name |
 | `cicero folder add "Client A" <families…>`, `folder remove` | puts every style of the families in the folder, or takes them out |
+| `cicero folder rename "Client A" "Client B"` | renames a folder. Stops when another folder has that name |
+| `cicero folder delete "Client A" <folders…>` | deletes folders. Their fonts stay in the library, on or off as they are |
 
-Names must be exact, but capitals don’t matter. When a name isn’t right, nothing changes, and the command says which names are near.
+Names must be exact, but capitals don’t matter. When a name isn’t right, nothing changes, and the command says which names are near. When you give more names than one, nothing changes if one of them isn’t right.
+
+`tag delete` and `folder delete` don’t ask first, as in Cicero. A smart folder that used a deleted tag or folder loses that rule.
 
 **While Cicero is open,** Cicero makes the change, so you see it in its window at once. Fonts you turn on or off from the command get a message in Cicero’s window with **Undo**. **While Cicero is closed,** the command makes the change itself, and Cicero has it when it opens.
 
