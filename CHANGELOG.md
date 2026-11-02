@@ -7,7 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Tab completion** for the Cicero CLI in Terminal: commands, options, and the names of your families, styles, tags and folders. If you installed the CLI before, choose **Cicero → Install Cicero CLI** once more. When Tab completion is off in Terminal, as macOS has it, Cicero offers to turn it on.
 - Cicero CLI: `tag rename`, `tag delete`, `folder rename` and `folder delete`.
 - Cicero CLI: `find` also looks in the fonts’ licenses and descriptions, and `status` shows a font’s description.
-- Cicero CLI: `cicero compare` draws families or styles in one picture, the same text in each, so an AI agent can look at the fonts when it helps you choose. A character a font lacks shows as a red box.
+- Cicero CLI: `cicero compare` draws families or styles in one picture, the same text in each, so an AI agent can look at the fonts when it helps you choose. A character a font lacks shows as the font’s own .notdef glyph.
 - Cicero CLI: `coverage` exits with 3 when a family lacks characters. A wrong option exits with 1 and, with `--json`, answers in JSON. More typos get a suggestion, like “skolr” for Skolar Sans. Dates show AM and PM where the Mac’s clock has 12 hours.
 
 ## 0.12.0b1

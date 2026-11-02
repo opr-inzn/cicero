@@ -8,7 +8,8 @@ import UniformTypeIdentifiers
 /// `cicero compare <names…>`: one PNG with the same text in each family's regular style (every style with
 /// `--all-styles`), or in styles named by their PostScript names, full names or family and style names, each under a label, so an assistant can look
 /// at the fonts and not only read their data. Fonts are drawn from their files, on or off. Characters a font lacks are
-/// drawn as red boxes, never in another font, and listed in its label and in the answer.
+/// drawn as its .notdef glyph (a red box when that's empty), never in another font, and listed in its label and
+/// in the answer.
 public enum CompareCommand {
     /// Cicero's own sample text (the font page's).
     public static let defaultText = "Sphinx of black quartz, judge my vow."
@@ -186,6 +187,8 @@ enum SampleSheet {
         let labelAscent: CGFloat
         let labelHeight: CGFloat
         let frame: CTFramesetter?
+        /// The text as laid out (see `sampleText`).
+        let layout: String
         let sampleHeight: CGFloat
         let font: CTFont?
 
@@ -201,13 +204,14 @@ enum SampleSheet {
             var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
             _ = CTLineGetTypographicBounds(label, &ascent, &descent, &leading)
             guard let font = sample.font else {
-                return Row(label: label, labelAscent: ascent, labelHeight: ascent + descent, frame: nil, sampleHeight: 0, font: nil)
+                return Row(label: label, labelAscent: ascent, labelHeight: ascent + descent, frame: nil, layout: "", sampleHeight: 0, font: nil)
             }
-            let framesetter = CTFramesetterCreateWithAttributedString(sampleText(text, font: font))
+            let attributed = sampleText(text.precomposedStringWithCanonicalMapping, font: font)
+            let framesetter = CTFramesetterCreateWithAttributedString(attributed)
             let fitted = CTFramesetterSuggestFrameSizeWithConstraints(
                 framesetter, CFRange(location: 0, length: 0), nil, CGSize(width: contentWidth, height: .greatestFiniteMagnitude), nil)
             return Row(label: label, labelAscent: ascent, labelHeight: ascent + descent, frame: framesetter,
-                       sampleHeight: ceil(fitted.height), font: font)
+                       layout: CFAttributedStringGetString(attributed) as String, sampleHeight: ceil(fitted.height), font: font)
         }
         let height = Int(ceil(2 * margin + rows.reduce(0) { $0 + $1.height } + CGFloat(max(rows.count - 1, 0)) * (2 * rowGap + 1)))
         guard height <= maximumHeight else {
@@ -235,7 +239,7 @@ enum SampleSheet {
             if let framesetter = row.frame, let font = row.font {
                 let box = CGRect(x: margin, y: CGFloat(height) - top - row.sampleHeight, width: contentWidth, height: row.sampleHeight)
                 draw(CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), CGPath(rect: box, transform: nil), nil),
-                     text: text, in: box, font: font, context: context)
+                     text: row.layout, in: box, font: font, context: context)
             }
             top += row.sampleHeight
         }
@@ -272,28 +276,57 @@ enum SampleSheet {
         return CTLineCreateWithAttributedString(string)
     }
 
+    /// The text in the sample's font, each character the font lacks (other than spaces and controls) a run of its own
+    /// as wide as the font's .notdef (its first glyph), so CoreText never takes it from another font and the line is as
+    /// long as the font would set it; `draw` puts the .notdef there.
     private static func sampleText(_ text: String, font: CTFont) -> CFAttributedString {
         var alignment = CTTextAlignment.natural
         let style = withUnsafeBytes(of: &alignment) { bytes in
             var setting = CTParagraphStyleSetting(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size, value: bytes.baseAddress!)
             return CTParagraphStyleCreate(&setting, 1)
         }
-        return NSAttributedString(string: text, attributes: [
-            NSAttributedString.Key(kCTFontAttributeName as String): font,
-            NSAttributedString.Key(kCTForegroundColorAttributeName as String): ink,
-            NSAttributedString.Key(kCTParagraphStyleAttributeName as String): style,
-        ])
+        // Each character the font lacks becomes U+FFFC, the character for things drawn in text, with the delegate: on a
+        // character the font lacks, CoreText looks for another font anyway, and macOS logs an error for each.
+        // A line may break on either side of U+FFFC, so a word joiner (U+2060, which draws nothing) holds it to the letters
+        // next to it: lines break where the text's own would.
+        var layout = ""
+        var missing: [Int] = []
+        let scalars = Array(text.unicodeScalars)
+        let breaks = { (scalar: Unicode.Scalar) in scalar.properties.isWhitespace || scalar.properties.generalCategory == .control }
+        for (index, scalar) in scalars.enumerated() {
+            if breaks(scalar) || font.has(scalar.value) {
+                layout.unicodeScalars.append(scalar)
+                continue
+            }
+            if index > 0, !breaks(scalars[index - 1]) { layout.unicodeScalars.append("\u{2060}") }
+            missing.append(layout.utf16.count)
+            layout.unicodeScalars.append("\u{FFFC}")
+            if index + 1 < scalars.count, !breaks(scalars[index + 1]) { layout.unicodeScalars.append("\u{2060}") }
+        }
+        let string = CFAttributedStringCreateMutable(nil, 0)!
+        CFAttributedStringReplaceString(string, CFRange(location: 0, length: 0), layout as CFString)
+        let whole = CFRange(location: 0, length: CFAttributedStringGetLength(string))
+        CFAttributedStringSetAttribute(string, whole, kCTFontAttributeName, font)
+        CFAttributedStringSetAttribute(string, whole, kCTForegroundColorAttributeName, ink)
+        CFAttributedStringSetAttribute(string, whole, kCTParagraphStyleAttributeName, style)
+        let notdef = Notdef(font)
+        for offset in missing {
+            // A delegate of its own for each, so runs of missing characters don't merge into one wide glyph.
+            CFAttributedStringSetAttribute(string, CFRange(location: offset, length: 1), kCTRunDelegateAttributeName, notdef.delegate())
+        }
+        return string
     }
 
-    /// The frame's lines, the runs in the sample's font as they are, the others (characters CoreText took from another
-    /// font) as red boxes as wide as those characters, from the baseline to the sample font's cap height. Spaces from
-    /// another font stay empty.
+    /// The frame's lines: the runs in the sample's font as they are; in the place of each character the font lacks, its
+    /// .notdef, as the font draws it, or a red box as wide when its .notdef is empty. Any other run CoreText took from another font
+    /// (it shouldn't: see `sampleText`) is a red box too, never drawn in that font; spaces stay empty.
     private static func draw(_ frame: CTFrame, text: String, in box: CGRect, font: CTFont, context: CGContext) {
         let lines = CTFrameGetLines(frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
         CTFrameGetLineOrigins(frame, CFRange(location: 0, length: 0), &origins)
         let name = CTFontCopyPostScriptName(font) as String
         let file = CTFontCopyAttribute(font, kCTFontURLAttribute) as? URL
+        let notdef = Notdef(font)
         let capHeight = CTFontGetCapHeight(font) > 0 ? CTFontGetCapHeight(font) : CTFontGetSize(font) * 0.7
         let stroke = max(1, CTFontGetSize(font) / 32)
         let units = Array(text.utf16)
@@ -301,28 +334,79 @@ enum SampleSheet {
             let start = CGPoint(x: box.minX + origin.x, y: box.minY + origin.y)
             for run in CTLineGetGlyphRuns(line) as! [CTRun] {
                 let attributes = CTRunGetAttributes(run) as NSDictionary
+                let count = CTRunGetGlyphCount(run)
+                var positions = [CGPoint](repeating: .zero, count: count)
+                CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
+                let points = positions.map { CGPoint(x: start.x + $0.x, y: start.y + $0.y) }
+                context.setStrokeColor(red)
+                context.setLineWidth(stroke)
+                if attributes[kCTRunDelegateAttributeName as String] != nil {
+                    for point in points {
+                        if notdef.isEmpty {
+                            context.stroke(CGRect(x: point.x + stroke, y: point.y + stroke / 2, width: notdef.width - 2 * stroke, height: capHeight - stroke))
+                        } else {
+                            var glyph: CGGlyph = 0
+                            var at = point
+                            // CoreGraphics adds the text position to the glyph's.
+                            context.textPosition = .zero
+                            context.setFillColor(ink)
+                            CTFontDrawGlyphs(font, &glyph, &at, 1, context)
+                        }
+                    }
+                    continue
+                }
                 let runFont = attributes[kCTFontAttributeName as String] as! CTFont
                 if CTFontCopyPostScriptName(runFont) as String == name, CTFontCopyAttribute(runFont, kCTFontURLAttribute) as? URL == file {
                     context.textPosition = start
                     CTRunDraw(run, context, CFRange(location: 0, length: 0))
                     continue
                 }
-                let count = CTRunGetGlyphCount(run)
-                var positions = [CGPoint](repeating: .zero, count: count)
                 var advances = [CGSize](repeating: .zero, count: count)
-                CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
                 CTRunGetAdvances(run, CFRange(location: 0, length: 0), &advances)
                 var indices = [CFIndex](repeating: 0, count: count)
                 CTRunGetStringIndices(run, CFRange(location: 0, length: 0), &indices)
-                context.setStrokeColor(red)
-                context.setLineWidth(stroke)
-                for ((position, advance), index) in zip(zip(positions, advances), indices) where advance.width > 2 * stroke {
+                for ((point, advance), index) in zip(zip(points, advances), indices) where advance.width > 2 * stroke {
                     // A space another font gives is a space: nothing in it to see.
                     if index < units.count, let scalar = Unicode.Scalar(units[index]), scalar.properties.isWhitespace { continue }
-                    context.stroke(CGRect(x: start.x + position.x + stroke, y: start.y + position.y + stroke / 2,
-                                          width: advance.width - 2 * stroke, height: capHeight - stroke))
+                    context.stroke(CGRect(x: point.x + stroke, y: point.y + stroke / 2, width: advance.width - 2 * stroke, height: capHeight - stroke))
                 }
             }
         }
+    }
+}
+
+/// A font's .notdef (glyph 0): how wide it is, whether it draws anything, and run delegates that make room for it.
+struct Notdef {
+    let width: CGFloat
+    let ascent: CGFloat
+    let descent: CGFloat
+    let isEmpty: Bool
+
+    init(_ font: CTFont) {
+        var glyph: CGGlyph = 0
+        var advance = CGSize.zero
+        CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
+        let path = CTFontCreatePathForGlyph(font, 0, nil)
+        isEmpty = path?.isEmpty ?? true
+        // A .notdef without width gets half an em, so its box shows.
+        width = advance.width > 0 ? advance.width : CTFontGetSize(font) / 2
+        ascent = CTFontGetAscent(font)
+        descent = CTFontGetDescent(font)
+    }
+
+    func delegate() -> CTRunDelegate {
+        var callbacks = CTRunDelegateCallbacks(
+            version: kCTRunDelegateVersion1,
+            dealloc: { Unmanaged<Box>.fromOpaque($0).release() },
+            getAscent: { Unmanaged<Box>.fromOpaque($0).takeUnretainedValue().metrics.ascent },
+            getDescent: { Unmanaged<Box>.fromOpaque($0).takeUnretainedValue().metrics.descent },
+            getWidth: { Unmanaged<Box>.fromOpaque($0).takeUnretainedValue().metrics.width })
+        return CTRunDelegateCreate(&callbacks, Unmanaged.passRetained(Box(self)).toOpaque())!
+    }
+
+    /// The metrics as an object, for the delegate's pointer.
+    private final class Box {
+        let metrics: Notdef
+        init(_ metrics: Notdef) { self.metrics = metrics }
     }
 }
