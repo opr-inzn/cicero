@@ -301,7 +301,7 @@ struct Compare: AsyncParsableCommand {
         discussion: """
             Writes a PNG: each family’s regular style, or every style with --all-styles, under a label with its name. A \
             name that isn’t a family’s can be a style’s PostScript name (Inter-Bold) or full name (Inter Bold). Fonts are \
-            drawn from their files, on or off. A character a font lacks is drawn as a red box, never in another font, \
+            drawn from their files, on or off. A character a font lacks is drawn as the font’s own .notdef glyph, never in another font, \
             and the label says which characters it lacks. Without --png, the picture goes in the temporary folder; the \
             answer says where.
             """
