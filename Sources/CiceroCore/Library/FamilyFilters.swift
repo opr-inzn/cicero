@@ -82,8 +82,10 @@ public struct FamilyFilters {
 
     /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the
     /// user's note, the foundry and classification the family is shown in, a built-in classification by its usual
-    /// words too, and its tags; and by the search field's tokens (see `Family.matches`).
-    public func searchMatcher(_ search: SearchQuery, tokens: [SearchToken] = []) -> (Family) -> Bool {
+    /// words too, and its tags; and by the search field's tokens (see `Family.matches`). `moreTexts` are a family's other
+    /// texts to look in, lowercased: the `cicero` command's `find` gives its fonts' licenses and descriptions.
+    public func searchMatcher(_ search: SearchQuery, tokens: [SearchToken] = [],
+                              moreTexts: @escaping (Family) -> [String] = { _ in [] }) -> (Family) -> Bool {
         guard !search.isEmpty else { return tokens.isEmpty ? { _ in true } : { $0.matches(tokens) } }
         let library = library, data = data
         let notes = data.familyNotes.mapValues { $0.lowercased() }
@@ -99,7 +101,7 @@ public struct FamilyFilters {
             let foundry = foundryName(family).flatMap { $0 == family.manufacturer ? nil : $0.lowercased() }
             let classification = classificationName(family)
             let terms = (classificationTerms[classification] ?? [classification.lowercased()]) + data.tags(of: family.id).map { $0.lowercased() }
-            return library.matches(family, search: search, note: notes[family.id], texts: foundry.map { [$0] } ?? [], terms: terms)
+            return library.matches(family, search: search, note: notes[family.id], texts: (foundry.map { [$0] } ?? []) + moreTexts(family), terms: terms)
         }
     }
 
