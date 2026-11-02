@@ -247,7 +247,11 @@ extension FindOptions.Sort: ExpressibleByArgument {}
 struct Find: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Find families.",
-        discussion: "Words are looked for as Cicero’s search field looks for them: in names, foundries, designers, classes, tags and notes."
+        discussion: """
+            Words are looked for as Cicero’s search field looks for them: in names, foundries, designers, classes, tags \
+            and notes. Unlike the search field, also in the fonts’ licenses, license URLs and descriptions, read from \
+            the font files, which takes longer.
+            """
     )
 
     @Argument(help: "Words to look for.")

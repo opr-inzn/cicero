@@ -86,6 +86,7 @@ public struct Describer {
         let coverage = object["coverage"]
         object["coverage"] = nil
         object.set("note", context.data.familyNotes[family.id])
+        object.set("description", Self.shared(faces.map { names[$0.id]?.description }))
         object.set("copyright", Self.shared(faces.map { names[$0.id]?.copyright }))
         object.set("designerURL", Self.shared(faces.map { names[$0.id]?.designerURL }))
         object.set("manufacturerURL", Self.shared(faces.map { names[$0.id]?.manufacturerURL }))
@@ -135,6 +136,7 @@ public struct Describer {
         object.set("manufacturer", face.manufacturer)
         object.set("manufacturerURL", details.manufacturerURL)
         object.set("vendorID", face.vendorID)
+        object.set("description", details.description)
         object.set("copyright", details.copyright)
         object.set("license", details.license)
         object.set("licenseURL", details.licenseURL)
