@@ -13,7 +13,7 @@ struct Cicero: AsyncParsableCommand {
             makes them itself. Add --json for answers that scripts and agents read; their fields are in the help page.
             """,
         version: Version.text,
-        subcommands: [Status.self, Find.self, CoverageCheck.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self]
+        subcommands: [Status.self, Find.self, CoverageCheck.self, Compare.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self]
     )
 
     /// ArgumentParser's own `main`, except when the command line is wrong (an unknown option, a missing name): that's
@@ -291,6 +291,53 @@ struct CoverageCheck: AsyncParsableCommand {
         // 3 when characters are missing, as `diff` exits 1 when files differ: a script can ask without reading the JSON.
         try await answer(common, text: Text.coverageCheck, exitCode: { Text.bool($0["covered"]) == false ? 3 : 0 }) {
             try await CoverageCommand.run(family: family, set: set, text: text, in: try await load(common, hidden))
+        }
+    }
+}
+
+struct Compare: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Draw families or styles in one picture, the same text in each, to look at them side by side.",
+        discussion: """
+            Writes a PNG: each family’s regular style, or every style with --all-styles, under a label with its name. A \
+            name that isn’t a family’s can be a style’s PostScript name (Inter-Bold) or full name (Inter Bold). Fonts are \
+            drawn from their files, on or off. A character a font lacks is drawn as a red box, never in another font, \
+            and the label says which characters it lacks. Without --png, the picture goes in the temporary folder; the \
+            answer says where.
+            """
+    )
+
+    @Argument(help: "Families’ names, or styles’ PostScript or full names.", completion: .families)
+    var names: [String] = []
+
+    @Flag(help: "Every style of the families, not only the regular one.")
+    var allStyles = false
+
+    @Option(help: "The text to draw. Without it: “\(CompareCommand.defaultText)”")
+    var text: String?
+
+    @Option(help: ArgumentHelp("The letters’ size in pixels (\(CompareCommand.sizes.lowerBound)–\(CompareCommand.sizes.upperBound)).", valueName: "pixels"))
+    var size = 48
+
+    @Option(help: ArgumentHelp("The picture’s width in pixels (\(CompareCommand.widths.lowerBound)–\(CompareCommand.widths.upperBound)). The text wraps to it.", valueName: "pixels"))
+    var width = 1200
+
+    @Option(help: ArgumentHelp("Where to write the picture.", valueName: "file"), completion: .file(extensions: ["png"]))
+    var png: String?
+
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+    @OptionGroup var common: CommonOptions
+
+    func run() async throws {
+        try await answer(common, text: Text.compare) {
+            var options = CompareCommand.Options()
+            options.names = names
+            options.allStyles = allStyles
+            options.text = text
+            options.size = size
+            options.width = width
+            options.png = png
+            return try CompareCommand.run(options, in: try await load(common, hidden))
         }
     }
 }

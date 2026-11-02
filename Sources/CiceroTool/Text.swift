@@ -219,6 +219,24 @@ enum Text {
             + table(missing.map { ["  " + (string($0["character"]) ?? ""), string($0["unicode"]) ?? ""] })
     }
 
+    // MARK: compare
+
+    static func compare(_ answer: JSON) -> String {
+        let samples = array(answer["samples"])
+        var lines = ["Wrote \(string(answer["png"]) ?? "") (\(int(answer["width"]) ?? 0) × \(int(answer["height"]) ?? 0) pixels):"]
+        lines.append(table(samples.map { sample in
+            var row = ["  " + (string(sample["family"]) ?? ""), string(sample["style"]) ?? ""]
+            let missing = array(sample["missing"]).compactMap { string($0["character"]) }
+            if bool(sample["unreadable"]) == true {
+                row.append("can’t read its file")
+            } else if !missing.isEmpty {
+                row.append("lacks " + missing.joined(separator: " "))
+            }
+            return row
+        }))
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: list
 
     static func list(_ what: ListCommand.What, _ answer: JSON) -> String {
