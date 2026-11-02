@@ -60,10 +60,27 @@ public enum FindCommand {
         let base = context.listedFamilies.filter { family in tests.allSatisfy { $0(family) } }
         let tokens = try options.filters.map { try token($0, in: context) }
         let query = SearchQuery(options.words.joined(separator: " "))
-        var found = base.filter(context.filters.searchMatcher(query, tokens: tokens))
+        // Unlike the app's search field (for now), words are looked for in the fonts' licenses and descriptions too,
+        // read from the files of the families the options leave.
+        let texts = query.isEmpty ? [:] : fileTexts(base)
+        var found = base.filter(context.filters.searchMatcher(query, tokens: tokens, moreTexts: { texts[$0.id] ?? [] }))
         // Nothing with a word that begins with what's typed: a piece of a longer word, then, as in the app ("vetica").
         if found.isEmpty, !query.isEmpty { found = base.filter(context.filters.searchMatcher(query.anywhereInNames, tokens: tokens)) }
         return sorted(found, by: options.sort)
+    }
+
+    /// Each family's licenses, license URLs and descriptions, lowercased, each once.
+    static func fileTexts(_ families: [Family]) -> [String: [String]] {
+        let names = FileNames.read(families.flatMap { $0.faces.map(\.face) })
+        var texts: [String: [String]] = [:]
+        for family in families {
+            var seen = Set<String>()
+            texts[family.id] = family.faces.flatMap { face -> [String] in
+                guard let read = names[face.face.id] else { return [] }
+                return [read.license, read.licenseURL, read.description].compactMap { $0?.lowercased() }
+            }.filter { seen.insert($0).inserted }
+        }
+        return texts
     }
 
     static func sorted(_ families: [Family], by sort: FindOptions.Sort?) -> [Family] {

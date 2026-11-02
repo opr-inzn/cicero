@@ -2,10 +2,11 @@ import CiceroCore
 import CoreText
 import Foundation
 
-/// What a face's name table says that Cicero doesn't keep in its caches: copyright (name ID 0), designer URL (12),
-/// manufacturer URL (11), license (13) and license URL (14). Read from the file when asked.
+/// What a face's name table says that Cicero doesn't keep in its caches: copyright (name ID 0), description (10),
+/// designer URL (12), manufacturer URL (11), license (13) and license URL (14). Read from the file when asked.
 public struct FileNames: Sendable, Equatable {
     public var copyright: String?
+    public var description: String?
     public var designerURL: String?
     public var manufacturerURL: String?
     public var license: String?
@@ -20,7 +21,7 @@ public struct FileNames: Sendable, Equatable {
             return value.isEmpty ? nil : value
         }
         return FileNames(
-            copyright: name(kCTFontCopyrightNameKey), designerURL: name(kCTFontDesignerURLNameKey),
+            copyright: name(kCTFontCopyrightNameKey), description: name(kCTFontDescriptionNameKey), designerURL: name(kCTFontDesignerURLNameKey),
             manufacturerURL: name(kCTFontVendorURLNameKey), license: name(kCTFontLicenseNameKey), licenseURL: name(kCTFontLicenseURLNameKey)
         )
     }

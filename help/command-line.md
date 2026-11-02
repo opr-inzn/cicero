@@ -37,7 +37,7 @@ To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line
 | `cicero status Inter` | One family and its styles: on or off, and from where |
 | `cicero status Inter --style Bold` | The same, and one style’s details: version, designer, license, embedding, coverage. A style name or a PostScript name (`Inter-Bold`) |
 | `cicero status Inter --all-styles` | Every style’s details |
-| `cicero find garamond` | Families, found as Cicero’s search field finds them: in names, foundries, designers, classifications, tags and notes |
+| `cicero find garamond` | Families, found as Cicero’s search field finds them: in names, foundries, designers, classifications, tags and notes. Also in the fonts’ licenses and descriptions (`cicero find rosettatype.com`), which the search field doesn’t look in yet |
 | `cicero coverage Inter --set adobe-latin-3` | Whether a family has every character of a [coverage set](character-sets.md), and which it lacks. Exit code 3 when it lacks some |
 | `cicero coverage Inter --text "Grüße, Łódź"` | The same for some text |
 | `cicero list families` | Every family. Also `tags`, `folders`, `locations`, `foundries`, and `coverage` (the coverage sets and their ids) |
@@ -49,6 +49,8 @@ To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line
 Names don’t need capitals: `cicero status inter` works. When a name isn’t quite right, the command says which names are near.
 
 ### Find
+
+Words are found where a word begins, in every field: each word must be found in one of them. With words, `find` also reads the license, license URL and description (OpenType name IDs 13, 14 and 10) of every style from its font file, so it takes longer: about a second for 7,000 styles.
 
 Add any of these to `cicero find`, with or without words:
 
@@ -133,7 +135,7 @@ Add `--json` to any command. Every answer is one JSON object with `"schema": 1` 
 | `version`, `designer`, `vendorID`, `fsType` (`installable`, `editable`, `previewAndPrint`, `restricted`) | `"mixed"` when the styles differ |
 | `coverage` | `characterCount`, and `largest`: the largest Latin S–XL (`latin`) and Adobe Latin (`adobeLatin`) set the regular style has, as a list with one id, or none |
 
-`status <family>` adds `note`; `copyright`, `designerURL`, `manufacturerURL`, `license` and `licenseURL`, read from the font files (`"mixed"` when the styles differ); `coverage.sets`, every coverage set the regular style has completely; and `styles`. Each style has `name`, `postScriptName`, `weight` (1–1000), `italic`, `width` (1–9), `status` (`active`, `inactive`, `appOnly`), `path`, `indexInFile`, `otherCopies` (other files with the same font) and `axes` (for a variable font: `tag`, `name`, `value`, `minimum`, `maximum`, `default`). An active style has `activeFrom`:
+`status <family>` adds `note`; `description`, `copyright`, `designerURL`, `manufacturerURL`, `license` and `licenseURL`, read from the font files (`"mixed"` when the styles differ); `coverage.sets`, every coverage set the regular style has completely; and `styles`. Each style has `name`, `postScriptName`, `weight` (1–1000), `italic`, `width` (1–9), `status` (`active`, `inactive`, `appOnly`), `path`, `indexInFile`, `otherCopies` (other files with the same font) and `axes` (for a variable font: `tag`, `name`, `value`, `minimum`, `maximum`, `default`). An active style has `activeFrom`:
 
 | `activeFrom` | The style is on |
 |---|---|
@@ -147,7 +149,7 @@ Add `--json` to any command. Every answer is one JSON object with `"schema": 1` 
 | `adobeFonts` | from Adobe Fonts, through Creative Cloud |
 | `other` | turned on by another app |
 
-With `--style` or `--all-styles`, a style also has `version`, `released`, `designer`, `designerURL`, `manufacturer`, `manufacturerURL`, `vendorID`, `copyright`, `license`, `licenseURL`, `fsType` and, for the regular style, `coverage`.
+With `--style` or `--all-styles`, a style also has `version`, `released`, `designer`, `designerURL`, `manufacturer`, `manufacturerURL`, `vendorID`, `description`, `copyright`, `license`, `licenseURL`, `fsType` and, for the regular style, `coverage`.
 
 ### A change
 
