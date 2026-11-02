@@ -16,6 +16,8 @@ final class AppModel {
     /// nil when a command making a change while Cicero was closed didn't finish in time.
     @ObservationIgnored private let appLock: AppLock?
     @ObservationIgnored private var commandRequests: CommandRequests?
+    /// The latest scan that ended, applied or not; a scan that replaced others ends for them too.
+    @ObservationIgnored private(set) var lastEndedScan = 0
     /// The engine as made at launch; `engine` knows the Font Library.
     @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
@@ -337,6 +339,13 @@ final class AppModel {
         asksAboutGuessing = asks
         guessesClassifications = !asks && defaults.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
+        // Records after a cicero command that stopped while it turned fonts on or off (see `ActivationJournal`).
+        // Only with the lock: without it, the command may still be at work. (`data`'s observer doesn't run in init.)
+        if appLock != nil, let journal = ActivationJournal.read(support: locations.support) {
+            data.records = journal.repair(data.records, registrar: CoreTextRegistrar(), locations: locations)
+            store.save(data)
+            if store.flush(durably: true) { ActivationJournal.remove(support: locations.support) }
+        }
         // Files from before there was a Font Library get its first place, saved with the next change.
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
         if guessesClassifications { classificationGuesses = guesser.guesses }
@@ -560,6 +569,7 @@ final class AppModel {
     }
 
     private func endScan(_ id: Int) {
+        lastEndedScan = max(lastEndedScan, id)
         #if CICERO_MEASURE
         endedScans += 1
         #endif

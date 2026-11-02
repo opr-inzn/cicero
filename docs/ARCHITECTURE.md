@@ -124,6 +124,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   app's `AppRequestWriter` while it's open, `ClosedAppWriter` while it's closed. `WriteDispatcher` picks one: the free
   `app.lock` means closed (the command holds it while it writes); held by the running app means `Requests/`, where the
   app's `CommandRequests` takes the request by renaming it and answers in JSON (`JSON(text:)` reads it back in order).
+  `ClosedAppWriter` writes an `ActivationJournal` (CiceroCore) before turning fonts and removes it after saving the
+  records; the next lock holder repairs the records from it.
 - **CiceroTool**: Swift Argument Parser commands that call those functions and print the value, as JSON with `--json`,
   else as text (`Text`). Built as `cicero-tool`; `build-app.sh` puts it in `Contents/Helpers/cicero` and signs it.
 - The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Command-Line Tool). The app depends on

@@ -13,6 +13,8 @@ public enum WriteCommand: Codable, Sendable, Equatable {
     case folderCreate(name: String)
     case folderAdd(folder: String, families: [String])
     case folderRemove(folder: String, families: [String])
+    /// A scan of everything, saved (`status --rescan`).
+    case rescan
 
     /// Whether it turns fonts on or off, which a scan after it shows.
     public var activates: Bool {
@@ -25,7 +27,7 @@ public enum WriteCommand: Codable, Sendable, Equatable {
     /// Whether it names families or their fonts, which needs the library.
     public var needsLibrary: Bool {
         switch self {
-        case .tagCreate, .folderCreate: false
+        case .tagCreate, .folderCreate, .rescan: false
         default: true
         }
     }
@@ -58,6 +60,8 @@ public protocol Writer: AnyObject {
     /// Turns the styles on, until Cicero quits with `untilQuit`; `title` names them in a toast.
     func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult
     func deactivate(_ faces: [LibraryFace]) async -> ActivationResult
+    /// Scans everything and saves what it found, for the command to read.
+    func rescan() async
     /// Whether this is Cicero, which can turn fonts on until it quits.
     var isApp: Bool { get }
 }
@@ -69,6 +73,9 @@ public protocol Writer: AnyObject {
 public enum WriteRunner {
     public static func run(_ request: WriteRequest, in context: LibraryContext, writer: Writer) async throws -> JSON {
         switch request.command {
+        case .rescan:
+            await writer.rescan()
+            return changes(changed: [], unchanged: [])
         case .activate(let families, let folder, let tag, let untilQuit):
             if untilQuit, !writer.isApp {
                 throw CommandError(.appNotOpen, "--until-quit needs Cicero open: Cicero turns those fonts off when it quits. Open Cicero, or leave out --until-quit.")

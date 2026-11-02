@@ -88,7 +88,7 @@ Names must be exact, but capitals don’t matter. When a name isn’t right, not
 
 ## How up to date it is
 
-- The list of families is the one Cicero saved the last time it looked through your fonts. `cicero status` says when that was. Cicero looks again by itself while it’s open. `cicero status --rescan` looks through your fonts first. While Cicero is closed, it saves what it finds, as Cicero would at its next launch. While Cicero is open, it doesn’t save it, because Cicero saves its own.
+- The list of families is the one Cicero saved the last time it looked through your fonts. `cicero status` says when that was. Cicero looks again by itself while it’s open. `cicero status --rescan` looks through your fonts first: while Cicero is open, Cicero does it and saves what it finds; while Cicero is closed, the command does it and saves it, as Cicero would at its next launch.
 - Whether a font is on or off is what macOS says at the moment you run the command.
 - What you change in Cicero is in the command’s answers a moment later. What you change with the command is in its answers at once.
 
@@ -155,6 +155,10 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 ### Does the command change anything?
 
 Only `activate`, `deactivate`, `tag` and `folder` change things. The other commands only read what Cicero saved. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
+
+### What if the command stops while it turns fonts on or off?
+
+If the command stops in the middle, for example because you press Control-C or the Mac switches off, some fonts can be on or off without Cicero knowing it. The next `cicero` change, or Cicero when it opens, puts this right. It doesn’t turn fonts on or off again. It notes which fonts are on and off now.
 
 ### Can the command and Cicero change things at the same time?
 
