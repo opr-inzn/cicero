@@ -9,11 +9,23 @@ It works while Cicero is closed too, and it never opens Cicero. It turns fonts o
 ## Install the CLI
 
 1. Choose **Cicero → Install Cicero CLI**. Cicero needs to be in your Applications folder.
-2. Enter your administrator password if macOS asks for it. Cicero puts a link to the CLI in `/usr/local/bin`.
-3. Cicero says when the CLI is installed, and the menu item then reads **Cicero CLI Installed**.
+2. Enter your administrator password if macOS asks for it. Cicero puts a link to the CLI in `/usr/local/bin`, and a link to its Tab completion in `/usr/local/share/zsh/site-functions`.
+3. Cicero says when the CLI is installed, and the menu item then reads **Cicero CLI installed**.
 4. Open Terminal and type `cicero --help`.
 
 The CLI is inside Cicero (`Cicero.app/Contents/Helpers/cicero`), so it updates with Cicero.
+
+If you installed the CLI with an earlier beta, the menu item reads **Install Cicero CLI** again: choose it once more to add Tab completion.
+
+### Tab completion
+
+In Terminal, press Tab to complete what you type: commands (`cicero fi` becomes `cicero find`), options, and names from your library: families, styles, tags, folders, locations, foundries, classifications and coverage sets. Press Tab twice to see every choice. `cicero status Hel` and Tab shows the families whose names start with “Hel”.
+
+Tab completion works in zsh, the shell Terminal uses unless you changed it. If Tab doesn’t complete, zsh’s completion is off: add this line to the file `.zshrc` in your home folder, then open a new Terminal window.
+
+```
+autoload -Uz compinit && compinit
+```
 
 ## What it can do
 
@@ -171,4 +183,4 @@ When **Show system fonts** is off in **Settings → General**, the command leave
 
 ### How do I remove the command?
 
-In Terminal, type `sudo rm /usr/local/bin/cicero`. Cicero itself stays as it is.
+In Terminal, type `sudo rm /usr/local/bin/cicero /usr/local/share/zsh/site-functions/_cicero`. Cicero itself stays as it is.
