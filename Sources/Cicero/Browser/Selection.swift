@@ -312,3 +312,38 @@ struct FamilyItem: ViewModifier {
             .accessibilityAction(named: family.hasActive ? "Deactivate" : "Activate") { model.toggle(family) }
     }
 }
+
+/// Reads ahead the regular styles of the families around one that comes into view in the grid or the list, mostly those
+/// after it, which scrolling goes towards: their files are read in the background before their tiles draw (see
+/// `FontLoader.prefetch`). Scans and new lists read ahead only their first families (`AppModel.readAheadFirst`): reading
+/// every family's file at each launch took 4.7 s of CPU at 20,000 families, and filled the page cache other apps use.
+enum ReadAhead {
+    static let before = 20
+    static let after = 80
+
+    /// Where the last family asked about was, in which list: the next one is most often beside it, so it's looked for
+    /// from there outwards. A table of every family's place, made for each new list, took 10–20 ms at 20,000 families
+    /// on each search and view switch.
+    private static var last: (order: FamilyOrder, index: Int)?
+
+    static func around(_ family: Family, in families: [Family]) {
+        let order = FamilyOrder(families)
+        let start = last?.order == order ? min(last!.index, families.count - 1) : 0
+        guard let index = place(of: family.id, in: families, from: start) else { return }
+        last = (order, index)
+        let near = families[max(0, index - before) ..< min(families.count, index + after)]
+        FontLoader.shared.prefetch(near.map(\.regular.face))
+    }
+
+    /// The family's place, looking from `start` outwards, one step each way at a time.
+    private static func place(of id: String, in families: [Family], from start: Int) -> Int? {
+        guard !families.isEmpty, start >= 0 else { return nil }
+        var step = 0
+        while start - step >= 0 || start + step < families.count {
+            if start + step < families.count, families[start + step].id == id { return start + step }
+            if step > 0, start - step >= 0, families[start - step].id == id { return start - step }
+            step += 1
+        }
+        return nil
+    }
+}

@@ -293,6 +293,7 @@ struct FontList: View {
                         FontListRow(row: row, columns: columns, widths: widths, isStriped: !row.position.isMultiple(of: 2),
                                     isSelected: model.selectedIDs.contains(row.id), model: model)
                             .modifier(FamilyItem(family: row.family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                            .onAppear { ReadAhead.around(row.family, in: families) }
                     }
                 }
                 .scrollTargetLayout()
