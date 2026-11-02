@@ -162,7 +162,7 @@ If the command stops in the middle, for example because you press Control-C or t
 
 ### Can the command and Cicero change things at the same time?
 
-No. Only one of them changes Cicero’s data at a time. While Cicero is open, the command asks Cicero to make the change. While Cicero is closed, the command makes it, and a Cicero that opens meanwhile waits until it’s done.
+No. Only one of them changes Cicero’s data at a time. While Cicero is open, the command asks Cicero to make the change. While Cicero is closed, the command makes it, and a Cicero that opens meanwhile waits until it’s done. If that takes more than a moment, Cicero says what it waits for, and you can quit it.
 
 ### Why doesn’t it find a font that comes with macOS?
 

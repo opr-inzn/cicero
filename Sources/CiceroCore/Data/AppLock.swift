@@ -17,16 +17,56 @@ public final class AppLock: @unchecked Sendable {
         support.appendingPathComponent("app.lock", isDirectory: false)
     }
 
-    /// The lock, if nothing holds it; nil when something does, or the file can't be made.
-    public static func take(support: URL) -> AppLock? {
+    /// What holds the lock, as written in the file by `take`: Cicero (by its name, for "Cicero (Beta)") or the command.
+    public enum Holder: Equatable, Sendable {
+        case command
+        case app(name: String)
+
+        var text: String {
+            switch self {
+            case .command: "command\n"
+            case .app(let name): "app\n\(name)\n"
+            }
+        }
+
+        init(text: String) {
+            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            self = lines.first == "app" && lines.count > 1 ? .app(name: String(lines[1])) : .command
+        }
+    }
+
+    public enum Attempt {
+        case taken(AppLock)
+        /// Something else holds it.
+        case held
+        /// The file can't be made or opened, so no lock can be had at all.
+        case unavailable
+    }
+
+    /// Takes the lock if nothing holds it, and writes who holds it in the file.
+    public static func attempt(support: URL, holder: Holder = .command) -> Attempt {
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         let descriptor = open(url(support: support).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
-        guard descriptor >= 0 else { return nil }
+        guard descriptor >= 0 else { return .unavailable }
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
             close(descriptor)
-            return nil
+            return .held
         }
-        return AppLock(descriptor: descriptor)
+        let text = Array(holder.text.utf8)
+        ftruncate(descriptor, 0)
+        _ = pwrite(descriptor, text, text.count, 0)
+        return .taken(AppLock(descriptor: descriptor))
+    }
+
+    /// The lock, if nothing holds it; nil when something does, or the file can't be made.
+    public static func take(support: URL, holder: Holder = .command) -> AppLock? {
+        if case .taken(let lock) = attempt(support: support, holder: holder) { return lock }
+        return nil
+    }
+
+    /// Who holds the lock, as the holder wrote it; worth asking only while `take` fails.
+    public static func holder(support: URL) -> Holder {
+        Holder(text: (try? String(contentsOf: url(support: support), encoding: .utf8)) ?? "")
     }
 
     /// The lock, once what holds it lets go, looking every 50 ms; nil when that takes longer than `timeout`.
