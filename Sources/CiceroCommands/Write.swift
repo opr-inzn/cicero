@@ -10,9 +10,13 @@ public enum WriteCommand: Codable, Sendable, Equatable {
     case tagCreate(name: String, color: String?)
     case tagAdd(tag: String, families: [String])
     case tagRemove(tag: String, families: [String])
+    case tagRename(tag: String, name: String)
+    case tagDelete(tags: [String])
     case folderCreate(name: String)
     case folderAdd(folder: String, families: [String])
     case folderRemove(folder: String, families: [String])
+    case folderRename(folder: String, name: String)
+    case folderDelete(folders: [String])
     /// A scan of everything, saved (`status --rescan`).
     case rescan
 
@@ -27,7 +31,7 @@ public enum WriteCommand: Codable, Sendable, Equatable {
     /// Whether it names families or their fonts, which needs the library.
     public var needsLibrary: Bool {
         switch self {
-        case .tagCreate, .folderCreate, .rescan: false
+        case .tagCreate, .tagRename, .tagDelete, .folderCreate, .folderRename, .folderDelete, .rescan: false
         default: true
         }
     }
@@ -64,6 +68,19 @@ public protocol Writer: AnyObject {
     func rescan() async
     /// Whether this is Cicero, which can turn fonts on until it quits.
     var isApp: Bool { get }
+    /// Renaming and deleting tags and folders: in Cicero as the sidebar does it, so a selected one stays selected under
+    /// its new name, and a deleted one is no longer selected.
+    func renameTag(_ old: String, to new: String)
+    func deleteTags(_ names: Set<String>)
+    func renameFolder(_ id: UUID, to name: String)
+    func deleteFolders(_ ids: Set<UUID>)
+}
+
+public extension Writer {
+    func renameTag(_ old: String, to new: String) { update { $0.renameTag(old, to: new) } }
+    func deleteTags(_ names: Set<String>) { update { $0.deleteTags(names) } }
+    func renameFolder(_ id: UUID, to name: String) { update { $0.renameSet(id, to: name) } }
+    func deleteFolders(_ ids: Set<UUID>) { update { $0.deleteSets(ids) } }
 }
 
 /// Makes a change and answers what it did: `{ "schema": 1, "changed": [...], "unchanged": [...], "failed": [ { "family",
@@ -123,6 +140,23 @@ public enum WriteRunner {
             let changed = ids.filter { has.contains($0) != adding }
             if !changed.isEmpty { writer.update { $0.setTag(tag, adding, for: changed) } }
             return changes(changed: changed, unchanged: ids.filter { has.contains($0) == adding })
+        case .tagRename(let typed, let name):
+            let tag = try Names.tag(typed, in: writer.data)
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { throw CommandError.invalid("A tag needs a name.") }
+            if trimmed == tag { return changes(changed: [], unchanged: [tag]) }
+            // Names are found ignoring case, so two tags that differ only in capitals couldn't be told apart.
+            if let other = writer.data.tags.first(where: { $0 != tag && Names.fold($0) == Names.fold(trimmed) }) {
+                throw CommandError.invalid("There’s already a tag called “\(other)”. Nothing changed.")
+            }
+            writer.renameTag(tag, to: trimmed)
+            return changes(changed: [trimmed], unchanged: [])
+        case .tagDelete(let typed):
+            guard !typed.isEmpty else { throw CommandError.invalid("Give at least one tag.") }
+            var seen = Set<String>()
+            let tags = try typed.map { try Names.tag($0, in: writer.data) }.filter { seen.insert($0).inserted }
+            writer.deleteTags(Set(tags))
+            return changes(changed: tags, unchanged: [])
         case .folderCreate(let name):
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw CommandError.invalid("A folder needs a name.") }
@@ -132,6 +166,23 @@ public enum WriteRunner {
             }
             writer.update { $0.addSet(named: trimmed) }
             return changes(changed: [trimmed], unchanged: [])
+        case .folderRename(let typed, let name):
+            let set = try Names.folder(typed, in: writer.data)
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { throw CommandError.invalid("A folder needs a name.") }
+            if trimmed == set.name { return changes(changed: [], unchanged: [set.name]) }
+            // As folder create: a name another folder has would fit two folders.
+            if let other = writer.data.sets.first(where: { $0.id != set.id && Names.fold($0.name) == Names.fold(trimmed) }) {
+                throw CommandError.invalid("There’s already a folder called “\(other.name)”. Nothing changed.")
+            }
+            writer.renameFolder(set.id, to: trimmed)
+            return changes(changed: [trimmed], unchanged: [])
+        case .folderDelete(let typed):
+            guard !typed.isEmpty else { throw CommandError.invalid("Give at least one folder.") }
+            var seen = Set<UUID>()
+            let sets = try typed.map { try Names.folder($0, in: writer.data) }.filter { seen.insert($0.id).inserted }
+            writer.deleteFolders(Set(sets.map(\.id)))
+            return changes(changed: sets.map(\.name), unchanged: [])
         case .folderAdd(let typed, let families), .folderRemove(let typed, let families):
             let adding = if case .folderAdd = request.command { true } else { false }
             let set = try Names.folder(typed, in: writer.data)

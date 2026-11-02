@@ -14,23 +14,9 @@ extension AppModel {
 
     func renameTag(_ old: String, to new: String) {
         let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != old, let index = data.tags.firstIndex(of: old) else { return }
+        guard !trimmed.isEmpty, trimmed != old, data.tags.contains(old) else { return }
         guard !data.tags.contains(trimmed) else { return showToast("There’s already a tag called “\(trimmed)”") }
-        var data = data
-        data.tags[index] = trimmed
-        let color = data.tagColors.removeValue(forKey: old)
-        data.tagColors[trimmed] = color
-        for (family, tags) in data.familyTags where tags.contains(old) {
-            data.familyTags[family] = tags.map { $0 == old ? trimmed : $0 }
-        }
-        for set in data.smartSets.indices {
-            for rule in data.smartSets[set].rules.indices
-            where data.smartSets[set].rules[rule].field == .tag && data.smartSets[set].rules[rule].value == old {
-                data.smartSets[set].rules[rule].value = trimmed
-            }
-        }
-        data.sidebar.rename("tag.\(old)", to: "tag.\(trimmed)")
-        self.data = data
+        data.renameTag(old, to: trimmed)
         if selectedItems.contains(.tag(old)) {
             selectSidebarItems(Set(selectedItems.map { $0 == .tag(old) ? .tag(trimmed) : $0 }))
         }
@@ -38,20 +24,7 @@ extension AppModel {
 
     /// Takes the tags off every family, and out of smart set rules.
     func deleteTags(_ names: Set<String>) {
-        var data = data
-        data.tags.removeAll(where: names.contains)
-        for (family, tags) in data.familyTags where tags.contains(where: names.contains) {
-            let left = tags.filter { !names.contains($0) }
-            data.familyTags[family] = left.isEmpty ? nil : left
-        }
-        for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .tag && names.contains($0.value) }
-        }
-        for name in names {
-            data.tagColors[name] = nil
-            data.sidebar.forget("tag.\(name)")
-        }
-        self.data = data
+        data.deleteTags(names)
         deselect { if case .tag(let name) = $0 { names.contains(name) } else { false } }
     }
 

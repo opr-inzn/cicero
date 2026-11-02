@@ -646,19 +646,12 @@ extension AppModel {
     }
 
     func renameSet(_ id: UUID, to name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let index = data.sets.firstIndex(where: { $0.id == id }) else { return }
-        data.sets[index].name = trimmed
+        data.renameSet(id, to: name)
     }
 
     /// Several at once, as the sidebar deletes the selected ones.
     func deleteSets(_ ids: Set<UUID>) {
-        let values = Set(ids.map(\.uuidString))
-        data.sets.removeAll { ids.contains($0.id) }
-        for id in ids { data.sidebar.forget("set.\(id)") }
-        for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .set && values.contains($0.value) }
-        }
+        data.deleteSets(ids)
         deselect { if case .set(let id) = $0 { ids.contains(id) } else { false } }
     }
 
