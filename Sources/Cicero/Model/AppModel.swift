@@ -12,6 +12,10 @@ final class AppModel {
     @ObservationIgnored let locations = Locations.standard
     @ObservationIgnored let scanner: LibraryScanner
     @ObservationIgnored let store: UserDataStore
+    /// Held from launch until Cicero quits, so the `cicero` command asks Cicero to make its changes (see `CommandRequests`);
+    /// nil when a command making a change while Cicero was closed didn't finish in time.
+    @ObservationIgnored private let appLock: AppLock?
+    @ObservationIgnored private var commandRequests: CommandRequests?
     /// The engine as made at launch; `engine` knows the Font Library.
     @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
@@ -314,6 +318,8 @@ final class AppModel {
         let locations = Locations.standard
         scanner = LibraryScanner(locations: locations)
         store = UserDataStore(locations: locations)
+        // One writer at a time: a cicero command making a change while Cicero was closed finishes first.
+        appLock = AppLock.wait(support: locations.support, timeout: .seconds(30))
         launchEngine = ActivationEngine(locations: locations)
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         scriptSamples = ScriptSamples(languages: languages)
@@ -338,6 +344,8 @@ final class AppModel {
         restoreGroups()
         restoreLibrary()
         begin()
+        commandRequests = CommandRequests(model: self)
+        commandRequests?.start()
     }
 
     // MARK: Lifecycle
@@ -451,6 +459,7 @@ final class AppModel {
     }
 
     private func prepareToQuit() {
+        commandRequests?.stop()
         #if CICERO_MEASURE
         let measuring = Measurements.begin("quit.endUntilQuit")
         let untilQuit = data.records.temporary.values.count { $0.scope == .untilQuit }
@@ -462,6 +471,7 @@ final class AppModel {
         #endif
         store.flush()
         scanner.flush()
+        appLock?.release()
     }
 
     // MARK: Scanning

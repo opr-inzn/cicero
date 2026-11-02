@@ -245,3 +245,31 @@ enum Text {
         }
     }
 }
+
+// MARK: Changes
+
+extension Text {
+    /// What a change did, in the words of that change: "Turned on: Inter, Roboto." and what it didn't.
+    static func changes(_ command: WriteCommand, _ answer: JSON) -> String {
+        let (done, notDone): (String, String) = switch command {
+        case .activate: ("Turned on", "Nothing to turn on")
+        case .deactivate: ("Turned off", "Nothing to turn off")
+        case .tagCreate: ("Made the tag", "There’s a tag called")
+        case .tagAdd: ("Gave the tag to", "Had the tag already")
+        case .tagRemove: ("Took the tag off", "Didn’t have the tag")
+        case .folderCreate: ("Made the folder", "There’s a folder called")
+        case .folderAdd: ("Put in the folder", "In the folder already")
+        case .folderRemove: ("Took out of the folder", "Not in the folder")
+        }
+        var lines: [String] = []
+        let changed = strings(answer["changed"]), unchanged = strings(answer["unchanged"])
+        if !changed.isEmpty { lines.append("\(done): \(changed.joined(separator: ", ")).") }
+        if !unchanged.isEmpty { lines.append("\(notDone): \(unchanged.joined(separator: ", ")).") }
+        let failed = array(answer["failed"])
+        if !failed.isEmpty {
+            lines.append("Failed:")
+            lines += failed.map { "  \(string($0["family"]) ?? "")  \(string($0["path"]) ?? ""): \(string($0["reason"]) ?? "")" }
+        }
+        return lines.isEmpty ? "Nothing to change." : lines.joined(separator: "\n")
+    }
+}
