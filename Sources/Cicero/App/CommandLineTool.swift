@@ -72,7 +72,10 @@ enum CommandLineTool {
         guard ApplicationsFolder.isInApplicationsFolder else {
             return ApplicationsFolder.offerToMove(forOpenAtLogin: false)
         }
-        if links.allSatisfy(\.isMade) { return showInstalled() }
+        if links.allSatisfy(\.isMade) {
+            Task { await showInstalled() }
+            return
+        }
         if linked != tool.path, FileManager.default.fileExists(atPath: link.path) || linked != nil {
             let alert = NSAlert()
             alert.messageText = "Replace the Cicero CLI?"
@@ -85,7 +88,7 @@ enum CommandLineTool {
             let outcome = await make(links.filter { !$0.isMade })
             State.shared.refresh()
             switch outcome {
-            case .installed: showInstalled()
+            case .installed: await showInstalled()
             case .cancelled: break  // The user cancelled macOS's password dialog: they know.
             case .failed:
                 let alert = NSAlert()
@@ -98,13 +101,30 @@ enum CommandLineTool {
         }
     }
 
-    /// The dialog after installing, and when it's chosen again once installed.
-    private static func showInstalled() {
+    /// The dialog after installing, and when it's chosen again once installed. When zsh's Tab completion is off, it
+    /// offers to turn it on (see `TabCompletion`), unless Cicero's line is in .zshrc already.
+    private static func showInstalled() async {
+        let tab = await TabCompletion.state()
+        let offers = tab.map { !$0.isOn && !TabCompletion.hasLine($0.file) } ?? false
+        // The file as the user knows it: in the home folder, unless their setup keeps zsh's files elsewhere.
+        let place = tab.map { $0.file.deletingLastPathComponent().path == NSHomeDirectory() ? "the file .zshrc in your home folder" : $0.file.path } ?? ""
         let alert = NSAlert()
         alert.messageText = "The Cicero CLI is installed"
         alert.informativeText = "In Terminal, type cicero --help."
+        if offers {
+            alert.informativeText += "\n\nTab completion is off in Terminal. To turn it on, Cicero adds a line to \(place). It works in new Terminal windows."
+            alert.addButton(withTitle: "Turn On Tab Completion")
+            alert.addButton(withTitle: "Not Now")
+        }
         NSApp.activate()
-        alert.runModal()
+        guard alert.runModal() == .alertFirstButtonReturn, offers, let file = tab?.file else { return }
+        if await TabCompletion.turnOn(file) { return }
+        let failed = NSAlert()
+        failed.alertStyle = .warning
+        failed.messageText = "Couldn’t turn on Tab completion"
+        failed.informativeText = "Add this line to \(place):\n\n\(TabCompletion.line)"
+        NSApp.activate()
+        failed.runModal()
     }
 
     /// Makes the links, without a password in the folders the user may write to (as Homebrew on Intel Macs lets them
