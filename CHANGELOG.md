@@ -2,10 +2,6 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
 
-## Unreleased
-
-- **Cicero → Install Cicero CLI** says when it’s done, and then reads **Cicero CLI Installed**.
-
 ## 0.12.0b1
 
 This is Cicero’s first beta: new features come here first, before they’re finished. Thank you for trying it.
