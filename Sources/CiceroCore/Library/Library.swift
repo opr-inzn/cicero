@@ -350,6 +350,34 @@ public final class LibraryScanner: Sendable {
         }
     }
 
+    /// The library the last scan saved, with each face on or off as macOS has it now, for a reader that doesn't scan,
+    /// like the `cicero` tool; nil when there's none. What macOS lists as active is on, and so is a file in macOS's own
+    /// folders, or in a Fonts folder unless macOS has it off; a file Cicero registered that the list leaves out is asked
+    /// about, as a scan does. `lastSaved` is when the library was saved.
+    public func savedLibraryAsNow(records: ActivationRecords) -> (library: Library, lastSaved: Date?)? {
+        guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
+        let saved = (try? FileManager.default.attributesOfItem(atPath: libraryURL.path))?[.modificationDate] as? Date
+        let listed = Set(registrar.activeFontURLs().map { $0.path(percentEncoded: false) })
+        var off: Set<String>?
+        let locations = locations
+        let registrar = registrar
+        let fontsFolders = [locations.userFonts.path + "/", locations.allUsersFonts.path + "/"]
+        let systemFolders = locations.systemFonts.map { $0.path + "/" }
+        let library = LibraryCache.decode(data) { _, path, app in
+            var active = listed.contains(path) || systemFolders.contains { path.hasPrefix($0) }
+            if !active, fontsFolders.contains(where: { path.hasPrefix($0) }) {
+                if off == nil { off = registrar.offFontPaths() }
+                let offPaths = off!
+                active = !offPaths.contains(path) && registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+            } else if !active, records.inPlace.contains(path) || records.temporary[path] != nil {
+                active = registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
+            }
+            let file = FoundFile(stamp: FaceStamp(modified: .distantPast, size: 0), isActive: active, appName: app)
+            return Self.faceState(of: path, file: file, locations: locations, records: records)
+        }
+        return library.map { ($0, saved) }
+    }
+
     /// Writes what was read from files and not saved yet, by a scan still reading too, and waits for the caches being
     /// written: as Cicero quits, so the next launch reads only the files left.
     public func flush() {

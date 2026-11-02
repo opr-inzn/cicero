@@ -130,6 +130,11 @@ public final class CoverageIndex: Sendable {
         return coverage
     }
 
+    /// Reads the cache, as `update` does first, for a reader that only looks coverage up, like the `cicero` tool.
+    public func loadSaved() {
+        loadIfNeeded(removingOldFile: false)
+    }
+
     public func clearCache() {
         state.withLock {
             $0.entries = [:]
@@ -140,7 +145,7 @@ public final class CoverageIndex: Sendable {
     }
 
     /// Waits for the cache to be written.
-    func waitForSave() {
+    public func waitForSave() {
         saveQueue.sync {}
     }
 
@@ -165,11 +170,13 @@ public final class CoverageIndex: Sendable {
 
     // MARK: - Disk cache
 
-    private func loadIfNeeded() {
+    /// `removingOldFile`: the cache of the version before goes, as the app reads this one; a reader that only looks
+    /// coverage up leaves the app's files as they are.
+    private func loadIfNeeded(removingOldFile: Bool = true) {
         state.withLock { state in
             guard !state.loaded else { return }
             state.loaded = true
-            try? FileManager.default.removeItem(at: oldFile)
+            if removingOldFile { try? FileManager.default.removeItem(at: oldFile) }
             guard let data = try? Data(contentsOf: file),
                   let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
                   cache.language == languages.dataVersion

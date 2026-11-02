@@ -103,6 +103,11 @@ public final class MeasurementIndex: Sendable {
         state.withLock { state in faces.allSatisfy { state.entries[$0] != nil } }
     }
 
+    /// Reads the cache, as `update` does first, for a reader that only looks measurements up, like the `cicero` tool.
+    public func loadSaved() {
+        loadIfNeeded()
+    }
+
     public func clearCache() {
         state.withLock {
             $0.entries = [:]

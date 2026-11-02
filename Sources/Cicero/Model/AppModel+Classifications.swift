@@ -2,12 +2,7 @@ import CiceroCore
 import Foundation
 
 /// Where a guessed classification comes from.
-enum ClassificationGuessSource {
-    /// Apple Intelligence, from the family's name.
-    case name
-    /// The model of letters, from their shapes.
-    case letters
-}
+typealias ClassificationGuessSource = ClassificationGuesses.Source
 
 /// Classifications: the one a family's fonts suggest (or for one they don't, a guess from its name or its letters),
 /// unless the user put it in another, the user's own among them. Built-in ones keep their place under the names the
@@ -45,12 +40,7 @@ extension AppModel {
     /// when the name says, else what the model sees in the letters; nothing while guessing is off, and nothing for a
     /// family whose letters say serif for some styles and sans serif for others.
     func classificationGuess() -> (Family) -> (classification: Classification, source: ClassificationGuessSource)? {
-        let names = classificationGuesses, letters = letterGuesses, guessing = guessesClassifications
-        return { family in
-            guard guessing, family.classification == .unclassified, !family.mixesSerifAndSans else { return nil }
-            if let guess = names[family.id], guess != .unclassified { return (guess, .name) }
-            return letters[family.id].map { ($0, .letters) }
-        }
+        ClassificationGuesses.rule(names: classificationGuesses, letters: letterGuesses, guessing: guessesClassifications)
     }
 
     func isUserClassification(_ name: String) -> Bool {

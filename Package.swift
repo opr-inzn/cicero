@@ -11,10 +11,21 @@ let package = Package(
     dependencies: [
         // Updates (see scripts/build-app.sh for how the framework gets into the app).
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+        // The `cicero` command's arguments, help and shell completions.
+        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2"),
     ],
     targets: [
         // Fonts, the library, activation, coverage and user data. No UI; tested by CiceroCoreTests.
         .target(name: "CiceroCore", path: "Sources/CiceroCore"),
+        // The `cicero` command's commands as functions, input to result value, and the JSON they answer in. No printing.
+        .target(name: "CiceroCommands", dependencies: ["CiceroCore"], path: "Sources/CiceroCommands"),
+        // The `cicero` command-line tool: arguments, printing for people and --json. Built as cicero-tool, as a binary
+        // named cicero would be the app's on a disk that ignores case; it goes in the bundle as Contents/Helpers/cicero.
+        .executableTarget(
+            name: "cicero-tool",
+            dependencies: ["CiceroCommands", .product(name: "ArgumentParser", package: "swift-argument-parser")],
+            path: "Sources/CiceroTool"
+        ),
         // The app. Everything in it runs on the main actor unless it says otherwise.
         .executableTarget(
             name: "Cicero",
