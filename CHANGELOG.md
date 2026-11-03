@@ -6,18 +6,9 @@ Each version’s notes here become its release notes on the [releases page](http
 
 - A beta is called **Cicero (Beta)** in the Dock and the Finder.
 - Links in **What’s New** and in the update window open their page.
-
-## 0.12.0b7
-
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](help/command-line.md#use-it-in-claude-and-codex) says.
 - `cicero rate` and `cicero note` give families ratings and notes.
-
-## 0.12.0b6
-
 - **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
-
-## 0.12.0b5
-
 - **Tab completion** for the Cicero CLI in Terminal: commands, options, and the names of your families, styles, tags and folders. If you installed the CLI before, choose **Cicero → Install Cicero CLI** once more.
 - `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
 - `cicero find` also looks in the fonts’ licenses, descriptions and web addresses. `--any` finds families with any of the words, like `cicero find trial unlicensed test --any`.
