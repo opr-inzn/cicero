@@ -88,7 +88,7 @@ Coverage is the coverage of each family’s regular style, as everywhere in Cice
 
 Instead of a family, you can name one style: by its PostScript name (`Inter-Bold`), its full name, or the family’s name and the style’s name (`"Inter Bold"`). Up to 50 styles fit in one picture.
 
-Cicero draws each font from its file, on or off. **When a font doesn’t have a character of the text, Cicero draws the font’s own .notdef glyph in its place:** the shape the font shows for a character it lacks, often a box. It never draws the character from another font. When a font’s .notdef is empty, Cicero draws a red box instead. The label says in red which characters the font lacks. When Cicero can’t read a font’s file, the label says so and nothing is drawn for that font.
+Cicero draws each font from its file, on or off. **When a font doesn’t have a character of the text, Cicero draws the font’s own .notdef glyph in its place:** the shape the font shows for a character it lacks, often a box. It never draws the character from another font. When a font’s .notdef is empty, the place stays empty, as wide as the font makes it. The label says in red which characters the font lacks. When Cicero can’t read a font’s file, the label says so and nothing is drawn for that font.
 
 ### Fonts Cicero hides
 
