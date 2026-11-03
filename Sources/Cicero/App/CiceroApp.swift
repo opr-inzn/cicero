@@ -12,6 +12,8 @@ struct CiceroApp: App {
     @State private var menuBarItem: MenuBarItem
 
     init() {
+        // Before the model reads the library, while its saved data still tells an update from the first launch.
+        WhatsNew.shared.noteLaunch()
         let model = AppModel()
         let updates = Updates()
         let menuBarItem = MenuBarItem(model: model)
@@ -72,6 +74,17 @@ struct CiceroApp: App {
         .defaultSize(width: 960, height: 640)
         .restorationBehavior(.disabled)
         .handlesExternalEvents(matching: [])
+
+        // After an update, and from the Help menu (see `WhatsNew`). Not in the Window menu: it shows what it's given.
+        Window("What’s New in Cicero", id: WindowID.whatsNew) {
+            WhatsNewWindow()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultWindowPlacement { _, _ in WindowPlacement(.center) }
+        .restorationBehavior(.disabled)
+        .handlesExternalEvents(matching: [])
+        .commandsRemoved()
 
         Settings {
             SettingsWindow()
@@ -201,13 +214,16 @@ struct CiceroCommands: Commands {
             Button("Rebuild Library", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
             Button("Clear Font Caches", systemImage: "eraser") { model.isClearingCaches = true }
         }
-        // The user guide, the project's pages on GitHub and the privacy policy on the website, opened in the
-        // default browser.
+        // What's new in this version, in its window; the user guide, the project's pages on GitHub and the privacy policy
+        // on the website, opened in the default browser.
         CommandGroup(replacing: .help) {
             Button("Cicero Help", systemImage: "questionmark.circle") {
                 NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/README.md")!)
             }
             .keyboardShortcut("?", modifiers: .command)
+            Button("What’s New in Cicero", systemImage: "newspaper") {
+                if WhatsNew.shared.showLatest() { openWindow(id: WindowID.whatsNew) }
+            }
             Button("Release Notes", systemImage: "doc.text") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/releases")!) }
             Button("Privacy Policy", systemImage: "hand.raised") { NSWorkspace.shared.open(URL(string: "https://cicero.maximilianinzinger.com/privacy")!) }
             Divider()

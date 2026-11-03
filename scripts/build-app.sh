@@ -39,6 +39,8 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"
 # Built-in character sets (see scripts/update-character-sets.py) and their licenses.
 cp Resources/CharacterSets.json Resources/CharacterSets-LICENSES.txt "$APP/Contents/Resources/"
+# The release notes, which Cicero shows in What's New after an update.
+cp CHANGELOG.md "$APP/Contents/Resources/"
 # The glyph names the order of Latin letters comes from (see scripts/update-letter-order.py): their license.
 cp Resources/GlyphsInfo-LICENSE.txt "$APP/Contents/Resources/"
 
