@@ -249,8 +249,8 @@ struct Find: AsyncParsableCommand {
         abstract: "Find families.",
         discussion: """
             Words are looked for as Cicero’s search field looks for them: in names, foundries, designers, classes, tags \
-            and notes. Unlike the search field, also in the fonts’ licenses, license URLs and descriptions, read from \
-            the font files, which takes longer.
+            and notes. Unlike the search field, also in the fonts’ licenses, descriptions, and license, manufacturer \
+            and designer URLs, read from the font files, which takes longer.
             """
     )
 
