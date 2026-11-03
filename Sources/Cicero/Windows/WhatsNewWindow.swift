@@ -79,8 +79,9 @@ struct ReleaseNotes: Identifiable {
 
 /// What's new since the version of Cicero that opened last: after an update, the main window opens the What's New
 /// window with the notes of each version since, newest first. Help → What's New in Cicero shows this version's again.
-/// At the first launch there's nothing new to show; the first time a Cicero from before this opened, it shows this
-/// version's notes only, as it can't tell which version that was.
+/// At the first launch there's nothing new to show. After a Cicero from before What's New, which kept no version, it
+/// shows this version's notes and the version's before it, which that one couldn't show either; but not a beta's
+/// before a stable version, as only beta users had that one.
 @Observable
 final class WhatsNew {
     static let shared = WhatsNew()
@@ -103,8 +104,11 @@ final class WhatsNew {
         let last = defaults.string(forKey: Self.lastVersionKey)
         if let last {
             pending = all.filter { Self.isNewer($0.version, than: last) && !Self.isNewer($0.version, than: current) }
-        } else if UserDataStore(locations: .standard).hasSavedData {
-            pending = all.filter { $0.version == current }
+        } else if UserDataStore(locations: .standard).hasSavedData, let index = all.firstIndex(where: { $0.version == current }) {
+            pending = [all[index]]
+            if all.indices.contains(index + 1), Self.isBeta(current) || !Self.isBeta(all[index + 1].version) {
+                pending.append(all[index + 1])
+            }
         }
         // Nothing to show waits for no window.
         if pending.isEmpty { defaults.set(current, forKey: Self.lastVersionKey) }
@@ -125,6 +129,11 @@ final class WhatsNew {
               let latest = ReleaseNotes.bundled?.first(where: { !Self.isNewer($0.version, than: current) }) else { return false }
         notes = [latest]
         return true
+    }
+
+    /// 0.12.0b1, not 0.12.0.
+    private static func isBeta(_ version: String) -> Bool {
+        version.contains(where: \.isLetter)
     }
 
     /// As Sparkle compares them, so a beta like 0.12.0b1 comes before 0.12.0.
