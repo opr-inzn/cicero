@@ -14,7 +14,7 @@ struct Cicero: AsyncParsableCommand {
             """,
         version: Version.text,
         subcommands: [Status.self, Find.self, CoverageCheck.self, Compare.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self,
-                      MCPServer.self]
+                      Rate.self, Note.self, MCPServer.self]
     )
 
     /// ArgumentParser's own `main`, except when the command line is wrong (an unknown option, a missing name): that's
@@ -100,6 +100,8 @@ enum Effect {
     case adds
     /// It renames: doing it again finds no name.
     case renames
+    /// It puts something new in the place of what was there, like a rating or a note.
+    case replaces
     /// It takes away or turns off.
     case removes
 }
@@ -680,4 +682,50 @@ struct Folder: AsyncParsableCommand {
         static let effect = Effect.removes
         var change: WriteCommand { .folderDelete(folders: folders) }
     }
+}
+
+struct Rate: Changing {
+    static let configuration = CommandConfiguration(
+        abstract: "Rate families from 1 to 5 stars, or take their rating away.",
+        discussion: "As the stars in Cicero’s Info panel. cicero status and cicero find show the rating."
+    )
+
+    @Argument(help: "Families’ names.", completion: .families)
+    var families: [String] = []
+
+    @Option(help: ArgumentHelp("How many stars, from 1 to 5; 0 takes the rating away.", valueName: "n"))
+    var stars: Int
+
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+    @OptionGroup var common: CommonOptions
+
+    static let effect = Effect.replaces
+    var change: WriteCommand { .rate(families: families, stars: stars) }
+    var shown: ShownFonts { hidden.shown }
+}
+
+struct Note: Changing {
+    static let configuration = CommandConfiguration(
+        abstract: "Write a family’s note, add to it, or take it away.",
+        discussion: """
+            The note in Cicero’s Info panel. The text takes the place of the note, or with --append goes after it on a \
+            new line. Empty text takes the note away. cicero status <family> shows the note, and cicero find finds its words.
+            """
+    )
+
+    @Argument(help: "A family’s name.", completion: .families)
+    var family: String
+
+    @Argument(help: "The note. Empty text takes the note away.")
+    var text: String
+
+    @Flag(help: "Add the text after the note, on a new line, and keep what the note says.")
+    var append = false
+
+    @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
+    @OptionGroup var common: CommonOptions
+
+    static let effect = Effect.replaces
+    var change: WriteCommand { .note(family: family, text: text, append: append) }
+    var shown: ShownFonts { hidden.shown }
 }
