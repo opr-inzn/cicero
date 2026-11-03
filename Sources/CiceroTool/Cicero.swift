@@ -299,10 +299,10 @@ struct Find: Answering {
             """
     )
 
-    @Argument(help: "Words to look for.")
+    @Argument(help: "Words to look for. A family needs all of them, unless --any.")
     var words: [String] = []
 
-    @Flag(help: "Families with any of the words, not all of them, like trial, unlicensed or test. Words in quotes are one search: all of them must be found.")
+    @Flag(help: "Families with any of the words, not all of them, like trial, unlicensed or test. Words with spaces between them in one argument (in quotes in Terminal) are one search: all of them must be found.")
     var any = false
 
     @OptionGroup var find: FindArguments
