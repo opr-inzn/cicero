@@ -29,6 +29,50 @@ autoload -Uz compinit && compinit -i
 
 To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line yourself. To turn it off, take the line out of `.zshrc`.
 
+## Use it in Claude and Codex
+
+AI agents can use Cicero through the CLI’s MCP server (Model Context Protocol), `cicero mcp`. The agent then has each command as a tool: `find`, `status`, `coverage`, `compare`, `list`, `activate`, `deactivate`, and `tag_create`, `tag_add`, `folder_add` and the other `tag` and `folder` commands. It gets the same answers as `--json` gives, and it sees the pictures `compare` draws. Apps without a terminal, like Claude Desktop, can use Cicero this way too.
+
+Install the CLI first (see [Install the CLI](#install-the-cli)). Then add Cicero to your agent app:
+
+**Claude Code:** in Terminal, type
+
+```
+claude mcp add --scope user cicero -- /usr/local/bin/cicero mcp
+```
+
+**Codex:** in Terminal, type
+
+```
+codex mcp add cicero -- /usr/local/bin/cicero mcp
+```
+
+or add these lines to the file `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.cicero]
+command = "/usr/local/bin/cicero"
+args = ["mcp"]
+```
+
+**Claude Desktop:** add `cicero` to `mcpServers` in the file `~/Library/Application Support/Claude/claude_desktop_config.json` (in Claude Desktop: **Settings → Developer → Edit Config**), then quit Claude Desktop and open it again:
+
+```json
+{
+  "mcpServers": {
+    "cicero": { "command": "/usr/local/bin/cicero", "args": ["mcp"] }
+  }
+}
+```
+
+Then ask, for example: “Which of my serif fonts have all of Adobe Latin 3? Show me three of them side by side.”
+
+- **The tools’ inputs** are the command’s options without `--`, in camelCase: `--all-styles` is `allStyles`, `--system-fonts` is `systemFonts` (and `false` for `--no-system-fonts`). The names a command takes are `family`, `families`, `names`, `words`, `tag` or `folder`, as in its help.
+- **Changes.** The tools tell the agent app which ones only read, and which ones turn fonts off or take tags, folders and families away, so it can ask you first. When Cicero asks before a change (more than 100 families, or fonts moving out of a folder others share), the tool answers with the question and changes nothing. The agent then asks you, and does the change only when you say yes.
+- **Only find and check:** use `cicero mcp --read-only` in place of `cicero mcp`. The agent then has no tools that change things.
+- **Pictures** from `compare` go in the temporary folder (the tool has no `png` input, so an agent can’t write over your files with it), and to the agent up to 8000 pixels high and wide. For a larger picture, the agent gets only its path.
+- The agent app starts `cicero mcp` itself and stops it when it quits. It never opens Cicero. Each tool reads your library again, so it always has what you changed in Cicero.
+
 ## What it can do
 
 | Command | What it shows |
@@ -216,3 +260,5 @@ When **Show system fonts** is off in **Settings → General**, the command leave
 ### How do I remove the command?
 
 In Terminal, type `sudo rm /usr/local/bin/cicero /usr/local/share/zsh/site-functions/_cicero`. Cicero itself stays as it is.
+
+To take Cicero out of your agent app, type `claude mcp remove --scope user cicero` or `codex mcp remove cicero`, or take `cicero` out of Claude Desktop’s `claude_desktop_config.json`.

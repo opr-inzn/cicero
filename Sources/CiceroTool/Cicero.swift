@@ -13,7 +13,8 @@ struct Cicero: AsyncParsableCommand {
             makes them itself. Add --json for answers that scripts and agents read; their fields are in the help page.
             """,
         version: Version.text,
-        subcommands: [Status.self, Find.self, CoverageCheck.self, Compare.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self]
+        subcommands: [Status.self, Find.self, CoverageCheck.self, Compare.self, List.self, Activate.self, Deactivate.self, Tag.self, Folder.self,
+                      MCPServer.self]
     )
 
     /// ArgumentParser's own `main`, except when the command line is wrong (an unknown option, a missing name): that's
@@ -82,6 +83,46 @@ struct ShownOptions: ParsableArguments {
     var shown: ShownFonts { ShownFonts(systemFonts: systemFonts, adobeFonts: adobeFonts, proofingFonts: proofingFonts) }
 }
 
+/// A command that answers in JSON, as `--json` prints it, and that `cicero mcp` offers as a tool (see `MCPTools`).
+protocol Answering: AsyncParsableCommand {
+    var common: CommonOptions { get }
+    /// What the command does to Cicero's library, for the agent apps.
+    static var effect: Effect { get }
+    /// The answer. Never prints, and never asks: a change that asks first throws `needsConfirmation` without `--yes`.
+    func result() async throws -> JSON
+}
+
+/// What a command does to Cicero's library.
+enum Effect {
+    /// It only reads. (`compare` writes its picture, nothing else.)
+    case reads
+    /// It changes things, and adds or turns on; doing it again changes nothing more.
+    case adds
+    /// It renames: doing it again finds no name.
+    case renames
+    /// It takes away or turns off.
+    case removes
+}
+
+/// A command that changes things, with `WriteDispatcher`.
+protocol Changing: Answering {
+    var change: WriteCommand { get }
+    /// The fonts this one command shows or hides.
+    var shown: ShownFonts { get }
+}
+
+extension Changing {
+    var shown: ShownFonts { ShownFonts() }
+
+    func result() async throws -> JSON {
+        try await WriteDispatcher.perform(WriteRequest(change, confirmed: common.yes, shown: shown), environment: .current())
+    }
+
+    func run() async throws {
+        try await write(change, common, shown)
+    }
+}
+
 /// Runs a command's work and prints its answer, or its error, as text or JSON. Exits with the error's code, or with the
 /// answer's own `exitCode` (as `coverage` does when characters are missing).
 func answer(_ common: CommonOptions, text: (JSON) -> String, exitCode: (JSON) -> Int32 = { _ in 0 },
@@ -129,7 +170,7 @@ func load(_ common: CommonOptions, _ shown: ShownOptions, rescan: Bool = false) 
     return context
 }
 
-struct Status: AsyncParsableCommand {
+struct Status: Answering {
     static let configuration = CommandConfiguration(
         abstract: "The library, or one family.",
         discussion: """
@@ -155,15 +196,19 @@ struct Status: AsyncParsableCommand {
 
     @OptionGroup var common: CommonOptions
 
-    func run() async throws {
-        try await answer(common, text: Text.status) {
-            let context = try await load(common, hidden, rescan: rescan)
-            guard let family else {
-                if style != nil || allStyles { throw CommandError(.invalidArgument, "--style and --all-styles go with a family.") }
-                return StatusCommand.library(in: context)
-            }
-            return try StatusCommand.family(family, style: style, allStyles: allStyles, in: context)
+    static let effect = Effect.reads
+
+    func result() async throws -> JSON {
+        let context = try await load(common, hidden, rescan: rescan)
+        guard let family else {
+            if style != nil || allStyles { throw CommandError(.invalidArgument, "--style and --all-styles go with a family.") }
+            return StatusCommand.library(in: context)
         }
+        return try StatusCommand.family(family, style: style, allStyles: allStyles, in: context)
+    }
+
+    func run() async throws {
+        try await answer(common, text: Text.status, result)
     }
 }
 
@@ -244,7 +289,7 @@ struct FindArguments: ParsableArguments {
 
 extension FindOptions.Sort: ExpressibleByArgument {}
 
-struct Find: AsyncParsableCommand {
+struct Find: Answering {
     static let configuration = CommandConfiguration(
         abstract: "Find families.",
         discussion: """
@@ -257,23 +302,27 @@ struct Find: AsyncParsableCommand {
     @Argument(help: "Words to look for.")
     var words: [String] = []
 
-    @Flag(help: "Families with any of the words, not all of them: cicero find trial unlicensed test --any. Words in quotes must all be found, as without --any.")
+    @Flag(help: "Families with any of the words, not all of them, like trial, unlicensed or test. Words in quotes are one search: all of them must be found.")
     var any = false
 
     @OptionGroup var find: FindArguments
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
+    static let effect = Effect.reads
+
+    func result() async throws -> JSON {
+        var options = find.options(words: words)
+        options.any = any
+        return try FindCommand.run(options, in: try await load(common, hidden))
+    }
+
     func run() async throws {
-        try await answer(common, text: Text.families) {
-            var options = find.options(words: words)
-            options.any = any
-            return try FindCommand.run(options, in: try await load(common, hidden))
-        }
+        try await answer(common, text: Text.families, result)
     }
 }
 
-struct CoverageCheck: AsyncParsableCommand {
+struct CoverageCheck: Answering {
     static let configuration = CommandConfiguration(
         commandName: "coverage",
         abstract: "Whether a family has every character of a set or a text, and which it lacks.",
@@ -292,15 +341,19 @@ struct CoverageCheck: AsyncParsableCommand {
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
+    static let effect = Effect.reads
+
+    func result() async throws -> JSON {
+        try await CoverageCommand.run(family: family, set: set, text: text, in: try await load(common, hidden))
+    }
+
     func run() async throws {
         // 3 when characters are missing, as `diff` exits 1 when files differ: a script can ask without reading the JSON.
-        try await answer(common, text: Text.coverageCheck, exitCode: { Text.bool($0["covered"]) == false ? 3 : 0 }) {
-            try await CoverageCommand.run(family: family, set: set, text: text, in: try await load(common, hidden))
-        }
+        try await answer(common, text: Text.coverageCheck, exitCode: { Text.bool($0["covered"]) == false ? 3 : 0 }, result)
     }
 }
 
-struct Compare: AsyncParsableCommand {
+struct Compare: Answering {
     static let configuration = CommandConfiguration(
         abstract: "Draw families or styles in one picture, the same text in each, to look at them side by side.",
         discussion: """
@@ -333,23 +386,27 @@ struct Compare: AsyncParsableCommand {
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
+    static let effect = Effect.reads
+
+    func result() async throws -> JSON {
+        var options = CompareCommand.Options()
+        options.names = names
+        options.allStyles = allStyles
+        options.text = text
+        options.size = size
+        options.width = width
+        options.png = png
+        return try CompareCommand.run(options, in: try await load(common, hidden))
+    }
+
     func run() async throws {
-        try await answer(common, text: Text.compare) {
-            var options = CompareCommand.Options()
-            options.names = names
-            options.allStyles = allStyles
-            options.text = text
-            options.size = size
-            options.width = width
-            options.png = png
-            return try CompareCommand.run(options, in: try await load(common, hidden))
-        }
+        try await answer(common, text: Text.compare, result)
     }
 }
 
 extension ListCommand.What: ExpressibleByArgument {}
 
-struct List: AsyncParsableCommand {
+struct List: Answering {
     static let configuration = CommandConfiguration(
         abstract: "List families, tags, folders, locations, foundries or coverage sets."
     )
@@ -366,13 +423,17 @@ struct List: AsyncParsableCommand {
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
+    static let effect = Effect.reads
+
+    func result() async throws -> JSON {
+        var options = FindOptions()
+        options.limit = limit
+        options.offset = offset
+        return try ListCommand.run(what, options: options, in: try await load(common, hidden))
+    }
+
     func run() async throws {
-        try await answer(common, text: { Text.list(what, $0) }) {
-            var options = FindOptions()
-            options.limit = limit
-            options.offset = offset
-            return try ListCommand.run(what, options: options, in: try await load(common, hidden))
-        }
+        try await answer(common, text: { Text.list(what, $0) }, result)
     }
 }
 
@@ -399,7 +460,7 @@ func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts
     }
 }
 
-struct Activate: AsyncParsableCommand {
+struct Activate: Changing {
     static let configuration = CommandConfiguration(
         abstract: "Turn on families, a folder’s fonts or a tag’s families.",
         discussion: "Fonts go on where they are, as when you turn them on in Cicero.",
@@ -421,12 +482,12 @@ struct Activate: AsyncParsableCommand {
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
-    func run() async throws {
-        try await write(.activate(families: families, folder: folder, tag: tag, untilQuit: untilQuit), common, hidden.shown)
-    }
+    static let effect = Effect.adds
+    var change: WriteCommand { .activate(families: families, folder: folder, tag: tag, untilQuit: untilQuit) }
+    var shown: ShownFonts { hidden.shown }
 }
 
-struct Deactivate: AsyncParsableCommand {
+struct Deactivate: Changing {
     static let configuration = CommandConfiguration(
         abstract: "Turn off families, a folder’s fonts or a tag’s families.",
         aliases: ["off"]
@@ -444,9 +505,9 @@ struct Deactivate: AsyncParsableCommand {
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
-    func run() async throws {
-        try await write(.deactivate(families: families, folder: folder, tag: tag), common, hidden.shown)
-    }
+    static let effect = Effect.removes
+    var change: WriteCommand { .deactivate(families: families, folder: folder, tag: tag) }
+    var shown: ShownFonts { hidden.shown }
 }
 
 struct Tag: AsyncParsableCommand {
@@ -455,7 +516,7 @@ struct Tag: AsyncParsableCommand {
         subcommands: [Create.self, Add.self, Remove.self, Rename.self, Delete.self]
     )
 
-    struct Create: AsyncParsableCommand {
+    struct Create: Changing {
         static let configuration = CommandConfiguration(abstract: "Make a tag. Nothing changes when there’s one of that name.")
 
         @Argument(help: "The tag’s name.")
@@ -466,12 +527,11 @@ struct Tag: AsyncParsableCommand {
 
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.tagCreate(name: name, color: color), common)
-        }
+        static let effect = Effect.adds
+        var change: WriteCommand { .tagCreate(name: name, color: color) }
     }
 
-    struct Add: AsyncParsableCommand {
+    struct Add: Changing {
         static let configuration = CommandConfiguration(abstract: "Give families a tag.")
 
         @Argument(help: "The tag.", completion: .tags)
@@ -483,12 +543,12 @@ struct Tag: AsyncParsableCommand {
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.tagAdd(tag: tag, families: families), common, hidden.shown)
-        }
+        static let effect = Effect.adds
+        var change: WriteCommand { .tagAdd(tag: tag, families: families) }
+        var shown: ShownFonts { hidden.shown }
     }
 
-    struct Remove: AsyncParsableCommand {
+    struct Remove: Changing {
         static let configuration = CommandConfiguration(abstract: "Take a tag off families.")
 
         @Argument(help: "The tag.", completion: .tags)
@@ -500,12 +560,12 @@ struct Tag: AsyncParsableCommand {
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.tagRemove(tag: tag, families: families), common, hidden.shown)
-        }
+        static let effect = Effect.removes
+        var change: WriteCommand { .tagRemove(tag: tag, families: families) }
+        var shown: ShownFonts { hidden.shown }
     }
 
-    struct Rename: AsyncParsableCommand {
+    struct Rename: Changing {
         static let configuration = CommandConfiguration(
             abstract: "Rename a tag.",
             discussion: "The families that have it keep it, under the new name, and so do smart folders’ rules."
@@ -519,12 +579,11 @@ struct Tag: AsyncParsableCommand {
 
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.tagRename(tag: tag, name: name), common)
-        }
+        static let effect = Effect.renames
+        var change: WriteCommand { .tagRename(tag: tag, name: name) }
     }
 
-    struct Delete: AsyncParsableCommand {
+    struct Delete: Changing {
         static let configuration = CommandConfiguration(
             abstract: "Delete tags.",
             discussion: "Takes them off every family and out of smart folders’ rules, as Delete Tag in Cicero does. The fonts stay."
@@ -535,9 +594,8 @@ struct Tag: AsyncParsableCommand {
 
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.tagDelete(tags: tags), common)
-        }
+        static let effect = Effect.removes
+        var change: WriteCommand { .tagDelete(tags: tags) }
     }
 }
 
@@ -547,7 +605,7 @@ struct Folder: AsyncParsableCommand {
         subcommands: [Create.self, Add.self, Remove.self, Rename.self, Delete.self]
     )
 
-    struct Create: AsyncParsableCommand {
+    struct Create: Changing {
         static let configuration = CommandConfiguration(abstract: "Make a folder. Nothing changes when there’s one of that name.")
 
         @Argument(help: "The folder’s name.")
@@ -555,12 +613,11 @@ struct Folder: AsyncParsableCommand {
 
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.folderCreate(name: name), common)
-        }
+        static let effect = Effect.adds
+        var change: WriteCommand { .folderCreate(name: name) }
     }
 
-    struct Add: AsyncParsableCommand {
+    struct Add: Changing {
         static let configuration = CommandConfiguration(abstract: "Put families in a folder, every style of them.")
 
         @Argument(help: "The folder: its name or id.", completion: .folders)
@@ -572,12 +629,12 @@ struct Folder: AsyncParsableCommand {
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.folderAdd(folder: folder, families: families), common, hidden.shown)
-        }
+        static let effect = Effect.adds
+        var change: WriteCommand { .folderAdd(folder: folder, families: families) }
+        var shown: ShownFonts { hidden.shown }
     }
 
-    struct Remove: AsyncParsableCommand {
+    struct Remove: Changing {
         static let configuration = CommandConfiguration(abstract: "Take families out of a folder.")
 
         @Argument(help: "The folder: its name or id.", completion: .folders)
@@ -589,12 +646,12 @@ struct Folder: AsyncParsableCommand {
         @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.folderRemove(folder: folder, families: families), common, hidden.shown)
-        }
+        static let effect = Effect.removes
+        var change: WriteCommand { .folderRemove(folder: folder, families: families) }
+        var shown: ShownFonts { hidden.shown }
     }
 
-    struct Rename: AsyncParsableCommand {
+    struct Rename: Changing {
         static let configuration = CommandConfiguration(abstract: "Rename a folder. Its fonts stay in it.")
 
         @Argument(help: "The folder: its name or id.", completion: .folders)
@@ -605,12 +662,11 @@ struct Folder: AsyncParsableCommand {
 
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.folderRename(folder: folder, name: name), common)
-        }
+        static let effect = Effect.renames
+        var change: WriteCommand { .folderRename(folder: folder, name: name) }
     }
 
-    struct Delete: AsyncParsableCommand {
+    struct Delete: Changing {
         static let configuration = CommandConfiguration(
             abstract: "Delete folders.",
             discussion: "As Delete Folder in Cicero: the fonts stay in the library, and stay on or off as they are."
@@ -621,8 +677,7 @@ struct Folder: AsyncParsableCommand {
 
         @OptionGroup var common: CommonOptions
 
-        func run() async throws {
-            try await write(.folderDelete(folders: folders), common)
-        }
+        static let effect = Effect.removes
+        var change: WriteCommand { .folderDelete(folders: folders) }
     }
 }

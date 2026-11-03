@@ -133,6 +133,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   (`LaunchWait`, an alert naming the holder after 1 s, with Quit).
 - **CiceroTool**: Swift Argument Parser commands that call those functions and print the value, as JSON with `--json`,
   else as text (`Text`). Built as `cicero-tool`; `build-app.sh` puts it in `Contents/Helpers/cicero` and signs it.
+  Each command that answers is `Answering` (`result()` gives the JSON without printing; changes are `Changing`, a
+  `WriteCommand` for `WriteDispatcher`). `cicero mcp` (`MCP.swift`, the Swift MCP SDK) makes a tool of each from its
+  ArgumentParser definition, turns a call back into the command line it stands for, and answers with `result()`.
 - The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Cicero CLI). The app depends on
   CiceroCommands for the changes it makes for the command.
 
