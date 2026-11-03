@@ -1,6 +1,6 @@
 # Changelog
 
-Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
+Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
 ## Unreleased
 
