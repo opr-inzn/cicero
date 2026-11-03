@@ -200,8 +200,8 @@ private struct VersionNotes: View {
     let notes: ReleaseNotes
 
     var body: some View {
-        // The notes close under their version, further from each other.
-        VStack(alignment: .leading, spacing: 4) {
+        // The first note as far under its version as the notes are from each other.
+        VStack(alignment: .leading, spacing: 10) {
             Text("Cicero \(notes.version)")
                 .font(.title2.bold())
                 .foregroundStyle(.tint)
