@@ -51,6 +51,8 @@ fi
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)
 # Before building and notarizing, which take a while: a build installed copies would never be offered isn't worth it.
 ./scripts/check-version.sh
+# The app has CHANGELOG.md in it and shows this version's notes in What's New after the update, so they go in first.
+grep -qx "## $VERSION" CHANGELOG.md || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first: What's New shows it." >&2; exit 1; }
 echo "Releasing Cicero $VERSION, signed by $IDENTITY"
 
 notarize() {
