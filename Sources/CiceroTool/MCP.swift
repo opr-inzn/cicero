@@ -171,8 +171,9 @@ enum MCPTools {
             inputSchema: ["type": "object", "properties": .object(properties), "required": .array(required), "additionalProperties": false],
             annotations: Tool.Annotations(
                 readOnlyHint: effect == .reads,
-                destructiveHint: effect == .reads ? nil : effect == .removes,
-                idempotentHint: effect == .reads ? nil : effect != .renames,
+                destructiveHint: effect == .reads ? nil : effect == .removes || effect == .replaces,
+                // A note added to twice says it twice.
+                idempotentHint: effect == .reads ? nil : effect == .adds || effect == .removes,
                 openWorldHint: false
             )
         )
@@ -195,7 +196,7 @@ enum MCPTools {
             let kind: Input.Kind = argument.kind == .flag ? .flag(inverted: inverted) : .option
             let integer = argument.kind == .option && (argument.defaultValue.flatMap(Int.init) != nil || argument.valueName == "n")
             return Input(kind: kind, property: camelCase(name), option: name, repeating: argument.isRepeating,
-                         required: false, integer: integer, values: argument.allValues, help: help)
+                         required: argument.kind == .option && !argument.isOptional, integer: integer, values: argument.allValues, help: help)
         }
     }
 

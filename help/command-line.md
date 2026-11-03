@@ -4,7 +4,7 @@
 
 The Cicero CLI (command-line tool) finds, checks and changes the fonts in Cicero’s library from Terminal, from scripts and from AI agents like Claude Code or Codex. It answers the way Cicero’s window does: the same search, the same classifications, foundries, tags and folders.
 
-It works while Cicero is closed too, and it never opens Cicero. It turns fonts on and off, and gives families tags and puts them in folders.
+It works while Cicero is closed too, and it never opens Cicero. It turns fonts on and off, gives families tags, ratings and notes, and puts them in folders.
 
 ## Install the CLI
 
@@ -31,7 +31,7 @@ To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line
 
 ## Use it in Claude and Codex
 
-AI agents can use Cicero through the CLI’s MCP server (Model Context Protocol), `cicero mcp`. The agent then has each command as a tool: `find`, `status`, `coverage`, `compare`, `list`, `activate`, `deactivate`, and `tag_create`, `tag_add`, `folder_add` and the other `tag` and `folder` commands. It gets the same answers as `--json` gives, and it sees the pictures `compare` draws. Apps without a terminal, like Claude Desktop, can use Cicero this way too.
+AI agents can use Cicero through the CLI’s MCP server (Model Context Protocol), `cicero mcp`. The agent then has each command as a tool: `find`, `status`, `coverage`, `compare`, `list`, `activate`, `deactivate`, `rate`, `note`, and `tag_create`, `tag_add`, `folder_add` and the other `tag` and `folder` commands. It gets the same answers as `--json` gives, and it sees the pictures `compare` draws. Apps without a terminal, like Claude Desktop, can use Cicero this way too.
 
 Install the CLI first (see [Install the CLI](#install-the-cli)). Then add Cicero to your agent app:
 
@@ -90,6 +90,8 @@ Then ask, for example: “Which of my serif fonts have all of Adobe Latin 3? Sho
 | `cicero deactivate Inter` | Turns them off (also `cicero off`) |
 | `cicero tag add Licensed Inter` | Gives families a tag. Also `tag create`, `tag remove`, `tag rename` and `tag delete` |
 | `cicero folder add "Client A" Inter` | Puts families in a folder. Also `folder create`, `folder remove`, `folder rename` and `folder delete` |
+| `cicero rate Inter Roboto --stars 5` | Gives families a rating from 1 to 5 stars |
+| `cicero note Inter "Licensed for the website"` | Writes a family’s note |
 
 Names don’t need capitals: `cicero status inter` works. When a name isn’t quite right, the command says which names are near.
 
@@ -163,6 +165,9 @@ For example, `cicero status Helvetica --system-fonts`. The options don’t chang
 | `cicero folder add "Client A" <families…>`, `folder remove` | puts every style of the families in the folder, or takes them out |
 | `cicero folder rename "Client A" "Client B"` | renames a folder. Stops when another folder has that name |
 | `cicero folder delete "Client A" <folders…>` | deletes folders. Their fonts stay in the library, on or off as they are |
+| `cicero rate <families…> --stars 5` | gives the families 5 stars, as the stars in the Info panel. `--stars 0` takes the rating away |
+| `cicero note Inter "Licensed for the website"` | writes the family’s note, in place of the note there was. `""` takes the note away |
+| `cicero note Inter "Second proof approved" --append` | adds the text after the note, on a new line |
 
 Names must be exact, but capitals don’t matter. When a name isn’t right, nothing changes, and the command says which names are near. When you give more names than one, nothing changes if one of them isn’t right.
 
@@ -243,7 +248,7 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 
 ### Does the command change anything?
 
-Only `activate`, `deactivate`, `tag` and `folder` change things. The other commands only read what Cicero saved. `compare` writes only its picture. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
+Only `activate`, `deactivate`, `tag`, `folder`, `rate` and `note` change things. The other commands only read what Cicero saved. `compare` writes only its picture. `--rescan`, while Cicero is closed, updates Cicero’s saved list of fonts, as Cicero would at its next launch. The options for hidden fonts don’t change Cicero’s settings.
 
 ### What if the command stops while it turns fonts on or off?
 

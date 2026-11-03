@@ -17,6 +17,11 @@ public enum WriteCommand: Codable, Sendable, Equatable {
     case folderRemove(folder: String, families: [String])
     case folderRename(folder: String, name: String)
     case folderDelete(folders: [String])
+    /// Stars from 1 to 5, as the Info panel gives; 0 takes the rating away.
+    case rate(families: [String], stars: Int)
+    /// The family's note: `text` in its place, or after it on a new line with `append`. Text that's only spaces and new
+    /// lines takes the note away, as in the Info panel.
+    case note(family: String, text: String, append: Bool)
     /// A scan of everything, saved (`status --rescan`).
     case rescan
 
@@ -191,6 +196,27 @@ public enum WriteRunner {
             let changed = ids.filter { adding ? !set.families.contains($0) : (set.families.contains($0) || set.styles[$0] != nil) }
             if !changed.isEmpty { writer.update { $0.setMembership(adding, for: changed, in: set.id) } }
             return changes(changed: changed, unchanged: ids.filter { !changed.contains($0) })
+        case .rate(let families, let stars):
+            guard (0...5).contains(stars) else { throw CommandError.invalid("Stars go from 1 to 5, or 0 to take the rating away.") }
+            let ids = try familyIDs(families, in: context)
+            let rating = stars == 0 ? nil : stars
+            let changed = ids.filter { writer.data.familyRatings[$0] != rating }
+            if !changed.isEmpty { writer.update { data in for id in changed { data.familyRatings[id] = rating } } }
+            return changes(changed: changed, unchanged: ids.filter { !changed.contains($0) })
+        case .note(let typed, let text, let append):
+            let id = try Names.family(typed, in: context).id
+            let old = writer.data.familyNotes[id]
+            let blank = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let note: String?
+            if append {
+                // Nothing to add: the note stays as it is.
+                note = blank ? old : old.map { $0 + "\n" + text } ?? text
+            } else {
+                note = blank ? nil : text
+            }
+            guard note != old else { return changes(changed: [], unchanged: [id]) }
+            writer.update { $0.familyNotes[id] = note }
+            return changes(changed: [id], unchanged: [])
         }
     }
 
