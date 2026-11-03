@@ -8,8 +8,7 @@ import UniformTypeIdentifiers
 /// `cicero compare <names…>`: one PNG with the same text in each family's regular style (every style with
 /// `--all-styles`), or in styles named by their PostScript names, full names or family and style names, each under a label, so an assistant can look
 /// at the fonts and not only read their data. Fonts are drawn from their files, on or off. Characters a font lacks are
-/// drawn as its .notdef glyph (a red box when that's empty), never in another font, and listed in its label and
-/// in the answer.
+/// drawn as its .notdef glyph, as the font draws it, never in another font, and listed in its label and in the answer.
 public enum CompareCommand {
     /// Cicero's own sample text (the font page's).
     public static let defaultText = "Sphinx of black quartz, judge my vow."
@@ -187,8 +186,6 @@ enum SampleSheet {
         let labelAscent: CGFloat
         let labelHeight: CGFloat
         let frame: CTFramesetter?
-        /// The text as laid out (see `sampleText`).
-        let layout: String
         let sampleHeight: CGFloat
         let font: CTFont?
 
@@ -204,14 +201,14 @@ enum SampleSheet {
             var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
             _ = CTLineGetTypographicBounds(label, &ascent, &descent, &leading)
             guard let font = sample.font else {
-                return Row(label: label, labelAscent: ascent, labelHeight: ascent + descent, frame: nil, layout: "", sampleHeight: 0, font: nil)
+                return Row(label: label, labelAscent: ascent, labelHeight: ascent + descent, frame: nil, sampleHeight: 0, font: nil)
             }
             let attributed = sampleText(text.precomposedStringWithCanonicalMapping, font: font)
             let framesetter = CTFramesetterCreateWithAttributedString(attributed)
             let fitted = CTFramesetterSuggestFrameSizeWithConstraints(
                 framesetter, CFRange(location: 0, length: 0), nil, CGSize(width: contentWidth, height: .greatestFiniteMagnitude), nil)
             return Row(label: label, labelAscent: ascent, labelHeight: ascent + descent, frame: framesetter,
-                       layout: CFAttributedStringGetString(attributed) as String, sampleHeight: ceil(fitted.height), font: font)
+                       sampleHeight: ceil(fitted.height), font: font)
         }
         let height = Int(ceil(2 * margin + rows.reduce(0) { $0 + $1.height } + CGFloat(max(rows.count - 1, 0)) * (2 * rowGap + 1)))
         guard height <= maximumHeight else {
@@ -239,7 +236,7 @@ enum SampleSheet {
             if let framesetter = row.frame, let font = row.font {
                 let box = CGRect(x: margin, y: CGFloat(height) - top - row.sampleHeight, width: contentWidth, height: row.sampleHeight)
                 draw(CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), CGPath(rect: box, transform: nil), nil),
-                     text: row.layout, in: box, font: font, context: context)
+                     in: box, font: font, context: context)
             }
             top += row.sampleHeight
         }
@@ -317,79 +314,52 @@ enum SampleSheet {
         return string
     }
 
-    /// The frame's lines: the runs in the sample's font as they are; in the place of each character the font lacks, its
-    /// .notdef, as the font draws it, or a red box as wide when its .notdef is empty. Any other run CoreText took from another font
-    /// (it shouldn't: see `sampleText`) is a red box too, never drawn in that font; spaces stay empty.
-    private static func draw(_ frame: CTFrame, text: String, in box: CGRect, font: CTFont, context: CGContext) {
+    /// The frame's lines: the runs in the sample's font as they are, and in the place of each character the font lacks its
+    /// .notdef, as the font draws it (nothing, when it's empty). A run CoreText took from another font (only characters
+    /// that draw nothing, as spaces and joiners, can be: see `sampleText`) isn't drawn: no other font is.
+    private static func draw(_ frame: CTFrame, in box: CGRect, font: CTFont, context: CGContext) {
         let lines = CTFrameGetLines(frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
         CTFrameGetLineOrigins(frame, CFRange(location: 0, length: 0), &origins)
         let name = CTFontCopyPostScriptName(font) as String
         let file = CTFontCopyAttribute(font, kCTFontURLAttribute) as? URL
-        let notdef = Notdef(font)
-        let capHeight = CTFontGetCapHeight(font) > 0 ? CTFontGetCapHeight(font) : CTFontGetSize(font) * 0.7
-        let stroke = max(1, CTFontGetSize(font) / 32)
-        let units = Array(text.utf16)
         for (line, origin) in zip(lines, origins) {
             let start = CGPoint(x: box.minX + origin.x, y: box.minY + origin.y)
             for run in CTLineGetGlyphRuns(line) as! [CTRun] {
                 let attributes = CTRunGetAttributes(run) as NSDictionary
-                let count = CTRunGetGlyphCount(run)
-                var positions = [CGPoint](repeating: .zero, count: count)
-                CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
-                let points = positions.map { CGPoint(x: start.x + $0.x, y: start.y + $0.y) }
-                context.setStrokeColor(red)
-                context.setLineWidth(stroke)
                 if attributes[kCTRunDelegateAttributeName as String] != nil {
-                    for point in points {
-                        if notdef.isEmpty {
-                            context.stroke(CGRect(x: point.x + stroke, y: point.y + stroke / 2, width: notdef.width - 2 * stroke, height: capHeight - stroke))
-                        } else {
-                            var glyph: CGGlyph = 0
-                            var at = point
-                            // CoreGraphics adds the text position to the glyph's.
-                            context.textPosition = .zero
-                            context.setFillColor(ink)
-                            CTFontDrawGlyphs(font, &glyph, &at, 1, context)
-                        }
-                    }
+                    let count = CTRunGetGlyphCount(run)
+                    var positions = [CGPoint](repeating: .zero, count: count)
+                    CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
+                    var glyphs = [CGGlyph](repeating: 0, count: count)
+                    var points = positions.map { CGPoint(x: start.x + $0.x, y: start.y + $0.y) }
+                    // CoreGraphics adds the text position to the glyphs'.
+                    context.textPosition = .zero
+                    context.setFillColor(ink)
+                    CTFontDrawGlyphs(font, &glyphs, &points, count, context)
                     continue
                 }
                 let runFont = attributes[kCTFontAttributeName as String] as! CTFont
-                if CTFontCopyPostScriptName(runFont) as String == name, CTFontCopyAttribute(runFont, kCTFontURLAttribute) as? URL == file {
-                    context.textPosition = start
-                    CTRunDraw(run, context, CFRange(location: 0, length: 0))
-                    continue
-                }
-                var advances = [CGSize](repeating: .zero, count: count)
-                CTRunGetAdvances(run, CFRange(location: 0, length: 0), &advances)
-                var indices = [CFIndex](repeating: 0, count: count)
-                CTRunGetStringIndices(run, CFRange(location: 0, length: 0), &indices)
-                for ((point, advance), index) in zip(zip(points, advances), indices) where advance.width > 2 * stroke {
-                    // A space another font gives is a space: nothing in it to see.
-                    if index < units.count, let scalar = Unicode.Scalar(units[index]), scalar.properties.isWhitespace { continue }
-                    context.stroke(CGRect(x: point.x + stroke, y: point.y + stroke / 2, width: advance.width - 2 * stroke, height: capHeight - stroke))
-                }
+                guard CTFontCopyPostScriptName(runFont) as String == name, CTFontCopyAttribute(runFont, kCTFontURLAttribute) as? URL == file
+                else { continue }
+                context.textPosition = start
+                CTRunDraw(run, context, CFRange(location: 0, length: 0))
             }
         }
     }
 }
 
-/// A font's .notdef (glyph 0): how wide it is, whether it draws anything, and run delegates that make room for it.
+/// A font's .notdef (glyph 0): its width, and run delegates that make room for it in a line.
 struct Notdef {
     let width: CGFloat
     let ascent: CGFloat
     let descent: CGFloat
-    let isEmpty: Bool
 
     init(_ font: CTFont) {
         var glyph: CGGlyph = 0
         var advance = CGSize.zero
         CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
-        let path = CTFontCreatePathForGlyph(font, 0, nil)
-        isEmpty = path?.isEmpty ?? true
-        // A .notdef without width gets half an em, so its box shows.
-        width = advance.width > 0 ? advance.width : CTFontGetSize(font) / 2
+        width = advance.width
         ascent = CTFontGetAscent(font)
         descent = CTFontGetDescent(font)
     }
