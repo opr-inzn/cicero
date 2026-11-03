@@ -68,7 +68,7 @@ public enum FindCommand {
         // is found; else the words are one search, as typed in the search field.
         let queries = options.any ? options.words.map(SearchQuery.init).filter { !$0.isEmpty } : [SearchQuery(options.words.joined(separator: " "))]
         let hasWords = queries.contains { !$0.isEmpty }
-        // Unlike the app's search field (for now), words are looked for in the fonts' licenses and descriptions too,
+        // Unlike the app's search field (for now), words are looked for in the fonts' licenses, descriptions and URLs too,
         // read from the files of the families the options leave.
         let texts = hasWords ? fileTexts(base) : [:]
         func found(_ queries: [SearchQuery], moreTexts: @escaping (Family) -> [String]) -> [Family] {
@@ -81,7 +81,7 @@ public enum FindCommand {
         return sorted(families, by: options.sort)
     }
 
-    /// Each family's licenses, license URLs and descriptions, lowercased, each once.
+    /// Each family's licenses, license URLs, descriptions, and manufacturer and designer URLs, lowercased, each once.
     static func fileTexts(_ families: [Family]) -> [String: [String]] {
         let names = FileNames.read(families.flatMap { $0.faces.map(\.face) })
         var texts: [String: [String]] = [:]
@@ -89,7 +89,7 @@ public enum FindCommand {
             var seen = Set<String>()
             texts[family.id] = family.faces.flatMap { face -> [String] in
                 guard let read = names[face.face.id] else { return [] }
-                return [read.license, read.licenseURL, read.description].compactMap { $0?.lowercased() }
+                return [read.license, read.licenseURL, read.description, read.manufacturerURL, read.designerURL].compactMap { $0?.lowercased() }
             }.filter { seen.insert($0).inserted }
         }
         return texts
