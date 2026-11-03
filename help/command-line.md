@@ -55,7 +55,7 @@ command = "/usr/local/bin/cicero"
 args = ["mcp"]
 ```
 
-**Claude Desktop:** add `cicero` to `mcpServers` in the file `~/Library/Application Support/Claude/claude_desktop_config.json` (in Claude Desktop: **Settings → Developer → Edit Config**), then quit Claude Desktop and open it again:
+**Claude Desktop:** add `cicero` to `mcpServers` in the file `~/Library/Application Support/Claude/claude_desktop_config.json` (in Claude Desktop: **Settings → Developer → Edit config**), then quit Claude Desktop and open it again:
 
 ```json
 {
