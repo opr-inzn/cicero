@@ -46,11 +46,17 @@ if [[ "$BUILT_SDK" != "$(xcrun --sdk macosx --show-sdk-version)" ]]; then
     exit 1
 fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-# A beta (a version like 0.12.0b1) is called Cicero (Beta) in the menu bar, the Dock and the Finder's Get Info. The
-# bundle stays Cicero.app, so updates replace it in place, whichever track it's on.
+# A beta (a version like 0.12.0b1) is called Cicero (Beta) in the menu bar, the Dock and the Finder. The bundle stays
+# Cicero.app, so updates replace it in place, whichever track it's on, and the CLI's link in /usr/local/bin still finds
+# it. The menu bar and About take CFBundleName. The Dock and the Finder show the file's name, unless the bundle has a
+# localized display name (LSHasLocalizedDisplayName) and CFBundleDisplayName is the file's name: then they show the
+# name in InfoPlist.strings.
 if [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)" == *b* ]]; then
     plutil -replace CFBundleName -string "Cicero (Beta)" "$APP/Contents/Info.plist"
-    plutil -replace CFBundleDisplayName -string "Cicero (Beta)" "$APP/Contents/Info.plist"
+    plutil -replace CFBundleDisplayName -string "Cicero" "$APP/Contents/Info.plist"
+    plutil -replace LSHasLocalizedDisplayName -bool true "$APP/Contents/Info.plist"
+    mkdir -p "$APP/Contents/Resources/en.lproj"
+    printf '"CFBundleDisplayName" = "Cicero (Beta)";\n"CFBundleName" = "Cicero (Beta)";\n' >"$APP/Contents/Resources/en.lproj/InfoPlist.strings"
 fi
 # Language data from Hyperglot (see scripts/update-languages.py) and its license.
 cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"
