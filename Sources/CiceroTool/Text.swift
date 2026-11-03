@@ -271,6 +271,11 @@ enum Text {
 
 extension Text {
     /// What a change did, in the words of that change: "Turned on: Inter, Roboto." and what it didn't.
+    /// "1 star", "5 stars".
+    static func stars(_ count: Int) -> String {
+        count == 1 ? "1 star" : "\(count) stars"
+    }
+
     static func changes(_ command: WriteCommand, _ answer: JSON) -> String {
         let (done, notDone): (String, String) = switch command {
         case .activate: ("Turned on", "Nothing to turn on")
@@ -286,6 +291,11 @@ extension Text {
         case .folderRename: ("Renamed the folder to", "The folder is called that already")
         case .folderDelete: ("Deleted", "")
         case .rescan: ("Scanned", "")
+        case .rate(_, 0): ("Took the rating off", "Had no rating")
+        case .rate(_, let stars): ("Rated \(Text.stars(stars))", "Had \(Text.stars(stars)) already")
+        case .note(_, _, true): ("Added to the note of", "Nothing to add to the note of")
+        case .note(_, let text, false) where text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: ("Took the note off", "Had no note")
+        case .note: ("Wrote the note of", "The note is that already")
         }
         var lines: [String] = []
         let changed = strings(answer["changed"]), unchanged = strings(answer["unchanged"])

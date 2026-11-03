@@ -32,6 +32,17 @@ public enum JSON: Equatable, Sendable {
         }
     }
 
+    /// On one line, without spaces, as `cicero mcp` answers: the same fields in the same order as `text`, in fewer
+    /// tokens for the agent.
+    public func compactText() -> String {
+        switch self {
+        case .string, .int, .double, .bool: return text()
+        case .array(let values): return "[" + values.map { $0.compactText() }.joined(separator: ",") + "]"
+        case .object(let object):
+            return "{" + object.fields.map { Self.quoted($0.key) + ":" + $0.value.compactText() }.joined(separator: ",") + "}"
+        }
+    }
+
     static func quoted(_ string: String) -> String {
         var out = "\""
         for scalar in string.unicodeScalars {

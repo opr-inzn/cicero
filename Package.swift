@@ -13,6 +13,8 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
         // The `cicero` command's arguments, help and shell completions.
         .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2"),
+        // `cicero mcp`: the Model Context Protocol server for AI agents.
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk", exact: "0.12.1"),
     ],
     targets: [
         // Fonts, the library, activation, coverage and user data. No UI; tested by CiceroCoreTests.
@@ -23,7 +25,11 @@ let package = Package(
         // named cicero would be the app's on a disk that ignores case; it goes in the bundle as Contents/Helpers/cicero.
         .executableTarget(
             name: "cicero-tool",
-            dependencies: ["CiceroCommands", .product(name: "ArgumentParser", package: "swift-argument-parser")],
+            dependencies: [
+                "CiceroCommands",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "MCP", package: "swift-sdk"),
+            ],
             path: "Sources/CiceroTool"
         ),
         // The app. Everything in it runs on the main actor unless it says otherwise.

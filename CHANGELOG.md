@@ -2,6 +2,11 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## Unreleased
+
+- **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [The Cicero CLI](help/command-line.md#use-it-in-claude-and-codex) says.
+- `cicero rate` and `cicero note` give families ratings and notes.
+
 ## 0.12.0b6
 
 - **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.

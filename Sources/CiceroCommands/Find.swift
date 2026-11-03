@@ -58,7 +58,8 @@ public enum FindCommand {
 
     /// The families that match, in the order asked for.
     public static func families(_ options: FindOptions, in context: LibraryContext) throws -> [Family] {
-        if options.any, options.words.allSatisfy({ SearchQuery($0).isEmpty }) {
+        let words = options.words.map(unquoted)
+        if options.any, words.allSatisfy({ SearchQuery($0).isEmpty }) {
             throw CommandError.invalid("--any goes with words: cicero find trial unlicensed test --any.")
         }
         let tests = try filters(options, in: context)
@@ -66,7 +67,7 @@ public enum FindCommand {
         let tokens = try options.filters.map { try token($0, in: context) }
         // With --any, each word (or phrase in quotes, one argument) is a search of its own, and a family any of them finds
         // is found; else the words are one search, as typed in the search field.
-        let queries = options.any ? options.words.map(SearchQuery.init).filter { !$0.isEmpty } : [SearchQuery(options.words.joined(separator: " "))]
+        let queries = options.any ? words.map(SearchQuery.init).filter { !$0.isEmpty } : [SearchQuery(words.joined(separator: " "))]
         let hasWords = queries.contains { !$0.isEmpty }
         // Unlike the app's search field (for now), words are looked for in the fonts' licenses, descriptions and URLs too,
         // read from the files of the families the options leave.
@@ -79,6 +80,18 @@ public enum FindCommand {
         // Nothing with a word that begins with what's typed: a piece of a longer word, then, as in the app ("vetica").
         if families.isEmpty, hasWords { families = found(queries.map(\.anywhereInNames), moreTexts: { _ in [] }) }
         return sorted(families, by: options.sort)
+    }
+
+    /// A word with quote marks at both ends, without them. In Terminal the shell takes them away; an agent that calls the
+    /// MCP tool may type them too ("\"Maximilian Inzinger\""), and no font has them in its name. One in the middle stays
+    /// (Sukey's), and so does one at one end only.
+    static func unquoted(_ word: String) -> String {
+        let pairs: [(Character, Character)] = [("\"", "\""), ("'", "'"), ("“", "”"), ("„", "“"), ("‘", "’"), ("«", "»"), ("»", "«")]
+        var word = word.trimmingCharacters(in: .whitespaces)
+        while word.count >= 2, let first = word.first, let last = word.last, pairs.contains(where: { $0 == (first, last) }) {
+            word = String(word.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+        return word
     }
 
     /// Each family's licenses, license URLs, descriptions, and manufacturer and designer URLs, lowercased, each once.
