@@ -152,6 +152,8 @@ struct WhatsNewWindow: View {
     private static let width: CGFloat = 560
     /// Below the title bar.
     private static let maximumHeight: CGFloat = 600
+    /// Between one version's notes and the next: a line of the notes' text, as tall as AppKit sets it.
+    private static let lineHeight = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .title3)).rounded()
 
     var body: some View {
         ScrollView {
@@ -159,7 +161,9 @@ struct WhatsNewWindow: View {
                 Text("What’s New in Cicero")
                     .font(.system(size: 28, weight: .semibold))
                     .frame(maxWidth: .infinity)
-                ForEach(WhatsNew.shared.notes) { VersionNotes(notes: $0) }
+                VStack(alignment: .leading, spacing: Self.lineHeight) {
+                    ForEach(WhatsNew.shared.notes) { VersionNotes(notes: $0) }
+                }
             }
             .padding(.horizontal, 44)
             // Under the title bar, which has room of its own.
