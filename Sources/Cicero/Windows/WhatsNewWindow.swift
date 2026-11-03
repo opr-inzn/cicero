@@ -12,8 +12,11 @@ struct ReleaseNotes: Identifiable {
     var items: [AttributedString] = []
     var id: String { version }
 
-    /// Where the links in CHANGELOG.md, which are relative to it, point from the app.
-    private static let base = URL(string: "https://github.com/opr-inzn/cicero/blob/main/")!
+    /// Where the links in CHANGELOG.md, which are relative to it, point from the app: the files as they were in the
+    /// version's release, as on its GitHub release page. Not main, where a page a beta brings isn't yet.
+    private static func base(_ version: String) -> URL? {
+        URL(string: "https://github.com/opr-inzn/cicero/blob/v\(version)/")
+    }
 
     /// Every version's notes, newest first, as in the file. Headings that aren't a version, like `## Unreleased`, are
     /// left out with what's under them.
@@ -27,7 +30,7 @@ struct ReleaseNotes: Identifiable {
         func flush() {
             defer { lines = [] }
             guard current != nil, !lines.isEmpty else { return }
-            let text = inline(lines.joined(separator: " "))
+            let text = inline(lines.joined(separator: " "), base: base(current?.version ?? ""))
             if isItem { current!.items.append(text) } else { current!.paragraphs.append(text) }
         }
         for line in text.components(separatedBy: .newlines) {
@@ -57,7 +60,7 @@ struct ReleaseNotes: Identifiable {
         return versions
     }
 
-    private static func inline(_ markdown: String) -> AttributedString {
+    private static func inline(_ markdown: String, base: URL?) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         guard var text = try? AttributedString(markdown: markdown, options: options, baseURL: base) else {
             return AttributedString(markdown)
