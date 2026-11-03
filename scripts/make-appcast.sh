@@ -33,6 +33,9 @@ BUILT=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" build/Cicero.app/Cont
 
 NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / { exit } found' CHANGELOG.md)
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }
+# Sparkle shows the notes with no address to start from, so a link relative to CHANGELOG.md would go nowhere: it points
+# to the file in this version's tag on GitHub, as the release page's links do. Full addresses (with ":") stay.
+NOTES=$(sed -E 's#\]\(([^):/\#][^):]*)\)#](https://github.com/opr-inzn/cicero/blob/v'"$VERSION"'/\1)#g' <<<"$NOTES")
 
 # Prints sparkle:edSignature="…" length="…" for the enclosure. The first time, macOS may ask to let
 # sign_update use the key; choose Always Allow.
