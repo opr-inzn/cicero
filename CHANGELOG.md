@@ -2,6 +2,11 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## 0.12.0b8
+
+- A beta is called **Cicero (Beta)** in the Dock and the Finder.
+- Links in **What’s New** and in the update window open their page.
+
 ## 0.12.0b7
 
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](help/command-line.md#use-it-in-claude-and-codex) says.
