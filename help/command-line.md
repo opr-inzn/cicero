@@ -53,6 +53,8 @@ Names don’t need capitals: `cicero status inter` works. When a name isn’t qu
 
 Words are found where a word begins, in every field: each word must be found in one of them. With words, `find` also reads the license, license URL and description (OpenType name IDs 13, 14 and 10) of every style from its font file, so it takes longer: about a second for 7,000 styles.
 
+Add `--any` to find the families that have any of the words, not all of them. Each word is a search of its own; words in quotes are one search, and must all be found, as without `--any`. For example, foundries call their trial fonts “Trial”, “Unlicensed” or “Test”: `cicero find trial unlicensed test --any` finds them all.
+
 Add any of these to `cicero find`, with or without words:
 
 | Option | Families |

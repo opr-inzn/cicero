@@ -14,6 +14,8 @@ public struct FindOptions: Sendable {
     }
 
     public var words: [String] = []
+    /// Families any of `words` finds, each word (or quoted phrase) a search of its own; else all of them, together.
+    public var any = false
     public var foundry: String?
     public var classification: String?
     /// "2019", "2015..2020", "2015..", "..2020".
@@ -56,17 +58,27 @@ public enum FindCommand {
 
     /// The families that match, in the order asked for.
     public static func families(_ options: FindOptions, in context: LibraryContext) throws -> [Family] {
+        if options.any, options.words.allSatisfy({ SearchQuery($0).isEmpty }) {
+            throw CommandError.invalid("--any goes with words: cicero find trial unlicensed test --any.")
+        }
         let tests = try filters(options, in: context)
         let base = context.listedFamilies.filter { family in tests.allSatisfy { $0(family) } }
         let tokens = try options.filters.map { try token($0, in: context) }
-        let query = SearchQuery(options.words.joined(separator: " "))
+        // With --any, each word (or phrase in quotes, one argument) is a search of its own, and a family any of them finds
+        // is found; else the words are one search, as typed in the search field.
+        let queries = options.any ? options.words.map(SearchQuery.init).filter { !$0.isEmpty } : [SearchQuery(options.words.joined(separator: " "))]
+        let hasWords = queries.contains { !$0.isEmpty }
         // Unlike the app's search field (for now), words are looked for in the fonts' licenses and descriptions too,
         // read from the files of the families the options leave.
-        let texts = query.isEmpty ? [:] : fileTexts(base)
-        var found = base.filter(context.filters.searchMatcher(query, tokens: tokens, moreTexts: { texts[$0.id] ?? [] }))
+        let texts = hasWords ? fileTexts(base) : [:]
+        func found(_ queries: [SearchQuery], moreTexts: @escaping (Family) -> [String]) -> [Family] {
+            let matchers = queries.map { context.filters.searchMatcher($0, tokens: tokens, moreTexts: moreTexts) }
+            return base.filter { family in matchers.contains { $0(family) } }
+        }
+        var families = found(queries, moreTexts: { texts[$0.id] ?? [] })
         // Nothing with a word that begins with what's typed: a piece of a longer word, then, as in the app ("vetica").
-        if found.isEmpty, !query.isEmpty { found = base.filter(context.filters.searchMatcher(query.anywhereInNames, tokens: tokens)) }
-        return sorted(found, by: options.sort)
+        if families.isEmpty, hasWords { families = found(queries.map(\.anywhereInNames), moreTexts: { _ in [] }) }
+        return sorted(families, by: options.sort)
     }
 
     /// Each family's licenses, license URLs and descriptions, lowercased, each once.

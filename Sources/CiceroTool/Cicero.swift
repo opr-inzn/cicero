@@ -257,13 +257,18 @@ struct Find: AsyncParsableCommand {
     @Argument(help: "Words to look for.")
     var words: [String] = []
 
+    @Flag(help: "Families with any of the words, not all of them: cicero find trial unlicensed test --any. Words in quotes must all be found, as without --any.")
+    var any = false
+
     @OptionGroup var find: FindArguments
     @OptionGroup(title: "Hidden fonts") var hidden: ShownOptions
     @OptionGroup var common: CommonOptions
 
     func run() async throws {
         try await answer(common, text: Text.families) {
-            try FindCommand.run(find.options(words: words), in: try await load(common, hidden))
+            var options = find.options(words: words)
+            options.any = any
+            return try FindCommand.run(options, in: try await load(common, hidden))
         }
     }
 }
