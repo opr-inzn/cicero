@@ -193,20 +193,23 @@ private struct VersionNotes: View {
     let notes: ReleaseNotes
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // The notes close under their version, further from each other.
+        VStack(alignment: .leading, spacing: 4) {
             Text("Cicero \(notes.version)")
                 .font(.title2.bold())
                 .foregroundStyle(.tint)
-            ForEach(notes.paragraphs.indices, id: \.self) { Text(notes.paragraphs[$0]) }
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(notes.items.indices, id: \.self) { index in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Circle()
-                            .fill(.tint)
-                            .frame(width: 7, height: 7)
-                            // Its middle halfway up a capital letter.
-                            .alignmentGuide(.firstTextBaseline) { $0.height / 2 + 5 }
-                        Text(notes.items[index])
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(notes.paragraphs.indices, id: \.self) { Text(notes.paragraphs[$0]) }
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(notes.items.indices, id: \.self) { index in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Circle()
+                                .fill(.tint)
+                                .frame(width: 7, height: 7)
+                                // Its middle halfway up a capital letter.
+                                .alignmentGuide(.firstTextBaseline) { $0.height / 2 + 5 }
+                            Text(notes.items[index])
+                        }
                     }
                 }
             }
