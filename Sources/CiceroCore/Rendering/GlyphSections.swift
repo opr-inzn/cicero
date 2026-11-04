@@ -125,9 +125,13 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
         // Every script's currency signs together, like ฿ and ؋, and the florin ƒ, a letter to Unicode.
         if category == .currencySymbol || value == 0x192 { return .currency }
-        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres, ℝ and the micro
-        // sign µ: with ℮, not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators.
-        if block == "Letterlike Symbols" && properties.isAlphabetic || value == 0xB5 { return .punctuationAndSymbols }
+        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and the micro
+        // sign µ: with ℮, not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators,
+        // and those of Letterlike Symbols Unicode marks as mathematical, like ℍ, ℝ, ℵ and ⅆ, but the signs `signs` lists,
+        // like ℓ.
+        if block == "Letterlike Symbols" && properties.isAlphabetic || value == 0xB5 {
+            return properties.isMath && GlyphSection.isListedSign(value) == false ? .mathematicalOperators : .punctuationAndSymbols
+        }
         if block == "Mathematical Alphanumeric Symbols" { return .mathematicalOperators }
         // Numbers in circles, like ①, ❶ and ㉑, and the other numbers Unicode has for numbering, like ⑴, ⒈ and 🄁, the Chinese
         // ones too, like ㊀ and ㈠, by their names, whichever block or script they're in. The letters in circles, like Ⓐ or
@@ -181,10 +185,20 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if Self.isRaisedOrLowered(name) { return .superscripts }
         if name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .ordinals }
         if name.contains("FRACTION") { return .fractions }
-        // Arrows, but not the combining ones, which are marks.
-        if name.contains("ARROW") && !isMark { return .arrows }
+        // Arrows, and the harpoons and the rest of the arrow blocks, like ⇌ and ⥋, but not the combining ones, which are marks.
+        if (name.contains("ARROW") || name.contains("HARPOON") || block == "Arrows" || block.hasPrefix("Supplemental Arrows")) && !isMark {
+            return .arrows
+        }
         // Ⅰ to Ⅿ and ⅰ to ⅿ, and the old forms, like ↀ; Unicode has them as Latin letters or numbers.
         if name.contains("ROMAN NUMERAL") { return .romanNumerals }
+        // Pictures, like ABC Stefan's faces, hearts and food: all of Miscellaneous Symbols (★ ♥ ☞), Dingbats (✓ ✉) and the
+        // emoji and pictograph blocks, and the emoji other blocks have, like ⌚ ⏰ ⭐, Miscellaneous Technical's all (⌨ ⏸);
+        // but circled figures and arrows (❶, ➔), which have groups of their own, and the geometric shapes, which go with
+        // the symbols, as do the letters and signs Unicode counts as emoji too, like ©, ™, Ⓜ and 🅰.
+        if Self.pictureBlocks.contains(block) || category == .otherSymbol && !block.hasPrefix("Geometric Shapes")
+            && (properties.isEmojiPresentation || properties.isEmoji && block == "Miscellaneous Technical") {
+            return .graphical
+        }
         // Latin letters in other blocks too, like ə in IPA Extensions or a fullwidth Ａ.
         let latin = ownScript == "Latin" || block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
@@ -211,10 +225,10 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .nonspacingMark, .spacingMark, .enclosingMark:
             return .combiningMarks
         case .modifierSymbol:
-            // Accents set on their own, like ´, ˘ and `; ^ with the operators, as Glyphs has it, and the skin tones of
-            // emoji with the symbols.
+            // Accents set on their own, like ´, ˘ and `; ^ with the operators, as Glyphs has it. (The skin tones of emoji
+            // are in a picture block, so Graphical.)
             if value == 0x5E { return .mathematicalOperators }
-            return name.hasPrefix("EMOJI MODIFIER") ? .punctuationAndSymbols : .diacriticalMarks
+            return .diacriticalMarks
         // Accents and tone letters that are letters to Unicode, like ʹ and ꜗ; others no script has, like the kana
         // repeat mark 〱, with the symbols.
         case .modifierLetter:
@@ -251,6 +265,13 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     static let enclosureKinds = [
         "CIRCLED", "NEGATIVE CIRCLED", "DOUBLE CIRCLED", "CIRCLED SANS-SERIF", "NEGATIVE CIRCLED SANS-SERIF", "PARENTHESIZED",
         "FULL STOP", "COMMA", "CIRCLED ON BLACK SQUARE", "CIRCLED IDEOGRAPH", "PARENTHESIZED IDEOGRAPH",
+    ]
+
+    /// The blocks of pictures, all of whose characters go in Graphical.
+    static let pictureBlocks: Set<String> = [
+        "Miscellaneous Symbols", "Dingbats", "Mahjong Tiles", "Domino Tiles", "Playing Cards",
+        "Miscellaneous Symbols and Pictographs", "Emoticons", "Ornamental Dingbats", "Transport and Map Symbols",
+        "Supplemental Symbols and Pictographs", "Chess Symbols", "Symbols and Pictographs Extended-A",
     ]
 
     /// Whether Unicode names it a superscript or subscript, like ᵝ MODIFIER LETTER SMALL BETA or ₐ.
@@ -360,6 +381,9 @@ public struct GlyphSection: Identifiable, Sendable {
                 buckets[group] = ordered(values, by: Self.signOrder, <)
             case .greek, .script("Cyrillic"):
                 buckets[group] = ordered(values, by: { (Self.glyphsRanks[$0] ?? .max, $0) }, <)
+            case .graphical:
+                // Unicode's pictures, then the private-use characters, like a foundry's logo.
+                buckets[group] = ordered(values, by: { (Unicode.Scalar($0)?.properties.generalCategory == .privateUse ? 1 : 0, $0) }, <)
             default:
                 if values.contains(where: { privateUse.characters[$0] != nil }) { buckets[group] = ordered(values, by: { $0 }, <) }
             }
@@ -467,12 +491,18 @@ public struct GlyphSection: Identifiable, Sendable {
         for (index, scalar) in run.1.unicodeScalars.enumerated() { places[scalar.value] = (run.0.rawValue, index) }
     }
 
+    /// Whether `signs` lists it, like ℓ among the symbols.
+    static func isListedSign(_ value: UInt32) -> Bool { signPlaces[value] != nil }
+
     /// The kind of a sign `signs` doesn't have, by its Unicode category: an interrobang with the punctuation, a fullwidth
     /// bracket with the brackets, ∀ with the operators.
     private static func signKind(of value: UInt32) -> SignKind {
         let block = Self.block(of: value) ?? ""
         if block.hasPrefix("Geometric Shapes") { return .geometry }
-        if block == "Mathematical Alphanumeric Symbols" { return .math }
+        // Mathematics' letters, like 𝐀 and ℍ, after the operators.
+        if block == "Mathematical Alphanumeric Symbols" || block == "Letterlike Symbols" && Unicode.Scalar(value)?.properties.isMath == true {
+            return .math
+        }
         switch Unicode.Scalar(value)?.properties.generalCategory {
         case .otherPunctuation, .connectorPunctuation: return .punctuation
         case .dashPunctuation: return .dash
