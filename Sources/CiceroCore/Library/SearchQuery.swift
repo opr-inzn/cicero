@@ -54,7 +54,7 @@ public struct SearchQuery: Sendable {
         guard !isEmpty else { return true }
         func found(_ run: Run) -> Bool {
             terms.contains { $0.hasPrefix(run.text) }
-                || names.contains { isAnywhereInNames ? $0.contains(run.text) : Self.beginsWord(run.text, in: $0) }
+                || names.contains { isAnywhereInNames ? Self.contains(run.text, in: $0) : Self.beginsWord(run.text, in: $0) }
                 || !run.isKeyword && texts.contains { Self.beginsWord(run.text, in: $0) }
         }
         // covered[i]: the words before the i-th split into runs that are found.
@@ -79,6 +79,7 @@ public struct SearchQuery: Sendable {
     /// Whether `run` is in `text` where a word begins: at its start, or after a character that's neither a letter nor
     /// a digit. A run that doesn't begin with a letter or digit itself, like "-bold", can be anywhere.
     static func beginsWord(_ run: String, in text: String) -> Bool {
+        if let found = asciiFind(run, in: text, wordStart: true) { return found }
         guard let first = run.first, first.isLetter || first.isNumber else { return text.contains(run) }
         var rest = text[...]
         while let range = rest.range(of: run) {
@@ -88,6 +89,38 @@ public struct SearchQuery: Sendable {
             rest = text[text.index(after: range.lowerBound)...]
         }
         return false
+    }
+
+    /// Whether `run` is anywhere in `text`.
+    static func contains(_ run: String, in text: String) -> Bool {
+        asciiFind(run, in: text, wordStart: false) ?? text.contains(run)
+    }
+
+    /// `beginsWord` (with `wordStart`) or `contains` for a run and a text that are both ASCII, as most fonts' names are,
+    /// byte by byte; nil for any other, which the slower search by characters takes. Foundation's `range(of:)` was 85 %
+    /// of a search's time at 20,000 families. In ASCII each byte is a character, and the letters and digits are A–Z, a–z
+    /// and 0–9, so the answer is the same; a byte over 127 could be part of a character the run's last letter is only the
+    /// start of (an e with a combining accent), so such text isn't searched here.
+    private static func asciiFind(_ run: String, in text: String, wordStart: Bool) -> Bool? {
+        var run = run, text = text
+        return run.withUTF8 { run in
+            text.withUTF8 { text -> Bool? in
+                guard let first = run.first, !run.contains(where: { $0 > 127 }), !text.contains(where: { $0 > 127 }) else { return nil }
+                guard run.count <= text.count else { return false }
+                // A run that doesn't begin with a letter or digit can be anywhere, as in `beginsWord`.
+                let atWordStart = wordStart && isASCIILetterOrDigit(first)
+                for start in 0...(text.count - run.count) where text[start] == first {
+                    if atWordStart, start > 0, isASCIILetterOrDigit(text[start - 1]) { continue }
+                    if memcmp(run.baseAddress! + 1, text.baseAddress! + start + 1, run.count - 1) == 0 { return true }
+                }
+                return false
+            }
+        }
+    }
+
+    private static func isASCIILetterOrDigit(_ byte: UInt8) -> Bool {
+        let lower = byte | 0x20
+        return (0x30...0x39).contains(byte) || (0x61...0x7A).contains(lower)
     }
 
     // MARK: Words for kinds of family
