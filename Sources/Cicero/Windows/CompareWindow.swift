@@ -315,9 +315,9 @@ private struct StackedLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        // The first row's baseline and every row's start where Overlay has them, so switching leaves the first font
-        // where it is. Its own ascent left the room it keeps above its glyphs for accents: going to Overlay moved
-        // it up, by 20 pt at 288 pt, and right, by the width of Overlay's line names.
+        // The first row's baseline where Overlay has its, so switching leaves the first font at its height. Its own
+        // ascent left the room it keeps above its glyphs for accents: going to Overlay moved it up, by 20 pt at 288 pt.
+        // The rows still start at the margin, not past a column as wide as Overlay's line names.
         let frame = CompareFrame(lines: samples.map(\.line), guides: samples.map(\.guides), tints: samples.map(\.tint),
                                  scale: displayScale)
         let overhang = samples.map(\.line.overhang).max() ?? 0
@@ -334,16 +334,15 @@ private struct StackedLayout: View {
     private func row(_ sample: CompareSample, frame: CompareFrame, overhang: CGFloat, width: CGFloat) -> some View {
         let ascent = sample.id == samples.first?.id ? frame.ascent : sample.line.ascent
         return VStack(alignment: .leading, spacing: 6) {
-            // Glyphs reaching left of the start go into the room left of it, so the lines start level with the names.
+            // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.ink.resolve(in: context.environment).cgColor
                 context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
             }
             .frame(width: overhang + width, height: ascent + sample.line.descent)
-            .padding(.leading, frame.origin - overhang)
+            .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
-                .padding(.leading, frame.origin)
         }
         .contentShape(.rect)
     }

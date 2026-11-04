@@ -3,10 +3,9 @@ import CiceroCore
 #endif
 import SwiftUI
 
-/// Where Compare puts its samples, the same in Stacked and Overlay, so that switching between them leaves the first
-/// font where it is, and so that changing the order moves no font in Overlay: the baseline (Overlay's, and Stacked's
-/// first row's) right under the tallest of what Overlay draws, and the lines starting right of the column for
-/// Overlay's line names, which Stacked keeps empty.
+/// Where Overlay puts its samples, and the baseline Stacked gives its first row too, so that switching between them
+/// leaves the first font at its height, and so that changing the order moves no font in Overlay: right under the
+/// tallest of what Overlay draws. The lines start right of the column for Overlay's line names.
 struct CompareFrame {
     let guides: CompareGuides
     /// From the top to the baseline: right under the tallest of what's drawn, any font's glyphs, the ascender lines a
@@ -27,7 +26,7 @@ struct CompareFrame {
     /// Overlay's samples', from `origin`, with a point to spare.
     let width: CGFloat
 
-    /// Where the lines start: Stacked's, and Overlay's that start at 0. The legend and the captions start here too.
+    /// Where Overlay's lines that start at 0 start, and its legend.
     var origin: CGFloat { left + overhang }
 
     init(lines: [TextLine], guides: [GuideHeights], tints: [Color], scale: CGFloat) {
