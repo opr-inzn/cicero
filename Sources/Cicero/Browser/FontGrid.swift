@@ -152,10 +152,18 @@ struct FontGrid: View {
             shown = Shown(text: text, ratio: SampleWidths.shared.listRatio)
             return
         }
-        let samples = model.library.families.filter(model.data.lists).map { family in
-            let (style, weight) = family.previewStyle(for: SearchQuery(""), weight: preview.weight)
-            return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: model.variations(for: family, face: style.id), features: [])
-        }
+        // Made off the main thread: at 20,000 families, 44 ms of it in the launch's first turn of work, as the window first
+        // shows. The Info panel's axes as `AppModel.variations(for:face:)` gives them.
+        let families = model.library.families, data = model.data, weight = preview.weight
+        let axes = model.familyAxes.mapValues { (face: $0.face, values: $0.values) }
+        let samples = await Task.detached(priority: .userInitiated) {
+            families.filter(data.lists).map { family in
+                let (style, weight) = family.previewStyle(for: SearchQuery(""), weight: weight)
+                let variations = axes[family.id].flatMap { $0.face == style.id ? $0.values : nil } ?? [:]
+                return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: variations, features: [])
+            }
+        }.value
+        guard !Task.isCancelled else { return }
         // Should that take a while, as when the files are first read, the text in the meantime with the width as it is.
         let meanwhile = Task {
             try? await Task.sleep(for: .milliseconds(300))
