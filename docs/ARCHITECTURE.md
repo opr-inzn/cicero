@@ -228,7 +228,14 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   stuttered. `GlyphGridRow` draws a row's cells in one `Canvas`, about 2 ms, characters on the pixels
   `Text` put them on (ascent and descent to the nearest point, no leading, the advance to the pixel above,
   cells shared out as a stack does); an AppKit view over the row tells clicks, drags, right-clicks and
-  tooltips apart by where they are, and `accessibilityRepresentation` gives VoiceOver a button per cell.
+  tooltips apart by where they are, and gives VoiceOver a button per cell.
+- No SwiftUI accessibility elements per cell in a lazy stack's rows. The glyph rows' cells were a SwiftUI
+  `Button` each in the row's `accessibilityRepresentation`; SwiftUI built them, some 600 elements a row,
+  whenever an accessibility client (VoiceOver, a window manager, an automation tool) read the page, and
+  kept them for every row the stack had made: Arial Unicode MS's page went from 245 MB to 1.4 GB, each
+  jump down it 1.3 s. `GridRowEventView` gives an `NSAccessibilityElement` per cell instead, made when
+  a client asks, kept until the cells change, asking the row for its frame: 419 MB, 0.3 s
+  (Tests/E2E/glyph-accessibility).
 - No GeometryReader over the rows of a lazy stack. One over each glyph row, measuring it for the popover's
   anchor, left rows in the middle of the font page undrawn on macOS 15 (on screen, with nothing in them);
   the click gives the clicked cell's frame instead, from the row's AppKit view (`cellPopover`).
