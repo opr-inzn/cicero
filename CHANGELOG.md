@@ -2,6 +2,14 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## 0.12.0b9
+
+- **Glyphs** shows every glyph, with no limits, and the alternates that two or three features draw together, like `four.osf.ss01`. Figures are grouped by style, each alternate after its figure.
+- Compare’s first row starts at the letters’ ascenders, so there’s less empty space above it at large sizes.
+- Cicero uses much less memory on a first launch and in a long session with many fonts.
+- Your Mac and Cicero stay awake while an import copies fonts.
+- **Tab completion** for the Cicero CLI works in bash and fish too. Choose **Cicero → Install Cicero CLI** once more to add it.
+
 ## 0.12.0b8
 
 - A beta is called **Cicero (Beta)** in the Dock and the Finder.
