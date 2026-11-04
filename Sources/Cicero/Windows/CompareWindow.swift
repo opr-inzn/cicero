@@ -297,13 +297,6 @@ private struct CompareSample: Identifiable {
         tintIndex = entry.tint % Self.tints.count
     }
 
-    /// A baseline this far down, moved down to a whole device pixel. CoreText moves text between pixels to one of them
-    /// itself, up or down depending on where it draws, so lines measured from the baseline stood a pixel off the glyphs.
-    static func onPixel(_ ascent: CGFloat, scale: CGFloat) -> CGFloat {
-        let scale = max(scale, 1)
-        return (ascent * scale).rounded(.up) / scale
-    }
-
     /// The style chosen for the family, if one was.
     static func chosenStyle(of entry: CompareEntry, in family: Family) -> LibraryFace? {
         entry.style.flatMap { style in family.faces.first { $0.id == style } }
@@ -318,31 +311,39 @@ private struct CompareSample: Identifiable {
 /// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
 /// fonts that reach further join or leave below it. Dragging a row changes the order.
 private struct StackedLayout: View {
+    @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
 
     var body: some View {
+        // The first row's baseline and every row's start where Overlay has them, so switching leaves the first font
+        // where it is. Its own ascent left the room it keeps above its glyphs for accents: going to Overlay moved
+        // it up, by 20 pt at 288 pt, and right, by the width of Overlay's line names.
+        let frame = CompareFrame(lines: samples.map(\.line), guides: samples.map(\.guides), tints: samples.map(\.tint),
+                                 scale: displayScale)
         let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
-            row(sample, overhang: overhang, width: width)
+            row(sample, frame: frame, overhang: overhang, width: width)
         } lifted: { sample in
             // Opaque, so the rows it passes don't show through.
-            row(sample, overhang: overhang, width: width)
+            row(sample, frame: frame, overhang: overhang, width: width)
                 .background { Color.canvas.padding(-8) }
         }
     }
 
-    private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
+    private func row(_ sample: CompareSample, frame: CompareFrame, overhang: CGFloat, width: CGFloat) -> some View {
+        let ascent = sample.id == samples.first?.id ? frame.ascent : sample.line.ascent
+        return VStack(alignment: .leading, spacing: 6) {
+            // Glyphs reaching left of the start go into the room left of it, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.ink.resolve(in: context.environment).cgColor
-                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: sample.line.ascent), color: color) }
+                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
             }
-            .frame(width: overhang + width, height: sample.line.ascent + sample.line.descent)
-            .padding(.leading, -overhang)
+            .frame(width: overhang + width, height: ascent + sample.line.descent)
+            .padding(.leading, frame.origin - overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
+                .padding(.leading, frame.origin)
         }
         .contentShape(.rect)
     }
@@ -350,49 +351,32 @@ private struct StackedLayout: View {
 
 /// Every sample over the others, each in its tint, on a shared baseline, their first letters' first stems on each other
 /// (see `FirstStem`), over lines for the baseline and each font's cap height, x-height, ascenders and descenders, named on the
-/// left, with their heights in the fonts' units on the right (`CompareGuides`). Dragging a chip in the legend below
-/// changes the order; its dot changes the colour.
+/// left, with their heights in the fonts' units on the right (`CompareGuides`), all where `CompareFrame` puts them.
+/// Dragging a chip in the legend below changes the order; its dot changes the colour.
 private struct OverlayLayout: View {
     @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
 
     var body: some View {
-        let guides = CompareGuides(samples.map { ($0.guides, $0.tint) })
-        // The baseline right under the tallest of what's drawn: any font's glyphs, the ascender lines a point above
-        // the ascenders, and the labels. Not under the first font's ascent, which kept it where Stacked has its first
-        // row's (from the version after 0.11.0 up to 0.12.0b8): fonts keep different room above their glyphs for
-        // accents, so changing which font came first moved them all up or down, by 16 pt at 288 pt.
+        let frame = CompareFrame(lines: samples.map(\.line), guides: samples.map(\.guides), tints: samples.map(\.tint),
+                                 scale: displayScale)
         let scale = max(displayScale, 1)
-        let ascent = CompareSample.onPixel(max(samples.map(\.line.inkAscent).max() ?? 0,
-                                               (samples.compactMap(\.guides.ascender).max() ?? 0).rounded(.up) + 1,
-                                               guides.labelsAbove.rounded(.up)), scale: scale)
-        // A point more for the lowest descender line, under its depth, and room for the labels.
-        let descent = max(samples.map(\.line.descent).max() ?? 0, (samples.compactMap(\.guides.descender).max() ?? 0).rounded(.up) + 1,
-                          guides.labelsBelow.rounded(.up))
-        // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
-        // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.
-        let stems = samples.map { FirstStem.x(in: $0.line.line) ?? 0 }
-        let starts = stems.map { (stems.max() ?? 0) - $0 }
-        // Room for glyphs reaching left of that, between the names and the samples.
-        let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
-        let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
-        // The lines start right of the names.
-        let left = guides.nameWidth + CompareGuides.gap
         VStack(alignment: .leading, spacing: 16) {
             Canvas { context, _ in
                 let environment = context.environment
                 context.withCGContext { cg in
-                    guides.draw(in: cg, baselineAt: ascent, from: left, width: overhang + width, scale: scale, environment: environment)
+                    frame.guides.draw(in: cg, baselineAt: frame.ascent, from: frame.left, width: frame.overhang + frame.width,
+                                      scale: scale, environment: environment)
                     // Over each other as inks on paper, or as lights in Dark Mode, so every font shows through those
                     // drawn over it. Simply laid over each other at 70 %, a few stems hid the serifs of a font below.
                     cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
-                    for (sample, start) in zip(samples, starts) {
+                    for (sample, start) in zip(samples, frame.starts) {
                         let color = sample.tint.opacity(0.7).resolve(in: environment).cgColor
-                        sample.line.draw(in: cg, baselineAt: CGPoint(x: left + overhang + start, y: ascent), color: color)
+                        sample.line.draw(in: cg, baselineAt: CGPoint(x: frame.origin + start, y: frame.ascent), color: color)
                     }
                 }
             }
-            .frame(width: left + overhang + width + CompareGuides.gap + guides.valueWidth, height: ascent + descent)
+            .frame(width: frame.origin + frame.width + CompareGuides.gap + frame.guides.valueWidth, height: frame.ascent + frame.descent)
             // The legend starts level with the samples.
             Reorderable(samples: samples, layout: AnyLayout(FlowLayout(spacing: 8, lineSpacing: 8)), axis: .horizontal) { sample in
                 chip(sample)
@@ -401,8 +385,8 @@ private struct OverlayLayout: View {
                 chip(sample)
                     .background(Color.canvas, in: .capsule)
             }
-            .frame(width: max(width, 480), alignment: .leading)
-            .padding(.leading, left + overhang)
+            .frame(width: max(frame.width, 480), alignment: .leading)
+            .padding(.leading, frame.origin)
         }
     }
 
