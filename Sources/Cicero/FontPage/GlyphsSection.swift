@@ -154,11 +154,11 @@ struct GlyphsSection: View {
     }
 
     /// "124 characters", and the ligatures and alternates when there are any:
-    /// "124 characters · 3 ligatures · 40 alternates".
+    /// "124 characters · 3 ligatures · 40 alternates", figures in another style, like old-style ones, not among them.
     private var count: String {
         let characters = characterCount
         let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
-        let alternateCount = alternates.values.reduce(0) { $0 + $1.count }
+        let alternateCount = alternates.values.reduce(0) { $0 + $1.filter { !$0.isFigureStyle }.count }
         var parts = [characters == 1 ? "1 character" : "\(characters.formatted()) characters"]
         if ligatureCount > 0 { parts.append(ligatureCount == 1 ? "1 ligature" : "\(ligatureCount.formatted()) ligatures") }
         if alternateCount > 0 { parts.append(alternateCount == 1 ? "1 alternate" : "\(alternateCount.formatted()) alternates") }
@@ -387,7 +387,7 @@ struct GlyphsSection: View {
             return GridCell(content: .glyph(glyph.glyph), isAlternate: cell.isAlternate,
                             label: "\(Self.text(glyph.character)), \(glyph.featureNames.listed())")
         case .alternate(let alternate):
-            return GridCell(content: .glyph(alternate.glyph), isAlternate: true,
+            return GridCell(content: .glyph(alternate.glyph), isAlternate: cell.isAlternate,
                             label: "\(Self.text(alternate.character)), \(alternate.listedNames)")
         }
     }

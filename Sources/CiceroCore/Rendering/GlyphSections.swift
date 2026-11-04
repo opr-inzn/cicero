@@ -16,6 +16,9 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
     /// in the Unicode blocks for it.
     case script(String)
+    /// A stylistic set that draws most of a font's characters anew, like ABC Repro's ss15, "Smallsize Centered": its
+    /// glyphs, by its tag and the font's name for it (see `FeatureGlyph.bigSets`).
+    case stylisticSet(tag: String, name: String)
     case graphical, diacriticalMarks, combiningMarks
 
     public static let greek = GlyphGroup.script("Greek")
@@ -48,6 +51,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .caseSensitiveForms: "Case-Sensitive Forms"
         case .arrows: "Arrows"
         case .script(let name): name
+        case .stylisticSet(_, let name): name
         case .localizedForms: "Localized Forms"
         case .initialForms: "Initial Forms"
         case .medialForms: "Medial Forms"
@@ -64,6 +68,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if case .script(let a) = left, case .script(let b) = right {
             return (UnicodeBlock.firstCodePoint(of: a), a) < (UnicodeBlock.firstCodePoint(of: b), b)
         }
+        if case .stylisticSet(let a, _) = left, case .stylisticSet(let b, _) = right { return a < b }
         return left.rank < right.rank
     }
 
@@ -80,25 +85,26 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .medialForms: 8
         case .finalForms: 9
         case .isolatedForms: 10
-        case .proportionalFigures: 11
-        case .tabularFigures: 12
-        case .circledFigures: 13
-        case .romanNumerals: 14
-        case .punctuationAndSymbols: 15
-        case .currency: 16
-        case .mathematicalOperators: 17
-        case .superscripts: 18
-        case .subscripts: 19
-        case .fractions: 20
-        case .numerators: 21
-        case .denominators: 22
-        case .ordinals: 23
-        case .caseSensitiveForms: 24
-        case .arrows: 25
-        case .script: 26
-        case .graphical: 27
-        case .diacriticalMarks: 28
-        case .combiningMarks: 29
+        case .stylisticSet: 11
+        case .proportionalFigures: 12
+        case .tabularFigures: 13
+        case .circledFigures: 14
+        case .romanNumerals: 15
+        case .punctuationAndSymbols: 16
+        case .currency: 17
+        case .mathematicalOperators: 18
+        case .superscripts: 19
+        case .subscripts: 20
+        case .fractions: 21
+        case .numerators: 22
+        case .denominators: 23
+        case .ordinals: 24
+        case .caseSensitiveForms: 25
+        case .arrows: 26
+        case .script: 27
+        case .graphical: 28
+        case .diacriticalMarks: 29
+        case .combiningMarks: 30
         }
     }
 
@@ -281,12 +287,13 @@ public enum GlyphCell: Hashable, Sendable {
     case feature(FeatureGlyph)
     case alternate(FeatureAlternate)
 
-    /// Whether it's an alternate of the cell before it, a character's or a feature glyph's, like a small capital's.
+    /// Whether it's an alternate of the cell before it, a character's or a feature glyph's, like a small capital's; a
+    /// figure in another style, like an old-style one, isn't: it starts a row of its own (see `GlyphSection.runs`).
     public var isAlternate: Bool {
         switch self {
         case .character: false
         case .feature(let glyph): glyph.isAlternate
-        case .alternate: true
+        case .alternate(let alternate): !alternate.isFigureStyle
         }
     }
 }
@@ -578,9 +585,11 @@ public struct GlyphSection: Identifiable, Sendable {
 
     /// The section's cells in runs, each starting a row of its own, with `alternates` giving a character's: in most
     /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
-    /// ones, then old-style ones, whichever the font's own are, then their other alternates, like a slashed zero, then
-    /// the signs a feature draws to go with them, by their own groups, then in `signOrder`'s order (see
-    /// `signPrecedes`): a tabular period, then a dollar, then a plus and a percent.
+    /// ones, then old-style ones, whichever the font's own are, each followed by its alternates in that style, like a
+    /// slashed zero after the zero or a stylistic set's old-style four after the old-style four (an alternate with no
+    /// figure of its own in its style at the run's end), then the signs a feature draws to go with them, by their own
+    /// groups, then in `signOrder`'s order (see `signPrecedes`): a tabular period, then a dollar, then a plus and a
+    /// percent. Up to 0.12.0b8 the alternates that weren't old-style or lining had a run of their own.
     /// Roman numerals are capitals, then small ones; circled figures a run for each kind; localized forms a run for each
     /// language.
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
@@ -618,32 +627,52 @@ public struct GlyphSection: Identifiable, Sendable {
         // The font's own figures are old-style when a feature offers lining ones for them, and none old-style ones.
         let tags = found.flatMap { $0.1.flatMap(\.allFeatures) } + glyphs.flatMap(\.alongWith)
         let ownAreOldStyle = tags.contains("lnum") && !tags.contains("onum")
-        enum Run: Int, CaseIterable { case lining, oldStyle, alternates, signs }
+        enum Run: Int, CaseIterable { case lining, oldStyle, signs }
         func run(of features: [String]) -> Run {
             if features.contains("onum") { return .oldStyle }
             if features.contains("lnum") { return .lining }
-            if features.isEmpty { return ownAreOldStyle ? .oldStyle : .lining }
-            return .alternates
+            return ownAreOldStyle ? .oldStyle : .lining
         }
-        var runs: [Run: [GlyphCell]] = [:]
-        for (scalar, list) in found {
-            runs[run(of: []), default: []].append(.character(scalar))
-            for alternate in list { runs[run(of: alternate.allFeatures), default: []].append(.alternate(alternate)) }
-        }
-        for glyph in glyphs {
-            let isFigure = GlyphGroup.of(glyph.character) == .proportionalFigures
-            runs[isFigure ? run(of: glyph.alongWith) : .signs, default: []].append(.feature(glyph))
-        }
-        runs[.signs] = runs[.signs]?.sorted { left, right in
-            func character(_ cell: GlyphCell) -> UInt32? {
-                guard case .feature(let glyph) = cell, GlyphGroup.of(glyph.character) != nil else { return nil }
-                return glyph.character
+        // Each style's figures in order, each followed by its alternates in that style.
+        var order: [Run: [UInt32]] = [:]
+        var cells: [Run: [UInt32: [GlyphCell]]] = [:]
+        var strays: [Run: [GlyphCell]] = [:]
+        func add(_ cell: GlyphCell, for character: UInt32, in run: Run) {
+            if cells[run]?[character] != nil {
+                cells[run]![character]!.append(cell)
+            } else if cell.isAlternate {
+                strays[run, default: []].append(cell)
+            } else {
+                order[run, default: []].append(character)
+                cells[run, default: [:]][character] = [cell]
             }
-            guard let a = character(left) else { return false }
-            guard let b = character(right) else { return true }
+        }
+        // The figures first, then their alternates, which go after them.
+        for (scalar, list) in found {
+            add(.character(scalar), for: scalar, in: run(of: []))
+            for alternate in list where alternate.isFigureStyle { add(.alternate(alternate), for: scalar, in: run(of: alternate.allFeatures)) }
+        }
+        for glyph in glyphs where !glyph.isAlternate {
+            let isFigure = GlyphGroup.of(glyph.character) == .proportionalFigures
+            add(.feature(glyph), for: glyph.character, in: isFigure ? run(of: glyph.alongWith) : .signs)
+        }
+        for (scalar, list) in found {
+            for alternate in list where !alternate.isFigureStyle { add(.alternate(alternate), for: scalar, in: run(of: alternate.allFeatures)) }
+        }
+        for glyph in glyphs where glyph.isAlternate {
+            let isFigure = GlyphGroup.of(glyph.character) == .proportionalFigures
+            add(.feature(glyph), for: glyph.character, in: isFigure ? run(of: glyph.alongWith) : .signs)
+        }
+        // The signs by their own groups, then `signOrder` (see `signPrecedes`), those of none last.
+        order[.signs]?.sort { a, b in
+            guard GlyphGroup.of(a) != nil else { return false }
+            guard GlyphGroup.of(b) != nil else { return true }
             return Self.signPrecedes(a, b)
         }
-        return Run.allCases.compactMap { runs[$0] }
+        return Run.allCases.compactMap { kind in
+            let list = (order[kind] ?? []).flatMap { cells[kind]![$0]! } + (strays[kind] ?? [])
+            return list.isEmpty ? nil : list
+        }
     }
 
     /// The runs, each with the words above it on the page, if any: a localized form's languages, like "Bulgarian".

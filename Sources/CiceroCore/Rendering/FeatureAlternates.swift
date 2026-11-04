@@ -33,6 +33,12 @@ public struct FeatureAlternate: Hashable, Sendable {
     public var allFeatureNames: [String] { featureNames + alongWithNames }
     /// The features' names as words: "Single-storey a or Stylistic Alternates", "Stylistic Set 1 and Old-Style Figures".
     public var listedNames: String { alongWith.isEmpty ? featureNames.listed("or") : allFeatureNames.listed() }
+    /// Whether it's a figure in another style, like an old-style one: a set of figures of its own, not an alternate of
+    /// the font's own figure, drawn by a figure style's feature (see `FeatureAlternates.figureStyles`) and no other.
+    public var isFigureStyle: Bool {
+        GlyphGroup.of(character) == .proportionalFigures && features.contains(where: FeatureAlternates.figureStyles.contains)
+            && alongWith.allSatisfy(FeatureAlternates.figureStyles.contains)
+    }
 }
 
 public enum FeatureAlternates {
@@ -69,6 +75,9 @@ public enum FeatureAlternates {
         return resolve(found, characters: LigatureGroup.characterGlyphs(of: font, needed: glyphs), excluding: excluding,
                        names: names(in: font))
     }
+
+    /// The features that draw figures in another style: old-style, lining or proportional ones.
+    public static let figureStyles: Set<String> = ["onum", "lnum", "pnum"]
 
     /// The most features an alternate takes together, like a stylistic set's old-style four (four.osf.ss01) or a zero
     /// with two sets on (zero.ss01.ss11).
