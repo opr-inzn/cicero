@@ -1,8 +1,7 @@
 import SwiftUI
 
-// Toolbar controls that highlight only what's chosen or on, never what's under the pointer: AppKit's
-// light up on hover, in a gray of their own, and Cicero has no hover states. On macOS 15, which has no glass, the
-// toolbar has the system's own controls instead.
+// Toolbar controls that highlight what's chosen or on, and light up under the pointer as AppKit's do, as the back
+// button does next to them. On macOS 15, which has no glass, the toolbar has the system's own controls instead.
 
 /// A toolbar item in a glass capsule of its own, 8 pt from the next as the Info button is from the search
 /// field. AppKit puts neighbouring items in one capsule, and a ToolbarSpacer between them leaves 16 pt.
@@ -99,14 +98,13 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 }
 
-/// A toolbar button, highlighted while it's on or pressed, and dimmed like AppKit's while it's disabled
-/// or its window is in the background. Sizes are AppKit's: a button fills its 36 pt glass capsule, and a
-/// picker's segments are inside it, `segmentInset` from its edges; the picker draws the chosen one's lens.
+/// A toolbar button, highlighted while it's on or pressed, lit up a little less while it's under the pointer, and
+/// dimmed like AppKit's while it's disabled or its window is in the background. Sizes are AppKit's: a button fills
+/// its 36 pt glass capsule, and a picker's segments are inside it, `segmentInset` from its edges; the picker draws the
+/// chosen one's lens.
 struct ToolbarButtonStyle: ButtonStyle {
     var isOn = false
     fileprivate var segment: Segment?
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.appearsActive) private var appearsActive
 
     /// A picker's segment, padded like AppKit's: less around a symbol than around a title.
     fileprivate enum Segment { case symbol, title }
@@ -115,17 +113,34 @@ struct ToolbarButtonStyle: ButtonStyle {
     static let segmentInset: CGFloat = 3
 
     func makeBody(configuration: Configuration) -> some View {
-        // A chosen segment has the picker's lens, not a fill.
-        let filled = segment == nil ? isOn || configuration.isPressed : configuration.isPressed && !isOn
+        ToolbarButton(configuration: configuration, isOn: isOn, segment: segment)
+    }
+}
+
+/// `ToolbarButtonStyle`'s button, a view of its own to know when the pointer is over it.
+private struct ToolbarButton: View {
+    let configuration: ButtonStyleConfiguration
+    let isOn: Bool
+    let segment: ToolbarButtonStyle.Segment?
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.appearsActive) private var appearsActive
+    @State private var isHovered = false
+
+    var body: some View {
+        // A chosen segment has the picker's lens, not a fill, pressed or under the pointer.
+        let pressed = segment == nil ? isOn || configuration.isPressed : configuration.isPressed && !isOn
+        // A grey between none and pressed: 65 on the toolbar's 40 in Dark Mode, as AppKit's back button has 71.
+        let hovered = isHovered && isEnabled && !(segment != nil && isOn)
         configuration.label
             .labelStyle(.iconOnly)
             .imageScale(.large)
             .foregroundStyle(isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
             .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 6 : 8)
-            .frame(minWidth: segment == nil ? 36 : 36 - 2 * Self.segmentInset, maxWidth: segment == nil ? nil : .infinity,
-                   minHeight: 36 - (segment == nil ? 0 : 2 * Self.segmentInset))
-            .background(filled ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .capsule)
+            .frame(minWidth: segment == nil ? 36 : 36 - 2 * ToolbarButtonStyle.segmentInset, maxWidth: segment == nil ? nil : .infinity,
+                   minHeight: 36 - (segment == nil ? 0 : 2 * ToolbarButtonStyle.segmentInset))
+            .background(pressed ? AnyShapeStyle(.quaternary) : hovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: .capsule)
             .contentShape(.rect)
+            .onHover { isHovered = $0 }
     }
 }
 
