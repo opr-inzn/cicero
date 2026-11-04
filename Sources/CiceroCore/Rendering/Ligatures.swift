@@ -617,21 +617,77 @@ public struct FeatureGlyph: Hashable, Sendable {
                 result.append(glyph)
             }
         }
-        // In each group of letters' forms, each glyph followed by its alternates; those of none the font draws, where
-        // their letters go.
         let ways = Ways(found, characters: characters)
         // Each glyph's group found once: `group` looks for its feature (13 passes over Arial Unicode MS's 9,087 localized
         // forms took 200 ms).
         let byGroup = Dictionary(grouping: result, by: \.group)
-        /// A group of letters' forms, or a big stylistic set's glyphs, each followed by its alternates.
-        func lettersOrder(of group: GlyphGroup, own: [FeatureGlyph], tags: Set<String>, setName: String? = nil) -> [FeatureGlyph] {
+        // Each big stylistic set's glyphs for characters that no other group lists, as a word's forms are. Each set's own
+        // glyphs before any group's alternates: else Repro LAB223's "smallsize centered" took "smallsize circled"'s glyphs
+        // as its alternates.
+        let owns = sets.map { set in
+            (found[set.tag] ?? []).compactMap { entry -> FeatureGlyph? in
+                guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
+                      characters[entry.glyph] == nil, seen.insert(entry.glyph).inserted
+                else { return nil }
+                return FeatureGlyph(glyph: entry.glyph, character: character, feature: set.tag, setName: set.name)
+            }
+        }
+        // The groups, in the order the page lists them: the letters' forms, the others, then the big sets.
+        var others: [GlyphGroup] = []
+        for feature in features where !letterGroups.contains(feature.group) && !others.contains(feature.group) { others.append(feature.group) }
+        let setGroups = sets.map { GlyphGroup.stylisticSet(tag: $0.tag, name: $0.name) }
+        let order = letterGroups + others + setGroups
+        let setTags = Set(sets.map(\.tag))
+        var ownOf: [GlyphGroup: [FeatureGlyph]] = byGroup
+        for (group, own) in zip(setGroups, owns) { ownOf[group] = own }
+        func tags(of group: GlyphGroup) -> Set<String> {
+            if case .stylisticSet(let tag, _) = group { return [tag] }
+            return Set(features.filter { $0.group == group }.map(\.tag))
+        }
+        // Each group's alternates (see `groupAlternates`): another group's glyph with a big set on, like zero.tf.ss15, is
+        // the set's, not Tabular Figures' (the other groups don't take the sets' features). A glyph several groups reach
+        // goes in the one that reaches it with the fewest features, else the one listed first: ABC Repro's G.fina.ss07
+        // (fina, then ss07) is Final Forms', not Medial Forms' (medi, ss07, then ss16, a set that draws final forms), which
+        // came first; its zero.subs.init (subs and init either way) stays Initial Forms'.
+        var candidates: [GlyphGroup: [(glyph: FeatureGlyph, of: CGGlyph?, closeness: Closeness)]] = [:]
+        var closest: [CGGlyph: (closeness: Closeness, index: Int)] = [:]
+        for (index, group) in order.enumerated() {
+            let own = ownOf[group] ?? []
+            let byGlyph = group == .localizedForms ? Dictionary(own.map { ($0.glyph, $0) }, uniquingKeysWith: { first, _ in first }) : [:]
+            var list: [(glyph: FeatureGlyph, of: CGGlyph?, closeness: Closeness)] = []
+            for (alternate, of, closeness) in groupAlternates(of: group, tags: tags(of: group), in: found,
+                                                              ways: ways, characters: characters, listed: own, names: names,
+                                                              avoiding: setGroups.contains(group) ? [] : setTags)
+            where !isLeftOut(alternate.feature, of: alternate.character) && !seen.contains(alternate.glyph) {
+                var glyph = alternate
+                if case .stylisticSet(_, let name) = group {
+                    glyph = FeatureGlyph(glyph: alternate.glyph, character: alternate.character, feature: alternate.feature,
+                                         alongWith: alternate.alongWith, alongWithNames: alternate.alongWithNames, isAlternate: true, setName: name)
+                } else if group == .localizedForms {
+                    // A localized form's alternates are those drawn from it, for its languages.
+                    guard let of, let base = byGlyph[of] else { continue }
+                    glyph = FeatureGlyph(glyph: alternate.glyph, character: alternate.character, feature: alternate.feature,
+                                         alongWith: alternate.alongWith, alongWithNames: alternate.alongWithNames, isAlternate: true,
+                                         languages: base.languages)
+                }
+                list.append((glyph, of, closeness))
+                if let best = closest[glyph.glyph], (best.closeness, best.index) <= (closeness, index) { continue }
+                closest[glyph.glyph] = (closeness, index)
+            }
+            candidates[group] = list
+        }
+        func alternates(of group: GlyphGroup) -> [(FeatureGlyph, of: CGGlyph?)] {
+            let index = order.firstIndex(of: group)!
+            return (candidates[group] ?? []).compactMap { alternate in
+                closest[alternate.glyph.glyph]?.index == index ? (alternate.glyph, alternate.of) : nil
+            }
+        }
+        /// A group of letters' forms, or a big stylistic set's glyphs, each followed by its alternates; those of none the
+        /// font draws, where their letters go.
+        func lettersOrder(of group: GlyphGroup, own: [FeatureGlyph]) -> [FeatureGlyph] {
             var after: [CGGlyph: [FeatureGlyph]] = [:]
             var blocks = own.map { [$0] }
-            for (found, of) in groupAlternates(of: group, tags: tags, in: found, ways: ways, characters: characters, listed: own, names: names)
-            where !isLeftOut(found.feature, of: found.character) && seen.insert(found.glyph).inserted {
-                let alternate = setName == nil ? found
-                    : FeatureGlyph(glyph: found.glyph, character: found.character, feature: found.feature, alongWith: found.alongWith,
-                                   alongWithNames: found.alongWithNames, isAlternate: true, setName: setName)
+            for (alternate, of) in alternates(of: group) {
                 if let of { after[of, default: []].append(alternate) } else { blocks.append([alternate]) }
             }
             // Small capitals by their lowercase letters (see `letterOrder`); a word's forms as the page lists their
@@ -651,50 +707,20 @@ public struct FeatureGlyph: Hashable, Sendable {
             }
             return ordered.flatMap { $0 + (after[$0[0].glyph] ?? []) }
         }
-        var grouped: [FeatureGlyph] = []
-        for group in letterGroups {
-            grouped += lettersOrder(of: group, own: byGroup[group] ?? [], tags: Set(features.filter { $0.group == group }.map(\.tag)))
-        }
+        let grouped = letterGroups.flatMap { lettersOrder(of: $0, own: byGroup[$0] ?? []) }
         // In the other groups, each glyph followed by its alternates too, like a tabular four with a stylistic set on
-        // (four.tf.ss09) after the tabular four; those of none the group draws at the group's end. A localized form's
-        // alternates are those drawn from it, for its languages.
-        var groups: [GlyphGroup] = []
-        for feature in features where !letterGroups.contains(feature.group) && !groups.contains(feature.group) { groups.append(feature.group) }
+        // (four.tf.ss09) after the tabular four; those of none the group draws at the group's end.
         var after: [CGGlyph: [FeatureGlyph]] = [:]
         var trailing: [FeatureGlyph] = []
-        for group in groups {
-            let own = byGroup[group] ?? []
-            let byGlyph = Dictionary(own.map { ($0.glyph, $0) }, uniquingKeysWith: { first, _ in first })
-            let tags = Set(features.filter { $0.group == group }.map(\.tag))
-            for (found, of) in groupAlternates(of: group, tags: tags, in: found, ways: ways, characters: characters, listed: own, names: names)
-            where !isLeftOut(found.feature, of: found.character) {
-                var alternate = found
-                if group == .localizedForms {
-                    guard let of, let base = byGlyph[of] else { continue }
-                    alternate = FeatureGlyph(glyph: found.glyph, character: found.character, feature: found.feature, alongWith: found.alongWith,
-                                             alongWithNames: found.alongWithNames, isAlternate: true, languages: base.languages)
-                }
-                guard seen.insert(alternate.glyph).inserted else { continue }
+        for group in others {
+            for (alternate, of) in alternates(of: group) {
                 if let of { after[of, default: []].append(alternate) } else { trailing.append(alternate) }
             }
         }
-        // Last, each big stylistic set's glyphs for characters that no other group lists, as a word's forms are, each
-        // followed by its alternates, like ABC Repro's small-size a with a single-storey a's set on after its small-size a.
-        // Each set's own glyphs first, then their alternates: else Repro LAB223's "smallsize centered" took "smallsize
-        // circled"'s glyphs as its alternates.
-        let owns = sets.map { set in
-            (found[set.tag] ?? []).compactMap { entry -> FeatureGlyph? in
-                guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
-                      characters[entry.glyph] == nil, seen.insert(entry.glyph).inserted
-                else { return nil }
-                return FeatureGlyph(glyph: entry.glyph, character: character, feature: set.tag, setName: set.name)
-            }
-        }
-        var setGlyphs: [FeatureGlyph] = []
-        for (set, own) in zip(sets, owns) {
-            setGlyphs += lettersOrder(of: .stylisticSet(tag: set.tag, name: set.name), own: own, tags: [set.tag], setName: set.name)
-        }
-        return grouped + groups.flatMap { byGroup[$0] ?? [] }.flatMap { [$0] + (after[$0.glyph] ?? []) } + trailing + setGlyphs
+        // Last, the big sets, each glyph followed by its alternates, like ABC Repro's small-size a with a single-storey
+        // a's set on after its small-size a, and its small-size tabular zero after its small-size zero.
+        let setGlyphs = zip(setGroups, owns).flatMap { lettersOrder(of: $0, own: $1) }
+        return grouped + others.flatMap { byGroup[$0] ?? [] }.flatMap { [$0] + (after[$0.glyph] ?? []) } + trailing + setGlyphs
     }
 
     /// A font's localized forms, each once, for the languages of every record of the feature that draws it for the same
@@ -771,9 +797,35 @@ public struct FeatureGlyph: Hashable, Sendable {
     /// the group's features draw one of its glyphs for isn't one of them, like the lining alternate of a currency sign
     /// whose small capital is its old-style one. A glyph's alternates are in the order of their features; a localized
     /// form's are only those drawn from it.
+    /// How far a group's alternate is from the group (see `resolve`): by the features that draw it.
+    struct Closeness: Comparable {
+        let features: Int
+
+        static func < (a: Closeness, b: Closeness) -> Bool { a.features < b.features }
+    }
+
+    /// Forms that can't be used together, like a subscript and a numerator, or an initial and a final form: features of
+    /// two groups of a kind. Fonts like ABC Repro draw them anyway (zero.subs.numr, zero.numr.dnom), as each feature
+    /// takes every glyph; they're left out.
+    static let exclusiveKinds: [[GlyphGroup]] = [
+        [.superscripts, .subscripts, .numerators, .denominators, .ordinals],
+        [.initialForms, .medialForms, .finalForms, .isolatedForms],
+    ]
+
+    /// Whether `tag`'s group and the group of one of `tags` are two of a kind in `exclusiveKinds`.
+    static func clashes(_ tag: String, with tags: [String]) -> Bool {
+        guard let group = exclusiveGroups[tag] else { return false }
+        return tags.contains { exclusiveGroups[$0].map { $0.kind == group.kind && $0.group != group.group } == true }
+    }
+
+    private static let exclusiveGroups: [String: (kind: Int, group: GlyphGroup)] = Dictionary(
+        features.compactMap { feature in
+            exclusiveKinds.firstIndex { $0.contains(feature.group) }.map { (feature.tag, (kind: $0, group: feature.group)) }
+        }, uniquingKeysWith: { first, _ in first })
+
     static func groupAlternates(of group: GlyphGroup, tags groupTags: Set<String>, in found: [String: [GSUBSubstitutions.Entry]],
                                 ways: Ways? = nil, characters: [CGGlyph: UInt32], listed own: [FeatureGlyph],
-                                names: [String: String]) -> [(FeatureGlyph, of: CGGlyph?)] {
+                                names: [String: String], avoiding: Set<String> = []) -> [(FeatureGlyph, of: CGGlyph?, closeness: Closeness)] {
         guard !own.isEmpty || groupTags.contains(where: { found[$0] != nil }) else { return [] }
         let ways = ways ?? Ways(found, characters: characters)
         guard !ways.next.isEmpty else { return [] }
@@ -845,7 +897,7 @@ public struct FeatureGlyph: Hashable, Sendable {
             for step in frontier {
                 let path = paths[step]!
                 guard path.tags.count < FeatureAlternates.chainLength else { continue }
-                for (glyph, tag) in next(step.glyph) where !path.tags.contains(tag) {
+                for (glyph, tag) in next(step.glyph) where !path.tags.contains(tag) && !avoiding.contains(tag) && !clashes(tag, with: path.tags) {
                     let to = Step(glyph: glyph, small: step.small || groupTags.contains(tag))
                     guard paths[to] == nil, to.small || reaches(glyph, after: path.tags.count + 1) else { continue }
                     paths[to] = Path(character: path.character, tags: path.tags + [tag],
@@ -867,7 +919,7 @@ public struct FeatureGlyph: Hashable, Sendable {
             let lowercase = Unicode.Scalar(character).map { Array(String(Character($0)).lowercased().unicodeScalars) } ?? []
             return lowercase.count == 1 ? ownGlyphs[lowercase[0].value] : nil
         }
-        let alternates = reached.map { step -> (FeatureGlyph, of: CGGlyph?) in
+        let alternates = reached.map { step -> (FeatureGlyph, of: CGGlyph?, closeness: Closeness) in
             let path = paths[step]!
             var others: [String] = []
             for tag in path.tags where !groupTags.contains(tag) && !others.contains(tag) { others.append(tag) }
@@ -878,7 +930,8 @@ public struct FeatureGlyph: Hashable, Sendable {
             let glyph = FeatureGlyph(glyph: step.glyph, character: path.character, feature: path.tags.first { groupTags.contains($0) }!,
                                      alongWith: others, alongWithNames: others.map { FeatureAlternates.name(of: $0, in: names) },
                                      isAlternate: true)
-            return (glyph, path.through ?? ownGlyph(of: path.character))
+            return (glyph, path.through ?? ownGlyph(of: path.character),
+                    Closeness(features: path.tags.count))
         }
         // Stylistic alternates, sets and character variants, then swashes and so on, then the forms for a language, like
         // FeatureAlternates.rank has them; each by its tags, then glyph.
