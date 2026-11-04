@@ -40,9 +40,6 @@ public struct LigatureGroup: Identifiable, Sendable {
 
     public var name: String { Self.features.first { $0.tag == tag }?.name ?? tag }
 
-    /// Keeps icon fonts, whose ligatures turn thousands of words into symbols, to a sensible number.
-    public static let limit = 3000
-
     /// The face's ligatures by feature, those whose every component is a character (or another ligature of
     /// characters); ligatures of alternates and contextual forms that no character maps to are left out. Reads
     /// the font's GSUB table; call off the main thread.
@@ -89,7 +86,7 @@ public struct LigatureGroup: Identifiable, Sendable {
         return features.compactMap { feature in
             var seen = Set<[UInt32]>()
             var ligatures: [Ligature] = []
-            for (tag, entry, text) in resolved where tag == feature.tag && ligatures.count < limit && seen.insert(text).inserted {
+            for (tag, entry, text) in resolved where tag == feature.tag && seen.insert(text).inserted {
                 ligatures.append(Ligature(glyph: entry.glyph, characters: text))
             }
             return ligatures.isEmpty ? nil : LigatureGroup(tag: feature.tag, ligatures: ligatures)
@@ -479,7 +476,14 @@ public struct FeatureGlyph: Hashable, Sendable {
         ("sups", "Superscript", .superscripts), ("subs", "Subscript", .subscripts), ("sinf", "Scientific Inferiors", .subscripts),
         ("numr", "Numerators", .numerators), ("dnom", "Denominators", .denominators), ("ordn", "Ordinals", .ordinals),
         ("case", "Case-Sensitive Forms", .caseSensitiveForms), ("locl", "Localized Forms", .localizedForms),
+        // A Latin font's forms for the start, middle and end of a word and for a letter alone (see `isScriptForm`).
+        ("init", "Initial Forms", .initialForms), ("medi", "Medial Forms", .medialForms), ("fina", "Final Forms", .finalForms),
+        ("isol", "Isolated Forms", .isolatedForms),
     ]
+
+    /// The groups of letters' forms, like the small capitals: each listed in its letters' order (see `letterOrder`),
+    /// each glyph followed by its alternates (see `groupAlternates`).
+    static let letterGroups: [GlyphGroup] = [.smallCaps, .initialForms, .medialForms, .finalForms, .isolatedForms]
 
     /// The feature's name, or for a localized form the languages it's for, like "Serbian and Macedonian".
     public var featureName: String {
@@ -491,13 +495,11 @@ public struct FeatureGlyph: Hashable, Sendable {
     public var featureNames: [String] { [featureName] + alongWithNames }
     public var group: GlyphGroup { Self.features.first { $0.tag == feature }?.group ?? .graphical }
 
-    /// Keeps a font with features over thousands of glyphs to a sensible number.
-    public static let limit = 3000
-
-    /// The face's glyphs that only those features draw, each once, by feature, then character, the case-sensitive forms
-    /// as their characters are listed (see `GlyphSection.signPrecedes`) and superscripts, subscripts, numerators and
-    /// denominators figures first (see `GlyphSection.valueOrder`), but the small capitals first, in their letters'
-    /// order (see `letterOrder`), each followed by its alternates (see `smallCapAlternates`), and the localized forms by
+    /// The face's glyphs that only those features draw, all of them, each once, by feature, then character, the
+    /// case-sensitive forms as their characters are listed (see `GlyphSection.signPrecedes`) and superscripts,
+    /// subscripts, numerators and denominators figures first (see `GlyphSection.valueOrder`), but the small capitals and
+    /// the forms by place in a word first, in their letters' order (see `letterOrder`), each followed by its alternates
+    /// (see `groupAlternates`), and the localized forms by
     /// language (see `localizedForms`); a glyph a character has too, like a superscript two the font maps U+00B2 to, is
     /// left to the character, and accents' case-sensitive forms are left out. Reads the font's GSUB table; call off the
     /// main thread.
@@ -505,7 +507,7 @@ public struct FeatureGlyph: Hashable, Sendable {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [] }
         let tags = Set(features.map(\.tag)).union(figureStyles)
-        let found = GSUBSubstitutions.read(table) { tags.contains($0) || drawsSmallCapAlternates($0) }
+        let found = GSUBSubstitutions.read(table) { tags.contains($0) || drawsGroupAlternates($0, in: .initialForms) }
             .mapValues { $0.filter { $0.components.count == 1 } }
         let glyphs = Set(found.values.flatMap { $0.flatMap { [$0.glyph] + $0.components } })
         guard !glyphs.isEmpty else { return [] }
@@ -516,11 +518,17 @@ public struct FeatureGlyph: Hashable, Sendable {
                        localized: localized, shared: shared)
     }
 
-    /// The features whose glyphs for small capitals are small capitals too: those that offer alternates, like a stylistic
-    /// set, but Lining Figures, which can give a small capital figure's full-size one, the forms for a language, like a
-    /// Turkish small capital i, and tabular figures.
-    static func drawsSmallCapAlternates(_ tag: String) -> Bool {
-        FeatureAlternates.rank(of: tag) != nil && tag != "lnum" || tag == "locl" || tag == "tnum"
+    /// The features whose glyphs for a group's glyphs are of the group too, like a stylistic set's small capital a or
+    /// initial a: those that offer alternates, but Lining Figures for small capitals, as it can give a small capital
+    /// figure's full-size one, the forms for a language, like a Turkish small capital i, and tabular figures.
+    static func drawsGroupAlternates(_ tag: String, in group: GlyphGroup) -> Bool {
+        FeatureAlternates.rank(of: tag) != nil && (tag != "lnum" || group != .smallCaps) || tag == "locl" || tag == "tnum"
+    }
+
+    /// Whether a form by place in a word is a script's way of joining its letters, like Arabic's, not a Latin font's
+    /// form: a character of a script with a group of its own (see `FeatureAlternates.positional`).
+    static func isScriptForm(_ tag: String, of character: UInt32) -> Bool {
+        FeatureAlternates.positional.contains(tag) && GlyphGroup.of(character)?.isScript == true
     }
 
     /// Whether a character is a private-use one, where an older font can keep its small capitals too, like U+F761 for a
@@ -540,14 +548,15 @@ public struct FeatureGlyph: Hashable, Sendable {
         var result: [FeatureGlyph] = []
         for feature in features {
             if feature.tag == "locl" {
-                for glyph in localizedForms(localized, characters: characters, shared: shared) where result.count < limit && seen.insert(glyph.glyph).inserted {
+                for glyph in localizedForms(localized, characters: characters, shared: shared) where seen.insert(glyph.glyph).inserted {
                     result.append(glyph)
                 }
                 continue
             }
             let entries = (found[feature.tag] ?? []).compactMap { entry -> FeatureGlyph? in
                 guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
-                      characters[entry.glyph] == nil || feature.group == .smallCaps && isPrivateUse(characters[entry.glyph]!)
+                      characters[entry.glyph] == nil || feature.group == .smallCaps && isPrivateUse(characters[entry.glyph]!),
+                      !isScriptForm(feature.tag, of: character)
                 else { return nil }
                 // Accents for capitals are the accented capitals' business, not worth a cell each; Greek's too, like the
                 // tonos, which the Greek group lists.
@@ -568,22 +577,40 @@ public struct FeatureGlyph: Hashable, Sendable {
                 }
                 : entries.sorted { $0.character < $1.character }
             let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
-            for glyph in sorted + combined where result.count < limit && seen.insert(glyph.glyph).inserted {
+            for glyph in sorted + combined where seen.insert(glyph.glyph).inserted {
                 result.append(glyph)
             }
         }
-        // Each small capital followed by its alternates; those of none the font draws, where their letters go.
-        let smallCaps = result.filter { $0.group == .smallCaps }
-        var after: [CGGlyph: [FeatureGlyph]] = [:]
-        var blocks = smallCaps.map { [$0] }
-        for (alternate, of) in smallCapAlternates(in: found, characters: characters, smallCaps: smallCaps, names: names)
-        where result.count < limit && seen.insert(alternate.glyph).inserted {
-            result.append(alternate)
-            if let of { after[of, default: []].append(alternate) } else { blocks.append([alternate]) }
+        // In each group of letters' forms, each glyph followed by its alternates; those of none the font draws, where
+        // their letters go.
+        var grouped: [FeatureGlyph] = []
+        for group in letterGroups {
+            let own = result.filter { $0.group == group }
+            let tags = Set(features.filter { $0.group == group }.map(\.tag))
+            var after: [CGGlyph: [FeatureGlyph]] = [:]
+            var blocks = own.map { [$0] }
+            for (alternate, of) in groupAlternates(of: group, tags: tags, in: found, characters: characters, listed: own, names: names)
+            where seen.insert(alternate.glyph).inserted {
+                if let of { after[of, default: []].append(alternate) } else { blocks.append([alternate]) }
+            }
+            // Small capitals by their lowercase letters (see `letterOrder`); a word's forms as the page lists their
+            // characters, capitals, then lowercase letters, then accented ones, figures and signs.
+            func precedes(_ a: UInt32, _ b: UInt32) -> Bool? {
+                if group == .smallCaps {
+                    let (x, y) = (letterOrder(of: a), letterOrder(of: b))
+                    return x == y ? nil : x < y
+                }
+                let (x, y) = (GlyphGroup.of(a) ?? .graphical, GlyphGroup.of(b) ?? .graphical)
+                if x != y { return x < y }
+                let (p, q) = (GlyphSection.letterOrder(of: a), GlyphSection.letterOrder(of: b))
+                return p == q ? nil : p < q
+            }
+            let ordered = blocks.sorted { a, b in
+                precedes(a[0].character, b[0].character) ?? ((a[0].isAlternate ? 1 : 0, a[0].glyph) < (b[0].isAlternate ? 1 : 0, b[0].glyph))
+            }
+            grouped += ordered.flatMap { $0 + (after[$0[0].glyph] ?? []) }
         }
-        let ordered = blocks.map { (order: letterOrder(of: $0[0].character), then: ($0[0].isAlternate ? 1 : 0, $0[0].glyph), block: $0) }
-            .sorted { $0.order != $1.order ? $0.order < $1.order : $0.then < $1.then }
-        return ordered.flatMap { $0.block + (after[$0.block[0].glyph] ?? []) } + result.filter { $0.group != .smallCaps }
+        return grouped + result.filter { !letterGroups.contains($0.group) }
     }
 
     /// A font's localized forms, each once, for the languages of every record of the feature that draws it for the same
@@ -625,52 +652,53 @@ public struct FeatureGlyph: Hashable, Sendable {
         return runs.sorted { ($0.script, $0.name) < ($1.script, $1.name) }.flatMap(\.glyphs)
     }
 
-    /// The small capitals other features draw, with the one each is an alternate of, if any: a stylistic set's small
-    /// capital a, which the set draws for the small capital a or Small Capitals for the set's a, of the small capital a,
-    /// or a Turkish small capital i, of the small capital i. Each takes a small capitals feature and one other, found
-    /// from a small capital in `smallCaps`, then from a character, lowercase letters before capitals, and not through
-    /// another character's glyph; a glyph the small capitals features draw a small capital for is full-size, like the
-    /// lining alternate of a currency sign whose small capital is its old-style one. A small capital's alternates are in
-    /// the order of their features.
-    static func smallCapAlternates(in found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32],
-                                   smallCaps: [FeatureGlyph], names: [String: String]) -> [(FeatureGlyph, of: CGGlyph?)] {
-        let smallCapTags: Set<String> = ["smcp", "c2sc"]
-        guard !smallCaps.isEmpty || smallCapTags.contains(where: { found[$0] != nil }) else { return [] }
+    /// The glyphs of a group of letters' forms (see `letterGroups`) that other features draw, with the one each is an
+    /// alternate of, if any. Small capitals: a stylistic set's small capital a, which the set draws for the small capital
+    /// a or Small Capitals for the set's a, of the small capital a, or a Turkish small capital i, of the small capital i;
+    /// forms by place in a word, like ABC Repro's initial Ä with a stylistic set on, of the initial Ä. Each takes one of
+    /// the group's features, `tags`, and one other, found from a glyph in `listed`, the group's, then from a character,
+    /// lowercase letters before capitals, and not through another character's glyph; a glyph the group's features draw
+    /// one of its glyphs for isn't one of them, like the lining alternate of a currency sign whose small capital is its
+    /// old-style one. A glyph's alternates are in the order of their features.
+    static func groupAlternates(of group: GlyphGroup, tags groupTags: Set<String>, in found: [String: [GSUBSubstitutions.Entry]],
+                                characters: [CGGlyph: UInt32], listed own: [FeatureGlyph], names: [String: String]) -> [(FeatureGlyph, of: CGGlyph?)] {
+        guard !own.isEmpty || groupTags.contains(where: { found[$0] != nil }) else { return [] }
         var next: [CGGlyph: [(glyph: CGGlyph, tag: String)]] = [:]
-        for tag in found.keys.filter({ smallCapTags.contains($0) || drawsSmallCapAlternates($0) }).sorted() {
+        for tag in found.keys.filter({ groupTags.contains($0) || drawsGroupAlternates($0, in: group) }).sorted() {
             for entry in found[tag] ?? [] {
                 guard let input = entry.components.first, input != entry.glyph,
-                      characters[entry.glyph].map(isPrivateUse) ?? true
+                      characters[entry.glyph].map(isPrivateUse) ?? true,
+                      characters[input].map({ isScriptForm(tag, of: $0) }) != true
                 else { continue }
                 next[input, default: []].append((entry.glyph, tag))
             }
         }
         guard !next.isEmpty else { return [] }
-        // From a small capital, another feature's way first: a contextual lookup of Small Capitals can draw a stylistic
-        // set's small capital from the small capital too, and that's the set's.
+        // From one of the group's glyphs, another feature's way first: a contextual lookup of Small Capitals can draw a
+        // stylistic set's small capital from the small capital too, and that's the set's.
         for (input, edges) in next {
-            next[input] = edges.filter { !smallCapTags.contains($0.tag) } + edges.filter { smallCapTags.contains($0.tag) }
+            next[input] = edges.filter { !groupTags.contains($0.tag) } + edges.filter { groupTags.contains($0.tag) }
         }
-        let fullSize = Set(smallCapTags.flatMap { found[$0] ?? [] }.compactMap(\.components.first))
+        let fullSize = Set(groupTags.flatMap { found[$0] ?? [] }.compactMap(\.components.first))
         struct Step: Hashable {
             let glyph: CGGlyph
-            /// Whether a small capitals feature is on the way.
+            /// Whether one of the group's features is on the way.
             let small: Bool
         }
         struct Path {
             let character: UInt32
             let tags: [String]
-            /// The small capital of `smallCaps` on the way.
+            /// The group's glyph in `listed` on the way.
             let through: CGGlyph?
         }
         var paths: [Step: Path] = [:]
         var frontier: [Step] = []
-        for smallCap in smallCaps {
-            let step = Step(glyph: smallCap.glyph, small: true)
-            paths[step] = Path(character: smallCap.character, tags: [smallCap.feature], through: smallCap.glyph)
+        for glyph in own {
+            let step = Step(glyph: glyph.glyph, small: true)
+            paths[step] = Path(character: glyph.character, tags: [glyph.feature], through: glyph.glyph)
             frontier.append(step)
         }
-        let listed = Set(smallCaps.map(\.glyph))
+        let listed = Set(own.map(\.glyph))
         let starts = characters.filter { next[$0.key] != nil && !listed.contains($0.key) }.map { glyph, character in
             let group = GlyphGroup.of(character)
             return (key: (group == .uppercase || group == .uppercaseAccents ? 1 : 0, character, glyph), glyph: glyph, character: character)
@@ -687,7 +715,7 @@ public struct FeatureGlyph: Hashable, Sendable {
                 let path = paths[step]!
                 guard path.tags.count < 2 else { continue }
                 for (glyph, tag) in next[step.glyph] ?? [] {
-                    let to = Step(glyph: glyph, small: step.small || smallCapTags.contains(tag))
+                    let to = Step(glyph: glyph, small: step.small || groupTags.contains(tag))
                     guard paths[to] == nil else { continue }
                     paths[to] = Path(character: path.character, tags: path.tags + [tag],
                                      through: path.through ?? (listed.contains(glyph) ? glyph : nil))
@@ -697,23 +725,24 @@ public struct FeatureGlyph: Hashable, Sendable {
             }
             frontier = following
         }
-        // A small capital reached from an alternate, like Small Capitals' for a stylistic set's a, is the alternate of the
-        // character's own small capital, or its lowercase letter's.
-        var own: [UInt32: CGGlyph] = [:]
-        for smallCap in smallCaps where own[smallCap.character] == nil { own[smallCap.character] = smallCap.glyph }
-        func ownSmallCap(of character: UInt32) -> CGGlyph? {
-            if let glyph = own[character] { return glyph }
+        // A glyph reached from an alternate, like Small Capitals' for a stylistic set's a, is the alternate of the
+        // character's own glyph of the group, or for a small capital, its lowercase letter's.
+        var ownGlyphs: [UInt32: CGGlyph] = [:]
+        for glyph in own where ownGlyphs[glyph.character] == nil { ownGlyphs[glyph.character] = glyph.glyph }
+        func ownGlyph(of character: UInt32) -> CGGlyph? {
+            if let glyph = ownGlyphs[character] { return glyph }
+            guard group == .smallCaps else { return nil }
             let lowercase = Unicode.Scalar(character).map { Array(String(Character($0)).lowercased().unicodeScalars) } ?? []
-            return lowercase.count == 1 ? own[lowercase[0].value] : nil
+            return lowercase.count == 1 ? ownGlyphs[lowercase[0].value] : nil
         }
         let alternates = reached.map { step -> (FeatureGlyph, of: CGGlyph?) in
             let path = paths[step]!
             var others: [String] = []
-            for tag in path.tags where !smallCapTags.contains(tag) && !others.contains(tag) { others.append(tag) }
-            let glyph = FeatureGlyph(glyph: step.glyph, character: path.character, feature: path.tags.first { smallCapTags.contains($0) }!,
+            for tag in path.tags where !groupTags.contains(tag) && !others.contains(tag) { others.append(tag) }
+            let glyph = FeatureGlyph(glyph: step.glyph, character: path.character, feature: path.tags.first { groupTags.contains($0) }!,
                                      alongWith: others, alongWithNames: others.map { FeatureAlternates.name(of: $0, in: names) },
                                      isAlternate: true)
-            return (glyph, path.through ?? ownSmallCap(of: path.character))
+            return (glyph, path.through ?? ownGlyph(of: path.character))
         }
         // Stylistic alternates, sets and character variants, then swashes and so on, then the forms for a language, like
         // FeatureAlternates.rank has them; each by its tags, then glyph.

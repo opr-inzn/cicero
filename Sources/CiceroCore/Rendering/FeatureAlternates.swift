@@ -36,13 +36,9 @@ public struct FeatureAlternate: Hashable, Sendable {
 }
 
 public enum FeatureAlternates {
-    /// Keeps a font with alternates for thousands of characters to a sensible number.
-    public static let limit = 3000
-
     /// The features that offer another design of a character, in the order a character's alternates are listed. Those
-    /// that shape a script, set vertical text or the forms of East Asian characters are left out, but for the forms by
-    /// place in a word that a Latin font can have too, and so are those with groups of their own (`FeatureGlyph`) and
-    /// the ligatures'.
+    /// that shape a script, set vertical text or the forms of East Asian characters are left out, and so are those with
+    /// groups of their own (`FeatureGlyph`), like a Latin font's forms by place in a word, and the ligatures'.
     static func rank(of tag: String) -> Int? {
         func numbered(_ prefix: String, through last: Int) -> Bool {
             tag.hasPrefix(prefix) && Int(tag.dropFirst(2)).map { (1...last).contains($0) } == true
@@ -56,16 +52,11 @@ public enum FeatureAlternates {
         case "c2pc": return 5
         case "onum", "lnum", "pnum", "zero": return 6
         case "titl", "hist", "calt", "rand", "nalt", "ornm", "jalt": return 7
-        // A Latin font's forms for the start, middle and end of a word, and for a letter alone (see `positional`).
-        case "init": return 8
-        case "medi": return 9
-        case "fina": return 10
-        case "isol": return 11
         default: return nil
         }
     }
 
-    /// The face's alternates by character, each glyph once, for the character its first feature draws it for; a
+    /// The face's alternates by character, all of them, each glyph once, for the character its first feature draws it for; a
     /// glyph a character has too is left to the character, as are those in `excluding`, like the glyphs listed in
     /// groups of their own. After a character's alternates, those that several of the features draw together, from
     /// another of its alternates (see `chainLength`). Reads the font's GSUB table; call off the main thread.
@@ -79,8 +70,8 @@ public enum FeatureAlternates {
                        names: names(in: font))
     }
 
-    /// Forms by place in a word: alternates for a Latin font's letters, figures or signs, but how a script like Arabic
-    /// joins its letters, so not for those of a script with a group of its own.
+    /// Forms by place in a word: groups of their own for a Latin font's letters, figures or signs (`FeatureGlyph`), but
+    /// how a script like Arabic joins its letters, so not for those of a script with a group of its own.
     static let positional: Set<String> = ["init", "medi", "fina", "isol"]
 
     /// The most features an alternate takes together, like a stylistic set's old-style four (four.osf.ss01) or a zero
@@ -89,13 +80,6 @@ public enum FeatureAlternates {
 
     static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32], excluding: Set<CGGlyph>,
                         names: [String: String]) -> [UInt32: [FeatureAlternate]] {
-        var inScript: [UInt32: Bool] = [:]
-        func isInScript(_ character: UInt32) -> Bool {
-            if let known = inScript[character] { return known }
-            let found = GlyphGroup.of(character)?.isScript ?? false
-            inScript[character] = found
-            return found
-        }
         var order: [CGGlyph] = []
         var drawnFor: [CGGlyph: UInt32] = [:]
         var tags: [CGGlyph: [String]] = [:]
@@ -105,15 +89,13 @@ public enum FeatureAlternates {
         for feature in features {
             for entry in found[feature] ?? [] {
                 guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
-                      characters[entry.glyph] == nil, !excluding.contains(entry.glyph),
-                      !positional.contains(feature) || !isInScript(character)
+                      characters[entry.glyph] == nil, !excluding.contains(entry.glyph)
                 else { continue }
                 if let first = drawnFor[entry.glyph] {
                     // Another feature that draws it for the same character.
                     if first == character, tags[entry.glyph]?.contains(feature) == false { tags[entry.glyph]?.append(feature) }
                     continue
                 }
-                guard order.count < limit else { continue }
                 order.append(entry.glyph)
                 drawnFor[entry.glyph] = character
                 tags[entry.glyph] = [feature]
@@ -124,16 +106,16 @@ public enum FeatureAlternates {
         // glyph once, for the first way to it. Not from a glyph a character has, and each feature once on the way.
         let rankOf = Dictionary(uniqueKeysWithValues: features.enumerated().map { ($1, $0) })
         var frontier = Set(order)
-        for _ in 1..<chainLength where !frontier.isEmpty && order.count < limit {
+        for _ in 1..<chainLength where !frontier.isEmpty {
             var following: Set<CGGlyph> = []
             for feature in features {
                 for entry in found[feature] ?? [] {
                     guard let input = entry.components.first, frontier.contains(input), let character = drawnFor[input],
                           entry.glyph != input, drawnFor[entry.glyph] == nil, characters[entry.glyph] == nil,
-                          !excluding.contains(entry.glyph), !positional.contains(feature) || !isInScript(character)
+                          !excluding.contains(entry.glyph)
                     else { continue }
                     let before = together[input] ?? Array(tags[input]!.prefix(1))
-                    guard !before.contains(feature), order.count < limit else { continue }
+                    guard !before.contains(feature) else { continue }
                     order.append(entry.glyph)
                     drawnFor[entry.glyph] = character
                     together[entry.glyph] = (before + [feature]).sorted { rankOf[$0]! < rankOf[$1]! }

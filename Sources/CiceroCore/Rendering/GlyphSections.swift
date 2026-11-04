@@ -3,12 +3,14 @@ import Foundation
 
 /// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the small
 /// capitals its features draw for them, the ligatures, then the forms its features draw for languages, after the
-/// letters they're forms of, the figures, Roman numerals among them, then punctuation, which any text has, before
+/// letters they're forms of, and a Latin font's forms for the start, middle and end of a word and for a letter alone,
+/// the figures, Roman numerals among them, then punctuation, which any text has, before
 /// currency and the other signs, then each other script, Greek first, as Unicode lists them, then what's in no
 /// script, like the private-use glyphs, and last the accents and marks, which have no letter to sit on and are looked
 /// for least. A font without Latin letters starts with its scripts (see `GlyphSection.sections`).
 public enum GlyphGroup: Hashable, Comparable, Sendable {
-    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, localizedForms, proportionalFigures, tabularFigures
+    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, localizedForms
+    case initialForms, medialForms, finalForms, isolatedForms, proportionalFigures, tabularFigures
     case circledFigures, romanNumerals, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
     case caseSensitiveForms, arrows
     /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
@@ -47,6 +49,10 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .arrows: "Arrows"
         case .script(let name): name
         case .localizedForms: "Localized Forms"
+        case .initialForms: "Initial Forms"
+        case .medialForms: "Medial Forms"
+        case .finalForms: "Final Forms"
+        case .isolatedForms: "Isolated Forms"
         case .graphical: "Graphical"
         case .diacriticalMarks: "Diacritical Marks"
         case .combiningMarks: "Combining Marks"
@@ -70,25 +76,29 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .smallCaps: 4
         case .ligatures: 5
         case .localizedForms: 6
-        case .proportionalFigures: 7
-        case .tabularFigures: 8
-        case .circledFigures: 9
-        case .romanNumerals: 10
-        case .punctuationAndSymbols: 11
-        case .currency: 12
-        case .mathematicalOperators: 13
-        case .superscripts: 14
-        case .subscripts: 15
-        case .fractions: 16
-        case .numerators: 17
-        case .denominators: 18
-        case .ordinals: 19
-        case .caseSensitiveForms: 20
-        case .arrows: 21
-        case .script: 22
-        case .graphical: 23
-        case .diacriticalMarks: 24
-        case .combiningMarks: 25
+        case .initialForms: 7
+        case .medialForms: 8
+        case .finalForms: 9
+        case .isolatedForms: 10
+        case .proportionalFigures: 11
+        case .tabularFigures: 12
+        case .circledFigures: 13
+        case .romanNumerals: 14
+        case .punctuationAndSymbols: 15
+        case .currency: 16
+        case .mathematicalOperators: 17
+        case .superscripts: 18
+        case .subscripts: 19
+        case .fractions: 20
+        case .numerators: 21
+        case .denominators: 22
+        case .ordinals: 23
+        case .caseSensitiveForms: 24
+        case .arrows: 25
+        case .script: 26
+        case .graphical: 27
+        case .diacriticalMarks: 28
+        case .combiningMarks: 29
         }
     }
 
@@ -306,29 +316,21 @@ public struct GlyphSection: Identifiable, Sendable {
         self.glyphs = glyphs
     }
 
-    /// Keeps the grid usable for fonts with tens of thousands of CJK characters: as many from each Unicode block.
-    public static let limit = 6000
-
     /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
     /// point order within a group, but for superscripts, subscripts and fractions (see `valueOrder`), and the accented
     /// letters (see `letterOrder`), punctuation, symbols and operators (see `signOrder`), and Greek and Cyrillic (see
     /// `glyphsGreekOrder`), as type designers list them;
     /// private-use characters in the groups `privateUse` gives them, each right after the character it's a form of, or
     /// where that one would go (see `privateUseNames`).
-    /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`). Limits very
-    /// large fonts to a sensible number of characters from each Unicode block.
+    /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`); all the
+    /// others are listed, the tens of thousands of a CJK font too.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [], privateUse: PrivateUseNames = .none,
                                 leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
         var buckets: [GlyphGroup: [UInt32]] = [:]
-        var perBlock: [String: Int] = [:]
         let scripts = GlyphGroup.scripts(of: coverage)
         for range in coverage.ranges {
             for value in range {
-                // The block first: one that's full needs no character classified.
-                let block = Self.block(of: value) ?? ""
-                guard perBlock[block, default: 0] < limit, let group = privateUse[value] ?? GlyphGroup.of(value, in: scripts), !isEmpty(value)
-                else { continue }
-                perBlock[block, default: 0] += 1
+                guard let group = privateUse[value] ?? GlyphGroup.of(value, in: scripts), !isEmpty(value) else { continue }
                 buckets[group, default: []].append(value)
             }
         }
