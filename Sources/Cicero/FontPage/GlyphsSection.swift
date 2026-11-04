@@ -227,15 +227,15 @@ struct GlyphsSection: View {
                 }
                 .buttonStyle(StillPushButtonStyle())
             case .alternate(let alternate):
-                let names = alternate.featureNames.listed("or")
+                let names = alternate.listedNames
                 GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
                     .frame(width: 160, height: 130)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
                 VStack(spacing: 0) {
                     Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed")
-                    // "Single-storey a (ss07)"
-                    Text(zip(alternate.featureNames, alternate.features).map { "\($0) (\($1))" }.joined(separator: "\n"))
+                    // "Single-storey a (ss07)", and "Old-Style Figures (onum)" under it for a stylistic set's old-style figure.
+                    Text(zip(alternate.allFeatureNames, alternate.allFeatures).map { "\($0) (\($1))" }.joined(separator: "\n"))
                         .foregroundStyle(.secondary)
                 }
                 .font(.callout).multilineTextAlignment(.center)
@@ -297,7 +297,7 @@ struct GlyphsSection: View {
             SampleGlyph(family: family.id, characters: text, face: style.face, glyph: glyph.glyph, features: glyph.featureTags)
         case .alternate(let alternate):
             SampleGlyph(family: family.id, characters: text, face: style.face, glyph: alternate.glyph,
-                        features: Array(alternate.features.prefix(1)))
+                        features: alternate.drawnWith)
         }
         return SampleClip(text: text, glyph: glyph)
     }
@@ -358,7 +358,7 @@ struct GlyphsSection: View {
         switch cell {
         case .character(let scalar): CharacterCodes.unicode(scalar)
         case .feature(let glyph): ([CharacterCodes.unicode(glyph.character)] + glyph.featureTags).joined(separator: ".")
-        case .alternate(let alternate): "\(CharacterCodes.unicode(alternate.character)).\(alternate.features.first ?? "alt")"
+        case .alternate(let alternate): ([CharacterCodes.unicode(alternate.character)] + alternate.drawnWith).joined(separator: ".")
         }
     }
 
@@ -388,7 +388,7 @@ struct GlyphsSection: View {
                             label: "\(Self.text(glyph.character)), \(glyph.featureNames.listed())")
         case .alternate(let alternate):
             return GridCell(content: .glyph(alternate.glyph), isAlternate: true,
-                            label: "\(Self.text(alternate.character)), \(alternate.featureNames.listed("or"))")
+                            label: "\(Self.text(alternate.character)), \(alternate.listedNames)")
         }
     }
 
@@ -450,7 +450,7 @@ struct GlyphsSection: View {
     private func shownAlternates(of scalar: UInt32, _ filter: Filter) -> [FeatureAlternate] {
         let all = alternates[scalar] ?? []
         guard !filter.isEmpty, !filter.matches(scalar) else { return all }
-        return all.filter { alternate in zip(alternate.featureNames, alternate.features).contains { filter.matches(feature: $0, tag: $1) } }
+        return all.filter { alternate in zip(alternate.allFeatureNames, alternate.allFeatures).contains { filter.matches(feature: $0, tag: $1) } }
     }
 
     private func filtered(_ sections: [GlyphSection]) -> [GlyphSection] {

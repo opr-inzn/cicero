@@ -614,7 +614,7 @@ public struct GlyphSection: Identifiable, Sendable {
         }
         let found = scalars.map { ($0, alternates($0)) }
         // The font's own figures are old-style when a feature offers lining ones for them, and none old-style ones.
-        let tags = found.flatMap { $0.1.flatMap(\.features) } + glyphs.flatMap(\.alongWith)
+        let tags = found.flatMap { $0.1.flatMap(\.allFeatures) } + glyphs.flatMap(\.alongWith)
         let ownAreOldStyle = tags.contains("lnum") && !tags.contains("onum")
         enum Run: Int, CaseIterable { case lining, oldStyle, alternates, signs }
         func run(of features: [String]) -> Run {
@@ -626,7 +626,7 @@ public struct GlyphSection: Identifiable, Sendable {
         var runs: [Run: [GlyphCell]] = [:]
         for (scalar, list) in found {
             runs[run(of: []), default: []].append(.character(scalar))
-            for alternate in list { runs[run(of: alternate.features), default: []].append(.alternate(alternate)) }
+            for alternate in list { runs[run(of: alternate.allFeatures), default: []].append(.alternate(alternate)) }
         }
         for glyph in glyphs {
             let isFigure = GlyphGroup.of(glyph.character) == .proportionalFigures
