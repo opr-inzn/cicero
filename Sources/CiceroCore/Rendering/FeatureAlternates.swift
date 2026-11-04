@@ -2,31 +2,49 @@ import CoreText
 import Foundation
 
 /// A glyph a feature offers in place of a character's own, like a single-storey a in a stylistic set, a swash or an
-/// old-style figure: the font page lists it after the character's, marked as an alternate.
+/// old-style figure, or several features together, like a stylistic set's old-style four: the font page lists it after
+/// the character's, marked as an alternate.
 public struct FeatureAlternate: Hashable, Sendable {
     public let glyph: CGGlyph
     /// The character whose glyph it replaces.
     public let character: UInt32
-    /// The features that draw it for the character, by tag ("ss01") and by name ("Single-storey a"), in the same order.
+    /// The features that draw it for the character, by tag ("ss01") and by name ("Single-storey a"), in the same order:
+    /// any one of them, or with `alongWith` on too, the one.
     public let features: [String]
     public let featureNames: [String]
+    /// The features it takes on top of that one, like Old-Style Figures for a four.osf.ss01, with their names.
+    public let alongWith: [String]
+    public let alongWithNames: [String]
 
-    public init(glyph: CGGlyph, character: UInt32, features: [String], featureNames: [String]) {
+    public init(glyph: CGGlyph, character: UInt32, features: [String], featureNames: [String], alongWith: [String] = [],
+                alongWithNames: [String] = []) {
         self.glyph = glyph
         self.character = character
         self.features = features
         self.featureNames = featureNames
+        self.alongWith = alongWith
+        self.alongWithNames = alongWithNames
+    }
+
+    /// The features to turn on to draw it: the first that draws it, and those it takes along with it.
+    public var drawnWith: [String] { Array(features.prefix(1)) + alongWith }
+    /// All its features and their names, in the same order: those that draw it, then those it takes along with them.
+    public var allFeatures: [String] { features + alongWith }
+    public var allFeatureNames: [String] { featureNames + alongWithNames }
+    /// The features' names as words: "Single-storey a or Stylistic Alternates", "Stylistic Set 1 and Old-Style Figures".
+    public var listedNames: String { alongWith.isEmpty ? featureNames.listed("or") : allFeatureNames.listed() }
+    /// Whether it's a figure in another style, like an old-style one: a set of figures of its own, not an alternate of
+    /// the font's own figure, drawn by a figure style's feature (see `FeatureAlternates.figureStyles`) and no other.
+    public var isFigureStyle: Bool {
+        GlyphGroup.of(character) == .proportionalFigures && features.contains(where: FeatureAlternates.figureStyles.contains)
+            && alongWith.allSatisfy(FeatureAlternates.figureStyles.contains)
     }
 }
 
 public enum FeatureAlternates {
-    /// Keeps a font with alternates for thousands of characters to a sensible number.
-    public static let limit = 3000
-
     /// The features that offer another design of a character, in the order a character's alternates are listed. Those
-    /// that shape a script, set vertical text or the forms of East Asian characters are left out, but for the forms by
-    /// place in a word that a Latin font can have too, and so are those with groups of their own (`FeatureGlyph`) and
-    /// the ligatures'.
+    /// that shape a script, set vertical text or the forms of East Asian characters are left out, and so are those with
+    /// groups of their own (`FeatureGlyph`), like the forms by place in a word, and the ligatures'.
     static func rank(of tag: String) -> Int? {
         func numbered(_ prefix: String, through last: Int) -> Bool {
             tag.hasPrefix(prefix) && Int(tag.dropFirst(2)).map { (1...last).contains($0) } == true
@@ -40,18 +58,14 @@ public enum FeatureAlternates {
         case "c2pc": return 5
         case "onum", "lnum", "pnum", "zero": return 6
         case "titl", "hist", "calt", "rand", "nalt", "ornm", "jalt": return 7
-        // A Latin font's forms for the start, middle and end of a word, and for a letter alone (see `positional`).
-        case "init": return 8
-        case "medi": return 9
-        case "fina": return 10
-        case "isol": return 11
         default: return nil
         }
     }
 
-    /// The face's alternates by character, each glyph once, for the character its first feature draws it for; a
+    /// The face's alternates by character, all of them, each glyph once, for the character its first feature draws it for; a
     /// glyph a character has too is left to the character, as are those in `excluding`, like the glyphs listed in
-    /// groups of their own. Reads the font's GSUB table; call off the main thread.
+    /// groups of their own. After a character's alternates, those that several of the features draw together, from
+    /// another of its alternates (see `chainLength`). Reads the font's GSUB table; call off the main thread.
     public static func read(_ face: FontFace, excluding: Set<CGGlyph> = []) -> [UInt32: [FeatureAlternate]] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [:] }
@@ -62,45 +76,73 @@ public enum FeatureAlternates {
                        names: names(in: font))
     }
 
-    /// Forms by place in a word: alternates for a Latin font's letters, figures or signs, but how a script like Arabic
-    /// joins its letters, so not for those of a script with a group of its own.
-    static let positional: Set<String> = ["init", "medi", "fina", "isol"]
+    /// The features that draw figures in another style: old-style, lining or proportional ones.
+    public static let figureStyles: Set<String> = ["onum", "lnum", "pnum"]
+
+    /// The most features an alternate takes together, like a stylistic set's old-style four (four.osf.ss01) or a zero
+    /// with two sets on (zero.ss01.ss11).
+    static let chainLength = 3
 
     static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32], excluding: Set<CGGlyph>,
                         names: [String: String]) -> [UInt32: [FeatureAlternate]] {
-        var inScript: [UInt32: Bool] = [:]
-        func isInScript(_ character: UInt32) -> Bool {
-            if let known = inScript[character] { return known }
-            let found = GlyphGroup.of(character)?.isScript ?? false
-            inScript[character] = found
-            return found
-        }
         var order: [CGGlyph] = []
         var drawnFor: [CGGlyph: UInt32] = [:]
         var tags: [CGGlyph: [String]] = [:]
+        /// The features a glyph drawn from another alternate takes together, in `features`' order.
+        var together: [CGGlyph: [String]] = [:]
         let features = found.keys.sorted { (rank(of: $0) ?? .max, $0) < (rank(of: $1) ?? .max, $1) }
         for feature in features {
             for entry in found[feature] ?? [] {
                 guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
-                      characters[entry.glyph] == nil, !excluding.contains(entry.glyph),
-                      !positional.contains(feature) || !isInScript(character)
+                      characters[entry.glyph] == nil, !excluding.contains(entry.glyph)
                 else { continue }
                 if let first = drawnFor[entry.glyph] {
                     // Another feature that draws it for the same character.
                     if first == character, tags[entry.glyph]?.contains(feature) == false { tags[entry.glyph]?.append(feature) }
                     continue
                 }
-                guard order.count < limit else { continue }
                 order.append(entry.glyph)
                 drawnFor[entry.glyph] = character
                 tags[entry.glyph] = [feature]
             }
         }
+        // Then from those alternates: a feature that draws another glyph for one, like Old-Style Figures' four.osf.ss01
+        // for Stylistic Set 1's four.ss01, or the set's for the four.osf, draws it with that one's features on, each
+        // glyph once, for the first way to it. Not from a glyph a character has, and each feature once on the way.
+        let rankOf = Dictionary(uniqueKeysWithValues: features.enumerated().map { ($1, $0) })
+        var frontier = Set(order)
+        for _ in 1..<chainLength where !frontier.isEmpty {
+            var following: Set<CGGlyph> = []
+            for feature in features {
+                for entry in found[feature] ?? [] {
+                    guard let input = entry.components.first, frontier.contains(input), let character = drawnFor[input],
+                          entry.glyph != input, drawnFor[entry.glyph] == nil, characters[entry.glyph] == nil,
+                          !excluding.contains(entry.glyph)
+                    else { continue }
+                    let before = together[input] ?? Array(tags[input]!.prefix(1))
+                    guard !before.contains(feature) else { continue }
+                    order.append(entry.glyph)
+                    drawnFor[entry.glyph] = character
+                    together[entry.glyph] = (before + [feature]).sorted { rankOf[$0]! < rankOf[$1]! }
+                    following.insert(entry.glyph)
+                }
+            }
+            frontier = following
+        }
         var result: [UInt32: [FeatureAlternate]] = [:]
         for glyph in order {
-            let character = drawnFor[glyph]!, features = tags[glyph]!
-            result[character, default: []].append(FeatureAlternate(glyph: glyph, character: character, features: features,
-                                                                   featureNames: features.map { name(of: $0, in: names) }))
+            let character = drawnFor[glyph]!
+            let alternate: FeatureAlternate
+            if let all = together[glyph] {
+                let along = Array(all.dropFirst())
+                alternate = FeatureAlternate(glyph: glyph, character: character, features: [all[0]], featureNames: [name(of: all[0], in: names)],
+                                             alongWith: along, alongWithNames: along.map { name(of: $0, in: names) })
+            } else {
+                let features = tags[glyph]!
+                alternate = FeatureAlternate(glyph: glyph, character: character, features: features,
+                                             featureNames: features.map { name(of: $0, in: names) })
+            }
+            result[character, default: []].append(alternate)
         }
         return result
     }
