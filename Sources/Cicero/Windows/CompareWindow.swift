@@ -318,7 +318,6 @@ private struct CompareSample: Identifiable {
 /// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
 /// fonts that reach further join or leave below it. Dragging a row changes the order.
 private struct StackedLayout: View {
-    @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
 
     var body: some View {
@@ -334,15 +333,13 @@ private struct StackedLayout: View {
     }
 
     private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat) -> some View {
-        // On a whole pixel, as in the overlay, so the first font is at the same height in both.
-        let ascent = CompareSample.onPixel(sample.line.ascent, scale: displayScale)
-        return VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
             // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.ink.resolve(in: context.environment).cgColor
-                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
+                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: sample.line.ascent), color: color) }
             }
-            .frame(width: overhang + width, height: ascent + sample.line.descent)
+            .frame(width: overhang + width, height: sample.line.ascent + sample.line.descent)
             .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
@@ -361,12 +358,12 @@ private struct OverlayLayout: View {
 
     var body: some View {
         let guides = CompareGuides(samples.map { ($0.guides, $0.tint) })
-        // The baseline where the stacked layout has its first row's, so switching layouts leaves the first font where
-        // it is, and lower only where another font's glyphs reach higher, or the ascender lines or their labels
-        // wouldn't fit above them. The room a font keeps above its glyphs, for accents the text doesn't have, pushed
-        // it down a few points.
+        // The baseline right under the tallest of what's drawn: any font's glyphs, the ascender lines a point above
+        // the ascenders, and the labels. Not under the first font's ascent, which kept it where Stacked has its first
+        // row's (from the version after 0.11.0 up to 0.12.0b8): fonts keep different room above their glyphs for
+        // accents, so changing which font came first moved them all up or down, by 16 pt at 288 pt.
         let scale = max(displayScale, 1)
-        let ascent = CompareSample.onPixel(max(samples.first?.line.ascent ?? 0, samples.map(\.line.inkAscent).max() ?? 0,
+        let ascent = CompareSample.onPixel(max(samples.map(\.line.inkAscent).max() ?? 0,
                                                (samples.compactMap(\.guides.ascender).max() ?? 0).rounded(.up) + 1,
                                                guides.labelsAbove.rounded(.up)), scale: scale)
         // A point more for the lowest descender line, under its depth, and room for the labels.
