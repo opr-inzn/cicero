@@ -18,7 +18,8 @@ public struct FeatureSetting: Hashable, Codable, Sendable {
 /// Only those of files drawn are kept: a descriptor keeps the font made from it alive, and CoreText keeps all it worked
 /// out for a font (the outline of every glyph whose bounds it was asked, say) as long as the font lives. The scanner,
 /// coverage and measurements, which make a font of every file once, kept 0.7 GB that way after a first launch with
-/// ~1,200 families, and 2.8 GB with 20,000 (Tests/E2E/first-launch-memory).
+/// ~1,200 families, and 2.8 GB with 20,000 (Tests/E2E/first-launch-memory). And of those, only the files used last:
+/// scrolled through, a library of 20,000 families kept every one of its 50,000 files, 2.8 GB more.
 public final class FontLoader: Sendable {
     public static let shared = FontLoader()
 
@@ -27,10 +28,16 @@ public final class FontLoader: Sendable {
     /// Files read at once by a prefetch: enough to warm up thousands of files in well under a second,
     /// while leaving cores for drawing.
     private static let prefetchLanes = 4
+    /// Files whose descriptors are kept: well over what a window shows and its prefetches read ahead, and more than the
+    /// fonts kept (`fonts`), so a font on screen at another size doesn't read its file again.
+    static let keptFiles = 3000
 
     private struct State: Sendable {
-        /// The faces of every file read so far (empty for files CoreText can't read).
+        /// The faces of the files read and used last, at most `keptFiles` (empty for files CoreText can't read).
         var descriptors: [String: FileDescriptors] = [:]
+        /// When each file in `descriptors` was last used, by a clock that counts uses.
+        var lastUse: [String: Int] = [:]
+        var clock = 0
         /// Files a prefetch is about to read.
         var pending: Set<String> = []
         /// Files waiting to be prefetched, the next one last; the latest request goes first.
@@ -44,6 +51,28 @@ public final class FontLoader: Sendable {
         var changes: [String: Int] = [:]
         /// Variable faces' axes, by face and generation (see `axes(of:)`).
         var axes: [String: [AxisRange]] = [:]
+
+        mutating func use(_ path: String) {
+            clock += 1
+            lastUse[path] = clock
+        }
+
+        /// Over `keptFiles`, drops a tenth of them at once, those unused longest, so the sorting is rare.
+        mutating func keep(_ fileDescriptors: FileDescriptors, for path: String) {
+            descriptors[path] = fileDescriptors
+            use(path)
+            guard descriptors.count > FontLoader.keptFiles else { return }
+            let drop = descriptors.count - FontLoader.keptFiles * 9 / 10
+            for (old, _) in lastUse.sorted(by: { $0.value < $1.value }).prefix(drop) {
+                descriptors[old] = nil
+                lastUse[old] = nil
+            }
+        }
+
+        mutating func forget(_ path: String) {
+            descriptors[path] = nil
+            lastUse[path] = nil
+        }
 
         mutating func changed(_ path: String) {
             generations[path, default: 0] += 1
@@ -68,6 +97,7 @@ public final class FontLoader: Sendable {
         let features = features.sorted { ($0.type, $0.selector) < ($1.type, $1.selector) }
         let (generation, changes) = state.withLock { state in
             state.drawn.insert(face.path)
+            if state.descriptors[face.path] != nil { state.use(face.path) }
             return (state.generations[face.path] ?? 0, state.changes[face.path] ?? 0)
         }
         var key = "\(face.id)|\(generation)|\(Int((size * 2).rounded()))"
@@ -180,7 +210,7 @@ public final class FontLoader: Sendable {
             let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
                 // Still pending means nothing read or invalidated the file in the meantime.
-                if state.pending.remove(path) != nil { state.descriptors[path] = descriptors }
+                if state.pending.remove(path) != nil { state.keep(descriptors, for: path) }
             }
         }
     }
@@ -248,7 +278,7 @@ public final class FontLoader: Sendable {
     public func invalidate(paths: Set<String>) {
         state.withLock { state in
             for path in paths {
-                state.descriptors[path] = nil
+                state.forget(path)
                 state.pending.remove(path)
                 state.changed(path)
             }
@@ -269,7 +299,7 @@ public final class FontLoader: Sendable {
         #endif
         let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
         state.withLock { state in
-            state.descriptors[path] = descriptors
+            state.keep(descriptors, for: path)
             state.pending.remove(path)
         }
         return descriptors
