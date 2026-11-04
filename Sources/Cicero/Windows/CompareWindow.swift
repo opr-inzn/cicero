@@ -276,6 +276,10 @@ private struct CompareSample: Identifiable {
     /// The style chosen; nil when it follows the preview weight.
     let style: FaceID?
     let line: TextLine
+    /// Room above the baseline as a type designer draws it: up to the font's ascenders (the tallest of b, d, h, k and
+    /// l), or to the tallest glyph if one reaches higher. The font's ascent is often far taller, as it keeps room for
+    /// accents and line spacing: 1,020 units in a font whose ascenders and capitals end at 700.
+    let letterAscent: CGFloat
     /// Its place in `tints`.
     let tintIndex: Int
     let id: UUID
@@ -291,7 +295,18 @@ private struct CompareSample: Identifiable {
         let weight = chosen.map(\.face.styleWeight) ?? preview.weight
         let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
         line = TextLine(text, font: font, kerning: 0)
+        letterAscent = max(line.inkAscent, (Self.ascenderHeight(of: font) ?? 0).rounded(.up))
         tintIndex = entry.tint % Self.tints.count
+    }
+
+    /// The top of the tallest of b, d, h, k and l; nil for a font that has none of them, like an emoji font.
+    static func ascenderHeight(of font: CTFont) -> CGFloat? {
+        var characters = Array("bdhkl".utf16), glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        CTFontGetGlyphsForCharacters(font, &characters, &glyphs, characters.count)
+        return glyphs.filter { $0 != 0 }.compactMap { glyph -> CGFloat? in
+            guard let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isNull else { return nil }
+            return path.boundingBoxOfPath.maxY
+        }.max()
     }
 
     /// The style chosen for the family, if one was.
@@ -306,7 +321,8 @@ private struct CompareSample: Identifiable {
 }
 
 /// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
-/// fonts that reach further join or leave below it. Dragging a row changes the order.
+/// fonts that reach further join or leave below it; the first row from its ascenders up only (see `OverlayLayout`).
+/// Dragging a row changes the order.
 private struct StackedLayout: View {
     let samples: [CompareSample]
 
@@ -323,13 +339,16 @@ private struct StackedLayout: View {
     }
 
     private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        // Under the font's ascent, the room it keeps for accents and line spacing left a gap above the first row:
+        // 92 pt at 288 pt for a font whose ascent is 1,020 units and its ascenders 700. The rows under it keep it.
+        let ascent = sample.id == samples.first?.id ? sample.letterAscent : sample.line.ascent
+        return VStack(alignment: .leading, spacing: 6) {
             // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.ink.resolve(in: context.environment).cgColor
-                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: sample.line.ascent), color: color) }
+                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
             }
-            .frame(width: overhang + width, height: sample.line.ascent + sample.line.descent)
+            .frame(width: overhang + width, height: ascent + sample.line.descent)
             .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
@@ -345,9 +364,8 @@ private struct OverlayLayout: View {
 
     var body: some View {
         // The baseline where the stacked layout has its first row's, so switching layouts leaves the first font where
-        // it is, and lower only where another font's glyphs reach higher. The room a font keeps above its glyphs, for
-        // accents the text doesn't have, pushed it down a few points.
-        let ascent = max(samples.first?.line.ascent ?? 0, samples.map(\.line.inkAscent).max() ?? 0)
+        // it is, and lower only where another font's glyphs reach higher.
+        let ascent = max(samples.first?.letterAscent ?? 0, samples.map(\.line.inkAscent).max() ?? 0)
         let descent = samples.map(\.line.descent).max() ?? 0
         // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
         // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.
@@ -356,7 +374,10 @@ private struct OverlayLayout: View {
         // Glyphs reaching left of that go into the margin, as in the stacked rows.
         let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
         let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
-        VStack(alignment: .leading, spacing: 16) {
+        // The chips' names at the height the stacked layout has the first font's, 6 pt under the samples, and in the
+        // same size: 16 pt under them, in callout, they moved down 15.5 pt on going to Overlay. Under a font that
+        // reaches lower than the first, they go lower with it. Sideways they start level with the samples.
+        VStack(alignment: .leading, spacing: 6 - Self.chipPadding.height) {
             Canvas { context, _ in
                 let environment = context.environment
                 context.withCGContext { cg in
@@ -382,11 +403,13 @@ private struct OverlayLayout: View {
         }
     }
 
+    /// Around a chip's dot and name.
+    private static let chipPadding = CGSize(width: 10, height: 5)
+
     private func chip(_ sample: CompareSample) -> some View {
         SampleCaption(sample: sample, showsTint: true)
-            .font(.callout)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Self.chipPadding.width)
+            .padding(.vertical, Self.chipPadding.height)
             .background(.fill.tertiary, in: .capsule)
     }
 }
