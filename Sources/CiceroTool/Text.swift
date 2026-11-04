@@ -215,7 +215,7 @@ enum Text {
         let what = string(answer["set"]).map { "the set \($0)" } ?? "the text"
         if bool(answer["covered"]) == true { return "\(name) has every character of \(what)." }
         let missing = array(answer["missing"])
-        return "\(name) lacks \(plural(missing.count, "character", "characters")) of \(what):\n"
+        return "\(name) is missing \(plural(missing.count, "character", "characters")) of \(what):\n"
             + table(missing.map { ["  " + (string($0["character"]) ?? ""), string($0["unicode"]) ?? ""] })
     }
 
@@ -230,7 +230,7 @@ enum Text {
             if bool(sample["unreadable"]) == true {
                 row.append("can’t read its file")
             } else if !missing.isEmpty {
-                row.append("lacks " + missing.joined(separator: " "))
+                row.append("missing " + missing.joined(separator: " "))
             }
             return row
         }))

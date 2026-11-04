@@ -261,7 +261,7 @@ enum SampleSheet {
             note = "can’t read its file: \(sample.style.face.path)"
         } else if !sample.missing.isEmpty {
             let listed = sample.missing.prefix(listedMissing).compactMap(Unicode.Scalar.init).map { String(Character($0)) }
-            note = "lacks " + listed.joined(separator: " ")
+            note = "missing " + listed.joined(separator: " ")
             if sample.missing.count > listedMissing { note! += " and \(sample.missing.count - listedMissing) more" }
         }
         if let note {
