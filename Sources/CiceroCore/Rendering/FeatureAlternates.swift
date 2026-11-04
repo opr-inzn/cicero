@@ -38,7 +38,7 @@ public struct FeatureAlternate: Hashable, Sendable {
 public enum FeatureAlternates {
     /// The features that offer another design of a character, in the order a character's alternates are listed. Those
     /// that shape a script, set vertical text or the forms of East Asian characters are left out, and so are those with
-    /// groups of their own (`FeatureGlyph`), like a Latin font's forms by place in a word, and the ligatures'.
+    /// groups of their own (`FeatureGlyph`), like the forms by place in a word, and the ligatures'.
     static func rank(of tag: String) -> Int? {
         func numbered(_ prefix: String, through last: Int) -> Bool {
             tag.hasPrefix(prefix) && Int(tag.dropFirst(2)).map { (1...last).contains($0) } == true
@@ -69,10 +69,6 @@ public enum FeatureAlternates {
         return resolve(found, characters: LigatureGroup.characterGlyphs(of: font, needed: glyphs), excluding: excluding,
                        names: names(in: font))
     }
-
-    /// Forms by place in a word: groups of their own for a Latin font's letters, figures or signs (`FeatureGlyph`), but
-    /// how a script like Arabic joins its letters, so not for those of a script with a group of its own.
-    static let positional: Set<String> = ["init", "medi", "fina", "isol"]
 
     /// The most features an alternate takes together, like a stylistic set's old-style four (four.osf.ss01) or a zero
     /// with two sets on (zero.ss01.ss11).
