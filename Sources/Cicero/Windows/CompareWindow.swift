@@ -276,6 +276,8 @@ private struct CompareSample: Identifiable {
     /// The style chosen; nil when it follows the preview weight.
     let style: FaceID?
     let line: TextLine
+    /// Where its letters reach, for the overlay's lines.
+    let guides: GuideHeights
     /// Its place in `tints`.
     let tintIndex: Int
     let id: UUID
@@ -291,7 +293,15 @@ private struct CompareSample: Identifiable {
         let weight = chosen.map(\.face.styleWeight) ?? preview.weight
         let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
         line = TextLine(text, font: font, kerning: 0)
+        guides = GuideHeights(font)
         tintIndex = entry.tint % Self.tints.count
+    }
+
+    /// A baseline this far down, moved down to a whole device pixel. CoreText moves text between pixels to one of them
+    /// itself, up or down depending on where it draws, so lines measured from the baseline stood a pixel off the glyphs.
+    static func onPixel(_ ascent: CGFloat, scale: CGFloat) -> CGFloat {
+        let scale = max(scale, 1)
+        return (ascent * scale).rounded(.up) / scale
     }
 
     /// The style chosen for the family, if one was.
@@ -308,6 +318,7 @@ private struct CompareSample: Identifiable {
 /// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
 /// fonts that reach further join or leave below it. Dragging a row changes the order.
 private struct StackedLayout: View {
+    @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
 
     var body: some View {
@@ -323,13 +334,15 @@ private struct StackedLayout: View {
     }
 
     private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        // On a whole pixel, as in the overlay, so the first font is at the same height in both.
+        let ascent = CompareSample.onPixel(sample.line.ascent, scale: displayScale)
+        return VStack(alignment: .leading, spacing: 6) {
             // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.ink.resolve(in: context.environment).cgColor
-                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: sample.line.ascent), color: color) }
+                context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
             }
-            .frame(width: overhang + width, height: sample.line.ascent + sample.line.descent)
+            .frame(width: overhang + width, height: ascent + sample.line.descent)
             .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
@@ -339,38 +352,51 @@ private struct StackedLayout: View {
 }
 
 /// Every sample over the others, each in its tint, on a shared baseline, their first letters' first stems on each other
-/// (see `FirstStem`). Dragging a chip in the legend below changes the order; its dot changes the colour.
+/// (see `FirstStem`), over lines for the baseline and each font's cap height, x-height, ascenders and descenders, named on the
+/// left, with their heights in the fonts' units on the right (`CompareGuides`). Dragging a chip in the legend below
+/// changes the order; its dot changes the colour.
 private struct OverlayLayout: View {
+    @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
 
     var body: some View {
+        let guides = CompareGuides(samples.map { ($0.guides, $0.tint) })
         // The baseline where the stacked layout has its first row's, so switching layouts leaves the first font where
-        // it is, and lower only where another font's glyphs reach higher. The room a font keeps above its glyphs, for
-        // accents the text doesn't have, pushed it down a few points.
-        let ascent = max(samples.first?.line.ascent ?? 0, samples.map(\.line.inkAscent).max() ?? 0)
-        let descent = samples.map(\.line.descent).max() ?? 0
+        // it is, and lower only where another font's glyphs reach higher, or the ascender lines or their labels
+        // wouldn't fit above them. The room a font keeps above its glyphs, for accents the text doesn't have, pushed
+        // it down a few points.
+        let scale = max(displayScale, 1)
+        let ascent = CompareSample.onPixel(max(samples.first?.line.ascent ?? 0, samples.map(\.line.inkAscent).max() ?? 0,
+                                               (samples.compactMap(\.guides.ascender).max() ?? 0).rounded(.up) + 1,
+                                               guides.labelsAbove.rounded(.up)), scale: scale)
+        // A point more for the lowest descender line, under its depth, and room for the labels.
+        let descent = max(samples.map(\.line.descent).max() ?? 0, (samples.compactMap(\.guides.descender).max() ?? 0).rounded(.up) + 1,
+                          guides.labelsBelow.rounded(.up))
         // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
         // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.
         let stems = samples.map { FirstStem.x(in: $0.line.line) ?? 0 }
         let starts = stems.map { (stems.max() ?? 0) - $0 }
-        // Glyphs reaching left of that go into the margin, as in the stacked rows.
+        // Room for glyphs reaching left of that, between the names and the samples.
         let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
         let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
+        // The lines start right of the names.
+        let left = guides.nameWidth + CompareGuides.gap
         VStack(alignment: .leading, spacing: 16) {
             Canvas { context, _ in
                 let environment = context.environment
                 context.withCGContext { cg in
+                    guides.draw(in: cg, baselineAt: ascent, from: left, width: overhang + width, scale: scale, environment: environment)
                     // Over each other as inks on paper, or as lights in Dark Mode, so every font shows through those
                     // drawn over it. Simply laid over each other at 70 %, a few stems hid the serifs of a font below.
                     cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
                     for (sample, start) in zip(samples, starts) {
                         let color = sample.tint.opacity(0.7).resolve(in: environment).cgColor
-                        sample.line.draw(in: cg, baselineAt: CGPoint(x: overhang + start, y: ascent), color: color)
+                        sample.line.draw(in: cg, baselineAt: CGPoint(x: left + overhang + start, y: ascent), color: color)
                     }
                 }
             }
-            .frame(width: overhang + width, height: ascent + descent)
-            .padding(.leading, -overhang)
+            .frame(width: left + overhang + width + CompareGuides.gap + guides.valueWidth, height: ascent + descent)
+            // The legend starts level with the samples.
             Reorderable(samples: samples, layout: AnyLayout(FlowLayout(spacing: 8, lineSpacing: 8)), axis: .horizontal) { sample in
                 chip(sample)
                     .help("Drag to change the order")
@@ -379,6 +405,7 @@ private struct OverlayLayout: View {
                     .background(Color.canvas, in: .capsule)
             }
             .frame(width: max(width, 480), alignment: .leading)
+            .padding(.leading, left + overhang)
         }
     }
 
