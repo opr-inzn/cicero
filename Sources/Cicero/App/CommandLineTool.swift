@@ -3,11 +3,11 @@ import CiceroCore
 import Observation
 
 /// The `cicero` command-line tool, in the bundle at Contents/Helpers/cicero, so it's always the app's own version.
-/// Install Cicero CLI links it into /usr/local/bin, which Terminal's search path has, and its zsh completion script
-/// (Contents/Resources/zsh/_cicero) into /usr/local/share/zsh/site-functions, which zsh's is, with one administrator's
-/// password when either folder needs one. Both are links into the bundle, so an update changes them with the app. The
-/// menu item says when they're installed, and installing ends with a dialog, not a toast: the item is used from the
-/// menu bar, often with no Library window open to show one.
+/// Install Cicero CLI links it into /usr/local/bin, which Terminal's search path has, and its completion scripts
+/// (Contents/Resources/zsh, bash and fish) into the folders in /usr/local/share where each shell looks for them, with one
+/// administrator's password when any folder needs one. All are links into the bundle, so an update changes them with the
+/// app. The menu item says when they're installed, and installing ends with a dialog, not a toast: the item is used from
+/// the menu bar, often with no Library window open to show one.
 enum CommandLineTool {
     /// Whether /usr/local/bin/cicero is a link to this Cicero's tool, for the menu item. Checked again as Cicero comes
     /// to the front, as Terminal or another Cicero may have changed the link meanwhile.
@@ -23,8 +23,8 @@ enum CommandLineTool {
             ) { _ in MainActor.assumeIsolated { State.shared.refresh() } }
         }
 
-        /// Both links: a CLI installed before there was a completion script reads as not installed, so choosing the
-        /// item again adds the script.
+        /// Every link: a CLI installed before there was a completion script, or before there were bash's and fish's,
+        /// reads as not installed, so choosing the item again adds the scripts.
         func refresh() {
             let installed = links.map { links in links.allSatisfy(\.isMade) } ?? false
             if installed != self.installed { self.installed = installed }
@@ -43,7 +43,15 @@ enum CommandLineTool {
     /// Where the links go: /usr/local, or for the E2E tests the folder in CICERO_INSTALL_PREFIX, which they may write to.
     nonisolated static let prefix = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CICERO_INSTALL_PREFIX"].flatMap { $0.isEmpty ? nil : $0 } ?? "/usr/local")
     nonisolated static let link = prefix.appendingPathComponent("bin/cicero")
-    nonisolated static let completionLink = prefix.appendingPathComponent("share/zsh/site-functions/_cicero")
+    /// Each shell's completion script: where it is in the bundle's Contents/Resources, and where its link goes. zsh looks
+    /// in its site-functions; fish in vendor_completions.d of each folder in XDG_DATA_DIRS, /usr/local/share without
+    /// one; bash, with Homebrew's bash-completion (macOS's own bash has no completion scripts), in
+    /// bash-completion/completions of the same folders.
+    nonisolated static let completionScripts = [
+        (script: "zsh/_cicero", link: "share/zsh/site-functions/_cicero"),
+        (script: "bash/cicero", link: "share/bash-completion/completions/cicero"),
+        (script: "fish/cicero.fish", link: "share/fish/vendor_completions.d/cicero.fish"),
+    ]
 
     /// The tool in the bundle that's running; nil in a build without it (swift run).
     static var tool: URL? {
@@ -51,11 +59,12 @@ enum CommandLineTool {
         return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
     }
 
-    /// The tool's link and its completion script's; nil in a build without them.
+    /// The tool's link and its completion scripts'; nil in a build without them.
     static var links: [Link]? {
-        let script = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/zsh/_cicero")
-        guard let tool, FileManager.default.fileExists(atPath: script.path) else { return nil }
-        return [Link(at: link, to: tool), Link(at: completionLink, to: script)]
+        let resources = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources")
+        let scripts = completionScripts.map { Link(at: prefix.appendingPathComponent($0.link), to: resources.appendingPathComponent($0.script)) }
+        guard let tool, scripts.allSatisfy({ FileManager.default.fileExists(atPath: $0.to.path) }) else { return nil }
+        return [Link(at: link, to: tool)] + scripts
     }
 
     /// What the link points to now, if it's a link.
@@ -63,7 +72,7 @@ enum CommandLineTool {
         try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)
     }
 
-    /// Links the tool and its completion script, asking first to replace a file in /usr/local/bin that isn't a link to
+    /// Links the tool and its completion scripts, asking first to replace a file in /usr/local/bin that isn't a link to
     /// this tool, and from a copy outside the Applications folder, which a link would stop working for once it's moved
     /// or the disk image goes. A completion script there that isn't this one's goes without asking: it's for the cicero
     /// being replaced, or for none.

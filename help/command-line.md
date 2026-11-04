@@ -9,13 +9,13 @@ It works while Cicero is closed too, and it never opens Cicero. It turns fonts o
 ## Install the CLI
 
 1. Choose **Cicero → Install Cicero CLI**. Cicero needs to be in your Applications folder.
-2. Enter your administrator password if macOS asks for it. Cicero puts a link to the CLI in `/usr/local/bin`, and a link to its Tab completion in `/usr/local/share/zsh/site-functions`.
+2. Enter your administrator password if macOS asks for it. Cicero puts a link to the CLI in `/usr/local/bin`, and links to its Tab completion for zsh, bash and fish in `/usr/local/share`.
 3. Cicero says when the CLI is installed, and the menu item then reads **Cicero CLI installed**.
 4. Open Terminal and type `cicero --help`.
 
 The CLI is inside Cicero (`Cicero.app/Contents/Helpers/cicero`), so it updates with Cicero.
 
-If you installed the CLI with an earlier beta, the menu item reads **Install Cicero CLI** again: choose it once more to add Tab completion.
+If you installed the CLI with an earlier beta, the menu item reads **Install Cicero CLI** again: choose it once more to add Tab completion, or its bash and fish parts.
 
 ### Tab completion
 
@@ -28,6 +28,10 @@ autoload -Uz compinit && compinit -i
 ```
 
 To turn it on later, choose **Cicero → Cicero CLI installed**, or add the line yourself. To turn it off, take the line out of `.zshrc`.
+
+In fish, Tab completion works when the CLI is installed. Open a new window.
+
+In bash, Tab completion needs bash-completion, which the bash that comes with macOS doesn’t have. Install bash and bash-completion with Homebrew (`brew install bash bash-completion@2`) and turn it on as Homebrew says. Then Tab completes `cicero` too.
 
 ## Use it in Claude and Codex
 
@@ -264,6 +268,6 @@ When **Show system fonts** is off in **Settings → General**, the command leave
 
 ### How do I remove the command?
 
-In Terminal, type `sudo rm /usr/local/bin/cicero /usr/local/share/zsh/site-functions/_cicero`. Cicero itself stays as it is.
+In Terminal, type `sudo rm /usr/local/bin/cicero /usr/local/share/zsh/site-functions/_cicero /usr/local/share/bash-completion/completions/cicero /usr/local/share/fish/vendor_completions.d/cicero.fish`. Cicero itself stays as it is.
 
 To take Cicero out of your agent app, type `claude mcp remove --scope user cicero` or `codex mcp remove cicero`, or take `cicero` out of Claude Desktop’s `claude_desktop_config.json`.
