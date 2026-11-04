@@ -7,8 +7,10 @@ import SwiftUI
 /// The lines Compare's Overlay draws under its samples, the baseline and each font's cap height, x-height, ascender and
 /// descender
 /// (`GuideHeights`), with their names in a column to the left and their heights in the font's units to the right.
-/// Lines of a kind closer together than a label is tall share one: one name, the fonts' values side by side in their
-/// order and tints. Labels that would overlap make way for each other, as little as they can.
+/// A font's lines of different kinds at the same height in its units are one line, with one label naming them all,
+/// like "Ascender = Cap Height". Lines of a kind closer together than a label is tall share one: one name, the fonts'
+/// values side by side in their order and tints. Labels that would overlap make way for each other, as little as they
+/// can.
 struct CompareGuides {
     enum Kind: CaseIterable {
         case ascender, capHeight, xHeight, baseline, descender
@@ -28,7 +30,11 @@ struct CompareGuides {
     }
 
     struct Line {
-        let kind: Kind
+        /// Every kind it stands for, in `Kind`'s order: more than one where a font's heights are the same in its units.
+        let kinds: [Kind]
+        var kind: Kind { kinds[0] }
+        /// Its kinds' names, like "Ascender = Cap Height".
+        var name: String { kinds.map(\.name).joined(separator: " = ") }
         /// Above the baseline; negative for a descender.
         let height: CGFloat
         /// The height in the font's units.
@@ -39,7 +45,8 @@ struct CompareGuides {
     }
 
     struct Label {
-        let kind: Kind
+        let kinds: [Kind]
+        var name: String { kinds.map(\.name).joined(separator: " = ") }
         /// In the fonts' order.
         let lines: [Line]
         /// Its middle, in points below the baseline (negative above it).
@@ -62,35 +69,42 @@ struct CompareGuides {
     let labelsBelow: CGFloat
 
     init(_ fonts: [(guides: GuideHeights, tint: Color)]) {
-        var lines = [Line(kind: .baseline, height: 0, units: 0, font: nil, tint: nil)]
+        var lines = [Line(kinds: [.baseline], height: 0, units: 0, font: nil, tint: nil)]
         for (index, (guides, tint)) in fonts.enumerated() {
-            if let height = guides.ascender {
-                lines.append(Line(kind: .ascender, height: height, units: guides.units(height), font: index, tint: tint))
+            let heights: [(Kind, CGFloat?)] = [(.ascender, guides.ascender), (.capHeight, guides.capHeight), (.xHeight, guides.xHeight),
+                                               (.descender, guides.descender.map { -$0 })]
+            var own: [Line] = []
+            for case let (kind, height?) in heights {
+                let units = height < 0 ? -guides.units(-height) : guides.units(height)
+                // The same in the font's units as one already there: one line for both, as far out as the further,
+                // so it stays clear of both their glyphs. Each with its own line and label, a font whose ascenders
+                // were as tall as its capitals showed the same value twice.
+                if let same = own.firstIndex(where: { $0.units == units }) {
+                    let line = own[same]
+                    own[same] = Line(kinds: line.kinds + [kind], height: height < 0 ? min(line.height, height) : max(line.height, height),
+                                     units: units, font: index, tint: tint)
+                } else {
+                    own.append(Line(kinds: [kind], height: height, units: units, font: index, tint: tint))
+                }
             }
-            if let height = guides.capHeight {
-                lines.append(Line(kind: .capHeight, height: height, units: guides.units(height), font: index, tint: tint))
-            }
-            if let height = guides.xHeight {
-                lines.append(Line(kind: .xHeight, height: height, units: guides.units(height), font: index, tint: tint))
-            }
-            if let depth = guides.descender {
-                lines.append(Line(kind: .descender, height: -depth, units: -guides.units(depth), font: index, tint: tint))
-            }
+            lines += own
         }
         self.lines = lines
 
-        // Lines of a kind each less than a label's height from the next share a label.
-        var groups: [(kind: Kind, lines: [Line])] = []
-        for kind in Kind.allCases {
+        // Lines of the same kinds each less than a label's height from the next share a label.
+        var groups: [(kinds: [Kind], lines: [Line])] = []
+        var kindsInOrder: [[Kind]] = []
+        for line in lines where !kindsInOrder.contains(line.kinds) { kindsInOrder.append(line.kinds) }
+        for kinds in kindsInOrder {
             var group: [Line] = []
-            for line in lines.filter({ $0.kind == kind }).sorted(by: { $0.height > $1.height }) {
+            for line in lines.filter({ $0.kinds == kinds }).sorted(by: { $0.height > $1.height }) {
                 if let last = group.last, last.height - line.height >= Self.labelHeight {
-                    groups.append((kind, group))
+                    groups.append((kinds, group))
                     group = []
                 }
                 group.append(line)
             }
-            if !group.isEmpty { groups.append((kind, group)) }
+            if !group.isEmpty { groups.append((kinds, group)) }
         }
 
         // Each label where its lines are on average; labels that would overlap pushed apart into a block, at the
@@ -115,7 +129,7 @@ struct CompareGuides {
             for (place, member) in block.members.enumerated() { centers[member] = block.top + (CGFloat(place) + 0.5) * height }
         }
         labels = order.map { index in
-            Label(kind: groups[index].kind, lines: groups[index].lines.sorted { ($0.font ?? -1) < ($1.font ?? -1) }, center: centers[index])
+            Label(kinds: groups[index].kinds, lines: groups[index].lines.sorted { ($0.font ?? -1) < ($1.font ?? -1) }, center: centers[index])
         }
         nameWidth = labels.map { Self.width(Self.text(name: $0, environment: nil)) }.max() ?? 0
         valueWidth = labels.map { Self.width(Self.text(values: $0, environment: nil)) }.max() ?? 0
@@ -157,7 +171,7 @@ struct CompareGuides {
     /// The name in the font's tint when the label is one font's, else grey.
     private static func text(name label: Label, environment: EnvironmentValues?) -> CTLine {
         let tint = label.lines.count == 1 ? label.lines[0].tint : nil
-        return line([(label.kind.name, tint)], environment: environment)
+        return line([(label.name, tint)], environment: environment)
     }
 
     /// Each font's value in its tint, side by side; the baseline's 0 in grey. Below the baseline with a minus sign.
