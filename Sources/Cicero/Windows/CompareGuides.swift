@@ -142,7 +142,8 @@ struct CompareGuides {
     /// the descenders, over the cap height, the x-height and the ascenders (across two rows, or through the glyphs' last row, a line
     /// looked blurred or a pixel off). The fonts' lines in their tints at 80 %, mixed as the samples are, the baseline
     /// grey over them. The names end `gap` left of `x`, the values start `gap` right of the lines.
-    func draw(in cg: CGContext, baselineAt baseline: CGFloat, from x: CGFloat, width: CGFloat, scale: CGFloat, environment: EnvironmentValues) {
+    func draw(in cg: CGContext, baselineAt baseline: CGFloat, from x: CGFloat, width: CGFloat, labels showsLabels: Bool = true,
+              scale: CGFloat, environment: EnvironmentValues) {
         let scale = max(scale, 1)
         func line(_ line: Line, color: CGColor) {
             let row = ((baseline - line.height) * scale).rounded() - (line.kind.isAbove ? 1 : 0)
@@ -158,7 +159,7 @@ struct CompareGuides {
             line(each, color: Color.secondary.resolve(in: environment).cgColor)
         }
         cg.setBlendMode(.normal)
-        for label in labels {
+        for label in labels where showsLabels {
             // Its capitals and figures centred on the label's middle.
             let textBaseline = baseline + label.center + Self.font.capHeight / 2
             let name = Self.text(name: label, environment: environment)

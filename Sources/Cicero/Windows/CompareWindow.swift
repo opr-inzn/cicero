@@ -31,6 +31,9 @@ struct CompareWindow: View {
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
     @AppStorage("compare.size") private var size = 72.0
+    /// Overlay's vertical metrics lines, and their names and values.
+    @AppStorage("compare.showsMetrics") private var showsMetrics = true
+    @AppStorage("compare.showsMetricLabels") private var showsMetricLabels = true
     /// Its own, so typing here leaves the previews in the main window as they are; saved soon, not with each letter.
     @Bindable private var savedText = SavedSoon.compareText
     private var text: String { savedText.value }
@@ -52,6 +55,7 @@ struct CompareWindow: View {
         let samples = entries.filter { !waiting.contains($0.path) }.map {
             CompareSample($0.entry, family: $0.family, text: text.isEmpty ? Self.placeholder : text, size: size, model: model, preview: preview)
         }
+        let metrics = CompareFrame.Metrics(lines: showsMetrics, labels: showsMetrics && showsMetricLabels)
         Group {
             if entries.isEmpty {
                 // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls
@@ -67,8 +71,8 @@ struct CompareWindow: View {
                 ScrollView([.horizontal, .vertical]) {
                     Group {
                         switch layout {
-                        case .stacked: StackedLayout(samples: samples)
-                        case .overlay: OverlayLayout(samples: samples)
+                        case .stacked: StackedLayout(samples: samples, metrics: metrics)
+                        case .overlay: OverlayLayout(samples: samples, metrics: metrics)
                         }
                     }
                     .padding(24)
@@ -109,7 +113,8 @@ struct CompareWindow: View {
                               help: "One row per font, or every font over each other")
             }
             ToolbarCapsule {
-                PreviewOptionsButton(own: OwnPreviewOptions(text: $savedText.value, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
+                PreviewOptionsButton(own: OwnPreviewOptions(text: $savedText.value, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes,
+                                                            showsMetrics: $showsMetrics, showsMetricLabels: $showsMetricLabels))
             }
         }
     }
@@ -313,13 +318,15 @@ private struct CompareSample: Identifiable {
 private struct StackedLayout: View {
     @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
+    /// Overlay's, for its baseline.
+    let metrics: CompareFrame.Metrics
 
     var body: some View {
         // The first row's baseline where Overlay has its, so switching leaves the first font at its height. Its own
         // ascent left the room it keeps above its glyphs for accents: going to Overlay moved it up, by 20 pt at 288 pt.
         // The rows still start at the margin, not past a column as wide as Overlay's line names.
         let frame = CompareFrame(lines: samples.map(\.line), guides: samples.map(\.guides), tints: samples.map(\.tint),
-                                 scale: displayScale)
+                                 metrics: metrics, scale: displayScale)
         let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
@@ -355,17 +362,20 @@ private struct StackedLayout: View {
 private struct OverlayLayout: View {
     @Environment(\.displayScale) private var displayScale
     let samples: [CompareSample]
+    let metrics: CompareFrame.Metrics
 
     var body: some View {
         let frame = CompareFrame(lines: samples.map(\.line), guides: samples.map(\.guides), tints: samples.map(\.tint),
-                                 scale: displayScale)
+                                 metrics: metrics, scale: displayScale)
         let scale = max(displayScale, 1)
         VStack(alignment: .leading, spacing: 16) {
             Canvas { context, _ in
                 let environment = context.environment
                 context.withCGContext { cg in
-                    frame.guides.draw(in: cg, baselineAt: frame.ascent, from: frame.left, width: frame.overhang + frame.width,
-                                      scale: scale, environment: environment)
+                    if metrics.lines {
+                        frame.guides.draw(in: cg, baselineAt: frame.ascent, from: frame.left, width: frame.overhang + frame.width,
+                                          labels: metrics.labels, scale: scale, environment: environment)
+                    }
                     // Over each other as inks on paper, or as lights in Dark Mode, so every font shows through those
                     // drawn over it. Simply laid over each other at 70 %, a few stems hid the serifs of a font below.
                     cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
@@ -375,7 +385,9 @@ private struct OverlayLayout: View {
                     }
                 }
             }
-            .frame(width: frame.origin + frame.width + CompareGuides.gap + frame.guides.valueWidth, height: frame.ascent + frame.descent)
+            .frame(width: frame.origin + frame.width + frame.right, height: frame.ascent + frame.descent)
+            // Without the names, glyphs reaching left of the start go into the margin, as in Stacked.
+            .padding(.leading, metrics.labels ? 0 : -frame.overhang)
             // The legend starts level with the samples.
             Reorderable(samples: samples, layout: AnyLayout(FlowLayout(spacing: 8, lineSpacing: 8)), axis: .horizontal) { sample in
                 chip(sample)
@@ -385,7 +397,7 @@ private struct OverlayLayout: View {
                     .background(Color.canvas, in: .capsule)
             }
             .frame(width: max(frame.width, 480), alignment: .leading)
-            .padding(.leading, frame.origin)
+            .padding(.leading, metrics.labels ? frame.origin : 0)
         }
     }
 

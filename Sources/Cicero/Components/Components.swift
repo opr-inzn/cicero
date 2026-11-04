@@ -1042,6 +1042,9 @@ struct OwnPreviewOptions {
     var placeholder: String
     var size: Binding<Double>
     var sizeRange: ClosedRange<Double>
+    /// Compare's tickboxes for Overlay's vertical metrics lines, and for their names and values.
+    var showsMetrics: Binding<Bool>?
+    var showsMetricLabels: Binding<Bool>?
 }
 
 /// The toolbar button with sample text and size. No Leading: the list, grid and specimens set each sample on one line,
@@ -1121,6 +1124,17 @@ private struct PreviewOptions: View {
                 } else {
                     row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
                 }
+            }
+            if let lines = own?.showsMetrics, let labels = own?.showsMetricLabels {
+                Section {
+                    Toggle("Show Vertical Metrics", isOn: lines)
+                        .help("Lines in Overlay for the baseline and each font’s cap height, x-height, ascenders and descenders")
+                    // Labels only for lines that are there.
+                    Toggle("Show Labels", isOn: labels)
+                        .disabled(!lines.wrappedValue)
+                        .help("The lines’ names on the left and their heights in the fonts’ units on the right")
+                }
+                .toggleStyle(.checkbox)
             }
         }
         .formStyle(.grouped)
