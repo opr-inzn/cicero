@@ -872,9 +872,12 @@ public final class LibraryScanner: Sendable {
             func addNext() {
                 guard let (path, stamp) = pending.popFirst() else { return }
                 group.addTask {
-                    // Previews and coverage need the same descriptors, so they aren't read again.
-                    let (faces, descriptors) = FontFileReader.read(atPath: path)
-                    FontLoader.shared.keep(descriptors, for: path)
+                    // Its descriptors aren't kept (see `FontLoader`). A file is read only when it's new or changed, so
+                    // fonts made from the path before are out of date, like the stand-in for a file that was moved away
+                    // and back: the grid still drew it as it went, from no file, which macOS answers with its "?" font
+                    // for one that's on.
+                    let faces = FontFileReader.faces(atPath: path)
+                    FontLoader.shared.invalidate(paths: [path])
                     return (path, CachedFile(stamp: stamp, dateAdded: FontFileReader.dateAdded(atPath: path), faces: faces))
                 }
             }
