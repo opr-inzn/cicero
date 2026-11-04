@@ -21,8 +21,8 @@ struct GridCell: Hashable {
 
 /// What a row's cells do, by their index in it.
 struct GridRowActions {
-    /// A click, or VoiceOver's press: opens the cell's popover. A click gives the cell's frame in the row, for the
-    /// popover to point at (see `cellPopover`); VoiceOver's press, which doesn't know it, gives none.
+    /// A click, or VoiceOver's press: opens the cell's popover, with the cell's frame in the row for it to point at
+    /// (see `cellPopover`).
     let open: (Int, CGRect?) -> Void
     /// The cell's right-click menu.
     let menu: (Int) -> [GridMenuItem]
@@ -43,7 +43,7 @@ struct GridMenuItem {
 /// A row of the font page's glyph or ligature cells, drawn as one view. A view for each cell, with its background, dot,
 /// menu, drag and click, made scrolling a font with thousands of glyphs stutter: the page's stack built about twenty of
 /// them for each row coming into view, some 12 ms for every 40 pt scrolled, where a row like this takes 2. The cells look
-/// as they did; AppKit tells which one a click, drag or right-click is on, and VoiceOver has a button for each.
+/// as they did; AppKit tells which one a click, drag or right-click is on, and gives VoiceOver a button for each.
 struct GlyphGridRow: View {
     let cells: [GridCell]
     /// Cells per row: a short last row's cells are as wide as a full one's.
@@ -66,11 +66,13 @@ struct GlyphGridRow: View {
         let drawing = GridRowDrawing(cells: cells, columns: columns, face: face, generation: generation, weight: weight,
                                      variations: variations, padding: padding, selected: selected, room: room)
         drawing.equatable()
+            // VoiceOver reads the cells from the events view over it.
+            .accessibilityHidden(true)
             // Out past the row, for text reaching past its cell, as `UnclippedText` lets it.
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
             .frame(height: GlyphsSection.cell)
             .overlay {
-                GridRowEvents(count: cells.count, columns: columns, actions: actions) { index, size, isDark, scale in
+                GridRowEvents(labels: cells.map(\.label), columns: columns, actions: actions) { index, size, isDark, scale in
                     // The cell as it's drawn, to drag.
                     let cell = GridRowDrawing(cells: [cells[index]], columns: 1, face: face, generation: generation, weight: weight,
                                               variations: variations, padding: padding, selected: nil, room: EdgeInsets())
@@ -78,17 +80,6 @@ struct GlyphGridRow: View {
                         .environment(\.colorScheme, isDark ? .dark : .light))
                     renderer.scale = scale
                     return renderer.nsImage
-                }
-            }
-            .accessibilityRepresentation {
-                HStack(spacing: GlyphsSection.spacing) {
-                    ForEach(cells.indices, id: \.self) { index in
-                        Button(cells[index].label) { actions.open(index, nil) }
-                            .frame(maxWidth: .infinity)
-                    }
-                    ForEach(cells.count..<max(columns, cells.count), id: \.self) { _ in
-                        Color.clear.frame(maxWidth: .infinity)
-                    }
                 }
             }
     }
@@ -258,10 +249,11 @@ enum GlyphDrawing {
     }
 }
 
-/// Clicks, drags, right-clicks and tooltips on a row's cells. A view per row, which SwiftUI's gestures and menus can't
-/// tell the cells of apart, so AppKit's events, which say where they are.
+/// Clicks, drags, right-clicks, tooltips and VoiceOver on a row's cells. A view per row, which SwiftUI's gestures and
+/// menus can't tell the cells of apart, so AppKit's events, which say where they are.
 private struct GridRowEvents: NSViewRepresentable {
-    let count: Int
+    /// What VoiceOver reads for each cell.
+    let labels: [String]
     let columns: Int
     let actions: GridRowActions
     /// A cell, as it looks, at its size, in dark or light, at a scale.
@@ -272,12 +264,13 @@ private struct GridRowEvents: NSViewRepresentable {
     }
 
     func updateNSView(_ view: GridRowEventView, context: Context) {
-        view.update(count: count, columns: columns, actions: actions, picture: picture)
+        view.update(labels: labels, columns: columns, actions: actions, picture: picture)
     }
 }
 
 final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
-    private var count = 0
+    private var labels: [String] = []
+    private var count: Int { labels.count }
     private var columns = 1
     private var actions: GridRowActions?
     private var picture: ((Int, CGSize, Bool, CGFloat) -> NSImage?)?
@@ -295,10 +288,59 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
 
     override var isFlipped: Bool { true }
 
-    fileprivate func update(count: Int, columns: Int, actions: GridRowActions, picture: @escaping (Int, CGSize, Bool, CGFloat) -> NSImage?) {
+    fileprivate func update(labels: [String], columns: Int, actions: GridRowActions, picture: @escaping (Int, CGSize, Bool, CGFloat) -> NSImage?) {
         let hadHelp = self.actions?.help != nil
-        (self.count, self.columns, self.actions, self.picture) = (count, columns, actions, picture)
+        if labels != self.labels, cellElements != nil {
+            cellElements = nil
+            NSAccessibility.post(element: self, notification: .layoutChanged)
+        }
+        (self.labels, self.columns, self.actions, self.picture) = (labels, columns, actions, picture)
         if hadHelp || actions.help != nil { updateToolTips() }
+    }
+
+    // MARK: - Accessibility
+
+    /// A button for each cell, made when VoiceOver or another client first asks, and kept until the cells change. They
+    /// were SwiftUI buttons in the row's `accessibilityRepresentation`, some 600 SwiftUI elements a row, built for every
+    /// row the page's lazy stack had made each time a client read the page: Arial Unicode MS went past 1.3 GB.
+    private var cellElements: [GridCellElement]?
+
+    private var elements: [GridCellElement] {
+        if let cellElements { return cellElements }
+        let made = labels.indices.map { GridCellElement(row: self, index: $0, label: labels[$0]) }
+        cellElements = made
+        return made
+    }
+
+    /// The row itself isn't one: its cells are read as the page's, as the buttons were.
+    override func isAccessibilityElement() -> Bool { false }
+
+    override func accessibilityChildren() -> [Any]? { elements }
+
+    // AppKit asks on the main thread, as for the rest.
+    nonisolated override func accessibilityHitTest(_ point: NSPoint) -> Any? {
+        MainActor.assumeIsolated { element(at: point) } ?? super.accessibilityHitTest(point)
+    }
+
+    /// The cell at a point on the screen.
+    private func element(at point: NSPoint) -> GridCellElement? {
+        guard let window, let index = index(at: convert(window.convertPoint(fromScreen: point), from: nil)) else { return nil }
+        return elements[index]
+    }
+
+    /// A cell's frame on the screen; none once it's gone.
+    fileprivate func screenFrame(of index: Int) -> CGRect {
+        let frames = frames
+        guard let window, frames.indices.contains(index) else { return .zero }
+        return window.convertToScreen(convert(frames[index], to: nil))
+    }
+
+    /// VoiceOver's press, as a click: the popover points at the cell.
+    fileprivate func press(_ index: Int) -> Bool {
+        let frames = frames
+        guard let actions, frames.indices.contains(index) else { return false }
+        actions.open(index, frames[index])
+        return true
     }
 
     private var scale: CGFloat { window?.backingScaleFactor ?? 2 }
@@ -400,6 +442,36 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
 
     func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
         index(at: point).flatMap { actions?.help?($0) } ?? ""
+    }
+}
+
+/// A cell of a row, as VoiceOver reads it: a button with the cell's label, where the cell is, which opens its popover.
+/// It asks the row for its frame each time, as the row moves with the page. AppKit calls it on the main thread only,
+/// where it's made.
+nonisolated private final class GridCellElement: NSAccessibilityElement, @unchecked Sendable {
+    private weak var row: GridRowEventView?
+    private let index: Int
+
+    @MainActor
+    init(row: GridRowEventView, index: Int, label: String) {
+        self.row = row
+        self.index = index
+        super.init()
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(label)
+        setAccessibilityParent(row)
+    }
+
+    override func isAccessibilityElement() -> Bool { true }
+
+    override func accessibilityFrame() -> NSRect {
+        let (row, index) = (row, index)
+        return MainActor.assumeIsolated { row?.screenFrame(of: index) ?? .zero }
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        let (row, index) = (row, index)
+        return MainActor.assumeIsolated { row?.press(index) ?? false }
     }
 }
 

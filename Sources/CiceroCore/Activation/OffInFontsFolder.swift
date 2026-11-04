@@ -108,6 +108,11 @@ extension ActivationEngine {
     @concurrent
     public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async
         -> (placed: [String: String], new: [String], failed: [String]) {
+        // Without it, macOS slows an app it can't see (App Nap) and lets the Mac sleep: every wait for fontd here then
+        // takes far longer, and an import of thousands of fonts left alone takes hours more.
+        let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
+                                                             reason: "Copying fonts in")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         let fm = FileManager.default
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         let plan = copyPlan(files)

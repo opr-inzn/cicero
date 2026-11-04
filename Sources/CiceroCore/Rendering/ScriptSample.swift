@@ -73,11 +73,12 @@ public final class ScriptSamples: Sendable {
 
     /// What a preview of `face` sets: `text`, or, when the face has none of its letters, text in its own script (see
     /// `ScriptSample`), `long` or short. `text` while the face's file hasn't been read, as reading it could take a while.
-    public func text(_ text: String, for face: FontFace, long: Bool = false) -> String {
+    /// `cached` false for asking about many faces once, as measuring every family's sample does (see `FontLoader.font`).
+    public func text(_ text: String, for face: FontFace, long: Bool = false, cached: Bool = true) -> String {
         guard !FontLoader.shared.wouldWait(for: face.path) else { return text }
         // Before the font, so a sample from a file that changed meanwhile is worked out again next time.
         let generation = FontLoader.shared.generation(of: face.path)
-        let font = FontLoader.shared.font(face, size: 12)
+        let font = FontLoader.shared.font(face, size: 12, cached: cached)
         guard ScriptSample.isNeeded(for: text, has: { font.glyph(for: Character($0)) != nil }),
               let sample = sample(for: face, generation: generation, font: font)
         else { return text }

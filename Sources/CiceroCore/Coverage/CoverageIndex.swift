@@ -158,9 +158,10 @@ public final class CoverageIndex: Sendable {
 
     /// The scalars the face's file says it covers (see `CharacterMap`), but those whose glyphs draw nothing, like a
     /// trial font's empty ones (see `EmptyGlyphs`); an installed font of the same name when the file can't be read,
-    /// and nothing when neither exists.
+    /// and nothing when neither exists. From the file's own descriptors, never those kept for drawing: the outline of
+    /// every glyph asked for its bounds stays as long as the font does (see `FontLoader`).
     static func scalars(of face: FontFace) -> ScalarRanges {
-        let descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
+        let descriptor = FontFiles.descriptor(for: face, in: FontFiles.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         guard CTFontCopyPostScriptName(font) as String == face.postScriptName else { return .empty }

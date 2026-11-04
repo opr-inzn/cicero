@@ -14,8 +14,12 @@ public struct FeatureSetting: Hashable, Codable, Sendable {
 }
 
 /// Creates CTFonts straight from font files, so inactive fonts preview without being installed.
-/// Thread-safe. Descriptors are prefetched in the background after scans so scrolling never parses files,
-/// and the scanner hands over the ones it reads, so a new file is read once.
+/// Thread-safe. Descriptors are prefetched in the background after scans so scrolling never parses files.
+/// Only those of files drawn are kept: a descriptor keeps the font made from it alive, and CoreText keeps all it worked
+/// out for a font (the outline of every glyph whose bounds it was asked, say) as long as the font lives. The scanner,
+/// coverage and measurements, which make a font of every file once, kept 0.7 GB that way after a first launch with
+/// ~1,200 families, and 2.8 GB with 20,000 (Tests/E2E/first-launch-memory). And of those, only the files used last:
+/// scrolled through, a library of 20,000 families kept every one of its 50,000 files, 2.8 GB more.
 public final class FontLoader: Sendable {
     public static let shared = FontLoader()
 
@@ -24,10 +28,16 @@ public final class FontLoader: Sendable {
     /// Files read at once by a prefetch: enough to warm up thousands of files in well under a second,
     /// while leaving cores for drawing.
     private static let prefetchLanes = 4
+    /// Files whose descriptors are kept: well over what a window shows and its prefetches read ahead, and more than the
+    /// fonts kept (`fonts`), so a font on screen at another size doesn't read its file again.
+    static let keptFiles = 3000
 
     private struct State: Sendable {
-        /// The faces of every file read so far (empty for files CoreText can't read).
+        /// The faces of the files read and used last, at most `keptFiles` (empty for files CoreText can't read).
         var descriptors: [String: FileDescriptors] = [:]
+        /// When each file in `descriptors` was last used, by a clock that counts uses.
+        var lastUse: [String: Int] = [:]
+        var clock = 0
         /// Files a prefetch is about to read.
         var pending: Set<String> = []
         /// Files waiting to be prefetched, the next one last; the latest request goes first.
@@ -42,6 +52,28 @@ public final class FontLoader: Sendable {
         /// Variable faces' axes, by face and generation (see `axes(of:)`).
         var axes: [String: [AxisRange]] = [:]
 
+        mutating func use(_ path: String) {
+            clock += 1
+            lastUse[path] = clock
+        }
+
+        /// Over `keptFiles`, drops a tenth of them at once, those unused longest, so the sorting is rare.
+        mutating func keep(_ fileDescriptors: FileDescriptors, for path: String) {
+            descriptors[path] = fileDescriptors
+            use(path)
+            guard descriptors.count > FontLoader.keptFiles else { return }
+            let drop = descriptors.count - FontLoader.keptFiles * 9 / 10
+            for (old, _) in lastUse.sorted(by: { $0.value < $1.value }).prefix(drop) {
+                descriptors[old] = nil
+                lastUse[old] = nil
+            }
+        }
+
+        mutating func forget(_ path: String) {
+            descriptors[path] = nil
+            lastUse[path] = nil
+        }
+
         mutating func changed(_ path: String) {
             generations[path, default: 0] += 1
             if drawn.remove(path) != nil { changes[path, default: 0] += 1 }
@@ -55,8 +87,9 @@ public final class FontLoader: Sendable {
     /// `weight` sets the weight axis of variable faces (clamped to its range); ignored otherwise. `variations` sets
     /// any of their axes, by tag, the weight axis over `weight`; the slider that sets one keeps it in range. A variable
     /// face is otherwise drawn exactly where it sits on its axes, optical size included: CoreText would match that to
-    /// the point size, and drops a setting of the default to do so. `cached` false makes the font without keeping it, for
-    /// measuring many faces once: kept, they'd push the fonts on screen out of the cache.
+    /// the point size, and drops a setting of the default to do so. `cached` false makes the font without keeping it, nor
+    /// its file's descriptors unless they were read already, for measuring many faces once: kept, they'd push the fonts
+    /// on screen out of the cache, and keep what CoreText worked out for each.
     public func font(_ face: FontFace, size: CGFloat, weight: Double? = nil, variations: [String: Double] = [:],
                      features: [FeatureSetting] = [], cached: Bool = true) -> CTFont {
         let weight = face.weightAxis.flatMap { axis in weight.map { min(max($0, axis.minimum), axis.maximum) } }
@@ -64,6 +97,7 @@ public final class FontLoader: Sendable {
         let features = features.sorted { ($0.type, $0.selector) < ($1.type, $1.selector) }
         let (generation, changes) = state.withLock { state in
             state.drawn.insert(face.path)
+            if state.descriptors[face.path] != nil { state.use(face.path) }
             return (state.generations[face.path] ?? 0, state.changes[face.path] ?? 0)
         }
         var key = "\(face.id)|\(generation)|\(Int((size * 2).rounded()))"
@@ -72,7 +106,7 @@ public final class FontLoader: Sendable {
         for feature in features { key += "|\(feature.type):\(feature.selector)" }
         if let font = fonts[key] { return font }
 
-        var descriptor = descriptor(for: face)
+        var descriptor = descriptor(for: face, in: cached ? fileDescriptors(at: face.path).list : descriptors(at: face.path))
         if face.weightAxis != nil || !face.axes.isEmpty {
             descriptor = Self.descriptor(descriptor, weight: weight, variations: variations)
         }
@@ -176,7 +210,7 @@ public final class FontLoader: Sendable {
             let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
                 // Still pending means nothing read or invalidated the file in the meantime.
-                if state.pending.remove(path) != nil { state.descriptors[path] = descriptors }
+                if state.pending.remove(path) != nil { state.keep(descriptors, for: path) }
             }
         }
     }
@@ -204,20 +238,9 @@ public final class FontLoader: Sendable {
 
     private static let mostReadAhead: Int64 = 32 << 20
 
-    /// Keeps descriptors read elsewhere: the scanner reads every new file. It reads one only when it's new or changed, so
-    /// fonts made from the path before are out of date, like the stand-in for a file that was moved away and back: the
-    /// grid still drew it as it went, from no file, which macOS answers with its "?" font for one that's on.
-    func keep(_ descriptors: [CTFontDescriptor], for path: String) {
-        state.withLock { state in
-            state.descriptors[path] = FileDescriptors(descriptors)
-            state.pending.remove(path)
-            state.changed(path)
-        }
-    }
-
-    /// The file's faces, read now unless they were already; for coverage, which needs the same ones.
+    /// The file's faces: those kept for drawing, else read now and not kept (see `font(cached:)`).
     func descriptors(at path: String) -> [CTFontDescriptor] {
-        fileDescriptors(at: path).list
+        state.withLock { $0.descriptors[path] }?.list ?? FontFiles.descriptors(at: path)
     }
 
     /// Whether the file's faces have been read (prefetched or on demand), so making a font from it won't read the file.
@@ -255,17 +278,16 @@ public final class FontLoader: Sendable {
     public func invalidate(paths: Set<String>) {
         state.withLock { state in
             for path in paths {
-                state.descriptors[path] = nil
+                state.forget(path)
                 state.pending.remove(path)
                 state.changed(path)
             }
         }
     }
 
-    /// The face's descriptor, reading its file now if it wasn't prefetched; an installed font of
-    /// the same name when the file can't be read.
-    private func descriptor(for face: FontFace) -> CTFontDescriptor {
-        FontFiles.descriptor(for: face, in: fileDescriptors(at: face.path).list) ?? FontFiles.installedDescriptor(named: face.postScriptName)
+    /// The face's descriptor among its file's; an installed font of the same name when the file can't be read.
+    private func descriptor(for face: FontFace, in descriptors: [CTFontDescriptor]) -> CTFontDescriptor {
+        FontFiles.descriptor(for: face, in: descriptors) ?? FontFiles.installedDescriptor(named: face.postScriptName)
     }
 
     private func fileDescriptors(at path: String) -> FileDescriptors {
@@ -277,7 +299,7 @@ public final class FontLoader: Sendable {
         #endif
         let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
         state.withLock { state in
-            state.descriptors[path] = descriptors
+            state.keep(descriptors, for: path)
             state.pending.remove(path)
         }
         return descriptors

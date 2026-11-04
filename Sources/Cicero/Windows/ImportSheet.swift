@@ -466,13 +466,13 @@ struct ImportSheet: View {
     }
 
     /// Of `total` files, `copying` copied in and `same` the same as others: ", 3 in your library already", ", in your library
-    /// already" for all of them, ", 2 the same as other files".
+    /// already" for all of them, ", 2 duplicates".
     private func alreadyNote(total: Int, copying: Int, same: Int) -> String {
         let inAlready = total - copying - same
         if copying + same == 0, total > 0 { return ", in your library already" }
         var parts: [String] = []
         if inAlready > 0 { parts.append("\(inAlready.formatted()) in your library already") }
-        if same > 0 { parts.append(same == 1 ? "1 the same as another file" : "\(same.formatted()) the same as other files") }
+        if same > 0 { parts.append(same == 1 ? "1 duplicate" : "\(same.formatted()) duplicates") }
         return parts.isEmpty ? "" : ", " + parts.listed()
     }
 
