@@ -530,51 +530,131 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
 /// A font family with everything lists, sorting and filters need worked out once, when the library
 /// is built, so views never recompute it.
 public struct Family: Identifiable, Hashable, Sendable {
+    /// Its fields, in one object every copy of it shares, so a copy is one reference: lists of thousands of families are
+    /// copied all the time (each search makes one, SwiftUI copies each family to read its id), and copying each of its
+    /// fields took about 6 ms a list at 20,000 families. Read-only, so sharing changes nothing else.
+    private let storage: Storage
+
+    private final class Storage: Sendable {
+        let fields: Fields
+        init(_ fields: Fields) { self.fields = fields }
+    }
+
+    private struct Fields: Hashable, Sendable {
+        // What the properties below give, described there.
+        let id: String
+        let name: String
+        let faces: [LibraryFace]
+        let state: FamilyState
+        let folderIDs: Set<UUID>
+        let manufacturer: String?
+        let dateAdded: Date?
+        let classification: Classification
+        let mixesSerifAndSans: Bool
+        let format: FontFormat
+        let isVariable: Bool
+        let isMonospaced: Bool
+        let hasItalics: Bool
+        let rangeLabel: String
+        let formatLabel: String
+        let app: String?
+        let isAdobeFonts: Bool
+        let position: SwitchPosition
+        let regular: LibraryFace
+        let activeCount: Int
+        let hasActive: Bool
+        let hasActivatable: Bool
+        let hasTemporarilyActivatable: Bool
+        let hasDeactivatable: Bool
+        let temporaryScope: TemporaryScope?
+
+        init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
+            precondition(!faces.isEmpty, "A family has at least one face")
+            id = name
+            let regular = Family.nearest(400, in: faces)
+            // The regular style's, else any style's: a family's styles name it alike.
+            self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
+                ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
+            self.faces = faces
+            self.state = state
+            self.folderIDs = folderIDs
+            self.manufacturer = manufacturer
+            dateAdded = faces.compactMap(\.dateAdded).min()
+            isVariable = faces.contains { !$0.face.axes.isEmpty }
+            isMonospaced = faces.contains { $0.face.isMonospaced }
+            hasItalics = faces.contains { $0.face.isItalic }
+            rangeLabel = Family.rangeLabel(of: faces.map(\.face))
+            formatLabel = Family.formatLabel(of: faces.map(\.face))
+            let apps = Set(faces.map(\.app))
+            app = apps.count == 1 ? apps.first! : nil
+            isAdobeFonts = faces.allSatisfy(\.isAdobeFonts)
+            position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
+            let formats = Set(faces.map { FontFormat.of(path: $0.face.path) })
+            format = formats.count == 1 ? formats.first! : .mixed
+            classification = Classification.of(name: name, faces: faces)
+            mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
+            self.regular = regular
+            activeCount = faces.count { $0.state.isActive }
+            hasActive = activeCount > 0
+            hasActivatable = faces.contains(where: \.canActivate)
+            hasTemporarilyActivatable = faces.contains(where: \.canActivateTemporarily)
+            hasDeactivatable = faces.contains(where: \.canDeactivate)
+            let scopes = Set(faces.filter(\.state.isActive).map(\.state.temporaryScope))
+            temporaryScope = scopes.count == 1 ? scopes.first! : nil
+        }
+    }
+
     /// The family name, as the fonts give it; the user's data knows the family by it.
-    public let id: String
+    public var id: String { storage.fields.id }
     /// The name to show: the family's in the Mac's language, when its fonts have one (ヒラギノ角ゴシック for Hiragino Sans on a
     /// Mac in Japanese), else `id`.
-    public let name: String
+    public var name: String { storage.fields.name }
     /// In `LibraryScanner.stylePrecedes`' order: lightest first, then along the designer's own axes, narrowest first,
     /// the other registered axes, and each upright before its italic.
-    public let faces: [LibraryFace]
-    public let state: FamilyState
+    public var faces: [LibraryFace] { storage.fields.faces }
+    public var state: FamilyState { storage.fields.state }
     /// Watched folders (and Cicero's Inactive folder) that contain the family.
-    public let folderIDs: Set<UUID>
+    public var folderIDs: Set<UUID> { storage.fields.folderIDs }
     /// The foundry the files name, tidied (no "Inc.", URLs or copyright lines). User renames are applied by the app.
-    public let manufacturer: String?
-    public let dateAdded: Date?
-    public let classification: Classification
+    public var manufacturer: String? { storage.fields.manufacturer }
+    public var dateAdded: Date? { storage.fields.dateAdded }
+    public var classification: Classification { storage.fields.classification }
     /// Set when the letters of some of its styles are serif and of others sans serif, as in a family with both
     /// Sans and Serif styles: it stays unclassified rather than going by its name.
-    public let mixesSerifAndSans: Bool
-    public let format: FontFormat
-    public let isVariable: Bool
-    public let isMonospaced: Bool
-    public let hasItalics: Bool
+    public var mixesSerifAndSans: Bool { storage.fields.mixesSerifAndSans }
+    public var format: FontFormat { storage.fields.format }
+    public var isVariable: Bool { storage.fields.isVariable }
+    public var isMonospaced: Bool { storage.fields.isMonospaced }
+    public var hasItalics: Bool { storage.fields.hasItalics }
     /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
-    public let rangeLabel: String
+    public var rangeLabel: String { storage.fields.rangeLabel }
     /// The kinds of file the faces come in, variable ones apart, for the exported font list: "OTF", "Variable",
     /// "OTF · Variable".
-    public let formatLabel: String
+    public var formatLabel: String { storage.fields.formatLabel }
+    /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
+    public var app: String? { storage.fields.app }
+    /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
+    public var isAdobeFonts: Bool { storage.fields.isAdobeFonts }
+    public var position: SwitchPosition { storage.fields.position }
+    /// The regular upright face, which stands for the family in previews and coverage.
+    public var regular: LibraryFace { storage.fields.regular }
+    public var activeCount: Int { storage.fields.activeCount }
+    public var hasActive: Bool { storage.fields.hasActive }
+    public var hasActivatable: Bool { storage.fields.hasActivatable }
+    public var hasTemporarilyActivatable: Bool { storage.fields.hasTemporarilyActivatable }
+    public var hasDeactivatable: Bool { storage.fields.hasDeactivatable }
+    /// Set when every active face is temporarily active with this scope.
+    public var temporaryScope: TemporaryScope? { storage.fields.temporaryScope }
     /// The kinds of file the faces come in, variable ones too, for tile captions: "OTF", "TTF", "OTF · TTF".
     public var fileKinds: String {
         Set(faces.map { ($0.face.path as NSString).pathExtension.uppercased() }).sorted().joined(separator: " · ")
     }
-    /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
-    public let app: String?
-    /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
-    public let isAdobeFonts: Bool
-    public let position: SwitchPosition
-    /// The regular upright face, which stands for the family in previews and coverage.
-    public let regular: LibraryFace
-    public let activeCount: Int
-    public let hasActive: Bool
-    public let hasActivatable: Bool
-    public let hasTemporarilyActivatable: Bool
-    public let hasDeactivatable: Bool
-    /// Set when every active face is temporarily active with this scope.
-    public let temporaryScope: TemporaryScope?
+
+    public static func == (a: Family, b: Family) -> Bool {
+        a.storage === b.storage || a.storage.fields == b.storage.fields
+    }
+
+    public func hash(into hasher: inout Hasher) { hasher.combine(storage.fields) }
 
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
     /// The axes besides weight its styles sit apart on, by tag and the font's name for them, in the order they're
@@ -621,38 +701,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var features: OpenTypeFeatures { faces.reduce([]) { $0.union($1.face.features) } }
 
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
-        precondition(!faces.isEmpty, "A family has at least one face")
-        id = name
-        let regular = Self.nearest(400, in: faces)
-        // The regular style's, else any style's: a family's styles name it alike.
-        self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
-            ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
-        self.faces = faces
-        self.state = state
-        self.folderIDs = folderIDs
-        self.manufacturer = manufacturer
-        dateAdded = faces.compactMap(\.dateAdded).min()
-        isVariable = faces.contains { !$0.face.axes.isEmpty }
-        isMonospaced = faces.contains { $0.face.isMonospaced }
-        hasItalics = faces.contains { $0.face.isItalic }
-        rangeLabel = Self.rangeLabel(of: faces.map(\.face))
-        formatLabel = Self.formatLabel(of: faces.map(\.face))
-        let apps = Set(faces.map(\.app))
-        app = apps.count == 1 ? apps.first! : nil
-        isAdobeFonts = faces.allSatisfy(\.isAdobeFonts)
-        position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
-        let formats = Set(faces.map { FontFormat.of(path: $0.face.path) })
-        format = formats.count == 1 ? formats.first! : .mixed
-        classification = Classification.of(name: name, faces: faces)
-        mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
-        self.regular = regular
-        activeCount = faces.count { $0.state.isActive }
-        hasActive = activeCount > 0
-        hasActivatable = faces.contains(where: \.canActivate)
-        hasTemporarilyActivatable = faces.contains(where: \.canActivateTemporarily)
-        hasDeactivatable = faces.contains(where: \.canDeactivate)
-        let scopes = Set(faces.filter(\.state.isActive).map(\.state.temporaryScope))
-        temporaryScope = scopes.count == 1 ? scopes.first! : nil
+        storage = Storage(Fields(name: name, faces: faces, state: state, folderIDs: folderIDs, manufacturer: manufacturer))
     }
 
     /// The switch position with some faces at other positions, worked out like `position`: for the app

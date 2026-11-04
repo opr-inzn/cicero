@@ -300,10 +300,14 @@ extension AppModel {
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
-        let listed = library.families.filter { family in
-            guard data.lists(family) else { return false }
-            return tests.contains { $0(family) } && matches(family)
-        }
+        // Read once, not through observation for each family; and the families' places first, so that a list of every
+        // family, as All Fonts without a search, is the library's own, not a copy of each: copying 20,000 families took
+        // 6 ms, half of making the list.
+        let data = data, families = library.families
+        func keeps(_ family: Family) -> Bool { data.lists(family) && tests.contains { $0(family) } && matches(family) }
+        var kept: [Int] = []
+        for index in families.indices where keeps(families[index]) { kept.append(index) }
+        let listed = kept.count == families.count ? families : kept.map { families[$0] }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 
