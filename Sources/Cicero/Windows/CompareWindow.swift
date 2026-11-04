@@ -551,7 +551,7 @@ private struct SampleCaption: View {
             .labelsHidden()
             if sample.family.faces.count > 1 {
                 Divider()
-                Button("Compare Another Style", systemImage: "plus") {
+                Button("Another Style", systemImage: "plus") {
                     let automatic = sample.family.face(nearestWeight: preview.weight).id
                     let shown = model.compareEntries.filter { $0.familyID == sample.family.id }.map { $0.style ?? automatic }
                     model.compareAnotherStyle(of: sample.id, besides: Set(shown))

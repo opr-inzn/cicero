@@ -215,7 +215,7 @@ The Compare window shows them in a text of its own, “Hamburgefonstiv” until 
 
 The Compare window has a size of its own, from 24 to 720 pt, 72 pt at first, so you can look at the fonts up close without changing the previews in the main window. Set it with **Size** in the Compare window’s **Preview Options**, or choose **View → Zoom Out** or **Zoom In** (⌘− and ⌘+) to go to the next smaller or bigger common size, like 96, 120 or 144 pt.
 
-Each font is in its regular style at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to the regular style. **Compare Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
+Each font is in its regular style at first. To compare another, click the style next to its name and choose one; **Automatic** goes back to the regular style. **Another Style** in the same menu adds the family again in a style that isn’t there yet, so you can set a family’s styles against each other, like Regular over Bold.
 
 To change the order, drag a row in Stacked or a name in Overlay. Both layouts keep the same order.
 
