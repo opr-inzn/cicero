@@ -104,11 +104,11 @@ struct CompareWindow: View {
         .focusedSceneValue(\.compareSize, $size)
         .toolbar {
             ToolbarCapsule { AddFamiliesButton(isPresented: $isAdding) }
-            ToolbarCapsule {
+            ToolbarCapsule(spaced: true) {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
                               help: "One row per font, or every font over each other")
             }
-            ToolbarCapsule {
+            ToolbarCapsule(spaced: true) {
                 PreviewOptionsButton(own: OwnPreviewOptions(text: $savedText.value, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
             }
         }

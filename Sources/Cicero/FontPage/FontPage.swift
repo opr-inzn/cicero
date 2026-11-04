@@ -88,7 +88,10 @@ struct FontPage: View {
         .navigationTitle(family.name)
         // No Preview Options: the page has its own size, tracking and alignment, and takes the weight from the
         // browser's. Its Leading, `PreviewSettings.lineSpacing`, is shared by every font page.
-        .toolbar { ToolbarCapsule { InfoButton() } }
+        .toolbar {
+            ToolbarCapsule { InfoButton() }
+            ToolbarGap()
+        }
         .onExitCommand { model.openFamilyID = nil }
     }
 }

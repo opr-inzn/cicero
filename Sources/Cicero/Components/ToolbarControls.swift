@@ -3,17 +3,28 @@ import SwiftUI
 // Toolbar controls that highlight what's chosen or on, and light up under the pointer as AppKit's do, as the back
 // button does next to them. On macOS 15, which has no glass, the toolbar has the system's own controls instead.
 
-/// A toolbar item in a glass capsule of its own, 8 pt from the next as the Info button is from the search
-/// field. AppKit puts neighbouring items in one capsule, and a ToolbarSpacer between them leaves 16 pt.
+/// A toolbar item on AppKit's own glass, as the back button is. AppKit puts neighbouring items in one capsule, so
+/// one that follows another is `spaced`: a ToolbarSpacer before it gives it a capsule of its own, 16 pt from the last.
 struct ToolbarCapsule<Content: View>: ToolbarContent {
+    var spaced = false
     @ViewBuilder let content: () -> Content
 
     var body: some ToolbarContent {
-        if #available(macOS 26, *) {
-            ToolbarItem { content().glassEffect(.regular, in: .capsule) }
-                .sharedBackgroundVisibility(.hidden)
+        if #available(macOS 26, *), spaced {
+            ToolbarSpacer(.fixed)
+            ToolbarItem { content() }
         } else {
             ToolbarItem { content() }
+        }
+    }
+}
+
+/// After the last capsule, the gap a `spaced` one has before it, so the search field stands as far from the capsules
+/// as they do from each other. Without it, AppKit leaves 8 pt there.
+struct ToolbarGap: ToolbarContent {
+    var body: some ToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarSpacer(.fixed)
         }
     }
 }

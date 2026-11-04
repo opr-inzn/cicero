@@ -87,8 +87,9 @@ struct BrowserView: View {
 struct BrowserToolbar: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarCapsule { BrowserModePicker() }
-        ToolbarCapsule { PreviewOptionsButton() }
-        ToolbarCapsule { InfoButton() }
+        ToolbarCapsule(spaced: true) { PreviewOptionsButton() }
+        ToolbarCapsule(spaced: true) { InfoButton() }
+        ToolbarGap()
     }
 }
 
