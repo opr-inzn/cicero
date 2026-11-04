@@ -299,6 +299,13 @@ private struct CompareSample: Identifiable {
         tintIndex = entry.tint % Self.tints.count
     }
 
+    /// The room above the first baseline in either layout: the tallest `letterAscent` of all the fonts, whichever
+    /// comes first. Only the first font's, and the first line moved down as a taller font in Overlay, or one dragged
+    /// to the top, needed more.
+    static func topAscent(of samples: [CompareSample]) -> CGFloat {
+        samples.map(\.letterAscent).max() ?? 0
+    }
+
     /// The top of the tallest of b, d, h, k and l; nil for a font that has none of them, like an emoji font.
     static func ascenderHeight(of font: CTFont) -> CGFloat? {
         var characters = Array("bdhkl".utf16), glyphs = [CGGlyph](repeating: 0, count: characters.count)
@@ -321,27 +328,28 @@ private struct CompareSample: Identifiable {
 }
 
 /// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
-/// fonts that reach further join or leave below it; the first row from its ascenders up only (see `OverlayLayout`).
-/// Dragging a row changes the order.
+/// fonts that reach further join or leave below it; the first row from the tallest font's ascenders up only, whichever
+/// font that is (see `CompareSample.topAscent`). Dragging a row changes the order.
 private struct StackedLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
         let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
+        let top = CompareSample.topAscent(of: samples)
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
-            row(sample, overhang: overhang, width: width)
+            row(sample, overhang: overhang, width: width, top: top)
         } lifted: { sample in
             // Opaque, so the rows it passes don't show through.
-            row(sample, overhang: overhang, width: width)
+            row(sample, overhang: overhang, width: width, top: top)
                 .background { Color.canvas.padding(-8) }
         }
     }
 
-    private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat) -> some View {
+    private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat, top: CGFloat) -> some View {
         // Under the font's ascent, the room it keeps for accents and line spacing left a gap above the first row:
         // 92 pt at 288 pt for a font whose ascent is 1,020 units and its ascenders 700. The rows under it keep it.
-        let ascent = sample.id == samples.first?.id ? sample.letterAscent : sample.line.ascent
+        let ascent = sample.id == samples.first?.id ? top : sample.line.ascent
         return VStack(alignment: .leading, spacing: 6) {
             // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
@@ -363,9 +371,9 @@ private struct OverlayLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        // The baseline where the stacked layout has its first row's, so switching layouts leaves the first font where
-        // it is, and lower only where another font's glyphs reach higher.
-        let ascent = max(samples.first?.letterAscent ?? 0, samples.map(\.line.inkAscent).max() ?? 0)
+        // The baseline where the stacked layout has its first row's, so neither switching layouts nor changing the
+        // order moves it.
+        let ascent = CompareSample.topAscent(of: samples)
         let descent = samples.map(\.line.descent).max() ?? 0
         // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
         // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.
