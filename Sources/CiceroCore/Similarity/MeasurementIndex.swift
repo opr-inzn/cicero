@@ -121,9 +121,10 @@ public final class MeasurementIndex: Sendable {
     }
 
     /// The face as its file has it, a variable one at the regular weight, as previews show it; an installed font of
-    /// the same name when the file can't be read, and nothing when neither exists.
+    /// the same name when the file can't be read, and nothing when neither exists. From the file's own descriptors, never
+    /// those kept for drawing, so what CoreText works out for measuring goes with the font (see `FontLoader`).
     static func font(_ face: FontFace) -> CTFont? {
-        var descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
+        var descriptor = FontFiles.descriptor(for: face, in: FontFiles.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         guard CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 0, nil)) as String == face.postScriptName else { return nil }
         if let axis = face.weightAxis {

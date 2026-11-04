@@ -57,6 +57,8 @@ enum FontFileReader {
         let familyName = CTFontCopyFamilyName(font) as String
         let styleName = name(kCTFontStyleNameKey, of: font) ?? "Regular"
         let fullName = CTFontCopyFullName(font) as String
+        let nameTable = CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), []) as Data?
+        let names = NameTable(nameTable)
         let symbolic = CTFontGetSymbolicTraits(font)
         let lowercasedStyle = styleName.lowercased()
         var axis: WeightAxis?
@@ -97,21 +99,19 @@ enum FontFileReader {
             panose: panose(os2),
             // The letters are looked at only when the file doesn't say what the face is.
             letterShape: familyClass == 0 && !isMonospaced ? LetterShapes.classification(of: font) : nil,
-            manufacturer: name(kCTFontManufacturerNameKey, of: font),
-            version: name(kCTFontVersionNameKey, of: font),
-            designer: name(kCTFontDesignerNameKey, of: font),
+            manufacturer: name(8, kCTFontManufacturerNameKey, in: names, of: font),
+            version: name(5, kCTFontVersionNameKey, in: names, of: font),
+            designer: name(9, kCTFontDesignerNameKey, in: names, of: font),
             vendorID: vendorID(os2),
             weightAxis: axis,
             width: widthClass(os2),
             axes: axes,
             isAtOrigin: isAtOrigin && !entries.isEmpty,
-            year: year(copyright: name(kCTFontCopyrightNameKey, of: font), created: created(head)),
+            year: year(copyright: name(0, kCTFontCopyrightNameKey, in: names, of: font), created: created(head)),
             embedding: embedding(os2),
             features: features,
             figures: figures(of: font, features: features),
-            localizedFamilyNames: LocalizedNames.familyNames(
-                CTFontCopyTable(font, CTFontTableTag(kCTFontTableName), []) as Data?, besides: familyName
-            )
+            localizedFamilyNames: LocalizedNames.familyNames(nameTable, besides: familyName)
         )
         return ReadFace(face: face, fvar: fvar, isAddedDefault: instance.isEmpty && fvar.map(leavesDefaultUnnamed) == true)
     }
@@ -241,6 +241,13 @@ enum FontFileReader {
         return Date(timeIntervalSince1970: TimeInterval(seconds) - 2_082_844_800)
     }
 
+
+    /// The name with this ID from the table read once, where that's what CoreText gives (see `NameTable`), else from
+    /// CoreText.
+    private static func name(_ nameID: Int, _ key: CFString, in names: NameTable?, of font: CTFont) -> String? {
+        if let names, let name = names.name(nameID) { return name }
+        return name(key, of: font)
+    }
 
     private static func name(_ key: CFString, of font: CTFont) -> String? {
         guard let value = CTFontCopyName(font, key) as String? else { return nil }
