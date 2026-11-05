@@ -49,7 +49,8 @@ extension AppModel {
     }
 
     /// Saves the current setup to the Backups folder; copies the location's fonts in, off, where installing puts them
-    /// (the long part, in the caller's task so it can be cancelled: the copies made so far go again); then, in one queued
+    /// (the long part, in the caller's task so it can be cancelled: the copies made so far stay, off, and copying again
+    /// takes them as they are); then, in one queued
     /// operation, turns off the location's fonts that were on, removes the location, reads the copies and turns on those
     /// of the fonts that were on. Folders, tags and the rest go by family and PostScript name, so they stay as they are.
     /// FontExplorer X's own files stay where they are. Returns how many files were copied; nil when nothing was done.
@@ -62,7 +63,7 @@ extension AppModel {
         defer { releaseScans() }
         let installed = await importEngine.installOff(prompt.files) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
-            for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
+            if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "Cicero offers the rest at the next launch")) }
             return nil
         }
         // Every file has to be in: a location whose fonts aren't all copied would lose some as it goes.

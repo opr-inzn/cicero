@@ -134,9 +134,14 @@ extension AppModel {
 
     // MARK: Importing
 
+    /// The toast once copying is cancelled with `count` files copied in, which stay.
+    static func stoppedCopying(_ count: Int, again: String) -> String {
+        "Stopped. The \(count == 1 ? "font file" : "\(count.formatted()) font files") copied in so far stay, off: \(again)"
+    }
+
     /// Saves the current setup to the Backups folder; copies the other app's fonts in, off, where installing puts them
-    /// (the long part, in the caller's task so it can be cancelled: the copies made so far go again); reads them in one
-    /// queued operation; brings in the rest, matched against the copies; then turns on the fonts that were on. Nil when
+    /// (the long part, in the caller's task so it can be cancelled: the copies made so far stay, off, and importing again
+    /// takes them as they are); reads them in one queued operation; brings in the rest, matched against the copies; then turns on the fonts that were on. Nil when
     /// nothing was done.
     func performImport(_ prompt: ImportPrompt, choices: ImportChoices, stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
         let imported = prompt.library
@@ -153,7 +158,7 @@ extension AppModel {
         defer { releaseScans() }
         let installed = await importEngine.installOff(files.map(\.source)) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
-            for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
+            if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "import again to finish")) }
             return nil
         }
         // The other app's paths → the copies'.

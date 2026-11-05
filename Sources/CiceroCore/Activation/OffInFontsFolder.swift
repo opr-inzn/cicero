@@ -104,7 +104,8 @@ extension ActivationEngine {
     /// one is copied and stands for the others (see `copyPlan`). Nothing is remembered as a copy of anything: the files are
     /// the user's own from now on. Those macOS didn't show off in time, as it can while it's busy, are tried once more at
     /// the end, with longer to wait (`retryWait`). Progress counts the files to copy. Returns where each file is now,
-    /// which of those are new, and the files that didn't go in; cancelling stops between batches.
+    /// which of those are new, and the files that didn't go in; cancelling stops between batches, and the copies made so
+    /// far stay, off, so importing again takes them as they are.
     @concurrent
     public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async
         -> (placed: [String: String], new: [String], failed: [String]) {
@@ -189,12 +190,16 @@ extension ActivationEngine {
             }
         }
         for staged in again.keys { try? fm.removeItem(atPath: staged) }
-        // Not once cancelled: the copies go again.
-        if !intoFontsFolderSoFar.isEmpty, !Task.isCancelled {
-            await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
-            // And once more for the last ones, which macOS may not have noticed yet.
-            try? await Task.sleep(for: .seconds(3))
-            await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
+        // Also once cancelled, as the copies stay: in a task of its own, where the waits aren't cut short.
+        if !intoFontsFolderSoFar.isEmpty {
+            let engine = self, paths = intoFontsFolderSoFar, earlier = registeredAgain
+            await Task {
+                var registeredAgain = earlier
+                await engine.turnOffAgain(paths, registeredAgain: &registeredAgain)
+                // And once more for the last ones, which macOS may not have noticed yet.
+                try? await Task.sleep(for: .seconds(3))
+                await engine.turnOffAgain(paths, registeredAgain: &registeredAgain)
+            }.value
         }
         // The same files as those copied take their copies.
         for (path, original) in plan.sameAs { if let copy = placed[original] { placed[path] = copy } }
