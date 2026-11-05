@@ -63,6 +63,14 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         }
     }
 
+    /// What a group with a font's own name is, like "Stylistic Set 15" for ABC Repro's "Smallsize Centered"; nil when
+    /// the title says it already.
+    public var kind: String? {
+        guard case .stylisticSet(let tag, let name) = self else { return nil }
+        let standard = FeatureAlternates.name(of: tag, in: [:])
+        return standard.caseInsensitiveCompare(name) == .orderedSame ? nil : standard
+    }
+
     /// Scripts in the order Unicode lists them, by their first block.
     public static func < (left: GlyphGroup, right: GlyphGroup) -> Bool {
         if case .script(let a) = left, case .script(let b) = right {
@@ -81,26 +89,28 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .smallCaps: 4
         case .ligatures: 5
         case .localizedForms: 6
-        case .initialForms: 7
-        case .medialForms: 8
-        case .finalForms: 9
-        case .isolatedForms: 10
-        case .stylisticSet: 11
-        case .proportionalFigures: 12
-        case .tabularFigures: 13
-        case .circledFigures: 14
-        case .romanNumerals: 15
-        case .punctuationAndSymbols: 16
-        case .currency: 17
-        case .mathematicalOperators: 18
-        case .superscripts: 19
-        case .subscripts: 20
-        case .fractions: 21
-        case .numerators: 22
-        case .denominators: 23
-        case .ordinals: 24
-        case .caseSensitiveForms: 25
-        case .arrows: 26
+        case .proportionalFigures: 7
+        case .tabularFigures: 8
+        case .circledFigures: 9
+        case .romanNumerals: 10
+        case .punctuationAndSymbols: 11
+        case .currency: 12
+        case .mathematicalOperators: 13
+        case .superscripts: 14
+        case .subscripts: 15
+        case .fractions: 16
+        case .numerators: 17
+        case .denominators: 18
+        case .ordinals: 19
+        case .caseSensitiveForms: 20
+        case .arrows: 21
+        // A font's own forms by place in a word and big sets after the figures and signs: they're hundreds of glyphs
+        // each in a font like ABC Repro, and pushed the figures and signs far down the page.
+        case .initialForms: 22
+        case .medialForms: 23
+        case .finalForms: 24
+        case .isolatedForms: 25
+        case .stylisticSet: 26
         case .script: 27
         case .graphical: 28
         case .diacriticalMarks: 29
@@ -336,6 +346,7 @@ public struct GlyphSection: Identifiable, Sendable {
     public let scalars: [UInt32]
     public let glyphs: [FeatureGlyph]
     public var title: String { group.title }
+    public var kind: String? { group.kind }
     public var id: GlyphGroup { group }
 
     public init(group: GlyphGroup, scalars: [UInt32], glyphs: [FeatureGlyph] = []) {

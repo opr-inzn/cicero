@@ -13,7 +13,7 @@ struct GridCell: Hashable {
     }
 
     let content: Content
-    /// A grey dot at the top right, for an alternate of the cell before it; grey, as colours stand for tags.
+    /// A dot in the accent colour at the top right, for an alternate of the cell before it.
     var isAlternate = false
     /// What VoiceOver reads for it.
     let label: String
@@ -185,7 +185,7 @@ private struct GridRowDrawing: View, Equatable {
                     }
                 }
                 if cell.isAlternate {
-                    context.fill(Circle().path(in: CGRect(x: frame.maxX - 11, y: frame.minY + 5, width: 6, height: 6)), with: .style(.secondary))
+                    context.fill(Circle().path(in: CGRect(x: frame.maxX - 11, y: frame.minY + 5, width: 6, height: 6)), with: .color(.accentColor))
                 }
             }
         }

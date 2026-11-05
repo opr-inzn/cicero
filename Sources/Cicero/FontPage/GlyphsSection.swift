@@ -7,7 +7,7 @@ import SwiftUI
 /// under headers like the groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and
 /// feature glyphs too.
 /// The alternates its features offer, like a stylistic set's, follow the characters or small capitals they're for,
-/// marked with a grey dot; figures go in rows by kind instead, lining, old-style, other alternates, then signs (see
+/// marked with a dot in the accent colour; figures go in rows by kind instead, lining, old-style, other alternates, then signs (see
 /// `GlyphSection.runs`).
 /// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
@@ -85,22 +85,52 @@ struct GlyphsSection: View {
             EmptyState(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
                        description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
+        } else if isShort(shown, shownLigatures) {
+            // What a filter finds, when it's a few rows, in a stack of its own, one row of the page's lazy stack: with
+            // only a few rows and the tall title above them, the lazy stack's guesses at the heights of rows it hadn't
+            // placed swung back and forth, and it laid the page out again and again at full CPU (ABC Repro filtered
+            // by "numr": six groups of 14 numerators).
+            VStack(alignment: .leading, spacing: 0) {
+                groups(shown, shownLigatures, style: style)
+            }
         } else {
-            let lead = GlyphSection.beforeLigatures(shown, of: sections)
-            ForEach(shown.prefix(lead)) { section in
-                self.section(section, style: style)
-            }
-            // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes, or after the one
-            // script a font without Latin letters starts with.
-            if !shownLigatures.isEmpty {
-                LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
-                                 columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation)
-            }
-            ForEach(shown.dropFirst(lead)) { section in
-                self.section(section, style: style)
-            }
-            Color.clear.frame(height: 6)
+            groups(shown, shownLigatures, style: style)
         }
+    }
+
+    /// Whether a filter's groups are at most `shortRows` rows, for a stack of their own (see `body`).
+    private func isShort(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup]) -> Bool {
+        guard !query.isEmpty else { return false }
+        let filter = Filter(query)
+        var rows = shownLigatures.reduce(0) { $0 + ($1.ligatures.count + columns - 1) / columns }
+        for section in shown {
+            for run in section.labeledRuns(alternates: { shownAlternates(of: $0, filter) }) {
+                rows += (run.cells.count + columns - 1) / columns
+                if rows > Self.shortRows { return false }
+            }
+        }
+        return true
+    }
+
+    /// The most rows a filter's groups have in a stack of their own: a few screens of them, drawn at once.
+    private static let shortRows = 60
+
+    @ViewBuilder
+    private func groups(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup], style: Style) -> some View {
+        let lead = GlyphSection.beforeLigatures(shown, of: sections)
+        ForEach(shown.prefix(lead)) { section in
+            self.section(section, style: style)
+        }
+        // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes, or after the one
+        // script a font without Latin letters starts with.
+        if !shownLigatures.isEmpty {
+            LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
+                             columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation)
+        }
+        ForEach(shown.dropFirst(lead)) { section in
+            self.section(section, style: style)
+        }
+        Color.clear.frame(height: 6)
     }
 
     private func section(_ section: GlyphSection, style: Style) -> some View {
@@ -146,7 +176,7 @@ struct GlyphsSection: View {
         } header: {
             HStack(spacing: 4) {
                 Text(section.title).font(.headline)
-                Text("– \(total.formatted())").font(.callout).foregroundStyle(.secondary)
+                Text((section.kind.map { "(\($0)) " } ?? "") + "– \(total.formatted())").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
@@ -157,11 +187,16 @@ struct GlyphsSection: View {
     }
 
     /// "124 characters", and the ligatures and alternates when there are any:
-    /// "124 characters · 3 ligatures · 40 alternates", figures in another style, like old-style ones, not among them.
+    /// "124 characters · 3 ligatures · 40 alternates", figures in another style, like old-style or tabular ones, not
+    /// among them. The alternates are those after characters and the glyphs features draw in the groups, like small
+    /// capitals, numerators, initial forms or a big set's (see `GlyphSection.glyphs`).
     private var count: String {
         let characters = characterCount
         let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
-        let alternateCount = alternates.values.reduce(0) { $0 + $1.filter { !$0.isFigureStyle }.count }
+        let featureGlyphs = sections.reduce(0) { total, section in
+            total + (section.group == .tabularFigures ? section.glyphs.filter(\.isAlternate).count : section.glyphs.count)
+        }
+        let alternateCount = alternates.values.reduce(0) { $0 + $1.filter { !$0.isFigureStyle }.count } + featureGlyphs
         var parts = [characters == 1 ? "1 character" : "\(characters.formatted()) characters"]
         if ligatureCount > 0 { parts.append(ligatureCount == 1 ? "1 ligature" : "\(ligatureCount.formatted()) ligatures") }
         if alternateCount > 0 { parts.append(alternateCount == 1 ? "1 alternate" : "\(alternateCount.formatted()) alternates") }

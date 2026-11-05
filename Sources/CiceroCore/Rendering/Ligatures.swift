@@ -557,11 +557,26 @@ public struct FeatureGlyph: Hashable, Sendable {
     }
 
     /// Whether a feature's glyph for a character is left out: accents' case-sensitive forms, which are the accented
-    /// capitals' business, not worth a cell each; Greek's too, like the tonos, which the Greek group lists.
+    /// capitals' business, not worth a cell each; Greek's too, like the tonos, which the Greek group lists; and another
+    /// position's form of a superscript, subscript, ordinal or fraction, like ABC Repro's numerator of ⁰ (uni2070.numr)
+    /// or denominator of ½, as for the forms of two positions (see `exclusiveKinds`); and a numerator or denominator of
+    /// anything but a figure, like ABC Repro's exclam.numr or arrowleft.dnom: fractions are made of figures.
     static func isLeftOut(_ tag: String, of character: UInt32) -> Bool {
+        if isOtherPosition(tag, of: character) { return true }
         guard tag == "case", let group = GlyphGroup.of(character) else { return false }
         return group == .diacriticalMarks || group == .combiningMarks
             || (group == .greek && Unicode.Scalar(character)?.properties.generalCategory == .modifierSymbol)
+    }
+
+    /// Whether `tag` draws another position's form of a superscript, subscript, ordinal or fraction, or a numerator or
+    /// denominator of anything but a figure (see `isLeftOut`).
+    static func isOtherPosition(_ tag: String, of character: UInt32) -> Bool {
+        guard let own = exclusiveGroups[tag], own.kind == 0 else { return false }
+        if own.group == .numerators || own.group == .denominators {
+            return Unicode.Scalar(character)?.properties.numericType != .decimal
+        }
+        guard let group = GlyphGroup.of(character) else { return false }
+        return [.superscripts, .subscripts, .ordinals, .fractions].contains(group) && group != own.group
     }
 
     /// Whether a character is a private-use one, where an older font can keep its small capitals too, like U+F761 for a
@@ -648,7 +663,18 @@ public struct FeatureGlyph: Hashable, Sendable {
         // the set's, not Tabular Figures' (the other groups don't take the sets' features). A glyph several groups reach
         // goes in the one that reaches it with the fewest features, else the one listed first: ABC Repro's G.fina.ss07
         // (fina, then ss07) is Final Forms', not Medial Forms' (medi, ss07, then ss16, a set that draws final forms), which
-        // came first; its zero.subs.init (subs and init either way) stays Initial Forms'.
+        // came first; its zero.subs.init (subs and init either way) stays Initial Forms'. A numerator, denominator,
+        // superscript, subscript or ordinal with a feature that only moves or spaces it, like ABC Repro's tabular
+        // zero.dnom.tf or its case-sensitive exclam.numr.case, is left out: it looks like the one without; so is a big
+        // set's, like zero.tf.ss15.
+        let positionTags = Set(features.filter { exclusiveKinds[0].contains($0.group) }.map(\.tag))
+        let spacingTags: Set<String> = ["tnum", "pnum", "case", "lnum", "onum"]
+        func avoided(by group: GlyphGroup) -> Set<String> {
+            if setGroups.contains(group) { return spacingTags }
+            if exclusiveKinds[0].contains(group) { return setTags.union(spacingTags) }
+            if group == .tabularFigures || group == .caseSensitiveForms { return setTags.union(positionTags) }
+            return setTags
+        }
         var candidates: [GlyphGroup: [(glyph: FeatureGlyph, of: CGGlyph?, closeness: Closeness)]] = [:]
         var closest: [CGGlyph: (closeness: Closeness, index: Int)] = [:]
         for (index, group) in order.enumerated() {
@@ -657,7 +683,7 @@ public struct FeatureGlyph: Hashable, Sendable {
             var list: [(glyph: FeatureGlyph, of: CGGlyph?, closeness: Closeness)] = []
             for (alternate, of, closeness) in groupAlternates(of: group, tags: tags(of: group), in: found,
                                                               ways: ways, characters: characters, listed: own, names: names,
-                                                              avoiding: setGroups.contains(group) ? [] : setTags)
+                                                              avoiding: avoided(by: group))
             where !isLeftOut(alternate.feature, of: alternate.character) && !seen.contains(alternate.glyph) {
                 var glyph = alternate
                 if case .stylisticSet(_, let name) = group {
@@ -897,7 +923,8 @@ public struct FeatureGlyph: Hashable, Sendable {
             for step in frontier {
                 let path = paths[step]!
                 guard path.tags.count < FeatureAlternates.chainLength else { continue }
-                for (glyph, tag) in next(step.glyph) where !path.tags.contains(tag) && !avoiding.contains(tag) && !clashes(tag, with: path.tags) {
+                for (glyph, tag) in next(step.glyph) where !path.tags.contains(tag) && !avoiding.contains(tag) && !clashes(tag, with: path.tags)
+                    && !isOtherPosition(tag, of: path.character) {
                     let to = Step(glyph: glyph, small: step.small || groupTags.contains(tag))
                     guard paths[to] == nil, to.small || reaches(glyph, after: path.tags.count + 1) else { continue }
                     paths[to] = Path(character: path.character, tags: path.tags + [tag],
