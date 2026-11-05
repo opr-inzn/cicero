@@ -24,6 +24,8 @@ public struct FeatureAlternate: Hashable, Sendable {
         self.featureNames = featureNames
         self.alongWith = alongWith
         self.alongWithNames = alongWithNames
+        isFigureStyle = GlyphGroup.of(character) == .proportionalFigures && features.contains(where: FeatureAlternates.figureStyles.contains)
+            && alongWith.allSatisfy(FeatureAlternates.figureStyles.contains)
     }
 
     /// The features to turn on to draw it: the first that draws it, and those it takes along with it.
@@ -35,10 +37,10 @@ public struct FeatureAlternate: Hashable, Sendable {
     public var listedNames: String { alongWith.isEmpty ? featureNames.listed("or") : allFeatureNames.listed() }
     /// Whether it's a figure in another style, like an old-style one: a set of figures of its own, not an alternate of
     /// the font's own figure, drawn by a figure style's feature (see `FeatureAlternates.figureStyles`) and no other.
-    public var isFigureStyle: Bool {
-        GlyphGroup.of(character) == .proportionalFigures && features.contains(where: FeatureAlternates.figureStyles.contains)
-            && alongWith.allSatisfy(FeatureAlternates.figureStyles.contains)
-    }
+    /// Worked out once, as it's made: the font page asks for each of its cells, and its count asks for every
+    /// alternate, each time the page updates, and finding a character's group took most of a glyph click's time on a
+    /// page of thousands of glyphs, like ABC Repro's.
+    public let isFigureStyle: Bool
 }
 
 public enum FeatureAlternates {

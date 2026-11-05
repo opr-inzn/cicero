@@ -30,9 +30,8 @@ struct GlyphsSection: View {
     /// The version of the face's file they were read from (see `PageContent.generation`).
     let generation: Int
     @State private var query = ""
-    @State private var popover: Cell?
-    /// Where the popover's cell is in its row, from the click that opened it (see `cellPopover`).
-    @State private var popoverCell: CGRect?
+    /// The cell whose popover is open. Only the rows read it, so a click updates the rows on screen, not the section.
+    @State private var open = OpenCell()
 
     private typealias Cell = GlyphCell
 
@@ -111,7 +110,7 @@ struct GlyphsSection: View {
         let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
         let rows = runs.flatMap { run in
             stride(from: 0, to: run.cells.count, by: columns).map { start in
-                (label: start == 0 ? run.label : nil, cells: run.cells[start ..< min(start + columns, run.cells.count)])
+                (label: start == 0 ? run.label : nil, cells: Array(run.cells[start ..< min(start + columns, run.cells.count)]))
             }
         }
         let total = runs.reduce(0) { $0 + $1.cells.count }
@@ -125,20 +124,24 @@ struct GlyphsSection: View {
             ForEach(rows.indices, id: \.self) { row in
                 // Right under the group's title, a line clear of the run before; as close to its cells as the title is.
                 let above = row == 0 ? 0 : Self.runGap
-                glyphRow(rows[row].cells, style: style)
-                    .padding(.top, rows[row].label == nil ? 0 : above + Self.labelLine + Self.labelGap)
-                    .overlay(alignment: .topLeading) {
-                        if let label = rows[row].label {
-                            Text(label)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .frame(height: Self.labelLine)
-                                .padding(.top, above)
-                        }
+                GlyphRow(open: open, cells: rows[row].cells, columns: columns) { selected in
+                    glyphRow(rows[row].cells, style: style, selected: selected)
+                } details: { cell in
+                    details(cell, style: style)
+                }
+                .padding(.top, rows[row].label == nil ? 0 : above + Self.labelLine + Self.labelGap)
+                .overlay(alignment: .topLeading) {
+                    if let label = rows[row].label {
+                        Text(label)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(height: Self.labelLine)
+                            .padding(.top, above)
                     }
-                    .padding(.horizontal, Self.inset)
-                    .padding(.bottom, row == rows.count - 1 ? 18 : Self.spacing)
+                }
+                .padding(.horizontal, Self.inset)
+                .padding(.bottom, row == rows.count - 1 ? 18 : Self.spacing)
             }
         } header: {
             HStack(spacing: 4) {
@@ -165,22 +168,16 @@ struct GlyphsSection: View {
         return parts.joined(separator: " · ")
     }
 
-    /// One popover per row, pointing at the clicked cell, rather than one per cell: each is worked out
-    /// again whenever the page updates. The cells share out the row's width, so they reach the page's edge
-    /// whatever it is, without the page drawing them again as it changes; a short last row keeps their width.
-    private func glyphRow(_ cells: ArraySlice<Cell>, style: Style) -> some View {
-        let column = popover.flatMap { cells.firstIndex(of: $0) }.map { $0 - cells.startIndex }
-        let cells = Array(cells)
+    /// A row's cells, with `selected` the one whose popover is open, drawn darker (see `GlyphRow`). The cells share out
+    /// the row's width, so they reach the page's edge whatever it is, without the page drawing them again as it
+    /// changes; a short last row keeps their width.
+    private func glyphRow(_ cells: [Cell], style: Style, selected: Int?) -> GlyphGridRow {
         let font = FontLoader.shared.font(style.face, size: Self.glyphSize, weight: style.weight, variations: style.variations)
-        let actions = GridRowActions(open: { (popover, popoverCell) = (cells[$0], $1) }, menu: { copyMenu(cells[$0], style: style) },
+        let open = open
+        let actions = GridRowActions(open: { (open.cell, open.rect) = (cells[$0], $1) }, menu: { copyMenu(cells[$0], style: style) },
                                      file: { dragFile(cells[$0], style: style) })
         return GlyphGridRow(cells: cells.map { gridCell($0, in: font) }, columns: columns, face: style.face, generation: generation,
-                            weight: style.weight, variations: style.variations, selected: column, actions: actions)
-        .cellPopover(column: column, columns: columns, cell: popoverCell, close: { popover = nil }) {
-            if let popover {
-                details(popover, style: style)
-            }
-        }
+                            weight: style.weight, variations: style.variations, selected: selected, actions: actions)
     }
 
     /// A character's name and codes, and buttons that copy it and its glyph's outline; for a feature's glyph, the
@@ -276,14 +273,14 @@ struct GlyphsSection: View {
     /// fonts are turned on: "“g” copied to clipboard".
     private func copy(_ text: String, shown: String) {
         Self.copy(text)
-        popover = nil
+        open.cell = nil
         model.showToast("\(shown) copied to clipboard")
     }
 
     /// The cell's character, which the page's text draws as the cell's glyph where it's pasted there.
     private func copyCharacter(_ cell: Cell, style: Style) {
         sampleClip(cell, style: style).copy()
-        popover = nil
+        open.cell = nil
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard")
     }
 
@@ -306,7 +303,7 @@ struct GlyphsSection: View {
     private func copyVector(_ cell: Cell, style: Style) {
         guard let outline = outline(cell, style: style) else { return NSSound.beep() }
         GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell), clip: sampleClip(cell, style: style))
-        popover = nil
+        open.cell = nil
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
     }
 
@@ -483,6 +480,37 @@ struct GlyphsSection: View {
             }
             return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches)
         }
+    }
+}
+
+/// The glyph cell whose popover is open, and where it is in its row, from the click that opened it (see `cellPopover`).
+/// An object of its own, read only by the rows (`GlyphRow`): opening or closing a popover then updates the rows on
+/// screen, not the whole section, whose body works out the rows of every group.
+@Observable
+final class OpenCell {
+    var cell: GlyphCell?
+    var rect: CGRect?
+}
+
+/// A row of a group's cells and the popover of the one clicked in it. The open cell is read here, in each row, not in
+/// the section: a click updates the rows on screen, not the section, whose body works out every group's rows.
+private struct GlyphRow<Details: View>: View {
+    let open: OpenCell
+    let cells: [GlyphCell]
+    let columns: Int
+    let row: (_ selected: Int?) -> GlyphGridRow
+    @ViewBuilder let details: (GlyphCell) -> Details
+
+    var body: some View {
+        let column = open.cell.flatMap { cells.firstIndex(of: $0) }
+        let mine = column.map { cells[$0] }
+        row(column)
+            // Closes only its own: another row's popover may have opened since.
+            .cellPopover(column: column, columns: columns, cell: open.rect, close: { if open.cell == mine { open.cell = nil } }) {
+                if let cell = open.cell {
+                    details(cell)
+                }
+            }
     }
 }
 
