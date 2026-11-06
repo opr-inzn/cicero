@@ -120,7 +120,7 @@ public enum LibraryImport {
     /// copy's); and gives the styles to turn on, when chosen. Apps of application sets are looked for where they were,
     /// then by name in `appFolders`.
     public static func apply(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, library: Library,
-                             paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders)
+                             paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders, copiedInOn: Set<String> = [])
         -> (summary: ImportSummary, activate: [LibraryFace]) {
         let matcher = FontMatcher(library)
         var summary = ImportSummary()
@@ -327,7 +327,10 @@ public enum LibraryImport {
         var activate: [LibraryFace] = []
         if choices.activate {
             var seen = Set<FaceID>()
-            activate = faces(imported.active).map(\.face).filter { $0.canActivate && seen.insert($0.face.id).inserted }
+            // Also those in the copies that went in on (`ActivationEngine.installOff`): on already, they're the import's to
+            // count and to undo, though turning them on again does nothing.
+            activate = faces(imported.active).map(\.face)
+                .filter { ($0.canActivate || copiedInOn.contains($0.face.path)) && seen.insert($0.face.id).inserted }
         }
         summary.notFound = notFound.count
         return (summary, activate)

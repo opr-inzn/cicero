@@ -14,8 +14,11 @@ extension ActivationEngine {
     /// macOS has it doesn't stick. `moves` is each file → where it goes; one whose place is taken goes beside it, as
     /// "Name 2.otf". The files on their way in are written down first (see `finishTurningOff`), so stopping halfway leaves
     /// none on. One macOS won't take or won't turn off goes back where it was. `exactly`, one whose place is taken stays
-    /// where it is instead. Returns where each file went, and the files that stayed.
-    public func moveIntoFontsFolderOff(_ moves: [String: String], exactly: Bool = false) async -> (placed: [String: String], failed: [String]) {
+    /// where it is instead. Files in `staysOn` (keys of `moves`) are registered and left on: they never go onto macOS's
+    /// list of fonts it has off, nor into the list of files on their way in. Returns where each file went, and the files
+    /// that stayed.
+    public func moveIntoFontsFolderOff(_ moves: [String: String], exactly: Bool = false, staysOn: Set<String> = [])
+        async -> (placed: [String: String], failed: [String]) {
         let fm = FileManager.default
         var placed: [String: String] = [:]
         var failed: [String] = []
@@ -31,7 +34,8 @@ extension ActivationEngine {
                 }
                 do {
                     try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-                    try noteTurningOff(moved.map(\.to) + [destination.path])
+                    let goingOff = moved.filter { !staysOn.contains($0.from) }.map(\.to)
+                    try noteTurningOff(goingOff + (staysOn.contains(from) ? [] : [destination.path]))
                     try Self.moveItem(Self.url(from), to: destination)
                     moved.append((from, destination.path))
                 } catch {
@@ -40,9 +44,10 @@ extension ActivationEngine {
             }
             guard !moved.isEmpty else { continue }
             let paths = moved.map(\.to)
+            let on = Set(moved.filter { staysOn.contains($0.from) }.map(\.to))
             // Turned off only once macOS shows it on: before that, turning it off wouldn't stick.
             let untaken = await registerAndConfirm(paths, scope: .persistent)
-            let stillOn = await registrar.setEnabled(paths.filter { !untaken.contains($0) }.map(Self.url), false)
+            let stillOn = await registrar.setEnabled(paths.filter { !untaken.contains($0) && !on.contains($0) }.map(Self.url), false)
             for (from, to) in moved {
                 guard untaken.contains(to) || stillOn.contains(to) else {
                     placed[from] = to
@@ -76,7 +81,8 @@ extension ActivationEngine {
     public func copyPlan(_ files: [String]) -> CopyPlan {
         var plan = CopyPlan()
         var seen = Set<String>()
-        // Where a file of each name goes (folder/name) → the files to copy there under it.
+        // Where a file of each name goes (folder/name, the name as the disk compares it: "Font.otf" and "FONT.OTF" are one
+        // name there) → the files to copy there under it. Kristoffer's FontBase folder had 36 such pairs of the same file.
         var named: [String: [String]] = [:]
         for path in files where seen.insert(path).inserted {
             if Task.isCancelled { break }
@@ -85,7 +91,7 @@ extension ActivationEngine {
                 plan.inAlready[path] = there
                 continue
             }
-            let key = folder.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
+            let key = folder.path + "/" + Self.nameKey((path as NSString).lastPathComponent)
             if let original = named[key]?.first(where: { Self.isIdenticalCopy(path, of: $0) }) {
                 plan.sameAs[path] = original
                 continue
@@ -106,8 +112,13 @@ extension ActivationEngine {
     /// the end, with longer to wait (`retryWait`). Progress counts the files to copy. Returns where each file is now,
     /// which of those are new, and the files that didn't go in; cancelling stops between batches, and the copies made so
     /// far stay, off, so importing again takes them as they are.
+    ///
+    /// Files in `on`, those whose fonts the other app had on, go into ~/Library/Fonts on rather than off and on again at
+    /// the end: each of those would be one more entry on macOS's list of fonts it has off, taken off again later, and
+    /// fontd takes longer over that list the longer it is (after an import of 31,015 files, 13 minutes at full speed
+    /// turning 3,718 on). A copy that stands for several files is on when one of them is. Once cancelled they go off too.
     @concurrent
-    public func installOff(_ files: [String], progress: @escaping @Sendable (Int, Int) -> Void) async
+    public func installOff(_ files: [String], on: Set<String> = [], progress: @escaping @Sendable (Int, Int) -> Void) async
         -> (placed: [String: String], new: [String], failed: [String]) {
         // Without it, macOS slows an app it can't see (App Nap) and lets the Mac sleep: every wait for fontd here then
         // takes far longer, and an import of thousands of fonts left alone takes hours more.
@@ -120,6 +131,11 @@ extension ActivationEngine {
         let total = plan.toCopy.count
         var placed = plan.inAlready
         var new: [String] = []
+        // The files to copy in on: those in `on`, and those that stand for one in `on`.
+        let onSources = on.union(plan.sameAs.filter { on.contains($0.key) }.map(\.value))
+        // Staged copies that go in on, and those moved in on so far.
+        var stagedOn = Set<String>()
+        var onSoFar: [String] = []
         // The copies moved into ~/Library/Fonts, off, and when they were last looked at (see `turnOffAgain`).
         var intoFontsFolderSoFar: [String] = []
         var registeredAgain = Set<String>()
@@ -155,6 +171,7 @@ extension ActivationEngine {
                 if folder == locations.userFonts {
                     intoFontsFolder[staged.path] = same.path
                     sources[staged.path] = path
+                    if onSources.contains(path) { stagedOn.insert(staged.path) }
                     continue
                 }
                 let destination = Self.uniqueURL(for: name, in: folder)
@@ -167,12 +184,12 @@ extension ActivationEngine {
                     try? fm.removeItem(at: staged)
                 }
             }
-            let moved = await moveIntoFontsFolderOff(intoFontsFolder)
+            let moved = await moveIntoFontsFolderOff(intoFontsFolder, staysOn: stagedOn)
             for (staged, destination) in moved.placed {
                 guard let source = sources[staged] else { continue }
                 placed[source] = destination
                 new.append(destination)
-                intoFontsFolderSoFar.append(destination)
+                if stagedOn.contains(staged) { onSoFar.append(destination) } else { intoFontsFolderSoFar.append(destination) }
             }
             for staged in moved.failed {
                 if let source = sources[staged], let destination = intoFontsFolder[staged] { again[staged] = (destination, source) }
@@ -181,20 +198,24 @@ extension ActivationEngine {
         if !again.isEmpty, !Task.isCancelled {
             var patient = self
             patient.confirmationWait = max(confirmationWait, Self.retryWait)
-            let moved = await patient.moveIntoFontsFolderOff(again.mapValues(\.destination))
+            let moved = await patient.moveIntoFontsFolderOff(again.mapValues(\.destination), staysOn: stagedOn)
             for (staged, destination) in moved.placed {
                 guard let source = again[staged]?.source else { continue }
                 placed[source] = destination
                 new.append(destination)
-                intoFontsFolderSoFar.append(destination)
+                if stagedOn.contains(staged) { onSoFar.append(destination) } else { intoFontsFolderSoFar.append(destination) }
             }
         }
         for staged in again.keys { try? fm.removeItem(atPath: staged) }
-        // Also once cancelled, as the copies stay: in a task of its own, where the waits aren't cut short.
-        if !intoFontsFolderSoFar.isEmpty {
-            let engine = self, paths = intoFontsFolderSoFar, earlier = registeredAgain
+        // Also once cancelled, as the copies stay: in a task of its own, where the waits aren't cut short. Once cancelled,
+        // the copies that went in on go off too, as the rest stay off until the import is done.
+        let cancelled = Task.isCancelled
+        let turningOff = cancelled ? onSoFar : []
+        if !intoFontsFolderSoFar.isEmpty || !turningOff.isEmpty {
+            let engine = self, paths = intoFontsFolderSoFar + turningOff, earlier = registeredAgain
             await Task {
                 var registeredAgain = earlier
+                if !turningOff.isEmpty { _ = await engine.registrar.setEnabled(turningOff.map(Self.url), false) }
                 await engine.turnOffAgain(paths, registeredAgain: &registeredAgain)
                 // And once more for the last ones, which macOS may not have noticed yet.
                 try? await Task.sleep(for: .seconds(3))

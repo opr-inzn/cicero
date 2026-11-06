@@ -156,7 +156,10 @@ extension AppModel {
         // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
-        let installed = await importEngine.installOff(files.map(\.source)) { done, total in stage(.copying(done: done, total: total)) }
+        // The files with fonts that were on go in on, as they'd be turned on at the end (see `installOff`).
+        let activePaths = choices.activate ? Set(imported.active.compactMap(\.path)) : []
+        let on = Set(files.filter { activePaths.contains($0.path) }.map(\.source))
+        let installed = await importEngine.installOff(files.map(\.source), on: on) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "import again to finish")) }
             return nil
@@ -185,7 +188,10 @@ extension AppModel {
                 }
             }
             var updated = model.data
-            var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library, paths: paths)
+            // The copies that went in on, as their fonts were on: the import turned them on, though nothing's left to do.
+            let copiedInOn = Set(on.compactMap { installed.placed[$0] }).intersection(installed.new)
+            var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library,
+                                                      paths: paths, copiedInOn: copiedInOn)
             // A style the other app's file still stands for goes on as its copy.
             let copies = Set(installed.placed.values)
             faces = faces.map { $0.copy(among: copies) }
