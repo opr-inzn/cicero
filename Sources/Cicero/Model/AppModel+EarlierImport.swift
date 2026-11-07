@@ -48,7 +48,8 @@ extension AppModel {
         data.records.inPlace.contains(face.face.path) || face.state.source == .otherApp
     }
 
-    /// Saves the current setup to the Backups folder; copies the location's fonts in, off, where installing puts them
+    /// Saves the current setup to the Backups folder; copies the location's fonts in, off (those on where they are, on),
+    /// where installing puts them
     /// (the long part, in the caller's task so it can be cancelled: the copies made so far stay, off, and copying again
     /// takes them as they are); then, in one queued
     /// operation, turns off the location's fonts that were on, removes the location, reads the copies and turns on those
@@ -61,7 +62,10 @@ extension AppModel {
         // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
-        let installed = await importEngine.installOff(prompt.files) { done, total in stage(.copying(done: done, total: total)) }
+        // The files with fonts on where they are go in on, as their copies would be turned on at the end (see
+        // `installOff`). Until then those fonts are on twice, from the location and from the copy.
+        let onFiles = Set(library.faces(inFiles: Set(prompt.files)).filter { isOnWhereItIs($0) }.map(\.face.path))
+        let installed = await importEngine.installOff(prompt.files, on: onFiles) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "Cicero offers the rest at the next launch")) }
             return nil
