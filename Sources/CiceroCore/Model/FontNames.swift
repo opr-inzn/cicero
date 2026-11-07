@@ -9,8 +9,18 @@ public enum FontNames {
     public static func describe(_ fonts: [(family: String, style: String)]) -> String? {
         var seen = Set<[String]>()
         let fonts = fonts.filter { !$0.family.isEmpty && seen.insert([$0.family, $0.style]).inserted }
-        if fonts.count == 1 { return [fonts[0].family, fonts[0].style].filter { !$0.isEmpty }.joined(separator: " ") }
+        if fonts.count == 1 { return name(family: fonts[0].family, style: fonts[0].style) }
         return describe(families: fonts.map(\.family))
+    }
+
+    /// "Inter Bold"; a name that says one of them already once, not twice: the style's for a style named after its
+    /// family ("Cry Bottom", not "Cry Bottom Cry Bottom"; "Cry Bottom Italic"), the family's for a family named after its
+    /// style ("Foo Bold" with the style Bold).
+    static func name(family: String, style: String) -> String {
+        let lowerFamily = family.lowercased(), lowerStyle = style.lowercased()
+        if lowerStyle == lowerFamily || lowerStyle.hasPrefix(lowerFamily + " ") { return style }
+        if style.isEmpty || lowerFamily.hasSuffix(" " + lowerStyle) { return family }
+        return "\(family) \(style)"
     }
 
     public static func describe(_ faces: [LibraryFace]) -> String? {
