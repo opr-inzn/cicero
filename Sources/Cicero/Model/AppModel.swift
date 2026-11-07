@@ -241,12 +241,17 @@ final class AppModel {
     /// Another font manager's library, read for the Import sheet. What reading one left in temporary folders goes
     /// when the sheet closes or shows another.
     var importing: ImportPrompt? {
-        didSet { if let oldValue, oldValue.id != importing?.id { oldValue.library.discard() } }
+        didSet {
+            if let oldValue, oldValue.id != importing?.id { oldValue.library.discard() }
+            showHeldToast()
+        }
     }
     /// An import is under way, which a library read meanwhile mustn't take the place of.
     var isImporting = false
     /// FontExplorer X's Font Library as a location, offered to be copied in (see `offerEarlierImportCopy`).
-    var earlierImportPrompt: EarlierImportPrompt?
+    var earlierImportPrompt: EarlierImportPrompt? {
+        didSet { showHeldToast() }
+    }
     /// Asked about it this launch already.
     @ObservationIgnored var askedAboutEarlierImport = false
     /// Until the first scan has asked about FontExplorer X's Font Library, or found nothing to ask: true at launch when
@@ -256,6 +261,8 @@ final class AppModel {
     private(set) var toast: String?
     /// What the toast's Undo does; nil for a toast without one.
     private(set) var toastUndo: (() -> Void)?
+    /// A toast that came while an import's sheet was up, shown once it closes (see `showToast`).
+    @ObservationIgnored private var heldToast: (message: String, undo: (() -> Void)?)?
 
     // MARK: Compare
 
@@ -944,8 +951,11 @@ final class AppModel {
     /// How long a toast with Undo stays.
     static let undoTime = Duration.seconds(6)
 
-    /// With `undo`, the toast has an Undo button, and stays long enough to reach it (`undoTime`).
+    /// With `undo`, the toast has an Undo button, and stays long enough to reach it (`undoTime`). While an import's sheet
+    /// is up, as with the toast for the fonts it turned on under its summary, the toast waits for the sheet to close:
+    /// under it, it would go unseen, and its Undo out of reach. The last one waiting shows.
     func showToast(_ message: String, undo: (() -> Void)? = nil) {
+        if importing != nil || earlierImportPrompt != nil { return heldToast = (message, undo) }
         toast = message
         toastUndo = undo
         toastTask?.cancel()
@@ -955,6 +965,13 @@ final class AppModel {
             self?.toast = nil
             self?.toastUndo = nil
         }
+    }
+
+    /// The toast that waited for an import's sheet, once no import sheet is up.
+    private func showHeldToast() {
+        guard importing == nil, earlierImportPrompt == nil, let held = heldToast else { return }
+        heldToast = nil
+        showToast(held.message, undo: held.undo)
     }
 
     /// The toast's Undo: does it, and the toast goes.
