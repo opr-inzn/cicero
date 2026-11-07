@@ -12,6 +12,12 @@ final class AppModel {
     @ObservationIgnored let locations = Locations.standard
     @ObservationIgnored let scanner: LibraryScanner
     @ObservationIgnored let store: UserDataStore
+    /// Held from launch until Cicero quits, so the `cicero` command asks Cicero to make its changes (see `CommandRequests`);
+    /// nil when a command making a change while Cicero was closed didn't finish in time.
+    @ObservationIgnored private let appLock: AppLock?
+    @ObservationIgnored private var commandRequests: CommandRequests?
+    /// The latest scan that ended, applied or not; a scan that replaced others ends for them too.
+    @ObservationIgnored private(set) var lastEndedScan = 0
     /// The engine as made at launch; `engine` knows the Font Library.
     @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
@@ -69,10 +75,8 @@ final class AppModel {
     /// `.unclassified` where it couldn't tell.
     private(set) var classificationGuesses: [String: Classification] = [:]
     /// Family → the classification the model sees in its letters, for the families nothing in their files
-    /// classifies, where it's at least `letterGuessLikelihood` sure (see `MeasurementIndex.classification`).
+    /// classifies, where it's at least `ClassificationGuesses.letterLikelihood` sure (see `MeasurementIndex.classification`).
     private(set) var letterGuesses: [String: Classification] = [:]
-    /// How sure the model must be of a classification for it to count: a wrong classification is worse than none.
-    static let letterGuessLikelihood: Float = 0.7
     /// Bumped whenever guesses arrive or go; cached lists depend on it.
     private(set) var guessRevision = 0
     /// nil when coverage is up to date.
@@ -139,14 +143,14 @@ final class AppModel {
             guessesChanged()
         }
     }
-    static let guessesClassificationsKey = "classification.guessesFromNames"
+    static let guessesClassificationsKey = ClassificationGuesses.guessingKey
     /// Whether to ask if Cicero should classify fonts automatically: from the first launch, until it's answered. The
     /// sidebar's Classifications has an Organize row meanwhile, which asks (see `showsGuessingQuestion`), rather than an
     /// alert as the window first opens. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
     private(set) var asksAboutGuessing = false
     /// Whether the question is showing, from a click on the sidebar’s Organize row.
     var showsGuessingQuestion = false
-    static let asksAboutGuessingKey = "classification.asksAboutGuessing"
+    static let asksAboutGuessingKey = ClassificationGuesses.askingKey
     /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
     /// don't draw again for every change to it.
     private(set) var tagDots: [String: [TagColor]] = [:]
@@ -333,6 +337,8 @@ final class AppModel {
         let locations = Locations.standard
         scanner = LibraryScanner(locations: locations)
         store = UserDataStore(locations: locations)
+        // One writer at a time: a cicero command making a change while Cicero was closed finishes first.
+        appLock = LaunchWait.lock(support: locations.support)
         launchEngine = ActivationEngine(locations: locations)
         languages = LanguageCatalog(contentsOf: Bundle.main.url(forResource: "Languages", withExtension: "json"))
         scriptSamples = ScriptSamples(languages: languages)
@@ -350,6 +356,13 @@ final class AppModel {
         asksAboutGuessing = asks
         guessesClassifications = !asks && defaults.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
+        // Records after a cicero command that stopped while it turned fonts on or off (see `ActivationJournal`).
+        // Only with the lock: without it, the command may still be at work. (`data`'s observer doesn't run in init.)
+        if appLock != nil, let journal = ActivationJournal.read(support: locations.support) {
+            data.records = journal.repair(data.records, registrar: CoreTextRegistrar(), locations: locations)
+            store.save(data)
+            if store.flush(durably: true) { ActivationJournal.remove(support: locations.support) }
+        }
         // Files from before there was a Font Library get its first place, saved with the next change.
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
         if guessesClassifications { classificationGuesses = guesser.guesses }
@@ -357,6 +370,8 @@ final class AppModel {
         restoreGroups()
         restoreLibrary()
         begin()
+        commandRequests = CommandRequests(model: self)
+        commandRequests?.start()
     }
 
     // MARK: Lifecycle
@@ -485,6 +500,7 @@ final class AppModel {
     }
 
     private func prepareToQuit() {
+        commandRequests?.stop()
         #if CICERO_MEASURE
         let measuring = Measurements.begin("quit.endUntilQuit")
         let untilQuit = data.records.temporary.values.count { $0.scope == .untilQuit }
@@ -496,6 +512,7 @@ final class AppModel {
         #endif
         store.flush()
         scanner.flush()
+        appLock?.release()
     }
 
     // MARK: Scanning
@@ -606,6 +623,7 @@ final class AppModel {
     }
 
     private func endScan(_ id: Int) {
+        lastEndedScan = max(lastEndedScan, id)
         #if CICERO_MEASURE
         endedScans += 1
         #endif
@@ -983,11 +1001,7 @@ final class AppModel {
     /// The classifications the model sees in the letters of the families nothing in their files classifies. They
     /// count only while guessing is on (see `classificationGuess`), but are kept, as the measurements are, either way.
     private func refreshLetterGuesses() {
-        var found: [String: Classification] = [:]
-        for family in library.families where family.classification == .unclassified && !family.mixesSerifAndSans {
-            guard let seen = measurements.classification(of: family.regular.face.id), seen.likelihood >= Self.letterGuessLikelihood else { continue }
-            found[family.id] = seen.classification
-        }
+        let found = ClassificationGuesses.letters(of: library.families, measurements: measurements)
         guard found != letterGuesses else { return }
         letterGuesses = found
         guard guessesClassifications else { return }
@@ -1073,69 +1087,6 @@ enum InfoTab: String, CaseIterable {
 struct AdjustedAxes: Equatable {
     let face: FaceID
     var values: [String: Double]
-}
-
-/// Turning off fonts whose files would move out of a folder others share, waiting for the user to say (see
-/// `AppModel.movingOutPrompt(for:)`).
-struct MovingOutPrompt: Identifiable {
-    let id = UUID()
-    /// Everything to turn off.
-    var faces: [LibraryFace]
-    /// Those whose files would move out of a shared folder.
-    var shared: [LibraryFace]
-    /// The folder they're in, when it's one, and who shares it.
-    var folder: (path: String, sharing: FolderSharing)?
-    /// The app that loads them ("Adobe apps", "InDesign"), when it's one.
-    var app: String?
-
-    var title: String {
-        let name = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "Shared Folders"
-        if shared.count == 1, let face = shared.first {
-            return "Move “\(face.face.familyName) \(face.face.styleName)” Out of \(name)?"
-        }
-        return "Move \(shared.count.formatted()) Styles Out of \(name)?"
-    }
-
-    var message: String {
-        let one = shared.count == 1
-        // "Adobe apps load", "InDesign loads".
-        let apps = app.map { $0 == "Adobe apps" ? "Adobe apps load" : "\($0) loads" } ?? "The apps they’re for load"
-        let place = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "the folders they’re in"
-        let moving = "\(apps) every font in \(place), so to turn \(one ? "it" : "them") off there too, Cicero moves \(one ? "its file" : "their files") into its Inactive folder."
-        guard let folder else {
-            return moving + " These folders sync with a cloud service or are on a server, so the files also go away for everyone who shares them."
-        }
-        let name = "“\((folder.path as NSString).lastPathComponent)”"
-        let files = one ? "the file also goes" : "the files also go"
-        switch folder.sharing {
-        case .iCloudDrive:
-            return moving + " \(name) is in iCloud Drive, so \(files) away on your other devices and for anyone you share it with."
-        case .cloudService(let service):
-            return moving + " \(name) syncs with \(service ?? "a cloud service"), so \(files) away on the other Macs that share it."
-        case .server(let server):
-            return moving + " \(name) is on the server “\(server)”, so \(files) away for everyone who uses it."
-        }
-    }
-
-    /// What the other choice is called: keeping the shared ones on in their app, where they are. Nil when that does
-    /// nothing, as for fonts on in that app only and nothing else to turn off.
-    var keepTitle: String? {
-        let shared = Set(shared.map(\.id))
-        guard self.shared.contains(where: { $0.position == .on }) || faces.contains(where: { !shared.contains($0.id) }) else { return nil }
-        guard let app else { return "Keep On in Their Apps" }
-        return "Keep On in \(app == "Adobe apps" ? "Adobe Apps" : app)"
-    }
-}
-
-/// Turning on more families at once than `UserData.manyFamilies`.
-struct ManyActivationPrompt: Identifiable {
-    let id = UUID()
-    /// What `AppModel.activate` was asked to call them.
-    var title: String
-    var faces: [LibraryFace]
-    var families: Int
-    /// Until Cicero quits.
-    var temporarily: Bool
 }
 
 /// Font files being added while the install method is Ask, waiting for the user to say how (see `InstallSheet`).

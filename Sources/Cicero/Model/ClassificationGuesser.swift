@@ -17,18 +17,9 @@ final class ClassificationGuesser {
     /// Families the model failed to answer for, in a way that may not last; asked again at the next launch.
     private var failed: Set<String> = []
 
-    /// Raised when the questions change, so the answers to the old ones are asked again.
-    private static let version = 1
-
-    private struct Saved: Codable {
-        var version: Int
-        var guesses: [String: Classification]
-    }
-
     init(caches: URL) {
-        url = caches.appendingPathComponent("classification-guesses.json", isDirectory: false)
-        let saved = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
-        guesses = saved.flatMap { $0.version == Self.version ? $0.guesses : nil } ?? [:]
+        url = ClassificationGuesses.namesFile(caches: caches)
+        guesses = ClassificationGuesses.savedNames(caches: caches)
     }
 
     /// Whether the model can answer. macOS 15 has none that apps can ask.
@@ -103,7 +94,7 @@ final class ClassificationGuesser {
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(Saved(version: Self.version, guesses: guesses)) else { return }
+        guard let data = try? JSONEncoder().encode(ClassificationGuesses.SavedNames(guesses: guesses)) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
     }

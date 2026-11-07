@@ -50,6 +50,25 @@ Folder turns them all on. Backups from before load as a flat list; FontExplorer 
 - What can go inside a folder: smart folders and app folders too, or folders only; and whether deleting a folder
   deletes the ones inside it or moves them up.
 
+### Search licenses and descriptions (M)
+
+**What.** Let the search field find words in each font's license, license URL and description, as `cicero find` does:
+"rosettatype.com" finds the families whose license points there, and "sturdy serif" can find "sturdy" in a description
+and "serif" in a name. The search field looks only at names, foundries and the like now.
+
+**How.** Read the license, its URL and the description (name IDs 13, 14 and 10) when Cicero scans a font, and keep them
+with the rest of what it knows about the font, so the search field doesn't open the files on every key press. `cicero
+find` reads them from the files each time, about a second for 7,000 styles; it would read the saved ones too. The words
+match as they do now: each word must begin a word somewhere in the family. Show the description in the Info panel.
+
+**Open.**
+- Common words: most licenses say "font", "software" and "free", so "free" would find nearly every family. Whether
+  license words count only when nothing else matches, only for words that look like a web address, or only after a
+  choice such as "Search Licenses Too".
+- How to show why a family was found when the word isn't in its name: a line under the card, or the Info panel opened
+  to it.
+- Libraries saved before: whether Cicero reads every font again once, or fills in the texts as it opens each file.
+
 ## Not planned
 
 Buying fonts inside Cicero, font subscription and rental services, and team servers with accounts: Cicero has no

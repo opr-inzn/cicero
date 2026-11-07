@@ -25,6 +25,9 @@ struct CiceroApp: App {
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
                 menuBarItem.start()
+                if LaunchWait.showedMessage {
+                    DispatchQueue.main.async { menuBarItem.openWindow?(id: WindowID.main) }
+                }
             }
         }
     }
@@ -104,6 +107,12 @@ struct CiceroCommands: Commands {
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
                 .disabled(!updates.canCheckForUpdates)
+            // Says when it's done, as installing shows nothing else to see (see CommandLineTool).
+            if CommandLineTool.State.shared.installed {
+                Button("Cicero CLI installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
+            } else {
+                Button("Install Cicero CLI", systemImage: "terminal") { CommandLineTool.install(model: model) }
+            }
         }
         CommandGroup(after: .newItem) {
             Button("Add Fonts", systemImage: "doc.badge.plus") { model.presentAddFontsPanel() }

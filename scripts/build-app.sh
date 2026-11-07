@@ -19,8 +19,29 @@ BIN_DIR="$("${BUILD[@]}" --show-bin-path)"
 
 APP=build/Cicero.app
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks" "$APP/Contents/Helpers"
 cp "$BIN_DIR/Cicero" "$APP/Contents/MacOS/Cicero"
+# The cicero command-line tool. Not in Contents/MacOS: on a disk that ignores case, cicero is Cicero, the app. It reads
+# CharacterSets.json and Languages.json from Contents/Resources, and Sparkle updates it with the app.
+cp "$BIN_DIR/cicero-tool" "$APP/Contents/Helpers/cicero"
+# Its completion scripts for zsh, bash and fish, made by the tool itself (swift-argument-parser), which Install Cicero
+# CLI links where each shell looks. For the command `cicero`, not the binary's name here.
+mkdir -p "$APP/Contents/Resources/zsh" "$APP/Contents/Resources/bash" "$APP/Contents/Resources/fish"
+"$BIN_DIR/cicero-tool" --generate-completion-script zsh > "$APP/Contents/Resources/zsh/_cicero"
+"$BIN_DIR/cicero-tool" --generate-completion-script bash > "$APP/Contents/Resources/bash/cicero"
+"$BIN_DIR/cicero-tool" --generate-completion-script fish > "$APP/Contents/Resources/fish/cicero.fish"
+if [[ "$(head -1 "$APP/Contents/Resources/zsh/_cicero")" != "#compdef cicero" ]]; then
+    echo "The zsh completion script isn't for the command cicero" >&2
+    exit 1
+fi
+if [[ "$(tail -1 "$APP/Contents/Resources/bash/cicero")" != "complete -o filenames -F _cicero cicero" ]]; then
+    echo "The bash completion script isn't for the command cicero" >&2
+    exit 1
+fi
+if ! grep -qx "complete -c 'cicero' -f" "$APP/Contents/Resources/fish/cicero.fish" || grep -q 'cicero-tool' "$APP/Contents/Resources/fish/cicero.fish"; then
+    echo "The fish completion script isn't for the command cicero" >&2
+    exit 1
+fi
 # The measurements are only in a binary built with them, never in one built for users: their types' symbols, and the
 # scenario's environment variable (a string long enough to be stored as text; LC_ALL=C and -a, or grep stops at the
 # first bytes that aren't UTF-8).
@@ -70,6 +91,7 @@ fi
 for CODE in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
     "${SIGN[@]}" "$CODE"
 done
+"${SIGN[@]}" --identifier com.maximilianinzinger.Cicero.cli "$APP/Contents/Helpers/cicero"
 "${SIGN[@]}" --entitlements Resources/Cicero.entitlements "$APP"
 codesign --verify --deep --strict "$APP"
 

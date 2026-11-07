@@ -2,25 +2,18 @@ import CiceroCore
 import Foundation
 
 /// Where a guessed classification comes from.
-enum ClassificationGuessSource {
-    /// Apple Intelligence, from the family's name.
-    case name
-    /// The model of letters, from their shapes.
-    case letters
-}
+typealias ClassificationGuessSource = ClassificationGuesses.Source
 
 /// Classifications: the one a family's fonts suggest (or for one they don't, a guess from its name or its letters),
 /// unless the user put it in another, the user's own among them. Built-in ones keep their place under the names the
 /// user gave them.
 extension AppModel {
     /// Every classification, for menus: the built-in ones under their names, then the user's.
-    var classificationNames: [String] {
-        Classification.allCases.map(name(of:)) + data.classifications
-    }
+    var classificationNames: [String] { data.classificationNames }
 
     /// A built-in classification's name, as the user renamed it.
     func name(of classification: Classification) -> String {
-        data.classificationRenames[classification.rawValue] ?? classification.rawValue
+        data.name(of: classification)
     }
 
     func classificationName(of family: Family) -> String {
@@ -29,14 +22,8 @@ extension AppModel {
 
     /// `classificationName(of:)` for many families: the user's choices are read once, not for every family.
     func classificationNamer() -> (Family) -> String {
-        let overrides = data.classificationOverrides
-        let renames = data.classificationRenames
         let guess = classificationGuess()
-        return { family in
-            if let override = overrides[family.id] { return override }
-            let classification = guess(family)?.classification ?? family.classification
-            return renames[classification.rawValue] ?? classification.rawValue
-        }
+        return data.classificationNamer { guess($0)?.classification }
     }
 
     /// The classification Automatic puts a family in: the one its fonts suggest, or the guess.
@@ -53,12 +40,7 @@ extension AppModel {
     /// when the name says, else what the model sees in the letters; nothing while guessing is off, and nothing for a
     /// family whose letters say serif for some styles and sans serif for others.
     func classificationGuess() -> (Family) -> (classification: Classification, source: ClassificationGuessSource)? {
-        let names = classificationGuesses, letters = letterGuesses, guessing = guessesClassifications
-        return { family in
-            guard guessing, family.classification == .unclassified, !family.mixesSerifAndSans else { return nil }
-            if let guess = names[family.id], guess != .unclassified { return (guess, .name) }
-            return letters[family.id].map { ($0, .letters) }
-        }
+        ClassificationGuesses.rule(names: classificationGuesses, letters: letterGuesses, guessing: guessesClassifications)
     }
 
     func isUserClassification(_ name: String) -> Bool {

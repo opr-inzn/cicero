@@ -1,11 +1,14 @@
 # Architecture
 
-Cicero is a SwiftPM package with two targets and a test target, which stays out of the public
-repository. Its one dependency is Sparkle (a binary framework, used by the app target only) for updates.
+Cicero is a SwiftPM package with four targets and a test target, which stays out of the public
+repository. Its dependencies are Sparkle (a binary framework, used by the app target only) for updates, and Swift
+Argument Parser for the `cicero` command's arguments.
 
 ```
-Sources/CiceroCore   fonts, the library, activation, coverage, user data — no UI
-Sources/Cicero       the app (SwiftUI); everything runs on the main actor by default
+Sources/CiceroCore      fonts, the library, activation, coverage, user data — no UI
+Sources/CiceroCommands  the cicero command's commands, as functions from input to a JSON value
+Sources/CiceroTool      the cicero command (product cicero-tool): arguments, --json, text for people
+Sources/Cicero          the app (SwiftUI); everything runs on the main actor by default
 Tests/CiceroCoreTests
 ```
 
@@ -107,6 +110,34 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   fonts named by file, PostScript name or family and style, sets, smart sets with their rules already in Cicero's
   terms, labels as tags, ratings, comments, activation history. `LibraryImport` adds the other app's fonts to the user data,
   then, once a scan has read them, matches the rest to the library and adds it, only ever adding.
+
+## The cicero command
+
+- **CiceroCommands**: each command is a function that takes its options and a `LibraryContext` and returns a `JSON`
+  value (an ordered object, so `schema` comes first and fields stay where the contract puts them; a nil field is left
+  out) or throws a `CommandError` (code, message, near names, exit code). Commands never print. `LibraryContext` loads
+  what the app saved: user-data.json (strictly: an unreadable file stops the command rather than being set aside),
+  `LibraryScanner.savedLibraryAsNow` (the saved library, each face on or off as macOS has it now, without a scan),
+  `CoverageIndex.loadSaved`, `MeasurementIndex.loadSaved` and `ClassificationGuesses` for the guessed classes, then
+  answers with the core's `FamilyFilters` and `UserData` rules, as the app does. `Names` finds what a typed name means,
+  or the near names. `Describer` makes families and styles into the contract's JSON, reading what the caches don't keep
+  (URLs, license, copyright, axis ranges) from the files. `ToolEnvironment` says where Cicero's files are; environment
+  variables move them for the tests, and `CICERO_FAKE_REGISTRAR` gives a list of active files in place of macOS.
+- **Changes** (`Write`, `Dispatch`, `Requests`; `AppLock` in CiceroCore): a change is a `WriteCommand` (names as typed) in
+  a `WriteRequest`. `WriteRunner` looks the names up, asks `ActivationQuestions`, and makes it through a `Writer`: the
+  app's `AppRequestWriter` while it's open, `ClosedAppWriter` while it's closed. `WriteDispatcher` picks one: the free
+  `app.lock` means closed (the command holds it while it writes); held by the running app means `Requests/`, where the
+  app's `CommandRequests` takes the request by renaming it and answers in JSON (`JSON(text:)` reads it back in order).
+  `ClosedAppWriter` writes an `ActivationJournal` (CiceroCore) before turning fonts and removes it after saving the
+  records; the next lock holder repairs the records from it. At launch the app waits for the lock as long as it's held
+  (`LaunchWait`, an alert naming the holder after 1 s, with Quit).
+- **CiceroTool**: Swift Argument Parser commands that call those functions and print the value, as JSON with `--json`,
+  else as text (`Text`). Built as `cicero-tool`; `build-app.sh` puts it in `Contents/Helpers/cicero` and signs it.
+  Each command that answers is `Answering` (`result()` gives the JSON without printing; changes are `Changing`, a
+  `WriteCommand` for `WriteDispatcher`). `cicero mcp` (`MCP.swift`, the Swift MCP SDK) makes a tool of each from its
+  ArgumentParser definition, turns a call back into the command line it stands for, and answers with `result()`.
+- The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Cicero CLI). The app depends on
+  CiceroCommands for the changes it makes for the command.
 
 ## The app
 
