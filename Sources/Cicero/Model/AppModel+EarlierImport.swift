@@ -20,21 +20,24 @@ struct EarlierImportPrompt: Identifiable {
 
 extension AppModel {
     /// Once a launch, after its first scan: asks about FontExplorer X's Font Library when it's still one of the user's
-    /// locations with fonts in it. Not Now asks again at the next launch.
+    /// locations with fonts in it. Not Now asks again at the next launch. Settles `mayOfferEarlierImportCopy`, as the
+    /// question is up or not to come.
     func offerEarlierImportCopy() {
         guard !askedAboutEarlierImport, !isImporting, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data)
-        else { return }
+        else { return mayOfferEarlierImportCopy = false }
         let faces = faces(in: [folder])
         let prefix = folder.path + "/"
         let files = Set(faces.flatMap { [$0.face.path] + $0.otherCopies }).filter { $0.hasPrefix(prefix) }.sorted()
-        guard !files.isEmpty else { return }
+        guard !files.isEmpty else { return mayOfferEarlierImportCopy = false }
         askedAboutEarlierImport = true
         let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
         let engine = importEngine
         let intoFontLibrary = data.installsIntoFontLibrary
         Task {
+            // With the question up, in the same turn, or not asked after all.
+            defer { mayOfferEarlierImportCopy = false }
             // Counted before asking, so the sheet says from the start how many it copies.
             let copying = await Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }.value
             guard !isImporting, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }

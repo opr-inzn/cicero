@@ -51,8 +51,13 @@ struct MainWindow: View {
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
         .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
-        // After an update, what's new, over the window once it's there (see `WhatsNew`).
-        .task { if WhatsNew.shared.takePending() { openWindow(id: WindowID.whatsNew) } }
+        // After an update, what's new, over the window once it's there (see `WhatsNew`), and once the question about
+        // FontExplorer X's Font Library is answered, when there's one: its sheet brings this window to the front, over
+        // What's New, which then can't be seen.
+        .task(id: model.mayOfferEarlierImportCopy || model.earlierImportPrompt != nil) {
+            guard !model.mayOfferEarlierImportCopy, model.earlierImportPrompt == nil, WhatsNew.shared.takePending() else { return }
+            openWindow(id: WindowID.whatsNew)
+        }
         // While the Fonts in Document sheet is up, it asks how to install itself: a window shows one sheet.
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.installPrompt : nil }, set: { model.installPrompt = $0 })) {
             InstallSheet(prompt: $0)

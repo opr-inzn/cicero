@@ -249,6 +249,9 @@ final class AppModel {
     var earlierImportPrompt: EarlierImportPrompt?
     /// Asked about it this launch already.
     @ObservationIgnored var askedAboutEarlierImport = false
+    /// Until the first scan has asked about FontExplorer X's Font Library, or found nothing to ask: true at launch when
+    /// there's such a location. What's New waits for the question and its answer (see `MainWindow`).
+    var mayOfferEarlierImportCopy = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
     /// What the toast's Undo does; nil for a toast without one.
@@ -365,6 +368,7 @@ final class AppModel {
         }
         // Files from before there was a Font Library get its first place, saved with the next change.
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
+        mayOfferEarlierImportCopy = FontExplorerImport.earlierImportLocation(in: data) != nil
         if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
         restoreGroups()
