@@ -168,6 +168,11 @@ extension ActivationEngine {
                 do {
                     try fm.createDirectory(at: staging, withIntermediateDirectories: true)
                     try fm.copyItem(at: Self.url(path), to: staged)
+                    // Without the downloaded-file tag the original has: with it, fontworker opens macOS's quarantine
+                    // database for each file it reads (and fails), so a read of the whole Fonts folder takes 6–9 times
+                    // as long, long enough for more copies to arrive and fontd to read it all again, and again (a storm,
+                    // Tests/E2E/fontbase-real-import "the quarantine tag"). The original keeps its tag.
+                    removexattr(staged.path, "com.apple.quarantine", 0)
                 } catch {
                     continue
                 }
