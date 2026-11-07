@@ -28,22 +28,34 @@ public struct FontMatcher: Sendable {
         text.lowercased().filter { !$0.isWhitespace && $0 != "-" && $0 != "_" }
     }
 
-    /// The styles a font is. With a file, the file's: the one with its PostScript name, or all of them when it gives
-    /// none or `wholeFile` asks for all, as for a set that has files rather than styles. Else, or when the file has no
-    /// such style, the one with its PostScript name, else the one with its family and style names (`defaultStyle` for a
-    /// font that names its family alone). Empty when the library has none.
+    /// The styles a font is. With a file, the file's: the one with its PostScript name (spelled otherwise too, see
+    /// `letters`), or all of them when it gives none or `wholeFile` asks for all, as for a set that has files rather
+    /// than styles. Else, or when the file has no such style, the one with its PostScript name, else the one with its
+    /// family and style names (`defaultStyle` for a font that names its family alone), else, when it gives a file, all
+    /// the file's styles. Empty when the library has none.
     public func faces(_ font: ImportedFont, defaultStyle: String? = nil, wholeFile: Bool = false) -> [(family: Family, face: LibraryFace)] {
         let postScriptName = font.postScriptName?.lowercased()
-        if let path = font.path, let inFile = byPath[path] {
+        let inFile = font.path.flatMap { byPath[$0] }
+        if let inFile {
             guard let postScriptName, !wholeFile else { return inFile }
             let named = inFile.filter { $0.face.face.postScriptName.lowercased() == postScriptName }
             if !named.isEmpty { return Array(named.prefix(1)) }
+            // Another app may read the name its own way: FontBase has "BONIFACE(19-10-18)" for "BONIFACE19-10-18",
+            // "Stanley-Bold" for "StanleyBold".
+            let spelled = inFile.filter { Self.letters($0.face.face.postScriptName) == Self.letters(postScriptName) }
+            if !spelled.isEmpty { return Array(spelled.prefix(1)) }
         }
         if let postScriptName, let found = byPostScriptName[postScriptName] { return [found] }
         if let family = font.family, let style = font.style ?? defaultStyle, let found = byName[Self.key(family) + "|" + Self.key(style)] {
             return [found]
         }
-        return []
+        // The file, by a name none of its styles has: a variable font's own name for its instances, as FontBase gives it.
+        return inFile ?? []
+    }
+
+    /// A name's letters and digits, in lowercase: "BONIFACE(19-10-18)" and "boniface191018" alike.
+    static func letters(_ name: String) -> String {
+        String(name.lowercased().filter { $0.isLetter || $0.isNumber })
     }
 
     /// The family with this name.
