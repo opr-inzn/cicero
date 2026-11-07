@@ -135,6 +135,21 @@ enum MeasureRun {
             }
             return
         }
+        // page, for A/B runs (run-vm.sh ONLY=page): the full scenario's five font pages, opened and closed ten times
+        // each, from the view CICERO_MEASURE_MODE names (specimens, as in the full scenario, unless it says otherwise).
+        if only == "page" {
+            let mode = ProcessInfo.processInfo.environment["CICERO_MEASURE_MODE"].flatMap(BrowserMode.init(rawValue:)) ?? .specimens
+            await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let picks = pagePicks(model)
+            for _ in 0..<10 {
+                for family in picks {
+                    await step("page.open", detail: family.name) { model.openFamilyID = family.id }
+                    await step("page.close") { model.openFamilyID = nil }
+                }
+            }
+            return
+        }
 
         // Sidebar items, each twice.
         let location = model.data.folders.first.map { SidebarItem.folder($0.id) }
@@ -161,8 +176,7 @@ enum MeasureRun {
         model.searchApplies = nil
 
         // Font pages: five families across the list.
-        let families = model.visibleFamilies
-        let picks = families.isEmpty ? [] : (0..<5).map { families[$0 * (families.count - 1) / 4] }
+        let picks = pagePicks(model)
         for family in picks {
             await step("page.open", detail: family.name) { model.openFamilyID = family.id }
             await step("page.close") { model.openFamilyID = nil }
@@ -501,6 +515,13 @@ enum MeasureRun {
         }
         walk(content)
         return found.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+    }
+
+    /// The families whose font pages the scenario opens: five evenly across the list the browser shows (first and last
+    /// included). The full scenario and ONLY=page both use these, so their page times are of the same pages.
+    private static func pagePicks(_ model: AppModel) -> [Family] {
+        let families = model.visibleFamilies
+        return families.isEmpty ? [] : (0..<5).map { families[$0 * (families.count - 1) / 4] }
     }
 
     /// Does `change`, then records how long the main thread took to be quiet again.
