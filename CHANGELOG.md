@@ -1,12 +1,13 @@
 # Changelog
 
-Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases).
+Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
 ## Unreleased
 
 - **The Cicero CLI** finds, checks and turns on your fonts, tags them, puts them in folders, and gives them ratings and notes, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. Tab completion works in zsh, bash and fish. See [The Cicero CLI](help/command-line.md).
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](help/command-line.md#use-it-in-claude-and-codex) says.
 - `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
+- **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
 
 ## 0.11.0
 
