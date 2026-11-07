@@ -104,7 +104,7 @@ struct CiceroCommands: Commands {
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
                 .disabled(!updates.canCheckForUpdates)
-            Button("Install Command-Line Tool", systemImage: "terminal") { CommandLineTool.install(model: model) }
+            Button("Install Command-Line", systemImage: "terminal") { CommandLineTool.install(model: model) }
         }
         CommandGroup(after: .newItem) {
             Button("Add Fonts", systemImage: "doc.badge.plus") { model.presentAddFontsPanel() }

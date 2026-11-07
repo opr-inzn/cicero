@@ -8,7 +8,7 @@ It works while Cicero is closed too, and it never opens Cicero. It turns fonts o
 
 ## Install the command
 
-1. Choose **Cicero → Install Command-Line Tool**. Cicero needs to be in your Applications folder.
+1. Choose **Cicero → Install Command-Line**. Cicero needs to be in your Applications folder.
 2. Enter your administrator password if macOS asks for it. Cicero puts a link to the command in `/usr/local/bin`.
 3. Open Terminal and type `cicero --help`.
 

@@ -132,7 +132,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   records; the next lock holder repairs the records from it.
 - **CiceroTool**: Swift Argument Parser commands that call those functions and print the value, as JSON with `--json`,
   else as text (`Text`). Built as `cicero-tool`; `build-app.sh` puts it in `Contents/Helpers/cicero` and signs it.
-- The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Command-Line Tool). The app depends on
+- The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Command-Line). The app depends on
   CiceroCommands for the changes it makes for the command.
 
 ## The app

@@ -2,7 +2,7 @@ import AppKit
 import CiceroCore
 
 /// The `cicero` command-line tool, in the bundle at Contents/Helpers/cicero, so it's always the app's own version.
-/// Install Command-Line Tool links it into /usr/local/bin, which Terminal's search path has, with an administrator's
+/// Install Command-Line links it into /usr/local/bin, which Terminal's search path has, with an administrator's
 /// password when that folder needs one.
 enum CommandLineTool {
     /// Where the link goes.
