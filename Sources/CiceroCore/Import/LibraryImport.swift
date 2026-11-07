@@ -327,8 +327,9 @@ public enum LibraryImport {
         var activate: [LibraryFace] = []
         if choices.activate {
             var seen = Set<FaceID>()
-            // Also those in the copies that went in on (`ActivationEngine.installOff`): on already, they're the import's to
-            // count and to undo, though turning them on again does nothing.
+            // Also those in the copies that went in on (`ActivationEngine.installOff`): on already, turning them on again
+            // does nothing. Those that went in on with this import are its to count and to undo (see
+            // `AppModel.performImport`).
             activate = faces(imported.active).map(\.face)
                 .filter { ($0.canActivate || copiedInOn.contains($0.face.path)) && seen.insert($0.face.id).inserted }
         }

@@ -22,12 +22,16 @@ extension AppModel {
 
     /// Never copying them: a font in a location or under Added Fonts goes on where it is, an installed one where it was
     /// installed, and one an earlier version copied as that copy, while it's the same as its file (see
-    /// `ActivationEngine.activate`).
-    func performActivation(_ faces: [LibraryFace]) {
+    /// `ActivationEngine.activate`). `named`, for an import: the styles it turned on, which the toast names and Undo
+    /// turns off, also those on already as their copies went in on, and none of those on from before, which `faces` may
+    /// have. No toast when it names none and nothing failed.
+    func performActivation(_ faces: [LibraryFace], named: [LibraryFace]? = nil) {
         let operation = expect(faces, at: .on)
         enqueue { model in
-            let result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
-            model.finish(result, operation: operation, undo: model.undo(turning: faces, on: false, failed: result.failed))
+            var result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
+            // What failed, the engine's message says.
+            if let named, result.failed.isEmpty { result.message = FontNames.describe(named).map { "\($0) activated" } ?? "" }
+            model.finish(result, operation: operation, undo: model.undo(turning: named ?? faces, on: false, failed: result.failed))
         }
     }
 
@@ -143,7 +147,7 @@ extension AppModel {
         data.records = result.records
         data.forgetInstalledAddedFiles()
         self.data = data
-        showToast(result.message, undo: undo)
+        if !result.message.isEmpty { showToast(result.message, undo: undo) }
         let scan = rescan()
         if let operation { settle(operation, after: scan) }
     }

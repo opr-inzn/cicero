@@ -201,14 +201,18 @@ extension AppModel {
                 }
             }
             var updated = model.data
-            // The copies that went in on, as their fonts were on: the import turned them on, though nothing's left to do.
-            // Those in already count too: a cancelled import of the same library left them on (`keepOnWhenCancelled`).
+            // The copies that went in on, as their fonts were on, and those in already, on as a cancelled import of the same
+            // library may have left them (`keepOnWhenCancelled`): on already, so nothing's left to do for them.
             let copiedInOn = Set(on.compactMap { installed.placed[$0] })
             var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library,
                                                       paths: paths, copiedInOn: copiedInOn)
             // A style the other app's file still stands for goes on as its copy.
             let copies = Set(installed.placed.values)
             faces = faces.map { $0.copy(among: copies) }
+            // The import's to count, name and undo: those it turns on, and those whose copies went in on just now. Not
+            // those on from before, as when the same library is imported again: nothing changes for them.
+            let copiedInOnNow = copiedInOn.intersection(installed.new)
+            let turnedOn = faces.filter { $0.canActivate || copiedInOnNow.contains($0.face.path) }
             result.fonts = installed.new.count
             result.notCopied = installed.failed.count
             result.removedCopies = removed
@@ -222,8 +226,8 @@ extension AppModel {
             let more = takingOver.isEmpty ? []
                 : (scanned ?? model.library).families.flatMap(\.faces).filter { takingOver.contains($0.face.path) && $0.canActivate }
             // In a Fonts folder or Cicero's Library, they go on where they are.
-            if !faces.isEmpty || !more.isEmpty { model.performActivation(faces + more) }
-            result.activated = faces.count
+            if !faces.isEmpty || !more.isEmpty { model.performActivation(faces + more, named: turnedOn + more) }
+            result.activated = turnedOn.count
             summary = result
         }
         return summary

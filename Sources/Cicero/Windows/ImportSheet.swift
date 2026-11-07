@@ -568,9 +568,12 @@ struct ImportSheet: View {
             lines.append("\(count(summary.notCopied, "font file")) couldn’t be copied. Import again to try \(summary.notCopied == 1 ? "it" : "them") again.")
         }
         if summary.activated > 0 {
-            lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).")
+            let one = summary.activated == 1
+            lines.append("\(count(summary.activated, "style")) activated, as \(one ? "it was" : "they were") in \(appName).")
             if prompt.source == .fontBase {
-                lines.append("When FontBase opens, it activates them again, from copies of its own, so they’re on twice. Deactivate them in FontBase to stop that.")
+                lines.append(one
+                    ? "When FontBase opens, it activates it again, from a copy of its own, so it’s on twice. Deactivate it in FontBase to stop that."
+                    : "When FontBase opens, it activates them again, from copies of its own, so they’re on twice. Deactivate them in FontBase to stop that.")
             }
         }
         if summary.removedCopies > 0 {
