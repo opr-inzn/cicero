@@ -116,9 +116,12 @@ extension ActivationEngine {
     /// Files in `on`, those whose fonts the other app had on, go into ~/Library/Fonts on rather than off and on again at
     /// the end: each of those would be one more entry on macOS's list of fonts it has off, taken off again later, and
     /// fontd takes longer over that list the longer it is (after an import of 31,015 files, 13 minutes at full speed
-    /// turning 3,718 on). A copy that stands for several files is on when one of them is. Once cancelled they go off too.
+    /// turning 3,718 on). A copy that stands for several files is on when one of them is. Once cancelled they go off too,
+    /// unless `keepOnWhenCancelled`: nothing else has those fonts on (FontBase deletes its own copies as it quits), and the
+    /// import would have turned them on anyway.
     @concurrent
-    public func installOff(_ files: [String], on: Set<String> = [], progress: @escaping @Sendable (Int, Int) -> Void) async
+    public func installOff(_ files: [String], on: Set<String> = [], keepOnWhenCancelled: Bool = false,
+                           progress: @escaping @Sendable (Int, Int) -> Void) async
         -> (placed: [String: String], new: [String], failed: [String]) {
         // Without it, macOS slows an app it can't see (App Nap) and lets the Mac sleep: every wait for fontd here then
         // takes far longer, and an import of thousands of fonts left alone takes hours more.
@@ -138,14 +141,14 @@ extension ActivationEngine {
         var onSoFar: [String] = []
         // The copies moved into ~/Library/Fonts, off, and when they were last looked at (see `turnOffAgain`).
         var intoFontsFolderSoFar: [String] = []
-        var registeredAgain = Set<String>()
+        var lookedAt = TurnOffAgain()
         var lastLook = ContinuousClock.now
         // Staged copies macOS didn't take in time → where they go in ~/Library/Fonts, and the file each is a copy of.
         var again: [String: (destination: String, source: String)] = [:]
         for start in stride(from: 0, to: total, by: Self.offBatchSize) {
             if Task.isCancelled { break }
             if ContinuousClock.now - lastLook > Self.lookAgainEvery {
-                await turnOffAgain(intoFontsFolderSoFar, registeredAgain: &registeredAgain)
+                await turnOffAgain(intoFontsFolderSoFar, state: &lookedAt)
                 lastLook = .now
             }
             progress(start, total)
@@ -208,18 +211,15 @@ extension ActivationEngine {
         }
         for staged in again.keys { try? fm.removeItem(atPath: staged) }
         // Also once cancelled, as the copies stay: in a task of its own, where the waits aren't cut short. Once cancelled,
-        // the copies that went in on go off too, as the rest stay off until the import is done.
+        // the copies that went in on go off too, as the rest stay off until the import is done, unless they stay on.
         let cancelled = Task.isCancelled
-        let turningOff = cancelled ? onSoFar : []
+        let turningOff = cancelled && !keepOnWhenCancelled ? onSoFar : []
         if !intoFontsFolderSoFar.isEmpty || !turningOff.isEmpty {
-            let engine = self, paths = intoFontsFolderSoFar + turningOff, earlier = registeredAgain
+            let engine = self, paths = intoFontsFolderSoFar + turningOff, earlier = lookedAt
             await Task {
-                var registeredAgain = earlier
+                var lookedAt = earlier
                 if !turningOff.isEmpty { _ = await engine.registrar.setEnabled(turningOff.map(Self.url), false) }
-                await engine.turnOffAgain(paths, registeredAgain: &registeredAgain)
-                // And once more for the last ones, which macOS may not have noticed yet.
-                try? await Task.sleep(for: .seconds(3))
-                await engine.turnOffAgain(paths, registeredAgain: &registeredAgain)
+                await engine.turnOffAtLast(paths, state: &lookedAt)
             }.value
         }
         // The same files as those copied take their copies.
@@ -237,29 +237,72 @@ extension ActivationEngine {
     /// How often `installOff` looks for copies macOS turned on again, and how many it looks at, at most.
     static let lookAgainEvery: Duration = .seconds(10)
     static let lookingAtMost = 500
+    /// How often `turnOffAgain` registers a file again that macOS doesn't have, at most, when it doesn't take.
+    static let registeringAgainAtMost = 3
+    /// How long `turnOffAtLast` goes on, at most, and how long it looks on after that, in the background.
+    static let lastLookAtMost: Duration = .seconds(120)
+    static let watchAfterwards: Duration = .seconds(180)
+
+    /// What `turnOffAgain` has done with the files it looked at: those it registered again and turned off, not looked at
+    /// again (the list may name them by another path), and how often it tried to register each that didn't take.
+    struct TurnOffAgain: Sendable {
+        var settled = Set<String>()
+        var tries: [String: Int] = [:]
+    }
+
+    /// At the end of `installOff`: `turnOffAgain` with no `lookingAtMost`, again every 3 seconds until nothing is left for
+    /// it to do, two minutes at most. In a storm (fontd going through its list a font at a time, see
+    /// Tests/E2E/fontbase-real-import), a look can find hundreds of copies the list doesn't name yet, and one of 500 left
+    /// 79 copies on that the other app had off.
+    ///
+    /// Then, without anyone waiting, every 10 seconds for `watchAfterwards`: a busy fontd can take a copy in after it
+    /// was turned off and forget that it's off, as it did with the last 24 batches before a cancel under load (479
+    /// copies on that FontBase had off, Tests/E2E/fontbase-real-import kload), after a last look that found nothing.
+    func turnOffAtLast(_ paths: [String], state: inout TurnOffAgain) async {
+        let deadline = ContinuousClock.now + Self.lastLookAtMost
+        while await turnOffAgain(paths, state: &state, atMost: .max) > 0, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .seconds(3))
+        }
+        let engine = self, settled = state
+        Task.detached(priority: .utility) {
+            var state = settled
+            let end = ContinuousClock.now + Self.watchAfterwards
+            while ContinuousClock.now < end {
+                try? await Task.sleep(for: .seconds(10))
+                await engine.turnOffAgain(paths, state: &state, atMost: .max)
+            }
+        }
+    }
 
     /// Turns off again the files among `paths`, in ~/Library/Fonts, that macOS's list of fonts it has off doesn't name any
     /// more. While it's busy, macOS can notice files that arrived there after `moveIntoFontsFolderOff` turned them off
     /// (in a macOS 15 VM, one or two batches of 20 in the first minute of an import of 31,209 fonts): it then forgets that
     /// they're off, and has them on, or not at all until it looks at the folder again, which turns them on. One it has on is
-    /// turned off; one it doesn't have is registered first, as turning off a file macOS doesn't have doesn't stick, but
-    /// only once (`registeredAgain`), so a file the list names by another path isn't turned on and off at every look.
-    /// Looking costs one read of the list, and a question for each file it doesn't name: no more than
-    /// `lookingAtMost` at a time, so a list that names the files by other paths can't have every file asked about. An
-    /// empty list says nothing: the files turned off are on it, unless it can't be read.
-    func turnOffAgain(_ paths: [String], registeredAgain: inout Set<String>) async {
-        guard !paths.isEmpty else { return }
+    /// turned off; one it doesn't have is registered first, as turning off a file macOS doesn't have doesn't stick. One
+    /// registered again and turned off is settled (`state`), so a file the list names by another path isn't turned on and
+    /// off at every look; one whose registering doesn't take, as in a storm, is tried again at the next look,
+    /// `registeringAgainAtMost` times. Looking costs one read of the list, and a question for each file it doesn't name:
+    /// no more than `atMost` at a time, so a list that names the files by other paths can't have every file asked about. An
+    /// empty list says nothing: the files turned off are on it, unless it can't be read. Returns how many files it found
+    /// to turn off or register.
+    @discardableResult
+    func turnOffAgain(_ paths: [String], state: inout TurnOffAgain, atMost: Int = Self.lookingAtMost) async -> Int {
+        guard !paths.isEmpty else { return 0 }
         let off = registrar.offFontPaths()
-        guard !off.isEmpty else { return }
-        let unlisted = Array(paths.lazy.filter { !off.contains($0) && FileManager.default.fileExists(atPath: $0) }.prefix(Self.lookingAtMost))
-        guard !unlisted.isEmpty else { return }
+        guard !off.isEmpty else { return 0 }
+        let settled = state.settled
+        let unlisted = Array(paths.lazy.filter { !off.contains($0) && !settled.contains($0) && FileManager.default.fileExists(atPath: $0) }
+            .prefix(atMost))
+        guard !unlisted.isEmpty else { return 0 }
         let on = unlisted.filter { registrar.isActive(Self.url($0)) }
-        let unregistered = unlisted.filter { !on.contains($0) && !registeredAgain.contains($0) }
-        registeredAgain.formUnion(unregistered)
+        let unregistered = unlisted.filter { !on.contains($0) && state.tries[$0, default: 0] < Self.registeringAgainAtMost }
+        for path in unregistered { state.tries[path, default: 0] += 1 }
         let taken = unregistered.isEmpty ? [] : await Set(unregistered).subtracting(registerAndConfirm(unregistered, scope: .persistent))
         let turningOff = on + unregistered.filter(taken.contains)
-        guard !turningOff.isEmpty else { return }
-        _ = await registrar.setEnabled(turningOff.map(Self.url), false)
+        guard !turningOff.isEmpty else { return unregistered.count }
+        let stillOn = await registrar.setEnabled(turningOff.map(Self.url), false)
+        state.settled.formUnion(unregistered.filter { taken.contains($0) && !stillOn.contains($0) })
+        return on.count + unregistered.count
     }
 
     /// The file `installOff` takes as it is for `path`: one with the same contents where it would copy it (`folder`, else

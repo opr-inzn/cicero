@@ -274,7 +274,7 @@ struct ImportSheet: View {
             // While fonts are copied, the task closes the sheet once it has stopped: closing it discards the unzipped
             // backup, which a copy may still be reading. Once they're copied, the rest goes through.
             Button("Cancel", role: .cancel) {
-                if let task { task.cancel() } else { dismiss() }
+                if let task { stage = .stopping; task.cancel() } else { dismiss() }
             }
             .disabled(stage != nil && !isCopying)
             Button("Import") { start() }
@@ -297,6 +297,9 @@ struct ImportSheet: View {
             case .starting:
                 ProgressView()
                 Text("Importing")
+            case .stopping:
+                ProgressView()
+                Text("Stopping…")
             }
         }
         .progressViewStyle(.linear)
@@ -319,6 +322,8 @@ struct ImportSheet: View {
                 let now = ProcessInfo.processInfo.systemUptime
                 Task { @MainActor in
                     guard self.summary == nil else { return }
+                    // Once Cancel is pressed, "Stopping…" stays until the task ends.
+                    guard self.stage != .stopping else { return }
                     if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
                     self.stage = stage
                 }

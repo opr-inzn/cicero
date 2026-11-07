@@ -50,7 +50,7 @@ struct EarlierImportSheet: View {
                 }
                 Spacer()
                 Button(stage == nil ? "Not Now" : "Cancel", role: .cancel) {
-                    if let task { task.cancel() } else { dismiss() }
+                    if let task { stage = .stopping; task.cancel() } else { dismiss() }
                 }
                 .disabled(stage != nil && !isCopying)
                 Button("Copy Fonts") { start() }
@@ -109,6 +109,9 @@ struct EarlierImportSheet: View {
             case .starting:
                 ProgressView()
                 Text("Turning fonts on")
+            case .stopping:
+                ProgressView()
+                Text("Stopping…")
             }
         }
         .progressViewStyle(.linear)
@@ -129,6 +132,8 @@ struct EarlierImportSheet: View {
             let copied = await model.copyEarlierImport(prompt) { stage in
                 let now = ProcessInfo.processInfo.systemUptime
                 Task { @MainActor in
+                    // Once Cancel is pressed, "Stopping…" stays until the task ends.
+                    guard self.stage != .stopping else { return }
                     if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
                     self.stage = stage
                 }

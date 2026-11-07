@@ -20,6 +20,8 @@ struct ImportPrompt: Identifiable {
 /// Where an import is, for the sheet.
 enum ImportStage: Equatable {
     case copying(done: Int, total: Int)
+    /// Cancelled while copying: the copies made so far are being settled (turned off, or left on) before the sheet closes.
+    case stopping
     case reading(done: Int, total: Int)
     case starting
 }
@@ -134,9 +136,12 @@ extension AppModel {
 
     // MARK: Importing
 
-    /// The toast once copying is cancelled with `count` files copied in, which stay.
-    static func stoppedCopying(_ count: Int, again: String) -> String {
-        "Stopped. The \(count == 1 ? "font file" : "\(count.formatted()) font files") copied in so far stay, off: \(again)"
+    /// The toast once copying is cancelled with `count` files copied in, which stay: off, but for `on` of them, on as they
+    /// were in `appName`.
+    static func stoppedCopying(_ count: Int, on: Int = 0, appName: String = "", again: String) -> String {
+        let files = count == 1 ? "font file" : "\(count.formatted()) font files"
+        guard on > 0 else { return "Stopped. The \(files) copied in so far stay, off: \(again)" }
+        return "Stopped. The \(files) copied in so far stay, \(on.formatted()) of them on, as in \(appName): \(again)"
     }
 
     /// Saves the current setup to the Backups folder; copies the other app's fonts in, off, where installing puts them
@@ -159,9 +164,17 @@ extension AppModel {
         // The files with fonts that were on go in on, as they'd be turned on at the end (see `installOff`).
         let activePaths = choices.activate ? Set(imported.active.compactMap(\.path)) : []
         let on = Set(files.filter { activePaths.contains($0.path) }.map(\.source))
-        let installed = await importEngine.installOff(files.map(\.source), on: on) { done, total in stage(.copying(done: done, total: total)) }
+        // Once cancelled, the copies that went in on stay on when nothing else has those fonts on: FontBase deletes its
+        // own copies as it quits. FontExplorer X leaves its fonts on, so with it they go off, or they'd be on twice.
+        let keepOn = imported.source == .fontBase
+        let installed = await importEngine.installOff(files.map(\.source), on: on, keepOnWhenCancelled: keepOn) { done, total in
+            stage(.copying(done: done, total: total))
+        }
         if Task.isCancelled {
-            if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "import again to finish")) }
+            let onCount = keepOn ? Set(on.compactMap { installed.placed[$0] }).intersection(installed.new).count : 0
+            if !installed.new.isEmpty {
+                showToast(Self.stoppedCopying(installed.new.count, on: onCount, appName: imported.source.appName, again: "import again to finish"))
+            }
             return nil
         }
         // The other app's paths → the copies'.
@@ -189,7 +202,8 @@ extension AppModel {
             }
             var updated = model.data
             // The copies that went in on, as their fonts were on: the import turned them on, though nothing's left to do.
-            let copiedInOn = Set(on.compactMap { installed.placed[$0] }).intersection(installed.new)
+            // Those in already count too: a cancelled import of the same library left them on (`keepOnWhenCancelled`).
+            let copiedInOn = Set(on.compactMap { installed.placed[$0] })
             var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library,
                                                       paths: paths, copiedInOn: copiedInOn)
             // A style the other app's file still stands for goes on as its copy.
