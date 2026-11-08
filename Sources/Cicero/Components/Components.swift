@@ -597,8 +597,12 @@ struct ValueField: View {
         if let typed { set(typed) } else { text = formatted(value) }
     }
 
+    /// Only a different number changes the value: leaving the field, or Return, with the number it had says nothing
+    /// moved (an axis set to where it was would make the style menu say Custom).
     private func set(_ new: Double) {
-        value = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+        let new = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+        // Within a thousandth of a step: rounding to the step can leave the same number a hair apart.
+        if abs(new - value) > step / 1000 { value = new }
         text = formatted(value)
     }
 
