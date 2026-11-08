@@ -151,6 +151,36 @@ enum MeasureRun {
             return
         }
 
+        // panels, for A/B runs (run-vm.sh ONLY=panels): the Info panel and the sidebar, each opened and closed ten times
+        // over the browser, then over the font page of the family with the most styles (in the first location, should
+        // there be one: a real library pushed in for this), where they were slower to slide.
+        if only == "panels" {
+            await step("mode", detail: "grid") { defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let location = model.data.folders.first?.id
+            let families = model.library.families.filter { location == nil || $0.folderIDs.contains(location!) }
+            guard let family = families.max(by: { $0.faces.count < $1.faces.count }) else {
+                return Measurements.count("run.failed", detail: "no family")
+            }
+            for place in ["browser", "page"] {
+                if place == "page" {
+                    await step("page.open", detail: family.name) { model.openFamilyID = family.id }
+                    // Its glyphs and ligatures, read in the background.
+                    _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(20))
+                }
+                for _ in 0..<10 {
+                    await step("info.open.\(place)", detail: family.name) { model.isInfoPresented = true }
+                    await step("info.close.\(place)", detail: family.name) { model.isInfoPresented = false }
+                }
+                for _ in 0..<10 {
+                    await step("sidebar.hide.\(place)", detail: family.name) { toggleSidebar() }
+                    await step("sidebar.show.\(place)", detail: family.name) { toggleSidebar() }
+                }
+            }
+            model.openFamilyID = nil
+            return
+        }
+
         // Sidebar items, each twice.
         let location = model.data.folders.first.map { SidebarItem.folder($0.id) }
         let items: [SidebarItem] = [.active, .inactive, .system] + (location.map { [$0] } ?? []) + [.all]
@@ -524,6 +554,20 @@ enum MeasureRun {
         return families.isEmpty ? [] : (0..<5).map { families[$0 * (families.count - 1) / 4] }
     }
 
+    /// Hides or shows the sidebar as its toolbar button does, sliding: the split view controller the window's sidebar is in.
+    private static func toggleSidebar() {
+        func controller(in view: NSView) -> NSSplitViewController? {
+            if let split = view as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
+               controller.splitViewItems.contains(where: { $0.behavior == .sidebar }) { return controller }
+            for child in view.subviews { if let found = controller(in: child) { return found } }
+            return nil
+        }
+        guard let view = TextEditingKeys.mainWindow?.contentView, let split = controller(in: view) else {
+            return Measurements.count("run.failed", detail: "no sidebar")
+        }
+        split.toggleSidebar(nil)
+    }
+
     /// Does `change`, then records how long the main thread took to be quiet again.
     private static func step(_ name: String, detail: String = "", _ change: () -> Void) async {
         // A signpost per step, so a profile's samples can be matched to it (`Step`, its name and detail in the message).
@@ -535,6 +579,8 @@ enum MeasureRun {
         Measurements.record(name, ms: settled.ms, detail: settled.timedOut ? "\(detail) (limit)" : detail)
         Measurements.record("\(name).work", ms: settled.workMs, detail: detail)
         Measurements.record("\(name).longest", ms: settled.longestMs, detail: detail)
+        // Turns over a frame at 60 Hz: frames an animation dropped meanwhile, as a count.
+        Measurements.record("\(name).slow", ms: Double(settled.slowTurns), detail: detail)
     }
 
     /// Records the time since the process started, until the main thread is quiet.
@@ -568,6 +614,8 @@ final class MainSettle {
         /// up to, and the most a click or a key press would have waited meanwhile.
         var workMs: Double
         var longestMs: Double
+        /// Turns over 16.7 ms, a frame at 60 Hz.
+        var slowTurns: Int
     }
 
     private let start: ContinuousClock.Instant
@@ -576,6 +624,7 @@ final class MainSettle {
     private var sawTurn = false
     private var work: Duration = .zero
     private var longest: Duration = .zero
+    private var slowTurns = 0
     private var observer: CFRunLoopObserver?
 
     private init() {
@@ -611,6 +660,7 @@ final class MainSettle {
                 lastBusyEnd = now
                 work += turn
                 longest = max(longest, turn)
+                if turn > .microseconds(16_700) { slowTurns += 1 }
             }
             wake = nil
             sawTurn = true
@@ -633,7 +683,7 @@ final class MainSettle {
             }
         }
         return Result(ms: (lastBusyEnd - start).milliseconds, end: lastBusyEnd, timedOut: timedOut,
-                      workMs: work.milliseconds, longestMs: longest.milliseconds)
+                      workMs: work.milliseconds, longestMs: longest.milliseconds, slowTurns: slowTurns)
     }
 }
 #endif
