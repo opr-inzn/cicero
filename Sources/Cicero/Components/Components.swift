@@ -613,12 +613,13 @@ struct ValueField: View {
         Self.formatted(value, step: step)
     }
 
-    /// With the Mac's decimal mark ("12,5" in German), as many decimals as the step has, and no thousands separator, as
-    /// fonts write axis values: 1000, not 1.000. A whole step shows a value between two as it is, to one decimal, as the
-    /// Styles table does: a style at 112.5 on a width axis reads 112,5, not 112.
+    /// With the Mac's decimal mark ("12,5" in German), no thousands separator, as fonts write axis values (1000, not
+    /// 1.000), and only the decimals the value has, up to as many as the step has, as the Styles table writes them: 12,
+    /// not 12,0. A whole step still shows a value between two to one decimal: a style at 112.5 on a width axis reads
+    /// 112,5, not 112.
     private static func formatted(_ value: Double, step: Double) -> String {
         let decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0
-        return value.formatted(.number.grouping(.never).precision(.fractionLength(decimals...max(decimals, 1))))
+        return value.formatted(.number.grouping(.never).precision(.fractionLength(0...max(decimals, 1))))
     }
 }
 
