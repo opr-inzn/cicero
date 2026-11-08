@@ -140,8 +140,9 @@ struct EarlierImportSheet: View {
             }
             task = nil
             if let copied {
-                model.showToast(copied == 0 ? "FontExplorer X’s fonts were in \(model.installPlace) already. Removed the location"
-                    : "Copied \(copied == 1 ? "1 font file" : "\(copied.formatted()) font files") into \(model.installPlace) and removed the location")
+                // The location going is in the question already.
+                model.showToast(copied == 0 ? "FontExplorer X’s fonts were in \(model.installPlace) already"
+                    : "Copied \(copied == 1 ? "1 font file" : "\(copied.formatted()) font files") into \(model.installPlace)")
             }
             dismiss()
         }
