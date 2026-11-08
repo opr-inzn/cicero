@@ -7,6 +7,12 @@ Each version’s notes here become its release notes on the [releases page](http
 - **The Cicero CLI** finds, checks and turns on your fonts, tags them, puts them in folders, and gives them ratings and notes, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. Tab completion works in zsh, bash and fish. See [The Cicero CLI](help/command-line.md).
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](help/command-line.md#use-it-in-claude-and-codex) says.
 - `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
+- **Faster with large libraries:** Cicero opens, scans, searches and switches views faster, and uses much less memory.
+- **Glyphs** lists every glyph in a font, with no limit.
+- **Glyphs are sorted better:** figures first, each alternate after its glyph, alternates that several features draw together (like an old-style figure from a stylistic set), and pictures, math letters and arrows grouped by kind.
+- **Importing is more reliable:** Cancel keeps the fonts copied so far, the fonts that were on come in on, fonts are found when FontBase or FontExplorer X spells their names otherwise, and the Mac stays awake while fonts are copied.
+- **Undo** in the message after you turn fonts on or off, or move them to the Trash. After Move to Trash, it puts the files back where they were, and gives the families back their folders, tags, rating and note.
+- The import sheet calls font files that are the same as others **duplicates**, and says how many there are.
 - **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
 
 ## 0.11.0
