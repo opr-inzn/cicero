@@ -7,6 +7,10 @@ struct FontGrid: View {
     @Environment(PreviewSettings.self) private var preview
     @Environment(\.infoPanelShown) private var infoShown
     @Environment(\.displayScale) private var scale
+    @Environment(\.isCovered) private var isCovered
+    /// How much of the sidebar's room the grid had as a font page covered it, kept until the page goes, so the sidebar
+    /// sliding meanwhile doesn't lay out its rows again (see `CoveredSize`).
+    @State private var coveredHidden: CGFloat?
     let families: [Family]
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
@@ -115,6 +119,7 @@ struct FontGrid: View {
             .visibleHeight($visibleHeight)
             .task(id: inputs) { await measureSamples(inputs) }
             .onChange(of: factor, initial: true) { GridScale.shared.factor = factor }
+            .onChange(of: isCovered, initial: true) { coveredHidden = isCovered ? SidebarRoom.shared.hiddenWidth : nil }
             .onDisappear { GridScale.shared.factor = nil }
             .modifier(KeepsTopOnResize())
             .background(Color.canvas)
@@ -181,7 +186,8 @@ struct FontGrid: View {
     /// lower: `restingWidth`, the width they have with the sidebar shown and the panel shut, sets their height.
     private func layout(minimum: CGFloat) -> (columns: Int, width: CGFloat, restingWidth: CGFloat) {
         let gridWidth = gridRoom.width
-        let resting = gridWidth + Self.infoPanelNarrowing(shown: gridRoom.infoShown, scale: scale) - SidebarRoom.shared.hiddenWidth
+        let hidden = isCovered ? coveredHidden ?? SidebarRoom.shared.hiddenWidth : SidebarRoom.shared.hiddenWidth
+        let resting = gridWidth + Self.infoPanelNarrowing(shown: gridRoom.infoShown, scale: scale) - hidden
         guard gridWidth > 0, resting > 0 else { return (1, minimum, minimum) }
         let count = min(Self.mostColumns, max(1, Int((resting + Self.spacing) / (minimum + Self.spacing))))
         let width = { (row: CGFloat) in (row - Self.spacing * CGFloat(count - 1)) / CGFloat(count) }

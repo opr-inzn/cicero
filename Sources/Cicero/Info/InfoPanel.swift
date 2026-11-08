@@ -77,11 +77,17 @@ struct InfoPanelOverlay: ViewModifier {
 /// in and out (see `InfoPanelOverlay`), and tells the page how far it is in (`infoPanelShown`).
 struct InfoPanelInset: ViewModifier {
     @Environment(AppModel.self) private var model
+    /// Set for the browser under a font page: its room stays as it was, without sliding, until the page goes, when it's
+    /// set at once to the room the panel takes then (see `CoveredSize`).
+    var isCovered = false
+    @State private var coveredShown: CGFloat?
 
     func body(content: Content) -> some View {
+        let shown: CGFloat = model.isInfoPresented ? 1 : 0
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: model.isInfoPresented ? 1 : 0)) }
+            .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: isCovered ? coveredShown ?? shown : shown)) }
+            .onChange(of: isCovered, initial: true) { coveredShown = isCovered ? shown : nil }
             // The toolbar and the gap around the panel show the page's colour from edge to edge.
             .background(Color.canvas)
     }

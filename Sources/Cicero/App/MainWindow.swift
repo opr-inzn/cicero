@@ -28,7 +28,7 @@ struct MainWindow: View {
                     // Here rather than in BrowserView, so switching its view doesn't make the toolbar again (see
                     // `BrowserToolbar`).
                     .toolbar { BrowserToolbar() }
-                    .modifier(DetailPage())
+                    .modifier(DetailPage(isCovered: model.openFamilyID != nil))
                     // A page of its own for each family, so one opened from another's, as from Similar, starts at the
                     // top, as from the browser, rather than scrolled where the other was.
                     .navigationDestination(for: String.self) { FontPage(familyID: $0).id($0).modifier(DetailPage()) }
@@ -272,11 +272,38 @@ private struct ReplaceAlerts: ViewModifier {
 
 /// A page of the detail column: room for the Info panel, and files dropped on it.
 private struct DetailPage: ViewModifier {
+    /// Set for the browser while a font page is pushed over it (see `CoveredSize`).
+    var isCovered = false
+
     func body(content: Content) -> some View {
         content
-            .modifier(InfoPanelInset())
+            .modifier(CoveredSize(isCovered: isCovered))
+            .environment(\.isCovered, isCovered)
+            .modifier(InfoPanelInset(isCovered: isCovered))
             .modifier(FileDrop())
     }
+}
+
+/// The browser kept at the size it had while a font page is pushed over it, and laid out again at the size it has now once
+/// the page goes: under the page it can't be seen, but the stack keeps it, and every frame of the sidebar or the Info
+/// panel sliding laid out its rows again too, which made a slide over a page slower than over the browser itself.
+private struct CoveredSize: ViewModifier {
+    let isCovered: Bool
+    /// The size it had before it was covered.
+    @State private var size: CGSize?
+
+    func body(content: Content) -> some View {
+        content
+            .frame(width: isCovered ? size?.width : nil, height: isCovered ? size?.height : nil, alignment: .topLeading)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { [isCovered] in if !isCovered { size = $0 } }
+            // Not clipped: the browser scrolls under the toolbar's glass, and while it's covered nothing of it shows.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+extension EnvironmentValues {
+    /// Whether a font page is pushed over the view: what it shows can't be seen, and so is kept as it is (see `CoveredSize`).
+    @Entry var isCovered = false
 }
 
 /// Font files and folders dropped from the Finder onto the browser or a font page, or copied there and pasted with ⌘V,
