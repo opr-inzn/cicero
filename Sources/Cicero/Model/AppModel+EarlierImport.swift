@@ -6,6 +6,9 @@ import CiceroCore
 struct EarlierImportPrompt: Identifiable {
     let id = UUID()
     let folder: WatchedFolder
+    /// The location's name when it was asked: the copying removes the location near the end, after which its folder's
+    /// own name ("Font Library") would show.
+    let name: String
     /// The font files in it the library lists.
     let files: [String]
     /// How many of them are copied: not those in already, and one of the same files (see `ActivationEngine.copyPlan`).
@@ -41,7 +44,8 @@ extension AppModel {
             // Counted before asking, so the sheet says from the start how many it copies.
             let copying = await Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }.value
             guard !isImporting, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
-            earlierImportPrompt = EarlierImportPrompt(folder: folder, files: files, copying: copying, countedForFontLibrary: intoFontLibrary,
+            earlierImportPrompt = EarlierImportPrompt(folder: folder, name: data.folderNames[folder.id.uuidString] ?? folder.displayName,
+                                                      files: files, copying: copying, countedForFontLibrary: intoFontLibrary,
                                                       onCount: onCount, smartSets: smartSets)
         }
     }

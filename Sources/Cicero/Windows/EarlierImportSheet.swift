@@ -71,7 +71,7 @@ struct EarlierImportSheet: View {
         }
     }
 
-    private var name: String { model.data.folderNames[prompt.folder.id.uuidString] ?? prompt.folder.displayName }
+    private var name: String { prompt.name }
 
     /// What happens: where the files go, what stays on, what's kept, and that the location goes.
     private var detail: String {
