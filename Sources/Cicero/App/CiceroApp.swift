@@ -233,7 +233,10 @@ struct CiceroCommands: Commands {
             Button("What’s New in Cicero", systemImage: "newspaper") {
                 if WhatsNew.shared.showLatest() { openWindow(id: WindowID.whatsNew) }
             }
-            Button("Release Notes", systemImage: "doc.text") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/releases")!) }
+            // Every released version's notes on one page (scripts/make-version-history.sh writes it at each release).
+            Button("Version History", systemImage: "doc.text") {
+                NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/version-history.md")!)
+            }
             Button("Privacy Policy", systemImage: "hand.raised") { NSWorkspace.shared.open(URL(string: "https://cicero.maximilianinzinger.com/privacy")!) }
             Divider()
             Button("Report an Issue", systemImage: "exclamationmark.bubble") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/issues/new")!) }

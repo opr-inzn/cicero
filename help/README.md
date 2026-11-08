@@ -39,5 +39,5 @@ New to Cicero? Start with [Getting started](getting-started.md). To open this gu
 
 ## Get more help
 
-- **Help → Release Notes** opens the list of versions and what changed in each.
+- **Help → What’s New in Cicero** shows what changed in this version, and **Help → Version History** opens [every version and what changed in each](version-history.md).
 - **Help → Report an Issue** opens a new issue on GitHub, where you can describe a problem or ask a question.

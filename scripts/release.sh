@@ -39,6 +39,8 @@ VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resource
 ./scripts/check-version.sh
 # The app has CHANGELOG.md in it and shows this version's notes in What's New after the update, so they go in first.
 grep -qx "## $VERSION" CHANGELOG.md || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first: What's New shows it." >&2; exit 1; }
+# Help → Version History opens help/version-history.md on GitHub, which has this version's notes once it's committed.
+./scripts/make-version-history.sh
 echo "Releasing Cicero $VERSION, signed by $IDENTITY"
 
 notarize() {

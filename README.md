@@ -44,7 +44,7 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **The Cicero CLI.** Find and check your fonts from Terminal, scripts and AI agents: `cicero find --class serif --set adobe-latin-3`, `cicero status Inter`, `cicero coverage Inter --text "Łódź"`, with `--json` for scripts. `cicero compare` draws fonts side by side in a picture an AI agent can look at. It also turns fonts on and off, gives them tags, ratings and notes, and puts them in folders, and it works while Cicero is closed. Press Tab to complete commands and the names of your families, tags and folders. Claude Code, Claude Desktop and Codex can use it as an MCP server, `cicero mcp`. Install it with Cicero → Install Cicero CLI ([how it works](help/command-line.md)).
 - **Updates.** Cicero checks GitHub for new versions and offers to install them. Check now with Cicero → Check for Updates, or turn off *Check for updates automatically* in Preferences → General.
 - **Moves itself to Applications.** Opened from the disk image or your Downloads folder, Cicero offers to move itself to the Applications folder, where app folders, opening at login and updates work.
-- **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with Release Notes and Report an Issue next to it in the Help menu.
+- **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with What’s New in Cicero, Version History and Report an Issue next to it in the Help menu.
 
 ## Help wanted: fonts beyond Latin
 

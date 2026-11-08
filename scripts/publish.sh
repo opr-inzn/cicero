@@ -20,6 +20,7 @@ fi
 
 NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / { exit } found' CHANGELOG.md)
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }
+grep -qx "## $VERSION" help/version-history.md || { echo "help/version-history.md doesn't have $VERSION: run scripts/make-version-history.sh and commit it." >&2; exit 1; }
 
 if [[ -n "$(git status --porcelain)" ]] || [[ "$(git rev-parse HEAD)" != "$(git rev-parse '@{u}')" ]]; then
     echo "Commit and push your changes first, so the release tag matches the published code." >&2

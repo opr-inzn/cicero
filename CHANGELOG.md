@@ -14,6 +14,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Undo** in the message after you turn fonts on or off, or move them to the Trash. After Move to Trash, it puts the files back where they were, and gives the families back their folders, tags, rating and note.
 - The import sheet calls font files that are the same as others **duplicates**, and says how many there are.
 - **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
+- **Help → Version History** opens every version’s notes on one page, in place of Release Notes.
 
 ## 0.11.0
 

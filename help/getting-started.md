@@ -152,7 +152,7 @@ Cicero checks for new versions each time it opens and once a day while it stays 
 - To check now, choose **Cicero → Check for Updates**
 - To stop checking by itself, open **Preferences → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
 
-Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). **Help → Release Notes** opens it, so you can see what changed in each version.
+Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). After an update, Cicero shows what’s new, and **Help → Version History** opens [what changed in each version](version-history.md).
 
 ## Get help
 
