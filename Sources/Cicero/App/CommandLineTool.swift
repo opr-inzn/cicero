@@ -6,11 +6,11 @@ import Observation
 /// Install Cicero CLI links it into /usr/local/bin, which Terminal's search path has, and its completion scripts
 /// (Contents/Resources/zsh, bash and fish) into the folders in /usr/local/share where each shell looks for them, with one
 /// administrator's password when any folder needs one. All are links into the bundle, so an update changes them with the
-/// app. The menu item says when they're installed, and installing ends with a dialog, not a toast: the item is used from
-/// the menu bar, often with no Library window open to show one.
+/// app. The menu item says when the tool's link is made, and installing ends with a dialog, not a toast: the item is used
+/// from the menu bar, often with no Library window open to show one.
 enum CommandLineTool {
     /// Whether /usr/local/bin/cicero is a link to this Cicero's tool, for the menu item. Checked again as Cicero comes
-    /// to the front, as Terminal or another Cicero may have changed the link meanwhile.
+    /// to the front, as Terminal or another Cicero may have changed the link meanwhile, and after installing.
     @Observable
     final class State {
         static let shared = State()
@@ -23,10 +23,11 @@ enum CommandLineTool {
             ) { _ in MainActor.assumeIsolated { State.shared.refresh() } }
         }
 
-        /// Every link: a CLI installed before there was a completion script, or before there were bash's and fish's,
-        /// reads as not installed, so choosing the item again adds the scripts.
+        /// The tool's link: the CLI is installed while /usr/local/bin/cicero points to this Cicero's tool, also when a
+        /// completion script's link is missing, as after an update that brings one the version before didn't link
+        /// (0.12.0b8 linked zsh's only). Choosing the item then adds the missing links (see `install`).
         func refresh() {
-            let installed = links.map { links in links.allSatisfy(\.isMade) } ?? false
+            let installed = tool.map { Link(at: link, to: $0).isMade } ?? false
             if installed != self.installed { self.installed = installed }
         }
     }
