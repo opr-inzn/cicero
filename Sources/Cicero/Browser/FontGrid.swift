@@ -260,6 +260,12 @@ final class SidebarRoom {
         return hidden >= 1 ? hidden : 0
     }
 
+    /// Whether the sidebar is on its way out or in: the browser's edge between beside it and the window's edge.
+    var isSliding: Bool {
+        guard isCollapsed || isShowing, let room, let detailStart else { return false }
+        return room - detailStart >= 1 && detailStart >= 0.5
+    }
+
     /// Where the browser starts with the sidebar shown at the width it has.
     private var room: CGFloat? {
         sidebar.map { $0.width + (beside ?? inset) }

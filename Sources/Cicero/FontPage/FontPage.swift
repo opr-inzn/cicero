@@ -73,7 +73,7 @@ struct FontPage: View {
             }
             // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
             // at once; only a change in the count redraws the glyphs.
-            .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
+            .modifier(GlyphColumnsReader(columns: $glyphColumns))
         }
         // The features of the style the Info panel shows, read now, so its Features tab has them when it opens.
         .task(id: FileFace(family.face(nearestWeight: preview.weight).face)) {
@@ -683,6 +683,36 @@ private extension TypeTester {
     /// Centered, unless the left alignment was chosen when there were only those two.
     static var savedAlignment: SampleAlignment {
         UserDefaults.standard.object(forKey: "typeTester.centered") as? Bool == false ? .leading : .center
+    }
+}
+
+/// How many glyph squares there are in a row: as many as fit across the page with the sidebar shown and the Info panel
+/// shut, as the browser's grid counts its tiles (see `FontGrid.layout`). Hiding the sidebar or opening the panel makes the
+/// squares and their glyphs bigger or smaller, never more or fewer (see `GlyphGridRow`), so a row keeps its glyphs as
+/// they slide; resizing the window or dragging the sidebar's edge counts them again. Counted only while neither slides:
+/// the room they take is measured a frame apart from the page's width, and in between the count could flicker.
+private struct GlyphColumnsReader: ViewModifier {
+    @Binding var columns: Int?
+    @Environment(\.infoPanelShown) private var infoShown
+    @Environment(\.displayScale) private var scale
+    /// The page's width, for counting again once a slide ends.
+    @State private var width: CGFloat?
+
+    func body(content: Content) -> some View {
+        let isSliding = (infoShown > 0 && infoShown < 1) || SidebarRoom.shared.isSliding
+        content
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                self.width = width
+                if !isSliding || columns == nil { columns = resting(width) }
+            }
+            .onChange(of: isSliding) { _, sliding in
+                if !sliding, let width { columns = resting(width) }
+            }
+    }
+
+    /// The squares that fit across the page as wide as it would be with the sidebar shown and the panel shut.
+    private func resting(_ width: CGFloat) -> Int {
+        GlyphsSection.columns(fitting: width + InfoPanelOverlay.room(shown: infoShown, scale: scale) - SidebarRoom.shared.hiddenWidth)
     }
 }
 

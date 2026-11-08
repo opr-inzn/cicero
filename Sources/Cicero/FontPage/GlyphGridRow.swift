@@ -62,7 +62,7 @@ struct GlyphGridRow: View {
 
     var body: some View {
         let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
-        let room = Self.room(for: cells, in: font)
+        let room = Self.room(for: cells, in: font, columns: columns)
         let drawing = GridRowDrawing(cells: cells, columns: columns, face: face, generation: generation, weight: weight,
                                      variations: variations, padding: padding, selected: selected, room: room)
         drawing.equatable()
@@ -70,7 +70,7 @@ struct GlyphGridRow: View {
             .accessibilityHidden(true)
             // Out past the row, for text reaching past its cell, as `UnclippedText` lets it.
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
-            .frame(height: GlyphsSection.cell)
+            .modifier(SquareRow(columns: columns))
             .overlay {
                 GridRowEvents(labels: cells.map(\.label), columns: columns, actions: actions) { index, size, isDark, scale in
                     // The cell as it's drawn, to drag.
@@ -99,9 +99,26 @@ struct GlyphGridRow: View {
                 left -= cell
                 x += cell + spacing
             }
-            return CGRect(x: pixel(x), y: 0, width: pixel(x + cell) - pixel(x), height: GlyphsSection.cell)
+            return CGRect(x: pixel(x), y: 0, width: pixel(x + cell) - pixel(x), height: side(width: width, columns: columns))
         }
     }
+
+    /// How wide a cell is, and so how high, in a row `width` wide of `columns` cells: squares, `spacing` apart. The row
+    /// is as many as fit with the sidebar shown and the Info panel shut (see `GlyphColumnsReader`), so hiding the sidebar
+    /// or opening the panel makes them bigger or smaller, and their glyphs with them (`zoom`), as the browser's grid does
+    /// its tiles, rather than moving glyphs to the next row.
+    nonisolated static func side(width: CGFloat, columns: Int) -> CGFloat {
+        max(1, (width - GlyphsSection.spacing * CGFloat(columns - 1)) / CGFloat(columns))
+    }
+
+    /// How much bigger than at `GlyphsSection.cell` a square this wide draws its glyph.
+    nonisolated static func zoom(side: CGFloat) -> CGFloat {
+        side / GlyphsSection.cell
+    }
+
+    /// The most a row's glyphs are zoomed, as far as how much room their text needs above and below goes: a page so
+    /// narrow that one square fits, with the sidebar then hidden.
+    private static let mostZoom: CGFloat = 3
 
     /// Where `Text` puts its baseline in a cell this tall: its line, the font's ascent and descent to the nearest point
     /// and no leading, in the middle, on a whole pixel.
@@ -113,15 +130,42 @@ struct GlyphGridRow: View {
     /// How far past the row its text may be drawn: above and below, as far as the font's glyphs reach past its line,
     /// and at least half its size, as `UnclippedText` lets text go; at the sides, into the page's margin. None for a row
     /// of glyphs, which fit their cells.
-    private static func room(for cells: [GridCell], in font: CTFont) -> EdgeInsets {
+    /// Worked out at the squares' resting size, as `font` is, and made room for at the most they're zoomed (`mostZoom`),
+    /// so it's the same whatever the row's width: the row doesn't know it until it's laid out.
+    private static func room(for cells: [GridCell], in font: CTFont, columns: Int) -> EdgeInsets {
         guard cells.contains(where: { if case .text = $0.content { true } else { false } }) else { return EdgeInsets() }
         let box = CTFontGetBoundingBox(font)
         let half = CTFontGetSize(font) / 2
         let baseline = baseline(in: GlyphsSection.cell, font: font)
         let above = max(box.maxY, CTFontGetAscent(font) + half) - baseline
         let below = baseline + max(-box.minY, CTFontGetDescent(font) + half) - GlyphsSection.cell
-        return EdgeInsets(top: max(0, above.rounded(.up)), leading: GlyphsSection.inset,
-                          bottom: max(0, below.rounded(.up)), trailing: GlyphsSection.inset)
+        return EdgeInsets(top: max(0, (above * mostZoom).rounded(.up)), leading: GlyphsSection.inset,
+                          bottom: max(0, (below * mostZoom).rounded(.up)), trailing: GlyphsSection.inset)
+    }
+}
+
+/// A row of squares: as high as its cells are wide (see `GlyphGridRow.side`).
+private struct SquareRow: ViewModifier {
+    let columns: Int
+
+    func body(content: Content) -> some View {
+        SquareRowLayout(columns: columns) { content }
+    }
+}
+
+private struct SquareRowLayout: Layout {
+    let columns: Int
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let resting = GlyphsSection.cell * CGFloat(columns) + GlyphsSection.spacing * CGFloat(columns - 1)
+        let width = proposal.width ?? resting
+        return CGSize(width: width, height: GlyphGridRow.side(width: width, columns: columns))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews {
+            subview.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+        }
     }
 }
 
@@ -159,16 +203,20 @@ private struct GridRowDrawing: View, Equatable {
 
     var body: some View {
         Canvas { context, size in
-            let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
+            let width = size.width - room.leading - room.trailing
+            let side = GlyphGridRow.side(width: width, columns: columns)
+            // At the size the square is zoomed to: a CoreText font at that size, not the resting one scaled, for glyphs
+            // hinted and placed on pixels as text at that size is.
+            let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize * GlyphGridRow.zoom(side: side), weight: weight,
+                                              variations: variations)
             // Glyphs by ID read from the file before it changed would be the new version's glyphs with those IDs; the
             // cells stay empty until the page has read it again. Characters are drawn by character, which stays right.
             let isCurrent = generation == FontLoader.shared.generation(of: face.path)
             let scale = context.environment.displayScale
-            let width = size.width - room.leading - room.trailing
             let frames = GlyphGridRow.frames(width: width, columns: columns, count: cells.count, scale: scale)
             let unrounded = GlyphGridRow.frames(width: width, columns: columns, count: cells.count)
             let color = Color.ink.resolve(in: context.environment).cgColor
-            let baseline = GlyphGridRow.baseline(in: GlyphsSection.cell, font: font, scale: scale)
+            let baseline = GlyphGridRow.baseline(in: side, font: font, scale: scale)
             // A cell at a time, each over the one before, as when they were views of their own.
             for (index, cell) in cells.enumerated() {
                 let frame = frames[index].offsetBy(dx: room.leading, dy: room.top)
