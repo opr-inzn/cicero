@@ -739,7 +739,10 @@ private struct StyleRows: View {
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         let showsWeight = family.stylesDifferInWeight
-        VStack(spacing: 0) {
+        // Lazy: a row's sample is text in its own font, and laid out again for every width the page passed through as a
+        // panel slid, all of a big family's rows were, off screen too. Rows one height, so its guesses at the height of
+        // those it hasn't made yet hold (see `page`).
+        LazyVStack(spacing: 0) {
             row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
                 Text("Styles")
             } style: {
