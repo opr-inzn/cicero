@@ -729,7 +729,8 @@ private struct StyleRows: View {
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
-                    Text("\(Int(style.face.styleWeight.rounded()))").monospacedDigit().foregroundStyle(.secondary)
+                    // As fonts write weights, as the axes are: 1000, not 1,000 or 1.000.
+                    Text(Int(style.face.styleWeight.rounded()).formatted(.number.grouping(.never))).monospacedDigit().foregroundStyle(.secondary)
                 } axes: {
                     ForEach(axes, id: \.tag) { axis in
                         Text(style.face.styleValue(on: axis.tag)?.formatted(.number.grouping(.never).precision(.fractionLength(0...1))) ?? "")

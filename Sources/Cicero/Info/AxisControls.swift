@@ -103,7 +103,12 @@ struct AxisControls: View {
             ValueSlider(value: value, range: range, step: axis.step)
                 .accessibilityLabel(axis.name)
         }
-        .help("\(axis.name) (\(axis.tag)), from \(axis.minimum.formatted()) to \(axis.maximum.formatted()), \(axis.defaultValue.formatted()) by default")
+        // Without a thousands separator, as fonts write axis values: 1000, not 1,000 or 1.000.
+        .help("\(axis.name) (\(axis.tag)), from \(Self.number(axis.minimum)) to \(Self.number(axis.maximum)), \(Self.number(axis.defaultValue)) by default")
+    }
+
+    private static func number(_ value: Double) -> String {
+        value.formatted(.number.grouping(.never))
     }
 
     /// Moves an axis of the style; the family's other axes stay where they were moved.
