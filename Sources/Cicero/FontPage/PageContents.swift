@@ -153,3 +153,47 @@ final class PageContents {
         return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font, generation: version)
     }
 }
+
+/// The open font page's OpenType features, by face and version of its file, read as the page opens, so the Info
+/// panel's Features tab has them from its first frame instead of a spinner; kept while the page is open, forgotten
+/// when it closes (see `AppModel.openFamilyID`).
+final class PageFeatures {
+    private var ready: [FileFace: [FontFeatureGroup]] = [:]
+    private var loading: [FileFace: Task<[FontFeatureGroup], Never>] = [:]
+
+    /// nil until read.
+    func features(of face: FontFace) -> [FontFeatureGroup]? {
+        ready[FileFace(face)]
+    }
+
+    /// Starts on a face's features, unless they're read or under way.
+    func prepare(_ face: FontFace) {
+        if features(of: face) == nil { _ = task(for: face) }
+    }
+
+    func features(loading face: FontFace) async -> [FontFeatureGroup] {
+        if let features = features(of: face) { return features }
+        return await task(for: face).value
+    }
+
+    private func task(for face: FontFace) -> Task<[FontFeatureGroup], Never> {
+        let key = FileFace(face)
+        if let under = loading[key] { return under }
+        let task = Task {
+            let features = await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
+            // Kept only if the page is still the one that asked: `forget` clears `loading`.
+            if loading[key] != nil {
+                loading[key] = nil
+                ready[key] = features
+            }
+            return features
+        }
+        loading[key] = task
+        return task
+    }
+
+    func forget() {
+        ready = [:]
+        loading = [:]
+    }
+}

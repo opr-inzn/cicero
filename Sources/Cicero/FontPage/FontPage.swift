@@ -75,6 +75,10 @@ struct FontPage: View {
             // at once; only a change in the count redraws the glyphs.
             .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
         }
+        // The features of the style the Info panel shows, read now, so its Features tab has them when it opens.
+        .task(id: FileFace(family.face(nearestWeight: preview.weight).face)) {
+            model.pageFeatures.prepare(family.face(nearestWeight: preview.weight).face)
+        }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
         .task(id: Reading(face: face.id, generation: FontLoader.shared.generation(of: face.path))) {
             loaded = (face.id, await model.pageContents.content(loading: face))

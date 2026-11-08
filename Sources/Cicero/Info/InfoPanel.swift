@@ -436,8 +436,10 @@ private struct FeatureControls: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .loading($loaded, for: FileFace(face)) { [face] in
-            await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
+        // On the open font page, those it read as it opened (see `PageFeatures`).
+        .loading($loaded, for: FileFace(face), cached: { [model, face] in model.pageFeatures.features(of: face) }) { [model, face] in
+            if model.openFamilyID == family.id { return await model.pageFeatures.features(loading: face) }
+            return await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
         }
     }
 

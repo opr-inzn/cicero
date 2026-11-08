@@ -27,6 +27,7 @@ final class AppModel {
     @ObservationIgnored let coverage: CoverageIndex
     @ObservationIgnored let measurements: MeasurementIndex
     @ObservationIgnored let pageContents: PageContents
+    @ObservationIgnored let pageFeatures = PageFeatures()
     @ObservationIgnored let appSets = AppSetWatcher()
     @ObservationIgnored let openDocumentFonts = DocumentFontWatcher()
     @ObservationIgnored let quickLook = QuickLook()
@@ -176,7 +177,12 @@ final class AppModel {
     var selectedIDs: Set<String> = []
     /// The family whose page is pushed over the browser.
     var openFamilyID: String? {
-        didSet { if openFamilyID != oldValue { pageStyleID = nil } }
+        didSet {
+            if openFamilyID != oldValue {
+                pageStyleID = nil
+                pageFeatures.forget()
+            }
+        }
     }
     /// The style chosen in the open font page's Style menu; nil follows the preview weight.
     var pageStyleID: FaceID?
