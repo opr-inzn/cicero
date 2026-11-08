@@ -18,6 +18,9 @@ struct FontPage: View {
         let generation: Int
     }
     @FocusState private var focused: Bool
+    /// Where the page is scrolled, and the glyph row kept at its top while the squares change size (see `TopRowKeeper`).
+    @State private var position = ScrollPosition()
+    @State private var keeper = TopRowKeeper()
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -74,7 +77,13 @@ struct FontPage: View {
             // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
             // at once; only a change in the count redraws the glyphs.
             .modifier(GlyphColumnsReader(columns: $glyphColumns))
+            .environment(\.topRowKeeper, keeper)
+            .coordinateSpace(.named(TopRowKeeper.space))
         }
+        .scrollPosition($position)
+        // Below the toolbar: `scrollTo(y:)` puts that point of the content there.
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
+        .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
         // The features of the style the Info panel shows, read now, so its Features tab has them when it opens.
         .task(id: FileFace(family.face(nearestWeight: preview.weight).face)) {
             model.pageFeatures.prepare(family.face(nearestWeight: preview.weight).face)
@@ -739,10 +748,10 @@ private struct StyleRows: View {
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         let showsWeight = family.stylesDifferInWeight
-        // Lazy: a row's sample is text in its own font, and laid out again for every width the page passed through as a
-        // panel slid, all of a big family's rows were, off screen too. Rows one height, so its guesses at the height of
-        // those it hasn't made yet hold (see `page`).
-        LazyVStack(spacing: 0) {
+        // Not lazy: a lazy stack guesses the height of rows it hasn't made from those it has, and each row is as high as
+        // its own font's line, so the page below moved by its guesses, half a row at a time, and the glyph row the page
+        // keeps at its top as the squares change size (see `TopRowKeeper`) moved with them.
+        VStack(spacing: 0) {
             row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
                 Text("Styles")
             } style: {

@@ -59,6 +59,7 @@ struct GlyphGridRow: View {
     /// The cell whose popover is open, drawn darker.
     let selected: Int?
     let actions: GridRowActions
+    @Environment(\.topRowKeeper) private var keeper
 
     var body: some View {
         let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
@@ -71,6 +72,11 @@ struct GlyphGridRow: View {
             // Out past the row, for text reaching past its cell, as `UnclippedText` lets it.
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
             .modifier(SquareRow(columns: columns))
+            // Where it is in the page, for the page to keep the row at its top in place as the squares change size.
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TopRowKeeper.space)) } action: { [keeper, key] in
+                keeper?.moved(key, to: $0)
+            }
+            .onDisappear { [keeper, key] in keeper?.gone(key) }
             .overlay {
                 GridRowEvents(labels: cells.map(\.label), columns: columns, actions: actions) { index, size, isDark, scale in
                     // The cell as it's drawn, to drag.
@@ -82,6 +88,11 @@ struct GlyphGridRow: View {
                     return renderer.nsImage
                 }
             }
+    }
+
+    /// Which row this is, among the page's: its cells' labels, which no other row has all of.
+    private var key: Int {
+        cells.map(\.label).hashValue
     }
 
     /// The cells' frames across a row `width` wide, as a stack of views shares it out among `columns` cells, `spacing`
