@@ -586,9 +586,11 @@ struct ValueField: View {
         }
     }
 
-    /// What's typed, with a decimal comma or point.
+    /// What's typed, with a decimal comma or point whatever the Mac's language (a parse in its format stops at the other
+    /// mark, taking 12.5 for 12 in German), else as the Mac's language writes numbers, for another decimal mark.
     private var typed: Double? {
-        Double(text.trimmingCharacters(in: .whitespaces).replacing(",", with: "."))
+        let text = text.trimmingCharacters(in: .whitespaces)
+        return Double(text.replacing(",", with: ".")) ?? (try? Double(text, format: .number.grouping(.never)))
     }
 
     private func commit() {
@@ -604,8 +606,11 @@ struct ValueField: View {
         Self.formatted(value, step: step)
     }
 
+    /// With the Mac's decimal mark ("12,5" in German), as many decimals as the step has, and no thousands separator, as
+    /// fonts write axis values: 1000, not 1.000.
     private static func formatted(_ value: Double, step: Double) -> String {
-        String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
+        let decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0
+        return value.formatted(.number.grouping(.never).precision(.fractionLength(decimals)))
     }
 }
 
