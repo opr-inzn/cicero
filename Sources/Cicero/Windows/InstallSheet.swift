@@ -162,7 +162,7 @@ private struct ManyActivationConfirmation: ViewModifier {
         content.background {
             Color.clear
                 .alert(
-                    model.manyActivationPrompt.map { "Activate \($0.families.formatted()) Families?" } ?? "",
+                    model.manyActivationPrompt.map { "Activate \($0.families.plain) Families?" } ?? "",
                     isPresented: Binding(get: { isActive && model.manyActivationPrompt != nil }, set: { if !$0 { model.manyActivationPrompt = nil } }),
                     presenting: model.manyActivationPrompt
                 ) { prompt in

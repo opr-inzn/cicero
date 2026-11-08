@@ -40,7 +40,7 @@ struct CharacterSetEditor: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("Preview").font(.headline)
-                    Text(scalars.count == 1 ? "1 character" : "\(scalars.count.formatted()) characters")
+                    Text(scalars.count == 1 ? "1 character" : "\(scalars.count.plain) characters")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()

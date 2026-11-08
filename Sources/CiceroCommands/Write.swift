@@ -105,8 +105,8 @@ public enum WriteRunner {
             let (faces, title) = try targets(families: families, folder: folder, tag: tag, in: context)
             let wanted = faces.filter(untilQuit ? \.canActivateTemporarily : \.canActivate)
             if !request.confirmed, let prompt = ActivationQuestions.many(for: wanted, title: title, temporarily: untilQuit, data: writer.data) {
-                throw CommandError(.needsConfirmation, "Turning on \(prompt.families.formatted()) families asks first. Add --yes to turn them on.",
-                                   question: .init(kind: "manyFamilies", title: "Activate \(prompt.families.formatted()) Families?",
+                throw CommandError(.needsConfirmation, "Turning on \(prompt.families.plain) families asks first. Add --yes to turn them on.",
+                                   question: .init(kind: "manyFamilies", title: "Activate \(prompt.families.plain) Families?",
                                                    message: "Apps load every font that’s on as they open, so this many at once can slow them down."))
             }
             let result = wanted.isEmpty ? nil : await writer.activate(wanted, untilQuit: untilQuit, title: title)
@@ -245,7 +245,7 @@ public enum WriteRunner {
         }
         let ids = try familyIDs(families, in: context)
         let found = ids.compactMap { id in context.listedFamilies.first { $0.id == id } }
-        return (found.flatMap(\.faces), found.count == 1 ? found[0].name : "\(found.count.formatted()) families")
+        return (found.flatMap(\.faces), found.count == 1 ? found[0].name : "\(found.count.plain) families")
     }
 
     /// Each family once: changed when a style of it turned, failed for each file that didn't, unchanged when there was

@@ -63,7 +63,7 @@ public struct MovingOutPrompt: Identifiable {
         if shared.count == 1, let face = shared.first {
             return "Move “\(face.face.familyName) \(face.face.styleName)” Out of \(name)?"
         }
-        return "Move \(shared.count.formatted()) Styles Out of \(name)?"
+        return "Move \(shared.count.plain) Styles Out of \(name)?"
     }
 
     public var message: String {

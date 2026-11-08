@@ -195,7 +195,7 @@ private struct AddFamilies: View {
             }
             if isFull {
                 Divider()
-                Text("Compare holds up to \(AppModel.compareLimit) styles. Take one out to add another.")
+                Text("Compare holds up to \(AppModel.compareLimit.plain) styles. Take one out to add another.")
                     .font(.callout)
                     .foregroundStyle(Color(Color.secondary.resolve(in: environment)))
                     .frame(maxWidth: .infinity, alignment: .leading)

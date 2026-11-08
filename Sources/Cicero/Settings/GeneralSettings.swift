@@ -76,7 +76,7 @@ struct GeneralSettings: View {
                         : "App folders activate fonts only while Cicero is open.")
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
-                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
+                    Text("Ask before activating more than \(UserData.manyFamilies.plain) families at once")
                     Text("Apps load every font that’s on as they open, so turning on many at once can slow them down.")
                 }
                 Toggle(isOn: $model.data.asksBeforeMovingOutOfSharedFolders) {

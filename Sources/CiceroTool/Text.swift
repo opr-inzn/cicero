@@ -30,7 +30,7 @@ enum Text {
         array(value).compactMap(string)
     }
 
-    static func number(_ value: Int) -> String { value.formatted() }
+    static func number(_ value: Int) -> String { value.plain }
 
     static func plural(_ count: Int, _ one: String, _ many: String) -> String {
         "\(number(count)) \(count == 1 ? one : many)"

@@ -60,17 +60,17 @@ struct BrowserView: View {
     }
 
     private func subtitle(_ families: [Family]) -> String {
-        let count = families.count == 1 ? "1 family" : "\(families.count.formatted()) families"
+        let count = families.count == 1 ? "1 family" : "\(families.count.plain) families"
         if let progress = model.coverageProgress, dependsOnCoverage {
-            return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)"
         }
         let counts = model.visibleCounts
-        var parts = [count, "\(counts.active.formatted()) active"]
+        var parts = [count, "\(counts.active.plain) active"]
         // On in one app only (like Adobe's fonts folder): neither active nor inactive, so counted apart.
         let apps = counts.appOnly
         if !apps.isEmpty {
             let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
-            parts.append("\(apps.count.formatted()) in \(place)")
+            parts.append("\(apps.count.plain) in \(place)")
         }
         return parts.joined(separator: " · ")
     }
@@ -123,8 +123,8 @@ private struct ScanCapsule: View {
     private func text(for progress: ScanProgress) -> String {
         switch progress {
         case .finding: "Finding fonts"
-        case .identifying(let done, let total): "Identifying fonts, \(done.formatted()) of \(total.formatted())"
-        case .updating(let done, let total): "Updating font details, \(done.formatted()) of \(total.formatted())"
+        case .identifying(let done, let total): "Identifying fonts, \(done.plain) of \(total.plain)"
+        case .updating(let done, let total): "Updating font details, \(done.plain) of \(total.plain)"
         }
     }
 }
@@ -141,11 +141,11 @@ private struct OnlineOnlyBar: View {
                 Image(systemName: "icloud.and.arrow.down")
                     .foregroundStyle(.secondary)
                 if let progress = model.downloads[folderID] {
-                    Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
+                    Text("Downloading \(progress.done.plain) of \(progress.total.plain)")
                     Spacer()
                     ProgressView().controlSize(.small)
                 } else {
-                    Text(count == 1 ? "1 font file here is online only, so it isn’t listed." : "\(count.formatted()) font files here are online only, so they aren’t listed.")
+                    Text(count == 1 ? "1 font file here is online only, so it isn’t listed." : "\(count.plain) font files here are online only, so they aren’t listed.")
                     Spacer()
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
                         .controlSize(.small)
@@ -178,7 +178,7 @@ private struct SimilarBar: View {
             return "The families that look most like \(name), the closest first."
         }
         if let progress = model.measurementProgress {
-            return "Measuring letters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "Measuring letters, \(progress.done.plain) of \(progress.total.plain)"
         }
         return "Cicero can’t compare \(name) with other fonts: it hasn’t got the Latin letters Cicero measures."
     }
@@ -249,9 +249,9 @@ private struct FolderOutOfReach: View {
             EmptyState("Online Only", systemImage: "icloud.and.arrow.down",
                        description: Text(count == 1
                            ? "The font file here is online only: the cloud service keeps it off this Mac. Download it to see it. To keep it on this Mac, make the folder available offline in the Finder."
-                           : "The \(count.formatted()) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")) {
+                           : "The \(count.plain) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")) {
                 if let progress = model.downloads[folderID] {
-                    ProgressView("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
+                    ProgressView("Downloading \(progress.done.plain) of \(progress.total.plain)")
                         .controlSize(.small)
                 } else {
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }

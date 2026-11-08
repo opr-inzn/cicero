@@ -88,7 +88,7 @@ private struct Specimen: View {
                             .foregroundStyle(.secondary)
                     }
                     if family.faces.count > Self.styleLimit {
-                        Text("+\(family.faces.count - Self.styleLimit) more").font(.caption).foregroundStyle(.tertiary)
+                        Text("+\((family.faces.count - Self.styleLimit).plain) more").font(.caption).foregroundStyle(.tertiary)
                     }
                 }
             }

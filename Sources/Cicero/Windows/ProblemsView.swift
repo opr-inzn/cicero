@@ -109,7 +109,7 @@ private struct MinorProblemGroup: View {
         } label: {
             HStack(spacing: 6) {
                 Text(kind.title).font(.title3.weight(.semibold))
-                Text("\(problems.count)").foregroundStyle(.secondary).monospacedDigit()
+                Text(problems.count.plain).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
@@ -231,7 +231,7 @@ private struct FolderRow: View {
                             Image(systemName: "chevron.right")
                                 .font(.caption2.weight(.semibold))
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            Text("\(folder.files.count) files")
+                            Text("\(folder.files.count.plain) files")
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -239,7 +239,7 @@ private struct FolderRow: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 2)
-                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count) Files")
+                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count.plain) Files")
                 }
                 Spacer(minLength: 0)
                 FixButtons(fixes: fixes, kind: kind, family: family).controlSize(.small)

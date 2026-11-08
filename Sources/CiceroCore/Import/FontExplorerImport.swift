@@ -273,7 +273,7 @@ public enum FontExplorerImport {
         }
 
         func describe(_ count: Int) -> String {
-            let number = count.formatted()
+            let number = count.plain
             return switch self {
             case .type1: count == 1 ? "1 PostScript Type 1 font or font suitcase, which Cicero can’t use"
                 : "\(number) PostScript Type 1 fonts and font suitcases, which Cicero can’t use"
@@ -561,15 +561,15 @@ private struct Reader {
         // The Font Library by where it was looked for, so it can be put there and imported again.
         if let absentLibrary {
             let place = absentLibrary.path.hasPrefix(home + "/") ? "~" + absentLibrary.path.dropFirst(home.count) : absentLibrary.path
-            let files = absentLibrary.files == 1 ? "1 font file" : "\(absentLibrary.files.formatted()) font files"
+            let files = absentLibrary.files == 1 ? "1 font file" : "\(absentLibrary.files.plain) font files"
             library.notes.append("\(files) in \(place) (not on this Mac)")
         }
         if missing > 0 {
             let other = absentLibrary == nil ? "" : "other "
-            library.notes.append(missing == 1 ? "1 \(other)font file that isn’t on this Mac" : "\(missing.formatted()) \(other)font files that aren’t on this Mac")
+            library.notes.append(missing == 1 ? "1 \(other)font file that isn’t on this Mac" : "\(missing.plain) \(other)font files that aren’t on this Mac")
         }
         let licensed = containers.values.count(where: \.hasLicense)
-        if licensed > 0 { library.notes.append("license details of \(licensed == 1 ? "1 font" : "\(licensed.formatted()) fonts")") }
+        if licensed > 0 { library.notes.append("license details of \(licensed == 1 ? "1 font" : "\(licensed.plain) fonts")") }
         if deactivating > 0 {
             library.notes.append("the fonts \(deactivating == 1 ? "an application set turns" : "\(deactivating) application sets turn") off (Autodeactivate)")
         }

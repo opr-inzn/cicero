@@ -293,7 +293,7 @@ struct ImportSheet: View {
                 CopyingProgressLine(done: done, total: total, estimate: estimate)
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
+                Text("Reading fonts, \(done.plain) of \(total.plain)")
             case .starting:
                 ProgressView()
                 Text("Importing")
@@ -476,8 +476,8 @@ struct ImportSheet: View {
         let inAlready = total - copying - same
         if copying + same == 0, total > 0 { return ", in your library already" }
         var parts: [String] = []
-        if inAlready > 0 { parts.append("\(inAlready.formatted()) in your library already") }
-        if same > 0 { parts.append(same == 1 ? "1 duplicate" : "\(same.formatted()) duplicates") }
+        if inAlready > 0 { parts.append("\(inAlready.plain) in your library already") }
+        if same > 0 { parts.append(same == 1 ? "1 duplicate" : "\(same.plain) duplicates") }
         return parts.isEmpty ? "" : ", " + parts.listed()
     }
 
@@ -523,7 +523,7 @@ struct ImportSheet: View {
     }
 
     private func count(_ number: Int, _ singular: String, _ plural: String? = nil) -> String {
-        number == 1 ? "1 \(singular)" : "\(number.formatted()) \(plural ?? singular + "s")"
+        number == 1 ? "1 \(singular)" : "\(number.plain) \(plural ?? singular + "s")"
     }
 
     // MARK: Done
@@ -582,7 +582,7 @@ struct ImportSheet: View {
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
         if summary.classifiedFamilies > 0 { lines.append("\(count(summary.classifiedFamilies, "family", "families")) classified.") }
         if summary.notedFamilies > 0 {
-            lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.formatted()) families with notes from their comments.")
+            lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.plain) families with notes from their comments.")
         }
         // Before what didn't come over: with nothing new, importing again says so first.
         if lines.isEmpty { lines.append("Nothing new: Cicero has all of it from before.") }

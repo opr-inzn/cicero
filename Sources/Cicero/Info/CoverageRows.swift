@@ -67,7 +67,7 @@ private struct LanguageList: View {
         let scripts = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
         List {
             ForEach(scripts.keys.sorted { (scripts[$0]?.count ?? 0) > (scripts[$1]?.count ?? 0) }, id: \.self) { script in
-                Section("\(script) (\(scripts[script]?.count ?? 0))") {
+                Section("\(script) (\((scripts[script]?.count ?? 0).plain))") {
                     ForEach(scripts[script] ?? []) { language in
                         HStack {
                             Text(language.name)
@@ -115,7 +115,7 @@ struct CharacterSetsRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let next = nextLatin(after: has) {
                     let missing = ranges.missing(sorted: next.scalars)
-                    Text(missing.count == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.count.formatted()) more characters")
+                    Text(missing.count == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.count.plain) more characters")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Show Missing") { showsMissing = true }
@@ -192,7 +192,7 @@ private struct MissingCharacterList: View {
             Button("Copy Characters", systemImage: "doc.on.doc", action: copy)
                 .buttonStyle(StillPushButtonStyle())
                 .background(Self.background, in: .rect(cornerRadius: 6))
-                .help("Copies the \(missing.count == 1 ? "character" : "\(missing.count.formatted()) characters"), with a space between each")
+                .help("Copies the \(missing.count == 1 ? "character" : "\(missing.count.plain) characters"), with a space between each")
                 .padding(.bottom, Self.barBottom)
                 .frame(maxWidth: .infinity)
                 // The blur starts at a line, the button's top edge: the rows fade on their way to it, so they don't blur
@@ -248,7 +248,7 @@ private struct MissingCharacterList: View {
     private func copy() {
         GlyphsSection.copy(missing.map(GlyphsSection.text).joined(separator: " "))
         dismiss()
-        model.showToast(missing.count == 1 ? "1 character copied to clipboard" : "\(missing.count.formatted()) characters copied to clipboard")
+        model.showToast(missing.count == 1 ? "1 character copied to clipboard" : "\(missing.count.plain) characters copied to clipboard")
     }
 }
 
@@ -270,7 +270,7 @@ struct UnicodeBlocksRow: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if partial > 0 {
-                    Text(partial == 1 ? "1 more block partly covered" : "\(partial) more blocks partly covered")
+                    Text(partial == 1 ? "1 more block partly covered" : "\(partial.plain) more blocks partly covered")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -300,7 +300,7 @@ struct UnicodeBlocksRow: View {
                 HStack {
                     Text(entry.block.name)
                     Spacer()
-                    Text("\(entry.has) of \(entry.block.scalars.count)").monospacedDigit().foregroundStyle(.secondary)
+                    Text("\(entry.has.plain) of \(entry.block.scalars.count.plain)").monospacedDigit().foregroundStyle(.secondary)
                 }
                 ProgressView(value: Double(entry.has), total: Double(max(entry.block.scalars.count, 1)))
                     .progressViewStyle(.linear)

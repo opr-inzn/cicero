@@ -28,7 +28,7 @@ struct FamilyMenu: View {
 
     var body: some View {
         if families.count > 1 {
-            Text("\(families.count) Families")
+            Text("\(families.count.plain) Families")
         } else if let note {
             Text(note)
         }

@@ -34,7 +34,7 @@ struct BackupSheet: View {
                     switch progress {
                     case .copying(let done, let total):
                         ProgressView(value: Double(done), total: Double(max(total, 1)))
-                        Text("Copying fonts, \(done.formatted()) of \(total.formatted())")
+                        Text("Copying fonts, \(done.plain) of \(total.plain)")
                     case .compressing:
                         ProgressView()
                         Text("Compressing")
@@ -65,7 +65,7 @@ struct BackupSheet: View {
         guard let fonts else { return "Counting" }
         if fonts.isEmpty { return "There are no font files in your library." }
         let size = fonts.reduce(Int64(0)) { $0 + $1.size }
-        return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.formatted()) files"), \(size.formatted(.byteCount(style: .file)))"
+        return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.plain) files"), \(size.formatted(.byteCount(style: .file)))"
     }
 
     private func backUp() {
@@ -85,7 +85,7 @@ struct BackupSheet: View {
                     Task { @MainActor in progress = step }
                 }
                 NSWorkspace.shared.activateFileViewerSelecting([destination])
-                model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.formatted()) font files")" : "Backed up your library")
+                model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.plain) font files")" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {
                 dismiss()

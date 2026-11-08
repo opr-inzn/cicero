@@ -78,17 +78,17 @@ struct EarlierImportSheet: View {
         let total = prompt.files.count
         let place = model.installPlace
         let files = switch copying {
-        case total: total == 1 ? "Cicero copies its font file into \(place)." : "Cicero copies its \(total.formatted()) font files into \(place)."
-        case 0: total == 1 ? "Its font file is in \(place) already." : "Its \(total.formatted()) font files are in \(place) already."
-        case total - 1: "Cicero copies \(copying.formatted()) of its \(total.formatted()) font files into \(place). The other one is there already."
-        default: "Cicero copies \(copying.formatted()) of its \(total.formatted()) font files into \(place). The others are there already."
+        case total: total == 1 ? "Cicero copies its font file into \(place)." : "Cicero copies its \(total.plain) font files into \(place)."
+        case 0: total == 1 ? "Its font file is in \(place) already." : "Its \(total.plain) font files are in \(place) already."
+        case total - 1: "Cicero copies \(copying.plain) of its \(total.plain) font files into \(place). The other one is there already."
+        default: "Cicero copies \(copying.plain) of its \(total.plain) font files into \(place). The others are there already."
         }
         // Which copies are on: as their fonts are now.
         let state = switch prompt.onCount {
         case 0: total == 1 ? " The copy is inactive, as the font is now." : " The copies are inactive, as the fonts are now."
         case total: total == 1 ? " The font is active now, and its copy will be too." : " The fonts are active now, and their copies will be too."
         case 1: " The font that’s active now will be active as its copy; the others come in inactive."
-        default: " The \(prompt.onCount.formatted()) styles that are active now will be active as their copies; the others come in inactive."
+        default: " The \(prompt.onCount.plain) styles that are active now will be active as their copies; the others come in inactive."
         }
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         return "\(files)\(state)\(office) Your folders, tags, ratings and notes stay as they are. "
@@ -105,7 +105,7 @@ struct EarlierImportSheet: View {
                 CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: true)
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
+                Text("Reading fonts, \(done.plain) of \(total.plain)")
             case .starting:
                 ProgressView()
                 Text("Turning fonts on")
@@ -142,7 +142,7 @@ struct EarlierImportSheet: View {
             if let copied {
                 // The location going is in the question already.
                 model.showToast(copied == 0 ? "FontExplorer X’s fonts were in \(model.installPlace) already"
-                    : "Copied \(copied == 1 ? "1 font file" : "\(copied.formatted()) font files") into \(model.installPlace)")
+                    : "Copied \(copied == 1 ? "1 font file" : "\(copied.plain) font files") into \(model.installPlace)")
             }
             dismiss()
         }

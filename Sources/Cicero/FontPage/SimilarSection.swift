@@ -59,7 +59,7 @@ struct SimilarSection: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 6)
                         .contentShape(.rect)
-                        .help(showsMore ? "Show the \(Self.shown) closest" : "Show the \(all) families that look most like \(family.name)")
+                        .help(showsMore ? "Show the \(Self.shown.plain) closest" : "Show the \(all.plain) families that look most like \(family.name)")
                 }
             }
             // As far from the styles above as the glyphs' title is from this.

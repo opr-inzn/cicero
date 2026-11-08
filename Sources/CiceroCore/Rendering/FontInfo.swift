@@ -52,7 +52,7 @@ public struct FontInfo: Sendable {
             ("Manufacturer", name(kCTFontManufacturerNameKey) ?? face.manufacturer),
             ("Vendor ID", face.vendorID),
             ("Variable weight", face.weightAxis.map { "\(Int($0.minimum))–\(Int($0.maximum))" }),
-            ("Glyphs", CTFontGetGlyphCount(font).formatted()),
+            ("Glyphs", CTFontGetGlyphCount(font).plain),
             ("Format", FontFormat.of(path: face.path).rawValue),
             ("Embedding", face.embedding?.title),
             ("Copyright", name(kCTFontCopyrightNameKey)),

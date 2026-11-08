@@ -83,7 +83,7 @@ struct CharacterSetsSettings: View {
     }
 
     private func count(_ characters: Int) -> String {
-        characters == 1 ? "1 character" : "\(characters.formatted()) characters"
+        characters == 1 ? "1 character" : "\(characters.plain) characters"
     }
 
     private func visibility(_ setID: String) -> Binding<Bool> {

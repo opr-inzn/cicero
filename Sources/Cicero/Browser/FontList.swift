@@ -620,7 +620,7 @@ private struct FontListRow: View {
                 height: 22
             )
         case .styles:
-            Text(row.styles, format: .number).monospacedDigit().foregroundStyle(.secondary)
+            Text(row.styles.plain).monospacedDigit().foregroundStyle(.secondary)
         case .classification:
             Text(row.classification).foregroundStyle(.secondary).lineLimit(1)
         case .foundry:
@@ -642,8 +642,8 @@ private struct FontListRow: View {
             case .missing(0, _):
                 Image(systemName: "checkmark").foregroundStyle(.secondary).accessibilityLabel("Has all of \(column.title(model))")
             case .missing(let missing, _):
-                Text("\(missing.formatted()) missing").foregroundStyle(.secondary).lineLimit(1)
-                    .accessibilityLabel("\(missing.formatted()) missing from \(column.title(model))")
+                Text("\(missing.plain) missing").foregroundStyle(.secondary).lineLimit(1)
+                    .accessibilityLabel("\(missing.plain) missing from \(column.title(model))")
             default:
                 EmptyView()
             }

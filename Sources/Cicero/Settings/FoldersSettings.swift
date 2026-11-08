@@ -95,12 +95,12 @@ private struct FolderRow: View {
             }
         case nil:
             if let progress = model.downloads[folder.id] {
-                Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
+                Text("Downloading \(progress.done.plain) of \(progress.total.plain)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if onlineOnly > 0 {
                 HStack(spacing: 6) {
-                    Label(onlineOnly == 1 ? "1 font file is online only" : "\(onlineOnly.formatted()) font files are online only", systemImage: "icloud.and.arrow.down")
+                    Label(onlineOnly == 1 ? "1 font file is online only" : "\(onlineOnly.plain) font files are online only", systemImage: "icloud.and.arrow.down")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folder.id) }

@@ -206,23 +206,23 @@ extension AppModel {
         var parts: [String] = []
         if settings {
             let folders = data.sets.count, smart = data.smartSets.count
-            if folders > 0 { parts.append(folders == 1 ? "1 folder" : "\(folders.formatted()) folders") }
-            if smart > 0 { parts.append(smart == 1 ? "1 smart folder" : "\(smart.formatted()) smart folders") }
+            if folders > 0 { parts.append(folders == 1 ? "1 folder" : "\(folders.plain) folders") }
+            if smart > 0 { parts.append(smart == 1 ? "1 smart folder" : "\(smart.plain) smart folders") }
             if parts.isEmpty { parts.append("your settings") }
         }
         if let fonts {
             let count = fonts.restored + fonts.fallback
-            parts.append(count == 1 ? "1 font file" : "\(count.formatted()) font files")
+            parts.append(count == 1 ? "1 font file" : "\(count.plain) font files")
         }
         var notes: [String] = []
         if let fonts, fonts.skipped > 0 {
-            notes.append(fonts.skipped == 1 ? "1 was already there" : "\(fonts.skipped.formatted()) were already there")
+            notes.append(fonts.skipped == 1 ? "1 was already there" : "\(fonts.skipped.plain) were already there")
         }
         if let fonts, fonts.fallback > 0 {
-            notes.append("\(fonts.fallback.formatted()) couldn’t go back and are in ~/\(LibraryBackup.fallbackFolderPath)")
+            notes.append("\(fonts.fallback.plain) couldn’t go back and are in ~/\(LibraryBackup.fallbackFolderPath)")
         }
         if let fonts, fonts.failed > 0 {
-            notes.append("\(fonts.failed.formatted()) couldn’t be written")
+            notes.append("\(fonts.failed.plain) couldn’t be written")
         }
         return (["Restored " + parts.listed()] + notes).joined(separator: "; ")
     }

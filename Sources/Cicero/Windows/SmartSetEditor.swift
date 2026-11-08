@@ -62,7 +62,7 @@ struct SmartSetEditor: View {
         let test = model.matcher(for: draft)
         let data = model.data
         let count = model.library.families.count { data.lists($0) && test($0) }
-        return count == 1 ? "1 family matches" : "\(count.formatted()) families match"
+        return count == 1 ? "1 family matches" : "\(count.plain) families match"
     }
 }
 

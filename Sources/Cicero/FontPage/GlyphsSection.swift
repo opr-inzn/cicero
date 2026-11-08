@@ -176,7 +176,7 @@ struct GlyphsSection: View {
         } header: {
             HStack(spacing: 4) {
                 Text(section.title).font(.headline)
-                Text((section.kind.map { "(\($0)) " } ?? "") + "– \(total.formatted())").font(.callout).foregroundStyle(.secondary)
+                Text((section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
@@ -197,9 +197,9 @@ struct GlyphsSection: View {
             total + (section.group == .tabularFigures ? section.glyphs.filter(\.isAlternate).count : section.glyphs.count)
         }
         let alternateCount = alternates.values.reduce(0) { $0 + $1.filter { !$0.isFigureStyle }.count } + featureGlyphs
-        var parts = [characters == 1 ? "1 character" : "\(characters.formatted()) characters"]
-        if ligatureCount > 0 { parts.append(ligatureCount == 1 ? "1 ligature" : "\(ligatureCount.formatted()) ligatures") }
-        if alternateCount > 0 { parts.append(alternateCount == 1 ? "1 alternate" : "\(alternateCount.formatted()) alternates") }
+        var parts = [characters == 1 ? "1 character" : "\(characters.plain) characters"]
+        if ligatureCount > 0 { parts.append(ligatureCount == 1 ? "1 ligature" : "\(ligatureCount.plain) ligatures") }
+        if alternateCount > 0 { parts.append(alternateCount == 1 ? "1 alternate" : "\(alternateCount.plain) alternates") }
         return parts.joined(separator: " · ")
     }
 

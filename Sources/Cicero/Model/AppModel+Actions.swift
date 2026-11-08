@@ -548,9 +548,9 @@ extension AppModel {
             guard let self else { return }
             downloads[id] = nil
             if failed.isEmpty {
-                showToast(paths.count == 1 ? "Downloaded 1 font file" : "Downloaded \(paths.count.formatted()) font files")
+                showToast(paths.count == 1 ? "Downloaded 1 font file" : "Downloaded \(paths.count.plain) font files")
             } else {
-                showToast("Couldn’t download \(failed.count.formatted()) of \(paths.count.formatted()) font files. Check the connection and try again")
+                showToast("Couldn’t download \(failed.count.plain) of \(paths.count.plain) font files. Check the connection and try again")
             }
             rescan()
         }

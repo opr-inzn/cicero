@@ -162,7 +162,7 @@ private struct Header: View {
     private var activation: String {
         let partly = family.faces.count { if case .appOnly = $0.state { true } else { false } }
         let counts = [(family.activeCount, "active"), (partly, "partly active"), (family.faces.count - family.activeCount - partly, "inactive")]
-        return counts.filter { $0.0 > 0 }.map { "\($0.0.formatted()) \($0.1)" }.joined(separator: " · ")
+        return counts.filter { $0.0 > 0 }.map { "\($0.0.plain) \($0.1)" }.joined(separator: " · ")
     }
 
     private var hasAdobeFonts: Bool { family.faces.contains(where: \.isAdobeFonts) }

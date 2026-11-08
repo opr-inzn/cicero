@@ -283,7 +283,7 @@ private struct SidebarContent: View {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
             SidebarLabel(row: row, highlight: highlight, fit: fit)
         }
-        .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
+        .badge(row.badge > 0 ? Text(row.badge.plain) : nil)
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
@@ -322,7 +322,7 @@ private struct SidebarRowMenu: View {
     var body: some View {
         let rows = model.menuTargets(of: row, selected: highlight.selected)
         if rows.count > 1 {
-            Text("\(rows.count) \(noun)")
+            Text("\(rows.count.plain) \(noun)")
         }
         switch row.item {
         case .temporary:

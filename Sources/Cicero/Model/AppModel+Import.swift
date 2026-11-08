@@ -139,9 +139,9 @@ extension AppModel {
     /// The toast once copying is cancelled with `count` files copied in, which stay: off, but for `on` of them, on as they
     /// were in `appName`.
     static func stoppedCopying(_ count: Int, on: Int = 0, appName: String = "", again: String) -> String {
-        let files = count == 1 ? "font file" : "\(count.formatted()) font files"
+        let files = count == 1 ? "font file" : "\(count.plain) font files"
         guard on > 0 else { return "Stopped. The \(files) copied in so far stay, off: \(again)" }
-        return "Stopped. The \(files) copied in so far stay, \(on.formatted()) of them on, as in \(appName): \(again)"
+        return "Stopped. The \(files) copied in so far stay, \(on.plain) of them on, as in \(appName): \(again)"
     }
 
     /// Saves the current setup to the Backups folder; copies the other app's fonts in, off, where installing puts them

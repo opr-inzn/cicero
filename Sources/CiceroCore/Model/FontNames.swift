@@ -38,7 +38,7 @@ public enum FontNames {
         case 2:
             let sorted = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             return "\(sorted[0]) and \(sorted[1])"
-        default: return "\(names.count.formatted()) families"
+        default: return "\(names.count.plain) families"
         }
     }
 

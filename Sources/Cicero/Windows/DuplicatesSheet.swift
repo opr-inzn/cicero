@@ -19,7 +19,7 @@ struct DuplicatesSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(prompt.duplicates.count == 1 ? "\(prompt.duplicates[0].family) Is Already in Your Library" : "\(prompt.duplicates.count) Families Are Already in Your Library")
+                Text(prompt.duplicates.count == 1 ? "\(prompt.duplicates[0].family) Is Already in Your Library" : "\(prompt.duplicates.count.plain) Families Are Already in Your Library")
                     .font(.title2.bold())
                     .lineLimit(1)
                 Text(prompt.duplicates.count == 1

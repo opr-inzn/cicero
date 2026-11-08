@@ -106,7 +106,7 @@ private struct TextTab: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
-                Text("Missing characters allowed: \(maxMissing)")
+                Text("Missing characters allowed: \(maxMissing.plain)")
             }
             Toggle("Active only", isOn: $activatedOnly)
             Spacer()
@@ -117,9 +117,9 @@ private struct TextTab: View {
 
     private var summary: String {
         guard !query.text.isEmpty else { return "" }
-        let count = matches.count == 1 ? "1 family" : "\(matches.count.formatted()) families"
+        let count = matches.count == 1 ? "1 family" : "\(matches.count.plain) families"
         if let progress = model.coverageProgress {
-            return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)"
         }
         return count
     }
@@ -297,8 +297,8 @@ private struct LanguagesTab: View {
             let query = Query(id: language.id, showSystem: model.data.showSystemFonts, showCreativeCloud: model.data.showCreativeCloudFonts,
                               fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
             FamilyRowList(sections: [
-                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
-                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
+                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.plain))", families: support.full, emptyText: "None"),
+                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.plain))", families: support.base, emptyText: "None"),
             ], selection: $selection, open: open) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
@@ -343,7 +343,7 @@ private struct LanguagesTab: View {
     private func facts(_ language: Language) -> String {
         var parts = ["\(language.scripts.joined(separator: ", ")) · \(language.speakers.formatted(.number.notation(.compactName))) speakers"]
         if let progress = model.coverageProgress, support.unindexed > 0 {
-            parts.append("checking characters, \(progress.done.formatted()) of \(progress.total.formatted())")
+            parts.append("checking characters, \(progress.done.plain) of \(progress.total.plain)")
         }
         return parts.joined(separator: " · ")
     }

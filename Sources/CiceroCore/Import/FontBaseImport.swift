@@ -186,9 +186,9 @@ public enum FontBaseImport {
             let automatic = ["fontbase_fontsTagsSystem", "fontbase_fontsTagsCrowd"].contains { !(values[$0]?.properties ?? []).isEmpty }
             if automatic { library.notes.append("the tags FontBase gives fonts itself, like Sans and Script") }
             let edited = values["fontbase_fontsOverrides"]?.properties?.count ?? 0
-            if edited > 0 { library.notes.append(edited == 1 ? "your changes to 1 font’s details" : "your changes to \(edited.formatted()) fonts’ details") }
+            if edited > 0 { library.notes.append(edited == 1 ? "your changes to 1 font’s details" : "your changes to \(edited.plain) fonts’ details") }
             let licenses = values["fontbase_licensesAll"]?.properties?.count ?? 0
-            if licenses > 0 { library.notes.append(licenses == 1 ? "1 license you added" : "\(licenses.formatted()) licenses you added") }
+            if licenses > 0 { library.notes.append(licenses == 1 ? "1 license you added" : "\(licenses.plain) licenses you added") }
             let activeFolders = (values["fontbase_foldersAll"]?.properties ?? []).filter { $0.value["status"]?.string == "active" && $0.value["virtual"]?.bool != true }
             if !activeFolders.isEmpty {
                 library.notes.append("turning on new fonts in \(activeFolders.count == 1 ? "the active folder" : "active folders") by themselves")
@@ -200,10 +200,10 @@ public enum FontBaseImport {
             let total = notDownloaded.values.reduce(0, +)
             if total > 0 {
                 let providers = notDownloaded.keys.sorted().listed()
-                library.notes.append("\(total.formatted()) \(providers) \(total == 1 ? "font" : "fonts") you haven’t downloaded")
+                library.notes.append("\(total.plain) \(providers) \(total == 1 ? "font" : "fonts") you haven’t downloaded")
             }
             if missing > 0 {
-                library.notes.append(missing == 1 ? "1 font file that isn’t on this Mac" : "\(missing.formatted()) font files that aren’t on this Mac")
+                library.notes.append(missing == 1 ? "1 font file that isn’t on this Mac" : "\(missing.plain) font files that aren’t on this Mac")
             }
         }
 

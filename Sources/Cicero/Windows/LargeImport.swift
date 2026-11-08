@@ -36,7 +36,7 @@ struct FontLibraryOffer: View {
         } else {
             let fontsFolder = CopyTimeEstimate.onFastMac(count, intoFontsFolder: true)
             let busy = fontsFolder >= 600 ? "or hours on a busy Mac" : "or much longer on a busy Mac"
-            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.formatted()) font files can take a long time") {
+            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.plain) font files can take a long time") {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 2) {
                     GridRow {
                         Text("Into your Fonts folder").foregroundStyle(.secondary)
@@ -93,7 +93,7 @@ struct CopyingProgressLine: View {
     var stacked = false
 
     var body: some View {
-        let count = Text("Copying fonts, \(done.formatted()) of \(total.formatted())").fixedSize()
+        let count = Text("Copying fonts, \(done.plain) of \(total.plain)").fixedSize()
         let left = estimate.remaining(total: total).map { $0 < 60 ? "Less than a minute left" : "About \(CopyTimeEstimate.phrase($0)) left" }
         if stacked {
             VStack(alignment: .leading, spacing: 4) {

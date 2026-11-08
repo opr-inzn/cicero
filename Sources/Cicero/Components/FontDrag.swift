@@ -53,7 +53,7 @@ struct FamilyDragPreview: View {
         .background(.background, in: .rect(cornerRadius: 8))
         .overlay(alignment: .topTrailing) {
             if count > 1 {
-                Text(count, format: .number)
+                Text(count.plain)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 6)

@@ -79,7 +79,7 @@ struct AxisControls: View {
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                 Text("Hidden Axes")
-                Text(moved > 0 ? "\(count) · \(moved) moved" : "\(count)").foregroundStyle(.secondary)
+                Text(moved > 0 ? "\(count.plain) · \(moved.plain) moved" : count.plain).foregroundStyle(.secondary)
                 Spacer()
             }
             .contentShape(.rect)

@@ -42,7 +42,7 @@ struct RestoreSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let progress {
                         ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
-                        Text("Putting fonts back, \(progress.done.formatted()) of \(progress.total.formatted())")
+                        Text("Putting fonts back, \(progress.done.plain) of \(progress.total.plain)")
                     } else {
                         ProgressView()
                         Text("Restoring")
@@ -84,7 +84,7 @@ struct RestoreSheet: View {
     }
 
     private var fontsDetail: String {
-        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.formatted()) files"). Puts each file back where it was, unless one is already there."
+        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.plain) files"). Puts each file back where it was, unless one is already there."
     }
 
     private func restore() {
