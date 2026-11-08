@@ -163,8 +163,7 @@ public final class FontLoader: Sendable {
                   minimum < maximum
             else { return nil }
             let tag = AxisTag.string(identifier)
-            let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
-            return AxisRange(tag: tag, name: name.isEmpty || name == tag ? AxisTag.registeredNames[tag] ?? tag : name,
+            return AxisRange(tag: tag, name: AxisTag.name(of: tag, given: entry[kCTFontVariationAxisNameKey as String] as? String ?? ""),
                              minimum: minimum, maximum: maximum, defaultValue: defaultValue,
                              isHidden: entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true)
         }
@@ -321,6 +320,16 @@ enum AxisTag {
     /// The names of the common axes, for fonts that name one by its tag or not at all.
     static let registeredNames = ["wght": "Weight", "wdth": "Width", "opsz": "Optical Size", "ital": "Italic",
                                   "slnt": "Slant", "GRAD": "Grade"]
+
+    /// The name Cicero shows for an axis: its own for the registered ones (wght, wdth, opsz, ital, slnt), which macOS
+    /// names in the Mac's language ("Breite" in German), while Cicero's other words are English, and a library read
+    /// before the language changed would keep the old one; the font's name for the designer's own axes, else Cicero's
+    /// (Grade), else the tag.
+    static func name(of tag: String, given: String) -> String {
+        if tag.first?.isLowercase == true, let name = registeredNames[tag] { return name }
+        let given = given.trimmingCharacters(in: .whitespaces)
+        return given.isEmpty || given == tag ? registeredNames[tag] ?? tag : given
+    }
 }
 
 /// The faces of one file. CTFontDescriptor is immutable and thread-safe, just not marked Sendable.

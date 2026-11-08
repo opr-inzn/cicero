@@ -82,8 +82,8 @@ enum FontFileReader {
             }
             if entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true { continue }
             let tag = AxisTag.string(identifier)
-            let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
-            axes.append(VariationAxis(tag: tag, name: name.isEmpty ? tag : name, value: instance[identifier] ?? defaultValue))
+            axes.append(VariationAxis(tag: tag, name: entry[kCTFontVariationAxisNameKey as String] as? String ?? "",
+                                      value: instance[identifier] ?? defaultValue))
         }
         let os2 = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), []) as Data?
         let head = CTFontCopyTable(font, CTFontTableTag(kCTFontTableHead), []) as Data?

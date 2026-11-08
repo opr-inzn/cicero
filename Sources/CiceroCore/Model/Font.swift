@@ -32,14 +32,15 @@ public struct WeightAxis: Hashable, Codable, Sendable {
 public struct VariationAxis: Hashable, Codable, Sendable {
     /// Four characters: a registered axis in lowercase (wght, wdth, ital, slnt, opsz), the designer's own in capitals (GRAD).
     public var tag: String
-    /// The name the font gives the axis; the tag when it gives none.
+    /// The name Cicero shows: its own for a registered axis, else the name the font gives the axis, else the tag (see
+    /// `AxisTag.name`). Also for one read from a cache with the name in another language.
     public var name: String
     /// The instance's position on the axis ("Bold" at 700 on wght).
     public var value: Double
 
     public init(tag: String, name: String, value: Double) {
         self.tag = tag
-        self.name = name
+        self.name = AxisTag.name(of: tag, given: name)
         self.value = value
     }
 }
