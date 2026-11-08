@@ -107,11 +107,9 @@ final class WhatsNew {
         let last = defaults.string(forKey: Self.lastVersionKey)
         if let last {
             pending = all.filter { Self.isNewer($0.version, than: last) && !Self.isNewer($0.version, than: current) }
-        } else if UserDataStore(locations: .standard).hasSavedData, let index = all.firstIndex(where: { $0.version == current }) {
-            pending = [all[index]]
-            if all.indices.contains(index + 1), Self.isBeta(current) || !Self.isBeta(all[index + 1].version) {
-                pending.append(all[index + 1])
-            }
+        } else if UserDataStore(locations: .standard).hasSavedData, let notes = all.first(where: { $0.version == current }) {
+            // After a Cicero without What's New, this version's notes only: the ones before it were its release notes.
+            pending = [notes]
         }
         // Nothing to show waits for no window.
         if pending.isEmpty { defaults.set(current, forKey: Self.lastVersionKey) }
@@ -132,11 +130,6 @@ final class WhatsNew {
               let latest = ReleaseNotes.bundled?.first(where: { !Self.isNewer($0.version, than: current) }) else { return false }
         notes = [latest]
         return true
-    }
-
-    /// 0.12.0b1, not 0.12.0.
-    private static func isBeta(_ version: String) -> Bool {
-        version.contains(where: \.isLetter)
     }
 
     /// As Sparkle compares them, so a beta like 0.12.0b1 comes before 0.12.0.
