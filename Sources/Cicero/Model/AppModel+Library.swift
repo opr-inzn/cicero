@@ -164,7 +164,12 @@ extension AppModel {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
-        return family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens, weight: weight)
+        return automaticStyle(of: family, weight: weight)
+    }
+
+    /// The style the family's previews show without one chosen on its page, and its weight (see `previewStyle`).
+    func automaticStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
+        family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens, weight: weight)
     }
 
     /// The tokens the search field suggests for what's typed, but for those it has (see `SearchToken.suggestions`).

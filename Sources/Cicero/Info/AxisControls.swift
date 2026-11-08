@@ -33,7 +33,7 @@ struct AxisControls: View {
         return Form {
             if !shown.isEmpty {
                 Section {
-                    ForEach(shown) { row($0, style: style.id, moved: moved, drawn: drawn) }
+                    ForEach(shown) { row($0, axes: axes, style: style, weight: weight, moved: moved, drawn: drawn) }
                 } header: {
                     HStack {
                         Text("Axes")
@@ -50,7 +50,7 @@ struct AxisControls: View {
                 let isOpen = showsHidden || shown.isEmpty
                 Section {
                     if isOpen {
-                        ForEach(hidden) { row($0, style: style.id, moved: moved, drawn: drawn) }
+                        ForEach(hidden) { row($0, axes: axes, style: style, weight: weight, moved: moved, drawn: drawn) }
                     }
                 } header: {
                     hiddenHeader(count: hidden.count, moved: hidden.count { moved[$0.tag] != nil }, isOpen: isOpen)
@@ -90,8 +90,11 @@ struct AxisControls: View {
     }
 
     /// The axis's name and tag, and the value, then a slider the panel's width.
-    private func row(_ axis: AxisRange, style: FaceID, moved: [String: Double], drawn: [String: Double]) -> some View {
-        let value = Binding { moved[axis.tag] ?? drawn[axis.tag] ?? axis.defaultValue } set: { set(axis.tag, to: $0, on: style, moved: moved) }
+    private func row(_ axis: AxisRange, axes: [AxisRange], style: LibraryFace, weight: Double, moved: [String: Double],
+                     drawn: [String: Double]) -> some View {
+        let value = Binding { moved[axis.tag] ?? drawn[axis.tag] ?? axis.defaultValue } set: {
+            set(axis.tag, to: $0, axes: axes, on: style, weight: weight, moved: moved)
+        }
         let range = axis.minimum...axis.maximum
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
@@ -111,11 +114,52 @@ struct AxisControls: View {
         value.formatted(.number.grouping(.never))
     }
 
-    /// Moves an axis of the style; the family's other axes stay where they were moved.
-    private func set(_ tag: String, to value: Double, on style: FaceID, moved: [String: Double]) {
+    /// Moves an axis of the style; the family's other axes stay where they were moved. Moved back to where the style
+    /// sits on every axis, it's the style again, and the Style menu says so; moved to where another of the file's styles
+    /// sits, on the open font page, that style is shown instead, as if chosen in the menu.
+    private func set(_ tag: String, to value: Double, axes: [AxisRange], on style: LibraryFace, weight: Double, moved: [String: Double]) {
         var values = moved
         values[tag] = value
-        model.familyAxes[family.id] = AdjustedAxes(face: style, values: values)
+        let own = place(of: style, weight: weight)
+        let position = axes.reduce(into: [String: Double]()) { $0[$1.tag] = values[$1.tag] ?? own[$1.tag] ?? $1.defaultValue }
+        if Self.isSame(position, own, on: axes) {
+            model.familyAxes[family.id] = nil
+            return
+        }
+        if model.openFamilyID == family.id, let other = otherStyle(at: position, axes: axes, besides: style) {
+            // Automatic while that's the style it shows: back to it without a style chosen.
+            let automatic = model.automaticStyle(of: family, weight: preview.weight)
+            let isAutomatic = automatic.face.id == other.id && Self.isSame(place(of: automatic.face, weight: automatic.weight), position, on: axes)
+            model.pageStyleID = isAutomatic ? nil : other.id
+            model.familyAxes[family.id] = nil
+            return
+        }
+        model.familyAxes[family.id] = AdjustedAxes(face: style.id, values: values)
+    }
+
+    /// Where a style is drawn on each of its axes, unmoved.
+    private func place(of style: LibraryFace, weight: Double) -> [String: Double] {
+        FontLoader.variation(of: FontLoader.shared.font(style.face, size: preview.size, weight: weight))
+    }
+
+    /// Another of the family's styles from the same font that sits at `position` on every axis: first by the axes the
+    /// library knows the styles' places on, then, for those, the hidden ones too, as the font draws them.
+    private func otherStyle(at position: [String: Double], axes: [AxisRange], besides style: LibraryFace) -> LibraryFace? {
+        let known = axes.filter { axis in style.face.axes.contains { $0.tag == axis.tag } }
+        return family.faces.first { other in
+            guard other.id != style.id, other.id.path == style.id.path,
+                  Self.isSame(position, other.face.axes.reduce(into: [:]) { $0[$1.tag] = $1.value }, on: known)
+            else { return false }
+            return Self.isSame(position, place(of: other, weight: other.face.styleWeight), on: axes)
+        }
+    }
+
+    /// Whether two places are the same on these axes: less than half a slider step apart on each, so a value the slider
+    /// rounded, like 0.30000000000000004, is the style's 0.3. An axis a place leaves out is at its default.
+    private static func isSame(_ a: [String: Double], _ b: [String: Double], on axes: [AxisRange]) -> Bool {
+        axes.allSatisfy { axis in
+            abs((a[axis.tag] ?? axis.defaultValue) - (b[axis.tag] ?? axis.defaultValue)) < axis.step / 2
+        }
     }
 }
 
