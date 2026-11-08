@@ -2,7 +2,7 @@
 
 ![Cicero’s window: All Fonts as a grid of tiles, each family previewed in itself, with the sidebar on the left](docs/screenshot.png)
 
-**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · [Roadmap](docs/ROADMAP.md) · Requires macOS 15 or later on Apple silicon.
+**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [Version history](help/version-history.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · Requires macOS 15 or later on Apple silicon.
 
 A font manager for macOS. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
@@ -50,7 +50,11 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 
 Cicero has mostly been tried with Latin fonts, and a lot of it still assumes them. Family names in your Mac’s language, the Cyrillic and Greek coverage sets and the 780 languages of the Character Toolbox reach further. But the samples the previews start with are Latin, the glyph map puts the letters of every other script into one group, and the classifications Cicero reads from the shapes of letters only measure Latin ones.
 
-If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or any other script, your help would be very welcome. Try Cicero with your fonts and [open an issue](https://github.com/opr-inzn/cicero/issues/new) for anything that looks wrong or is missing: a preview that shows the wrong script, text that runs the wrong way, glyphs grouped in a way that makes no sense for your script, or a coverage set you’d need. Sample fonts, sample texts and pull requests are welcome too.
+If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or any other script, your help would be very welcome. Try Cicero with your fonts and [open an issue](https://github.com/opr-inzn/cicero/issues/new) for anything that looks wrong or is missing: a preview that shows the wrong script, text that runs the wrong way, glyphs grouped in a way that makes no sense for your script, or a coverage set you’d need. Sample fonts, sample texts and pull requests are welcome too: see [Contributing](CONTRIBUTING.md).
+
+## Contributing
+
+Bug reports, sample fonts, sample texts, ideas and pull requests are all welcome. [CONTRIBUTING.md](CONTRIBUTING.md) says how: open an issue before a larger change, open pull requests against the `beta` branch, and say how you tested.
 
 ## Roadmap
 
