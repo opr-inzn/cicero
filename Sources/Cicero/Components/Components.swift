@@ -593,7 +593,10 @@ struct ValueField: View {
         return Double(text.replacing(",", with: ".")) ?? (try? Double(text, format: .number.grouping(.never)))
     }
 
+    /// Leaving the field, or Return, with its text as it was changes nothing: read back, a number shown rounded would
+    /// move the value (and the style menu would say Custom).
     private func commit() {
+        guard text != formatted(value) else { return }
         if let typed { set(typed) } else { text = formatted(value) }
     }
 
@@ -611,10 +614,11 @@ struct ValueField: View {
     }
 
     /// With the Mac's decimal mark ("12,5" in German), as many decimals as the step has, and no thousands separator, as
-    /// fonts write axis values: 1000, not 1.000.
+    /// fonts write axis values: 1000, not 1.000. A whole step shows a value between two as it is, to one decimal, as the
+    /// Styles table does: a style at 112.5 on a width axis reads 112,5, not 112.
     private static func formatted(_ value: Double, step: Double) -> String {
         let decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0
-        return value.formatted(.number.grouping(.never).precision(.fractionLength(decimals)))
+        return value.formatted(.number.grouping(.never).precision(.fractionLength(decimals...max(decimals, 1))))
     }
 }
 
