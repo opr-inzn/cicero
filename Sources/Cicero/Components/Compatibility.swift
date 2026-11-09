@@ -29,12 +29,8 @@ extension View {
         }
     }
 
-    @ViewBuilder func hardTopScrollEdge() -> some View {
-        if #available(macOS 26, *) { scrollEdgeEffectStyle(.hard, for: .top) } else { self }
-    }
-
-    @ViewBuilder func topScrollEdgeHidden(_ isHidden: Bool) -> some View {
-        if #available(macOS 26, *) { scrollEdgeEffectHidden(isHidden, for: .top) } else { self }
+    @ViewBuilder func hardTopScrollEdge(_ isHard: Bool = true) -> some View {
+        if #available(macOS 26, *) { scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top) } else { self }
     }
 
     func toolbarGlassFollowsAppearance() -> some View {
