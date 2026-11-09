@@ -68,23 +68,32 @@ struct FontGrid: View {
         let fit = measure.fit(size: preview.size, ratio: ratio, restingTile: restingTile,
                               drawn: factor.map { GridScale.drawn(preview.size, factor: $0) } ?? preview.size)
         let inputs = sampleInputs
+        let pinned = model.similarFamilyID.flatMap { id in families.first?.id == id ? families.first : nil }
+        let rowWidth = CGFloat(count) * (tile + Self.spacing) - Self.spacing
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
-                    ForEach(families) { family in
+                    ForEach(pinned == nil ? families[...] : families.dropFirst()) { family in
                         Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                             .onAppear { ReadAhead.around(family, in: families) }
                     }
                 }
                 .scrollTargetLayout()
-                .frame(width: CGFloat(count) * (tile + Self.spacing) - Self.spacing)
+                .frame(width: rowWidth)
                 // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as before the Info panel opened kept its columns and pushed the window's panes aside.
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .onGeometryChange(for: GridRoom.self) { [infoShown] in GridRoom(width: $0.size.width, infoShown: infoShown) } action: { gridRoom = $0 }
-                .cardsPadding(infoShown: infoShown, scale: scale)
+                .cardsPadding(infoShown: infoShown, scale: scale, top: pinned == nil)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
+            .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
+                if let pinned {
+                    Tile(family: pinned, sampleText: shown.text, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(pinned.id), model: model)
+                        .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                        .frame(width: rowWidth)
+                }
+            })
             .visibleHeight($visibleHeight)
             .task(id: inputs) { await measureSamples(inputs) }
             .onChange(of: factor, initial: true) { GridScale.shared.factor = factor }
@@ -95,7 +104,7 @@ struct FontGrid: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count)))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count), pinned: pinned?.id))
         }
     }
 
@@ -368,8 +377,8 @@ struct FamilyCard: ViewModifier {
 }
 
 extension View {
-    func cardsPadding(infoShown: CGFloat, scale: CGFloat) -> some View {
-        padding([.leading, .vertical], InfoPanelOverlay.top)
+    func cardsPadding(infoShown: CGFloat, scale: CGFloat, top: Bool = true) -> some View {
+        padding(top ? [.leading, .vertical] : [.leading, .bottom], InfoPanelOverlay.top)
             .padding(.trailing, FontGrid.cardsTrailing(infoShown: infoShown, scale: scale))
     }
 }

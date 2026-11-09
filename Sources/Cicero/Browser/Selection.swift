@@ -95,6 +95,7 @@ struct FamilyKeys: ViewModifier {
     let proxy: ScrollViewProxy
     @Binding var position: ScrollPosition
     var layout = FamilyLayout.list
+    var pinned: String?
     @State private var typed = ""
     @State private var lastTyped = Date.distantPast
     @State private var pendingQuickLook: Task<Void, Never>?
@@ -179,6 +180,11 @@ struct FamilyKeys: ViewModifier {
         if id == families.first?.id { position.scrollTo(edge: .top) } else { proxy.scrollTo(id, anchor: .top) }
     }
 
+    private func select(_ id: String) {
+        model.selectedIDs = [id]
+        anchor = SelectionAnchor(id: id)
+    }
+
     private func open() -> KeyPress.Result {
         if model.quickLook.isOpen, let shown = model.quickLook.shown {
             model.openFamilyID = shown.family.id
@@ -208,12 +214,55 @@ struct FamilyKeys: ViewModifier {
             }
             if case .list = layout { return .ignored }
         }
-        guard let target = FamilySelection.step(forward ? step : -step, in: families.map(\.id), selection: &model.selectedIDs,
+        var ids = families.map(\.id)
+        if let pinned, ids.first == pinned {
+            ids.removeFirst()
+            if !press.modifiers.contains(.shift), model.selectedIDs.count == 1, let selected = model.selectedIDs.first {
+                if selected == pinned {
+                    guard forward, let first = ids.first else { return .handled }
+                    select(first)
+                    proxy.scrollTo(first)
+                    return .handled
+                }
+                if !forward, let index = ids.firstIndex(of: selected), index < step {
+                    select(pinned)
+                    return .handled
+                }
+            }
+        }
+        guard let target = FamilySelection.step(forward ? step : -step, in: ids, selection: &model.selectedIDs,
                                                 anchor: &anchor, extending: press.modifiers.contains(.shift)) else {
             return .ignored
         }
         proxy.scrollTo(target)
         return .handled
+    }
+}
+
+struct PinnedBar<Bar: View>: ViewModifier {
+    let isShown: Bool
+    let infoShown: CGFloat
+    let scale: CGFloat
+    @ViewBuilder let bar: () -> Bar
+    @State private var isScrolled = false
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top >= 1 } action: { isScrolled = $1 }
+            .topBar {
+                if isShown {
+                    bar()
+                        // Never as wide as the bar asks: its width would hold the browser at least that wide and push the window's panes aside.
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, InfoPanelOverlay.top)
+                        .padding(.leading, InfoPanelOverlay.top)
+                        .padding(.trailing, FontGrid.cardsTrailing(infoShown: infoShown, scale: scale))
+                        .background(Color.canvas)
+                        .overlay(alignment: .bottom) {
+                            if isScrolled { Divider() }
+                        }
+                }
+            }
     }
 }
 

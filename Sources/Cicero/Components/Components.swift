@@ -240,11 +240,9 @@ struct Tag: View {
     var systemImage: String?
 
     var body: some View {
-        HStack(spacing: 2.5) {
+        HStack(alignment: .firstTextBaseline, spacing: 2.5) {
             if let systemImage {
-                Image(systemName: systemImage)
-                    .offset(y: Self.capitalsDrop - Self.inkDrop(of: systemImage))
-                    .frame(height: 0)
+                Text(Image(systemName: systemImage))
                     .accessibilityHidden(true)
             }
             Text(text)
@@ -259,37 +257,6 @@ struct Tag: View {
     }
 
     private static let font = Font.system(size: 9, weight: .semibold)
-
-    private static let capitalsDrop: CGFloat = {
-        let font = NSFont.systemFont(ofSize: 9, weight: .semibold)
-        let layout = NSLayoutManager()
-        return layout.defaultBaselineOffset(for: font) - font.capHeight / 2 - layout.defaultLineHeight(for: font) / 2
-    }()
-
-    private static var inkDrops: [String: CGFloat] = [:]
-
-    private static func inkDrop(of symbol: String) -> CGFloat {
-        if let drop = inkDrops[symbol] { return drop }
-        let scale = 20
-        let renderer = ImageRenderer(content: Image(systemName: symbol).font(font))
-        renderer.scale = CGFloat(scale)
-        var drop: CGFloat = 0
-        if let image = renderer.cgImage,
-           let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
-                                   bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-           let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
-            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            let inked = (0..<image.height).filter { row in
-                (0..<image.width).contains { pixels[(row * image.width + $0) * 4 + 3] > 127 }
-            }
-            if let top = inked.first, let bottom = inked.last {
-                drop = CGFloat(top + bottom + 1 - image.height) / 2 / CGFloat(scale)
-            }
-        }
-        inkDrops[symbol] = drop
-        return drop
-    }
 }
 
 struct VariableTag: View {

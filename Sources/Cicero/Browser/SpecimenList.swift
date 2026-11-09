@@ -12,26 +12,33 @@ struct SpecimenList: View {
     @State private var position = ScrollPosition(idType: String.self)
 
     var body: some View {
+        let pinned = model.similarFamilyID.flatMap { id in families.first?.id == id ? families.first : nil }
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: FontGrid.spacing) {
-                    ForEach(families) { family in
-                        Specimen(family: family, foundry: model.foundryName(of: family), isSelected: model.selectedIDs.contains(family.id), model: model)
+                    ForEach(pinned == nil ? families[...] : families.dropFirst()) { family in
+                        Specimen(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
                             .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                             .onAppear { prefetchStyles(near: family) }
                     }
                 }
                 .scrollTargetLayout()
-                .cardsPadding(infoShown: infoShown, scale: scale)
+                .cardsPadding(infoShown: infoShown, scale: scale, top: pinned == nil)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
+            .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
+                if let pinned {
+                    Specimen(family: pinned, isSelected: model.selectedIDs.contains(pinned.id), model: model)
+                        .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                }
+            })
             .visibleHeight($visibleHeight)
             .modifier(KeepsTopOnResize(position: $position))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .specimens))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .specimens, pinned: pinned?.id))
         }
     }
 
@@ -45,7 +52,6 @@ struct SpecimenList: View {
 private struct Specimen: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    let foundry: String?
     let isSelected: Bool
     let model: AppModel
 
@@ -54,16 +60,18 @@ private struct Specimen: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(family.name).font(.headline).lineLimit(1)
-                TagDots(colors: model.tagColors(of: family))
-                StatusTag(family: family)
-                VariableTag(family: family)
-                Text([foundry, family.stylesLabel].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                NoteMark(note: model.note(of: family))
-                RatingStars(rating: model.rating(of: family))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(family.name).font(.headline).lineLimit(1)
+                    TagDots(colors: model.tagColors(of: family)).centredOnName()
+                    StatusTag(family: family).centredOnName()
+                    VariableTag(family: family).centredOnName()
+                    Text(family.rangeLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    NoteMark(note: model.note(of: family)).centredOnName()
+                    RatingStars(rating: model.rating(of: family))
+                }
                 Spacer(minLength: 8)
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
@@ -90,5 +98,16 @@ private struct Specimen: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(FamilyCard(isSelected: isSelected))
+    }
+}
+
+private extension View {
+    func centredOnName() -> some View {
+        alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + Self.nameMiddle }
+    }
+
+    static var nameMiddle: CGFloat {
+        let font = NSFont.preferredFont(forTextStyle: .headline)
+        return (font.ascender + font.descender) / 2
     }
 }
