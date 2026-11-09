@@ -460,6 +460,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         let isAdobeFonts: Bool
         let position: SwitchPosition
         let regular: LibraryFace
+        let picks: [StylePick]
         let activeCount: Int
         let hasActive: Bool
         let hasActivatable: Bool
@@ -470,7 +471,8 @@ public struct Family: Identifiable, Hashable, Sendable {
         init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
             precondition(!faces.isEmpty, "A family has at least one face")
             id = name
-            let regular = Family.nearest(400, in: faces)
+            let picks = faces.map { StylePick($0.face) }
+            let regular = Family.nearest(400, in: faces, picks: picks)
             self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
                 ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
             self.faces = faces
@@ -492,6 +494,7 @@ public struct Family: Identifiable, Hashable, Sendable {
             classification = Classification.of(name: name, faces: faces)
             mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
             self.regular = regular
+            self.picks = picks
             activeCount = faces.count { $0.state.isActive }
             hasActive = activeCount > 0
             hasActivatable = faces.contains(where: \.canActivate)
@@ -581,21 +584,28 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var italic: LibraryFace? {
         if regular.face.isItalic { return regular }
         let italics = faces.filter { $0.face.isItalic && !$0.face.isOrnaments }
-        return italics.isEmpty ? nil : Self.nearest(400, in: italics)
+        return italics.isEmpty ? nil : Self.nearest(400, in: italics, picks: italics.map { StylePick($0.face) })
     }
 
     public func face(nearestWeight weight: Double) -> LibraryFace {
-        weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
+        weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces, picks: storage.fields.picks)
     }
 
-    private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
+    private static func nearest(_ weight: Double, in faces: [LibraryFace], picks: [StylePick]) -> LibraryFace {
         // Not a style of ornaments, which ties with the Regular in Hoefler Text, unless that's all there is.
-        let letters = faces.filter { !$0.face.isOrnaments }
-        let faces = letters.isEmpty ? faces : letters
-        let hasUpright = faces.contains { !$0.face.isItalic }
-        var best: LibraryFace?
+        let letters = faces.indices.filter { !faces[$0].face.isOrnaments }
+        let candidates = letters.isEmpty ? Array(faces.indices) : letters
+        let hasUpright = candidates.contains { !faces[$0].face.isItalic }
+        var best: Int?
         var variable: LibraryFace?
-        for candidate in faces where !hasUpright || !candidate.face.isItalic {
+        // A variable font without a weight axis has all its instances at one weight: the one at its origin, rather than the first one listed, which can be at the end of every axis.
+        func rank(_ index: Int) -> (Int, Int, Int, Int, Double, Double) {
+            let pick = picks[index], face = faces[index].face, distance = abs(pick.weight - weight)
+            return (pick.isCompanion ? 1 : 0, Int(distance / 100), pick.weightIsNamed ? 0 : 1, (face.isAtOrigin ? 0 : 10) + abs(pick.width - 5),
+                    distance, abs(Double(face.weight) - weight))
+        }
+        for index in candidates where !hasUpright || !faces[index].face.isItalic {
+            let candidate = faces[index]
             if candidate.face.weightAxis != nil {
                 // The instance at the font's origin, the regular weight of those there, rather than the first one, which in SF Pro is Compressed.
                 guard let found = variable else { variable = candidate; continue }
@@ -603,18 +613,11 @@ public struct Family: Identifiable, Hashable, Sendable {
                     || abs(candidate.face.styleWeight - 400) < abs(found.face.styleWeight - 400)) {
                     variable = candidate
                 }
-            } else if let current = best {
-                // A variable font without a weight axis has all its instances at one weight: the one at its origin, rather than the first one listed, which can be at the end of every axis.
-                let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
-                if distance < bestDistance || distance == bestDistance && (candidate.face.isAtOrigin && !current.face.isAtOrigin
-                    || candidate.face.isAtOrigin == current.face.isAtOrigin && abs(candidate.face.width - 5) < abs(current.face.width - 5)) {
-                    best = candidate
-                }
-            } else {
-                best = candidate
+            } else if best.map({ rank(index) < rank($0) }) ?? true {
+                best = index
             }
         }
-        return variable ?? best ?? faces[0]
+        return variable ?? best.map { faces[$0] } ?? faces[0]
     }
 
     static func rangeLabel(of faces: [FontFace]) -> String {
@@ -669,13 +672,49 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
 }
 
+struct StylePick: Hashable, Sendable {
+    var weight: Double
+    var weightIsNamed: Bool
+    var width: Int
+    var isCompanion: Bool
+
+    // Older families give every font of a group of four the style name Regular, so the PostScript name's style part goes first: a Bold styled Regular, a Thin whose PostScript name is SansThin-Regular.
+    init(_ face: FontFace) {
+        let postScript = Self.postScriptStyle(of: face)
+        let names = [postScript.map(StyleName.init), StyleName(face.styleName)].compactMap { $0 }
+        var weights = names.compactMap(\.weight)
+        if let own = postScript.map(StyleName.init), own.weight == nil, own.hasOther { weights.removeAll { $0 == 400 } }
+        let named = weights.first { $0 != 400 } ?? weights.first
+        weight = Double(named ?? face.weight)
+        weightIsNamed = named != nil
+        width = names.lazy.compactMap(\.width).first ?? face.width
+        let words = [face.styleName, postScript ?? ""].flatMap { name in
+            StyleName.spaced(name).lowercased().split { !$0.isLetter }.map(String.init)
+        }
+        isCompanion = !Self.companionWords.isDisjoint(with: words) || !face.isItalic && names.contains(where: \.hasSlope)
+    }
+
+    // Lig is also short for Light, so ligatures only in full.
+    private static let companionWords: Set<String> = [
+        "sc", "caps", "smallcaps", "expert", "exp", "alt", "alts", "alternate", "alternates", "alternative", "swash",
+        "swashes", "ligatures", "ornaments", "orn", "pi", "euro", "fractions", "initials", "dingbats", "symbols",
+        "outline", "inline", "shadow", "shaded", "stencil", "hollow",
+    ]
+
+    private static func postScriptStyle(of face: FontFace) -> String? {
+        guard let hyphen = face.postScriptName.firstIndex(of: "-") else { return nil }
+        let style = face.postScriptName[face.postScriptName.index(after: hyphen)...]
+        return style.isEmpty ? nil : String(style)
+    }
+}
+
 // Many files give every style the same classes, Bold and Light at 400 or Extended at normal width, so the name tells styles apart more reliably.
 struct StyleName {
     var weight: Int?
     var width: Int?
     var widthWords: [String] = []
-    private var hasSlope = false
-    private var hasOther = false
+    private(set) var hasSlope = false
+    private(set) var hasOther = false
     // A word Cicero doesn't know may be a weight, like Buch in "Buch Kursiv".
     var isRegular: Bool { weight == nil && !hasOther && (width != nil || hasSlope) }
 
@@ -727,6 +766,20 @@ struct StyleName {
     }
 
     private static let prefixes: Set<String> = ["extra", "ultra", "semi", "demi", "x", "xx", "u"]
+
+    // Old-style figures' OsF stays one word: "RegularSCOsF" is Regular SC Osf.
+    static func spaced(_ name: String) -> String {
+        let characters = Array(name.replacingOccurrences(of: "OsF", with: "Osf"))
+        var spaced = ""
+        for (index, character) in characters.enumerated() {
+            if index > 0, character.isUppercase {
+                let previous = characters[index - 1], next = index + 1 < characters.count ? characters[index + 1] : nil
+                if previous.isLowercase || previous.isUppercase && next?.isLowercase == true { spaced.append(" ") }
+            }
+            spaced.append(character)
+        }
+        return spaced
+    }
 
     static let weights: [String: Int] = [
         "hairline": 50, "extrathin": 70, "xthin": 70, "ultrathin": 80, "lazer": 85, "lz": 85, "thin": 100, "th": 100,

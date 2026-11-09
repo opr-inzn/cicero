@@ -59,8 +59,10 @@ public struct SimilarFonts: Sendable {
     }
 
     static let copyWords: Set<String> = [
-        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn",
-        "sc", "tc", "hk", "mo",
+        "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn", "ot",
+        "sc", "tc", "hk", "mo", "cyr", "cyrillic", "grk", "greek", "ce", "w1g", "c",
+        "lf", "tf", "osf", "scosf", "caps", "smallcaps", "expert", "exp", "alt", "alts", "alternate", "alternates", "swash",
+        "swashes", "lig", "ligatures", "fractions", "pi", "ornaments", "initials",
     ]
     static let weightWords: Set<String> = [
         "hairline", "thin", "extralight", "ultralight", "light", "book", "regular", "medium", "semibold", "demibold", "bold",
@@ -68,12 +70,13 @@ public struct SimilarFonts: Sendable {
     ]
 
     static func design(of name: String) -> String {
-        var words = name.lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
+        var words = StyleName.spaced(name).lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
         if words.count > 1, words[0] == "test" { words.removeFirst() }
         func stripCopies() {
             while words.count > 1, let last = words.last, copyWords.contains(last) || weightWords.contains(last) || isVersion(last) {
                 words.removeLast()
                 if weightWords.contains(last), words.count > 1, ["semi", "demi", "extra", "ultra"].contains(words.last!) { words.removeLast() }
+                if last == "caps", words.count > 1, ["small", "petite", "all"].contains(words.last!) { words.removeLast() }
             }
         }
         stripCopies()
