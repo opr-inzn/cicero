@@ -7,13 +7,15 @@ nonisolated struct GlyphHeading: Hashable, Sendable {
     let name: String?
     let detail: String
     let startsCategory: Bool
+    let labelFollows: Bool
 
-    init(index: Int, category: String, name: String, detail: String, after previous: String?) {
+    init(index: Int, category: String, name: String, detail: String, after previous: String?, labelFollows: Bool = false) {
         self.index = index
         self.category = category
         self.name = name == category ? nil : name
         self.detail = detail
         startsCategory = previous != category
+        self.labelFollows = labelFollows
     }
 }
 
@@ -46,7 +48,8 @@ struct GlyphHeader: View {
     let heading: GlyphHeading
 
     var body: some View {
-        let height = heading.name == nil ? Self.barHeight : Self.barHeight + Self.headingHeight
+        let nameHeight = heading.labelFollows ? Self.line : Self.headingHeight
+        let height = heading.name == nil ? Self.barHeight : Self.barHeight + nameHeight
         VStack(alignment: .leading, spacing: 0) {
             CategoryBar(heading: heading)
                 .modifier(WhenPinned(always: heading.startsCategory || heading.name == nil))
@@ -60,7 +63,7 @@ struct GlyphHeader: View {
                     Spacer()
                 }
                 .padding(.horizontal, GlyphsSection.inset)
-                .frame(height: Self.headingHeight, alignment: .top)
+                .frame(height: nameHeight, alignment: .top)
             }
         }
         .background(Color.canvas)

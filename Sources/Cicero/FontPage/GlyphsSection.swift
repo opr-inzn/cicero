@@ -29,6 +29,7 @@ struct GlyphsSection: View {
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 24
+    static let titleGap: CGFloat = 56
     static let labelLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .callout)).rounded(.up)
     static let labelGap: CGFloat = 4
     static let runGap = labelLine - spacing - 2
@@ -56,7 +57,7 @@ struct GlyphsSection: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(TopRowKeeper.space)).minY } action: { [titleMoved] in titleMoved($0) }
         .padding(.horizontal, Self.inset)
-        .padding(.top, 56)
+        .padding(.top, Self.titleGap)
         .padding(.bottom, 4)
         if shown.isEmpty && shownLigatures.isEmpty {
             EmptyState(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
@@ -124,7 +125,8 @@ struct GlyphsSection: View {
         }
         let total = runs.reduce(0) { $0 + $1.cells.count }
         let heading = GlyphHeading(index: index, category: section.category, name: section.name,
-                                   detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous)
+                                   detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous,
+                                   labelFollows: runs.first?.label != nil)
         return Section {
             // Rows of the page's lazy stack, all one height: it guesses unplaced rows' heights from placed ones, so a LazyVGrid per group re-laid it out at full CPU, and rows in stacks of their own drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in

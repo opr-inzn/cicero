@@ -33,6 +33,10 @@ extension View {
         if #available(macOS 26, *) { scrollEdgeEffectStyle(.hard, for: .top) } else { self }
     }
 
+    @ViewBuilder func topScrollEdgeHidden(_ isHidden: Bool) -> some View {
+        if #available(macOS 26, *) { scrollEdgeEffectHidden(isHidden, for: .top) } else { self }
+    }
+
     func toolbarGlassFollowsAppearance() -> some View {
         modifier(FreshScrollEdges())
     }
@@ -48,20 +52,25 @@ extension View {
 
 private struct FreshScrollEdges: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appearsActive) private var appearsActive
     @State private var isHard = false
 
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
             content
                 .scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top)
-                .onChange(of: colorScheme) {
-                    // Hard for a moment, so macOS sets the top edges up afresh: on macOS 26 the toolbar's glass over them could keep the old appearance until something scrolled.
-                    isHard = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isHard = false }
-                }
+                .onChange(of: colorScheme) { refresh() }
+                // On a switch back to Cicero, the toolbar's glass could come back in the system's appearance and fade to the app's.
+                .onChange(of: appearsActive) { if appearsActive { refresh() } }
         } else {
             content
         }
+    }
+
+    private func refresh() {
+        // Hard for a moment, so macOS sets the top edges up afresh: on macOS 26 the toolbar's glass over them could keep the old appearance until something scrolled.
+        isHard = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isHard = false }
     }
 }
 

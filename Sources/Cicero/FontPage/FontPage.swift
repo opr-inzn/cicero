@@ -65,7 +65,8 @@ struct FontPage: View {
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
-        .onScrollGeometryChange(for: Bool.self) { [titleY] geometry in titleY.map { geometry.contentOffset.y + geometry.contentInsets.top >= $0 - 24 } ?? false } action: { solidTop = $1 }
+        .onScrollGeometryChange(for: Bool.self) { [titleY] geometry in titleY.map { geometry.contentOffset.y >= $0 - GlyphsSection.titleGap } ?? false } action: { solidTop = $1 }
+        .topScrollEdgeHidden(solidTop)
         .overlay(alignment: .top) {
             if solidTop {
                 Color.canvas.frame(height: 2).background(Color.canvas.ignoresSafeArea(edges: .top))
