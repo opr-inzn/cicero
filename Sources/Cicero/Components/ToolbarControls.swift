@@ -30,6 +30,7 @@ struct ToolbarPicker<Value: Hashable>: View {
     let symbol: ((Value) -> String)?
     let help: String?
     @Namespace private var lens
+    @Environment(\.colorScheme) private var colorScheme
 
     init(_ label: String, values: [Value], selection: Binding<Value>, title: @escaping (Value) -> String,
          symbol: ((Value) -> String)? = nil, help: String? = nil) {
@@ -73,10 +74,16 @@ struct ToolbarPicker<Value: Hashable>: View {
                 .buttonStyle(ToolbarButtonStyle(isOn: selection == value, segment: symbol == nil ? .title : .symbol))
                 .background {
                     if selection == value {
-                        Capsule()
-                            .fill(.quaternary)
-                            .glassEffect(.regular.interactive(), in: .capsule)
-                            .matchedGeometryEffect(id: "lens", in: lens)
+                        if colorScheme == .dark {
+                            Capsule()
+                                .fill(.quaternary)
+                                .matchedGeometryEffect(id: "lens", in: lens)
+                        } else {
+                            Capsule()
+                                .fill(.quaternary)
+                                .glassEffect(.regular.interactive(), in: .capsule)
+                                .matchedGeometryEffect(id: "lens", in: lens)
+                        }
                     }
                 }
                 .help(help ?? "")
@@ -123,7 +130,7 @@ private struct ToolbarButton: View {
             .labelStyle(.iconOnly)
             .imageScale(.large)
             .foregroundStyle(isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-            .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 6 : 8)
+            .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 10 : 8)
             .frame(minWidth: segment == nil ? 36 : 36 - 2 * ToolbarButtonStyle.segmentInset, maxWidth: segment == nil ? nil : .infinity,
                    minHeight: 36 - (segment == nil ? 0 : 2 * ToolbarButtonStyle.segmentInset))
             .background(pressed ? AnyShapeStyle(.quaternary) : hovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: .capsule)
