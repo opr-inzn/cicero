@@ -124,7 +124,7 @@ private struct Header: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
+        .padding(.top, 8)
         .padding(.bottom, 16)
         .contentShape(.rect)
         .contextMenu { FamilyMenu(families: [family], model: model) }
