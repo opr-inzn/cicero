@@ -147,6 +147,8 @@ struct StyleMenu: View {
         }
         CopySourcesMenu(styles: [face], title: "\(family.name) \(face.face.styleName)", model: model)
         Divider()
+        Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: family, style: face) }
+            .disabled(!model.canShowSimilar(family, style: face))
         Button("Reveal in Finder", systemImage: "finder") { model.reveal(path: face.face.path) }
         Button("Copy PostScript Name", systemImage: "doc.on.clipboard") {
             NSPasteboard.general.clearContents()

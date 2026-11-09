@@ -158,8 +158,8 @@ private struct SimilarBar: View {
     }
 
     private var message: String {
-        let name = model.family(familyID)?.name ?? familyID
-        if let family = model.family(familyID), model.canShowSimilar(family) {
+        let name = model.similarName ?? familyID
+        if let family = model.family(familyID), model.canShowSimilar(family, style: model.similarStyle) {
             return "The families that look most like \(name), the closest first."
         }
         if let progress = model.measurementProgress {

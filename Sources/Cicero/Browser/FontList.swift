@@ -277,6 +277,7 @@ struct FontList: View {
             }
         }
         .onChange(of: model.similarFamilyID) { keepsOwnOrder = true }
+        .onChange(of: model.similarStyleID) { keepsOwnOrder = true }
         .onChange(of: model.selectedItems) { keepsOwnOrder = true }
     }
 

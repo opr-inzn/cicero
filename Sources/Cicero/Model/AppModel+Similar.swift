@@ -18,8 +18,8 @@ extension AppModel {
         let measurements = measurements
         let table = SimilarFonts(families: library.families.filter(data.lists), measurements: { measurements.measurements(of: $0.regular.face.id) },
                                  embeddings: { measurements.embedding(of: $0.regular.face.id) },
-                                 italicMeasurements: { $0.italic.flatMap { measurements.measurements(of: $0.face.id) } },
-                                 italicEmbeddings: { $0.italic.flatMap { measurements.embedding(of: $0.face.id) } },
+                                 styleMeasurements: { measurements.measurements(of: $0.id) },
+                                 styleEmbeddings: { measurements.embedding(of: $0.id) },
                                  classification: similarClassifier())
         similarCache = (key, table)
         return table
@@ -34,15 +34,26 @@ extension AppModel {
         }
     }
 
-    func similarFamilies(to family: Family, limit: Int) -> [Family] {
-        similarFonts.nearest(to: family.id, limit: limit).compactMap(library.family)
+    func similarFamilies(to family: Family, kind: SearchQuery.Style? = nil, limit: Int) -> [Family] {
+        similarFonts.nearest(to: family.id, kind: kind, limit: limit).compactMap(library.family)
     }
 
-    func canShowSimilar(_ family: Family) -> Bool {
-        similarFonts.contains(family.id)
+    func canShowSimilar(_ family: Family, style: LibraryFace? = nil) -> Bool {
+        similarFonts.contains(family.id, kind: style.map(family.kind(of:)))
     }
 
-    func showSimilar(to family: Family) {
+    var similarStyle: LibraryFace? {
+        guard let id = similarStyleID, let family = similarFamilyID.flatMap(library.family) else { return nil }
+        return family.faces.first { $0.id == id }
+    }
+
+    var similarName: String? {
+        guard let id = similarFamilyID else { return nil }
+        let name = library.family(id)?.name ?? id
+        return similarStyle.map { "\(name) \($0.face.styleName)" } ?? name
+    }
+
+    func showSimilar(to family: Family, style: LibraryFace? = nil) {
         if similarFamilyID == nil, documentList == nil {
             listReturn = selectedItems
             listReturnPage = openFamilyID
@@ -51,6 +62,7 @@ extension AppModel {
         selection = nil
         documentList = nil
         similarFamilyID = family.id
+        similarStyleID = style?.id
         openFamilyID = nil
         selectedIDs = [family.id]
         jumpTargets = [family.id]

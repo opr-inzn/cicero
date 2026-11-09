@@ -62,6 +62,7 @@ struct VisibleKey: Equatable {
     var coverageRevision: Int
     var guessRevision: Int
     var similar: String?
+    var similarStyle: FaceID?
     var document: DocumentList?
     var measurementRevision: Int
 }
@@ -136,6 +137,10 @@ extension AppModel {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
+        if let style = similarStyle, let source = similarFamilyID.flatMap(library.family), appliedSearch.isEmpty, searchTokens.isEmpty {
+            if family.id == source.id { return (style, style.face.styleWeight) }
+            return (family.face(for: source.kind(of: style), weight: style.face.styleWeight), style.face.styleWeight)
+        }
         return automaticStyle(of: family, weight: weight)
     }
 
@@ -175,7 +180,7 @@ extension AppModel {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
             dataRevision: dataRevision, coverageRevision: listDependsOnCoverage ? coverageRevision : 0, guessRevision: guessRevision,
-            similar: similarFamilyID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
+            similar: similarFamilyID, similarStyle: similarStyleID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
     }
 
@@ -225,7 +230,8 @@ extension AppModel {
         }
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
-            return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
+            let kind = similarStyle.map(family.kind(of:))
+            return ([family] + similarFamilies(to: family, kind: kind, limit: Self.similarListed)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
         let data = data, families = library.families

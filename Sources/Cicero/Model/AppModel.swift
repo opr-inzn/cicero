@@ -143,7 +143,10 @@ final class AppModel {
         }
     }
     var pageStyleID: FaceID?
-    var similarFamilyID: String?
+    var similarFamilyID: String? {
+        didSet { if similarFamilyID != oldValue { similarStyleID = nil } }
+    }
+    var similarStyleID: FaceID?
     var documentList: DocumentList?
     var jumpTargets: Set<String>?
     var searchText = "" {

@@ -21,18 +21,6 @@ replaces the current model only when its lists are picked more often.
   font page a little and makes the twelve in the list worse.
 - The families to add: each needs tags for what it is (serif, grotesque, humanist and so on), set by hand.
 
-### Similar styles (M)
-
-**What.** Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones.
-Similar fonts compare families by their regular styles now.
-
-**How.** Measure and embed every style rather than each family's regular one (about a millisecond each), and compare a
-style with the others of its slant. Families' lists stay as they are.
-
-**Open.**
-- How to show a style's list: the browser lists families, so styles would need a list of their own.
-- A family's own other styles: whether they belong in the list.
-
 ### Subfolders in Locations and Folders (M)
 
 **What.** Show the folders inside a location under its row, and let folders hold other folders. A location is one row

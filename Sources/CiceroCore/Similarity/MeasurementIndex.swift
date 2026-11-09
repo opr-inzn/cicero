@@ -71,7 +71,11 @@ public final class MeasurementIndex: Sendable {
 
     static func measuredFaces(of families: [Family]) -> [FontFace] {
         families.flatMap { family in
-            [family.regular.face] + (family.italic.map { $0.face.id == family.regular.face.id ? [] : [$0.face] } ?? [])
+            var faces = [family.regular.face]
+            for kind in family.kinds {
+                if let face = family.representative(of: kind)?.face, !faces.contains(where: { $0.id == face.id }) { faces.append(face) }
+            }
+            return faces
         }
     }
 

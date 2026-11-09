@@ -105,10 +105,18 @@ public struct SearchQuery: Sendable {
 
     // MARK: Styles a search names
 
-    public struct Style: Equatable, Sendable {
+    public struct Style: Hashable, Sendable {
         public var isItalic = false
         public var width: Int?
         public var weight: Int?
+
+        public init(isItalic: Bool = false, width: Int? = nil, weight: Int? = nil) {
+            self.isItalic = isItalic
+            self.width = width
+            self.weight = weight
+        }
+
+        var side: Int { ((width ?? 5) - 5).signum() }
     }
 
     public func style(forFamilyNamed names: [String]) -> Style? {
@@ -193,7 +201,28 @@ extension Family {
         return (face, isNamed ? face.face.styleWeight : Double(named))
     }
 
-    func face(for style: SearchQuery.Style, weight: Double, variable: Bool = false) -> LibraryFace {
+    public func kind(of face: LibraryFace) -> SearchQuery.Style {
+        let width = widthClass(of: face.face)
+        return SearchQuery.Style(isItalic: face.face.isItalic, width: width == 5 ? nil : width)
+    }
+
+    public var kinds: [SearchQuery.Style] {
+        let letters = faces.filter { !$0.face.isOrnaments }
+        var kinds: [SearchQuery.Style] = []
+        for face in letters.isEmpty ? faces : letters {
+            let kind = kind(of: face)
+            if !kinds.contains(kind) { kinds.append(kind) }
+        }
+        return kinds
+    }
+
+    public func representative(of kind: SearchQuery.Style) -> LibraryFace? {
+        let face = face(for: SearchQuery.Style(isItalic: kind.isItalic, width: kind.width), weight: 400)
+        let found = self.kind(of: face)
+        return found.isItalic == kind.isItalic && found.side == kind.side ? face : nil
+    }
+
+    public func face(for style: SearchQuery.Style, weight: Double, variable: Bool = false) -> LibraryFace {
         let letters = faces.filter { !$0.face.isOrnaments }
         var candidates = letters.isEmpty ? faces : letters
         func keep(_ test: (LibraryFace) -> Bool) {

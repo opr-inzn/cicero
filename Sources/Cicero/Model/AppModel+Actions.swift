@@ -785,7 +785,7 @@ extension AppModel {
     }
 
     var selectionTitle: String {
-        if let id = similarFamilyID { return "Similar to \(library.family(id)?.name ?? id)" }
+        if let name = similarName { return "Similar to \(name)" }
         if let list = documentList { return "Fonts in “\(list.name)”" }
         let item = selection ?? .all
         if selectedItems.count > 1 {
