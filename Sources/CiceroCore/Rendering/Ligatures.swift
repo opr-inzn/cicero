@@ -824,10 +824,13 @@ public struct FeatureGlyph: Hashable, Sendable {
 
     static func letterOrder(of character: UInt32) -> (GlyphGroup, UInt32, UInt32, UInt32, Int, UInt32) {
         let group: GlyphGroup = switch GlyphGroup.of(character) ?? .graphical {
-        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents: .lowercase
+        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents, .phoneticLetters: .lowercase
         case let other: other
         }
-        let lowercase = Unicode.Scalar(character).flatMap { String(Character($0)).lowercased().unicodeScalars.first?.value } ?? character
+        let text = Unicode.Scalar(character).map { String(Character($0)) } ?? ""
+        let lower = text.lowercased()
+        let own = lower == text && Unicode.Scalar(character)?.properties.isUppercase == true ? text.decomposedStringWithCompatibilityMapping.lowercased() : lower
+        let lowercase = own.unicodeScalars.first?.value ?? character
         let (base, kind, letter, _, _) = GlyphSection.letterOrder(of: lowercase)
         return (group, base, kind, letter, lowercase == character ? 0 : 1, character)
     }

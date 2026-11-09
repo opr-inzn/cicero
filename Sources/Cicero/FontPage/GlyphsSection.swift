@@ -136,7 +136,8 @@ struct GlyphsSection: View {
             }
         } header: {
             HStack(spacing: 4) {
-                Text(section.title).font(.headline)
+                ((section.script.map { Text("\($0) › ").foregroundStyle(.secondary) } ?? Text("")) + Text(section.name))
+                    .font(.headline)
                 Text((section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }

@@ -2,27 +2,70 @@ import CoreText
 import Foundation
 
 public enum GlyphGroup: Hashable, Comparable, Sendable {
-    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, localizedForms
+    case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, phoneticLetters, ligatures, localizedForms
     case initialForms, medialForms, finalForms, isolatedForms, proportionalFigures, tabularFigures
-    case circledFigures, romanNumerals, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
+    case circledFigures, romanNumerals, punctuationAndSymbols, currency, mathematicalOperators, letterlikeSymbols
+    case superscripts, subscripts, fractions, numerators, denominators, ordinals
     case caseSensitiveForms, arrows
     case script(String)
+    case scriptPart(String, ScriptPart)
     case stylisticSet(tag: String, name: String)
     case graphical, diacriticalMarks, combiningMarks
 
     public static let greek = GlyphGroup.script("Greek")
 
-    public var isScript: Bool {
-        if case .script = self { true } else { false }
+    public enum ScriptPart: Int, Sendable {
+        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, signs
+
+        var title: String {
+            switch self {
+            case .uppercase: "Uppercase"
+            case .lowercase: "Lowercase"
+            case .uppercaseAccents: "Uppercase Accents"
+            case .lowercaseAccents: "Lowercase Accents"
+            case .smallCaps: "Small Caps"
+            case .signs: "Signs and Marks"
+            }
+        }
+
+        var order: Int { rawValue < ScriptPart.smallCaps.rawValue ? rawValue : rawValue + 1 }
     }
 
-    public var title: String {
+    public var isScript: Bool { scriptName != nil }
+
+    public var scriptName: String? {
+        switch self {
+        case .script(let name), .scriptPart(let name, _): name
+        default: nil
+        }
+    }
+
+    private var scriptKey: (UInt32, String, Int)? {
+        switch self {
+        case .script(let name): (UnicodeBlock.firstCodePoint(of: name), name, ScriptPart.smallCaps.rawValue)
+        case .scriptPart(let name, let part): (UnicodeBlock.firstCodePoint(of: name), name, part.order)
+        default: nil
+        }
+    }
+
+    public var title: String { script.map { "\($0) › \(name)" } ?? name }
+
+    public var script: String? {
+        switch self {
+        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents, .smallCaps: "Latin"
+        case .scriptPart(let script, _): script
+        default: nil
+        }
+    }
+
+    public var name: String {
         switch self {
         case .uppercase: "Uppercase"
         case .lowercase: "Lowercase"
         case .uppercaseAccents: "Uppercase Accents"
         case .lowercaseAccents: "Lowercase Accents"
         case .smallCaps: "Small Caps"
+        case .phoneticLetters: "Phonetic Letters"
         case .ligatures: "Ligatures"
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
@@ -31,6 +74,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .punctuationAndSymbols: "Punctuation and Symbols"
         case .currency: "Currency"
         case .mathematicalOperators: "Mathematical Operators"
+        case .letterlikeSymbols: "Letterlike Symbols"
         case .superscripts: "Superscript"
         case .subscripts: "Subscript"
         case .fractions: "Fractions"
@@ -40,6 +84,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .caseSensitiveForms: "Case-Sensitive Forms"
         case .arrows: "Arrows"
         case .script(let name): name
+        case .scriptPart(_, let part): part.title
         case .stylisticSet(_, let name): name
         case .localizedForms: "Localized Forms"
         case .initialForms: "Initial Forms"
@@ -59,9 +104,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     }
 
     public static func < (left: GlyphGroup, right: GlyphGroup) -> Bool {
-        if case .script(let a) = left, case .script(let b) = right {
-            return (UnicodeBlock.firstCodePoint(of: a), a) < (UnicodeBlock.firstCodePoint(of: b), b)
-        }
+        if let a = left.scriptKey, let b = right.scriptKey { return a < b }
         if case .stylisticSet(let a, _) = left, case .stylisticSet(let b, _) = right { return a < b }
         return left.rank < right.rank
     }
@@ -82,23 +125,25 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .punctuationAndSymbols: 11
         case .currency: 12
         case .mathematicalOperators: 13
-        case .superscripts: 14
-        case .subscripts: 15
-        case .fractions: 16
-        case .numerators: 17
-        case .denominators: 18
-        case .ordinals: 19
-        case .caseSensitiveForms: 20
-        case .arrows: 21
-        case .initialForms: 22
-        case .medialForms: 23
-        case .finalForms: 24
-        case .isolatedForms: 25
-        case .stylisticSet: 26
-        case .script: 27
-        case .graphical: 28
-        case .diacriticalMarks: 29
-        case .combiningMarks: 30
+        case .phoneticLetters: 14
+        case .letterlikeSymbols: 15
+        case .superscripts: 16
+        case .subscripts: 17
+        case .fractions: 18
+        case .numerators: 19
+        case .denominators: 20
+        case .ordinals: 21
+        case .caseSensitiveForms: 22
+        case .arrows: 23
+        case .initialForms: 24
+        case .medialForms: 25
+        case .finalForms: 26
+        case .isolatedForms: 27
+        case .stylisticSet: 28
+        case .script, .scriptPart: 29
+        case .graphical: 30
+        case .diacriticalMarks: 31
+        case .combiningMarks: 32
         }
     }
 
@@ -119,9 +164,9 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if category == .currencySymbol || value == 0x192 { return .currency }
         // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ and the micro sign µ.
         if block == "Letterlike Symbols" && properties.isAlphabetic || value == 0xB5 {
-            return properties.isMath && GlyphSection.isListedSign(value) == false ? .mathematicalOperators : .punctuationAndSymbols
+            return properties.isMath && GlyphSection.isListedSign(value) == false ? .letterlikeSymbols : .punctuationAndSymbols
         }
-        if block == "Mathematical Alphanumeric Symbols" { return .mathematicalOperators }
+        if block == "Mathematical Alphanumeric Symbols" { return .letterlikeSymbols }
         // Letters in circles, like Ⓐ, are named CIRCLED too, but have no numeric value.
         if properties.numericType != nil, Self.isEnclosedNumber(name) { return .circledFigures }
         let ownScript = UnicodeScripts.script(of: value)
@@ -171,9 +216,11 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .uppercaseLetter, .titlecaseLetter:
             return latin ? (0x41...0x5A ~= value ? .uppercase : .uppercaseAccents) : .graphical
         case .lowercaseLetter:
-            return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .graphical
+            guard latin else { return .graphical }
+            return 0x61...0x7A ~= value ? .lowercase : Self.isPhonetic(value, named: name, in: block) ? .phoneticLetters : .lowercaseAccents
         case .otherLetter:
-            return latin ? .lowercaseAccents : .punctuationAndSymbols
+            guard latin else { return .punctuationAndSymbols }
+            return Self.isPhonetic(value, named: name, in: block) ? .phoneticLetters : .lowercaseAccents
         case .decimalNumber:
             return .proportionalFigures
         case .mathSymbol:
@@ -193,6 +240,18 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
             return .punctuationAndSymbols
         }
     }
+
+    // Letters with a capital in Latin Extended-A or -B, like ɛ Ɛ, ə Ə and ɔ Ɔ, are written in African and Azerbaijani text, though Unicode keeps them with IPA.
+    static func isPhonetic(_ value: UInt32, named name: String, in block: String) -> Bool {
+        if name.contains("LETTER SMALL CAPITAL") { return true }
+        let upper = Unicode.Scalar(value).map { Array($0.properties.uppercaseMapping.unicodeScalars).map(\.value) } ?? []
+        if Self.phoneticBlocks.contains(block) { return upper.count != 1 || upper[0] == value || !(0x100...0x24F ~= upper[0]) }
+        return 0x180...0x24F ~= value && upper == [value] && value != 0x237
+    }
+
+    private static let phoneticBlocks: Set<String> = [
+        "IPA Extensions", "Phonetic Extensions", "Phonetic Extensions Supplement", "Latin Extended-E", "Latin Extended-F", "Latin Extended-G",
+    ]
 
     static func isEnclosedNumber(_ name: String) -> Bool {
         name.contains("CIRCLED") || name.hasPrefix("PARENTHESIZED") || name.hasSuffix(" FULL STOP") || name.hasSuffix(" COMMA")
@@ -274,6 +333,8 @@ public struct GlyphSection: Identifiable, Sendable {
     public let scalars: [UInt32]
     public let glyphs: [FeatureGlyph]
     public var title: String { group.title }
+    public var script: String? { group.script }
+    public var name: String { group.name }
     public var kind: String? { group.kind }
     public var id: GlyphGroup { group }
 
@@ -293,6 +354,18 @@ public struct GlyphSection: Identifiable, Sendable {
                 buckets[group, default: []].append(value)
             }
         }
+        for (group, values) in buckets {
+            let bases = values.map { privateUse.characters[$0] ?? $0 }
+            guard case .script(let script) = group, Self.hasBothCases(bases) else { continue }
+            buckets[group] = nil
+            for (value, base) in zip(values, bases) { buckets[.scriptPart(script, Self.part(of: base, in: script)), default: []].append(value) }
+        }
+        func smallCaps(of character: UInt32) -> GlyphGroup {
+            (GlyphGroup.of(character)?.scriptName).map { .scriptPart($0, .smallCaps) } ?? .smallCaps
+        }
+        if let values = buckets.removeValue(forKey: .smallCaps) {
+            for value in values { buckets[smallCaps(of: privateUse.characters[value] ?? value), default: []].append(value) }
+        }
         func ordered<Key>(_ values: [UInt32], by key: (UInt32) -> Key, _ precedes: (Key, Key) -> Bool) -> [UInt32] {
             values.map { value in
                 let base = privateUse.characters[value] ?? value
@@ -305,10 +378,12 @@ public struct GlyphSection: Identifiable, Sendable {
             switch group {
             case .superscripts, .subscripts, .numerators, .denominators, .fractions:
                 buckets[group] = ordered(values, by: { Self.valueOrder(of: $0, in: group) }, <)
-            case .uppercaseAccents, .lowercaseAccents, .smallCaps:
+            case .uppercaseAccents, .lowercaseAccents, .smallCaps, .phoneticLetters, .scriptPart:
                 buckets[group] = ordered(values, by: Self.letterOrder, <)
             case .punctuationAndSymbols, .mathematicalOperators:
                 buckets[group] = ordered(values, by: Self.signOrder, <)
+            case .letterlikeSymbols:
+                buckets[group] = ordered(values, by: Self.letterlikeOrder, <)
             case .greek, .script("Cyrillic"):
                 buckets[group] = ordered(values, by: { (Self.glyphsRanks[$0] ?? .max, $0) }, <)
             case .graphical:
@@ -317,19 +392,37 @@ public struct GlyphSection: Identifiable, Sendable {
                 if values.contains(where: { privateUse.characters[$0] != nil }) { buckets[group] = ordered(values, by: { $0 }, <) }
             }
         }
-        let glyphs = Dictionary(grouping: features, by: \.group)
+        let glyphs = Dictionary(grouping: features) { $0.group == .smallCaps ? smallCaps(of: $0.character) : $0.group }
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
         if !groups.contains(where: { $0 < .smallCaps }) {
-            let main = groups.filter(\.isScript).max { a, b in
-                let (x, y) = (buckets[a]?.count ?? 0, buckets[b]?.count ?? 0)
-                return x != y ? x < y : b < a
-            }
-            let leading = groups.filter(\.isScript).sorted { a, b in a != b && (a == main || b != main && a < b) }
-            groups = leading + groups.filter { !$0.isScript }
+            var sizes: [String: Int] = [:]
+            for group in groups { if let script = group.scriptName { sizes[script, default: 0] += buckets[group]?.count ?? 0 } }
+            let main = sizes.max { a, b in a.value != b.value ? a.value < b.value : GlyphGroup.script(b.key) < .script(a.key) }?.key
+            let scripts = groups.filter(\.isScript)
+            groups = scripts.filter { $0.scriptName == main } + scripts.filter { $0.scriptName != main } + groups.filter { !$0.isScript }
         }
         return groups.compactMap { group in
             let scalars = buckets[group] ?? [], featured = glyphs[group] ?? []
             return scalars.isEmpty && featured.isEmpty ? nil : GlyphSection(group: group, scalars: scalars, glyphs: featured)
+        }
+    }
+
+    private static func hasBothCases(_ values: [UInt32]) -> Bool {
+        let categories = Set(values).compactMap { Unicode.Scalar($0)?.properties.generalCategory }
+        return categories.count { $0 == .lowercaseLetter } >= 10 && categories.count { $0 == .uppercaseLetter || $0 == .titlecaseLetter } >= 10
+    }
+
+    private static func part(of value: UInt32, in script: String) -> GlyphGroup.ScriptPart {
+        guard let scalar = Unicode.Scalar(value) else { return .signs }
+        let basic: Bool = switch script {
+        case "Greek": (0x391...0x3A9 ~= value || 0x3B1...0x3C9 ~= value) && value != 0x3C2
+        case "Cyrillic": 0x410...0x44F ~= value
+        default: String(Character(scalar)).decomposedStringWithCanonicalMapping.unicodeScalars.count == 1
+        }
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .titlecaseLetter: return basic ? .uppercase : .uppercaseAccents
+        case .lowercaseLetter: return basic ? .lowercase : .lowercaseAccents
+        default: return .signs
         }
     }
 
@@ -360,7 +453,34 @@ public struct GlyphSection: Identifiable, Sendable {
         if let number = properties?.numericValue, properties?.numericType == .digit || properties?.numericType == .decimal {
             return (0, number, value)
         }
-        return (properties?.isAlphabetic == true ? 2 : 1, 0, value)
+        let base = Unicode.Scalar(value).flatMap { String(Character($0)).decomposedStringWithCompatibilityMapping.unicodeScalars.first?.value } ?? value
+        if properties?.isAlphabetic != true {
+            let (kind, index, _) = signOrder(of: base)
+            return (1, Double(kind) * 1e8 + (index == .max ? 1e7 + Double(base) : Double(index)), value)
+        }
+        let order = letterOrder(of: base)
+        let plain = 0x61...0x7A ~= (String(Character(Unicode.Scalar(base)!)).lowercased().unicodeScalars.first?.value ?? base)
+        return (plain ? 2 : 3, order.0 == 0 ? Double(order.1) : 1e7 + Double(order.0) * 4 + Double(min(order.1, 3)), value)
+    }
+
+    private static let letterStyles = [
+        "BOLD", "ITALIC", "BOLD ITALIC", "SCRIPT", "BOLD SCRIPT", "FRAKTUR", "DOUBLE-STRUCK", "BOLD FRAKTUR", "SANS-SERIF", "SANS-SERIF BOLD",
+        "SANS-SERIF ITALIC", "SANS-SERIF BOLD ITALIC", "MONOSPACE", "DOUBLE-STRUCK ITALIC",
+    ]
+
+    private static let letterStyleWords = Set(letterStyles.flatMap { $0.split(separator: " ") })
+
+    // Unicode names ℌ BLACK-LETTER CAPITAL H and 𝔄 MATHEMATICAL FRAKTUR CAPITAL A: one style, which Unicode splits between two blocks.
+    static func letterStyle(of value: UInt32) -> Int {
+        let name = (Self.name(of: value) ?? "").replacingOccurrences(of: "MATHEMATICAL ", with: "").replacingOccurrences(of: "BLACK-LETTER", with: "FRAKTUR")
+        let style = name.split(separator: " ").prefix { letterStyleWords.contains($0) }.joined(separator: " ")
+        return letterStyles.firstIndex(of: style) ?? letterStyles.count
+    }
+
+    static func letterlikeOrder(of value: UInt32) -> (Int, Int, Double) {
+        let category = Unicode.Scalar(value)?.properties.generalCategory
+        let kind = category == .uppercaseLetter ? 0 : category == .lowercaseLetter ? 1 : 2
+        return (letterStyle(of: value), kind, valueOrder(of: value, in: .superscripts).1)
     }
 
     static func signOrder(of value: UInt32) -> (Int, Int, UInt32) {
@@ -429,7 +549,7 @@ public struct GlyphSection: Identifiable, Sendable {
             if let featured = name.suffixes.lazy.compactMap({ Self.suffixGroups[$0.lowercased()] }).first,
                featured != .smallCaps || Self.isLetter(character) {
                 group = featured
-            } else if name.isLigature, let own, [.uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents].contains(own) {
+            } else if name.isLigature, let own, [.uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents, .phoneticLetters].contains(own) {
                 group = .ligatures
             } else {
                 group = own == .graphical ? nil : own
@@ -501,6 +621,15 @@ public struct GlyphSection: Identifiable, Sendable {
             let kinds = Dictionary(grouping: scalars, by: GlyphGroup.enclosureKind(of:)).sorted { rank($0.key) < rank($1.key) }
             return kinds.map { withAlternates($0.value.sorted { (value($0), $0) < (value($1), $1) }) }
                 + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
+        case .superscripts, .subscripts, .numerators, .denominators:
+            return [withAlternates(scalars), glyphs.map(GlyphCell.feature)].filter { !$0.isEmpty }
+        case .letterlikeSymbols:
+            var runs: [[GlyphCell]] = []
+            for (index, scalar) in scalars.enumerated() {
+                if index == 0 || Self.letterStyle(of: scalar) != Self.letterStyle(of: scalars[index - 1]) { runs.append([]) }
+                runs[runs.count - 1] += withAlternates([scalar])
+            }
+            return runs + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
         case .romanNumerals:
             let small = scalars.filter { Self.name(of: $0)?.hasPrefix("SMALL") == true }
             return [withAlternates(scalars.filter { !small.contains($0) }), withAlternates(small) + glyphs.map(GlyphCell.feature)]
