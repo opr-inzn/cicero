@@ -88,7 +88,6 @@ struct FontPage: View {
         .focusEffectDisabled()
         .defaultFocus($focused, true)
         .navigationTitle(family.name)
-        .modifier(ToolbarBackgroundHidden(isHidden: solidTop))
         .toolbar {
             ToolbarCapsule { InfoButton() }
             ToolbarGap()
@@ -715,20 +714,6 @@ private struct StyleRows: View {
             if showsWeight { weight().frame(width: 56, alignment: .leading) }
             axes().lineLimit(1)
             status().frame(width: statusWidth, alignment: .leading)
-        }
-    }
-}
-
-private struct ToolbarBackgroundHidden: ViewModifier {
-    let isHidden: Bool
-
-    func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content
-                .toolbarBackground(isHidden ? AnyShapeStyle(Color.canvas) : AnyShapeStyle(.bar), for: .windowToolbar)
-                .toolbarBackgroundVisibility(isHidden ? .visible : .automatic, for: .windowToolbar)
-        } else {
-            content
         }
     }
 }
