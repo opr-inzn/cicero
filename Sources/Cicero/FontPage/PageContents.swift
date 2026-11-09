@@ -106,15 +106,10 @@ final class PageContents {
         let font = FontLoader.shared.font(face, size: 12)
         let empty = EmptyGlyphs(font: font)
         let scalars = await coverage.coverage(computing: face).scalars
-        let featureGlyphs = await features.filter { !empty.contains($0.glyph) }
+        let (featureGlyphs, listed) = await FeatureAlternates.listed(features: features, alternates: alternates, leavingOut: empty.contains)
         // Small capitals an older font keeps in private use too are listed as small capitals, not again as characters.
         let smallCaps = GlyphSection.privateUse(in: font, coverage: scalars,
                                                 drawing: Set(featureGlyphs.filter { $0.group == .smallCaps }.map(\.glyph)))
-        let grouped = Set(featureGlyphs.map(\.glyph))
-        let listed = await alternates.compactMapValues { list in
-            let left = list.filter { !grouped.contains($0.glyph) && !empty.contains($0.glyph) }
-            return left.isEmpty ? nil : left
-        }
         let drawn = await ligatures.compactMap { group in
             let left = group.ligatures.filter { !empty.contains($0.glyph) }
             return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)

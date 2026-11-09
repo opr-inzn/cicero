@@ -5,6 +5,7 @@ import SwiftUI
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    @Environment(\.glyphsTitleMoved) private var titleMoved
     let family: Family
     let face: FontFace
     let columns: Int
@@ -32,13 +33,6 @@ struct GlyphsSection: View {
     static let labelGap: CGFloat = 4
     static let runGap = labelLine - spacing - 2
     static let glyphSize: CGFloat = 26
-    static let chevronRaise: CGFloat = {
-        let font = NSFont.preferredFont(forTextStyle: .headline) as CTFont
-        var character: UniChar = 0x203A, glyph: CGGlyph = 0
-        guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1) else { return 0 }
-        let bounds = CTFontGetBoundingRectsForGlyphs(font, .default, [glyph], nil, 1)
-        return ((CTFontGetCapHeight(font) - bounds.minY - bounds.maxY) / 2 * 2).rounded() / 2
-    }()
 
     nonisolated static func columns(fitting width: CGFloat) -> Int {
         max(1, Int((width - 2 * inset + spacing) / (cell + spacing)))
@@ -55,12 +49,12 @@ struct GlyphsSection: View {
             Text(count)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .monospacedDigit()
             Spacer()
             TextField("Filter", text: $query, prompt: Text("Character, name or U+ code"))
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 280)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(TopRowKeeper.space)).minY } action: { [titleMoved] in titleMoved($0) }
         .padding(.horizontal, Self.inset)
         .padding(.top, 56)
         .padding(.bottom, 4)
@@ -73,6 +67,7 @@ struct GlyphsSection: View {
             VStack(alignment: .leading, spacing: 0) {
                 groups(shown, shownLigatures, style: style)
             }
+            .environment(\.pinsHeadings, false)
         } else {
             groups(shown, shownLigatures, style: style)
         }
@@ -96,20 +91,30 @@ struct GlyphsSection: View {
     @ViewBuilder
     private func groups(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup], style: Style) -> some View {
         let lead = GlyphSection.beforeLigatures(shown, of: sections)
-        ForEach(shown.prefix(lead)) { section in
-            self.section(section, style: style)
+        let ligatureCategory = lead > 0 ? shown[lead - 1].category : "Latin"
+        let categories = shown.prefix(lead).map(\.category) + shownLigatures.map { _ in ligatureCategory } + shown.dropFirst(lead).map(\.category)
+        let indexed = Array(shown.enumerated())
+        ForEach(indexed.prefix(lead), id: \.element.id) { index, section in
+            self.section(section, style: style, index: index, after: index > 0 ? shown[index - 1].category : nil, categories: categories)
         }
         if !shownLigatures.isEmpty {
             LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
-                             columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation)
+                             columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation,
+                             firstIndex: lead, category: ligatureCategory, after: lead > 0 ? shown[lead - 1].category : nil,
+                             categories: categories)
         }
-        ForEach(shown.dropFirst(lead)) { section in
-            self.section(section, style: style)
+        ForEach(indexed.dropFirst(lead), id: \.element.id) { index, section in
+            let previous = index > lead ? shown[index - 1].category : shownLigatures.isEmpty ? (lead > 0 ? shown[lead - 1].category : nil) : ligatureCategory
+            self.section(section, style: style, index: index + shownLigatures.count, after: previous, categories: categories)
         }
         Color.clear.frame(height: 6)
     }
 
-    private func section(_ section: GlyphSection, style: Style) -> some View {
+    static func bottom(of index: Int, in categories: [String]) -> CGFloat {
+        index + 1 < categories.count && categories[index + 1] == categories[index] ? max(0, 22 - GlyphHeader.barHeight) : 18
+    }
+
+    private func section(_ section: GlyphSection, style: Style, index: Int, after previous: String?, categories: [String]) -> some View {
         let filter = Filter(query)
         let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
         let rows = runs.flatMap { run in
@@ -118,6 +123,8 @@ struct GlyphsSection: View {
             }
         }
         let total = runs.reduce(0) { $0 + $1.cells.count }
+        let heading = GlyphHeading(index: index, category: section.category, name: section.name,
+                                   detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous)
         return Section {
             // Rows of the page's lazy stack, all one height: it guesses unplaced rows' heights from placed ones, so a LazyVGrid per group re-laid it out at full CPU, and rows in stacks of their own drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in
@@ -137,19 +144,10 @@ struct GlyphsSection: View {
                     }
                 }
                 .padding(.horizontal, Self.inset)
-                .padding(.bottom, row == rows.count - 1 ? 18 : Self.spacing)
+                .padding(.bottom, row == rows.count - 1 ? Self.bottom(of: index, in: categories) : Self.spacing)
             }
         } header: {
-            HStack(spacing: 4) {
-                ((section.script.map { Text("\($0) ") + Text("›").baselineOffset(Self.chevronRaise) + Text(" ") }?.foregroundStyle(.secondary) ?? Text(""))
-                    + Text(section.name))
-                    .font(.headline)
-                Text((section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)").font(.callout).foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, Self.inset)
-            .padding(.top, 4)
-            .padding(.bottom, runs.first?.label == nil ? 4 : 0)
+            GlyphHeader(heading: heading)
         }
     }
 

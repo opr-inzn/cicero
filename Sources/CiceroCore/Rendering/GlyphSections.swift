@@ -49,13 +49,18 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         }
     }
 
-    public var title: String { script.map { "\($0) › \(name)" } ?? name }
+    public var title: String { category == name ? name : "\(category) › \(name)" }
 
-    public var script: String? {
+    public var category: String {
         switch self {
-        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents, .smallCaps: "Latin"
-        case .scriptPart(let script, _): script
-        default: nil
+        case .uppercase, .lowercase, .uppercaseAccents, .lowercaseAccents, .smallCaps, .phoneticLetters, .ligatures, .localizedForms: "Latin"
+        case .proportionalFigures, .tabularFigures, .fractions, .superscripts, .subscripts, .numerators, .denominators, .ordinals,
+             .circledFigures, .romanNumerals: "Figures"
+        case .punctuationAndSymbols, .currency, .mathematicalOperators, .letterlikeSymbols, .arrows, .caseSensitiveForms: "Symbols"
+        case .initialForms, .medialForms, .finalForms, .isolatedForms, .stylisticSet: "Forms"
+        case .script(let name), .scriptPart(let name, _): name
+        case .graphical: "Graphical"
+        case .diacriticalMarks, .combiningMarks: "Marks"
         }
     }
 
@@ -117,25 +122,25 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .uppercaseAccents: 2
         case .lowercaseAccents: 3
         case .smallCaps: 4
-        case .ligatures: 5
-        case .localizedForms: 6
-        case .proportionalFigures: 7
-        case .tabularFigures: 8
-        case .circledFigures: 9
-        case .romanNumerals: 10
-        case .punctuationAndSymbols: 11
-        case .currency: 12
-        case .mathematicalOperators: 13
-        case .phoneticLetters: 14
-        case .letterlikeSymbols: 15
-        case .superscripts: 16
-        case .subscripts: 17
-        case .fractions: 18
-        case .numerators: 19
-        case .denominators: 20
-        case .ordinals: 21
-        case .caseSensitiveForms: 22
-        case .arrows: 23
+        case .phoneticLetters: 5
+        case .ligatures: 6
+        case .localizedForms: 7
+        case .proportionalFigures: 8
+        case .tabularFigures: 9
+        case .fractions: 10
+        case .superscripts: 11
+        case .subscripts: 12
+        case .numerators: 13
+        case .denominators: 14
+        case .ordinals: 15
+        case .circledFigures: 16
+        case .romanNumerals: 17
+        case .punctuationAndSymbols: 18
+        case .currency: 19
+        case .mathematicalOperators: 20
+        case .letterlikeSymbols: 21
+        case .arrows: 22
+        case .caseSensitiveForms: 23
         case .initialForms: 24
         case .medialForms: 25
         case .finalForms: 26
@@ -339,7 +344,7 @@ public struct GlyphSection: Identifiable, Sendable {
     public let scalars: [UInt32]
     public let glyphs: [FeatureGlyph]
     public var title: String { group.title }
-    public var script: String? { group.script }
+    public var category: String { group.category }
     public var name: String { group.name }
     public var kind: String? { group.kind }
     public var id: GlyphGroup { group }
@@ -670,17 +675,17 @@ public struct GlyphSection: Identifiable, Sendable {
         default:
             break
         }
-        guard group == .proportionalFigures || group == .tabularFigures else {
+        guard group == .proportionalFigures || group == .tabularFigures || group == .currency else {
             return [withAlternates(scalars) + glyphs.map(GlyphCell.feature)]
         }
         let found = scalars.map { ($0, alternates($0)) }
         let tags = found.flatMap { $0.1.flatMap(\.allFeatures) } + glyphs.flatMap(\.alongWith)
         let ownAreOldStyle = tags.contains("lnum") && !tags.contains("onum")
-        enum Run: Int, CaseIterable { case lining, oldStyle, signs }
-        func run(of features: [String]) -> Run {
-            if features.contains("onum") { return .oldStyle }
-            if features.contains("lnum") { return .lining }
-            return ownAreOldStyle ? .oldStyle : .lining
+        enum Run: Hashable { case style([String]), signs }
+        func run(of features: [String]) -> Run { .style(["lnum", "onum", "pnum"].filter(features.contains)) }
+        func rank(_ run: Run) -> (Int, Int, String) {
+            guard case .style(let tags) = run else { return (2, 0, "") }
+            return (tags.contains("onum") || !tags.contains("lnum") && ownAreOldStyle ? 1 : 0, tags.count, tags.joined(separator: " "))
         }
         var order: [Run: [UInt32]] = [:]
         var cells: [Run: [UInt32: [GlyphCell]]] = [:]
@@ -715,7 +720,7 @@ public struct GlyphSection: Identifiable, Sendable {
             guard GlyphGroup.of(b) != nil else { return true }
             return Self.signPrecedes(a, b)
         }
-        return Run.allCases.compactMap { kind in
+        return Set(order.keys).union(strays.keys).sorted { rank($0) < rank($1) }.compactMap { kind in
             let list = (order[kind] ?? []).flatMap { cells[kind]![$0]! } + (strays[kind] ?? [])
             return list.isEmpty ? nil : list
         }

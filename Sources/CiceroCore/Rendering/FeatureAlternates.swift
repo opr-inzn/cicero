@@ -17,7 +17,7 @@ public struct FeatureAlternate: Hashable, Sendable {
         self.featureNames = featureNames
         self.alongWith = alongWith
         self.alongWithNames = alongWithNames
-        isFigureStyle = GlyphGroup.of(character) == .proportionalFigures && features.contains(where: FeatureAlternates.figureStyles.contains)
+        isFigureStyle = [.proportionalFigures, .currency].contains(GlyphGroup.of(character)) && features.contains(where: FeatureAlternates.figureStyles.contains)
             && alongWith.allSatisfy(FeatureAlternates.figureStyles.contains)
     }
 
@@ -57,6 +57,19 @@ public enum FeatureAlternates {
     }
 
     public static let figureStyles: Set<String> = ["onum", "lnum", "pnum"]
+
+    public static func listed(features: [FeatureGlyph], alternates: [UInt32: [FeatureAlternate]], leavingOut isEmpty: (CGGlyph) -> Bool)
+        -> (features: [FeatureGlyph], alternates: [UInt32: [FeatureAlternate]]) {
+        let styles = Set(alternates.values.joined().filter(\.isFigureStyle).map(\.glyph))
+        // STIX Two Text's case draws the lining proportional figures its pnum draws: they're a style of its figures.
+        let features = features.filter { !isEmpty($0.glyph) && !($0.group == .caseSensitiveForms && styles.contains($0.glyph)) }
+        let grouped = Set(features.map(\.glyph))
+        let alternates = alternates.compactMapValues { list in
+            let left = list.filter { !grouped.contains($0.glyph) && !isEmpty($0.glyph) }
+            return left.isEmpty ? nil : left
+        }
+        return (features, alternates)
+    }
 
     static let chainLength = 3
 

@@ -12,28 +12,28 @@ struct LigaturesSection: View {
     let groups: [LigatureGroup]
     let characters: [CGGlyph: UInt32]
     let generation: Int
+    let firstIndex: Int
+    let category: String
+    let after: String?
+    let categories: [String]
     @State private var popover: (tag: String, characters: [UInt32])?
 
     private static var spacing: CGFloat { GlyphsSection.spacing }
     private static var inset: CGFloat { GlyphsSection.inset }
 
     var body: some View {
-        ForEach(groups) { group in
+        ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+            let heading = GlyphHeading(index: firstIndex + index, category: category, name: group.name,
+                                       detail: "– \(group.ligatures.count.plain)", after: index == 0 ? after : category)
             Section {
                 let rows = (group.ligatures.count + columns - 1) / columns
                 ForEach(0..<rows, id: \.self) { row in
                     ligatureRow(group.ligatures[row * columns ..< min((row + 1) * columns, group.ligatures.count)], in: group)
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, row == rows - 1 ? 18 : Self.spacing)
+                        .padding(.bottom, row == rows - 1 ? GlyphsSection.bottom(of: firstIndex + index, in: categories) : Self.spacing)
                 }
             } header: {
-                HStack(spacing: 4) {
-                    Text(group.name).font(.headline)
-                    Text("– \(group.ligatures.count.plain)").font(.callout).foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, Self.inset)
-                .padding(.vertical, 4)
+                GlyphHeader(heading: heading)
             }
         }
     }

@@ -16,6 +16,8 @@ struct FontPage: View {
     @FocusState private var focused: Bool
     @State private var position = ScrollPosition()
     @State private var keeper = TopRowKeeper()
+    @State private var titleY: CGFloat?
+    @State private var solidTop = false
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -42,7 +44,7 @@ struct FontPage: View {
                     StyleRows(family: family)
                 }
                 // Only rows of about one height go in this lazy stack: it guesses the height of rows it hasn't placed from those it has, and with the styles in it too the guesses swung so far that the page laid itself out again and again at full CPU.
-                LazyVStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
                     if let shown {
                         if let glyphColumns {
                             let content = shown.content
@@ -58,10 +60,17 @@ struct FontPage: View {
             }
             .modifier(GlyphColumnsReader(columns: $glyphColumns))
             .environment(\.topRowKeeper, keeper)
+            .environment(\.glyphsTitleMoved, { y in if titleY != y { titleY = y } })
             .coordinateSpace(.named(TopRowKeeper.space))
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
+        .onScrollGeometryChange(for: Bool.self) { [titleY] geometry in titleY.map { geometry.contentOffset.y + geometry.contentInsets.top >= $0 - 24 } ?? false } action: { solidTop = $1 }
+        .overlay(alignment: .top) {
+            if solidTop {
+                Color.canvas.frame(height: 2).background(Color.canvas.ignoresSafeArea(edges: .top))
+            }
+        }
         .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
         .task(id: FileFace(family.face(nearestWeight: preview.weight).face)) {
             model.pageFeatures.prepare(family.face(nearestWeight: preview.weight).face)
@@ -73,11 +82,13 @@ struct FontPage: View {
             loaded = (face.id, content)
         }
         .background(Color.canvas)
+        .contextMenu { FamilyMenu(families: [family], model: model) }
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
         .defaultFocus($focused, true)
         .navigationTitle(family.name)
+        .modifier(ToolbarBackgroundHidden(isHidden: solidTop))
         .toolbar {
             ToolbarCapsule { InfoButton() }
             ToolbarGap()
@@ -704,6 +715,20 @@ private struct StyleRows: View {
             if showsWeight { weight().frame(width: 56, alignment: .leading) }
             axes().lineLimit(1)
             status().frame(width: statusWidth, alignment: .leading)
+        }
+    }
+}
+
+private struct ToolbarBackgroundHidden: ViewModifier {
+    let isHidden: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .toolbarBackground(isHidden ? AnyShapeStyle(Color.canvas) : AnyShapeStyle(.bar), for: .windowToolbar)
+                .toolbarBackgroundVisibility(isHidden ? .visible : .automatic, for: .windowToolbar)
+        } else {
+            content
         }
     }
 }

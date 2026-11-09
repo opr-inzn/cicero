@@ -249,8 +249,8 @@ struct Tag: View {
         }
         .font(Self.font)
         .padding(.horizontal, 5)
-        .padding(.top, 1.6)
-        .padding(.bottom, 1.9)
+        // A whole number of points tall: centred in a row, a fractional height drew the capsule half a pixel off its text, which snaps to pixels.
+        .frame(height: 14)
         .background(tint.opacity(0.14), in: .capsule)
         .foregroundStyle(tint.opacity(0.9))
         .fixedSize()
