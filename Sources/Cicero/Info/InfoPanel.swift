@@ -158,7 +158,7 @@ private struct FamilyInfo: View {
     private var tabs: [InfoTab] { family.isVariable ? InfoTab.allCases : InfoTab.allCases.filter { $0 != .axes } }
 
     private var tab: Binding<InfoTab> {
-        Binding { model.infoTab == .axes && !family.isVariable ? .info : model.infoTab } set: { model.infoTab = $0 }
+        Binding { model.shownInfoTab } set: { model.infoTab = $0 }
     }
 }
 

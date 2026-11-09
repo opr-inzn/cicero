@@ -470,6 +470,7 @@ private struct HeaderCell: View {
     let sort: () -> Void
     let resize: (CGFloat) -> Void
     let endResize: () -> Void
+    @GestureState private var isResizing = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -495,8 +496,11 @@ private struct HeaderCell: View {
                     .offset(x: resizeEdge == .leading ? -gap : gap)
                     .pointerStyle(.columnResize)
                     .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .updating($isResizing) { _, state, _ in state = true }
                         .onChanged { drag in resize(resizeEdge == .leading ? -drag.translation.width : drag.translation.width) }
                         .onEnded { _ in endResize() })
+                    // A cancelled drag never ends, and the next one on this column would start from where it stopped.
+                    .onChange(of: isResizing) { _, now in if !now { endResize() } }
                     .accessibilityHidden(true)
             }
         }

@@ -11,6 +11,7 @@ struct ImportSheet: View {
     @State private var summary: ImportSummary?
     @State private var appIsOpen = false
     @State private var isRereading = false
+    @State private var rereading: Task<Void, Never>?
     @State private var copies: Copies?
     @State private var isLooking = true
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
@@ -50,10 +51,10 @@ struct ImportSheet: View {
         .onAppear { appIsOpen = isAppRunning }
         .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
-            if isOtherApp(note) { appIsOpen = isAppRunning }
+            if isOtherApp(note), stage == nil, summary == nil { appIsOpen = isAppRunning }
         }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { note in
-            guard isOtherApp(note) else { return }
+            guard isOtherApp(note), stage == nil, summary == nil else { return }
             appIsOpen = isAppRunning
             if !appIsOpen { reread() }
         }
@@ -79,9 +80,12 @@ struct ImportSheet: View {
 
     private func reread() {
         isRereading = true
-        Task {
-            defer { isRereading = false }
-            guard let fresh = await model.reread(prompt) else { return }
+        rereading?.cancel()
+        rereading = Task {
+            let fresh = await model.reread(prompt)
+            guard !Task.isCancelled else { return }
+            isRereading = false
+            guard let fresh else { return }
             let before = prompt.library
             let defaults = ImportChoices(for: fresh.library)
             let oldSets = Set(before.sets.map(\.id))

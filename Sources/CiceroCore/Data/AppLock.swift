@@ -59,12 +59,12 @@ public final class AppLock: @unchecked Sendable {
         Holder(text: (try? String(contentsOf: url(support: support), encoding: .utf8)) ?? "")
     }
 
-    public static func wait(support: URL, timeout: Duration) -> AppLock? {
+    public static func wait(support: URL, timeout: Duration) async -> AppLock? {
         let deadline = ContinuousClock.now + timeout
         while true {
             if let lock = take(support: support) { return lock }
-            if ContinuousClock.now >= deadline { return nil }
-            Thread.sleep(forTimeInterval: 0.05)
+            if ContinuousClock.now >= deadline || Task.isCancelled { return nil }
+            try? await Task.sleep(for: .milliseconds(50))
         }
     }
 

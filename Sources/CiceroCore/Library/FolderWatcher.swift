@@ -52,7 +52,7 @@ public final class FolderWatcher: @unchecked Sendable {
         )
         guard let stream = FSEventStreamCreate(
             nil, callback, &context, watched as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5, flags
-        ) else { return }
+        ) else { return self.watched = [] }
         self.stream = stream
         FSEventStreamSetDispatchQueue(stream, .main)
         FSEventStreamStart(stream)

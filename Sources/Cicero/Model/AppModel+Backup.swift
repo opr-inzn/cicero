@@ -93,6 +93,10 @@ extension AppModel {
     // MARK: Restore
 
     func chooseBackupToRestore() async -> BackupContents? {
+        guard !isRestoringBackup else {
+            showToast("Wait for the restore to finish first")
+            return nil
+        }
         let panel = NSOpenPanel()
         // By the declared type, and by extension in case the type isn't registered with macOS yet.
         panel.allowedContentTypes = [.ciceroBackup] + [UTType(filenameExtension: LibraryBackup.fileExtension)].compactMap { $0 }
@@ -111,6 +115,9 @@ extension AppModel {
     }
 
     func restore(_ contents: BackupContents, settings: Bool, fonts: Bool, progress: @escaping @Sendable (Int, Int) -> Void) async {
+        guard !isRestoringBackup else { return showToast("Wait for the restore to finish first") }
+        isRestoringBackup = true
+        defer { isRestoringBackup = false }
         let backup = backup
         let current = data
         guard await saveSetupSnapshot(named: "Before Restore", nothingWas: "restored") else { return }

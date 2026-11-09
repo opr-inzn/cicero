@@ -367,6 +367,7 @@ private struct Reorderable<Item: View, Lifted: View>: View {
     @ViewBuilder let lifted: (CompareSample) -> Lifted
     private static var space: String { "compare.reorderable" }
     @State private var drag: SampleDrag?
+    @GestureState private var isDragging = false
     @State private var frames: [UUID: CGRect] = [:]
 
     var body: some View {
@@ -381,6 +382,10 @@ private struct Reorderable<Item: View, Lifted: View>: View {
             }
         }
         .coordinateSpace(.named(Self.space))
+        // A cancelled drag never ends: without this, its sample stays hidden and its lifted copy stays up.
+        .onChange(of: isDragging) { _, now in
+            if !now { DispatchQueue.main.async { if drag?.isSettling == false { drag = nil } } }
+        }
         .overlay(alignment: .topLeading) {
             if let drag, let sample = samples.first(where: { $0.id == drag.id }) {
                 lifted(sample)
@@ -392,6 +397,7 @@ private struct Reorderable<Item: View, Lifted: View>: View {
 
     private func reorder(_ id: UUID) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.space))
+            .updating($isDragging) { _, state, _ in state = true }
             .onChanged { value in
                 if drag?.id != id || drag?.isSettling == true, let frame = frames[id] {
                     drag = SampleDrag(id: id, grab: CGSize(width: value.startLocation.x - frame.minX, height: value.startLocation.y - frame.minY),

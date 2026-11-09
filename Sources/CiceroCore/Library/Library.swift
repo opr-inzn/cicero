@@ -814,7 +814,7 @@ public final class LibraryScanner: Sendable {
         #endif
         let fm = FileManager.default
         try? fm.createDirectory(at: locations.caches, withIntermediateDirectories: true)
-        try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)
+        if (try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)) == nil { state.withLock { $0.dirty = true } }
     }
 
     private func saveLibraryIfNeeded(_ library: Library) {
@@ -827,7 +827,7 @@ public final class LibraryScanner: Sendable {
         }
         guard changed else { return }
         try? FileManager.default.createDirectory(at: locations.caches, withIntermediateDirectories: true)
-        try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)
+        if (try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)) == nil { state.withLock { $0.savedFingerprint = nil } }
     }
 
     private static func savesAlike(_ a: Library, _ b: Library) -> Bool {

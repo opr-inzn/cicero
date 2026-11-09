@@ -54,8 +54,16 @@ public enum AppLocation {
     ) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if fm.fileExists(atPath: destination.path) { try trash(destination) }
-        try fm.copyItem(at: bundle, to: destination)
+        // Copied beside it first: the Cicero there goes to the Trash only once there's a whole one to take its place.
+        let copy = destination.deletingLastPathComponent().appendingPathComponent(".\(destination.lastPathComponent).\(UUID().uuidString)", isDirectory: true)
+        do {
+            try fm.copyItem(at: bundle, to: copy)
+            if fm.fileExists(atPath: destination.path) { try trash(destination) }
+            try fm.moveItem(at: copy, to: destination)
+        } catch {
+            try? fm.removeItem(at: copy)
+            throw error
+        }
         // Without the quarantine attribute, or Gatekeeper translocates the copy again.
         removeQuarantine(destination)
     }

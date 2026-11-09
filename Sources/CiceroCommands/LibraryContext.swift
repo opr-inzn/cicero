@@ -115,7 +115,9 @@ public final class LibraryContext: @unchecked Sendable {
     }
 
     public static func isAppOpen(_ environment: ToolEnvironment) -> Bool {
-        !NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).isEmpty
+        NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).contains {
+            !$0.isTerminated && kill($0.processIdentifier, 0) == 0
+        }
     }
 
     // MARK: What the app shows

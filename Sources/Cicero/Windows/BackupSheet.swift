@@ -80,7 +80,7 @@ struct BackupSheet: View {
                 try await model.backUp(to: destination, fonts: fonts, includeFonts: include) { step in
                     Task { @MainActor in progress = step }
                 }
-                NSWorkspace.shared.activateFileViewerSelecting([destination])
+                if !Task.isCancelled { NSWorkspace.shared.activateFileViewerSelecting([destination]) }
                 model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.plain) font files")" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {

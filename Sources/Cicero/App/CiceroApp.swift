@@ -180,7 +180,7 @@ struct CiceroCommands: Commands {
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
                 .keyboardShortcut(opensSelection ? KeyboardShortcut("o") : KeyboardShortcut(.downArrow))
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
-            let hidesInfo = model.isInfoPresented && model.infoTab == .info
+            let hidesInfo = model.isInfoPresented && model.shownInfoTab == .info
             Button(hidesInfo ? "Hide Info" : "Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
             Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look", systemImage: "eye") { model.quickLook.toggle() }

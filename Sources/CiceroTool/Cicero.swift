@@ -139,7 +139,9 @@ func load(_ common: CommonOptions, _ shown: ShownOptions, rescan: Bool = false) 
     if rescan {
         do {
             _ = try await WriteDispatcher.perform(WriteRequest(.rescan), environment: environment)
-        } catch let error as CommandError where error.code != .unreadableUserData {
+        } catch let error as CommandError where error.code == .unreadableUserData {
+            throw error
+        } catch {
             scansHere = true
         }
     }

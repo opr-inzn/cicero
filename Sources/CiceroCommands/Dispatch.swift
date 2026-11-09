@@ -31,7 +31,7 @@ public enum WriteDispatcher {
                 if let error = CommandError(answer: answer) { throw error }
                 return answer
             }
-            guard let lock = AppLock.wait(support: support, timeout: otherCommand) else {
+            guard let lock = await AppLock.wait(support: support, timeout: otherCommand) else {
                 throw CommandError(.busy, "The Cicero CLI is making another change. Nothing changed. Try again in a moment.")
             }
             lock.release()

@@ -158,6 +158,7 @@ final class AppModel {
     var isEditingSidebar = false
     var isInfoPresented = false
     var infoTab: InfoTab = .info
+    var shownInfoTab: InfoTab { infoTab == .axes && inspectedFamily?.isVariable != true ? .info : infoTab }
     var familyFeatures: [String: [FeatureSetting]] = [:]
     var familyAxes: [String: AdjustedAxes] = [:]
 
@@ -186,6 +187,7 @@ final class AppModel {
         }
     }
     var isImporting = false
+    @ObservationIgnored var isRestoringBackup = false
     var earlierImportPrompt: EarlierImportPrompt? {
         didSet { showHeldToast() }
     }
@@ -212,6 +214,8 @@ final class AppModel {
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var coverageTask: Task<Void, Never>?
     @ObservationIgnored private var measurementTask: Task<Void, Never>?
+    @ObservationIgnored private var coverageRun = 0
+    @ObservationIgnored private var measurementRun = 0
     @ObservationIgnored private var problemsTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -579,6 +583,7 @@ final class AppModel {
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
+        if let similar = similarFamilyID, new.family(similar) == nil { endSimilar() }
         FontLoader.shared.invalidate(paths: new.changedPaths)
         pageContents.forget(paths: new.changedPaths)
         FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
@@ -598,11 +603,16 @@ final class AppModel {
     private func updateCoverage() {
         coverageTask?.cancel()
         measurementTask?.cancel()
+        measurementRun &+= 1
+        measurementProgress = nil
+        coverageRun &+= 1
+        let run = coverageRun
         let families = library.families
         let coverage = coverage
         let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
             guard let self else { return }
             Task { @MainActor in
+                guard self.coverageRun == run else { return }
                 self.coverageProgress = CoverageProgress(done: done, total: total)
                 if done == total || done % 200 == 0 { self.coverageRevision &+= 1 }
             }
@@ -622,11 +632,14 @@ final class AppModel {
 
     private func updateMeasurements() {
         measurementTask?.cancel()
+        measurementRun &+= 1
+        let run = measurementRun
         let families = library.families
         let measurements = measurements
         let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
             guard let self else { return }
             Task { @MainActor in
+                guard self.measurementRun == run else { return }
                 self.measurementProgress = CoverageProgress(done: done, total: total)
                 if done == total || done % 200 == 0 {
                     self.measurementRevision &+= 1

@@ -49,7 +49,9 @@ struct LigaturesSection: View {
         return GlyphGridRow(cells: shown.map { GridCell(content: .glyph($0.glyph), label: "Ligature of \($0.text)") }, columns: columns,
                             face: face, generation: generation, weight: weight, variations: variations, padding: 2, selected: column,
                             actions: actions)
-        .cellPopover(column: column, columns: columns, cell: popoverCell, close: { popover = nil }) {
+        .cellPopover(column: column, columns: columns, cell: popoverCell, close: {
+            if let shown = popover, shown.tag == group.tag, ligatures.contains(where: { $0.characters == shown.characters }) { popover = nil }
+        }) {
             if let column {
                 details(ligatures[ligatures.startIndex + column], in: group)
             }

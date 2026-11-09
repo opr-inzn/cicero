@@ -62,7 +62,8 @@ struct RestoreSheet: View {
         }
         .padding(20)
         .frame(width: 520)
-        .onDisappear { contents.discard() }
+        .interactiveDismissDisabled(isRestoring)
+        .onDisappear { if !isRestoring { contents.discard() } }
     }
 
     private var settingsDetail: String {
@@ -89,6 +90,7 @@ struct RestoreSheet: View {
             await model.restore(contents, settings: settings, fonts: includeFonts) { done, total in
                 Task { @MainActor in progress = (done, total) }
             }
+            contents.discard()
             dismiss()
         }
     }

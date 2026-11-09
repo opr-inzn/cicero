@@ -22,7 +22,9 @@ private struct FontCacheSheetModifier: ViewModifier {
                 clearedSystemCaches = false
                 isOfferingRestart = true
             } content: {
-                FontCacheSheet { clearedSystemCaches = $0 }
+                FontCacheSheet { cleared in
+                    if isPresented { clearedSystemCaches = cleared } else if cleared { isOfferingRestart = true }
+                }
             }
             .alert("Font Caches Cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
