@@ -2,7 +2,8 @@ import CiceroCore
 
 extension AppModel {
     func newTag(for families: [Family] = []) {
-        newTagRequest = NewTagRequest(families: families, color: TagColor.next(after: data.tagColors.values))
+        let request = NewTagRequest(families: families, color: TagColor.next(after: data.tagColors.values))
+        ask { $0.newTagRequest = request }
     }
 
     func addTag(named name: String, color: TagColor?, to families: [Family] = []) {

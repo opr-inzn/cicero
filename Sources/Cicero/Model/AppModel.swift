@@ -872,6 +872,22 @@ final class AppModel {
         refreshGroups()
     }
 
+    func ask(overActivationSheets: Bool = false, _ show: @escaping (AppModel) -> Void) {
+        guard isAsking(overActivationSheets: overActivationSheets) else { return show(self) }
+        Task {
+            while isAsking(overActivationSheets: overActivationSheets) { try? await Task.sleep(for: .milliseconds(200)) }
+            show(self)
+        }
+    }
+
+    private func isAsking(overActivationSheets: Bool) -> Bool {
+        let hosts = overActivationSheets ? false : installPrompt != nil || documentFonts != nil
+        return hosts || manyActivationPrompt != nil || movingOutPrompt != nil || copySwitchPrompt != nil || duplicatePrompt != nil
+            || replacePrompt != nil || openAppsReplacePrompt != nil || trashPlan != nil || textPrompt != nil || newTagRequest != nil
+            || editingSmartSet != nil || editingAppsForSet != nil || editingCharacterSet != nil || !deletingCharacterSets.isEmpty
+            || isClearingCaches || importing != nil || earlierImportPrompt != nil || showsGuessingQuestion
+    }
+
     func answerGuessing(_ guesses: Bool) {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Self.asksAboutGuessingKey)

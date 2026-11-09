@@ -219,7 +219,7 @@ private struct SidebarContent: View {
             Menu {
                 // The symbols the sidebar has for each kind.
                 Button("New Folder", systemImage: "folder") { model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0) } }
-                Button("New Smart Folder", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
+                Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
                 Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
             } label: {
                 Image(systemName: "plus")
@@ -233,7 +233,7 @@ private struct SidebarContent: View {
         case .tags:
             plus("New tag") { model.newTag() }
         case .characterSets:
-            plus("New coverage set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
+            plus("New coverage set") { model.ask { $0.editingCharacterSet = CustomCharacterSet(name: "", characters: "") } }
         case .classifications:
             plus("New classification") { model.newClassification() }
         case .foundries:
@@ -335,11 +335,11 @@ private struct SidebarRowMenu: View {
             let ids = Set(rows.compactMap { if case .characterSet(let id) = $0.item { id } else { nil } })
             let custom = model.data.customCharacterSets.filter { ids.contains($0.setID) }
             if rows.count == 1, let set = custom.first {
-                Button("Edit Coverage Set", systemImage: "pencil") { model.editingCharacterSet = set }
+                Button("Edit Coverage Set", systemImage: "pencil") { model.ask { $0.editingCharacterSet = set } }
             }
             if !custom.isEmpty {
                 Button(custom.count == 1 ? "Delete Coverage Set" : "Delete Coverage Sets", systemImage: "trash") {
-                    model.deletingCharacterSets = custom
+                    model.ask { $0.deletingCharacterSets = custom }
                 }
             }
         default:
@@ -427,9 +427,9 @@ private struct SidebarRowMenu: View {
         if rows.count == 1 {
             if let id = sets.first, let set = model.data.sets.first(where: { $0.id == id }) {
                 Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
-                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.editingAppsForSet = id }
+                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.ask { $0.editingAppsForSet = id } }
             } else if let id = smartSets.first, let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.editingSmartSet = smartSet }
+                Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.ask { $0.editingSmartSet = smartSet } }
             }
         }
         Button("Delete \(kinds)", systemImage: "trash") {
@@ -525,7 +525,7 @@ private struct OrganizeRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button { model.showsGuessingQuestion = true } label: {
+        Button { model.ask { $0.showsGuessingQuestion = true } } label: {
             Label { Text("Organize").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
                 // Not sparkles, which are Ornamental's: a letter under a magnifying glass, as Cicero looks at the letters.
                 Image(systemName: "character.magnify").foregroundStyle(Color.solar)

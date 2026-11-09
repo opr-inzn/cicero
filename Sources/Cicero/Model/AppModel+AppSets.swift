@@ -11,7 +11,7 @@ extension AppModel {
             self.data.sets.append(set)
             self.data.sidebar.hidden.remove(SidebarSection.sets.key)
             self.selection = .set(set.id)
-            self.editingAppsForSet = set.id
+            self.ask { $0.editingAppsForSet = set.id }
         }
     }
 

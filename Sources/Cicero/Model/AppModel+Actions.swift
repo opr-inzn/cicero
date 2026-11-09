@@ -12,7 +12,7 @@ extension AppModel {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
-            return manyActivationPrompt = prompt
+            return ask(overActivationSheets: true) { $0.manyActivationPrompt = prompt }
         }
         performActivation(targets)
     }
@@ -35,7 +35,7 @@ extension AppModel {
         let targets = faces.filter(\.canActivateTemporarily)
         guard !targets.isEmpty else { return showToast("Already on") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: "", temporarily: true) {
-            return manyActivationPrompt = prompt
+            return ask(overActivationSheets: true) { $0.manyActivationPrompt = prompt }
         }
         let operation = expect(targets, at: .on)
         enqueue { model in
@@ -66,7 +66,7 @@ extension AppModel {
             return showToast(faces.contains { $0.state.isActive } ? "These fonts are managed by macOS or another app" : "Nothing to deactivate")
         }
         if !confirmed, let prompt = movingOutPrompt(for: targets) {
-            return movingOutPrompt = prompt
+            return ask(overActivationSheets: true) { $0.movingOutPrompt = prompt }
         }
         performDeactivation(targets)
     }
@@ -167,7 +167,7 @@ extension AppModel {
         if plan.alsoTurnsOff.isEmpty {
             confirmCopySwitch(request)
         } else {
-            copySwitchPrompt = request
+            ask { $0.copySwitchPrompt = request }
         }
     }
 
@@ -282,7 +282,7 @@ extension AppModel {
         guard let plan = engine.trashPlan(for: faces, removing: families, in: library, title: title) else {
             return showToast("Fonts that come with macOS or an app can’t be moved to the Trash")
         }
-        trashPlan = plan
+        ask { $0.trashPlan = plan }
     }
 
     func moveToTrash(_ plan: TrashPlan) {
@@ -982,7 +982,7 @@ extension AppModel {
     // MARK: Prompts
 
     func prompt(_ title: String, text: String = "", confirm: String, action: @escaping (String) -> Void) {
-        textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, action: action)
+        ask { $0.textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, action: action) }
     }
 
     // MARK: Compare
@@ -1099,7 +1099,7 @@ extension AppModel {
             if !faces.isEmpty { deactivate(faces) }
         case .trash(let paths):
             guard let plan = engine.spareCopiesTrashPlan(paths, families: Set([family].compactMap(\.self)), in: library) else { return }
-            trashPlan = plan
+            ask { $0.trashPlan = plan }
         case .forgetInPlace(let path):
             enqueue { model in
                 model.data.records = await model.engine.forgetInPlace([path], records: model.data.records)
@@ -1152,7 +1152,7 @@ extension AppModel {
         let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
         plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count) Extra Copies"
-        trashPlan = plan
+        ask { [plan] in $0.trashPlan = plan }
     }
 }
 

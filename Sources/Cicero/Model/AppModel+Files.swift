@@ -143,23 +143,13 @@ extension AppModel {
             let handling = data.duplicateHandling
             let chosen = duplicates.map { $0.choice(for: handling) }
             guard !chosen.contains(nil) else {
-                return whenNotAsking { $0.duplicatePrompt = prompt }
+                return ask { $0.duplicatePrompt = prompt }
             }
             if handling == .replace, duplicates.contains(where: warnsBeforeReplacing) {
-                return whenNotAsking { $0.replacePrompt = prompt }
+                return ask { $0.replacePrompt = prompt }
             }
             addFontFiles(paths, resolving: duplicates, choices: Dictionary(uniqueKeysWithValues: zip(duplicates.map(\.id), chosen.compactMap(\.self))),
                          method: method, into: location, then: then)
-        }
-    }
-
-    // One question at a time: set while another is up, a prompt would take its place, and the files it was for would never be added.
-    private func whenNotAsking(_ ask: @escaping (AppModel) -> Void) {
-        Task {
-            while duplicatePrompt != nil || replacePrompt != nil || openAppsReplacePrompt != nil || installPrompt != nil {
-                try? await Task.sleep(for: .milliseconds(200))
-            }
-            ask(self)
         }
     }
 
@@ -191,7 +181,7 @@ extension AppModel {
                 model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, into: location, then: then,
                                    askedAboutOpenApps: true)
             }
-            return whenNotAsking { $0.openAppsReplacePrompt = prompt }
+            return ask { $0.openAppsReplacePrompt = prompt }
         }
         // A file only of skipped families stays out, and one that takes the library's copies' places is in as those.
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))

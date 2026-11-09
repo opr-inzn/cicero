@@ -90,7 +90,7 @@ extension AppModel {
                 showToast(source == .fontBook ? "No collections Cicero can import" : "Nothing in it Cicero can import")
             case .success(let library):
                 let waits = source == .fontBase && urls == [FontBaseImport.folder()].compactMap { $0 }
-                importing = ImportPrompt(library: library, origin: origin, urls: urls, waitsForQuit: waits)
+                ask { $0.importing = ImportPrompt(library: library, origin: origin, urls: urls, waitsForQuit: waits) }
             case .failure:
                 switch source {
                 case .fontExplorer: showToast("That isn’t a FontExplorer X library or backup")

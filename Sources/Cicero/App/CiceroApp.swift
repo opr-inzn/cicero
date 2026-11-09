@@ -137,7 +137,7 @@ struct CiceroCommands: Commands {
                 model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("New Smart Folder", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
+            Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Button(model.selectedFamilies.isEmpty ? "New App Folder" : "New App Folder from Selection", systemImage: "app.badge.checkmark") {
                 model.newApplicationSet(with: model.selectedFamilies)
@@ -220,7 +220,7 @@ struct CiceroCommands: Commands {
             Button("Rescan Library", systemImage: "arrow.clockwise") { model.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
             Button("Rebuild Library", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
-            Button("Clear Font Caches", systemImage: "eraser") { model.isClearingCaches = true }
+            Button("Clear Font Caches", systemImage: "eraser") { model.ask { $0.isClearingCaches = true } }
         }
         // What's new in this version, in its window; the user guide, the project's pages on GitHub and the privacy policy
         // on the website, opened in the default browser.

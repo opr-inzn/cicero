@@ -302,7 +302,7 @@ private struct EmptyBrowser: View {
             EmptyState("No Matching Fonts", systemImage: "gearshape",
                        description: Text("No fonts in your library match this smart folder’s rules.")) {
                 if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                    Button("Edit Smart Folder") { model.editingSmartSet = smartSet }
+                    Button("Edit Smart Folder") { model.ask { $0.editingSmartSet = smartSet } }
                 }
             }
         case .characterSet(let id) where model.coverageProgress != nil:
