@@ -60,7 +60,8 @@ public struct SimilarFonts: Sendable {
 
     static let copyWords: Set<String> = [
         "trial", "unlicensed", "test", "demo", "beta", "variable", "var", "vf", "pro", "std", "plus", "pron", "stdn", "ot",
-        "sc", "tc", "hk", "mo", "cyr", "cyrillic", "grk", "greek", "ce", "w1g", "c",
+        "sc", "tc", "hk", "mo", "cyr", "cyrillic", "grk", "greek", "ce", "w1g", "c", "arabic", "hebrew", "armenian", "georgian",
+        "thai", "devanagari",
         "lf", "tf", "osf", "scosf", "caps", "smallcaps", "expert", "exp", "alt", "alts", "alternate", "alternates", "swash",
         "swashes", "lig", "ligatures", "fractions", "pi", "ornaments", "initials",
     ]
