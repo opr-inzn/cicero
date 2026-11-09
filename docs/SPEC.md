@@ -222,7 +222,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   them wider and the Info panel narrower, never more or fewer.
   The type shrinks further, to 0.4 at most, only where its letters fit but its line doesn't: a first or last letter
   with a lot of room beside it.
-- **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, "Foundry · N styles", switch; the sample at preview size, on the left; up to 14 style names set in themselves (+N more), each line of them on one baseline (`FlowLayout` lines its children up by their first text's baseline, not their tops, which sit as high as each face's ascent puts them).
+- **Specimens**: cards like the grid's tiles (light grey, tinted and outlined when selected, 12 pt apart, 16 pt from the edges) — name, tag dot, status tag, switch; the sample at preview size, on the left; up to 14 style names set in themselves (+N more), each line of them on one baseline (`FlowLayout` lines its children up by their first text's baseline, not their tops, which sit as high as each face's ascent puts them).
 - Tag dot: an 8 pt circle in the tag's colour, with no ring (side by side, 2 pt apart, for a family tagged
   several ways before 0.5). Cards are opaque (the card's grey on the window's background), so the
   picture dragged to the sidebar looks like the card.

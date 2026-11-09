@@ -51,7 +51,7 @@ The grid is the view Cicero starts with.
 
 ### Specimens
 
-One wide row per family: the name, the foundry and number of styles, the family’s stars if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), the sample at the preview size, and up to 14 of its style names, each set in its own style.
+One wide row per family: the name, the family’s stars if you’ve [rated](organizing.md#ratings) it and a note symbol if it has a [note](organizing.md#notes), the sample at the preview size, and up to 14 of its style names, each set in its own style.
 
 ### Status tags
 

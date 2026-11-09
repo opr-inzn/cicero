@@ -65,10 +65,6 @@ private struct Specimen: View {
                     TagDots(colors: model.tagColors(of: family)).centredOnName()
                     StatusTag(family: family).centredOnName()
                     VariableTag(family: family).centredOnName()
-                    Text(family.rangeLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                     NoteMark(note: model.note(of: family)).centredOnName()
                     RatingStars(rating: model.rating(of: family))
                 }
