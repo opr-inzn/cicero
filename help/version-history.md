@@ -4,6 +4,24 @@ What changed in each version of Cicero, newest first. To download a version, see
 
 <!-- Written by scripts/make-version-history.sh from CHANGELOG.md. Change CHANGELOG.md, not this file. -->
 
+## 0.12.0
+
+- **The Cicero CLI** finds, checks and turns on your fonts, tags them, puts them in folders, and gives them ratings and notes, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. Tab completion works in zsh, bash and fish. See [The Cicero CLI](command-line.md).
+- **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](command-line.md#use-it-in-claude-and-codex) says.
+- `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
+- **Faster with large libraries:** Cicero opens, scans, searches and switches views faster, and uses much less memory.
+- **Glyphs** lists every glyph in a font, with no limit.
+- **Glyphs are sorted better:** figures first, each alternate after its glyph, alternates that several features draw together (like an old-style figure from a stylistic set), and pictures, math letters and arrows grouped by kind.
+- **Importing is more reliable:** Cancel keeps the fonts copied so far, the fonts that were on come in on, fonts are found when FontBase or FontExplorer X spells their names otherwise, and the Mac stays awake while fonts are copied.
+- **Undo** in the message after you turn fonts on or off, or move them to the Trash. After Move to Trash, it puts the files back where they were, and gives the families back their folders, tags, rating and note.
+- The import sheet calls font files that are the same as others **duplicates**, and says how many there are.
+- Numbers have no thousands separator: “1174 families”, not “1,174 families”.
+- The axis fields show a style’s exact value, like 12.5, not 13. The **Style** menu shows the style the axes match, not **Custom**.
+- Axes have Cicero’s English names, like **Width**, whatever the Mac’s language.
+- **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
+- **Help → Version History** opens every version’s notes on one page, in place of Release Notes.
+- **Fixes:** a font you turn on just after an import stays on; fonts dropped on a folder or tag twice in a row both join it; Classify fonts automatically, turned on in Preferences, stays on; fonts on until Cicero quits stay on when moving them to the Trash fails; and a change you stop the Cicero CLI from making is never made later.
+
 ## 0.11.0
 
 This version makes a change to how Cicero installs and turns on fonts, and where it puts them. Thank you for using Cicero and reporting bugs while it’s in beta.
