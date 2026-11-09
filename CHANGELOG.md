@@ -18,7 +18,6 @@ Each version’s notes here become its release notes on the [releases page](http
 - Axes have Cicero’s English names, like **Width**, whatever the Mac’s language.
 - **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
 - **Help → Version History** opens every version’s notes on one page, in place of Release Notes.
-- **Fixes:** a font you turn on just after an import stays on; fonts dropped on a folder or tag twice in a row both join it; Classify fonts automatically, turned on in Preferences, stays on; fonts on until Cicero quits stay on when moving them to the Trash fails; and a change you stop the Cicero CLI from making is never made later.
 
 ## 0.11.0
 
