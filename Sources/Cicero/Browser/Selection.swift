@@ -93,6 +93,7 @@ struct FamilyKeys: ViewModifier {
     let order: FamilyOrder
     @Binding var anchor: SelectionAnchor
     let proxy: ScrollViewProxy
+    @Binding var position: ScrollPosition
     var layout = FamilyLayout.list
     @State private var typed = ""
     @State private var lastTyped = Date.distantPast
@@ -175,7 +176,7 @@ struct FamilyKeys: ViewModifier {
     }
 
     private func scrollToTop(_ id: String) {
-        proxy.scrollTo(id, anchor: .top)
+        if id == families.first?.id { position.scrollTo(edge: .top) } else { proxy.scrollTo(id, anchor: .top) }
     }
 
     private func open() -> KeyPress.Result {

@@ -95,7 +95,7 @@ extension EnvironmentValues {
 
 struct KeepsTopOnResize: ViewModifier {
     // Applied by the scroll view as it lays out, so after the rows have reflowed (a proxy can jump too early).
-    @State private var position = ScrollPosition(idType: String.self)
+    @Binding var position: ScrollPosition
     @State private var topID: String?
     @State private var isAtTop = true
 

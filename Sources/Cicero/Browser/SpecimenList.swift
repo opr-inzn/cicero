@@ -9,6 +9,7 @@ struct SpecimenList: View {
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
     @State private var visibleHeight: CGFloat = 0
+    @State private var position = ScrollPosition(idType: String.self)
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -25,12 +26,12 @@ struct SpecimenList: View {
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .visibleHeight($visibleHeight)
-            .modifier(KeepsTopOnResize())
+            .modifier(KeepsTopOnResize(position: $position))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .specimens))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .specimens))
         }
     }
 

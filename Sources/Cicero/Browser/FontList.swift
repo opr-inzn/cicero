@@ -236,6 +236,7 @@ struct FontList: View {
     @FocusState private var focused: Bool
     @State private var visibleWidth: CGFloat = 900
     @State private var visibleHeight: CGFloat = 0
+    @State private var position = ScrollPosition(idType: String.self)
 
     var body: some View {
         let columns = shownColumns
@@ -265,12 +266,12 @@ struct FontList: View {
             }
             .hardTopScrollEdge()
             .visibleHeight($visibleHeight)
-            .modifier(KeepsTopOnResize())
+            .modifier(KeepsTopOnResize(position: $position))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position))
             .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                 move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)
             }

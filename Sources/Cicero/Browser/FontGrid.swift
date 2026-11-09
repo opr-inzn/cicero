@@ -13,6 +13,7 @@ struct FontGrid: View {
     @FocusState private var focused: Bool
     @State private var gridRoom = GridRoom(width: 0, infoShown: 0)
     @State private var visibleHeight: CGFloat = 0
+    @State private var position = ScrollPosition(idType: String.self)
     @State private var shown: Shown?
 
     static let spacing: CGFloat = 12
@@ -89,12 +90,12 @@ struct FontGrid: View {
             .onChange(of: factor, initial: true) { GridScale.shared.factor = factor }
             .onChange(of: isCovered, initial: true) { coveredHidden = isCovered ? SidebarRoom.shared.hiddenWidth : nil }
             .onDisappear { GridScale.shared.factor = nil }
-            .modifier(KeepsTopOnResize())
+            .modifier(KeepsTopOnResize(position: $position))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .grid(columns: count)))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count)))
         }
     }
 
