@@ -49,7 +49,7 @@ const page = `<!doctype html>
   .needs { position: absolute; top: ${LAYOUT - 42}px; left: 0; right: 0; margin: 0; font: 12px/1 Areal; color: #a5a49f; }
 </style>
 <h1>Drag Cicero into Applications.</h1>
-<p class="lede">Then open it from your Applications folder.</p>
+<p class="lede">Once copied, open it from Applications.</p>
 <div class="well" style="left: 90px"></div>
 <div class="well" style="left: 370px"></div>
 <svg class="arrow" width="48" height="12" viewBox="0 0 48 12" fill="none" stroke="#a5a49f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
