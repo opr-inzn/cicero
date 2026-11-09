@@ -5,6 +5,7 @@ import Synchronization
 public final class MeasurementIndex: Sendable {
     private let file: URL
     private let embedder: LetterEmbedding?
+    private let weights: Bool
     private let state = Mutex(State())
     private let saveQueue = DispatchQueue(label: "Cicero.MeasurementIndex.save", qos: .utility)
 
@@ -23,7 +24,8 @@ public final class MeasurementIndex: Sendable {
         var dirty = false
     }
 
-    public init(caches: URL, embedder: LetterEmbedding? = nil) {
+    public init(caches: URL, embedder: LetterEmbedding? = nil, weights: Bool = false) {
+        self.weights = weights
         file = caches.appendingPathComponent("letters.plist", isDirectory: false)
         self.embedder = embedder
     }
@@ -32,7 +34,7 @@ public final class MeasurementIndex: Sendable {
         let signpost = Signposts.library.beginInterval("Letters")
         defer { Signposts.library.endInterval("Letters", signpost) }
         loadIfNeeded()
-        let faces = Self.measuredFaces(of: families)
+        let faces = Self.measuredFaces(of: families, weights: weights)
         let stamped = faces.map { ($0, CoverageStamp.of(path: $0.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
@@ -69,11 +71,12 @@ public final class MeasurementIndex: Sendable {
         }
     }
 
-    static func measuredFaces(of families: [Family]) -> [FontFace] {
+    static func measuredFaces(of families: [Family], weights: Bool = false) -> [FontFace] {
         families.flatMap { family in
             var faces = [family.regular.face]
-            for kind in family.kinds {
-                if let face = family.representative(of: kind)?.face, !faces.contains(where: { $0.id == face.id }) { faces.append(face) }
+            for face in family.kinds.compactMap(family.representative(of:)) + (weights ? family.weightNeighbors : [])
+            where !faces.contains(where: { $0.id == face.id }) {
+                faces.append(face.face)
             }
             return faces
         }

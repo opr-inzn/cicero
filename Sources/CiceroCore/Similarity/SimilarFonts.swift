@@ -12,6 +12,7 @@ public struct SimilarFonts: Sendable {
     private let styleDesigns: [String]
     private let styleRows: [[SearchQuery.Style: Int]]
     private let regularKinds: [SearchQuery.Style]
+    private let neighborRows: [[Int]]
     private let italicOnly: [Bool]
     private let rounded: [Bool]
     private let plainDesigns: [String]
@@ -39,6 +40,7 @@ public struct SimilarFonts: Sendable {
 
     public static let otherClassification: Float = 1
     public static let notRounded: Float = 10
+    static let nearerWeightSteps: Float = 2
 
     static let slanted: Float = 0.1
     static let roundedWords: Set<String> = ["rounded", "round", "rnd"]
@@ -109,6 +111,7 @@ public struct SimilarFonts: Sendable {
 
     public init(families: [Family], measurements: (Family) -> LetterMeasurements?, embeddings: ((Family) -> [Float]?)? = nil,
                 styleMeasurements: ((LibraryFace) -> LetterMeasurements?)? = nil, styleEmbeddings: ((LibraryFace) -> [Float]?)? = nil,
+                otherWeights: Bool = false,
                 classification: (Family) -> String?,
                 weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
                 embeddingWeight: Float = SimilarFonts.embeddingWeight, otherClassification: Float = SimilarFonts.otherClassification) {
@@ -117,6 +120,7 @@ public struct SimilarFonts: Sendable {
         var designs: [String] = [], styleDesigns: [String] = [], italicOnly: [Bool] = [], rounded: [Bool] = []
         var plainDesigns: [String] = [], regularKinds: [SearchQuery.Style] = [], styleRows: [[SearchQuery.Style: Int]] = []
         var styles: [(family: Int, kind: SearchQuery.Style, values: [Float], embedding: [Float])] = []
+        var neighbors: [(family: Int, values: [Float], embedding: [Float])] = []
         func usable(_ measured: LetterMeasurements?, _ embedded: [Float]?) -> Bool {
             (measured != nil || !measuring) && (embedded != nil || !embedding) && (measured != nil || embedded != nil)
         }
@@ -134,6 +138,12 @@ public struct SimilarFonts: Sendable {
                 let styleMeasured = styleMeasurements?(face), styleEmbedded = embedding ? styleEmbeddings?(face) : nil
                 if usable(styleMeasured, styleEmbedded) {
                     styles.append((ids.count, kind, styleMeasured?.values ?? Array(repeating: .nan, count: Self.measures), styleEmbedded ?? []))
+                }
+            }
+            for face in otherWeights ? family.weightNeighbors : [] {
+                let styleMeasured = styleMeasurements?(face), styleEmbedded = embedding ? styleEmbeddings?(face) : nil
+                if usable(styleMeasured, styleEmbedded) {
+                    neighbors.append((ids.count, styleMeasured?.values ?? Array(repeating: .nan, count: Self.measures), styleEmbedded ?? []))
                 }
             }
             styleRows.append(rows)
@@ -156,6 +166,12 @@ public struct SimilarFonts: Sendable {
             values += style.values
             vectors += style.embedding
         }
+        var neighborRows = [[Int]](repeating: [], count: ids.count)
+        for (offset, neighbor) in neighbors.enumerated() {
+            neighborRows[neighbor.family].append(ids.count + styles.count + offset)
+            values += neighbor.values
+            vectors += neighbor.embedding
+        }
         self.ids = ids
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         self.values = values
@@ -167,6 +183,7 @@ public struct SimilarFonts: Sendable {
         self.styleDesigns = styleDesigns
         self.styleRows = styleRows
         self.regularKinds = regularKinds
+        self.neighborRows = neighborRows
         self.italicOnly = italicOnly
         self.rounded = rounded
         self.plainDesigns = plainDesigns
@@ -195,7 +212,11 @@ public struct SimilarFonts: Sendable {
         found.reserveCapacity(ids.count)
         for other in ids.indices where other != reference {
             guard let row = kind.map({ self.row(of: other, for: $0) }) ?? other else { continue }
-            found.append((other, distance(reference, start, other, row: row)))
+            var apart = distance(reference, start, other, row: row)
+            if kind == nil {
+                for neighbor in nearerWeights(of: other, than: row, to: start) { apart = min(apart, distance(reference, start, other, row: neighbor)) }
+            }
+            found.append((other, apart))
         }
         found.sort { $0.distance < $1.distance }
         let keys = kind == nil ? designs : styleDesigns
@@ -211,6 +232,17 @@ public struct SimilarFonts: Sendable {
             for (slot, entry) in zip(slots, ordered) { nearest[slot] = entry }
         }
         return nearest.prefix(limit).map { (ids[$0.index], $0.distance) }
+    }
+
+    private func nearerWeights(of family: Int, than row: Int, to start: Int) -> [Int] {
+        let weight = LetterMeasurements.Measure.weight.rawValue
+        let wanted = values[start * Self.measures + weight], own = values[row * Self.measures + weight]
+        guard !wanted.isNaN, !neighborRows[family].isEmpty else { return [] }
+        let limit = Self.nearerWeightSteps * (Self.steps[.weight] ?? 1)
+        return neighborRows[family].filter { neighbor in
+            let other = values[neighbor * Self.measures + weight]
+            return !other.isNaN && abs(other - wanted) <= limit && (own.isNaN || abs(other - wanted) < abs(own - wanted))
+        }
     }
 
     private func row(of family: Int, for kind: SearchQuery.Style) -> Int? {

@@ -221,6 +221,14 @@ extension Family {
         return kinds
     }
 
+    public var weightNeighbors: [LibraryFace] {
+        let kind = kind(of: regular), weight = regular.face.namedWeight
+        let others = faces.filter { $0.id != regular.id && $0.face.weightAxis == nil && !$0.face.isOrnaments && self.kind(of: $0) == kind }
+        let lighter = others.filter { $0.face.namedWeight < weight }.max { $0.face.namedWeight < $1.face.namedWeight }
+        let heavier = others.filter { $0.face.namedWeight > weight }.min { $0.face.namedWeight < $1.face.namedWeight }
+        return [lighter, heavier].compactMap { $0 }
+    }
+
     public func representative(of kind: SearchQuery.Style) -> LibraryFace? {
         let face = face(for: SearchQuery.Style(isItalic: kind.isItalic, width: kind.width), weight: 400)
         let found = self.kind(of: face)
