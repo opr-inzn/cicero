@@ -8,7 +8,7 @@ public final class MeasurementIndex: Sendable {
     private let state = Mutex(State())
     private let saveQueue = DispatchQueue(label: "Cicero.MeasurementIndex.save", qos: .utility)
 
-    public static let version = 8
+    public static let version = 9
 
     private struct Entry: Sendable {
         var stamp: CoverageStamp

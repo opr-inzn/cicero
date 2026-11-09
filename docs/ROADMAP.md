@@ -11,14 +11,12 @@ What's done is in the [changelog](../CHANGELOG.md).
 **What.** Show Similar Fonts lists that look more alike, text serifs and grotesques above all, among which the lists are
 least sure now.
 
-**How.** The small model that looks at the letters learned from open-source families, four fifths of them, with the
-rest kept back to test it. Train it on all of them, and on more text serifs and grotesques, where more examples made the
-most difference. Judge its lists against the current ones on a library of fonts it has never seen, family by family; it
-replaces the current model only when its lists are picked more often.
+**How.** The small model that looks at the letters learned from every open-source family Cicero trains on. Train it on
+more text serifs and grotesques, where more examples made the most difference. Judge its lists against the current ones
+on a library of fonts it has never seen, family by family; it replaces the current model only when its lists are picked
+more often.
 
 **Open.**
-- Whether a second model, trained another way, makes better lists alongside the first: so far it helps the six on a
-  font page a little and makes the twelve in the list worse.
 - The families to add: each needs tags for what it is (serif, grotesque, humanist and so on), set by hand.
 
 ### Subfolders in Locations and Folders (M)

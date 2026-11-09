@@ -21,9 +21,9 @@ swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/Cicer
 # Optionally each style's letter measurements, for the model to learn to tell them: the tests' EmbeddingEvaluation
 # writes them to measurements.tsv (CICERO_EMBEDDING_WORK="$T/work" swift test --filter EmbeddingEvaluation).
 
-# The model in Resources: designs of a kind alike (--soft), learned for 60 epochs with the first tenth held out.
+# The model in Resources: designs of a kind alike (--soft), learned for 60 epochs from every family (--fold -1).
 "$T/venv/bin/python" -I scripts/embedding/train.py train "$T/work" --measurements "$T/work/measurements.tsv" \
-    --epochs 60 --fold 0 --soft 2 --instance 0.3
+    --epochs 60 --fold -1 --soft 2 --instance 0.3
 "$T/venv/bin/python" -I scripts/embedding/train.py classify "$T/work"
 "$T/venv/bin/python" -I scripts/embedding/train.py export "$T/work" Resources/LetterEmbedding.mlpackage
 ```

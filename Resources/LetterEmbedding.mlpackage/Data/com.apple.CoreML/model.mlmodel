@@ -12,12 +12,12 @@
 classification
 *
 †Ä¢˙
-éA font's letters (see LetterImages.swift), 0 to 1, and their advances, in squares, as 128 numbers of length 1, alike fonts close, and how likely it is to be Serif, Sans Serif, Script, Ornamental. Learned from Google Fonts families under the OFL, Apache and UFL licenses.epoch 60¢4
-#com.github.apple.coremltools.sourcetorch==2.14.1¢:
-+com.github.apple.coremltools.source_dialectTorchScript¢:
+éA font's letters (see LetterImages.swift), 0 to 1, and their advances, in squares, as 128 numbers of length 1, alike fonts close, and how likely it is to be Serif, Sans Serif, Script, Ornamental. Learned from Google Fonts families under the OFL, Apache and UFL licenses.epoch 60¢:
++com.github.apple.coremltools.source_dialectTorchScript¢4
+#com.github.apple.coremltools.sourcetorch==2.14.1¢+
+$com.github.apple.coremltools.version9.0¢:
 ,com.github.apple.coremltools.conversion_date
-2026-10-20¢+
-$com.github.apple.coremltools.version9.0≤Åãíâ
+2026-10-21≤Åãíâ
 mainàâ
 )
 letters
@@ -38,26 +38,26 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 var_12
 
 
-*
-name
-
-	"
-op_12*!
+*!
 val
 
 
 
 
 
-@@é
-reshape
-x
-	
-letters
+@@*
+name
+
+	"
+op_12é
+reshape
 shape
 
 
-var_123
+var_12
+x
+	
+letters3
 input_1_cast_fp16
 
 
@@ -71,73 +71,73 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_1_cast_fp16j
 const
 input_3_pad_type_0
-*(
-name 
-
-"
-input_3_pad_type_0*
+*
 val
 
 
 "
-customn
+custom*(
+name 
+
+"
+input_3_pad_type_0n
 const
 input_3_pad_0
 
 
-*#
-name
-
-"
-input_3_pad_0*!
+*!
 val
 
 
 
 
 
-t
+*#
+name
+
+"
+input_3_pad_0t
 const!
 input_3_strides_0
 
 
-*'
-name
-
-"
-input_3_strides_0*
+*
 val
 
 
 
 
-x
+*'
+name
+
+"
+input_3_strides_0x
 const#
 input_3_dilations_0
 
 
-*)
-name!
-
-"
-input_3_dilations_0*
+*
 val
 
 
 
 
-a
+*)
+name!
+
+"
+input_3_dilations_0a
 const
 input_3_groups_0
-*&
-name
-
-"
-input_3_groups_0*
+*
 val
 
 
-Æ
+*&
+name
+
+"
+input_3_groups_0Æ
 const1
 const_0_to_fp16
 
@@ -145,11 +145,7 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 
 
 
-*%
-name
-
-"
-const_0_to_fp16*K
+*K
 valD
 
 
@@ -157,45 +153,49 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 
 
 *"
-@model_path/weights/weight.bin@ã
+@model_path/weights/weight.bin@*%
+name
+
+"
+const_0_to_fp16ã
 const
 const_1_to_fp16
 
 
 
-*%
-name
-
-"
-const_1_to_fp16*:
+*:
 val3
 
 
 
 *#
-@model_path/weights/weight.bin¿‚
-conv
-weight
-
-const_0_to_fp16
-groups
-
-input_3_groups_0$
+@model_path/weights/weight.bin¿*%
+name
+
+"
+const_1_to_fp16‚
+conv$
 	dilations
 
-input_3_dilations_0
-x
-
-input_1_cast_fp16
-pad
-
-input_3_pad_0
-bias
-
-const_1_to_fp16"
+input_3_dilations_0"
 pad_type
 
-input_3_pad_type_0 
+input_3_pad_type_0
+weight
+
+const_0_to_fp16
+x
+
+input_1_cast_fp16
+bias
+
+const_1_to_fp16
+groups
+
+input_3_groups_0
+pad
+
+input_3_pad_0 
 strides
 
 input_3_strides_03
@@ -227,73 +227,73 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_7_cast_fp16j
 const
 input_9_pad_type_0
-*(
-name 
-
-"
-input_9_pad_type_0*
+*
 val
 
 
 "
-customn
+custom*(
+name 
+
+"
+input_9_pad_type_0n
 const
 input_9_pad_0
 
 
-*#
-name
-
-"
-input_9_pad_0*!
+*!
 val
 
 
 
 
 
-t
+*#
+name
+
+"
+input_9_pad_0t
 const!
 input_9_strides_0
 
 
-*'
-name
-
-"
-input_9_strides_0*
+*
 val
 
 
 
 
-x
+*'
+name
+
+"
+input_9_strides_0x
 const#
 input_9_dilations_0
 
 
-*)
-name!
-
-"
-input_9_dilations_0*
+*
 val
 
 
 
 
-a
+*)
+name!
+
+"
+input_9_dilations_0a
 const
 input_9_groups_0
-*&
-name
-
-"
-input_9_groups_0*
+*
 val
 
 
-Ø
+*&
+name
+
+"
+input_9_groups_0Ø
 const1
 const_2_to_fp16
 
@@ -301,11 +301,7 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 0
 
 
-*%
-name
-
-"
-const_2_to_fp16*L
+*L
 valE
 
 
@@ -313,45 +309,49 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 
 
 *#
-@model_path/weights/weight.bin¿å
+@model_path/weights/weight.bin¿*%
+name
+
+"
+const_2_to_fp16å
 const
 const_3_to_fp16
 
 
 
-0*%
-name
-
-"
-const_3_to_fp16*;
+0*;
 val4
 
 
 
 0*$
-@model_path/weights/weight.binÄ®‰
-conv
-weight
-
-const_2_to_fp16
-groups
-
-input_9_groups_0$
+@model_path/weights/weight.binÄ®*%
+name
+
+"
+const_3_to_fp16‰
+conv$
 	dilations
 
-input_9_dilations_0
-x
-
-input_7_cast_fp16
-pad
-
-input_9_pad_0
-bias
-
-const_3_to_fp16"
+input_9_dilations_0"
 pad_type
 
-input_9_pad_type_0 
+input_9_pad_type_0
+weight
+
+const_2_to_fp16
+x
+
+input_7_cast_fp16
+bias
+
+const_3_to_fp16
+groups
+
+input_9_groups_0
+pad
+
+input_9_pad_0 
 strides
 
 input_9_strides_04
@@ -383,73 +383,73 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_13_cast_fp16l
 const
 input_15_pad_type_0
-*)
-name!
-
-"
-input_15_pad_type_0*
+*
 val
 
 
 "
-customp
+custom*)
+name!
+
+"
+input_15_pad_type_0p
 const
 input_15_pad_0
 
 
-*$
-name
-
-"
-input_15_pad_0*!
+*!
 val
 
 
 
 
 
-v
+*$
+name
+
+"
+input_15_pad_0v
 const"
 input_15_strides_0
 
 
-*(
-name 
-
-"
-input_15_strides_0*
+*
 val
 
 
 
 
-z
+*(
+name 
+
+"
+input_15_strides_0z
 const$
 input_15_dilations_0
 
 
-**
-name"
-
-"
-input_15_dilations_0*
+*
 val
 
 
 
 
-c
+**
+name"
+
+"
+input_15_dilations_0c
 const
 input_15_groups_0
-*'
-name
-
-"
-input_15_groups_0*
+*
 val
 
 
-∞
+*'
+name
+
+"
+input_15_groups_0∞
 const1
 const_4_to_fp16
 
@@ -457,11 +457,7 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 0
 0
 
-*%
-name
-
-"
-const_4_to_fp16*M
+*M
 valF
 
 
@@ -469,45 +465,49 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 0
 
 *$
-@model_path/weights/weight.bin¿©å
+@model_path/weights/weight.bin¿©*%
+name
+
+"
+const_4_to_fp16å
 const
 const_5_to_fp16
 
 
 
-0*%
-name
-
-"
-const_5_to_fp16*;
+0*;
 val4
 
 
 
 0*$
-@model_path/weights/weight.binÄÓÍ
-conv
-weight
-
-const_4_to_fp16
-groups
-
-input_15_groups_0%
+@model_path/weights/weight.binÄÓ*%
+name
+
+"
+const_5_to_fp16Í
+conv%
 	dilations
 
-input_15_dilations_0
-x
-
-input_13_cast_fp16
-pad
-
-input_15_pad_0
-bias
-
-const_5_to_fp16#
+input_15_dilations_0#
 pad_type
 
-input_15_pad_type_0!
+input_15_pad_type_0
+weight
+
+const_4_to_fp16
+x
+
+input_13_cast_fp16
+bias
+
+const_5_to_fp16
+groups
+
+input_15_groups_0
+pad
+
+input_15_pad_0!
 strides
 
 input_15_strides_04
@@ -539,73 +539,73 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_19_cast_fp16l
 const
 input_21_pad_type_0
-*)
-name!
-
-"
-input_21_pad_type_0*
+*
 val
 
 
 "
-customp
+custom*)
+name!
+
+"
+input_21_pad_type_0p
 const
 input_21_pad_0
 
 
-*$
-name
-
-"
-input_21_pad_0*!
+*!
 val
 
 
 
 
 
-v
+*$
+name
+
+"
+input_21_pad_0v
 const"
 input_21_strides_0
 
 
-*(
-name 
-
-"
-input_21_strides_0*
+*
 val
 
 
 
 
-z
+*(
+name 
+
+"
+input_21_strides_0z
 const$
 input_21_dilations_0
 
 
-**
-name"
-
-"
-input_21_dilations_0*
+*
 val
 
 
 
 
-c
+**
+name"
+
+"
+input_21_dilations_0c
 const
 input_21_groups_0
-*'
-name
-
-"
-input_21_groups_0*
+*
 val
 
 
-∞
+*'
+name
+
+"
+input_21_groups_0∞
 const1
 const_6_to_fp16
 
@@ -613,11 +613,7 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 `
 0
 
-*%
-name
-
-"
-const_6_to_fp16*M
+*M
 valF
 
 
@@ -625,45 +621,49 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 0
 
 *$
-@model_path/weights/weight.bin¿Ôå
+@model_path/weights/weight.bin¿Ô*%
+name
+
+"
+const_6_to_fp16å
 const
 const_7_to_fp16
 
 
 
-`*%
-name
-
-"
-const_7_to_fp16*;
+`*;
 val4
 
 
 
 `*$
-@model_path/weights/weight.binÄ¯Í
-conv
-weight
-
-const_6_to_fp16
-groups
-
-input_21_groups_0%
+@model_path/weights/weight.binÄ¯*%
+name
+
+"
+const_7_to_fp16Í
+conv%
 	dilations
 
-input_21_dilations_0
-x
-
-input_19_cast_fp16
-pad
-
-input_21_pad_0
-bias
-
-const_7_to_fp16#
+input_21_dilations_0#
 pad_type
 
-input_21_pad_type_0!
+input_21_pad_type_0
+weight
+
+const_6_to_fp16
+x
+
+input_19_cast_fp16
+bias
+
+const_7_to_fp16
+groups
+
+input_21_groups_0
+pad
+
+input_21_pad_0!
 strides
 
 input_21_strides_04
@@ -695,73 +695,73 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_25_cast_fp16l
 const
 input_27_pad_type_0
-*)
-name!
-
-"
-input_27_pad_type_0*
+*
 val
 
 
 "
-customp
+custom*)
+name!
+
+"
+input_27_pad_type_0p
 const
 input_27_pad_0
 
 
-*$
-name
-
-"
-input_27_pad_0*!
+*!
 val
 
 
 
 
 
-v
+*$
+name
+
+"
+input_27_pad_0v
 const"
 input_27_strides_0
 
 
-*(
-name 
-
-"
-input_27_strides_0*
+*
 val
 
 
 
 
-z
+*(
+name 
+
+"
+input_27_strides_0z
 const$
 input_27_dilations_0
 
 
-**
-name"
-
-"
-input_27_dilations_0*
+*
 val
 
 
 
 
-c
+**
+name"
+
+"
+input_27_dilations_0c
 const
 input_27_groups_0
-*'
-name
-
-"
-input_27_groups_0*
+*
 val
 
 
-∞
+*'
+name
+
+"
+input_27_groups_0∞
 const1
 const_8_to_fp16
 
@@ -769,11 +769,7 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 `
 `
 
-*%
-name
-
-"
-const_8_to_fp16*M
+*M
 valF
 
 
@@ -781,45 +777,49 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 `
 
 *$
-@model_path/weights/weight.binÄ˙å
+@model_path/weights/weight.binÄ˙*%
+name
+
+"
+const_8_to_fp16å
 const
 const_9_to_fp16
 
 
 
-`*%
-name
-
-"
-const_9_to_fp16*;
+`*;
 val4
 
 
 
 `*$
-@model_path/weights/weight.bin¿äÍ
-conv
-weight
-
-const_8_to_fp16
-groups
-
-input_27_groups_0%
+@model_path/weights/weight.bin¿ä*%
+name
+
+"
+const_9_to_fp16Í
+conv%
 	dilations
 
-input_27_dilations_0
-x
-
-input_25_cast_fp16
-pad
-
-input_27_pad_0
-bias
-
-const_9_to_fp16#
+input_27_dilations_0#
 pad_type
 
-input_27_pad_type_0!
+input_27_pad_type_0
+weight
+
+const_8_to_fp16
+x
+
+input_25_cast_fp16
+bias
+
+const_9_to_fp16
+groups
+
+input_27_groups_0
+pad
+
+input_27_pad_0!
 strides
 
 input_27_strides_04
@@ -851,73 +851,73 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_31_cast_fp16l
 const
 input_33_pad_type_0
-*)
-name!
-
-"
-input_33_pad_type_0*
+*
 val
 
 
 "
-customp
+custom*)
+name!
+
+"
+input_33_pad_type_0p
 const
 input_33_pad_0
 
 
-*$
-name
-
-"
-input_33_pad_0*!
+*!
 val
 
 
 
 
 
-v
+*$
+name
+
+"
+input_33_pad_0v
 const"
 input_33_strides_0
 
 
-*(
-name 
-
-"
-input_33_strides_0*
+*
 val
 
 
 
 
-z
+*(
+name 
+
+"
+input_33_strides_0z
 const$
 input_33_dilations_0
 
 
-**
-name"
-
-"
-input_33_dilations_0*
+*
 val
 
 
 
 
-c
+**
+name"
+
+"
+input_33_dilations_0c
 const
 input_33_groups_0
-*'
-name
-
-"
-input_33_groups_0*
+*
 val
 
 
-¥
+*'
+name
+
+"
+input_33_groups_0¥
 const3
 const_10_to_fp16
 
@@ -925,11 +925,7 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 Ä
 `
 
-*&
-name
-
-"
-const_10_to_fp16*N
+*N
 valG
 
 
@@ -937,43 +933,47 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 `
 
 *$
-@model_path/weights/weight.bin¿åê
+@model_path/weights/weight.bin¿å*&
+name
+
+"
+const_10_to_fp16ê
 const!
 const_11_to_fp16
 
 
-Ä*&
-name
-
-"
-const_11_to_fp16*<
+Ä*<
 val5
 
 
 Ä*$
-@model_path/weights/weight.binÄÕ Ì
-conv
-weight
-
-const_10_to_fp16
-groups
-
-input_33_groups_0%
+@model_path/weights/weight.binÄÕ *&
+name
+
+"
+const_11_to_fp16Ì
+conv%
 	dilations
 
-input_33_dilations_0
-x
-
-input_31_cast_fp16
-pad
-
-input_33_pad_0
-bias
-
-const_11_to_fp16#
+input_33_dilations_0#
 pad_type
 
-input_33_pad_type_0!
+input_33_pad_type_0
+weight
+
+const_10_to_fp16
+x
+
+input_31_cast_fp16
+bias
+
+const_11_to_fp16
+groups
+
+input_33_groups_0
+pad
+
+input_33_pad_0!
 strides
 
 input_33_strides_05
@@ -1007,103 +1007,103 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 input_39_kernel_sizes_0
 
 
-*-
-name%
-
-"
-input_39_kernel_sizes_0*
+*
 val
 
 
 
 
-v
+*-
+name%
+
+"
+input_39_kernel_sizes_0v
 const"
 input_39_strides_0
 
 
-*(
-name 
-
-"
-input_39_strides_0*
+*
 val
 
 
 
 
-k
+*(
+name 
+
+"
+input_39_strides_0k
 const
 input_39_pad_type_0
-*)
-name!
-
-"
-input_39_pad_type_0*
+*
 val
 
 	"
-validp
+valid*)
+name!
+
+"
+input_39_pad_type_0p
 const
 input_39_pad_0
 
 
-*$
-name
-
-"
-input_39_pad_0*!
+*!
 val
 
 
 
 
 
-    i
+    *$
+name
+
+"
+input_39_pad_0i
 const
 input_39_ceil_mode_0
-**
+*
+val
+
+
+ **
 name"
 
 "
-input_39_ceil_mode_0*
+input_39_ceil_mode_0è
+const/
+'input_39_exclude_padding_from_average_0
+*
 val
 
 
- è
-const/
-'input_39_exclude_padding_from_average_0
-*=
+ *=
 name5
 -
 +")
-'input_39_exclude_padding_from_average_0*
-val
-
-
- å
-avg_pool
-x
-
-input_37_cast_fp16K
-exclude_padding_from_average+
-)
-'input_39_exclude_padding_from_average_0!
-strides
-
-input_39_strides_0#
+'input_39_exclude_padding_from_average_0å
+avg_pool#
 pad_type
 
-input_39_pad_type_0
-pad
-
-input_39_pad_0%
+input_39_pad_type_0
+x
+
+input_37_cast_fp16%
 	ceil_mode
 
 input_39_ceil_mode_0+
 kernel_sizes
 
-input_39_kernel_sizes_05
+input_39_kernel_sizes_0
+pad
+
+input_39_pad_0K
+exclude_padding_from_average+
+)
+'input_39_exclude_padding_from_average_0!
+strides
+
+input_39_strides_05
 input_39_cast_fp16
 
 
@@ -1119,26 +1119,26 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 concat_0
 
 
-*
-name
-
-"
-
-concat_0* 
+* 
 val
 
 
 	
 
-Äí
-reshape
-x
-
-input_39_cast_fp16
+Ä*
+name
+
+"
+
+concat_0í
+reshape
 shape
 
 
-concat_0)
+concat_0
+x
+
+input_39_cast_fp16)
 input_41_cast_fp16
 
 
@@ -1153,31 +1153,31 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 
 
 Ä
-Ä*4
-name,
-$
-"" 
-model_letter_20_weight_to_fp16*C
+Ä*C
 val<
 
 
 Ä
 Ä*$
-@model_path/weights/weight.bin¿œ ®
+@model_path/weights/weight.bin¿œ *4
+name,
+$
+"" 
+model_letter_20_weight_to_fp16®
 const-
 model_letter_20_bias_to_fp16
 
 
-Ä*2
-name*
-"
- "
-model_letter_20_bias_to_fp16*<
+Ä*<
 val5
 
 
 Ä*$
-@model_path/weights/weight.binÄ–@“
+@model_path/weights/weight.binÄ–@*2
+name*
+"
+ "
+model_letter_20_bias_to_fp16“
 linear,
 weight"
  
@@ -1214,25 +1214,25 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 var_123
 
 
-*
-name
-
-
-"
-op_123*)
+*)
 val"
 
 
 
 
-ˇˇˇˇˇˇˇˇˇÄç
-reshape
-x
-
-var_115_cast_fp16
+ˇˇˇˇˇˇˇˇˇÄ*
+name
+
+
+"
+op_123ç
+reshape
 shape
 	
-var_123(
+var_123
+x
+
+var_115_cast_fp16(
 var_124_cast_fp16
 
 
@@ -1244,41 +1244,41 @@ $com.github.apple.coremltools.version9.0≤Åãíâ
 op_124_cast_fp16N
 const
 var_126
-*
+*
+val
+
+
+*
 name
 
 
 "
-op_126*
-val
-
-
-k
+op_126k
 const
 input_45_interleave_0
-*+
-name#
-
-"
-input_45_interleave_0*
+*
 val
 
 
- »
+ *+
+name#
+
+"
+input_45_interleave_0»
 concat'
 
 interleave
 
-input_45_interleave_0
-axis
-	
-var_126+
+input_45_interleave_0+
 values!
 
 var_124_cast_fp16
 
 
-advances)
+advances
+axis
+	
+var_126)
 input_45_cast_fp16
 
 
@@ -1293,31 +1293,31 @@ interleave
 
 
 Ä
-ê*5
-name-
-%
-#"!
-model_together_0_weight_to_fp16*C
+ê*C
 val<
 
 
 Ä
 ê*$
-@model_path/weights/weight.bin¿“@´
+@model_path/weights/weight.bin¿“@*5
+name-
+%
+#"!
+model_together_0_weight_to_fp16´
 const.
 model_together_0_bias_to_fp16
 
 
-Ä*3
-name+
-#
-!"
-model_together_0_bias_to_fp16*=
+Ä*=
 val6
 
 
 Ä*%
-@model_path/weights/weight.binÄ”¡‘
+@model_path/weights/weight.binÄ”¡*3
+name+
+#
+!"
+model_together_0_bias_to_fp16‘
 linear-
 weight#
 !
@@ -1341,25 +1341,25 @@ interleave
 input_49_rank2_expansion_axes_0
 
 
-*5
-name-
-%
-#"!
-input_49_rank2_expansion_axes_0*'
+*'
 val 
 
 
 
 
 
-ˇˇˇˇˇˇˇˇˇ“
-expand_dims
-x
-
-linear_1_cast_fp16+
+ˇˇˇˇˇˇˇˇˇ*5
+name-
+%
+#"!
+input_49_rank2_expansion_axes_0“
+expand_dims+
 axes#
 !
-input_49_rank2_expansion_axes_0?
+input_49_rank2_expansion_axes_0
+x
+
+linear_1_cast_fp16?
 "input_49_rank2_expansion_cast_fp16
 
 
@@ -1374,91 +1374,91 @@ interleave
 %model_together_1_running_mean_to_fp16
 
 
-Ä*;
-name3
-+
-)"'
-%model_together_1_running_mean_to_fp16*=
+Ä*=
 val6
 
 
 Ä*%
-@model_path/weights/weight.bin¿€¡π
+@model_path/weights/weight.bin¿€¡*;
+name3
++
+)"'
+%model_together_1_running_mean_to_fp16π
 const5
 $model_together_1_running_var_to_fp16
 
 
-Ä*:
-name2
-*
-("&
-$model_together_1_running_var_to_fp16*=
+Ä*=
 val6
 
 
 Ä*%
-@model_path/weights/weight.binÄ‰¡Ø
+@model_path/weights/weight.binÄ‰¡*:
+name2
+*
+("&
+$model_together_1_running_var_to_fp16Ø
 const0
 model_together_1_weight_to_fp16
 
 
-Ä*5
-name-
-%
-#"!
-model_together_1_weight_to_fp16*=
+Ä*=
 val6
 
 
 Ä*%
-@model_path/weights/weight.bin¿Ï¡´
+@model_path/weights/weight.bin¿Ï¡*5
+name-
+%
+#"!
+model_together_1_weight_to_fp16´
 const.
 model_together_1_bias_to_fp16
 
 
-Ä*3
-name+
-#
-!"
-model_together_1_bias_to_fp16*=
+Ä*=
 val6
 
 
 Ä*%
-@model_path/weights/weight.binÄı¡_
+@model_path/weights/weight.binÄı¡*3
+name+
+#
+!"
+model_together_1_bias_to_fp16_
 const
 var_130_to_fp16
 
-*$
-name
-
-"
-op_130_to_fp16*
+*
 val
 
 
 :
-® í
+® *$
+name
+
+"
+op_130_to_fp16í
 
-batch_norm1
-mean)
-'
-%model_together_1_running_mean_to_fp16+
-x&
-$
-"input_49_rank2_expansion_cast_fp16)
-beta!
-
-model_together_1_bias_to_fp16
+batch_norm
 epsilon
 
-var_130_to_fp16,
+var_130_to_fp16)
+beta!
+
+model_together_1_bias_to_fp16+
+x&
+$
+"input_49_rank2_expansion_cast_fp16,
 gamma#
 !
 model_together_1_weight_to_fp164
 variance(
 &
-$model_together_1_running_var_to_fp16=
+$model_together_1_running_var_to_fp161
+mean)
+'
+%model_together_1_running_mean_to_fp16=
  input_49_batch_norm_1d_cast_fp16
 
 
@@ -1473,25 +1473,25 @@ $""
 input_49_axes_0
 
 
-*%
-name
-
-"
-input_49_axes_0*'
+*'
 val 
 
 
 
 
 
-ˇˇˇˇˇˇˇˇˇ¶
-squeeze)
-x$
-"
- input_49_batch_norm_1d_cast_fp16
+ˇˇˇˇˇˇˇˇˇ*%
+name
+
+"
+input_49_axes_0¶
+squeeze
 axes
 
-input_49_axes_0)
+input_49_axes_0)
+x$
+"
+ input_49_batch_norm_1d_cast_fp16)
 input_49_cast_fp16
 
 
@@ -1519,31 +1519,31 @@ $""
 
 
 Ä
-Ä*5
-name-
-%
-#"!
-model_together_3_weight_to_fp16*D
+Ä*D
 val=
 
 
 Ä
 Ä*%
-@model_path/weights/weight.bin¿˝¡´
+@model_path/weights/weight.bin¿˝¡*5
+name-
+%
+#"!
+model_together_3_weight_to_fp16´
 const.
 model_together_3_bias_to_fp16
 
 
-Ä*3
-name+
-#
-!"
-model_together_3_bias_to_fp16*=
+Ä*=
 val6
 
 
 Ä*%
-@model_path/weights/weight.binÄ˛…‘
+@model_path/weights/weight.binÄ˛…*3
+name+
+#
+!"
+model_together_3_bias_to_fp16‘
 linear-
 weight#
 !
@@ -1567,40 +1567,40 @@ $""
 var_149
 
 
-*
-name
-
-
-"
-op_149*
+*
 val
 
 
 
 
-N
-const
-var_150
-*
+*
 name
 
 
 "
-op_150*
+op_149N
+const
+var_150
+*
 val
 
 
-≠
-reduce_l2_norm
+*
+name
+
+
+"
+op_150≠
+reduce_l2_norm
+axes
+	
+var_149
 	keep_dims
 	
 var_150
 x
 
-linear_2_cast_fp16
-axes
-	
-var_149'
+linear_2_cast_fp16'
 var_152_cast_fp16
 
 
@@ -1613,16 +1613,16 @@ $""
 const
 var_153_to_fp16
 
-*$
-name
-
-"
-op_153_to_fp16*
+*
 val
 
 
 :
- ê
+ *$
+name
+
+"
+op_153_to_fp16ê
 maximum
 x
 
@@ -1643,17 +1643,17 @@ $""
 denom_reps_0
 
 
-*"
-name
-
-"
-denom_reps_0* 
+* 
 val
 
 
 	
 
-Äã
+Ä*"
+name
+
+"
+denom_reps_0ã
 tile
 x
 
@@ -1688,48 +1688,48 @@ $""
 input_55_cast_fp16à
 const*
 "input_55_cast_fp16_to_fp32_dtype_0
-*8
-name0
-(
-&"$
-"input_55_cast_fp16_to_fp32_dtype_0*
+*
 val
 
 
 "
-fp32Ø
+fp32*8
+name0
+(
+&"$
+"input_55_cast_fp16_to_fp32_dtype_0Ø
 const0
 classify_0_weight_to_fp16
 
 
 @
-Ä*/
-name'
-
-"
-classify_0_weight_to_fp16*C
+Ä*C
 val<
 
 
 @
 Ä*%
-@model_path/weights/weight.bin¿Ä ù
+@model_path/weights/weight.bin¿Ä */
+name'
+
+"
+classify_0_weight_to_fp16ù
 const'
 classify_0_bias_to_fp16
 
 
 
-@*-
-name%
-
-"
-classify_0_bias_to_fp16*<
+@*<
 val5
 
 
 
 @*%
-@model_path/weights/weight.binÄÅÀ«
+@model_path/weights/weight.binÄÅÀ*-
+name%
+
+"
+classify_0_bias_to_fp16«
 linear'
 weight
 
@@ -1767,27 +1767,23 @@ $""
 
 
 
-@*/
-name'
-
-"
-classify_2_weight_to_fp16*B
+@*B
 val;
 
 
 
 @*%
-@model_path/weights/weight.bin¿ÇÀÜ
+@model_path/weights/weight.bin¿ÇÀ*/
+name'
+
+"
+classify_2_weight_to_fp16Ü
 const'
 classify_2_bias_to_fp16
 
 
 
-*-
-name%
-
-"
-classify_2_bias_to_fp16*%
+*%
 val
 
 
@@ -1795,7 +1791,11 @@ $""
 
 :
 
-õ(œØF¶«
+"-Ê•NÆˇò*-
+name%
+
+"
+classify_2_bias_to_fp16«
 linear'
 weight
 
@@ -1817,16 +1817,16 @@ $""
 linear_4_cast_fp16N
 const
 var_166
-*
+*
+val
+
+
+*
 name
 
 
 "
-op_166*
-val
-
-
-å
+op_166å
 softmax
 x
 
@@ -1845,23 +1845,23 @@ $""
 op_168_cast_fp16Ö
 const)
 !var_168_cast_fp16_to_fp32_dtype_0
-*6
-name.
-&
-$""
- op_168_cast_fp16_to_fp32_dtype_0*
+*
 val
 
 
 "
-fp32ñ
-cast
-x
-
-var_168_cast_fp16.
+fp32*6
+name.
+&
+$""
+ op_168_cast_fp16_to_fp32_dtype_0ñ
+cast.
 dtype%
 #
-!var_168_cast_fp16_to_fp32_dtype_0$
+!var_168_cast_fp16_to_fp32_dtype_0
+x
+
+var_168_cast_fp16$
 classification
 
 
@@ -1871,13 +1871,13 @@ $""
 
 "
 cast_8î
-cast
-x
-
-input_55_cast_fp16/
+cast/
 dtype&
 $
-"input_55_cast_fp16_to_fp32_dtype_0 
+"input_55_cast_fp16_to_fp32_dtype_0
+x
+
+input_55_cast_fp16 
 	embedding
 
 
