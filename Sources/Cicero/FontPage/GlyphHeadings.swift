@@ -23,6 +23,10 @@ extension EnvironmentValues {
     @Entry var pinsHeadings = true
 }
 
+@Observable final class HeadingCovers {
+    var covered: [Int: CGFloat] = [:]
+}
+
 extension EnvironmentValues {
     @Entry var glyphsTitleMoved: (CGFloat) -> Void = { _ in }
 }
@@ -43,13 +47,16 @@ struct GlyphHeader: View {
     static let line = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .headline)).rounded(.up)
     static let barHeight = line + 4
     static let headingHeight = line + 8
+    static let labelledHeight = barHeight + line
 
     @Environment(\.pinsHeadings) private var pins
     let heading: GlyphHeading
+    var covers: HeadingCovers?
 
     var body: some View {
         let nameHeight = heading.labelFollows ? Self.line : Self.headingHeight
         let height = heading.name == nil ? Self.barHeight : Self.barHeight + nameHeight
+        let cover = heading.labelFollows && heading.name != nil ? covers?.covered[heading.index] ?? Self.headingHeight - Self.line : 0
         VStack(alignment: .leading, spacing: 0) {
             CategoryBar(heading: heading)
                 .modifier(WhenPinned(always: heading.startsCategory || heading.name == nil))
@@ -71,7 +78,14 @@ struct GlyphHeader: View {
             Color.canvas.frame(height: 200).alignmentGuide(.top) { $0[.bottom] }
                 .modifier(WhenPinned(always: false, below: -200))
         }
-        .overlay(alignment: .bottom) { Divider().modifier(WhenPinned(always: false, below: height - 1)) }
+        .overlay(alignment: .bottom) {
+            VStack(spacing: 0) {
+                Color.canvas.frame(height: cover)
+                Divider()
+            }
+            .alignmentGuide(.bottom) { $0[.bottom] - cover }
+            .modifier(WhenPinned(always: false, below: height - 1))
+        }
         .visualEffect { [pins, height] content, proxy in
             let y = proxy.frame(in: .scrollView).minY
             let pushed = pins && y < 0.5 && y > -height + 0.5

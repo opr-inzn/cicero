@@ -17,6 +17,7 @@ struct GlyphsSection: View {
     let generation: Int
     @State private var query = ""
     @State private var open = OpenCell()
+    @State private var covers = HeadingCovers()
 
     private typealias Cell = GlyphCell
 
@@ -145,11 +146,15 @@ struct GlyphsSection: View {
                             .padding(.top, above)
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { [most = GlyphHeader.headingHeight - GlyphHeader.line, top = GlyphHeader.labelledHeight] proxy in
+                    guard row == 0, heading.labelFollows else { return 0 }
+                    return min(most, max(0, top - proxy.frame(in: .scrollView).minY))
+                } action: { [covers] in if row == 0 && heading.labelFollows { covers.covered[index] = $0 } }
                 .padding(.horizontal, Self.inset)
                 .padding(.bottom, row == rows.count - 1 ? Self.bottom(of: index, in: categories) : Self.spacing)
             }
         } header: {
-            GlyphHeader(heading: heading)
+            GlyphHeader(heading: heading, covers: covers)
         }
     }
 
