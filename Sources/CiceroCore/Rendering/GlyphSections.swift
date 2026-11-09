@@ -15,7 +15,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     public static let greek = GlyphGroup.script("Greek")
 
     public enum ScriptPart: Int, Sendable {
-        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, signs
+        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, signs, caseSensitiveForms
 
         var title: String {
             switch self {
@@ -25,6 +25,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
             case .lowercaseAccents: "Lowercase Accents"
             case .smallCaps: "Small Caps"
             case .signs: "Signs and Marks"
+            case .caseSensitiveForms: "Case-Sensitive Forms"
             }
         }
 
@@ -65,7 +66,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .uppercaseAccents: "Uppercase Accents"
         case .lowercaseAccents: "Lowercase Accents"
         case .smallCaps: "Small Caps"
-        case .phoneticLetters: "Phonetic Letters"
+        case .phoneticLetters: "IPA"
         case .ligatures: "Ligatures"
         case .proportionalFigures: "Proportional Figures"
         case .tabularFigures: "Tabular Figures"
@@ -200,6 +201,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
             return .script(script)
         }
         if name.contains("SUBSCRIPT") { return .subscripts }
+        if Self.isModifierLetter(name) { return .phoneticLetters }
         if Self.isRaisedOrLowered(name) { return .superscripts }
         if name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .ordinals }
         if name.contains("FRACTION") { return .fractions }
@@ -279,6 +281,10 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         "Miscellaneous Symbols and Pictographs", "Emoticons", "Ornamental Dingbats", "Transport and Map Symbols",
         "Supplemental Symbols and Pictographs", "Chess Symbols", "Symbols and Pictographs Extended-A",
     ]
+
+    static func isModifierLetter(_ name: String) -> Bool {
+        name.hasPrefix("MODIFIER LETTER SMALL") || name.hasPrefix("MODIFIER LETTER CAPITAL")
+    }
 
     private static func isRaisedOrLowered(_ name: String) -> Bool {
         name.contains("SUBSCRIPT") || name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL")
@@ -360,8 +366,9 @@ public struct GlyphSection: Identifiable, Sendable {
             buckets[group] = nil
             for (value, base) in zip(values, bases) { buckets[.scriptPart(script, Self.part(of: base, in: script)), default: []].append(value) }
         }
-        func smallCaps(of character: UInt32) -> GlyphGroup {
-            (GlyphGroup.of(character)?.scriptName).map { .scriptPart($0, .smallCaps) } ?? .smallCaps
+        func smallCaps(of character: UInt32) -> GlyphGroup { ofScript(.smallCaps, character, .smallCaps) }
+        func ofScript(_ group: GlyphGroup, _ character: UInt32, _ part: GlyphGroup.ScriptPart) -> GlyphGroup {
+            (GlyphGroup.of(character)?.scriptName).map { .scriptPart($0, part) } ?? group
         }
         if let values = buckets.removeValue(forKey: .smallCaps) {
             for value in values { buckets[smallCaps(of: privateUse.characters[value] ?? value), default: []].append(value) }
@@ -378,7 +385,16 @@ public struct GlyphSection: Identifiable, Sendable {
             switch group {
             case .superscripts, .subscripts, .numerators, .denominators, .fractions:
                 buckets[group] = ordered(values, by: { Self.valueOrder(of: $0, in: group) }, <)
-            case .uppercaseAccents, .lowercaseAccents, .smallCaps, .phoneticLetters, .scriptPart:
+            case .phoneticLetters:
+                buckets[group] = ordered(values, by: { (value: UInt32) -> (Int, Int, Double, UInt32, UInt32, UInt32) in
+                    guard Self.isModifier(value) else {
+                        let order = Self.letterOrder(of: value)
+                        return (0, 0, 0, order.0, order.1, order.2)
+                    }
+                    let order = Self.valueOrder(of: value, in: .superscripts)
+                    return (1, order.0, order.1, 0, 0, value)
+                }, <)
+            case .uppercaseAccents, .lowercaseAccents, .smallCaps, .scriptPart:
                 buckets[group] = ordered(values, by: Self.letterOrder, <)
             case .punctuationAndSymbols, .mathematicalOperators:
                 buckets[group] = ordered(values, by: Self.signOrder, <)
@@ -392,7 +408,13 @@ public struct GlyphSection: Identifiable, Sendable {
                 if values.contains(where: { privateUse.characters[$0] != nil }) { buckets[group] = ordered(values, by: { $0 }, <) }
             }
         }
-        let glyphs = Dictionary(grouping: features) { $0.group == .smallCaps ? smallCaps(of: $0.character) : $0.group }
+        let glyphs = Dictionary(grouping: features) { glyph in
+            switch glyph.group {
+            case .smallCaps: smallCaps(of: glyph.character)
+            case .caseSensitiveForms: ofScript(.caseSensitiveForms, glyph.character, .caseSensitiveForms)
+            case let group: group
+            }
+        }
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
         if !groups.contains(where: { $0 < .smallCaps }) {
             var sizes: [String: Int] = [:]
@@ -623,6 +645,10 @@ public struct GlyphSection: Identifiable, Sendable {
                 + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
         case .superscripts, .subscripts, .numerators, .denominators:
             return [withAlternates(scalars), glyphs.map(GlyphCell.feature)].filter { !$0.isEmpty }
+        case .phoneticLetters:
+            let modifiers = scalars.filter(Self.isModifier)
+            return [withAlternates(scalars.filter { !Self.isModifier($0) }) + glyphs.map(GlyphCell.feature), withAlternates(modifiers)]
+                .filter { !$0.isEmpty }
         case .letterlikeSymbols:
             var runs: [[GlyphCell]] = []
             for (index, scalar) in scalars.enumerated() {
@@ -703,6 +729,8 @@ public struct GlyphSection: Identifiable, Sendable {
             return (glyph.featureName, run)
         }
     }
+
+    static func isModifier(_ value: UInt32) -> Bool { GlyphGroup.isModifierLetter(name(of: value) ?? "") }
 
     public static func name(of scalar: UInt32) -> String? {
         guard let scalar = Unicode.Scalar(scalar) else { return nil }

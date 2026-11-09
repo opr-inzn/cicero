@@ -32,6 +32,13 @@ struct GlyphsSection: View {
     static let labelGap: CGFloat = 4
     static let runGap = labelLine - spacing - 2
     static let glyphSize: CGFloat = 26
+    static let chevronRaise: CGFloat = {
+        let font = NSFont.preferredFont(forTextStyle: .headline) as CTFont
+        var character: UniChar = 0x203A, glyph: CGGlyph = 0
+        guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1) else { return 0 }
+        let bounds = CTFontGetBoundingRectsForGlyphs(font, .default, [glyph], nil, 1)
+        return ((CTFontGetCapHeight(font) - bounds.minY - bounds.maxY) / 2 * 2).rounded() / 2
+    }()
 
     nonisolated static func columns(fitting width: CGFloat) -> Int {
         max(1, Int((width - 2 * inset + spacing) / (cell + spacing)))
@@ -136,7 +143,8 @@ struct GlyphsSection: View {
             }
         } header: {
             HStack(spacing: 4) {
-                ((section.script.map { Text("\($0) › ").foregroundStyle(.secondary) } ?? Text("")) + Text(section.name))
+                ((section.script.map { Text("\($0) ") + Text("›").baselineOffset(Self.chevronRaise) + Text(" ") }?.foregroundStyle(.secondary) ?? Text(""))
+                    + Text(section.name))
                     .font(.headline)
                 Text((section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)").font(.callout).foregroundStyle(.secondary)
                 Spacer()
