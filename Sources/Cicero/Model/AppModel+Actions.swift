@@ -345,10 +345,11 @@ extension AppModel {
                 for name in plan.removedFamilies { model.forget(family: name) }
             }
             let trashed = result.trashed
+            let unknown = result.succeeded - trashed.count
             #if CICERO_MEASURE
             model.lastTrashed = trashed
             #endif
-            model.showToast(result.message, undo: trashed.isEmpty ? nil : { [weak model] in model?.putBack(trashed, as: before) })
+            model.showToast(result.message, undo: trashed.isEmpty ? nil : { [weak model] in model?.putBack(trashed, unknown: unknown, as: before) })
             model.rescan()
         }
     }
@@ -358,7 +359,7 @@ extension AppModel {
     /// tags, rating, note, activation count and foundry name of the families it forgot, where nothing took their
     /// place since; and, once a scan has read them, each file on or off as it was: on where it is, or until Cicero
     /// quits, and off again in the Fonts folder, where macOS turns a file that comes back on by itself.
-    func putBack(_ trashed: [String: String], as before: TrashUndo) {
+    func putBack(_ trashed: [String: String], unknown: Int, as before: TrashUndo) {
         enqueue { model in
             let outcome = await model.engine.putBack(trashed, off: before.off)
             let back = Set(outcome.back)
@@ -379,7 +380,7 @@ extension AppModel {
                 if !off.isEmpty { model.data.records = await model.engine.deactivate(off, records: model.data.records).records }
             }
             model.rescan()
-            model.showToast(Self.putBackMessage(back: back.count, problems: outcome.problems))
+            model.showToast(Self.putBackMessage(back: back.count, problems: outcome.problems, unknown: unknown))
         }
     }
 
@@ -402,13 +403,15 @@ extension AppModel {
         self.data = data
     }
 
-    static func putBackMessage(back: Int, problems: [String: ActivationEngine.PutBackProblem]) -> String {
-        guard !problems.isEmpty else { return back == 1 ? "Put back from the Trash" : "Put back \(back) files from the Trash" }
+    static func putBackMessage(back: Int, problems: [String: ActivationEngine.PutBackProblem], unknown: Int = 0) -> String {
+        guard !problems.isEmpty || unknown > 0 else { return back == 1 ? "Put back from the Trash" : "Put back \(back) files from the Trash" }
+        let total = back + problems.count + unknown
+        guard !problems.isEmpty else { return "Put back \(back) of \(total) files" }
         let gone = problems.values.count { $0 == .notInTrash }, taken = problems.values.count { $0 == .pathTaken }
         let reasons = [gone > 0 ? "\(gone) no longer in the Trash" : nil, taken > 0 ? "\(taken) where another file is now" : nil,
                        problems.count - gone - taken > 0 ? "\(problems.count - gone - taken) couldn’t be moved" : nil].compactMap { $0 }
-        let lead = back == 0 ? (problems.count == 1 ? "Couldn’t put the file back" : "Couldn’t put the files back")
-            : "Put back \(back) of \(back + problems.count) files"
+        let lead = back == 0 ? (total == 1 ? "Couldn’t put the file back" : "Couldn’t put the files back")
+            : "Put back \(back) of \(total) files"
         return lead + ": " + reasons.joined(separator: ", ")
     }
 
