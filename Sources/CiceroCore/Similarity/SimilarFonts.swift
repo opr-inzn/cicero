@@ -12,6 +12,7 @@ public struct SimilarFonts: Sendable {
     private let italicRows: [Int?]
     private let italicOnly: [Bool]
     private let rounded: [Bool]
+    private let plainDesigns: [String]
     private let scales: [Float]
     private let weights: [Float]
     private let embeddingWeight: Float
@@ -35,7 +36,7 @@ public struct SimilarFonts: Sendable {
     public static let embeddingStep: Float = 0.1
 
     public static let otherClassification: Float = 1
-    public static let notRounded: Float = 4
+    public static let notRounded: Float = 10
 
     static let slanted: Float = 0.1
     static let roundedWords: Set<String> = ["rounded", "round", "rnd"]
@@ -105,6 +106,7 @@ public struct SimilarFonts: Sendable {
         let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
         var ids: [String] = [], values: [Float] = [], vectors: [Float] = [], classifications: [String?] = [], sizes: [OpticalSize?] = []
         var designs: [String] = [], uprightDesigns: [String] = [], italicOnly: [Bool] = [], rounded: [Bool] = []
+        var plainDesigns: [String] = []
         var italics: [(family: Int, values: [Float], embedding: [Float])] = []
         func usable(_ measured: LetterMeasurements?, _ embedded: [Float]?) -> Bool {
             (measured != nil || !measuring) && (embedded != nil || !embedding) && (measured != nil || embedded != nil)
@@ -127,8 +129,10 @@ public struct SimilarFonts: Sendable {
             designs.append(Self.design(of: family.id))
             uprightDesigns.append(Self.uprightDesign(of: family.id))
             italicOnly.append(isItalic)
-            let words = Set(family.id.lowercased().split { !$0.isLetter }.map(String.init))
-            rounded.append(measured?[.rounded] == 1 || !words.isDisjoint(with: Self.roundedWords))
+            let words = family.id.split { !$0.isLetter && !$0.isNumber && $0 != "." }.map(String.init)
+            let plain = words.filter { !Self.roundedWords.contains($0.lowercased()) }
+            rounded.append(measured?[.rounded] == 1 || plain.count < words.count)
+            plainDesigns.append(Self.design(of: plain.joined(separator: " ")))
         }
         let slant = LetterMeasurements.Measure.slant.rawValue
         var italicRows: [Int?] = italicOnly.indices.map { italicOnly[$0] || abs(values[$0 * Self.measures + slant]) > Self.slanted ? $0 : nil }
@@ -148,6 +152,7 @@ public struct SimilarFonts: Sendable {
         self.italicRows = italicRows
         self.italicOnly = italicOnly
         self.rounded = rounded
+        self.plainDesigns = plainDesigns
         scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
@@ -212,7 +217,7 @@ public struct SimilarFonts: Sendable {
         }
         var apart = sum.squareRoot()
         if let first = classifications[a], let second = classifications[b], first != second { apart += otherClassification }
-        if rounded[a], !rounded[b] { apart += Self.notRounded }
+        if rounded[a], !rounded[b], designs[b] != plainDesigns[a] { apart += Self.notRounded }
         return apart
     }
 }
