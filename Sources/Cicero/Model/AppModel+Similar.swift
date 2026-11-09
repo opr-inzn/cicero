@@ -42,6 +42,14 @@ extension AppModel {
         similarFonts.contains(family.id, kind: style.map(family.kind(of:)))
     }
 
+    func shownStyle(of family: Family) -> LibraryFace? {
+        let chosen = openFamilyID == family.id && pageStyleID != nil
+        let searched = family.namesStyle(SearchQuery(appliedSearch), tokens: searchTokens)
+        guard chosen || searched || similarStyle != nil else { return nil }
+        let face = previewStyle(of: family, weight: 400).face
+        return face.id == family.regular.id ? nil : face
+    }
+
     var similarStyle: LibraryFace? {
         guard let id = similarStyleID, let family = similarFamilyID.flatMap(library.family) else { return nil }
         return family.faces.first { $0.id == id }

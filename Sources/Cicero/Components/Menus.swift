@@ -62,8 +62,9 @@ struct FamilyMenu: View {
         Divider()
 
         if families.count == 1 {
-            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: families[0]) }
-                .disabled(!model.canShowSimilar(families[0]))
+            let style = model.shownStyle(of: families[0])
+            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: families[0], style: style) }
+                .disabled(!model.canShowSimilar(families[0], style: style))
         }
         if families.count > 1 {
             Button("Compare", systemImage: "rectangle.split.1x2") {

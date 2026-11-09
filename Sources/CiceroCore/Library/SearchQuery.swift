@@ -187,6 +187,11 @@ extension Family {
         return terms
     }
 
+    public func namesStyle(_ query: SearchQuery, tokens: [SearchToken]) -> Bool {
+        let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
+        return SearchToken.style(of: tokens, over: typed) != nil
+    }
+
     public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double) -> (face: LibraryFace, weight: Double) {
         let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
         let variable = tokens.contains(.variable)
