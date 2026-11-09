@@ -45,7 +45,13 @@ struct EarlierImportSheet: View {
                 }
                 Spacer()
                 Button(stage == nil ? "Not Now" : "Cancel", role: .cancel) {
-                    if let task { stage = .stopping; task.cancel() } else { dismiss() }
+                    if let task {
+                        stage = .stopping
+                        task.cancel()
+                    } else {
+                        model.declineEarlierImport(prompt)
+                        dismiss()
+                    }
                 }
                 .disabled(stage != nil && !isCopying)
                 Button("Copy Fonts") { start() }

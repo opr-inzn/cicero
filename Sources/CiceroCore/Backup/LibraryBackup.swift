@@ -79,6 +79,7 @@ public struct FontRestoreResult: Sendable, Equatable {
     public var failed = 0
     public var restoredPaths: Set<String> = []
     public var turningOff: [String: String] = [:]
+    public var fallbackPaths: [String: String] = [:]
     public var cancelled = false
 
     public init() {}
@@ -329,8 +330,10 @@ public struct LibraryBackup: Sendable {
             let fallback = fallbackFolder.appendingPathComponent(relative, isDirectory: false).path
             if fm.fileExists(atPath: fallback) {
                 result.skipped += 1
+                result.fallbackPaths[target] = fallback
             } else if (try? Self.place(source, at: fallback)) != nil {
                 result.fallback += 1
+                result.fallbackPaths[target] = fallback
             } else {
                 result.failed += 1
             }

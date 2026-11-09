@@ -132,8 +132,12 @@ extension AppModel {
             return showToast("Stopped restoring")
         }
 
-        let restored = backup.userData(from: contents, fontLibrary: fontLibrary)
-        await enqueued { model in
+        var restored = backup.userData(from: contents, fontLibrary: fontLibrary)
+        if let moved = fontResult?.fallbackPaths, !moved.isEmpty {
+            restored.fontFiles = restored.fontFiles.map { moved[$0] ?? $0 }
+            restored.records.inPlace = Set(restored.records.inPlace.map { moved[$0] ?? $0 })
+        }
+        await enqueued { [restored] model in
             if settings {
                 var data = restored
                 data.records = model.data.records

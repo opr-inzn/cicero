@@ -289,7 +289,7 @@ final class AppModel {
             if store.flush(durably: true) { AppFolderMoves.remove(support: locations.support) }
         }
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
-        mayOfferEarlierImportCopy = FontExplorerImport.earlierImportLocation(in: data) != nil
+        mayOfferEarlierImportCopy = FontExplorerImport.earlierImportLocation(in: data).map { !Self.declinedEarlierImport($0) } ?? false
         if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
         restoreGroups()

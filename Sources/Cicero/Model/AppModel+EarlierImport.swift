@@ -13,9 +13,20 @@ struct EarlierImportPrompt: Identifiable {
 }
 
 extension AppModel {
+    static let declinedEarlierImportsKey = "earlierImport.declinedLocations"
+
+    static func declinedEarlierImport(_ folder: WatchedFolder) -> Bool {
+        UserDefaults.standard.stringArray(forKey: declinedEarlierImportsKey)?.contains(folder.id.uuidString) == true
+    }
+
+    func declineEarlierImport(_ prompt: EarlierImportPrompt) {
+        let declined = UserDefaults.standard.stringArray(forKey: Self.declinedEarlierImportsKey) ?? []
+        UserDefaults.standard.set(declined + [prompt.folder.id.uuidString], forKey: Self.declinedEarlierImportsKey)
+    }
+
     func offerEarlierImportCopy() {
         guard !askedAboutEarlierImport, !isImporting, importing == nil,
-              let folder = FontExplorerImport.earlierImportLocation(in: data)
+              let folder = FontExplorerImport.earlierImportLocation(in: data), !Self.declinedEarlierImport(folder)
         else { return mayOfferEarlierImportCopy = false }
         let faces = faces(in: [folder])
         let prefix = folder.path + "/"
