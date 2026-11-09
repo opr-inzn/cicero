@@ -27,7 +27,6 @@ enum ApplicationsFolder {
                 _ = LoginItem.set(true, model: model)
             }
         } else if !defaults.bool(forKey: dontAskKey) {
-            // Once the window is up, rather than in the middle of a view update.
             Task { offerToMove(forOpenAtLogin: false) }
         }
     }
@@ -66,8 +65,7 @@ enum ApplicationsFolder {
             volumeIsDiskImage: volume?.volume.map(isDiskImage) ?? false,
             home: .homeDirectory, canWriteToApplications: FileManager.default.isWritableFile(atPath: "/Applications"))
 
-        // A Cicero running from there quits before its copy goes to the Trash, so the moved one opens
-        // instead of bringing it to the front.
+        // A Cicero running from there quits before its copy goes to the Trash, so the moved one opens instead of bringing it to the front.
         let replaced = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
             .filter { $0 != .current && $0.bundleURL?.standardizedFileURL.path == move.destination.standardizedFileURL.path }
         replaced.forEach { $0.terminate() }

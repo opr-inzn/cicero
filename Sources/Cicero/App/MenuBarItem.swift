@@ -30,12 +30,10 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
     func start() {
         guard observers.isEmpty else { return }
         let center = NotificationCenter.default
-        // The switches in Settings write to the defaults.
         observers.append(center.addObserver(forName: UserDefaults.didChangeNotification, object: defaults, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.update() }
         })
-        // A window that closes is still there as this comes. Menus are windows too, without a title bar: one closing as
-        // its item opens a window would count before that window shows.
+        // A window that closes is still there as this comes. Menus are windows too, without a title bar: one closing as its item opens a window would count before that window shows.
         let windowChanges = [NSWindow.didBecomeKeyNotification, NSWindow.willCloseNotification, NSApplication.didUnhideNotification]
         for name in windowChanges {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
@@ -64,7 +62,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
                     return true
                 }])
             }
-            // Its window hands what's dragged over it to its delegate.
             item.button?.window?.registerForDraggedTypes([.fileURL])
             item.button?.window?.delegate = self
             statusItem = item
@@ -82,7 +79,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         let policy: NSApplication.ActivationPolicy = hidesDockIcon && !hasWindow ? .accessory : .regular
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
-        // The last window closed: back to the app that was in front before, rather than Cicero with nothing to show.
         if policy == .accessory, NSApp.isActive { NSApp.hide(nil) }
     }
 
@@ -94,7 +90,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
             showMenu()
         } else if let window = frontMainWindow {
             window.performClose(nil)
-            // Back to the app that was in front before, rather than Cicero with nothing to show.
             let hasWindow = NSApp.windows.contains { $0.styleMask.contains(.titled) && $0.isVisible }
             if !hasWindow, NSApp.isActive { NSApp.hide(nil) }
         } else {
@@ -153,7 +148,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         let session = ActivationEngine.currentSession()
         let temporary = model.data.records.temporary.filter { $0.value.session == session }
         guard !temporary.isEmpty else { return [] }
-        // A file can have several styles: a collection's, or a variable font's named ones.
         var faces: [String: [LibraryFace]] = [:]
         for face in model.library.families.lazy.flatMap(\.faces) where temporary[face.face.path] != nil {
             faces[face.face.path, default: []].append(face)
@@ -202,7 +196,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         } else {
             model.activateFonts(in: [row])
         }
-        // Asking whether to turn on so many, or to move files out of a shared folder, happens in the main window.
         if model.manyActivationPrompt != nil || model.movingOutPrompt != nil {
             NSApp.bringForward { openWindow?(id: WindowID.main) }
         }
@@ -288,7 +281,6 @@ extension NSApplication {
         // macOS 26 turns down an app's own request to come forward, even from a click on its icon in the menu bar, so Cicero also asks Launch Services, as the Dock does.
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        // This copy, as it runs: brought forward rather than opened again.
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration)
     }
 }

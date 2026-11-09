@@ -26,7 +26,7 @@ extension Classification {
 }
 
 enum FaceCache {
-    private static let magic: UInt32 = 0x4346_5450  // "PTFC"
+    private static let magic: UInt32 = 0x4346_5450
     static let version: UInt32 = 12
     static let withoutFigures: UInt32 = 11
 

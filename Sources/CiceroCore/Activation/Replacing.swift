@@ -19,10 +19,8 @@ extension ActivationEngine {
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
-        // Staged copy → the replacement it's for, of those that go in off, into a Fonts folder or Cicero's Library.
         var goingInOff: [String: FileReplacement] = [:]
         var intoLibrary: [String: FileReplacement] = [:]
-        // Copies nothing goes in for (see `spareCopies`), with their originals.
         var spare: [(replacement: FileReplacement, original: String)] = []
         for replacement in replacements {
             if let original = spareCopies[replacement.old] {
@@ -55,7 +53,6 @@ extension ActivationEngine {
                 try fm.moveItem(at: staged, to: old)
                 done.append(replacement)
             } catch {
-                // The old file is in the Trash, to put back from there.
                 try? fm.removeItem(at: staged)
                 failed.append(replacement.old)
             }
@@ -76,7 +73,6 @@ extension ActivationEngine {
             placed.merge(library.placed) { first, _ in first }
             for old in library.placed.keys { records.installedCopies[old] = nil }
         }
-        // Once its original has the added file, the copy goes; while it doesn't, the copy stays as it was.
         for (replacement, original) in spare {
             guard done.contains(where: { $0.old == original }), didTrash(Self.url(replacement.old)) else {
                 failed.append(replacement.old)
@@ -87,12 +83,10 @@ extension ActivationEngine {
             records.installedCopies[replacement.old] = nil
         }
 
-        // On again, as it was: the new file where it went in, the old one where it stayed.
         let back = { (paths: [String]) in paths.filter { fm.fileExists(atPath: $0) } }
         if !back(persistent).isEmpty { _ = await registerAndConfirm(back(persistent), scope: .persistent) }
         if !back(session).isEmpty { _ = await registerAndConfirm(back(session), scope: .session) }
 
-        // Where each new file is.
         func new(_ replacement: FileReplacement) -> String { placed[replacement.old] ?? replacement.old }
         if moving {
             for (added, copies) in Dictionary(grouping: done, by: \.added) where !Self.isProtected(added) {
@@ -102,7 +96,6 @@ extension ActivationEngine {
             }
         }
 
-        // "Replaced Inter. The old file is in the Trash", and what couldn't be, by name: ". Couldn’t replace Roboto".
         var message: String
         if done.isEmpty {
             message = Self.message("Replaced", "replace", succeeded: 0, failed: failed.count,
@@ -142,13 +135,11 @@ extension ActivationEngine {
         func sameName(_ replacement: FileReplacement) -> Bool {
             Self.url(replacement.added).lastPathComponent.compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
         }
-        // Old path → where the old file waits.
         var waiting: [String: String] = [:]
         var moves: [String: String] = [:]
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
             let old = Self.url(replacement.old)
             guard sameName(replacement) else {
-                // While the old file is still there, so never its path.
                 moves[path] = Self.uniqueURL(for: Self.url(replacement.added).lastPathComponent, in: old.deletingLastPathComponent()).path
                 continue
             }
@@ -177,7 +168,6 @@ extension ActivationEngine {
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) where moves[path] != nil {
             let aside = waiting[replacement.old]
             guard let new = moved.placed[path] else {
-                // Back in the staging folder; the old file goes back as it was.
                 try? fm.removeItem(atPath: path)
                 if let aside { await putBack(aside, at: replacement.old, remembered: remembered.contains(replacement.old)) }
                 failed.append(replacement.old)
@@ -188,10 +178,8 @@ extension ActivationEngine {
                 if new != replacement.old { placed[replacement.old] = new }
                 if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
             } else if aside != nil {
-                // In the Inactive folder, the old one stays in the library, off, beside the new one.
                 done.append(replacement)
             } else {
-                // The old one stays, off; the new one goes again, before macOS has it for long.
                 try? fm.removeItem(atPath: new)
                 failed.append(replacement.old)
             }
@@ -245,7 +233,6 @@ extension ActivationEngine {
         }
         guard !ready.isEmpty else { return [:] }
         let remembered = await registrar.waitUntilForgotten(ready.values.sorted(), timeout: .zero, every: .zero)
-        // Where each waits → (its "Name 2" path, the path meant for it).
         var waiting: [String: (interim: String, original: String)] = [:]
         for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
             // Renamed where it is, a file would lose being off, so it leaves for the Inactive folder and goes in again.

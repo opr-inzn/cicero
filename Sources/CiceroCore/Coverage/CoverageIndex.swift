@@ -56,8 +56,6 @@ public final class CoverageIndex: Sendable {
     }
 
     public init(caches: URL, languages: LanguageCatalog) {
-        // v4 leaves out characters CoreText adds that the font's character map doesn't have, v3 those whose glyphs
-        // draw nothing.
         file = caches.appendingPathComponent("coverage-v4.plist", isDirectory: false)
         oldFile = caches.appendingPathComponent("coverage-v3.plist", isDirectory: false)
         self.languages = languages
@@ -93,7 +91,6 @@ public final class CoverageIndex: Sendable {
                 }
             }
         }
-        // What to keep is decided now, against these families; only the writing waits.
         if saves, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
             saveQueue.async { self.write(entries) }
         }
@@ -126,7 +123,6 @@ public final class CoverageIndex: Sendable {
             $0.entries = [:]
             $0.dirty = false
         }
-        // After any write already queued, so none can put the file back.
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
     }
 

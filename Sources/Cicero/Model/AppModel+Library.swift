@@ -9,14 +9,12 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        // `folders` and `sets` are keys in the user's sidebar data (`SidebarPreferences.order`), so the cases can't follow
-        // the titles.
+        // `folders` and `sets` are keys in the user's sidebar data (`SidebarPreferences.order`), so the cases can't follow the titles.
         case .folders: "Locations"
         case .sets: "Folders"
         case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
-        // As in Settings: which fonts have every character of a set.
         case .characterSets: "Coverage"
         }
     }
@@ -197,7 +195,6 @@ extension AppModel {
                               coverageRevision: coverageColumns.isEmpty ? 0 : coverageRevision)
         if let cached = fontRowsCache, cached.key == key { return (cached.rows, cached.families) }
         let sources = coverageColumns.compactMap { column in coverageSource(of: column).map { (column, $0) } }
-        // No order keeps the families' own, as for similar fonts, the closest first.
         #if CICERO_MEASURE
         let measuring = Measurements.begin("fontRows")
         defer { measuring.end(detail: "\(visibleFamilies.count) rows") }
@@ -214,9 +211,7 @@ extension AppModel {
     private func computeVisibleFamilies() -> [Family] {
         let query = SearchQuery(appliedSearch)
         var found = listedFamilies(where: searchMatcher(query, tokens: searchTokens))
-        // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
         if found.isEmpty, !query.isEmpty { found = listedFamilies(where: searchMatcher(query.anywhereInNames, tokens: searchTokens)) }
-        // A new list's first screens, read ahead before its tiles ask (see `ReadAhead`).
         FontLoader.shared.prefetch(found.prefix(Self.readAheadNewList).map(\.regular.face))
         return found
     }
@@ -233,9 +228,6 @@ extension AppModel {
             return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
-        // Read once, not through observation for each family; and the families' places first, so that a list of every
-        // family, as All Fonts without a search, is the library's own, not a copy of each: copying 20,000 families took
-        // 6 ms, half of making the list.
         let data = data, families = library.families
         func keeps(_ family: Family) -> Bool { data.lists(family) && tests.contains { $0(family) } && matches(family) }
         var kept: [Int] = []
@@ -269,7 +261,6 @@ extension AppModel {
         let listed = library.families.filter(data.lists)
         guard !query.isEmpty else { return listed }
         var found = listed.filter(searchMatcher(query))
-        // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
         if found.isEmpty { found = listed.filter(searchMatcher(query.anywhereInNames)) }
         let ranks = found.map { query.suggestionRank(of: $0.name.lowercased()) ?? 2 }
         return (0...2).flatMap { rank in zip(found, ranks).filter { $0.1 == rank }.map(\.0) }

@@ -48,8 +48,6 @@ public enum FontBaseImport {
             let root = rootFolder()
             let realRoot = LibraryScanner.realPath(root)
 
-            // Each file by its path under the folder, and where it is on this Mac: under the folder, or, through a
-            // symbolic link, elsewhere.
             var pathOf: [String: String] = [:]
             var located: [String: String] = [:]
             var missing = 0
@@ -63,7 +61,6 @@ public enum FontBaseImport {
                 if let id = entry["id"]?.string, pathOf[id] == nil { pathOf[id] = relative }
                 let path = root + relative
                 guard fm.fileExists(atPath: path) else {
-                    // A provider's font FontBase lists without having downloaded it, or a file that's gone.
                     let parts = relative.split(separator: "/")
                     if entry["url"]?.string != nil, parts.count > 2, parts[0] == "Providers" {
                         notDownloaded[String(parts[1]), default: 0] += 1
@@ -103,7 +100,6 @@ public enum FontBaseImport {
                                     style: names[id]?["fontSubFamily"]?.string)
             }
 
-            // Collections: the user's, and Favorites when it has any; not the filters.
             var otherCollections: [String] = []
             for (id, collection) in values["fontbase_collectionsAll"]?.properties ?? [] {
                 let type = collection["type"]?.string ?? ""
@@ -121,7 +117,6 @@ public enum FontBaseImport {
                 }
             }
 
-            // The user's tags, each given to the fonts that have it.
             var tagged: [String: [ImportedFont]] = [:]
             var tagOrder: [String] = []
             for (id, tags) in values["fontbase_fontsTagsUser"]?.properties ?? [] {
@@ -134,7 +129,6 @@ public enum FontBaseImport {
             }
             library.tags = tagOrder.map { ImportedTag(name: $0, color: nil, fonts: tagged[$0] ?? []) }
 
-            // The fonts that are on, at the paths FontBase copied them from.
             var active = Set<String>()
             for (id, relative) in values["fontbase_fontsStatus"]?.properties ?? [] {
                 guard let relative = relative.string, relative.hasPrefix("/") else { continue }
@@ -142,8 +136,6 @@ public enum FontBaseImport {
                 if located[relative] != nil { active.insert(id) }
             }
 
-            // FontBase's copies of those, left in the Fonts folder: FontBase was set to keep them on once it quit, or
-            // didn't get to delete them. Only those named after a font that's on and still in its folder.
             if let copies, let files = try? fm.contentsOfDirectory(at: copies, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
                 library.leftoverCopies = files.filter { file in
                     FontFormat.fileExtensions.contains(file.pathExtension.lowercased())

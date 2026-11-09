@@ -51,8 +51,7 @@ enum FontFileReader {
         var axis: WeightAxis?
         var axes: [VariationAxis] = []
         var isAtOrigin = true
-        // A named instance's own coordinates; axes it leaves out are at their defaults. (The font's variation
-        // would also hold the optical size CoreText picks for its point size.)
+        // A named instance's own coordinates, with axes it leaves out at their defaults; the font's variation would also hold the optical size CoreText picks for its point size.
         let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
             .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
         let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), []) as Data?
@@ -84,7 +83,6 @@ enum FontFileReader {
             isMonospaced: isMonospaced,
             familyClass: familyClass,
             panose: panose(os2),
-            // The letters are looked at only when the file doesn't say what the face is.
             letterShape: familyClass == 0 && !isMonospaced ? LetterShapes.classification(of: font) : nil,
             manufacturer: name(8, kCTFontManufacturerNameKey, in: names, of: font),
             version: name(5, kCTFontVersionNameKey, in: names, of: font),
@@ -226,7 +224,6 @@ enum FontFileReader {
         }
         let traits = CTFontCopyTraits(font) as NSDictionary
         let trait = (traits[kCTFontWeightTrait as String] as? NSNumber)?.doubleValue ?? 0
-        // AppKit's weight scale: ultraLight -0.8 … regular 0 … black 0.62.
         let scale: [(Double, Int)] = [(-0.8, 100), (-0.6, 200), (-0.4, 300), (0, 400), (0.23, 500), (0.3, 600), (0.4, 700), (0.56, 800), (0.62, 900)]
         return scale.min { abs($0.0 - trait) < abs($1.0 - trait) }!.1
     }
@@ -244,15 +241,15 @@ enum FontFileReader {
         // Not the proportion digit, which often says monospaced of fonts that aren't.
         let kind = table[table.startIndex + 32], serifStyle = table[table.startIndex + 33]
         switch kind {
-        case 2:  // Latin text
+        case 2:
             switch serifStyle {
-            case 2...10: return .serif  // cove, square, thin, oval, exaggerated, triangle
-            case 11...13: return .sansSerif  // normal, obtuse and perpendicular sans
+            case 2...10: return .serif
+            case 11...13: return .sansSerif
             default: return nil
             }
-        case 3: return .script  // Latin hand written
-        case 4: return .ornamental  // Latin decorative
-        case 5: return .symbol  // Latin symbol
+        case 3: return .script
+        case 4: return .ornamental
+        case 5: return .symbol
         default: return nil
         }
     }

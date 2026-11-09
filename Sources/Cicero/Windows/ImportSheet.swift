@@ -40,7 +40,6 @@ struct ImportSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                 }
-                // As tall as what's in it, up to the sheet's 640 points, so nothing is left empty below the last line.
                 .frame(height: contentHeight.map { min($0, 640 - headerHeight - 70) })
                 .disabled(stage != nil)
                 Divider()
@@ -49,7 +48,6 @@ struct ImportSheet: View {
         }
         .frame(width: 600)
         .onAppear { appIsOpen = isAppRunning }
-        // Again when the fonts go elsewhere: those in already are looked for where they go.
         .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
             if isOtherApp(note) { appIsOpen = isAppRunning }
@@ -145,8 +143,6 @@ struct ImportSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 2)
-                // Counting the files again for every step of the progress would hold up the window. Not before the first
-                // look has found which are in already: offered for thousands of fonts in already, it would go again.
                 if stage == nil, copies != nil, case let count = copyingCount,
                    FontLibraryOffer.isShown(count: count, chose: choseFontLibrary, installsIntoFontLibrary: model.data.installsIntoFontLibrary) {
                     FontLibraryOffer(count: count, chose: $choseFontLibrary)
@@ -214,8 +210,6 @@ struct ImportSheet: View {
                 if !library.active.isEmpty {
                     checkbox("Activate the fonts that were active", detail: activateDetail, isOn: $choices.activate)
                 }
-                // While the app is open its copies are its own: it deletes them as it quits, unless it's set not to. So
-                // they're only offered once the library has been read again after it quit.
                 if !library.leftoverCopies.isEmpty, !isWaiting {
                     checkbox("Remove \(appName)’s copies", detail: "\(count(library.leftoverCopies.count, "copy", "copies")) it left in "
                         + "\(commonFolder(library.leftoverCopies)), to the Trash, so those fonts aren’t on twice.",
@@ -257,8 +251,7 @@ struct ImportSheet: View {
                     .lineLimit(2)
             }
             Spacer()
-            // While fonts are copied, the task closes the sheet once it has stopped: closing it discards the unzipped
-            // backup, which a copy may still be reading. Once they're copied, the rest goes through.
+            // While fonts are copied, the task closes the sheet once it has stopped: closing it discards the unzipped backup, which a copy may still be reading.
             Button("Cancel", role: .cancel) {
                 if let task { stage = .stopping; task.cancel() } else { dismiss() }
             }
@@ -308,7 +301,6 @@ struct ImportSheet: View {
                 let now = ProcessInfo.processInfo.systemUptime
                 Task { @MainActor in
                     guard self.summary == nil else { return }
-                    // Once Cancel is pressed, "Stopping…" stays until the task ends.
                     guard self.stage != .stopping else { return }
                     if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
                     self.stage = stage
@@ -382,7 +374,6 @@ struct ImportSheet: View {
 
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
-        // FontBase's own library can't be imported until it has quit.
         let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so they aren’t on twice."
         return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
     }
@@ -519,7 +510,6 @@ struct ImportSheet: View {
 
     private func resultLines(_ summary: ImportSummary) -> [String] {
         var lines: [String] = []
-        // In the other app's words, as the sheet listed them: "12 collections as folders".
         let sets = prompt.source == .fontExplorer ? "set" : "collection"
         let labels = prompt.source == .fontExplorer
         let kinds: [(Int, String, String)] = [
@@ -551,7 +541,6 @@ struct ImportSheet: View {
         if summary.notedFamilies > 0 {
             lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.plain) families with notes from their comments.")
         }
-        // Before what didn't come over: with nothing new, importing again says so first.
         if lines.isEmpty { lines.append("Nothing new: Cicero has all of it from before.") }
         if summary.notFound > 0 {
             let kinds = switch prompt.source {

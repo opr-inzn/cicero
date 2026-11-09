@@ -25,7 +25,6 @@ final class QuickLook {
         if selected.count == 1, let id = selected.first { return model.family(id).map { [$0] } ?? [] }
         var ids = order.filter(selected.contains)
         if ids.count < selected.count {
-            // Selected but not in the order the browser last gave (sorted or filtered since): after the others.
             let listed = Set(ids)
             ids += model.library.families.lazy.map(\.id).filter { selected.contains($0) && !listed.contains($0) }
         }
@@ -35,7 +34,6 @@ final class QuickLook {
     var shown: (family: Family, index: Int, count: Int)? {
         let families = families
         guard !families.isEmpty else { return nil }
-        // One family doesn't depend on `currentID`, which every arrow key changes too.
         let index = families.count == 1 ? 0 : families.firstIndex { $0.id == currentID } ?? 0
         return (families[index], index, families.count)
     }
@@ -54,7 +52,6 @@ final class QuickLook {
 
     func selectionChanged(from old: Set<String>, to new: Set<String>) {
         let added = new.subtracting(old)
-        // Several at once (⌘A, a ⇧-click) keep the one shown.
         if added.count == 1 {
             currentID = added.first
         } else if let id = currentID, !new.contains(id) {
@@ -99,7 +96,7 @@ final class QuickLook {
             center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.close() }
             },
-            // Sheets and alerts (the activation prompt, say, from the panel's switch) would open under the panel.
+            // Sheets and alerts would open under the panel.
             center.addObserver(forName: NSWindow.willBeginSheetNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.panel?.orderOut(nil) }
             },
@@ -109,7 +106,6 @@ final class QuickLook {
                     self.panel?.orderFront(nil)
                 }
             },
-            // It goes to the Dock with the window and comes back with it.
             center.addObserver(forName: NSWindow.willMiniaturizeNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.panel?.orderOut(nil) }
             },
@@ -129,7 +125,6 @@ final class QuickLook {
         content.sizingOptions = []
         panel.contentView = content
         let center = NotificationCenter.default
-        // Its close button.
         center.addObserver(forName: NSWindow.willCloseNotification, object: panel, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.close() }
         }
@@ -171,10 +166,8 @@ final class QuickLookPanel: NSPanel {
         isRestorable = false
         isExcludedFromWindowsMenu = true
         collectionBehavior.insert(.fullScreenAuxiliary)
-        // On macOS 26 the page runs on under the title bar, which turns translucent over it (see `underTitleBar`).
         if #available(macOS 26, *) { styleMask.insert(.fullSizeContentView) }
         minSize = NSSize(width: 420, height: 320)
-        // The title bar in the page's colour, so the name sits on the specimen.
         titlebarAppearsTransparent = true
         titlebarSeparatorStyle = .none
         backgroundColor = Self.page
@@ -214,7 +207,6 @@ final class QuickLookPanel: NSPanel {
         let closeButton = QuickLookTitleButton { [weak self] in self?.close() }
         closeButton.toolTip = "Close"
         closeButton.setAccessibilityLabel("Close")
-        // Where Finder's is: 1.5 pt right of the window's own. Kept from the bar's top and left.
         let top: NSView.AutoresizingMask = bar.isFlipped ? .maxYMargin : .minYMargin
         let centre = NSPoint(x: close.frame.midX + 1.5, y: close.frame.midY)
         let side = QuickLookTitleButton.side
@@ -225,7 +217,6 @@ final class QuickLookPanel: NSPanel {
         titleLabel.textColor = QuickLookTitleButton.titleColor
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.sizeToFit()
-        // Its letters 9 pt after the circle, less the label's own inset.
         let start = (centre.x + QuickLookTitleButton.diameter / 2 + 9 - 2.5).rounded()
         titleLabel.frame = NSRect(x: start, y: (centre.y - titleLabel.frame.height / 2).rounded(),
                                   width: max(0, bar.bounds.width - start - 12), height: titleLabel.frame.height)
@@ -271,7 +262,6 @@ private final class QuickLookTitleButton: NSButton {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.saveGState()
         context.translateBy(x: bounds.midX - Self.diameter / 2, y: bounds.midY - Self.diameter / 2)
-        // The × cuts the circle only.
         context.beginTransparencyLayer(auxiliaryInfo: nil)
         context.setFillColor((isHighlighted ? Self.pressedCircle : Self.circle).cgColor)
         context.fillEllipse(in: CGRect(x: 0, y: 0, width: Self.diameter, height: Self.diameter))
@@ -335,7 +325,6 @@ private struct QuickLookView: View {
             GeometryReader { proxy in
                 FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count, width: proxy.size.width,
                                 titleBar: proxy.safeAreaInsets.top)
-                    // A new family starts at the top.
                     .id(shown.family.id)
             }
         }
@@ -363,22 +352,17 @@ private struct FamilyQuickLook: View {
     var body: some View {
         let scale = scale
         ScrollView {
-            // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
                 sample(scale: scale)
                     .padding(.horizontal, Self.inset)
                     .padding(.top, 12 * scale)
                     .padding(.bottom, 24 * scale)
-                // With one style the sample already shows it.
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 15 * scale)
                     ForEach(family.faces) { style in
                         QuickLookText(text: style.face.styleName, face: style.face, size: 22 * scale, weight: style.face.styleWeight)
-                            // As tall as the font's own line spacing, without padding: some fonts keep room above their
-                            // capitals (for accents, a taller style), and padding as well spread the rows far apart.
-                            // At least 1.25 × the size, for fonts set tight.
                             .frame(minHeight: 22 * scale * 1.25)
                             .padding(.horizontal, Self.inset)
                     }
@@ -443,7 +427,6 @@ private struct FamilyQuickLook: View {
         .frame(height: 36)
         .glass(in: .capsule)
         .overlay {
-            // In dark mode the glass is as dark as the page, and the bar didn't look as if it floated over it.
             if #available(macOS 26, *), colorScheme == .dark {
                 Capsule().fill(.white.opacity(0.06)).allowsHitTesting(false)
             }

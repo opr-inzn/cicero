@@ -15,8 +15,7 @@ enum SearchTokenTint {
               let appKitDrawToken = class_getInstanceMethod(appKitCell, drawToken),
               let appKitTint = class_getInstanceMethod(appKitCell, tint),
               let appKitDraw = class_getInstanceMethod(appKitCell, draw),
-              // The private method still returns an object and takes nothing, as the block standing in for it does:
-              // called some other way, the block would crash.
+              // The private method still returns an object and takes nothing, as the block standing in for it does: called some other way, the block would crash.
               Self.returnsObjectOnly(appKitTint) else { return }
         let highlight: @convention(block) (NSCell) -> NSColor = { _ in highlightTint() }
         let tintImplementation = imp_implementationWithBlock(highlight)

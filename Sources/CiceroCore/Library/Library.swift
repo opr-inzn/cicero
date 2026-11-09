@@ -66,7 +66,6 @@ public struct Locations: Sendable {
     }
 
     public func isInInactiveFolder(_ path: String) -> Bool {
-        // The former folders' paths without making their URLs: scans ask for every file.
         if path.hasPrefix(inactiveFolder.path + "/") { return true }
         let support = self.support.path + "/"
         return path.hasPrefix(support) && Self.formerInactiveNames.contains { path.hasPrefix(support + $0 + "/") }
@@ -246,7 +245,6 @@ public final class LibraryScanner: Sendable {
                 guard case .active(.temporary) = state else { return state }
                 if let record = records.temporary[path], record.scope == .whileAppsRun, record.session == session { return state }
                 asSaved = false
-                // What `faceState` says of a file that isn't active.
                 if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
                 return .inactive
             }
@@ -311,7 +309,6 @@ public final class LibraryScanner: Sendable {
         if let changes, !rereadAll, let last, last.input == input, let refound = refind(last, changes: changes) {
             find = refound
         } else {
-            // Asking fontd for the active files takes ~100 ms, as long as walking the folders; do both at once.
             let registrar = registrar
             async let active = Self.activeFontURLs(registrar)
             let replaying = changes == nil && kept != nil && !rereadAll && last?.input == input ? last?.walks : nil
@@ -349,9 +346,6 @@ public final class LibraryScanner: Sendable {
             parsed = await parse(stale, progress: report)
             signposter.endInterval("Parse", parsing)
         }
-        // What was read is in the cache already (see `parse`), so the scan that replaced this one reads only the rest:
-        // one of everything, after an update that reads every file again, would otherwise never finish while fonts
-        // kept changing.
         try Task.checkCancellation()
 
         let files = updateCache(found: found, parsed: parsed, keeping: reach)
@@ -362,8 +356,6 @@ public final class LibraryScanner: Sendable {
         }
         let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys)) }
         state.withLock { $0.last = (inputs, library) }
-        // After a few changed files the caches are written once the library is back, as on a busy Mac that can
-        // take longer than everything else.
         let save = { [self] in
             signposter.withIntervalSignpost("Save cache") {
                 saveCacheIfNeeded()
@@ -402,7 +394,6 @@ public final class LibraryScanner: Sendable {
                 found[path] = nil
                 continue
             }
-            // As `enumerateFolders` finds it, folder by folder.
             let previous = found[path]
             var file = FoundFile(stamp: stamp, isActive: false)
             var listed = added
@@ -426,9 +417,6 @@ public final class LibraryScanner: Sendable {
                 found[path] = nil
                 continue
             }
-            // A file that was there keeps what fontd said of it. A new one in a Fonts folder is on, as macOS turns on
-            // whatever is put there, if a few seconds later (the scan after it says, see `AppModel.fontsChanged`);
-            // any other is off unless Cicero registered it before (as `confirmRegistered` asks).
             file.isActive = previous?.isActive ?? file.inFontsFolder
             if !file.isActive, file.inFontsFolder || input.records.inPlace.contains(path) || input.records.temporary[path] != nil {
                 file.isActive = (file.inFontsFolder && !last.listed) || registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
@@ -436,10 +424,8 @@ public final class LibraryScanner: Sendable {
             if ActiveSource.isAdobeFonts(path) { file.folderIDs.append(WatchedFolder.adobeFontsID) }
             found[path] = file
         }
-        // An added file the last scan of everything found gone that's back isn't gone any more.
         var reach = last.reach
         reach.goneFiles = reach.goneFiles.filter { found[$0] == nil }
-        // The walks of the folders holding these files are out of date: the next scan after a notice walks them again.
         let walks = last.walks.filter { key, _ in !Self.holds(key.path, any: changes) }
         return Find(input: input, found: found, reach: reach, listed: last.listed, walks: walks)
     }
@@ -578,20 +564,15 @@ public final class LibraryScanner: Sendable {
                 found[path] = FoundFile(stamp: stamp, isActive: false, inFontsFolder: true)
             }
         }
-        // macOS's own fonts are on, whether or not CoreText's list has them. Its hidden ones (".SFNS") have
-        // names starting with a dot, which the library leaves out.
+        // macOS's own fonts are on, whether or not CoreText's list has them; its hidden ones (".SFNS") have names starting with a dot, which the library leaves out.
         for folder in locations.systemFonts {
             Self.enumerate(folder) { path, stamp in
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }
         let inactive = locations.inactiveFolders.map { WatchedFolder(id: WatchedFolder.inactiveFolderID, path: $0.path) }
-        // A location or the Font Library that holds the Inactive folder, as the home folder or ~/Cicero would, leaves it
-        // out: what's in it is Cicero's, off, and belongs with the folder it came from.
         let inactivePaths = inactive.flatMap { [$0.path + "/", Self.realPath($0.path) + "/"] }
         for folder in input.folders + inactive {
-            // Adobe's folders and Cicero's own are listed only when they're there; the Font Library counts as away when
-            // it's on a disk that isn't connected, or one Cicero may not read, like the user's folders.
             if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.inactiveFolderID,
                let availability = FolderAvailability.of(folder.path) {
                 if folder.id == WatchedFolder.fontLibraryID && availability == .notFound { continue }
@@ -608,14 +589,12 @@ public final class LibraryScanner: Sendable {
                 if found[path]!.appName == nil { found[path]!.appName = folder.appName }
             }
             let onlineOnly = { (path: String) in reach.onlineOnly[folder.id, default: []].append(path) }
-            // The Inactive folders aren't watched: always walked.
             if folder.id == WatchedFolder.inactiveFolderID {
                 Self.enumerate(folder.url, skipping: skipped, onlineOnly: onlineOnly, add)
             } else {
                 walk(folder.url, skipping: skipped, onlineOnly: onlineOnly, add)
             }
         }
-        // Adobe Fonts that Adobe apps turned on for themselves are on in those apps, and Creative Cloud's to switch.
         if let folder = locations.adobeFontsInAdobeApps {
             walk(folder, includingHidden: true) { path, stamp in
                 if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
@@ -638,7 +617,6 @@ public final class LibraryScanner: Sendable {
             if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
             found[path]!.folderIDs.append(WatchedFolder.addedFilesID)
         }
-        // Files Cicero moved out of an app's folder to turn them off still belong with that folder.
         for (path, origin) in input.records.appFolderOrigins where found[path] != nil {
             guard let folder = input.folders.first(where: { $0.appName != nil && origin.hasPrefix($0.path + "/") }) else { continue }
             found[path]!.folderIDs.append(folder.id)
@@ -651,7 +629,6 @@ public final class LibraryScanner: Sendable {
     private func addActive(_ urls: [URL], to found: inout [String: FoundFile], linked: [(real: String, chosen: String)]) {
         for url in urls {
             var path = url.path(percentEncoded: false)
-            // A file in a folder reached through a symlink goes by the path the folder was found at.
             if found[path] == nil, let folder = linked.first(where: { path.hasPrefix($0.real) }) {
                 let chosen = folder.chosen + path.dropFirst(folder.real.count)
                 if found[chosen] != nil { path = chosen }
@@ -757,10 +734,7 @@ public final class LibraryScanner: Sendable {
             func addNext() {
                 guard let (path, stamp) = pending.popFirst() else { return }
                 group.addTask {
-                    // Its descriptors aren't kept (see `FontLoader`). A file is read only when it's new or changed, so
-                    // fonts made from the path before are out of date, like the stand-in for a file that was moved away
-                    // and back: the grid still drew it as it went, from no file, which macOS answers with its "?" font
-                    // for one that's on.
+                    // Its descriptors aren't kept, so fonts made from the path before are out of date: a file moved away and back would still draw from no file, which macOS answers with its "?" font.
                     let faces = FontFileReader.faces(atPath: path)
                     FontLoader.shared.invalidate(paths: [path])
                     return (path, CachedFile(stamp: stamp, dateAdded: FontFileReader.dateAdded(atPath: path), faces: faces))
@@ -901,8 +875,6 @@ public final class LibraryScanner: Sendable {
             }
         }
 
-        // One face per PostScript name (and slant) within a family: the active file wins, the others are its other
-        // copies. Different families keep their own faces even when names clash (the Problems view says so).
         var byFamily: [String: [(LibraryFace, Set<UUID>, FaceStamp)]] = [:]
         for (_, copies) in candidates {
             let sorted = copies.sorted { Self.precedes($0, $1) }
@@ -963,8 +935,6 @@ public final class LibraryScanner: Sendable {
         hasher.combine(offline)
         let changed: Set<String> = state.withLock { state in
             var changed = Set(state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys)
-            // Files back without being read again, their faces kept while they were out of reach; to the first library,
-            // every file is new. One read again is new to `FontLoader` already (see `FontLoader.keep`).
             if state.built {
                 for path in found.keys where state.lastStamps[path] == nil && !read.contains(path) { changed.insert(path) }
             }
@@ -1032,7 +1002,6 @@ public final class LibraryScanner: Sendable {
     static func activeSource(of path: String, locations: Locations, records: ActivationRecords) -> ActiveSource {
         if path.hasPrefix("/System/") || path.hasPrefix("/Library/Application Support/Apple/") { return .macOS }
         if locations.systemFonts.contains(where: { path.hasPrefix($0.path + "/") }) { return .macOS }
-        // Also one in a Fonts folder, which is turned off there, on for a while.
         if let temporary = records.temporary[path], !ActiveSource.isAdobeFonts(path) { return .temporary(temporary.scope) }
         if path.hasPrefix(locations.allUsersFonts.path + "/") { return .allUsers }
         if path.hasPrefix(locations.userFonts.path + "/") { return .fontsFolder }
@@ -1071,13 +1040,11 @@ public final class LibraryScanner: Sendable {
     }
 
     private func sorted(_ families: [Family]) -> [Family] {
-        // A family shown in the Mac's language by that name, and its own after it, so two that show alike stay apart.
         let keys = families.map { $0.name == $0.id ? $0.id : $0.name + "\u{0}" + $0.id }
         let order: [String] = state.withLock { state in
             if keys.allSatisfy({ state.ranks[$0] != nil }) {
                 return keys.sorted { state.ranks[$0]! < state.ranks[$1]! }
             }
-            // Sorted from a fixed starting order, so the result never depends on dictionary order.
             let sorted = keys.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             state.ranks = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($1, $0) })
             return sorted

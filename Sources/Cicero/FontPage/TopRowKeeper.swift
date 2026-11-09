@@ -18,8 +18,7 @@ final class TopRowKeeper {
     private var isResizing: Bool { settling != nil }
 
     func moved(_ key: Int, to frame: CGRect) {
-        // A row as wide as it was not: the page is changing width. Rows say so before the page does; the row at the top
-        // is noted from where the rows were until now.
+        // A row as wide as it was not: the page is changing width, and rows say so before the page does.
         if let before = frames[key], abs(before.width - frame.width) >= 0.5 { resizing() }
         frames[key] = frame
         if let held, held.key == key, isResizing { keep(held, at: frame) }
@@ -35,7 +34,6 @@ final class TopRowKeeper {
         settling = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled, let self else { return }
-            // Once more where the last layout put the row.
             if let held, let frame = frames[held.key] { keep(held, at: frame) }
             settling = nil
         }

@@ -27,7 +27,6 @@ extension AppModel {
 
     func canExport(_ item: SidebarItem) -> Bool {
         switch item {
-        // Creative Cloud's files never leave it.
         case .folder(WatchedFolder.adobeFontsID): false
         case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
         case .all, .active, .inactive, .temporary, .system, .recent, .problems: false
@@ -116,7 +115,6 @@ extension AppModel {
         let current = data
         guard await saveSetupSnapshot(named: "Before Restore", nothingWas: "restored") else { return }
 
-        // Restoring the settings brings the backup's Font Library, if it has one; otherwise its fonts go into this one.
         let fontLibrary = settings && !contents.userData.fontLibraryPath.isEmpty ? nil : current.fontLibraryPath
         var fontResult: FontRestoreResult?
         if fonts { fontResult = await backup.restoreFonts(contents, fontLibrary: fontLibrary, progress: progress) }
@@ -131,18 +129,13 @@ extension AppModel {
         await enqueued { model in
             if settings {
                 var data = restored
-                // This Mac's activation state, merged below.
                 data.records = model.data.records
-                // A backup from before there were license tags gets them, and one from 0.9.1 or before loses the former
-                // ones it never used, as a library from then does as it loads.
                 data.updateLicenseTags()
-                // And one from before a Font Library that fonts aren't installed into became a location, as it does too.
                 data.keepFormerFontLibraryAsLocation(hasFonts: model.fontLibraryHasFonts)
                 model.data = data
                 model.selection = .all
             }
             if let fallbackFolder { model.addFallbackFolder(fallbackFolder) }
-            // Fonts that were off in the Fonts folder go back there, off.
             let off = await model.engine.moveIntoFontsFolderOff(fontResult?.turningOff ?? [:])
             let current = model.data.records
             let written = Set((fontResult?.restoredPaths ?? []).map { off.placed[$0] ?? $0 })
@@ -151,7 +144,6 @@ extension AppModel {
             }.value
             model.data.records = merged.records
             if !merged.reactivate.isEmpty {
-                // macOS doesn't know these registrations; a scan finds the faces of the files just put back.
                 let input = model.scanInput
                 if let library = try? await model.scanner.scan(input, progress: { _ in }) {
                     let wanted = Set(merged.reactivate)
@@ -222,7 +214,6 @@ private enum ExportPanel {
         panel.accessoryView = picker
         apply(choice.format, to: panel)
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        // A name typed with .zip means an archive, whatever the picker says.
         return (url, url.pathExtension.lowercased() == "zip" ? .zip : choice.format)
     }
 

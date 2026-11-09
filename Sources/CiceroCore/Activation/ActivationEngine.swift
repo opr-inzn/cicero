@@ -30,8 +30,7 @@ public struct CoreTextRegistrar: FontRegistrar {
             CTFontManagerRegisterFontURLs(urls as CFArray, scope, true, handler)
         }
         if result.timedOut, !result.failed.isEmpty {
-            // fontd may still turn on the files it hadn't by then; taken back, they stay off, as the caller is told.
-            // Without waiting, as fontd may not be answering.
+            // fontd may still turn on the files it hadn't by then; they're taken back without waiting, as fontd may not be answering.
             let late = urls.filter { result.failed.contains($0.path(percentEncoded: false)) }
             DispatchQueue.global(qos: .utility).async {
                 CTFontManagerUnregisterFontURLs(late as CFArray, scope) { _, _ in true }
@@ -68,8 +67,6 @@ public struct CoreTextRegistrar: FontRegistrar {
 
     public func setEnabled(_ urls: [URL], _ enabled: Bool) async -> Set<String> {
         guard !urls.isEmpty else { return [] }
-        // It returns once fontd has done it, in a few milliseconds a file, unless fontd isn't answering: then the files
-        // that aren't as asked by the time it's waited long enough count as failed.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let resumed = OSAllocatedUnfairLock(initialState: false)
             let resume: @Sendable () -> Void = {
@@ -102,7 +99,7 @@ public struct CoreTextRegistrar: FontRegistrar {
     }
 
     private static func setEnabledNow(_ urls: [URL], _ enabled: Bool) {
-        // Each font by its file and PostScript name, never the descriptors CoreText makes from the file: those would turn off every file with fonts of those names in the Fonts folders too, another copy the user has on.
+        // Each font by its file and PostScript name, never the descriptors CoreText makes from the file: those would turn off every file with fonts of those names in the Fonts folders too.
         let descriptors = urls.flatMap { url in
             let paths = [url.path(percentEncoded: false)] + LibraryScanner.linkedPaths(url.path(percentEncoded: false)).sorted()
             return (CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []).flatMap { font -> [CTFontDescriptor] in
@@ -120,7 +117,7 @@ public struct CoreTextRegistrar: FontRegistrar {
         var left = Set(paths)
         let deadline = ContinuousClock.now + timeout
         while true {
-            // Asked about the files, fontd runs, and it lets go of gone files only while it does (seen after a restart).
+            // Asked about the files, fontd runs, and it lets go of gone files only while it does.
             for path in left { _ = CTFontManagerGetScopeForURL(URL(fileURLWithPath: path) as CFURL) }
             left.formIntersection(Self.offListPaths())
             if left.isEmpty || ContinuousClock.now >= deadline { return left }
@@ -180,8 +177,7 @@ public struct CoreTextRegistrar: FontRegistrar {
             let timeout = Self.fontdTimeout(for: urls.count)
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
                 guard collector.isWaiting else { return }
-                // Asking about each file takes fontd too, which may not answer either: then, a while later, every
-                // file counts as failed.
+                // Asking about each file takes fontd too, which may not answer either.
                 let all = Set(urls.map { $0.path(percentEncoded: false) })
                 DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) { collector.finish(failing: all, timedOut: true) }
                 collector.finish(failing: Set(urls.filter(undone).map { $0.path(percentEncoded: false) }), timedOut: true)
@@ -300,16 +296,12 @@ public struct ActivationEngine: Sendable {
         var records = records
         followRenamedOrigins(of: faces, records: &records)
         var failed: [String] = []
-        // Files to copy, and the family each is copied for (see `placeCopy`).
         var toCopy: [(path: String, family: String)] = []
-        // Files to register where they are; `record` for those Cicero must remember to unregister.
         var toRegister: [(path: String, record: Bool)] = []
         let targets = Self.uniqueByPath(faces.map { currentVersion(of: installedCopy(of: $0, records: records), records: records) })
             .filter(\.canActivate)
         Self.stopKeepingOff(targets.map(\.face.path))
-        // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder ends
-        // only once the file is on there (below): ending it first would take the file off macOS's list of fonts it has
-        // off, and leave it off.
+        // A session registration of the same file would shadow the permanent one; one of a file in a Fonts folder ends only once the file is on there (below), as ending it first would take the file off macOS's list of fonts it has off, and leave it off.
         let temporary = targets.map(\.face.path).filter { records.temporary[$0] != nil }
         let sessionOnly = temporary.filter { !isInsideFontsFolder($0) }
         let stuckInSession = sessionOnly.isEmpty ? [] : await registrar.unregister(sessionOnly.map(Self.url), scope: .session)
@@ -330,8 +322,6 @@ public struct ActivationEngine: Sendable {
                 toCopy.append((path, face.face.familyName))
             }
         }
-        // Unregistering isn't needed: they're off. A new file where one turned off was a moment ago is turned on as it's
-        // registered (see `CoreTextRegistrar.register`).
         for path in toCopy.flatMap({ outdatedCopies(of: $0.path, records: records) }) where didTrash(Self.url(path)) {
             records.installedCopies[path] = nil
             removeEmptyFolders(around: path)
@@ -346,7 +336,6 @@ public struct ActivationEngine: Sendable {
                 }
             }
         }
-        // Files in a Fonts folder go on where they are; registering takes care of any macOS hasn't noticed yet.
         let inFontsFolders = (toRegister.map(\.path) + copies.filter { !$0.isNew }.map(\.destination)).filter(isInsideFontsFolder)
         var stillOff = inFontsFolders.isEmpty ? [] : await registrar.setEnabled(inFontsFolders.map(Self.url), true)
         // One that was on for a while seems on either way; with its session registration ended, it's on only if it went on.
@@ -356,7 +345,6 @@ public struct ActivationEngine: Sendable {
             stillOff.formUnion(wereTemporary.filter { !registrar.isActive(Self.url($0)) })
         }
         let enabled = Set(inFontsFolders).subtracting(stillOff)
-        // Copies are registered too: left alone, they'd reach apps only once macOS notices the file, seconds later.
         let registering = (toRegister.map(\.path) + copies.map(\.destination)).filter { !enabled.contains($0) }
         let stuck = await registerAndConfirm(registering, scope: .persistent)
         var succeeded = 0
@@ -378,7 +366,6 @@ public struct ActivationEngine: Sendable {
                 || isInInactiveFolder(copy.source)
                     && !records.installedCopies.contains { $0.key != copy.destination && $0.value == copy.source }
         })
-        // Back in ~/Library/Fonts, a file from the Inactive folder is the user's own again, no copy of anything.
         for copy in removed where isInInactiveFolder(copy.source) && !isInFontLibrary(copy.destination) {
             records.installedCopies[copy.destination] = nil
         }
@@ -400,7 +387,6 @@ public struct ActivationEngine: Sendable {
         let stuck = await registerAndConfirm(copies.map(\.destination), scope: .persistent)
         let installed = keep(copies, stuck: stuck, records: &records, failed: &failed)
         if moving { removeOriginals(of: installed) }
-        // Read from the copies: moving, the originals are gone.
         let message = Self.message("Installed", "install", succeeded: installed.count, failed: failed.count,
                                    done: FontNames.describe(FontNames.fonts(inFiles: installed.map(\.destination))),
                                    undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
@@ -465,7 +451,6 @@ public struct ActivationEngine: Sendable {
         var done = Set<String>()
         var toRegister: [String] = []
         let session = Self.currentSession()
-        // An old copy whose file has changed gives way to the new version, where it is, as `activate` copies it.
         let targets = Self.uniqueByPath(faces.map { currentVersion(of: $0, records: records) })
         Self.stopKeepingOff(targets.map(\.face.path))
         // Never one of Creative Cloud's: one only Adobe apps load would be on in every app.
@@ -574,12 +559,10 @@ public struct ActivationEngine: Sendable {
         var persistent: [String] = []
         var session: [String] = []
         var leaving: [String] = []
-        // The library's other files with the same fonts as each file, among which an installed copy's original must be.
         var listed: [String: Set<String>] = [:]
         for face in faces { listed[face.face.path, default: []].formUnion(face.otherCopies) }
         for face in Self.uniqueByPath(faces) {
             let path = face.face.path
-            // Creative Cloud's files never move, also those only Adobe apps load.
             if face.isAdobeFonts {
                 locked.append(path)
                 continue
@@ -599,8 +582,7 @@ public struct ActivationEngine: Sendable {
             case .fontsFolder:
                 inFontsFolder.append(path)
             case .temporary where isInsideFontsFolder(path):
-                // Ending its session registration would take it off macOS's list of fonts it has off, and macOS would
-                // turn it on again later: it's turned off there, which ends the session registration too.
+                // Ending its session registration would take it off macOS's list of fonts it has off, and macOS would turn it on again later: it's turned off there, which ends the session registration too.
                 inFontsFolder.append(path)
             case .inPlace, .otherApp:
                 persistent.append(path)
@@ -610,9 +592,7 @@ public struct ActivationEngine: Sendable {
                 locked.append(path)
             }
         }
-        // Cicero's spare copies, when another copy takes their place, go to the Trash. They're unregistered first, so apps
-        // drop them at once: turned off, they'd be on macOS's list of fonts it has off, which turns a new file of the
-        // same name there off too, until fontd notices the old one went.
+        // Unregistered before they go to the Trash: turned off, they'd be on macOS's list of fonts it has off, which turns a new file of the same name there off too, until fontd notices the old one went.
         let spares = trashingCopies
             ? inFontsFolder.filter { records.temporary[$0] == nil && isSpareInstalledCopy($0, listed: listed[$0] ?? [], records: records) }
             : []
@@ -625,7 +605,6 @@ public struct ActivationEngine: Sendable {
                     removeEmptyFolders(around: path)
                     succeeded += 1
                 } else {
-                    // Still in the Fonts folder: on again, as macOS would soon make it anyway, and then off there.
                     _ = await registrar.register([Self.url(path)], scope: .persistent)
                     offThere.append(path)
                 }
@@ -800,15 +779,12 @@ public struct ActivationEngine: Sendable {
                 failed.append(path)
             }
         }
-        // Files in a folder the user may not change, like the Fonts folder next to InDesign, go once macOS has
-        // asked for an administrator's password, as in the Finder.
         if !forbidden.isEmpty {
             let moved = await trashAsAdministrator(forbidden.map(Self.url))
             for path in forbidden {
                 if moved.contains(path) { trashed(path) } else { failed.append(path) }
             }
         }
-        // Files that stayed where they were stay in use.
         let kept = persistent.filter(failed.contains)
         if !kept.isEmpty { _ = await registrar.register(kept.map(Self.url), scope: .persistent) }
         let keptSession = session.filter(failed.contains)
@@ -838,11 +814,9 @@ public struct ActivationEngine: Sendable {
         let fm = FileManager.default
         var back: [String] = []
         var problems: [String: PutBackProblem] = [:]
-        // Where each goes in the Trash → its path, for those going back into a Fonts folder off.
         var offInFontsFolder: [String: String] = [:]
         for (path, location) in trashed.sorted(by: { $0.key < $1.key }) {
             guard Self.exists(location) else { problems[path] = .notInTrash; continue }
-            // A file at its path now is never written over.
             guard !Self.exists(path) else { problems[path] = .pathTaken; continue }
             // macOS turns on whatever arrives in a Fonts folder, and turning a file off before macOS has it doesn't stick.
             if off.contains(path), isInsideFontsFolder(path) {
@@ -923,8 +897,6 @@ public struct ActivationEngine: Sendable {
             let stillOn = await endSessionRegistrations(leftovers)
             for path in leftovers where !stillOn.contains(path) || records.inPlace.contains(path) { records.temporary[path] = nil }
         }
-        // An application set's registration from before a logout ended with it. One in a Fonts folder is off there again;
-        // one that's on was turned on for good along the way, and goes off.
         let stillOn = earlier.filter { isInsideFontsFolder($0) && registrar.isActive(Self.url($0)) }
         if !stillOn.isEmpty { _ = await registrar.setEnabled(stillOn.map(Self.url), false) }
         for path in earlier { records.temporary[path] = nil }
@@ -969,7 +941,6 @@ public struct ActivationEngine: Sendable {
         var records = records
         let paths = records.temporary.filter { $0.value.scope == .untilQuit }.map(\.key)
         guard !paths.isEmpty else { return records }
-        // As `endSessionRegistrations` does it.
         let inFontsFolders = paths.filter(isInsideFontsFolder)
         let elsewhere = paths.filter { !isInsideFontsFolder($0) }
         if !inFontsFolders.isEmpty { registrar.disableNow(inFontsFolders.map(Self.url)) }
@@ -1067,7 +1038,6 @@ public struct ActivationEngine: Sendable {
             removeEmptyFolders(around: destination.path)
             throw error
         }
-        // A font back from the Inactive folder, which it only left the Fonts folder for, arrives no more than then.
         if isInInactiveFolder(path), let added = Self.dateAdded(of: source) { Self.setDateAdded(added, of: destination) }
         return PlacedCopy(destination: destination.path, source: path, isNew: true)
     }
@@ -1153,7 +1123,6 @@ public struct ActivationEngine: Sendable {
     }
 
     private func isSpareInstalledCopy(_ path: String, listed: Set<String>, records: ActivationRecords) -> Bool {
-        // Only a copy Cicero installed whose original is in the library and unchanged is spare: another file with the same font names is no copy of it.
         guard let origin = records.installedCopies[path] else { return false }
         return listed.contains(origin) && Self.isIdenticalCopy(path, of: origin)
     }

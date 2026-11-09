@@ -298,10 +298,6 @@ public enum ActiveSource: Hashable, Sendable {
     }
 
     public static func isAdobeFonts(_ path: String) -> Bool {
-        // Bytes, with memmem: String.contains compares characters, about 2 µs a path, which was half of reading the
-        // saved library of 50,000 faces at launch (and the generic firstRange(of:) on bytes is slower still). The
-        // marker is ASCII, so bytes find it where characters do (but after a folder name that begins with a combining
-        // mark, which no folder of fonts has). A string without contiguous UTF-8, a bridged one, is asked as before.
         path.utf8.withContiguousStorageIfAvailable { bytes in
             coreSyncMarker.withUnsafeBufferPointer { marker in
                 memmem(bytes.baseAddress, bytes.count, marker.baseAddress, marker.count) != nil
@@ -445,7 +441,6 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
 
     private struct Fields: Hashable, Sendable {
-        // What the properties below give, described there.
         let id: String
         let name: String
         let faces: [LibraryFace]
@@ -476,7 +471,6 @@ public struct Family: Identifiable, Hashable, Sendable {
             precondition(!faces.isEmpty, "A family has at least one face")
             id = name
             let regular = Family.nearest(400, in: faces)
-            // The regular style's, else any style's: a family's styles name it alike.
             self.name = LocalizedNames.name(in: regular.face.localizedFamilyNames)
                 ?? faces.lazy.compactMap { LocalizedNames.name(in: $0.face.localizedFamilyNames) }.first ?? name
             self.faces = faces
@@ -560,7 +554,6 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var stylesDifferInWeight: Bool { Set(faces.map { Int($0.face.styleWeight.rounded()) }).count > 1 }
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
     public var lastAdded: Date? {
-        // Files that come with macOS or an app are as new as the last update of either.
         faces.lazy.filter { $0.state.source != .macOS && $0.state.source != .app }.compactMap(\.dateAdded).max()
     }
 
@@ -598,16 +591,14 @@ public struct Family: Identifiable, Hashable, Sendable {
         var variable: LibraryFace?
         for candidate in faces where !hasUpright || !candidate.face.isItalic {
             if candidate.face.weightAxis != nil {
-                // The instance at the font's origin, the regular weight of those there, rather than the first
-                // one, which in SF Pro is Compressed.
+                // The instance at the font's origin, the regular weight of those there, rather than the first one, which in SF Pro is Compressed.
                 guard let found = variable else { variable = candidate; continue }
                 if candidate.face.isAtOrigin && (!found.face.isAtOrigin
                     || abs(candidate.face.styleWeight - 400) < abs(found.face.styleWeight - 400)) {
                     variable = candidate
                 }
             } else if let current = best {
-                // A variable font without a weight axis has all its instances at one weight: the one at its origin,
-                // rather than the first one listed, which can be at the end of every axis.
+                // A variable font without a weight axis has all its instances at one weight: the one at its origin, rather than the first one listed, which can be at the end of every axis.
                 let distance = abs(Double(candidate.face.weight) - weight), bestDistance = abs(Double(current.face.weight) - weight)
                 if distance < bestDistance || distance == bestDistance && (candidate.face.isAtOrigin && !current.face.isAtOrigin
                     || candidate.face.isAtOrigin == current.face.isAtOrigin && abs(candidate.face.width - 5) < abs(current.face.width - 5)) {
@@ -623,11 +614,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     static func rangeLabel(of faces: [FontFace]) -> String {
         let styleNames = faces.map { StyleName($0.styleName) }
         func value(_ face: FontFace, _ tag: String) -> Double? { face.axes.first { $0.tag == tag }?.value }
-        // The weight the name spells out. Names come first because a variable font may nudge an instance off
-        // the round value (Skia's Black Condensed is lighter than its Black) and many static files leave every
-        // class at 400. A style whose name gives none ("Italic", "Condensed") has the weight of a named style at
-        // the same place on the axis or with the same class; else, when the name gives a width or slope, the
-        // regular weight; else that place or class ("110", "W3").
+        // Names come first: a variable font may nudge an instance off the round value, as Skia's Black Condensed is lighter than its Black.
         let rawWeights = faces.map { value($0, "wght") ?? Double($0.weight) }
         var namedByRaw: [Double: [Double]] = [:]
         for (name, raw) in zip(styleNames, rawWeights) {
@@ -638,9 +625,7 @@ public struct Family: Identifiable, Hashable, Sendable {
             if let named = namedByRaw[raw]?.min(by: { abs($0 - raw) < abs($1 - raw) }) { return named }
             return name.isRegular ? 400 : raw
         }
-        // A variable font's instances are placed by their width values, and those whose names give the same width,
-        // as written ("Compressed", not "XXX Compressed"), are one width. A static name without a width word means
-        // the normal width; a width class other than normal was set on purpose, while normal is often just left.
+        // A width class other than normal was set on purpose, while normal is often just left.
         let widthGroups = Self.groups(zip(faces, styleNames).map { face, name in
             if let raw = value(face, "wdth") { return (raw, name.widthWords.isEmpty ? nil : name.widthWords) }
             return (Double(face.width == 5 ? name.width ?? 5 : face.width), nil)
@@ -768,7 +753,6 @@ extension Classification {
         let name = name.lowercased()
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
-            // A stencil or an outline of a sans serif is still ornamental.
             (.ornamental, ["stencil", "inline", "outline", "fraktur", "blackletter"]),
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
             (.serif, ["serif", "slab", "garamond", "antiqua"]),

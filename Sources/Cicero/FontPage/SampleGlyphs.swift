@@ -123,7 +123,6 @@ nonisolated extension NSAttributedString {
             guard let glyph = (value as? SampleGlyphValue)?.glyph else { return }
             let length = (glyph.characters as NSString).length
             guard length > 0 else { return }
-            // Copies pasted side by side, or what's left of them after typing.
             var location = run.location
             while location + length <= NSMaxRange(run) {
                 if string.substring(with: NSRange(location: location, length: length)) == glyph.characters {

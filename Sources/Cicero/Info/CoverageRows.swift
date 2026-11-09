@@ -82,8 +82,6 @@ private struct LanguageList: View {
             }
         }
         .listStyle(.plain)
-        // Floating over the list, whose rows scroll up under it, so the list reaches the popover's edges as the
-        // other rows' lists do.
         .topBar {
             TextField("Search", text: $query, prompt: Text("Search languages"))
                 .textFieldStyle(.roundedBorder)
@@ -159,7 +157,6 @@ private struct MissingCharacterList: View {
     var body: some View {
         List(missing, id: \.self) { scalar in
             HStack(spacing: 8) {
-                // At the row's leading edge, as far in as the codes are from the trailing one.
                 Text(Self.drawn(scalar))
                     .font(.system(size: 18))
                     .frame(width: 30, alignment: .leading)
@@ -173,28 +170,21 @@ private struct MissingCharacterList: View {
             }
         }
         .listStyle(.plain)
-        // The last row above the button, clear of the fade.
         .popoverListInsets(top: 4, bottom: 14)
-        // Floating over the list, whose last rows scroll up from under it, frosted under it as they are under the
-        // toolbar: still there, blurred, by the scroll edge effect of a bar starting at the button.
         .bottomBar {
-            // The default button's look, but StillPushButtonStyle's on the list's background: the default one's fill
-            // is see-through, and the rows showed through its label.
+            // StillPushButtonStyle on the list's background, as the default button's fill is see-through and the rows showed through its label.
             Button("Copy Characters", systemImage: "doc.on.doc", action: copy)
                 .buttonStyle(StillPushButtonStyle())
                 .background(Self.background, in: .rect(cornerRadius: 6))
                 .help("Copies the \(missing.count == 1 ? "character" : "\(missing.count.plain) characters"), with a space between each")
                 .padding(.bottom, Self.barBottom)
                 .frame(maxWidth: .infinity)
-                // The blur starts at a line, the button's top edge: the rows fade on their way to it, so they don't blur
-                // there from crisp, and less again under it, where they show through blurred.
                 .background {
                     LinearGradient(gradient: Self.fade, startPoint: .top, endPoint: .bottom)
                         .padding(.top, -Self.fadeAbove)
                         .allowsHitTesting(false)
                 }
         }
-        // As tall as the list, up to the height of the other rows' popovers.
         .frame(width: 340, height: min(420, CGFloat(missing.count) * 30 + 4 + 14 + Self.buttonHeight + Self.barBottom))
     }
 

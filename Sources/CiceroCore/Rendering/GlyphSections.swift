@@ -90,8 +90,6 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .ordinals: 19
         case .caseSensitiveForms: 20
         case .arrows: 21
-        // A font's own forms by place in a word and big sets after the figures and signs: they're hundreds of glyphs
-        // each in a font like ABC Repro, and pushed the figures and signs far down the page.
         case .initialForms: 22
         case .medialForms: 23
         case .finalForms: 24
@@ -119,25 +117,13 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
         // Every script's currency signs together, like ฿ and ؋, and the florin ƒ, a letter to Unicode.
         if category == .currencySymbol || value == 0x192 { return .currency }
-        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ for litres and the micro
-        // sign µ: with ℮, not with other scripts' letters; and mathematics' letters and figures, like 𝐀, with its operators,
-        // and those of Letterlike Symbols Unicode marks as mathematical, like ℍ, ℝ, ℵ and ⅆ, but the signs `signs` lists,
-        // like ℓ.
+        // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ and the micro sign µ.
         if block == "Letterlike Symbols" && properties.isAlphabetic || value == 0xB5 {
             return properties.isMath && GlyphSection.isListedSign(value) == false ? .mathematicalOperators : .punctuationAndSymbols
         }
         if block == "Mathematical Alphanumeric Symbols" { return .mathematicalOperators }
-        // Numbers in circles, like ①, ❶ and ㉑, and the other numbers Unicode has for numbering, like ⑴, ⒈ and 🄁, the Chinese
-        // ones too, like ㊀ and ㈠, by their names, whichever block or script they're in. The letters in circles, like Ⓐ or
-        // the Ⓟ some fonts have for ℗, have no numeric value and go with the symbols.
+        // Letters in circles, like Ⓐ, are named CIRCLED too, but have no numeric value.
         if properties.numericType != nil, Self.isEnclosedNumber(name) { return .circledFigures }
-        // A script's own characters. In the blocks for it, all of them: Arabic's letters, figures and tatweel, Greek's tonos
-        // and question mark. Elsewhere, its letters, marks and figures, like Greek's small capitals among the phonetic
-        // letters, the Coptic letters in Greek's block, 々 among CJK punctuation or halfwidth katakana, but not those
-        // Unicode calls superscripts or subscripts. A character several scripts share, like the danda of Devanagari,
-        // Bengali and others, Arabic's comma and vowel marks, which Syriac has too, or its digits, which Thaana has, goes
-        // with the one the font has the most letters of; with none of them, with its own script, if it has one, or the
-        // punctuation or marks. Latin's are listed by kind, like a combining grave in a Latin font with Greek letters too.
         let ownScript = UnicodeScripts.script(of: value)
         let blockScript = unicodeBlock?.script
         let script: String?, all: Bool
@@ -147,27 +133,20 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
                 let others = shared.filter { $0 != "Latin" && letters($0) > 0 }
                 let most = others.max { letters($0) < letters($1) }
                 if let blockScript, let most, others.contains(blockScript), letters(blockScript) * 2 >= letters(most) {
-                    // Its block's script, like Devanagari for its stress signs in a font with more Latin letters, unless the
-                    // font has far more letters of another, like a Syriac font with an Arabic letter or two.
                     script = blockScript
                 } else if blockScript != nil || shared.max(by: { letters($0) < letters($1) }) != "Latin" {
                     script = most ?? ownScript
                 } else {
-                    // Shared with Latin, which the font has the most letters of, like a combining acute in a font with Greek
-                    // and Cyrillic too: with the marks or punctuation.
                     script = nil
                 }
             } else {
                 script = blockScript.flatMap { shared.contains($0) ? $0 : nil } ?? ownScript
             }
-            // In a script's block, like the danda, all of them; elsewhere, like the CJK comma 、, only letters, marks and figures.
             all = blockScript != nil
         } else if let ownScript {
             script = ownScript
             all = blockScript == ownScript
         } else {
-            // A sign every script could use in a script's block, like Greek's question mark, goes with that script; in a
-            // font without its letters, like the svasti sign of Tibetan's block in a Japanese font, with the symbols.
             let hasLetters = scripts.map { $0[blockScript ?? "", default: 0] > 0 } ?? true
             script = hasLetters ? blockScript : nil
             all = true
@@ -179,52 +158,33 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         if Self.isRaisedOrLowered(name) { return .superscripts }
         if name.contains("ORDINAL INDICATOR") || value == 0x2116 { return .ordinals }
         if name.contains("FRACTION") { return .fractions }
-        // Arrows, and the harpoons and the rest of the arrow blocks, like ⇌ and ⥋, but not the combining ones, which are marks.
         if (name.contains("ARROW") || name.contains("HARPOON") || block == "Arrows" || block.hasPrefix("Supplemental Arrows")) && !isMark {
             return .arrows
         }
-        // Ⅰ to Ⅿ and ⅰ to ⅿ, and the old forms, like ↀ; Unicode has them as Latin letters or numbers.
         if name.contains("ROMAN NUMERAL") { return .romanNumerals }
-        // Pictures, like ABC Stefan's faces, hearts and food: all of Miscellaneous Symbols (★ ♥ ☞), Dingbats (✓ ✉) and the
-        // emoji and pictograph blocks, and the emoji other blocks have, like ⌚ ⏰ ⭐, Miscellaneous Technical's all (⌨ ⏸);
-        // but circled figures and arrows (❶, ➔), which have groups of their own, and the geometric shapes, which go with
-        // the symbols, as do the letters and signs Unicode counts as emoji too, like ©, ™, Ⓜ and 🅰.
         if Self.pictureBlocks.contains(block) || category == .otherSymbol && !block.hasPrefix("Geometric Shapes")
             && (properties.isEmojiPresentation || properties.isEmoji && block == "Miscellaneous Technical") {
             return .graphical
         }
-        // Latin letters in other blocks too, like ə in IPA Extensions or a fullwidth Ａ.
         let latin = ownScript == "Latin" || block.contains("Latin") || name.hasPrefix("LATIN ")
         switch category {
-        // A to Z on their own; Æ, Ł, Þ and the like with the accented letters.
         case .uppercaseLetter, .titlecaseLetter:
             return latin ? (0x41...0x5A ~= value ? .uppercase : .uppercaseAccents) : .graphical
         case .lowercaseLetter:
             return latin ? (0x61...0x7A ~= value ? .lowercase : .lowercaseAccents) : .graphical
-        // Latin's letters without case, like the click ǀ and the glottal stop ʔ; signs that are letters to Unicode but no
-        // script's, like 〆, with the symbols.
         case .otherLetter:
             return latin ? .lowercaseAccents : .punctuationAndSymbols
-        // 0 to 9, and figures no script has, like the fullwidth ０; a script's own go with it.
         case .decimalNumber:
             return .proportionalFigures
         case .mathSymbol:
-            // The vertical line is typed as punctuation, with the broken bar; the shapes Unicode calls math signs, like ▷,
-            // ◁ and ◻, with the other shapes, as Glyphs has them.
             return value == 0x7C || block == "Geometric Shapes" ? .punctuationAndSymbols : .mathematicalOperators
-        // %, ‰ and ‱ with the operators, as Glyphs has them.
         case .otherPunctuation where [0x25, 0x2030, 0x2031].contains(value):
             return .mathematicalOperators
-        // The accents letters take, like U+0301, and the marks scripts share; a script's own go with its letters.
         case .nonspacingMark, .spacingMark, .enclosingMark:
             return .combiningMarks
         case .modifierSymbol:
-            // Accents set on their own, like ´, ˘ and `; ^ with the operators, as Glyphs has it. (The skin tones of emoji
-            // are in a picture block, so Graphical.)
             if value == 0x5E { return .mathematicalOperators }
             return .diacriticalMarks
-        // Accents and tone letters that are letters to Unicode, like ʹ and ꜗ; others no script has, like the kana
-        // repeat mark 〱, with the symbols.
         case .modifierLetter:
             return latin || block == "Spacing Modifier Letters" || block == "Modifier Tone Letters" ? .diacriticalMarks : .punctuationAndSymbols
         case .privateUse, .unassigned:
@@ -352,7 +312,6 @@ public struct GlyphSection: Identifiable, Sendable {
             case .greek, .script("Cyrillic"):
                 buckets[group] = ordered(values, by: { (Self.glyphsRanks[$0] ?? .max, $0) }, <)
             case .graphical:
-                // Unicode's pictures, then the private-use characters, like a foundry's logo.
                 buckets[group] = ordered(values, by: { (Unicode.Scalar($0)?.properties.generalCategory == .privateUse ? 1 : 0, $0) }, <)
             default:
                 if values.contains(where: { privateUse.characters[$0] != nil }) { buckets[group] = ordered(values, by: { $0 }, <) }
@@ -360,9 +319,6 @@ public struct GlyphSection: Identifiable, Sendable {
         }
         let glyphs = Dictionary(grouping: features, by: \.group)
         var groups = Set(buckets.keys).union(glyphs.keys).sorted()
-        // A font without Latin letters, like an Arabic or a Syriac one, starts with its scripts: the one it has the most
-        // letters of, then the others, like the Arabic figures of a Syriac font, in Unicode's order; its small capitals, like
-        // a Greek font's, after them.
         if !groups.contains(where: { $0 < .smallCaps }) {
             let main = groups.filter(\.isScript).max { a, b in
                 let (x, y) = (buckets[a]?.count ?? 0, buckets[b]?.count ?? 0)
@@ -383,7 +339,6 @@ public struct GlyphSection: Identifiable, Sendable {
         let lowercase = String(Character(scalar)).lowercased()
         let scalars = Array(lowercase.unicodeScalars)
         let letter = scalars.count == 1 ? scalars[0].value : character
-        // The letter it's a form of, the first Unicode takes it apart into, like the α of ά, and what its accents sit on.
         let base = lowercase.decomposedStringWithCompatibilityMapping.unicodeScalars.first?.value ?? letter
         let built = lowercase.decomposedStringWithCanonicalMapping.unicodeScalars.first?.value ?? letter
         let kind: UInt32 = letter == base ? 0 : built == base ? 1 : max(built, 2)
@@ -422,7 +377,6 @@ public struct GlyphSection: Identifiable, Sendable {
 
     private static let signs: [(SignKind, String)] = [
         (.punctuation, ".,:;…!¡?¿·•#*/\\‖‼‾‿"),
-        // Hyphen-minus, en and em dash, hyphen, non-breaking hyphen, figure dash, horizontal bar, then the low lines.
         (.dash, "-–—‐‑‒―_‗"),
         (.bracket, "()[]{}⟨⟩"),
         (.quote, "‚„“”‘’‛‟«»‹›\"'"),
@@ -440,7 +394,6 @@ public struct GlyphSection: Identifiable, Sendable {
     private static func signKind(of value: UInt32) -> SignKind {
         let block = Self.block(of: value) ?? ""
         if block.hasPrefix("Geometric Shapes") { return .geometry }
-        // Mathematics' letters, like 𝐀 and ℍ, after the operators.
         if block == "Mathematical Alphanumeric Symbols" || block == "Letterlike Symbols" && Unicode.Scalar(value)?.properties.isMath == true {
             return .math
         }
@@ -465,7 +418,6 @@ public struct GlyphSection: Identifiable, Sendable {
             }
         }
         guard !named.isEmpty else { return .none }
-        // The glyphs the base names are names of, and the characters the font maps to those.
         let glyphs = Dictionary(uniqueKeysWithValues: Set(named.values.map(\.base)).map { ($0, CTFontGetGlyphWithName(font, $0 as CFString)) })
         let characters = LigatureGroup.characterGlyphs(of: font, needed: Set(glyphs.values.filter { $0 != 0 }))
         var groups: [UInt32: GlyphGroup] = [:]
@@ -491,7 +443,7 @@ public struct GlyphSection: Identifiable, Sendable {
 
     private static func isLetter(_ character: UInt32) -> Bool {
         switch Unicode.Scalar(character)?.properties.generalCategory {
-        // Not modifier letters: Unicode counts accents like ˆ as ones, and a font's small capital accents, like circumflex.sc, stay with the accents.
+        // Not modifier letters: Unicode counts accents like ˆ as ones.
         case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .otherLetter: true
         default: false
         }
@@ -544,19 +496,16 @@ public struct GlyphSection: Identifiable, Sendable {
         }
         switch group {
         case .circledFigures:
-            // A row for each kind (see `GlyphGroup.enclosureKind`), from its lowest number up: ⓪ ① … ⑳ ㉑ … ㊿, then ⓿ ❶ … ⓴.
             func rank(_ kind: String) -> (Int, String) { (GlyphGroup.enclosureKinds.firstIndex(of: kind) ?? .max, kind) }
             func value(_ scalar: UInt32) -> Double { Unicode.Scalar(scalar)?.properties.numericValue ?? 0 }
             let kinds = Dictionary(grouping: scalars, by: GlyphGroup.enclosureKind(of:)).sorted { rank($0.key) < rank($1.key) }
             return kinds.map { withAlternates($0.value.sorted { (value($0), $0) < (value($1), $1) }) }
                 + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
         case .romanNumerals:
-            // Capitals, then small ones, like ⅰ.
             let small = scalars.filter { Self.name(of: $0)?.hasPrefix("SMALL") == true }
             return [withAlternates(scalars.filter { !small.contains($0) }), withAlternates(small) + glyphs.map(GlyphCell.feature)]
                 .filter { !$0.isEmpty }
         case .localizedForms:
-            // A row for each language, or each that share their forms, as `FeatureGlyph.localizedForms` lists them.
             var runs: [[GlyphCell]] = []
             for (index, glyph) in glyphs.enumerated() {
                 if index == 0 || glyph.languages != glyphs[index - 1].languages { runs.append([]) }
@@ -570,7 +519,6 @@ public struct GlyphSection: Identifiable, Sendable {
             return [withAlternates(scalars) + glyphs.map(GlyphCell.feature)]
         }
         let found = scalars.map { ($0, alternates($0)) }
-        // The font's own figures are old-style when a feature offers lining ones for them, and none old-style ones.
         let tags = found.flatMap { $0.1.flatMap(\.allFeatures) } + glyphs.flatMap(\.alongWith)
         let ownAreOldStyle = tags.contains("lnum") && !tags.contains("onum")
         enum Run: Int, CaseIterable { case lining, oldStyle, signs }
@@ -579,7 +527,6 @@ public struct GlyphSection: Identifiable, Sendable {
             if features.contains("lnum") { return .lining }
             return ownAreOldStyle ? .oldStyle : .lining
         }
-        // Each style's figures in order, each followed by its alternates in that style.
         var order: [Run: [UInt32]] = [:]
         var cells: [Run: [UInt32: [GlyphCell]]] = [:]
         var strays: [Run: [GlyphCell]] = [:]
@@ -593,7 +540,6 @@ public struct GlyphSection: Identifiable, Sendable {
                 cells[run, default: [:]][character] = [cell]
             }
         }
-        // The figures first, then their alternates, which go after them.
         for (scalar, list) in found {
             add(.character(scalar), for: scalar, in: run(of: []))
             for alternate in list where alternate.isFigureStyle { add(.alternate(alternate), for: scalar, in: run(of: alternate.allFeatures)) }
@@ -609,7 +555,6 @@ public struct GlyphSection: Identifiable, Sendable {
             let isFigure = GlyphGroup.of(glyph.character) == .proportionalFigures
             add(.feature(glyph), for: glyph.character, in: isFigure ? run(of: glyph.alongWith) : .signs)
         }
-        // The signs by their own groups, then `signOrder` (see `signPrecedes`), those of none last.
         order[.signs]?.sort { a, b in
             guard GlyphGroup.of(a) != nil else { return false }
             guard GlyphGroup.of(b) != nil else { return true }

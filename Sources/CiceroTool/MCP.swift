@@ -18,7 +18,7 @@ struct MCPServer: AsyncParsableCommand {
     var readOnly = false
 
     func run() async throws {
-        // Standard output is the agent's: only the server writes there. Anything else that prints goes to standard error.
+        // Standard output is the agent's: only the server writes there.
         let output = dup(STDOUT_FILENO)
         dup2(STDERR_FILENO, STDOUT_FILENO)
         let tools = MCPTools.all(readOnly: readOnly)
@@ -124,7 +124,6 @@ enum MCPTools {
         let isChange = command is any Changing.Type
         var inputs: [Input] = []
         for argument in arguments {
-            // An argument has no option name, only its value's.
             guard let name = argument.preferredName?.name ?? argument.valueName,
                   !(name.hasPrefix("no-") && longNames.contains(String(name.dropFirst(3)))),
                   isChange || name != "yes",
@@ -157,7 +156,6 @@ enum MCPTools {
             annotations: Tool.Annotations(
                 readOnlyHint: effect == .reads,
                 destructiveHint: effect == .reads ? nil : effect == .removes || effect == .replaces,
-                // A note added to twice says it twice.
                 idempotentHint: effect == .reads ? nil : effect == .adds || effect == .removes,
                 openWorldHint: false
             )

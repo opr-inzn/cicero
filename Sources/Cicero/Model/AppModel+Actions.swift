@@ -21,7 +21,6 @@ extension AppModel {
         let operation = expect(faces, at: .on)
         enqueue { model in
             var result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
-            // What failed, the engine's message says.
             if let named, result.failed.isEmpty { result.message = FontNames.describe(named).map { "\($0) activated" } ?? "" }
             model.finish(result, operation: operation, undo: model.undo(turning: named ?? faces, on: false, failed: result.failed))
         }
@@ -144,7 +143,6 @@ extension AppModel {
             if on {
                 self.activate(current, title: Self.title(for: families), confirmed: true)
             } else {
-                // Asking first, as ever, before moving a file out of a folder others share.
                 self.deactivate(current)
             }
         }
@@ -286,7 +284,6 @@ extension AppModel {
     }
 
     func moveToTrash(_ plan: TrashPlan) {
-        // Things as they are, for the toast's Undo (see `putBack`).
         let before = TrashUndo(plan: plan, data: data, library: library)
         enqueue { model in
             let result = await model.engine.moveToTrash(plan, records: model.data.records)
@@ -437,7 +434,6 @@ extension AppModel {
         let new = urls.map(\.standardizedFileURL.path).filter { !existing.contains($0) }
         guard !new.isEmpty else { return }
         for path in new {
-            // Adobe's folders come with the Proofing switch rather than one by one.
             if WatchedFolder.detectAppName(forPath: path) != nil {
                 data.showAdobeAppFolders = true
             } else {
@@ -736,13 +732,9 @@ extension AppModel {
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
             SidebarRow(key: "library.active", title: "Active", icon: "checkmark.seal", item: .active),
             SidebarRow(key: "library.inactive", title: "Inactive", icon: "xmark.seal", item: .inactive),
-            // Only while a font is on until Cicero quits, and while it's selected, so turning the last one off there doesn't
-            // take the row away under the pointer. The symbol of Activate Temporarily and the Temporary tag.
             hasTemporaryFonts || selectedItems.contains(.temporary)
                 ? SidebarRow(key: "library.temporary", title: "Temporary", icon: "clock", item: .temporary) : nil,
-            // Not a clock, which stands for fonts on until Cicero quits.
             SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
-            // With system fonts off in Settings, they're nowhere, this item included.
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
         ].compactMap { $0 }
@@ -760,19 +752,15 @@ extension AppModel {
         switch section {
         case .folders:
             var folders = data.folders
-            // Every folder Adobe apps load by themselves is one item.
             if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
             }
-            // Adobe Fonts, from Creative Cloud, apart from the fonts the user put in Adobe's folders.
             if ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeFontsID, path: ""))
             }
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
             }
-            // Never Cicero's Inactive folder: it only keeps fonts while they're off, and Inactive lists those. Nor the
-            // Font Library: it takes the place of ~/Library/Fonts, whose fonts are in All Fonts like the rest.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
@@ -882,8 +870,6 @@ extension AppModel {
         let items = sidebarSelection(items, from: selectedItems)
         guard let any = items.first else { selection = nil; return }
         let list = sidebarList(of: any)
-        // The one selected before when it's still there, else the first. Conflicts has no fonts to show,
-        // so it's never the one among several.
         let candidates = items.count > 1 ? items.subtracting([.problems]) : items
         let primary = selection.flatMap { candidates.contains($0) ? $0 : nil }
             ?? rows(inList: list).first { candidates.contains($0.item) }?.item ?? candidates.first
@@ -1093,7 +1079,6 @@ extension AppModel {
         case .reveal(let paths):
             NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
         case .deactivate(let ids):
-            // Asks first like any deactivation, for files Cicero didn't install.
             let ids = Set(ids)
             let faces = library.families.flatMap(\.faces).filter { ids.contains($0.id) }
             if !faces.isEmpty { deactivate(faces) }
@@ -1103,7 +1088,6 @@ extension AppModel {
         case .forgetInPlace(let path):
             enqueue { model in
                 model.data.records = await model.engine.forgetInPlace([path], records: model.data.records)
-                // A file that's gone was out of the library already: the scan finds the same one and leaves the problems as they were.
                 model.updateProblems()
                 model.rescan()
             }
@@ -1142,7 +1126,6 @@ extension AppModel {
                 model.data.records = await model.engine.forgetInPlace(inPlace, records: model.data.records)
                 model.rescan()
             }
-            // Not left to the scan: with the files gone already, it finds the same library and leaves the problems as they were.
             model.updateProblems()
         }
     }
@@ -1192,7 +1175,6 @@ private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
         } else {
             response = alert.runModal()
         }
-        // Cancelled, the panel stays open without saying anything.
         guard response == .alertSecondButtonReturn else { throw CocoaError(.userCancelled) }
     }
 }

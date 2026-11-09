@@ -8,7 +8,6 @@ enum LetterShapes {
     static func classification(of font: CTFont) -> Classification? {
         // Before the I and l: monospaced styles give both serifs to tell them apart.
         if isMonospaced(font) { return .monospaced }
-        // How far italics lean: along for each unit up.
         let slant = tan(-CTFontGetSlantAngle(font) * .pi / 180)
         switch (Reading(font, "I", slant: slant), Reading(font, "l", slant: slant)) {
         case (.measured(let i), .measured(let l)):
@@ -67,7 +66,6 @@ enum LetterShapes {
         var reach: CGFloat
 
         init?(_ font: CTFont, _ character: Character, slant: CGFloat) {
-            // In thousandths of an em, whatever size the font was made at.
             var scale = CGAffineTransform(scaleX: 1000 / CTFontGetSize(font), y: 1000 / CTFontGetSize(font))
             guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, &scale) else { return nil }
             let box = path.boundingBoxOfPath
@@ -77,7 +75,6 @@ enum LetterShapes {
             guard outline.contours <= 2 else { return nil }
             func y(_ fraction: CGFloat) -> CGFloat { box.minY + box.height * fraction }
 
-            // One run of ink at 30, 50 and 70 per cent of the height, about as wide at each, on a straight line.
             let stem = ([0.3, 0.5, 0.7] as [CGFloat]).compactMap { fraction -> ClosedRange<CGFloat>? in
                 let runs = outline.runs(at: y(fraction))
                 return runs.count == 1 ? runs[0] : nil
@@ -91,7 +88,6 @@ enum LetterShapes {
             let lean = (centers[2] - centers[0]) / (box.height * 0.4)
             guard abs(lean - slant) < 0.12 else { return nil }
 
-            // How far the ink a little way in from an end reaches past where the stem would be there.
             func overhang(_ fractions: [CGFloat]) -> (left: CGFloat, right: CGFloat) {
                 var left: CGFloat = 0, right: CGFloat = 0
                 for fraction in fractions {
@@ -125,7 +121,6 @@ enum LetterShapes {
             var edges: [Edge] = []
             var contours = 0
             func line(to point: CGPoint) {
-                // Flat edges cross no horizontal line.
                 if point.y != current.y { edges.append(Edge(from: current, to: point)) }
                 current = point
             }

@@ -13,51 +13,38 @@ struct MainWindow: View {
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: SidebarWidth.minimum, ideal: SidebarWidth.ideal, max: SidebarWidth.maximum)
-                // When it slides out and in, and where it is, for how much room hiding it gives the grid (see `SidebarRoom`).
                 .background { SidebarItemReader() }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { SidebarRoom.shared.sidebar = $0 }
         } detail: {
-            // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping
-            // whatever is around the stack: each page makes room for the Info panel and takes dropped files.
+            // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping whatever is around the stack: each page makes room for the Info panel and takes dropped files.
             NavigationStack(path: Binding(
                 get: { model.openFamilyID.map { [$0] } ?? [] },
                 set: { model.openFamilyID = $0.last }
             )) {
                 BrowserView()
-                    // Here rather than in BrowserView, so switching its view doesn't make the toolbar again (see
-                    // `BrowserToolbar`).
+                    // Here rather than in BrowserView, so switching its view doesn't make the toolbar again.
                     .toolbar { BrowserToolbar() }
                     .modifier(DetailPage(isCovered: model.openFamilyID != nil))
-                    // A page of its own for each family, so one opened from another's, as from Similar, starts at the
-                    // top, as from the browser, rather than scrolled where the other was.
+                    // A page of its own for each family, so one opened from another's starts at the top rather than scrolled where the other was.
                     .navigationDestination(for: String.self) { FontPage(familyID: $0).id($0).modifier(DetailPage()) }
             }
-            // A font page appears and goes at once, never sliding in, whatever else is animating.
             .transaction(value: model.openFamilyID) { transaction in
                 transaction.animation = nil
                 transaction.disablesAnimations = true
             }
-            // At the sidebar's edge, also while it slides in and out, which the grid follows (see `SidebarRoom`).
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { SidebarRoom.shared.detailStart = $0 }
         }
-        // On the split view, so font pages keep the field too (on the stack it doesn't show at all); typing in
-        // it, or changing its tokens, on one goes back to the matches.
+        // On the split view: on the stack, the search field doesn't show at all.
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
-        // On the split view, so the browser and font pages both have it.
         .toolbarGlassFollowsAppearance()
-        // Over the split view, so the panel stays put when a font page opens or closes.
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
         .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
-        // After an update, what's new, over the window once it's there (see `WhatsNew`), and once the question about
-        // FontExplorer X's Font Library is answered, when there's one: its sheet brings this window to the front, over
-        // What's New, which then can't be seen.
         .task(id: model.mayOfferEarlierImportCopy || model.earlierImportPrompt != nil) {
             guard !model.mayOfferEarlierImportCopy, model.earlierImportPrompt == nil, WhatsNew.shared.takePending() else { return }
             openWindow(id: WindowID.whatsNew)
         }
-        // While the Fonts in Document sheet is up, it asks how to install itself: a window shows one sheet.
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.installPrompt : nil }, set: { model.installPrompt = $0 })) {
             InstallSheet(prompt: $0)
         }
@@ -101,10 +88,8 @@ struct MainWindow: View {
         } message: { plan in
             Text(Self.trashMessage(plan))
         }
-        // From the sidebar's Organize row, until it's answered.
         .alert("Classify Your Fonts Automatically?", isPresented: Binding(get: { model.showsGuessingQuestion }, set: { _ in })) {
-            // Side by side, Not Now in grey and Classify in the accent colour, the one Return chooses: a longer title, like
-            // Don't Classify, and the alert stacks them.
+            // Side by side only with short titles: a longer one, like Don't Classify, makes the alert stack the buttons.
             Button("Classify") { model.answerGuessing(true) }
                 .keyboardShortcut(.defaultAction)
             Button("Not Now", role: .cancel) { model.answerGuessing(false) }
@@ -122,8 +107,7 @@ struct MainWindow: View {
         }
         .onChange(of: model.textPrompt?.id) { promptText = model.textPrompt?.initialText ?? "" }
         .overlay(alignment: .bottom) {
-            // Animated in here only: on the window, everything that changed with a toast (fonts trashed, the
-            // Info panel showing another) would slide into place too.
+            // Animated in here only: on the window, everything that changed with a toast would slide into place too.
             ZStack {
                 if let toast = model.toast {
                     HStack(spacing: 12) {
@@ -178,7 +162,6 @@ struct MainWindow: View {
         if !plan.otherFamilies.isEmpty {
             let names = plan.otherFamilies.count > 3 ? plan.otherFamilies.prefix(3).joined(separator: ", ") + " and others" : plan.otherFamilies.listed()
             if plan.spareCopiesOf != nil {
-                // Conflicts only removes files whose every font has a copy elsewhere.
                 let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
                 let keep = plan.otherFamilies.count == 1 ? "which keeps its other copies" : "which keep their other copies"
                 parts.append("\(files) \(names), \(keep).")
@@ -294,16 +277,13 @@ private struct FileDrop: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // From outside Cicero: families dragged within the window are names, not files.
             .drops(of: URL.self, fromOutsideOnly: true, isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
-                // A glyph dragged off a font page and let go over it again, as when the user changes their mind: no
-                // toast saying it isn't a font. macOS 15 doesn't say the drag is Cicero's own, so its file is left out.
+                // A glyph dragged off a font page and let go over it again: macOS 15 doesn't say the drag is Cicero's own, so its file is left out.
                 let urls = urls.filter { !GlyphVectors.isDragFile($0) }
                 guard !urls.isEmpty else { return }
                 model.open(urls, into: model.targetForAddedFiles)
             }
-            // While the grid, the list or the page has the focus; elsewhere `AppDelegate` takes ⌘V.
             .onPasteCommand(of: [.fileURL]) { _ in model.pasteFiles() }
             .overlay {
                 if isTargeted {

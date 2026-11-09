@@ -53,7 +53,6 @@ final class CommandRequests {
         guard let model else { return }
         let answer: JSON
         if let request = taken.request {
-            // Names are looked up in the library this launch's first scan found, not in one saved before, or none.
             if request.command.needsLibrary {
                 while !model.hasScanned, model.lastEndedScan == 0 { try? await Task.sleep(for: .milliseconds(100)) }
             }
@@ -72,7 +71,6 @@ final class CommandRequests {
         } else {
             answer = Requests.unreadable
         }
-        // On the disk before the answer, so the command's next read has it.
         let saved = model.store.flush()
         let failed = CommandError(answer: answer) != nil
         Requests.reply(saved || failed ? answer : CommandError(.failed, "Cicero made the change but couldn’t save it. Check that the disk has space and can be written to.").json,

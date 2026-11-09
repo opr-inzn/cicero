@@ -77,7 +77,6 @@ struct EarlierImportSheet: View {
         case total - 1: "Cicero copies \(copying.plain) of its \(total.plain) font files into \(place). The other one is there already."
         default: "Cicero copies \(copying.plain) of its \(total.plain) font files into \(place). The others are there already."
         }
-        // Which copies are on: as their fonts are now.
         let state = switch prompt.onCount {
         case 0: total == 1 ? " The copy is inactive, as the font is now." : " The copies are inactive, as the fonts are now."
         case total: total == 1 ? " The font is active now, and its copy will be too." : " The fonts are active now, and their copies will be too."
@@ -95,7 +94,6 @@ struct EarlierImportSheet: View {
             switch stage {
             case .copying(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                // Too narrow for both on one line beside the buttons.
                 CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: true)
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
@@ -126,7 +124,6 @@ struct EarlierImportSheet: View {
             let copied = await model.copyEarlierImport(prompt) { stage in
                 let now = ProcessInfo.processInfo.systemUptime
                 Task { @MainActor in
-                    // Once Cancel is pressed, "Stopping…" stays until the task ends.
                     guard self.stage != .stopping else { return }
                     if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
                     self.stage = stage
@@ -134,7 +131,6 @@ struct EarlierImportSheet: View {
             }
             task = nil
             if let copied {
-                // The location going is in the question already.
                 model.showToast(copied == 0 ? "FontExplorer X’s fonts were in \(model.installPlace) already"
                     : "Copied \(copied == 1 ? "1 font file" : "\(copied.plain) font files") into \(model.installPlace)")
             }

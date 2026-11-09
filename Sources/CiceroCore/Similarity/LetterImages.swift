@@ -59,7 +59,6 @@ enum LetterImages {
             advances[position] = Float(advance.width * scale / CGFloat(size))
             context.setFillColor(gray: 0, alpha: 1)
             context.fill(CGRect(x: 0, y: 0, width: size, height: size))
-            // Centred across by its ink, on the baseline.
             var placed = CGAffineTransform(translationX: CGFloat(size) / 2 - path.boundingBoxOfPath.midX * scale, y: baseline)
                 .scaledBy(x: scale, y: scale)
             guard let shape = path.copy(using: &placed) else { continue }

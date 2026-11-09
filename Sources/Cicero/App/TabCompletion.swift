@@ -23,7 +23,6 @@ nonisolated enum TabCompletion {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shellPath)
         process.arguments = ["-l", "-i", "-c", #"print -r -- "@@cicero-zdotdir ${ZDOTDIR:-$HOME}"; print -r -- "@@cicero-compdef $(whence -w compdef)""#]
-        // The home folder Cicero has (a test copy's fake one too), never another; ZDOTDIR as the user's files set it.
         var environment = ProcessInfo.processInfo.environment
         environment["HOME"] = NSHomeDirectory()
         environment["ZDOTDIR"] = nil

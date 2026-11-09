@@ -84,10 +84,7 @@ public final class FontLoader: Sendable {
         for feature in features {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
         }
-        // A millionth of a point larger for each time the file changed after fonts were made from it. CoreText calls
-        // fonts of the same file, name and size equal whatever the file holds now, and the sample, the grid and anything
-        // else drawing text with a font made from a new version kept drawing the old letters: text reuses an equal font
-        // it already has. Fonts from files that didn't change while Cicero was open are exactly their size.
+        // A millionth of a point larger for each time the file changed: CoreText calls fonts of the same file, name and size equal whatever the file holds now, and text reuses an equal font it already has, so it kept drawing the old letters.
         let font = CTFontCreateWithFontDescriptor(descriptor, size + CGFloat(changes) / 1_000_000, nil)
         if cached { fonts[key] = font }
         return font
@@ -169,7 +166,6 @@ public final class FontLoader: Sendable {
             Self.readAhead(path)
             let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
-                // Still pending, and the same generation, means nothing read or invalidated the file in the meantime.
                 if state.generations[path] ?? 0 == generation, state.pending.remove(path) != nil { state.keep(descriptors, for: path) }
             }
         }
@@ -181,14 +177,10 @@ public final class FontLoader: Sendable {
         defer { close(fd) }
         var info = stat()
         guard fstat(fd, &info) == 0, info.st_size > 0 else { return }
-        // At most the first 32 MB: a few big files, the emoji font's 183 MB above all, were most of what launches read
-        // ahead (506 of 634 MB with macOS 26's fonts), filling the page cache other apps use. A preview draws a few
-        // glyphs; the rest of such a file is read as it's drawn.
         let count = min(info.st_size, Self.mostReadAhead)
         var advice = radvisory(ra_offset: 0, ra_count: Int32(count))
         _ = fcntl(fd, F_RDADVISE, &advice)
         #if CICERO_MEASURE
-        // How much the read-ahead asks for, in MB (as the "ms" of the line).
         Measurements.record("readAhead.mb", ms: Double(count) / 1_048_576, detail: path)
         #endif
     }
@@ -241,7 +233,6 @@ public final class FontLoader: Sendable {
     private func fileDescriptors(at path: String) -> FileDescriptors {
         if let cached = state.withLock({ $0.descriptors[path] }) { return cached }
         #if CICERO_MEASURE
-        // On the main thread, as a view draws, the app performance runs count it.
         let measuring = Thread.isMainThread ? Measurements.begin("mainThreadFileRead") : nil
         defer { measuring?.end(detail: path) }
         #endif

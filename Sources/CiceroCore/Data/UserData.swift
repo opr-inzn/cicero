@@ -89,21 +89,17 @@ public struct UserData: Codable, Equatable, Sendable {
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
         folderNames = try value(.folderNames, d.folderNames)
-        // Web fonts, which versions before 0.6 added, are no longer read.
         fontFiles = try value(.fontFiles, d.fontFiles).filter { FontFormat.fileExtensions.contains(($0 as NSString).pathExtension.lowercased()) }
         missingFontFiles = try value(.missingFontFiles, d.missingFontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)
         tags = try value(.tags, d.tags)
         familyTags = try value(.familyTags, d.familyTags)
-        // A colour a later version adds is no colour here, rather than a file that doesn't load.
         tagColors = try value(.tagColors, [String: String]()).compactMapValues(TagColor.init(rawValue:))
         familyRatings = try value(.familyRatings, d.familyRatings).filter { (1...5).contains($0.value) }
         familyNotes = try value(.familyNotes, d.familyNotes).filter { !$0.value.isEmpty }
         activations = try value(.activations, d.activations)
-        // Missing in files from before there were license tags, which are yet to get them.
         licenseStatusesAdded = try value(.licenseStatusesAdded, false)
-        // Missing in files from 0.9.1 and before, which are yet to lose the former license tags.
         formerLicenseTagsRemoved = try value(.formerLicenseTagsRemoved, false)
         fontLibraryLocationChecked = try value(.fontLibraryLocationChecked, false)
         foundryOverrides = try value(.foundryOverrides, d.foundryOverrides)
@@ -113,29 +109,22 @@ public struct UserData: Codable, Equatable, Sendable {
         classificationRenames = try value(.classificationRenames, d.classificationRenames)
         customCharacterSets = try value(.customCharacterSets, d.customCharacterSets)
         sidebar = try value(.sidebar, d.sidebar)
-        // A way a later version adds is Ask here, rather than a file that doesn't load.
         installMethod = try value(.installMethod, String?.none).map { InstallMethod(rawValue: $0) ?? .ask } ?? d.installMethod
         installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
         fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
-        // Test builds saved the library's name with the location its folder becomes ("Font Library", then "Cicero’s Font
-        // Library"); it's called as the library is now (see `named`), whatever the library is called.
         if let location = fontLibraryLocation, let name = folderNames[location.id.uuidString], Self.formerFontLibraryNames.contains(name) {
             folderNames[location.id.uuidString] = nil
         }
-        // The same for a choice a later version adds.
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
         asksBeforeMovingOutOfSharedFolders = try value(.asksBeforeMovingOutOfSharedFolders, d.asksBeforeMovingOutOfSharedFolders)
         showSystemFonts = try value(.showSystemFonts, d.showSystemFonts)
-        // Saved as showAdobeFonts before, a name that sounded like Adobe Fonts from Creative Cloud.
         showAdobeAppFolders = try c.decodeIfPresent(Bool.self, forKey: .showAdobeAppFolders)
             ?? decoder.container(keyedBy: FormerKeys.self).decodeIfPresent(Bool.self, forKey: .showAdobeFonts)
             ?? d.showAdobeAppFolders
         showCreativeCloudFonts = try value(.showCreativeCloudFonts, d.showCreativeCloudFonts)
         activatesDocumentFonts = try value(.activatesDocumentFonts, d.activatesDocumentFonts)
         records = try value(.records, d.records)
-        // Rules for Slab Serif, a classification there used to be, pick Serif, which it's part of now; unless
-        // Slab Serif is one of the user's.
         let serif = classificationRenames[Classification.serif.rawValue] ?? Classification.serif.rawValue
         for set in smartSets.indices {
             for rule in smartSets[set].rules.indices where smartSets[set].rules[rule].field == .classification {
@@ -194,7 +183,6 @@ public struct UserData: Codable, Equatable, Sendable {
         guard hasFonts, !fontLibraryPath.isEmpty, fontLibraryLocation == nil else { return nil }
         let location = WatchedFolder(path: fontLibraryPath)
         folders.append(location)
-        // A name the user gave the library goes with it; else it's called as the library is (see `named`).
         if let given = folderNames[WatchedFolder.fontLibraryID.uuidString] { folderNames[location.id.uuidString] = given }
         return location
     }
@@ -452,7 +440,6 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
         self.comparison = comparison ?? field.comparisons[0]
         self.value = value
     }
-
 
     public enum Field: String, Codable, CaseIterable, Sendable {
         case name, foundry, designer, classification, tag, rating, note, hasNote, set, folder, status, kind, format, styles, feature, embedding

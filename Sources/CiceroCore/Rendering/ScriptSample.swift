@@ -20,7 +20,7 @@ public struct ScriptSample: Hashable, Sendable {
         guard let script = scripts.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key else { return nil }
         var names: [String] = []
         for language in languages.filter(\.isCurrent).sorted(by: { $0.speakers > $1.speakers }) {
-            // Without the comma some names end in, like Punjabi's ਪੰਜਾਬੀ,
+            // Without the comma some names end in, like Punjabi's "ਪੰਜਾਬੀ,".
             guard let name = language.autonym?.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces)), !name.isEmpty,
                   !names.contains(name),
                   name.unicodeScalars.allSatisfy({ $0.properties.isWhitespace || characters.contains($0.value) }),
@@ -60,7 +60,6 @@ public final class ScriptSamples: Sendable {
 
     public func text(_ text: String, for face: FontFace, long: Bool = false, cached: Bool = true) -> String {
         guard !FontLoader.shared.wouldWait(for: face.path) else { return text }
-        // Before the font, so a sample from a file that changed meanwhile is worked out again next time.
         let generation = FontLoader.shared.generation(of: face.path)
         let font = FontLoader.shared.font(face, size: 12, cached: cached)
         guard ScriptSample.isNeeded(for: text, has: { font.glyph(for: Character($0)) != nil }),

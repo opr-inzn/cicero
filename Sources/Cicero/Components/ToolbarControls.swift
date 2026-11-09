@@ -1,8 +1,5 @@
 import SwiftUI
 
-// Toolbar controls that highlight what's chosen or on, and light up under the pointer as AppKit's do, as the back
-// button does next to them. On macOS 15, which has no glass, the toolbar has the system's own controls instead.
-
 struct ToolbarCapsule<Content: View>: ToolbarContent {
     var spaced = false
     @ViewBuilder let content: () -> Content
@@ -66,7 +63,6 @@ struct ToolbarPicker<Value: Hashable>: View {
 
     @available(macOS 26, *)
     private var onGlass: some View {
-        // Segments as wide as the widest, like AppKit's.
         HStack(spacing: 0) {
             ForEach(values, id: \.self) { value in
                 Button {
@@ -77,7 +73,6 @@ struct ToolbarPicker<Value: Hashable>: View {
                 .buttonStyle(ToolbarButtonStyle(isOn: selection == value, segment: symbol == nil ? .title : .symbol))
                 .background {
                     if selection == value {
-                        // Grey on glass, so it shows on the capsule's own glass in the dark too.
                         Capsule()
                             .fill(.quaternary)
                             .glassEffect(.regular.interactive(), in: .capsule)
@@ -89,8 +84,7 @@ struct ToolbarPicker<Value: Hashable>: View {
         }
         .padding(ToolbarButtonStyle.segmentInset)
         .fixedSize()
-        // To accessibility, a segmented control: as buttons in a toolbar item, every segment took its name from the
-        // item, the first segment's title, as soon as the window updated.
+        // To accessibility, a segmented control: as buttons in a toolbar item, every segment took its name from the item, the first segment's title, as soon as the window updated.
         .accessibilityRepresentation {
             Picker(label, selection: $selection) {
                 ForEach(values, id: \.self) { Text(title($0)).tag($0) }
@@ -123,9 +117,7 @@ private struct ToolbarButton: View {
     @State private var isHovered = false
 
     var body: some View {
-        // A chosen segment has the picker's lens, not a fill, pressed or under the pointer.
         let pressed = segment == nil ? isOn || configuration.isPressed : configuration.isPressed && !isOn
-        // A grey between none and pressed: 65 on the toolbar's 40 in Dark Mode, as AppKit's back button has 71.
         let hovered = isHovered && isEnabled && !(segment != nil && isOn)
         configuration.label
             .labelStyle(.iconOnly)

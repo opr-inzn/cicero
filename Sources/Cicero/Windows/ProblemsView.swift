@@ -11,7 +11,6 @@ struct ProblemsView: View {
         }
         Group {
             if groups.isEmpty {
-                // Like the other empty states: what shows up here, not a verdict on the fonts.
                 if model.hasScanned {
                     EmptyState("No Conflicts", systemImage: "checkmark.circle",
                                description: Text("Fonts installed twice, duplicates, and missing or damaged files show up here."))
@@ -32,8 +31,7 @@ struct ProblemsView: View {
                     }
                     .frame(maxWidth: 760, alignment: .leading)
                     .padding(24)
-                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its
-                    // bar sits at the edge.
+                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its bar sits at the edge.
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -60,11 +58,9 @@ private struct ProblemGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Centred, not on the baseline: there the buttons sat low beside the large title.
             HStack(spacing: 12) {
                 Text(kind.title).font(.title2.bold())
                 Spacer(minLength: 0)
-                // One problem's extra copies have their own buttons.
                 let extras = problems.filter { !$0.extraCopies.isEmpty }
                 if extras.count > 1 {
                     Button(kind == .installedTwice ? "Remove All Extra Copies" : "Move All Extra Copies to Trash", role: .destructive) {
@@ -74,7 +70,6 @@ private struct ProblemGroup: View {
                         ? "Keeps the newest copy of each font and moves the others to the Trash."
                         : "Keeps the newest copy of each font in each folder and moves the others to the Trash.")
                 }
-                // Not fonts missing from folders: Remove from Folder is a different thing to do.
                 let forgettable = problems.filter { $0.fixes.contains(where: \.isForget) }
                 if kind == .missing && forgettable.count > 1 {
                     Button("Forget All") { model.forgetAll(of: forgettable) }
@@ -168,7 +163,6 @@ private struct FileRow: View {
                     if isNewest { NewestTag() }
                     if !file.preferredFor.isEmpty && file.preferredStyles == nil { PreferredTag(names: file.preferredFor) }
                 }
-                // Under a title, the whole path says which file it is.
                 Text(((file.title == nil ? (file.path as NSString).deletingLastPathComponent : file.path) as NSString).abbreviatingWithTildeInPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)

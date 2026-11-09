@@ -31,8 +31,6 @@ public struct FontMatcher: Sendable {
             guard let postScriptName, !wholeFile else { return inFile }
             let named = inFile.filter { $0.face.face.postScriptName.lowercased() == postScriptName }
             if !named.isEmpty { return Array(named.prefix(1)) }
-            // Another app may read the name its own way: FontBase has "BONIFACE(19-10-18)" for "BONIFACE19-10-18",
-            // "Stanley-Bold" for "StanleyBold".
             let spelled = inFile.filter { Self.letters($0.face.face.postScriptName) == Self.letters(postScriptName) }
             if !spelled.isEmpty { return Array(spelled.prefix(1)) }
         }
@@ -40,7 +38,6 @@ public struct FontMatcher: Sendable {
         if let family = font.family, let style = font.style ?? defaultStyle, let found = byName[Self.key(family) + "|" + Self.key(style)] {
             return [found]
         }
-        // The file, by a name none of its styles has: a variable font's own name for its instances, as FontBase gives it.
         return inFile ?? []
     }
 

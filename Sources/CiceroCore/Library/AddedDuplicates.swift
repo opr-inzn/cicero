@@ -101,7 +101,6 @@ public enum AddedDuplicates {
             }
         }
         guard !matched.isEmpty else { return [] }
-        // Every file the library has: the fonts in it, and one of its copies, to tell whether Cicero may change it.
         var namesIn: [String: Set<String>] = [:]
         var copyAt: [String: FaceCopy] = [:]
         for family in library.families {

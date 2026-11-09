@@ -6,8 +6,7 @@ extension CompletionKind {
     static func names(_ kind: CompletionNames.Kind) -> CompletionKind {
         .custom { words, _, _ in
             let names = CompletionNames.names(kind, words: words, environment: .current())
-            // zsh reads each name as name:description, so a colon in a name is escaped there. fish and bash take the
-            // names as they are: fish would show the backslash.
+            // zsh reads each name as name:description, so a colon in a name is escaped there only: fish would show the backslash.
             guard CompletionShell.requesting == .zsh else { return names }
             return names.map { $0.replacingOccurrences(of: ":", with: "\\:") }
         }

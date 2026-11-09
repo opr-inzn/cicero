@@ -83,7 +83,6 @@ extension AppModel {
         var documents: [URL] = []
         // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
         var webFonts: Set<String> = []
-        // Another font manager's library or collections open the Import sheet.
         let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
         let readFolders = readFolders
         for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
@@ -101,23 +100,19 @@ extension AppModel {
                 webFonts.insert(pathExtension.uppercased())
             }
         }
-        // One document at a time: the sheet shows one.
         if let document = documents.first { findFonts(in: document) }
         guard !folders.isEmpty || !files.isEmpty else {
             guard documents.isEmpty, imports.isEmpty else { return }
-            // "Cicero doesn’t use web fonts like WOFF2", or "… like WOFF and WOFF2" for both kinds.
             if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
         if !folders.isEmpty {
             let before = Set(data.folders.map(\.id))
             addFolders(folders)
-            // One folder alone: show its fonts.
             let added = data.folders.filter { !before.contains($0.id) }
             if files.isEmpty, added.count == 1 { selection = .folder(added[0].id) }
         }
         guard !files.isEmpty else { return }
-        // Dropped on Added Fonts, they're listed where they are; on another location, copied or moved, they go into it.
         var method: InstallMethod?
         var location: DropLocation?
         if case .folder(let id) = target {
@@ -174,8 +169,6 @@ extension AppModel {
                       askedAboutOpenApps: Bool = false) {
         let skipped = duplicates.filter { choices[$0.id] == .skip }
         let replacements = duplicates.filter { choices[$0.id] == .replace && $0.canReplace }.flatMap(\.replacements)
-        // InDesign, Illustrator and Photoshop keep a font's old version until they restart, so open documents can show
-        // wrong letters once its file is replaced: the user says first. Once the alert or sheet before has gone.
         if !replacements.isEmpty, !askedAboutOpenApps, case let apps = openAppsKeepingFonts, !apps.isEmpty {
             let prompt = OpenAppsReplacePrompt(apps: apps) { model in
                 model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, into: location, then: then,
@@ -183,11 +176,8 @@ extension AppModel {
             }
             return ask { $0.openAppsReplacePrompt = prompt }
         }
-        // A file only of skipped families stays out, and one that takes the library's copies' places is in as those.
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
             .union(replacements.map(\.added))
-        // With Ask, how to bring in files the library doesn't have yet, and added ones that are off; once the sheet or
-        // alert before has gone. Files added while it's up join it.
         let offAdded = movableFiles(among: paths).filter { !library.activePaths.contains($0) }
         if method == nil, data.installMethod == .ask,
            case let asked = paths.filter({ !left.contains($0) && (!isListed($0) || offAdded.contains($0)) }), !asked.isEmpty {
@@ -197,7 +187,6 @@ extension AppModel {
             }
             Task {
                 guard let shown = installPrompt else { return installPrompt = prompt }
-                // Into one place, the sheet names it; files for several are copied or moved into each of theirs.
                 installPrompt = InstallPrompt(files: shown.files + prompt.files.filter { !shown.files.contains($0) },
                                               offersMove: shown.offersMove || prompt.offersMove,
                                               location: shown.location == prompt.location ? shown.location : nil) { model, method in
@@ -213,12 +202,10 @@ extension AppModel {
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
         let movable = movableFiles(among: paths)
-        // Files the library doesn't list, and added ones that are off.
         let installing = !installs ? [] : paths.filter { path in
             !isListed(path) || movable.contains(path) && !library.activePaths.contains(path)
         }
         let moving = method == .move
-        // Copied or moved, files the library doesn't list are installed, or take over the library's copies.
         let new = installs ? [] : paths.filter { !isListed($0) }
         if !new.isEmpty {
             data.fontFiles += new
@@ -237,7 +224,6 @@ extension AppModel {
             var messages: [String] = []
             var failed = false
             var replaced = replacements.map(\.old)
-            // Each file installed → its copy.
             var copies: [String: String] = [:]
             if !installing.isEmpty {
                 let result = if let location {
@@ -257,12 +243,10 @@ extension AppModel {
                 replaced = replaced.map { result.placed[$0] ?? $0 }
                 if !result.renameLater.isEmpty { model.renameBackLater(result.renameLater) }
             }
-            // An added file Cicero installed leaves Added Fonts: the copy is the font now.
             model.data.fontFiles.removeAll { copies[$0] != nil }
             model.data.forgetInstalledAddedFiles()
             let message = (messages + [skipNote]).filter { !$0.isEmpty }.joined(separator: ". ")
             let found = shown.union(copies.values).union(existing).union(replaced)
-            // Nothing to show when nothing went in: the toast says so.
             guard let then, !found.isEmpty else {
                 model.showToast(message)
                 model.rescan()
@@ -337,7 +321,6 @@ extension AppModel {
         let found = library.families.filter { family in
             family.faces.contains { paths.contains($0.face.path) || $0.otherCopies.contains(where: paths.contains) }
         }
-        // What adding them did first, then what else there is to say: one toast.
         let say = { (more: String) in
             let message = [opened.note.message, more].filter { !$0.isEmpty }.joined(separator: ". ")
             if !message.isEmpty { self.showToast(message) }
@@ -346,15 +329,12 @@ extension AppModel {
             let name = paths.count == 1 ? URL(fileURLWithPath: paths.first!).lastPathComponent : nil
             return say(name.map { "Couldn’t read “\($0)”" } ?? "Couldn’t read these fonts")
         }
-        // With system fonts hidden, a font that comes with macOS is nowhere to show; so is one from Creative Cloud.
         let families = found.filter(data.lists)
         guard !families.isEmpty else {
             return say(found[0].state == .system
                 ? "That font comes with macOS, and system fonts are hidden (Preferences → General)"
                 : "That font is from Adobe Fonts, which are hidden (Preferences → General)")
         }
-        // Joining a folder or tag: "Inter installed and added to “Client”", or "Inter added to “Client”" after what else
-        // adding them did.
         let names = FontNames.describe(families: families.map(\.name)) ?? ""
         let joins = { (place: String) in
             opened.note.installedAll ? self.showToast("\(names) installed and added to “\(place)”") : say("\(names) added to “\(place)”")
@@ -371,9 +351,6 @@ extension AppModel {
         }
         let ids = Set(families.map(\.id))
         let isShown = { (families: [Family]) in Set(families.map(\.id)).isSubset(of: Set(self.visibleFamilies.map(\.id))) }
-        // Added files in Added Fonts; others where the browser shows them, else in All Fonts. Dropped on a folder, tag or
-        // location, the browser stays there with the ones that went in, the search cleared if it hides them; added files
-        // that stayed out of a location are in Added Fonts, and others, in another place, aren't shown.
         let added = families.allSatisfy { $0.folderIDs.contains(WatchedFolder.addedFilesID) }
         var first = families[0]
         if let target = opened.target {

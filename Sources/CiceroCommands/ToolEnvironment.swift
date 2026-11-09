@@ -57,7 +57,6 @@ public struct ToolEnvironment: @unchecked Sendable {
             let contents = binary.deletingLastPathComponent().deletingLastPathComponent()
             let bundled = contents.appendingPathComponent("Resources", isDirectory: true)
             if fm.fileExists(atPath: bundled.appendingPathComponent("CharacterSets.json").path) { return bundled }
-            // .build/<triple>/<configuration>/cicero-tool → the package.
             var folder = binary.deletingLastPathComponent()
             for _ in 0..<5 {
                 folder = folder.deletingLastPathComponent()

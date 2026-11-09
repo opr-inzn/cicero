@@ -53,19 +53,14 @@ public enum FindCommand {
         let tests = try filters(options, in: context)
         let base = context.listedFamilies.filter { family in tests.allSatisfy { $0(family) } }
         let tokens = try options.filters.map { try token($0, in: context) }
-        // With --any, each word (or phrase in quotes, one argument) is a search of its own, and a family any of them finds
-        // is found; else the words are one search, as typed in the search field.
         let queries = options.any ? words.map(SearchQuery.init).filter { !$0.isEmpty } : [SearchQuery(words.joined(separator: " "))]
         let hasWords = queries.contains { !$0.isEmpty }
-        // Unlike the app's search field (for now), words are looked for in the fonts' licenses, descriptions and URLs too,
-        // read from the files of the families the options leave.
         let texts = hasWords ? fileTexts(base) : [:]
         func found(_ queries: [SearchQuery], moreTexts: @escaping (Family) -> [String]) -> [Family] {
             let matchers = queries.map { context.filters.searchMatcher($0, tokens: tokens, moreTexts: moreTexts) }
             return base.filter { family in matchers.contains { $0(family) } }
         }
         var families = found(queries, moreTexts: { texts[$0.id] ?? [] })
-        // Nothing with a word that begins with what's typed: a piece of a longer word, then, as in the app ("vetica").
         if families.isEmpty, hasWords { families = found(queries.map(\.anywhereInNames), moreTexts: { _ in [] }) }
         return sorted(families, by: options.sort)
     }

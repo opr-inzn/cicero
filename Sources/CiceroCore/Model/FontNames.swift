@@ -48,7 +48,7 @@ public enum FontNames {
 
 extension Sequence where Element == String {
     public func listed(_ conjunction: String = "and") -> String {
-        // Not ListFormatter: it follows the Mac's language, and said "Inter, Roboto und Lato" in an English sentence on a German Mac.
+        // Not ListFormatter: it follows the Mac's language, not the app's.
         let items = Array(self)
         guard let last = items.last, items.count > 1 else { return items.first ?? "" }
         return items.dropLast().joined(separator: ", ") + " \(conjunction) " + last

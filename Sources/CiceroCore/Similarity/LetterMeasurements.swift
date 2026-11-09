@@ -34,7 +34,6 @@ public struct LetterMeasurements: Equatable, Sendable {
     private static let fewest = 10
 
     public static func measure(_ font: CTFont) -> LetterMeasurements? {
-        // In thousandths of an em.
         let font = LetterImages.inThousandths(font)
         var letters: [Character: Letter] = [:]
         func letter(_ character: Character) -> Letter? {
@@ -54,7 +53,6 @@ public struct LetterMeasurements: Equatable, Sendable {
         set(.ascender, mean(["l", "d"].compactMap { letter($0).map { $0.box.maxY / capHeight } }))
         set(.descender, mean(["p", "q"].compactMap { letter($0).map { -$0.box.minY / capHeight } }))
 
-        // Stems: the H's left one away from its crossbar, and the n's.
         var stems: [CGFloat] = []
         let h = letter("H")
         if let h, let stem = h.leftStem(at: [0.25, 0.75]) { stems.append(stem) }
@@ -77,7 +75,6 @@ public struct LetterMeasurements: Equatable, Sendable {
         }
         let contrast = mean(contrasts).map { min($0, 1.5) }
         set(.contrast, contrast)
-        // Strokes about as thick all round have no stress to speak of, whichever way they're thinnest.
         if let o, let axis = o.stressAxis() { set(.stress, min(max(axis.tilt, -40), 40) / 30 * min(axis.modulation / 0.5, 1)) }
 
         let lowercase = "abcdefghijklmnopqrstuvwxyz".compactMap { letter($0)?.advance }
@@ -203,7 +200,6 @@ private struct Letter {
             let here = (stem.lowerBound + shift)...(stem.upperBound + shift)
             return rows(at: y).first { $0.overlaps(here) }
         }
-        // Up from the baseline, past a cupped foot's hollow, to where the ink is about as wide as the stem again.
         let step = max(1, height * 0.005)
         var widest = width, thickness: CGFloat = 0
         var y = base + step / 2
@@ -237,8 +233,6 @@ private struct Letter {
         }
         let mean = sum / CGFloat(directions)
         guard mean > 0 else { return nil }
-        // Thickest where the wave peaks; thinnest a quarter turn on, so the tilt from upright is the thickest
-        // direction's from level.
         let thickest = atan2(sines, cosines) / 2 * 180 / .pi
         return (thickest, hypot(cosines, sines) / CGFloat(directions / 2) / mean)
     }

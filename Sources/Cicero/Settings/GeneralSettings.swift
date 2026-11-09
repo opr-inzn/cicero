@@ -30,7 +30,6 @@ struct GeneralSettings: View {
                     Text("Show Cicero in the menu bar")
                     Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts of the document you have open, turn folders on and off, see which fonts are on for apps, or quit Cicero.")
                 }
-                // On while the menu bar has no icon: Cicero can't leave the Dock then.
                 Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
                     Text("Show Cicero in the Dock")
                     Text(showsMenuBarIcon
@@ -50,7 +49,6 @@ struct GeneralSettings: View {
                     Text("Cicero’s Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
-                // Each pop-up menu as wide as its own choices.
                 LabeledContent {
                     PopUpPicker(options: InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) },
                                 selection: $model.data.installMethod)
@@ -94,7 +92,6 @@ struct GeneralSettings: View {
                     Text("Show fonts from Creative Cloud")
                     Text("Creative Cloud activates and deactivates Adobe Fonts. Cicero lists them but can’t manage them.")
                 }
-                // The folders type designers export fonts to, to test them in Adobe apps.
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     Text("Show fonts installed for proofing in Adobe apps")
                     Text("Lists the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them. [How to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")

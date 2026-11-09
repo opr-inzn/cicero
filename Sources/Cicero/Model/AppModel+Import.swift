@@ -69,7 +69,6 @@ extension AppModel {
     func importFiles(among urls: [URL]) -> Set<URL> {
         let fontExplorer = urls.filter { FontExplorerImport.fileExtensions.contains($0.pathExtension.lowercased()) }
         let fontBook = urls.filter { $0.pathExtension.lowercased() == FontBookImport.fileExtension }
-        // One library at a time: the sheet shows one.
         if let file = fontExplorer.first {
             readImport([file], source: .fontExplorer, origin: "“\(file.lastPathComponent)”")
         } else if !fontBook.isEmpty {
@@ -132,19 +131,14 @@ extension AppModel {
         isImporting = true
         defer { isImporting = false }
         guard await saveSetupSnapshot(named: "Before Import", nothingWas: "imported") else { return nil }
-        // The other app's copies go first, so they aren't on beside Cicero's.
         let removed = choices.removeCopies ? LibraryImport.removeCopies(imported) : 0
         var data = data
         let files = LibraryImport.fontFiles(imported, choices: choices, data: &data, locations: locations)
         self.data.showAdobeAppFolders = data.showAdobeAppFolders
-        // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
-        // The files with fonts that were on go in on, as they'd be turned on at the end (see `installOff`).
         let activePaths = choices.activate ? Set(imported.active.compactMap(\.path)) : []
         let on = Set(files.filter { activePaths.contains($0.path) }.map(\.source))
-        // Once cancelled, the copies that went in on stay on when nothing else has those fonts on: FontBase deletes its
-        // own copies as it quits. FontExplorer X leaves its fonts on, so with it they go off, or they'd be on twice.
         let keepOn = imported.source == .fontBase
         let installed = await importEngine.installOff(files.map(\.source), on: on, keepOnWhenCancelled: keepOn) { done, total in
             stage(.copying(done: done, total: total))
@@ -156,22 +150,16 @@ extension AppModel {
             }
             return nil
         }
-        // The other app's paths → the copies'.
         var paths: [String: String] = [:]
         for file in files { if let copy = installed.placed[file.source] { paths[file.path] = copy } }
         stage(.starting)
         var summary: ImportSummary?
         await enqueued { model in
-            // Files Cicero still has on where they are, though the library doesn't list them any more, as a location it
-            // was in has gone: their copies take over, so the fonts aren't on from the other app's files.
             let stale = files.map(\.source).filter { model.data.records.inPlace.contains($0) && installed.placed[$0] != nil }
             if !stale.isEmpty { model.data.records = await model.engine.forgetInPlace(stale, records: model.data.records) }
-            // The other app's own files, still on after it quit, as FontExplorer X leaves them: turned off, so the copies
-            // can take over, rather than the fonts staying on from its files.
             let copiedFrom = Set(files.map(\.source).filter { installed.placed[$0] != nil })
             let onFromApp = choices.activate ? model.library.faces(inFiles: copiedFrom).filter { $0.state.source == .otherApp } : []
             if !onFromApp.isEmpty { model.data.records = await model.engine.deactivate(onFromApp, records: model.data.records).records }
-            // The library with the copies in it, to match against.
             let input = model.scanInput
             let scanned = try? await model.scanner.scan(input) { progress in
                 switch progress {
@@ -180,16 +168,11 @@ extension AppModel {
                 }
             }
             var updated = model.data
-            // The copies that went in on, as their fonts were on, and those in already, on as a cancelled import of the same
-            // library may have left them (`keepOnWhenCancelled`): on already, so nothing's left to do for them.
             let copiedInOn = Set(on.compactMap { installed.placed[$0] })
             var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library,
                                                       paths: paths, copiedInOn: copiedInOn)
-            // A style the other app's file still stands for goes on as its copy.
             let copies = Set(installed.placed.values)
             faces = faces.map { $0.copy(among: copies) }
-            // The import's to count, name and undo: those it turns on, and those whose copies went in on just now. Not
-            // those on from before, as when the same library is imported again: nothing changes for them.
             let copiedInOnNow = copiedInOn.intersection(installed.new)
             let turnedOn = faces.filter { $0.canActivate || copiedInOnNow.contains($0.face.path) }
             result.fonts = installed.new.count
@@ -200,11 +183,9 @@ extension AppModel {
             if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
             model.data = updated
             model.rescan()
-            // And the copies of those that were on from the other app's files.
             let takingOver = Set(stale.compactMap { installed.placed[$0] }).subtracting(faces.map(\.face.path))
             let more = takingOver.isEmpty ? []
                 : (scanned ?? model.library).families.flatMap(\.faces).filter { takingOver.contains($0.face.path) && $0.canActivate }
-            // In a Fonts folder or Cicero's Library, they go on where they are.
             if !faces.isEmpty || !more.isEmpty { model.performActivation(faces + more, named: turnedOn + more) }
             result.activated = turnedOn.count
             summary = result

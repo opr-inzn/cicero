@@ -73,12 +73,10 @@ struct FontLine: View {
             let scheme = colorScheme
             let scale = displayScale
             let line = Self.line(of: font, in: height, scale: scale)
-            // From the line's top, less the room above it, to its bottom and the room below, and at least the row: a
-            // line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
+            // A line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
             let room = UnclippedText(font: font).room
             let top = min(0, line.top - room.top), bottom = max(height, line.top + line.height + room.bottom)
-            // At the sides too, where Text doesn't cut glyphs off either, as Zapfino's Z reaching left of the line's start:
-            // as far as the font's glyphs reach. Only for drawing: the line is cut to the column's width.
+            // At the sides too, where Text doesn't cut glyphs off either, as Zapfino's Z reaching left of the line's start.
             let box = CTFontGetBoundingBox(font)
             let left = max(0, -box.minX).rounded(.up), right = max(0, box.maxX).rounded(.up)
             Canvas { context, size in
@@ -244,8 +242,6 @@ struct Tag: View {
     var body: some View {
         HStack(spacing: 2.5) {
             if let systemImage {
-                // Its drawing on the middle of the capitals, with no height of its own, so tags with a symbol are as
-                // tall as those without.
                 Image(systemName: systemImage)
                     .offset(y: Self.capitalsDrop - Self.inkDrop(of: systemImage))
                     .frame(height: 0)
@@ -255,10 +251,6 @@ struct Tag: View {
         }
         .font(Self.font)
         .padding(.horizontal, 5)
-        // The capitals in the middle of the capsule, measured at 1x and 2x. They sit on whole pixels, so the capsule is
-        // 14.5 pt high: at 2x that leaves 16 pixels around the 13 of the capitals, 8 above and 8 below, and at 1x it's 15
-        // pixels, within an eighth of one. At 14 pt they were half a pixel high at 2x and a third at 1x. Any top from 1.5
-        // to 1.7 pt does it; 1.6 keeps away from both ends.
         .padding(.top, 1.6)
         .padding(.bottom, 1.9)
         .background(tint.opacity(0.14), in: .capsule)
@@ -288,7 +280,6 @@ struct Tag: View {
                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
            let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            // The rows with ink, from the top.
             let inked = (0..<image.height).filter { row in
                 (0..<image.width).contains { pixels[(row * image.width + $0) * 4 + 3] > 127 }
             }
@@ -330,10 +321,8 @@ struct StatusTag: View {
     }
 
     private var content: (String, Color, String?)? {
-        // With the symbols of New App Folder and Activate Temporarily.
         if family.temporaryScope == .whileAppsRun { return ("App Folder", .appSet, "app.badge.checkmark") }
         if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
-        // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Proofing.
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
         case .system: return ("System", .secondary, nil)
@@ -374,8 +363,6 @@ struct EmptyState<Actions: View>: View {
         ContentUnavailableView {
             Label(title, systemImage: systemImage).labelStyle(EmptyStateLabelStyle())
         } description: {
-            // Nearer the title, and the buttons further from it, so the text reads as the title's and the buttons
-            // as a step of their own.
             description?.padding(.top, -4)
         } actions: {
             actions.padding(.top, 6)
@@ -472,9 +459,7 @@ struct ValueField: View {
         self.step = step
         self.unit = unit
         self.alignment = alignment
-        // The number from the start, not once it appears: a field measured before it's on screen, as the font page's
-        // controls measure theirs to choose a layout (see `TesterControls`), would measure as wide as its title, which it
-        // shows while empty.
+        // The number from the start, not once it appears: a field measured before it's on screen, as `TesterControls` does, would measure as wide as its title, which it shows while empty.
         _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
@@ -486,7 +471,6 @@ struct ValueField: View {
         }
         Group {
             if alignment == .leading {
-                // Nothing after it moves as the value changes, and a row's last value ends where the row does.
                 ZStack(alignment: .leading) {
                     Text(formatted(range.lowerBound) + unit).hidden()
                     Text(formatted(range.upperBound) + unit).hidden()
@@ -498,7 +482,6 @@ struct ValueField: View {
         }
         .monospacedDigit()
         .onAppear { text = formatted(value) }
-        // The slider moved; typing leaves the value alone until it's committed.
         .onChange(of: value) { text = formatted($1) }
         .onChange(of: isFocused) { if !$1 { commit() } }
     }
@@ -516,8 +499,6 @@ struct ValueField: View {
                 return .handled
             }
         if alignment == .leading {
-            // As wide as the number, growing as it's typed, so the unit follows it; the field keeps 4 pt for
-            // the caret after the number, which the unit takes back to sit as close as after a right-aligned one.
             field.fixedSize().padding(.trailing, -4)
         } else {
             field.multilineTextAlignment(.trailing)
@@ -647,7 +628,6 @@ extension View {
             .padding(.horizontal, 4)
             .padding(.vertical, 3)
         }
-        // The fill and corners of the grouped forms' cards.
         .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
         .clipShape(.rect(cornerRadius: 12, style: .continuous))
     }
@@ -679,7 +659,6 @@ struct FolderActivationPicker: View {
             Text("Inactive").tag("")
             Text("Active").tag(Self.active)
             Text("Active in Adobe Apps").tag("Adobe")
-            // One typed in, or InDesign from before there was Active in Specific App.
             if let app = folder.appName, app != "Adobe" {
                 Text("Active in \(FaceState.appDescription(app))").tag(app)
             }
@@ -970,9 +949,7 @@ private struct PreviewOptions: View {
                 TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview Text"))
                     .labelsHidden()
                 HStack {
-                    // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
                     Menu("Presets\u{200A}") {
-                        // Yours first, in the order saved, then Cicero's.
                         ForEach(preview.savedPresets, id: \.self) { sample in
                             Button(Self.title(of: sample)) { text.wrappedValue = sample }
                         }
@@ -987,7 +964,6 @@ private struct PreviewOptions: View {
                     .buttonStyle(.borderless)
                     .fixedSize()
                     Spacer()
-                    // Once the text is one of yours, the button takes it out again.
                     if preview.isSavedPreset(text.wrappedValue) {
                         Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
                             .help("Takes the preview text out of Presets")
@@ -997,8 +973,7 @@ private struct PreviewOptions: View {
                             .help("Adds the preview text to Presets")
                     }
                 }
-                // The text in another case, which Save as Preset then saves as it is. ß in capitals is SS, as the text is
-                // set in every font, not all of which have ẞ.
+                // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
                 LabeledContent("Case") {
                     CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
                 }
@@ -1007,7 +982,6 @@ private struct PreviewOptions: View {
                 if let own {
                     row("Size", own.size, range: own.sizeRange, unit: " pt")
                 } else if let factor = GridScale.shared.factor {
-                    // The size the grid draws at while the sidebar is hidden or the Info panel open (see `GridScale`).
                     row("Size", Binding {
                         GridScale.drawn(preview.size, factor: factor)
                     } set: {

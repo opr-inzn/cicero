@@ -18,7 +18,6 @@ struct BrowserView: View {
         let families = model.visibleFamilies
         return Group {
             if families.isEmpty && model.hasScanned {
-                // Just the message on the plain background, in place of the empty list, grid or specimens.
                 EmptyBrowser()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.canvas)
@@ -31,7 +30,6 @@ struct BrowserView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            // With nothing listed, the empty view says it instead.
             if case .folder(let id) = model.selection, !families.isEmpty, model.onlineOnlyCount(inFolder: id) > 0 {
                 OnlineOnlyBar(folderID: id)
             }
@@ -63,7 +61,6 @@ struct BrowserView: View {
         }
         let counts = model.visibleCounts
         var parts = [count, "\(counts.active.plain) active"]
-        // On in one app only (like Adobe's fonts folder): neither active nor inactive, so counted apart.
         let apps = counts.appOnly
         if !apps.isEmpty {
             let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
@@ -189,7 +186,6 @@ private struct ListBar: View {
                 if isWorking {
                     ProgressView().controlSize(.small)
                 }
-                // Text in the accent colour, as the bar's way back.
                 Button("Done", action: done)
                     .buttonStyle(.plain)
                     .foregroundStyle(.tint)
@@ -263,7 +259,6 @@ private struct EmptyBrowser: View {
     @ViewBuilder
     private var content: some View {
         if model.similarFamilyID != nil {
-            // Only when the family is gone, or hidden: it comes first otherwise.
             EmptyState("Font Not Available", systemImage: "textformat",
                        description: Text("This font is no longer in your library."))
         } else if let list = model.documentList {
@@ -280,8 +275,6 @@ private struct EmptyBrowser: View {
         case .folder(let id) where model.availability(ofFolder: id) != nil || model.onlineOnlyCount(inFolder: id) > 0:
             FolderOutOfReach(folderID: id)
         case .inactive:
-            // With no locations of their own too: what's here is what's on, and Proofing may well be under Locations.
-            // The same whatever "When you add font files" says: a location keeps its fonts off with every choice.
             EmptyState("Everything Is Active", systemImage: "checkmark.seal",
                        description: Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")) {
                 Button("Add Location") { model.presentAddFolderPanel() }

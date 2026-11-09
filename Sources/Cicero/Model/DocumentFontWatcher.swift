@@ -51,7 +51,6 @@ final class DocumentFontWatcher {
         guard let model, model.data.activatesDocumentFonts, !isAsleep, let running = NSWorkspace.shared.frontmostApplication,
               let app = running.bundleIdentifier.flatMap(App.init), !refused.contains(app)
         else { return }
-        // Matched again each time it comes to the front: the app may have been opened again since.
         lastFonts[app] = nil
         let pid = running.processIdentifier
         polling = Task { [weak self] in
@@ -69,7 +68,6 @@ final class DocumentFontWatcher {
         switch await Self.ask(app, pid) {
         case nil:
             refused.insert(app)
-            // This app's task, which `polling` may no longer be: another app may have come to the front while it asked.
             withUnsafeCurrentTask { $0?.cancel() }
             return
         case .fonts(let fonts)?:
@@ -79,12 +77,9 @@ final class DocumentFontWatcher {
         }
         guard !Task.isCancelled, answer != lastFonts[app], let model, model.hasScanned else { return }
         lastFonts[app] = answer
-        // Ones on for another app's documents or a set too, so they stay on for this one when that app quits.
         if matcher?.fingerprint != model.library.fingerprint { matcher = (model.library.fingerprint, FontMatcher(model.library)) }
         let wanted = DocumentFonts.match(answer, using: matcher!.matcher).compactMap(\.face).filter { face in
             let forApps = model.data.records.temporary[face.face.path]?.scope == .whileAppsRun
-            // Not one in an app's own folder, which that app loads already, but one turned off out of it into the
-            // Inactive folder: the document can't have it otherwise.
             let parked = model.data.records.appFolderOrigins[face.face.path] != nil
             return (forApps || !face.state.isActive) && (face.app == nil || parked) && !face.isAdobeFonts
         }
@@ -123,7 +118,6 @@ final class DocumentFontWatcher {
         do {
             switch app {
             case .inDesign:
-                // Codes from InDesign itself, which has no dictionary file.
                 let fonts = every("FonT", of: documents)
                 let (n, f, s) = try (
                     strings(get(property("fPSN", of: fonts), from: pid)),
@@ -133,7 +127,7 @@ final class DocumentFontWatcher {
                 guard n.count == f.count, n.count == s.count else { return .fonts([]) }
                 return .fonts(n.indices.map { DocumentFont(postScriptName: n[$0], family: f[$0], style: s[$0]) })
             case .illustrator, .photoshop:
-                // Files are read as last saved. Illustrator names an unsaved one like "/Untitled-1".
+                // Illustrator names an unsaved document like "/Untitled-1".
                 let filePath = app == .illustrator ? "aiFS" : "Dpth"
                 func paths(_ result: NSAppleEventDescriptor) -> [String] {
                     items(result).compactMap { $0.fileURLValue?.path }.filter { FileManager.default.fileExists(atPath: $0) }
@@ -149,7 +143,6 @@ final class DocumentFontWatcher {
         } catch let error as NSError where error.code == errAEEventNotPermitted {
             return nil
         } catch {
-            // Quit, busy for longer than the timeout, or with no documents.
             return app == .inDesign ? .fonts([]) : .files([])
         }
     }
@@ -216,7 +209,6 @@ extension DocumentFontWatcher {
 
     @concurrent
     static func frontDocument(ofApp bundleID: String, pid: pid_t) async throws -> FrontDocument? {
-        // Codes from each app's dictionary.
         func file(_ path: String, of document: NSAppleEventDescriptor) throws -> FrontDocument? {
             let result = try get(property(path, of: document), from: pid)
             // Illustrator's file URL has no scheme, so it isn't one: the path, made into one again.
@@ -227,8 +219,7 @@ extension DocumentFontWatcher {
             else { return nil }
             return .file(url)
         }
-        // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would
-        // give up after its timeout and take the question away with it.
+        // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would give up after its timeout and take the question away with it.
         let target = NSAppleEventDescriptor(processIdentifier: pid)
         if let address = target.aeDesc,
            AEDeterminePermissionToAutomateTarget(address, AEEventClass(kAECoreSuite), AEEventID(kAEGetData), true) == errAEEventNotPermitted {
@@ -254,7 +245,6 @@ extension DocumentFontWatcher {
             case "com.adobe.Acrobat.Pro", "com.adobe.Reader":
                 return try file("pfal", of: property("padc", of: .null()))
             default:
-                // The standard suite's front window and its document, which many apps that open files have.
                 var first: Int32 = 1
                 let index = NSAppleEventDescriptor(descriptorType: DescType(typeSInt32), bytes: &first, length: 4)!
                 let window = specifier(of: code("cwin"), form: DescType(formAbsolutePosition), data: index, in: .null())
@@ -263,7 +253,6 @@ extension DocumentFontWatcher {
         } catch let error as NSError where error.code == errAEEventNotPermitted {
             throw error
         } catch {
-            // No document, an unsaved one, an app that doesn't know these terms, or one busy for longer than the timeout.
             return nil
         }
     }

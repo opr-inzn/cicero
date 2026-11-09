@@ -39,7 +39,6 @@ struct InstallSheet: View {
                        detail: one ? "Lists the file under Added Fonts, where it is, without turning it on."
                            : "Lists the files under Added Fonts, where they are, without turning them on.") { choose(.inPlace) }
             }
-            // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline) {
                 Toggle("Remember this choice (you can change it later)", isOn: $remember)
@@ -71,7 +70,6 @@ struct InstallSheet: View {
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                // As tall for every symbol, so the titles line up.
                 Image(systemName: icon)
                     .font(.system(size: 28))
                     .foregroundStyle(.tint)
@@ -117,7 +115,6 @@ private struct MovingOutConfirmation: ViewModifier {
     @Environment(AppModel.self) private var model
 
     func body(content: Content) -> some View {
-        // On a view of its own, as the question about turning on many fonts.
         content.background {
             Color.clear
                 .alert(

@@ -239,7 +239,6 @@ struct FontList: View {
 
     var body: some View {
         let columns = shownColumns
-        // A column that's been turned off, or whose set was deleted, no longer sorts the list.
         let sort: FontListColumn? = model.hasOwnOrder && keepsOwnOrder ? nil : columns.contains(sortColumn) ? sortColumn : .name
         let sortsByCoverage = sort.map { $0.isSeries || $0.isSingleSet } ?? false
         let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], coverageColumns: sortsByCoverage ? sort.map { [$0] } ?? [] : [])
@@ -258,12 +257,9 @@ struct FontList: View {
                 }
                 .scrollTargetLayout()
                 .padding(.bottom, 8)
-                // The columns always add up to this width, so it never depends on them.
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { visibleWidth = $0 }
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
-            // A bar below the toolbar rather than headers pinned over the rows, so the rows go under the toolbar
-            // and the headers together, behind one edge with a line under it, as in the Finder.
             .topBar {
                 header(columns: columns, widths: widths, sort: sort)
             }
@@ -381,8 +377,6 @@ struct FontList: View {
             ForEach(allColumns.filter { $0.canHide && ![.added, .format].contains($0) && !$0.isSeries && !$0.isSingleSet }) { column in
                 toggle(column)
             }
-            // The series, then the built-in sets no series covers, a menu per group unless it has just one, then the
-            // user's own sets.
             Menu("Coverage") {
                 ForEach(allColumns.filter(\.isSeries)) { column in
                     toggle(column)
@@ -406,8 +400,7 @@ struct FontList: View {
             toggle(.added)
             toggle(.format)
         }
-        // As wide as the bar, whatever the columns add up to: while a font page covers the list, its width isn't
-        // measured again, and columns wider than the bar would widen the whole stack, page included.
+        // As wide as the bar, whatever the columns add up to: while a font page covers the list, its width isn't measured again, and columns wider than the bar would widen the whole stack, page included.
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
     }
 
@@ -440,7 +433,6 @@ struct FontList: View {
 
     private func resize(_ column: FontListColumn, by change: CGFloat, widths: [FontListColumn: CGFloat]) {
         if resizing?.column != column {
-            // A narrow window may have the columns narrower than saved: from here on, what's shown is saved.
             setWidths(widths)
             let room = (widths[.preview] ?? 0) - FontListColumn.preview.minimumWidth
             resizing = (column, widths[column] ?? column.minimumWidth, max(0, room))
@@ -494,7 +486,7 @@ private struct HeaderCell: View {
         .accessibilityAction { if column.comparator != nil { sort() } }
         .overlay(alignment: resizeEdge == .leading ? .leading : .trailing) {
             if let resizeEdge {
-                // The gap beside the edge. The drag is measured in the window, where it doesn't move with the edge.
+                // The drag is measured in the window, where it doesn't move with the edge.
                 let gap = FontListRow.spacing
                 Color.clear
                     .frame(width: gap)
@@ -526,7 +518,6 @@ private struct FontListRow: View {
     var body: some View {
         HStack(spacing: Self.spacing) {
             ForEach(columns) { column in
-                // In a stack, so a cell with nothing to say (no date, no set) still takes its width.
                 ZStack(alignment: .leading) { cell(column) }.frame(width: widths[column], alignment: .leading)
             }
         }
@@ -546,7 +537,6 @@ private struct FontListRow: View {
         let family = row.family
         switch column {
         case .status:
-            // The row offers Activate/Deactivate to accessibility already.
             ActivationSwitch(family: family, model: model).accessibilityHidden(true)
         case .name:
             HStack(spacing: 6) {
@@ -557,8 +547,6 @@ private struct FontListRow: View {
             }
         case .preview:
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
-            // Every row the same height, however tall the font's glyphs, which may run over its edges rather
-            // than be cut off.
             FontLine(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face,
                 size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,

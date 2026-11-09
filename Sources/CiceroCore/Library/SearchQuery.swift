@@ -36,7 +36,6 @@ public struct SearchQuery: Sendable {
                 || names.contains { isAnywhereInNames ? Self.contains(run.text, in: $0) : Self.beginsWord(run.text, in: $0) }
                 || !run.isKeyword && texts.contains { Self.beginsWord(run.text, in: $0) }
         }
-        // covered[i]: the words before the i-th split into runs that are found.
         var covered = [true] + Array(repeating: false, count: runs.count)
         for start in runs.indices where covered[start] {
             for (length, run) in runs[start].enumerated() where !covered[start + length + 1] && found(run) {
@@ -77,7 +76,6 @@ public struct SearchQuery: Sendable {
                 // ASCII only: a byte over 127 could be part of a character the run's last letter only begins, like an e with a combining accent.
                 guard let first = run.first, !run.contains(where: { $0 > 127 }), !text.contains(where: { $0 > 127 }) else { return nil }
                 guard run.count <= text.count else { return false }
-                // A run that doesn't begin with a letter or digit can be anywhere, as in `beginsWord`.
                 let atWordStart = wordStart && isASCIILetterOrDigit(first)
                 for start in 0...(text.count - run.count) where text[start] == first {
                     if atWordStart, start > 0, isASCIILetterOrDigit(text[start - 1]) { continue }
@@ -116,7 +114,6 @@ public struct SearchQuery: Sendable {
     public func style(forFamilyNamed names: [String]) -> Style? {
         let words = text.split(separator: " ").filter { word in !names.contains { Self.beginsWord(String(word), in: $0) } }
         var style = Style()
-        // Joined as in style names, so "semi bold" is semibold.
         for word in StyleName.words(words.joined(separator: " ")) {
             if Self.slopeWords.contains(word) {
                 style.isItalic = true
@@ -168,8 +165,7 @@ extension Family {
         let size = SimilarFonts.OpticalSize(name: id)
         if hasOpticalSize || size == .text { terms.append("text") }
         if hasOpticalSize || size == .display { terms.append("display") }
-        // On a width axis, against the regular's place on it, as not every font's is in percent (Skia's goes from 0.62
-        // to 1.3); else by the OS/2 width class.
+        // On a width axis, against the regular's place on it, as not every font's is in percent (Skia's goes from 0.62 to 1.3); else by the OS/2 width class.
         let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
         let widths = faces.map { face in
             face.axes.first { $0.tag == "wdth" }.map { $0.value < normal ? -1 : $0.value > normal ? 1 : 0 } ?? (face.width - 5).signum()
@@ -212,7 +208,6 @@ extension Family {
             keep { abs(widthClass(of: $0.face) - wanted) == nearest }
         }
         keep { $0.face.weightAxis != nil }
-        // A static style has no axes to be moved on, so it stays beside them.
         let named = ["wght"] + (style.isItalic ? ["ital", "slnt"] : []) + (style.width == nil ? [] : ["wdth"])
         let origin = Dictionary(regular.face.axes.map { ($0.tag, $0.value) }) { first, _ in first }
         func moved(_ face: FontFace) -> Int {

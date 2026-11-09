@@ -56,7 +56,6 @@ public struct MovingOutPrompt: Identifiable {
 
     public var message: String {
         let one = shared.count == 1
-        // "Adobe apps load", "InDesign loads".
         let apps = app.map { $0 == "Adobe apps" ? "Adobe apps load" : "\($0) loads" } ?? "The apps they’re for load"
         let place = folder.map { "“\(($0.path as NSString).lastPathComponent)”" } ?? "the folders they’re in"
         let moving = "\(apps) every font in \(place), so to turn \(one ? "it" : "them") off there too, Cicero moves \(one ? "its file" : "their files") into its Inactive folder."

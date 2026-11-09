@@ -38,15 +38,13 @@ struct CompareWindow: View {
                 (entry: entry, family: family, path: CompareSample.face(for: entry, in: family, preview: preview).face.path)
             }
         }
-        // A family whose file is on a server joins the others once it's been read in the background.
         let waiting = entries.map(\.path).filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
         let samples = entries.filter { !waiting.contains($0.path) }.map {
             CompareSample($0.entry, family: $0.family, text: text.isEmpty ? Self.placeholder : text, size: size, model: model, preview: preview)
         }
         Group {
             if entries.isEmpty {
-                // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls
-                // under it.
+                // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls under it.
                 ScrollView {
                     EmptyState("Nothing to Compare", systemImage: "square.on.square",
                                description: Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")) {
@@ -63,9 +61,7 @@ struct CompareWindow: View {
                         }
                     }
                     .padding(24)
-                    // As big as the window at least, so samples smaller than it sit at its top left: macOS 15 centres
-                    // them in a scroll view of both axes, whatever its alignment anchor. Its container is the window
-                    // less the toolbar already.
+                    // As big as the window at least, so samples smaller than it sit at its top left: macOS 15 centres them in a scroll view of both axes, whatever its alignment anchor.
                     .frame(minWidth: viewport.width, minHeight: viewport.height, alignment: .topLeading)
                 }
                 .defaultScrollAnchor(.topLeading, for: .alignment)
@@ -74,16 +70,12 @@ struct CompareWindow: View {
                 }
             }
         }
-        // Filling the window when there's nothing to compare too, on the canvas.
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
-        // The window takes focus, as it comes to the front and once Add Families closes, rather than the size field
-        // in its toolbar.
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
         .defaultFocus($focused, true)
         .onChange(of: isAdding) { if !$1 { focused = true } }
-        // Closing the window ends the comparison: opened again, it starts empty or with the families selected.
         .onDisappear { model.compareEntries = [] }
         .background(Color.canvas)
         .background(FontDropTarget { drags in _ = model.addToCompare(drags.flatMap(\.families)) })
@@ -171,7 +163,6 @@ private struct AddFamilies: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    // Back at the top for each search, where the first family found is highlighted.
                     .id(text)
                     .onChange(of: highlighted) { if let id = $1 { proxy.scrollTo(id) } }
                 }
@@ -204,7 +195,6 @@ private struct AddFamilies: View {
 
     private func row(_ family: Family, isCompared: Bool, isAvailable: Bool, isHighlighted: Bool) -> some View {
         HStack(spacing: 0) {
-            // A fixed width keeps the names lined up however wide each family's letters are, as in the suggestions.
             FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
                 // Resolved, as the popover's material lightens a colour that changes with the appearance.
                 .foregroundStyle(isHighlighted ? Color.white : Color(Color.secondary.resolve(in: environment)))
@@ -303,18 +293,14 @@ private struct StackedLayout: View {
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
             row(sample, overhang: overhang, width: width, top: top)
         } lifted: { sample in
-            // Opaque, so the rows it passes don't show through.
             row(sample, overhang: overhang, width: width, top: top)
                 .background { Color.canvas.padding(-8) }
         }
     }
 
     private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat, top: CGFloat) -> some View {
-        // Under the font's ascent, the room it keeps for accents and line spacing left a gap above the first row:
-        // 92 pt at 288 pt for a font whose ascent is 1,020 units and its ascenders 700. The rows under it keep it.
         let ascent = sample.id == samples.first?.id ? top : sample.line.ascent
         return VStack(alignment: .leading, spacing: 6) {
-            // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
             Canvas { context, _ in
                 let color = Color.ink.resolve(in: context.environment).cgColor
                 context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
@@ -332,26 +318,16 @@ private struct OverlayLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        // The baseline where the stacked layout has its first row's, so neither switching layouts nor changing the
-        // order moves it.
         let ascent = CompareSample.topAscent(of: samples)
         let descent = samples.map(\.line.descent).max() ?? 0
-        // Where each line starts: the one whose stem is furthest from its start level with the legend, the others
-        // further in, so their stems stand on its. Started together, a serif font's stem stood right of a sans one's.
         let stems = samples.map { FirstStem.x(in: $0.line.line) ?? 0 }
         let starts = stems.map { (stems.max() ?? 0) - $0 }
-        // Glyphs reaching left of that go into the margin, as in the stacked rows.
         let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
         let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
-        // The chips' names at the height the stacked layout has the first font's, 6 pt under the samples, and in the
-        // same size: 16 pt under them, in callout, they moved down 15.5 pt on going to Overlay. Under a font that
-        // reaches lower than the first, they go lower with it. Sideways they start level with the samples.
         VStack(alignment: .leading, spacing: 6 - Self.chipPadding.height) {
             Canvas { context, _ in
                 let environment = context.environment
                 context.withCGContext { cg in
-                    // Over each other as inks on paper, or as lights in Dark Mode, so every font shows through those
-                    // drawn over it. Simply laid over each other at 70 %, a few stems hid the serifs of a font below.
                     cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
                     for (sample, start) in zip(samples, starts) {
                         let color = sample.tint.opacity(0.7).resolve(in: environment).cgColor
@@ -407,7 +383,6 @@ private struct Reorderable<Item: View, Lifted: View>: View {
         .coordinateSpace(.named(Self.space))
         .overlay(alignment: .topLeading) {
             if let drag, let sample = samples.first(where: { $0.id == drag.id }) {
-                // Rows stay in their column, as in a list; chips go wherever the pointer does.
                 lifted(sample)
                     .offset(x: axis == .vertical ? 0 : drag.location.x - drag.grab.width, y: drag.location.y - drag.grab.height)
                     .allowsHitTesting(false)
@@ -509,8 +484,7 @@ private struct SampleCaption: View {
                 .disabled(model.isCompareFull)
             }
         } label: {
-            // One text, as a menu's label puts an image of its own first. Grey here only: on the menu, the grey
-            // would reach its items' icons too.
+            // One text, as a menu's label puts an image of its own first; grey here only, as on the menu the grey would reach its items' icons too.
             Text("\(sample.face.face.styleName) \(Image(systemName: "chevron.down"))")
                 .foregroundStyle(.secondary)
                 .tint(.secondary)
@@ -532,7 +506,6 @@ private struct TintMenu: View {
         Circle()
             .fill(sample.tint)
             .frame(width: 8, height: 8)
-            // A larger target, the dot where it is.
             .padding(3)
             .overlay {
                 TintMenuArea(tints: CompareSample.tints.map { (title: $0.title, image: NSImage.menuDot(resolved($0.color))) },
@@ -587,7 +560,6 @@ private final class TintMenuView: NSView {
             item.state = index == chosen ? .on : .off
             menu.addItem(item)
         }
-        // Its top-left corner just under the dot's.
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: isFlipped ? bounds.maxY + 4 : -4), in: self)
     }
 

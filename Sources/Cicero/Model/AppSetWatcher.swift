@@ -19,8 +19,7 @@ final class AppSetWatcher {
         guard self.model == nil else { return }
         self.model = model
         running = Self.runningBundleIDs()
-        // The list changes as an app starts launching, before it reads its fonts; the launch
-        // notification comes only once it has finished.
+        // The list changes as an app starts launching, before it reads its fonts; the launch notification comes only once it has finished.
         observation = NSWorkspace.shared.observe(\.runningApplications) { [weak self] _, _ in
             Task { @MainActor in self?.runningAppsChanged() }
         }
@@ -85,7 +84,6 @@ final class AppSetWatcher {
         let current = Self.onForAppSets(model.data.records)
         for (path, names) in managed where !current.contains(path) { dismissed.formUnion(names) }
         managed = managed.filter { current.contains($0.key) }
-        // Ones on from before Cicero started, or before the library listed them.
         for path in current where managed[path]?.isEmpty ?? true { managed[path] = Set(names(in: path)) }
         let (wanted, faces) = plan()
         let records = model.data.records
@@ -96,18 +94,15 @@ final class AppSetWatcher {
         }
         guard !turningOn.isEmpty || !turningOff.isEmpty || appsChanged else { return }
 
-        // The switches move at once, as for the user's own activations, and settle with the scan after.
         var operations: [Int] = []
         let on = self.faces(inFiles: turningOn)
         if !on.isEmpty { operations.append(model.expect(on, at: .on)) }
         let off = Dictionary(grouping: self.faces(inFiles: turningOff)) { face in
-            // A font from an app's folder goes back to being on in that app.
             face.app != nil && records.appFolderOrigins[face.face.path] == nil ? SwitchPosition.app : .off
         }
         for (position, faces) in off { operations.append(model.expect(faces, at: position)) }
 
         model.enqueue { [weak self] model in
-            // Worked out again: an operation that ran in the meantime may have changed what's on.
             guard let self else { return }
             let (wanted, faces) = self.plan()
             let result = await model.engine.syncAppSets(wanted, faces: faces, records: model.data.records)
@@ -121,7 +116,6 @@ final class AppSetWatcher {
             } else if result.succeeded > 0 {
                 model.showToast("\(FontNames.describe(on) ?? "Fonts") activated for \(self.appNames(wanting: wanted))")
             }
-            // The engine has waited for macOS, so a scan now sees what the sync did.
             let scan = model.rescan()
             for operation in operations { model.settle(operation, after: scan) }
         }
@@ -166,7 +160,6 @@ final class AppSetWatcher {
             guard !apps.isEmpty else { continue }
             for name in set.memberFamilies {
                 guard let family = model.library.family(name) else { continue }
-                // Only the styles it has of a family it has some of.
                 for face in family.faces where set.contains(style: face.face.postScriptName, of: name) { want(face, for: apps) }
             }
         }
@@ -196,7 +189,6 @@ final class AppSetWatcher {
         let ids = wanted.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         var seen = Set<String>()
         var names = (model?.data.sets ?? []).flatMap(\.apps).filter { ids.contains($0.bundleID) && seen.insert($0.bundleID).inserted }.map(\.name)
-        // Apps that asked for their documents' fonts without being in a set.
         for app in NSWorkspace.shared.runningApplications {
             guard let id = app.bundleIdentifier, ids.contains(id), seen.insert(id).inserted else { continue }
             names.append(app.localizedName ?? id)

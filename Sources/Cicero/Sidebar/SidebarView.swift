@@ -13,8 +13,7 @@ struct SidebarView: View {
 
     var body: some View {
         let shown = pendingSelection ?? model.selectedItems
-        // The rows are a view of their own: a list's selection updates whatever makes the list, and this
-        // way that's just this, not every section and row. Each row's title reads the selection it draws.
+        // The rows are a view of their own: a list's selection updates whatever makes the list, and this way that's just this, not every section and row.
         List(selection: Binding(get: { shown }, set: select)) {
             SidebarContent(highlight: highlight, drag: drag, fit: fit)
         }
@@ -23,7 +22,6 @@ struct SidebarView: View {
         .onChange(of: shown, initial: true) { highlight.selected = shown }
         .contextMenu { EditSidebarButton(model: model) }
         .onChange(of: model.selectedItems) {
-            // Selected some other way (a new set, say) while the browser was catching up: that wins.
             guard pendingSelection != nil else { return }
             pace.commit?.cancel()
             pendingSelection = nil
@@ -76,7 +74,7 @@ private struct SidebarContent: View {
             if editing || model.isVisible(section.key) {
                 let groups = section == .characterSets ? model.characterSetGroups : []
                 let rows = section == .characterSets ? [] : model.rows(for: section)
-                // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside (see `SectionHeader`).
+                // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside.
                 Section {
                     if model.isExpanded(section) {
                         if section == .classifications && model.asksAboutGuessing && !editing {
@@ -105,7 +103,6 @@ private struct SidebarContent: View {
         let shownRows = shown(rows)
         return ForEach(shownRows) { row($0, section: section) }
             .onMove { source, destination in
-                // Without the list's animation: the gap already shows where the rows land (see `SidebarDataSource`).
                 var transaction = Transaction(animation: nil)
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
@@ -130,10 +127,7 @@ private struct SidebarContent: View {
             )) {
                 movableRows(group.rows, in: key(group.id), section: .characterSets)
             } label: {
-                // Only the chevron toggles a group in a selectable list; make the title do it too. A tap
-                // rather than a button, so the title doesn't dim while it's pressed. An icon and full-strength
-                // text like the rows around it, as a playlist folder has in Music's sidebar. Coloured here, as the
-                // rows are (see `SidebarLabel`), or the list grays it while another window is in front.
+                // In a selectable list only the chevron toggles a group: a tap, not a button, so the title doesn't dim while pressed; coloured here, or the list greys it while another window is in front.
                 Label {
                     Text(group.title).lineLimit(1).sidebarTitle(group.title, key: key(group.id), fit: fit)
                 } icon: {
@@ -217,7 +211,6 @@ private struct SidebarContent: View {
             plus("Add a folder of fonts") { model.presentAddFolderPanel() }
         case .sets:
             Menu {
-                // The symbols the sidebar has for each kind.
                 Button("New Folder", systemImage: "folder") { model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0) } }
                 Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
                 Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
@@ -270,8 +263,7 @@ private struct SidebarContent: View {
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
         // Asked for as the list starts dragging the row, which tells which rows a drag has.
         .itemProvider { drag.provider(for: row) }
-        // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear,
-        // which shows when a section opens or a long one scrolls. The one families are over lights up.
+        // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear.
         if model.takesFamilies(row.item) {
             content
                 .background(FontDropTarget(isOver: { isOver in
@@ -303,7 +295,6 @@ private struct SidebarRowMenu: View {
         switch row.item {
         case .temporary:
             if rows.count == 1 {
-                // Only the styles on until Cicero quits: the families' other styles stay as they are.
                 Button("Activate Permanently", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
                 Button("Deactivate", systemImage: "xmark.seal") { model.deactivateFonts(in: [row.item]) }
             }
@@ -373,7 +364,6 @@ private struct SidebarRowMenu: View {
     @ViewBuilder
     private func locationItems(_ ids: [UUID]) -> some View {
         if ids.count == 1, let id = ids.first {
-            // Shows the folder under another name in Cicero; the folder on disk keeps its own. Left empty, it goes back to that.
             Button("Rename Location", systemImage: "pencil") {
                 model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
             }
@@ -416,10 +406,8 @@ private struct SidebarRowMenu: View {
     private func folderItems(_ rows: [SidebarRow]) -> some View {
         let sets = Set(rows.compactMap { if case .set(let id) = $0.item { id } else { nil } })
         let smartSets = Set(rows.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
-        // Folders when there are any among them, smart ones being folders too.
         let kind = sets.isEmpty ? "Smart Folder" : "Folder"
         let kinds = rows.count == 1 ? kind : kind + "s"
-        // The symbols of the sidebar's Active and Inactive.
         Button("Activate \(kinds)", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
         Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: rows.map(\.item)) }
         Button("Deactivate \(kinds)", systemImage: "xmark.seal") { model.deactivateFonts(in: rows.map(\.item)) }
@@ -443,7 +431,6 @@ private struct SidebarRowMenu: View {
         if names.count == 1, let name = names.first {
             Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
         }
-        // Checked when every tag has the colour.
         Menu {
             Toggle("None", isOn: Binding(
                 get: { names.allSatisfy { model.data.tagColors[$0] == nil } },
@@ -488,7 +475,6 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
     var body: some View {
         HStack(spacing: 6) {
             leading
-            // As wide as the header lets it be, in place of a spacer.
             Text(title)
                 .sidebarTitle(title, key: key, fit: fit)
                 .opacity(isDimmed ? 0.45 : 1)
@@ -496,7 +482,6 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                // Turns at once, while the section's rows open and close.
                 .transaction { $0.animation = nil }
                 .frame(width: 14)
                 .padding(.trailing, 4)
@@ -527,7 +512,6 @@ private struct OrganizeRow: View {
     var body: some View {
         Button { model.ask { $0.showsGuessingQuestion = true } } label: {
             Label { Text("Organize").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
-                // Not sparkles, which are Ornamental's: a letter under a magnifying glass, as Cicero looks at the letters.
                 Image(systemName: "character.magnify").foregroundStyle(Color.solar)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -725,8 +709,7 @@ final class SidebarDrag {
         rows = Array(rows.suffix(count))
         self.session = session
         listFrame = frame
-        // Let go where nothing changes, as back in their own place, the rows are there again at once: AppKit slid the
-        // picture back there and faded it out first, with the place empty.
+        // Let go where nothing changes, the rows are there again at once: AppKit slid the picture back there and faded it out first, with the place empty.
         session.animatesToStartingPositionsOnCancelOrFail = false
         pictures = []
         session.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
@@ -775,7 +758,6 @@ final class SidebarDrag {
             .foregroundStyle(.primary)
             .padding(.leading, leading)
             .frame(width: size.width, height: size.height, alignment: .leading)
-            // As light as Finder's sidebar rows are dragged: measured against them on macOS 26.
             .opacity(0.88)
             .environment(\.colorScheme, isDark ? .dark : .light))
         renderer.scale = outline.window?.backingScaleFactor ?? 2
@@ -783,7 +765,6 @@ final class SidebarDrag {
     }
 
     func moved(to point: NSPoint) {
-        // All Fonts, Active and Inactive don't go: nothing to show for them.
         guard session != nil, rows.contains(where: \.canHide) else { return }
         let isOutside = !listFrame.contains(point)
         if isOutside {

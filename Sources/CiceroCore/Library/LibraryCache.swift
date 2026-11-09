@@ -1,7 +1,7 @@
 import Foundation
 
 enum LibraryCache {
-    private static let magic: UInt32 = 0x4243_4C43  // "CLCB"
+    private static let magic: UInt32 = 0x4243_4C43
     private static let version: UInt32 = 1
 
     private struct SavedFamily: Sendable {
@@ -43,7 +43,6 @@ enum LibraryCache {
         writer.write(Array(library.activePaths))
         writer.write(UInt32(library.unavailableFolders.count))
         for (id, availability) in library.unavailableFolders {
-            // Not found and disconnected share tag 0; a disconnected disk's name comes after the offline paths.
             let tag: UInt8 = switch availability {
             case .notFound, .disconnected: 0
             case .noAccess: 1
@@ -77,7 +76,6 @@ enum LibraryCache {
                 let faces = try reader.u32()
                 guard faces == FaceCache.version || faces == FaceCache.withoutFigures else { return nil }
                 let fingerprint = Int(try reader.i64())
-                // Read in one pass; making the families, most of the work, is spread over the cores after.
                 var members: [SavedFamily] = []
                 for _ in 0..<Int(try reader.u32()) {
                     let name = try reader.string()

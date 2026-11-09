@@ -18,7 +18,6 @@ extension ActivationEngine {
         case .iCloudDrive:
             return .iCloudDrive
         case .other:
-            // Its folder in ~/Library/CloudStorage starts with its name.
             let folder = paths.lazy.compactMap { path in path.range(of: "/Library/CloudStorage/").map { path[$0.upperBound...] } }.first
             let name = folder?.prefix { $0 != "/" }.split(separator: "-", maxSplits: 1).first.map(String.init) ?? ""
             return .cloudService(serviceName(name))

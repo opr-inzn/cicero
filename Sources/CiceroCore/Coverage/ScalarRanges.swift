@@ -87,7 +87,6 @@ public struct ScalarRanges: Sendable, Equatable {
     }
 
     public func contains(_ scalar: UInt32) -> Bool {
-        // The last range whose lower bound is at or before the scalar is the only one that can hold it.
         var low = 0
         var high = bounds.count / 2
         while low < high {
@@ -154,7 +153,6 @@ public struct ScalarRanges: Sendable, Equatable {
                 kept.append(low)
                 kept.append(high)
             }
-            // The range that ends first can't meet any later one of the other.
             if bounds[mine + 1] < other.bounds[theirs + 1] { mine += 2 } else { theirs += 2 }
         }
         return ScalarRanges(bounds: kept)

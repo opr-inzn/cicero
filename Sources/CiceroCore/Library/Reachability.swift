@@ -28,8 +28,7 @@ public enum Reachability {
         let name = String(parts[1])
         var volume = stat(), volumes = stat()
         guard lstat("/Volumes/" + name, &volume) == 0 else { return name }
-        // A folder left where the disk was mounted is on the same disk as /Volumes. (The startup disk is
-        // there as a link.)
+        // A folder left where the disk was mounted is on the same disk as /Volumes; the startup disk is there as a link.
         guard volume.st_mode & S_IFMT == S_IFDIR, stat("/Volumes", &volumes) == 0 else { return nil }
         return volume.st_dev == volumes.st_dev ? name : nil
     }

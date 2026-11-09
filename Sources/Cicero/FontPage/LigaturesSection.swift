@@ -44,7 +44,6 @@ struct LigaturesSection: View {
             shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
         }.map { $0 - ligatures.startIndex }
         let shown = Array(ligatures)
-        // The characters in its tooltip; a long one is scaled down to fit, 2 pt clear of the cell's sides.
         let actions = GridRowActions(open: { (popover, popoverCell) = ((group.tag, shown[$0].characters), $1) }, menu: { menu(shown[$0], in: group) },
                                      file: { dragFile(shown[$0]) }, help: { shown[$0].text })
         return GlyphGridRow(cells: shown.map { GridCell(content: .glyph($0.glyph), label: "Ligature of \($0.text)") }, columns: columns,
@@ -87,8 +86,6 @@ struct LigaturesSection: View {
                     .multilineTextAlignment(.center)
                     .textSelection(.enabled)
             }
-            // A ligature has no code of its own: what's copied is its characters, which the font draws as this glyph
-            // where its feature is on, and the page's text where they're pasted (see `SampleGlyph`).
             VStack {
                 Button("Copy Characters", systemImage: "doc.on.doc") { copyCharacters(ligature, in: group) }
                     .help("Copies “\(ligature.text)”, which shows as this ligature when pasted into the text above, and elsewhere with \(group.name) on")

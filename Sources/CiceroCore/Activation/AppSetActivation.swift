@@ -19,7 +19,6 @@ extension ActivationEngine {
         }.sorted()
 
         if !release.isEmpty {
-            // One that won't unregister keeps its record, so the next sync tries again.
             let stuck = await endSessionRegistrations(release)
             for path in release where !stuck.contains(path) { records.temporary[path] = nil }
         }

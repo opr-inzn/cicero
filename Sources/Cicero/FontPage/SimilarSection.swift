@@ -24,7 +24,6 @@ struct SimilarSection: View {
                 .padding(.horizontal, 24)
             }
         } else if model.measurementProgress != nil {
-            // Measuring the library's letters, the first time: quietly, as it takes a moment.
             VStack(alignment: .leading, spacing: 0) {
                 header(all: 0)
                 Divider()
@@ -43,10 +42,8 @@ struct SimilarSection: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 6)
-            // Over the title's row rather than in it, so that it's as high as the styles'.
             .overlay(alignment: .trailing) {
                 if all > Self.shown {
-                    // Like the sidebar's Edit: grey text at the title's size, not a bezeled button heavier than the title.
                     Button(showsMore ? "Show Less" : "Show All") { showsMore.toggle() }
                         .buttonStyle(StillButtonStyle())
                         .font(.subheadline)
@@ -56,7 +53,6 @@ struct SimilarSection: View {
                         .help(showsMore ? "Show the \(Self.shown.plain) closest" : "Show the \(all.plain) families that look most like \(family.name)")
                 }
             }
-            // As far from the styles above as the glyphs' title is from this.
             .padding(.top, 50)
     }
 
@@ -66,11 +62,9 @@ struct SimilarSection: View {
         return Button {
             model.openFamilyID = other.id
         } label: {
-            // Its name, whatever the preview text, so that the row says which family it is.
             FontText(text: other.name, face: face, size: 20, weight: preview.weight, features: model.features(for: other))
                 .foregroundStyle(Color.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // One height for every row, whatever each font's line spacing; tall glyphs reach past it, never cut off.
                 .frame(height: 44)
                 .contentShape(.rect)
         }

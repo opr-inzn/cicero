@@ -29,7 +29,6 @@ struct ToolboxWindow: View {
                 ToolbarPicker("View", values: ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
-        // Turning fonts on or off from a font's menu here can ask first, which the Library window does: it comes forward.
         .onChange(of: model.manyActivationPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
         .onChange(of: model.movingOutPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
     }
@@ -74,8 +73,7 @@ private struct TextTab: View {
     }
 
     var body: some View {
-        // The rows stay, empty, under the messages rather than make way for them: the bar is rebuilt when the
-        // scroll view under it comes or goes, and the text field in it lost focus with the first letter typed.
+        // The rows stay, empty, under the messages: the bar is rebuilt when the scroll view under it comes or goes, and the text field in it lost focus with the first letter typed.
         ZStack {
             table
             if query.text.isEmpty {
@@ -87,7 +85,6 @@ private struct TextTab: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // The fonts scroll under the controls and column titles.
         .fadingTopBar {
             VStack(spacing: 0) {
                 controls
@@ -125,7 +122,6 @@ private struct TextTab: View {
         let model = self.model
         let preview = self.preview
         let sample = query.text
-        // Clearing the text leaves the last matches until the search catches up.
         let matches = sample.isEmpty ? [] : self.matches
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
         return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
@@ -141,7 +137,6 @@ private struct TextTab: View {
                     )
                     .foregroundStyle(Color.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    // Glyphs taller than the row run over its edges rather than be cut off.
                     .frame(height: 22)
                     Text(Self.characters(missing[family.id] ?? [])).foregroundStyle(.secondary).lineLimit(1)
                         .frame(width: 160, alignment: .leading)
@@ -177,7 +172,6 @@ private struct TextTab: View {
             return
         }
         isSearching = true
-        // Wait for a pause in typing before walking a big library.
         try? await Task.sleep(for: .milliseconds(200))
         guard !Task.isCancelled else { return }
         let data = model.data
@@ -261,10 +255,8 @@ private struct LanguagesTab: View {
                     .monospacedDigit()
             }
         }
-        // The languages scroll under the search field.
         .fadingTopBar {
             HStack(spacing: 8) {
-                // Short enough for the field beside the sort menu at the list's narrowest.
                 TextField("Search", text: $search, prompt: Text("Language or script"))
                     .textFieldStyle(.roundedBorder)
                 Picker("Sort", selection: $sortByName) {
@@ -309,7 +301,6 @@ private struct LanguagesTab: View {
                         .frame(height: 22)
                 }
             }
-            // The fonts scroll under the language.
             .fadingTopBar {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {

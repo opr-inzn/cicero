@@ -55,7 +55,6 @@ struct GlyphsSection: View {
                 .frame(maxWidth: 280)
         }
         .padding(.horizontal, Self.inset)
-        // Well clear of the styles above, and close to the groups it heads.
         .padding(.top, 56)
         .padding(.bottom, 4)
         if shown.isEmpty && shownLigatures.isEmpty {
@@ -63,10 +62,7 @@ struct GlyphsSection: View {
                        description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else if isShort(shown, shownLigatures) {
-            // What a filter finds, when it's a few rows, in a stack of its own, one row of the page's lazy stack: with
-            // only a few rows and the tall title above them, the lazy stack's guesses at the heights of rows it hadn't
-            // placed swung back and forth, and it laid the page out again and again at full CPU (ABC Repro filtered
-            // by "numr": six groups of 14 numerators).
+            // A few rows in a stack of their own, one row of the page's lazy stack: under the tall title, the lazy stack's guesses at the heights of rows it hadn't placed swung back and forth, and it laid the page out again and again at full CPU.
             VStack(alignment: .leading, spacing: 0) {
                 groups(shown, shownLigatures, style: style)
             }
@@ -96,8 +92,6 @@ struct GlyphsSection: View {
         ForEach(shown.prefix(lead)) { section in
             self.section(section, style: style)
         }
-        // In the Ligatures group's place, after its characters, like ﬀ, that no feature makes, or after the one
-        // script a font without Latin letters starts with.
         if !shownLigatures.isEmpty {
             LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
                              columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation)
@@ -110,8 +104,6 @@ struct GlyphsSection: View {
 
     private func section(_ section: GlyphSection, style: Style) -> some View {
         let filter = Filter(query)
-        // Figures in runs, lining, old-style and so on, each starting a row (see `GlyphSection.runs`); a run's first row
-        // has its label above it, if it has one, like a localized form's language.
         let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
         let rows = runs.flatMap { run in
             stride(from: 0, to: run.cells.count, by: columns).map { start in
@@ -120,14 +112,8 @@ struct GlyphsSection: View {
         }
         let total = runs.reduce(0) { $0 + $1.cells.count }
         return Section {
-            // Rows of the page's stack, not a LazyVGrid per group in it. The stack guesses the height of groups it
-            // hasn't placed from those it has, and groups run from one row to hundreds, so every correction shifted
-            // the page and changed which groups were placed: it re-laid itself out at full CPU. Rows of fixed cells
-            // are all one height, so the guesses are right; labelled ones are few, in the small Localized Forms group.
-            // A label goes over room above its row, not in a stack with it: rows in stacks of their own drew other
-            // groups' rows in their place after a long jump down the page.
+            // Rows of the page's lazy stack, all one height: it guesses unplaced rows' heights from placed ones, so a LazyVGrid per group re-laid it out at full CPU, and rows in stacks of their own drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in
-                // Right under the group's title, a line clear of the run before; as close to its cells as the title is.
                 let above = row == 0 ? 0 : Self.runGap
                 GlyphRow(open: open, cells: rows[row].cells, columns: columns) { selected in
                     glyphRow(rows[row].cells, style: style, selected: selected)
@@ -155,7 +141,6 @@ struct GlyphsSection: View {
                 Spacer()
             }
             .padding(.horizontal, Self.inset)
-            // A first row's label follows the title as its next line.
             .padding(.top, 4)
             .padding(.bottom, runs.first?.label == nil ? 4 : 0)
         }
@@ -193,7 +178,6 @@ struct GlyphsSection: View {
                     .onDrag { dragItem(cell, style: style) }
                 Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: scalar)
-                // Stacked: side by side they're wider than the popover.
                 VStack {
                     Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
                         .help("Copies “\(Self.text(scalar))”")
@@ -205,19 +189,14 @@ struct GlyphsSection: View {
                     .frame(width: 160, height: 130)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
-                // The name, then the features right under it, as lines of one text.
                 VStack(spacing: 0) {
                     Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed")
-                    // "Tabular Figures (tnum)", and "Old-Style Figures (onum)" under it for a tabular old-style figure.
                     Text(zip(glyph.featureNames, glyph.featureTags).map { "\($0) (\($1))" }.joined(separator: "\n"))
                         .foregroundStyle(.secondary)
                 }
                 .font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: glyph.character)
-                // The glyph has no code of its own: what's copied is the character, which the font draws like this
-                // where the feature is on, and the page's text where it's pasted (see `SampleGlyph`).
                 VStack {
-                    // A localized form in text of its language, any other with its features on.
                     let drawn = glyph.feature == "locl" ? "in \(glyph.featureName) text" : "with \(glyph.featureNames.listed()) on"
                     Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
                         .help("Copies “\(Self.text(glyph.character))”, which shows like this when pasted into the text above, and elsewhere \(drawn)")
@@ -232,7 +211,6 @@ struct GlyphsSection: View {
                     .onDrag { dragItem(cell, style: style) }
                 VStack(spacing: 0) {
                     Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed")
-                    // "Single-storey a (ss07)", and "Old-Style Figures (onum)" under it for a stylistic set's old-style figure.
                     Text(zip(alternate.allFeatureNames, alternate.allFeatures).map { "\($0) (\($1))" }.joined(separator: "\n"))
                         .foregroundStyle(.secondary)
                 }
@@ -428,8 +406,6 @@ struct GlyphsSection: View {
         let filter = Filter(query)
         guard !filter.isEmpty else { return sections }
         return sections.compactMap { section in
-            // A character with an alternate the filter finds, which follows it; a feature's glyph by its character, or
-            // the feature's name or tag.
             let characters = section.scalars.filter { filter.matches($0) || !shownAlternates(of: $0, filter).isEmpty }
             let glyphs = section.glyphs.filter { glyph in
                 filter.matches(glyph.character) || zip(glyph.featureNames, glyph.featureTags).contains { filter.matches(feature: $0, tag: $1) }
@@ -444,7 +420,6 @@ struct GlyphsSection: View {
         let trimmed = filter.trimmed
         return groups.compactMap { group in
             let matches = group.ligatures.filter { ligature in
-                // Its own character too, like ﬁ or U+FB01.
                 let own = ligatureCharacters[ligature.glyph]
                 return ligature.text.localizedCaseInsensitiveContains(trimmed)
                     || filter.code.map { ligature.characters.contains($0) || own == $0 } ?? false
@@ -472,7 +447,6 @@ private struct GlyphRow<Details: View>: View {
         let column = open.cell.flatMap { cells.firstIndex(of: $0) }
         let mine = column.map { cells[$0] }
         row(column)
-            // Closes only its own: another row's popover may have opened since.
             .cellPopover(column: column, columns: columns, cell: open.rect, close: { if open.cell == mine { open.cell = nil } }) {
                 if let cell = open.cell {
                     details(cell)

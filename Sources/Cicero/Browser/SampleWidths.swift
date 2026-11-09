@@ -58,7 +58,6 @@ final class SampleWidths {
         Measurements.record("sampleWidths", ms: 0, detail: "\(measured.new) measured, \(measured.used.count) saved")
         measuredLog.append((measured.new, measured.used.count))
         #endif
-        // Only this measurement's samples are kept, so the file doesn't grow with every preview text tried.
         if measured.new > 0 || measured.used.count != known.count {
             saved = measured.used
             save(measured.used)
@@ -171,7 +170,7 @@ final class SampleWidths {
         for (index, sample) in samples.enumerated() {
             if index % 32 == 0, Task.isCancelled { return nil }
             let path = sample.face.path
-            // Not a file on a server, which asking anything could hold up, unless it was read already; it isn't saved.
+            // Not a file on a server, which asking anything could hold up, unless it was read already.
             var file = stat()
             let local = Reachability.isOnLocalDisk(path)
             if local {
@@ -185,8 +184,7 @@ final class SampleWidths {
                 lane.used[savedKey] = ratio
                 continue
             }
-            // Nor one a cloud service keeps online only, which reading would download: its tile measures it once it has
-            // it, and it counts the next time the list is measured.
+            // Nor one a cloud service keeps online only, which reading would download.
             if local, file.st_flags & UInt32(SF_DATALESS) != 0, !FontLoader.shared.hasDescriptors(for: path) { continue }
             let text = scriptSamples.text(sample.text, for: sample.face, cached: false)
             let key = sample.key(text: text)

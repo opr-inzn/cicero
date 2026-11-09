@@ -38,7 +38,6 @@ public enum Requests {
             let open = AppLock.isHeld(support: support)
             if fm.fileExists(atPath: waiting.path) {
                 if !open || ContinuousClock.now - start > takeWithin {
-                    // Withdrawn, unless Cicero takes it at this moment: then its answer comes.
                     let withdrawn = folder.appendingPathComponent("\(id).withdrawn", isDirectory: false)
                     if (try? fm.moveItem(at: waiting, to: withdrawn)) != nil {
                         try? fm.removeItem(at: withdrawn)
@@ -53,7 +52,6 @@ public enum Requests {
                 }
                 throw CommandError(.busy, "Cicero didn’t take the change in time. Nothing changed. Try again in a moment.")
             } else if !open {
-                // Taken, and Cicero went away: an answer written just before is read once more.
                 if let answer = readReply(reply) {
                     try? fm.removeItem(at: reply)
                     try? fm.removeItem(at: taken)

@@ -47,7 +47,6 @@ public struct LigatureGroup: Identifiable, Sendable {
         var made: [CGGlyph: [UInt32]] = [:]
         var pending = features.flatMap { feature in (found[feature.tag] ?? []).map { (feature.tag, $0) } }
         var resolved: [(String, GSUBSubstitutions.Entry, [UInt32])] = []
-        // Each pass resolves the ligatures whose components are known by now, so ligatures of ligatures follow.
         while true {
             var next: [(String, GSUBSubstitutions.Entry)] = []
             for (tag, entry) in pending {
@@ -101,7 +100,6 @@ public struct LigatureGroup: Identifiable, Sendable {
     }
 
     private static func forEachCharacter(of font: CTFont, _ body: (UInt32, CGGlyph) -> Bool) {
-        // Up to a thousand characters at a time, one call each: one call per character took most of the time.
         var scalars: [UInt32] = []
         var units: [UniChar] = []
         var glyphs: [CGGlyph] = []
@@ -120,14 +118,11 @@ public struct LigatureGroup: Identifiable, Sendable {
             }
             glyphs = [CGGlyph](repeating: 0, count: units.count)
             CTFontGetGlyphsForCharacters(font, units, &glyphs, units.count)
-            // A character the font has no glyph for gets 0, as asking for it alone fails.
             var index = 0
             for scalar in scalars {
                 var glyph = glyphs[index]
                 index += scalar < 0x10000 ? 1 : 2
-                // Right after another character, CoreText reads a variation selector as part of a variation sequence
-                // with it, and gives it no glyph of its own (0xFFFF); alone, it gets the one the font has for it, as
-                // Cambria Math has for U+FE00.
+                // Right after another character, CoreText reads a variation selector as part of a variation sequence and gives it no glyph of its own (0xFFFF); alone, it gets the font's, as Cambria Math has for U+FE00.
                 if isVariationSelector(scalar) { glyph = self.glyph(for: scalar, in: font) }
                 if glyph != 0, !body(scalar, glyph) { return false }
             }
@@ -167,7 +162,6 @@ enum GSUBSubstitutions {
 
     static func read(_ table: Data, including includes: (String) -> Bool) -> [String: [Entry]] {
         let reader = Reader(bytes: [UInt8](table))
-        // Header: version (4 bytes), then the offsets of the script, feature and lookup lists.
         guard let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [:] }
         let lookups = Lookups(reader: reader, list: lookupList)
         var result: [String: [Entry]] = [:]
@@ -188,7 +182,6 @@ enum GSUBSubstitutions {
     static func readByLanguage(_ table: Data, feature tag: String) -> [(languages: [String], entries: [Entry])] {
         let reader = Reader(bytes: [UInt8](table))
         guard let scriptList = reader.u16(4), let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [] }
-        // Feature index → the languages whose language systems list it.
         var languages: [Int: [String]] = [:]
         for script in 0..<(reader.u16(scriptList) ?? 0) {
             guard let offset = reader.u16(scriptList + 2 + script * 6 + 4) else { continue }
@@ -197,7 +190,6 @@ enum GSUBSubstitutions {
                 let at = start + 4 + system * 6
                 guard let language = reader.tag(at)?.trimmingCharacters(in: .whitespaces), let offset = reader.u16(at + 4) else { continue }
                 let langSys = start + offset
-                // Lookup order (reserved), then the required feature's index, then the others'.
                 let required = reader.u16(langSys + 2).flatMap { $0 == 0xFFFF ? nil : $0 }
                 let indices = (0..<(reader.u16(langSys + 4) ?? 0)).compactMap { reader.u16(langSys + 6 + $0 * 2) }
                 for index in (required.map { [$0] } ?? []) + indices where !languages[index, default: []].contains(language) {
@@ -309,7 +301,6 @@ enum GSUBSubstitutions {
             guard let format = reader.u16(start) else { return [] }
             switch format {
             case 1, 2:
-                // Rule sets, each a list of rules, each ending in its records.
                 let first = start + (chained && format == 2 ? 10 : format == 2 ? 6 : 4)
                 guard let setCount = reader.u16(first) else { return [] }
                 var indices: [Int] = []
@@ -433,8 +424,6 @@ public struct FeatureGlyph: Hashable, Sendable {
         ("sups", "Superscript", .superscripts), ("subs", "Subscript", .subscripts), ("sinf", "Scientific Inferiors", .subscripts),
         ("numr", "Numerators", .numerators), ("dnom", "Denominators", .denominators), ("ordn", "Ordinals", .ordinals),
         ("case", "Case-Sensitive Forms", .caseSensitiveForms), ("locl", "Localized Forms", .localizedForms),
-        // Forms for the start, middle and end of a word and for a letter alone: a Latin font's, like ABC Repro's, and a
-        // script's, like Arabic's.
         ("init", "Initial Forms", .initialForms), ("medi", "Medial Forms", .medialForms), ("fina", "Final Forms", .finalForms),
         ("isol", "Isolated Forms", .isolatedForms),
     ]
@@ -473,8 +462,6 @@ public struct FeatureGlyph: Hashable, Sendable {
     static func bigSets(in found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32], total: Int,
                         names: [String: String]) -> [(tag: String, name: String)] {
         guard total > 0 else { return [] }
-        // Not the glyphs another group's feature or an earlier big set draws: Repro LAB223's "smallsize circled" draws its
-        // forms by place in a word, like exclam.isol.
         var taken = Set(features.flatMap { found[$0.tag] ?? [] }.map(\.glyph))
         return found.keys.filter { $0.hasPrefix("ss") && Int($0.dropFirst(2)).map { (1...20).contains($0) } == true }.sorted().compactMap { tag in
             let entries = (found[tag] ?? []).filter { entry in
@@ -534,9 +521,6 @@ public struct FeatureGlyph: Hashable, Sendable {
                 else { return nil }
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: feature.tag)
             }
-            // Case-sensitive forms as their characters are listed, brackets in pairs (see `GlyphSection.signPrecedes`);
-            // superscripts, subscripts, numerators and denominators as their groups' characters are, figures first (see
-            // `GlyphSection.valueOrder`).
             let byValue: Set<GlyphGroup> = [.superscripts, .subscripts, .numerators, .denominators]
             let sorted = feature.tag == "case" ? entries.sorted { GlyphSection.signPrecedes($0.character, $1.character) }
                 : byValue.contains(feature.group) ? entries.sorted { a, b in
@@ -544,7 +528,6 @@ public struct FeatureGlyph: Hashable, Sendable {
                     return x != y ? x < y : a.glyph < b.glyph
                 }
                 : entries.sorted { $0.character < $1.character }
-            // Tabular figures in another style after them; a tabular slashed zero right after the tabular zero.
             let combined = feature.tag == "tnum" ? tabularFigures(in: found, characters: characters) : []
             var list = sorted + combined.filter { !$0.isAlternate }
             for alternate in combined where alternate.isAlternate {
@@ -559,12 +542,7 @@ public struct FeatureGlyph: Hashable, Sendable {
             }
         }
         let ways = Ways(found, characters: characters)
-        // Each glyph's group found once: `group` looks for its feature (13 passes over Arial Unicode MS's 9,087 localized
-        // forms took 200 ms).
         let byGroup = Dictionary(grouping: result, by: \.group)
-        // Each big stylistic set's glyphs for characters that no other group lists, as a word's forms are. Each set's own
-        // glyphs before any group's alternates: else Repro LAB223's "smallsize centered" took "smallsize circled"'s glyphs
-        // as its alternates.
         let owns = sets.map { set in
             (found[set.tag] ?? []).compactMap { entry -> FeatureGlyph? in
                 guard let input = entry.components.first, let character = characters[input], entry.glyph != input,
@@ -573,7 +551,6 @@ public struct FeatureGlyph: Hashable, Sendable {
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: set.tag, setName: set.name)
             }
         }
-        // The groups, in the order the page lists them: the letters' forms, the others, then the big sets.
         var others: [GlyphGroup] = []
         for feature in features where !letterGroups.contains(feature.group) && !others.contains(feature.group) { others.append(feature.group) }
         let setGroups = sets.map { GlyphGroup.stylisticSet(tag: $0.tag, name: $0.name) }
@@ -585,14 +562,6 @@ public struct FeatureGlyph: Hashable, Sendable {
             if case .stylisticSet(let tag, _) = group { return [tag] }
             return Set(features.filter { $0.group == group }.map(\.tag))
         }
-        // Each group's alternates (see `groupAlternates`): another group's glyph with a big set on, like zero.tf.ss15, is
-        // the set's, not Tabular Figures' (the other groups don't take the sets' features). A glyph several groups reach
-        // goes in the one that reaches it with the fewest features, else the one listed first: ABC Repro's G.fina.ss07
-        // (fina, then ss07) is Final Forms', not Medial Forms' (medi, ss07, then ss16, a set that draws final forms), which
-        // came first; its zero.subs.init (subs and init either way) stays Initial Forms'. A numerator, denominator,
-        // superscript, subscript or ordinal with a feature that only moves or spaces it, like ABC Repro's tabular
-        // zero.dnom.tf or its case-sensitive exclam.numr.case, is left out: it looks like the one without; so is a big
-        // set's, like zero.tf.ss15.
         let positionTags = Set(features.filter { exclusiveKinds[0].contains($0.group) }.map(\.tag))
         let spacingTags: Set<String> = ["tnum", "pnum", "case", "lnum", "onum"]
         func avoided(by group: GlyphGroup) -> Set<String> {
@@ -616,7 +585,6 @@ public struct FeatureGlyph: Hashable, Sendable {
                     glyph = FeatureGlyph(glyph: alternate.glyph, character: alternate.character, feature: alternate.feature,
                                          alongWith: alternate.alongWith, alongWithNames: alternate.alongWithNames, isAlternate: true, setName: name)
                 } else if group == .localizedForms {
-                    // A localized form's alternates are those drawn from it, for its languages.
                     guard let of, let base = byGlyph[of] else { continue }
                     glyph = FeatureGlyph(glyph: alternate.glyph, character: alternate.character, feature: alternate.feature,
                                          alongWith: alternate.alongWith, alongWithNames: alternate.alongWithNames, isAlternate: true,
@@ -640,9 +608,6 @@ public struct FeatureGlyph: Hashable, Sendable {
             for (alternate, of) in alternates(of: group) {
                 if let of { after[of, default: []].append(alternate) } else { blocks.append([alternate]) }
             }
-            // Small capitals by their lowercase letters (see `letterOrder`); a word's forms as the page lists their
-            // characters, capitals, then lowercase letters, then accented ones, figures and signs. Each character's place
-            // worked out once: in the sort, it took ABC Repro 70 ms a group.
             typealias Place = (GlyphGroup, UInt32, UInt32, UInt32, Int, UInt32)
             func place(of character: UInt32) -> Place {
                 if group == .smallCaps { return letterOrder(of: character) }
@@ -658,8 +623,6 @@ public struct FeatureGlyph: Hashable, Sendable {
             return ordered.flatMap { $0 + (after[$0[0].glyph] ?? []) }
         }
         let grouped = letterGroups.flatMap { lettersOrder(of: $0, own: byGroup[$0] ?? []) }
-        // In the other groups, each glyph followed by its alternates too, like a tabular four with a stylistic set on
-        // (four.tf.ss09) after the tabular four; those of none the group draws at the group's end.
         var after: [CGGlyph: [FeatureGlyph]] = [:]
         var trailing: [FeatureGlyph] = []
         for group in others {
@@ -667,8 +630,6 @@ public struct FeatureGlyph: Hashable, Sendable {
                 if let of { after[of, default: []].append(alternate) } else { trailing.append(alternate) }
             }
         }
-        // Last, the big sets, each glyph followed by its alternates, like ABC Repro's small-size a with a single-storey
-        // a's set on after its small-size a, and its small-size tabular zero after its small-size zero.
         let setGlyphs = zip(setGroups, owns).flatMap { lettersOrder(of: $0, own: $1) }
         return grouped + others.flatMap { byGroup[$0] ?? [] }.flatMap { [$0] + (after[$0.glyph] ?? []) } + trailing + setGlyphs
     }
@@ -771,16 +732,12 @@ public struct FeatureGlyph: Hashable, Sendable {
         }
         var paths: [Step: Path] = [:]
         var frontier: [Step] = []
-        // Only those with a way on: most of a big font's localized forms have none.
         for glyph in own where ways.next[glyph.glyph] != nil {
             let step = Step(glyph: glyph.glyph, small: true)
             paths[step] = Path(character: glyph.character, tags: glyph.featureTags, through: glyph.glyph)
             frontier.append(step)
         }
         let listed = Set(own.lazy.map(\.glyph))
-        // The glyphs one of the group's features draws from, and those a way to one of them starts from, by the fewest
-        // steps to it: a way from a character starts only where it can reach the group in time. (From every character
-        // with a feature, each group took 70 ms in Arial Unicode MS, whose 11,025 localized forms gave it 11,025 starts.)
         var toGroup: [CGGlyph: Int] = [:]
         for tag in groupTags {
             for entry in found[tag] ?? [] { if let input = entry.components.first { toGroup[input] = 0 } }
@@ -799,7 +756,6 @@ public struct FeatureGlyph: Hashable, Sendable {
         func reaches(_ glyph: CGGlyph, after count: Int) -> Bool {
             toGroup[glyph].map { count + $0 < FeatureAlternates.chainLength } == true
         }
-        // A localized form's alternates are drawn from it, so not from a character.
         let starts = (group == .localizedForms ? [:] : characters).filter { reaches($0.key, after: 0) && !listed.contains($0.key) }.map { glyph, character in
             let group = GlyphGroup.of(character)
             return (key: (group == .uppercase || group == .uppercaseAccents ? 1 : 0, character, glyph), glyph: glyph, character: character)
@@ -827,8 +783,6 @@ public struct FeatureGlyph: Hashable, Sendable {
             }
             frontier = following
         }
-        // A glyph reached from an alternate, like Small Capitals' for a stylistic set's a, is the alternate of the
-        // character's own glyph of the group, or for a small capital, its lowercase letter's.
         var ownGlyphs: [UInt32: CGGlyph] = [:]
         for glyph in own where ownGlyphs[glyph.character] == nil { ownGlyphs[glyph.character] = glyph.glyph }
         func ownGlyph(of character: UInt32) -> CGGlyph? {
@@ -842,7 +796,6 @@ public struct FeatureGlyph: Hashable, Sendable {
             let path = paths[step]!
             var others: [String] = []
             for tag in path.tags where !groupTags.contains(tag) && !others.contains(tag) { others.append(tag) }
-            // Like a character's alternates' (see `FeatureAlternates.resolve`): stylistic sets before figure styles.
             others = others.enumerated().sorted { a, b in
                 (FeatureAlternates.rank(of: a.element) ?? 20, a.offset) < (FeatureAlternates.rank(of: b.element) ?? 20, b.offset)
             }.map(\.element)
@@ -852,9 +805,6 @@ public struct FeatureGlyph: Hashable, Sendable {
             return (glyph, path.through ?? ownGlyph(of: path.character),
                     Closeness(features: path.tags.count))
         }
-        // Stylistic alternates, sets and character variants, then swashes and so on, then the forms for a language, like
-        // FeatureAlternates.rank has them; each by its tags, then glyph.
-        // The ranks worked out once, not in the sort.
         var ranks: [String: Int] = [:]
         let ordered = alternates.map { alternate in
             (order: alternate.0.alongWith.map { tag in
@@ -900,7 +850,6 @@ public struct FeatureGlyph: Hashable, Sendable {
                 guard let input = entry.components.first, let character = from[input], characters[entry.glyph] == nil,
                       entry.glyph != input
                 else { return nil }
-                // A slashed zero is an alternate of the tabular zero; old-style and lining ones are figures of their own.
                 return FeatureGlyph(glyph: entry.glyph, character: character, feature: "tnum", alongWith: [style],
                                     isAlternate: !FeatureAlternates.figureStyles.contains(style))
             }

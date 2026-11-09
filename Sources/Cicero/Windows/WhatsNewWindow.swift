@@ -17,7 +17,6 @@ struct ReleaseNotes: Identifiable {
     static func parse(_ text: String) -> [ReleaseNotes] {
         var versions: [ReleaseNotes] = []
         var current: ReleaseNotes?
-        // The lines of the paragraph or item being read; `isItem` says which.
         var lines: [String] = []
         var isItem = false
 
@@ -41,7 +40,6 @@ struct ReleaseNotes: Identifiable {
                 isItem = true
                 lines = [String(trimmed.dropFirst(2))]
             } else if line.first?.isWhitespace == true, isItem, !lines.isEmpty {
-                // An item that goes on over several lines.
                 lines.append(trimmed)
             } else {
                 if isItem { flush() }
@@ -92,10 +90,8 @@ final class WhatsNew {
         if let last {
             pending = all.filter { Self.isNewer($0.version, than: last) && !Self.isNewer($0.version, than: current) }
         } else if UserDataStore(locations: .standard).hasSavedData, let notes = all.first(where: { $0.version == current }) {
-            // After a Cicero without What's New, this version's notes only: the ones before it were its release notes.
             pending = [notes]
         }
-        // Nothing to show waits for no window.
         if pending.isEmpty { defaults.set(current, forKey: Self.lastVersionKey) }
     }
 
@@ -139,7 +135,6 @@ struct WhatsNewWindow: View {
                 }
             }
             .padding(.horizontal, 44)
-            // Under the title bar, which has room of its own.
             .padding(.top, 12)
             .padding(.bottom, 8)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
@@ -151,8 +146,7 @@ struct WhatsNewWindow: View {
             }
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
-            // Opaque, so the notes scrolling under it don't show through its label, as they did while the window wasn't
-            // in front and the button wasn't blue.
+            // Opaque, so the notes scrolling under it don't show through its label while the window isn't in front and the button isn't blue.
             .buttonBorderShape(.capsule)
             .background(Color(nsColor: .windowBackgroundColor), in: .capsule)
             .padding(.vertical, 20)
@@ -169,7 +163,6 @@ private struct VersionNotes: View {
     let notes: ReleaseNotes
 
     var body: some View {
-        // The first note as far under its version as the notes are from each other.
         VStack(alignment: .leading, spacing: 10) {
             Text("Cicero \(notes.version)")
                 .font(.title2.bold())
@@ -182,7 +175,6 @@ private struct VersionNotes: View {
                             Circle()
                                 .fill(.tint)
                                 .frame(width: 7, height: 7)
-                                // Its middle halfway up a capital letter.
                                 .alignmentGuide(.firstTextBaseline) { $0.height / 2 + 5 }
                             Text(notes.items[index])
                         }

@@ -20,7 +20,6 @@ public enum CompletionNames {
             let custom = saved.customCharacterSets.enumerated().map { CharacterSetCatalog.definition(for: $1, level: $0) }
             return ((catalog?.builtIn ?? []) + custom).map(\.id)
         case .families, .foundries, .styles:
-            // Proofing fonts shown other than as Cicero's setting has them need a scan: left as saved.
             let shown = ShownFonts(systemFonts: flag("system-fonts", in: words), adobeFonts: flag("adobe-fonts", in: words))
             let data = shown.applied(to: saved)
             let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar, saves: false)
@@ -31,7 +30,6 @@ public enum CompletionNames {
             case .foundries:
                 return Set(context.listedFamilies.compactMap(context.foundryName)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             case .styles:
-                // The first word after the command that names a family.
                 for word in words.dropFirst(2) where !word.hasPrefix("-") {
                     if let family = try? Names.family(word, in: context) { return family.faces.map(\.face.styleName) }
                 }

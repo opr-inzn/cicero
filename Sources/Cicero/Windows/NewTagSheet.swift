@@ -54,7 +54,6 @@ struct NewTagSheet: View {
                 if let option {
                     Circle().fill(option.color)
                 } else {
-                    // No colour: an empty circle, struck through.
                     Circle().strokeBorder(.secondary, lineWidth: 1)
                     Rectangle().fill(.secondary).frame(width: 1, height: 16).rotationEffect(.degrees(45))
                 }

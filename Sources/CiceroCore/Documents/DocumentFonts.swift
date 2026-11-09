@@ -126,7 +126,6 @@ public enum DocumentFonts {
         do { try process.run() } catch { throw Failure.unreadable }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        // 11: some of the members aren't there, as a package without master spreads.
         guard process.terminationStatus == 0 || process.terminationStatus == 11 else { throw Failure.unreadable }
         return data
     }

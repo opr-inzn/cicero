@@ -18,7 +18,6 @@ private struct FontCacheSheetModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $isPresented) {
-                // The alert waits for the sheet to go away.
                 guard clearedSystemCaches else { return }
                 clearedSystemCaches = false
                 isOfferingRestart = true

@@ -17,8 +17,6 @@ nonisolated struct PageContent: Sendable {
         let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
         var listed: Set<UInt32> = []
-        // The characters whose glyph a ligature is (the lowest, for its popover, where several share one); none to look
-        // for without ligatures.
         for scalar in made.isEmpty ? [] : glyphs.flatMap(\.scalars).reversed() {
             guard let character = Unicode.Scalar(scalar) else { continue }
             var units = Array(String(Character(character)).utf16)
@@ -112,7 +110,6 @@ final class PageContents {
         // Small capitals an older font keeps in private use too are listed as small capitals, not again as characters.
         let smallCaps = GlyphSection.privateUse(in: font, coverage: scalars,
                                                 drawing: Set(featureGlyphs.filter { $0.group == .smallCaps }.map(\.glyph)))
-        // Those in groups of their own, like tabular figures, aren't listed again after their characters.
         let grouped = Set(featureGlyphs.map(\.glyph))
         let listed = await alternates.compactMapValues { list in
             let left = list.filter { !grouped.contains($0.glyph) && !empty.contains($0.glyph) }
@@ -122,8 +119,6 @@ final class PageContents {
             let left = group.ligatures.filter { !empty.contains($0.glyph) }
             return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
         }
-        // The coverage has only the characters the font draws, and those with nothing to draw that it has; of those, the
-        // page shows the ones it draws something for anyway.
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
                                              privateUse: GlyphSection.privateUseNames(in: font, coverage: scalars),
                                              leavingOut: { smallCaps.contains($0) || EmptyGlyphs.isInvisible($0) && empty.drawsNothing(for: $0) })
@@ -153,7 +148,6 @@ final class PageFeatures {
         if let under = loading[key] { return under }
         let task = Task {
             let features = await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
-            // Kept only if the page is still the one that asked: `forget` clears `loading`.
             if loading[key] != nil {
                 loading[key] = nil
                 ready[key] = features

@@ -30,7 +30,6 @@ struct DuplicatesSheet: View {
                 LazyVStack(spacing: 0) {
                     ForEach(prompt.duplicates) { duplicate in
                         row(duplicate)
-                        // Between rows only: the bar below has its own line.
                         if duplicate.id != prompt.duplicates.last?.id { Divider().padding(.leading, 20) }
                     }
                 }
@@ -86,7 +85,6 @@ struct DuplicatesSheet: View {
             Spacer(minLength: 12)
             Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) }, set: { choices[duplicate.id] = $0 })) {
                 ForEach(DuplicateChoice.allCases.filter { $0 != .replace || duplicate.canReplace }, id: \.self) { choice in
-                    // "Replace your copies" when it's more than one file.
                     Text(choice == .replace && duplicate.replacements.count > 1 ? "Replace your copies" : choice.title).tag(choice)
                 }
             }

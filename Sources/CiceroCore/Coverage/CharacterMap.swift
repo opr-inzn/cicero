@@ -27,28 +27,23 @@ public enum CharacterMap {
             }
         }
 
-        // Header: version, then the number of encoding records: platform, encoding and offset each.
         for record in 0..<(reader.u16(2) ?? 0) {
             let at = 4 + record * 8
             guard let platform = reader.u16(at), let encoding = reader.u16(at + 2), let start = reader.u32(at + 4),
-                  // Unicode, Windows symbol, Windows Unicode BMP and full repertoire.
                   platform == 0 || (platform == 3 && [0, 1, 10].contains(encoding)),
                   let format = reader.u16(start)
             else { continue }
             switch format {
             case 0:
-                // 256 one-byte glyph IDs after format, length and language.
                 guard reader.u16(start + 6 + 254) != nil else { continue }
                 read = true
                 for code in 0..<256 where reader.bytes[start + 6 + code] != 0 { add(code, code) }
             case 4:
-                // Segments: end codes, a reserved pad, start codes, deltas and range offsets, segCount of each.
                 guard let doubled = reader.u16(start + 6) else { continue }
                 let ends = start + 14, starts = ends + doubled + 2, deltas = starts + doubled, offsets = deltas + doubled
                 guard reader.u16(offsets + doubled - 2) != nil else { continue }
                 read = true
-                // Each code once, from the segment that has it first: a damaged table's overlapping segments could
-                // otherwise add up to billions.
+                // Each code once, from the segment that has it first: a damaged table's overlapping segments could otherwise add up to billions.
                 var next = 0
                 for segment in 0..<doubled / 2 {
                     guard let last = reader.u16(ends + segment * 2), let segmentStart = reader.u16(starts + segment * 2),
@@ -70,7 +65,6 @@ public enum CharacterMap {
                     }
                 }
             case 6, 10:
-                // A run of glyph IDs from a first code: 16-bit header fields for format 6, 32-bit for 10.
                 let wide = format == 10
                 guard let first = wide ? reader.u32(start + 12) : reader.u16(start + 6),
                       let count = wide ? reader.u32(start + 16) : reader.u16(start + 8)
@@ -80,8 +74,6 @@ public enum CharacterMap {
                 read = true
                 for index in 0..<count where reader.u16(glyphs + index * 2) != 0 { add(first + index, first + index) }
             case 12, 13:
-                // Groups of start code, end code and glyph ID, 32 bits each. Format 12 counts the glyph up from the
-                // start code; 13 gives the whole group the one glyph.
                 guard let count = reader.u32(start + 12), reader.u32(start + 16 + count * 12 - 4) != nil || count == 0 else { continue }
                 read = true
                 for group in 0..<count {

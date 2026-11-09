@@ -47,8 +47,6 @@ public final class FolderWatcher: @unchecked Sendable {
             }
             if matters { watcher.onChange(changed) }
         }
-        // WatchRoot: also when a watched folder itself is moved, deleted or comes back (a disk remounted).
-        // NoDefer: an event on its own comes at once rather than half a second later.
         let flags = FSEventStreamCreateFlags(
             kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot | kFSEventStreamCreateFlagNoDefer
         )

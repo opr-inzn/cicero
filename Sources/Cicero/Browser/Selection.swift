@@ -30,7 +30,6 @@ enum FamilySelection {
     static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor, extending: Bool) -> String? {
         guard !ids.isEmpty else { return nil }
         if extending, let start = anchor.id, selection.contains(start), let a = ids.firstIndex(of: start) {
-            // The end of the range away from the anchor moves, so Shift grows and shrinks it either way.
             let head: Int
             if let id = anchor.head, selection.contains(id), let index = ids.firstIndex(of: id) {
                 head = index
@@ -51,7 +50,6 @@ enum FamilySelection {
 
     private static func extend(to id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) -> Bool {
         guard let start = anchor.id, let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) else { return false }
-        // Cleared or changed elsewhere since (Escape, a click between families): nothing of it to keep.
         if !anchor.base.isSubset(of: selection) { anchor.base = [] }
         selection = anchor.base.union(ids[min(a, b)...max(a, b)])
         anchor.head = id
@@ -108,16 +106,12 @@ struct FamilyKeys: ViewModifier {
         content
             .onKeyPress(.return) { open() }
             .onKeyPress(.escape) {
-                // Quick Look closes before the selection clears.
                 if quickLook.isOpen { quickLook.close() } else { model.selectedIDs = [] }
                 return .handled
             }
             .onKeyPress(.space, phases: [.down, .repeat]) { press in
                 guard press.modifiers.isDisjoint(with: [.command, .option, .control, .shift]) else { return .ignored }
-                guard press.phase == .down else { return .handled }  // Holding the bar down opens or closes it once.
-                // While a name is being typed, a space is part of it ("New York") if a letter follows it soon after;
-                // otherwise it opens Quick Look a moment later, as it would have straight away. Where no family's
-                // name goes on with a space, it opens Quick Look at once.
+                guard press.phase == .down else { return .handled }
                 if pendingQuickLook == nil, !typed.hasSuffix(" "), !typed.isEmpty, Date.now.timeIntervalSince(lastTyped) <= 1,
                    families.contains(where: {
                        $0.name.range(of: typed + " ", options: [.anchored, .caseInsensitive, .diacriticInsensitive]) != nil
@@ -155,8 +149,6 @@ struct FamilyKeys: ViewModifier {
                 guard let target = families.first(where: {
                     $0.name.range(of: typed, options: [.anchored, .caseInsensitive, .diacriticInsensitive]) != nil
                 }) else {
-                    // Nothing starts with what's been typed: the selection stays where the letters before took it.
-                    // A first letter that finds nothing isn't kept, so the next one starts afresh.
                     if typed.count == 1 { typed = ""; return .ignored }
                     return .handled
                 }
@@ -165,7 +157,6 @@ struct FamilyKeys: ViewModifier {
                 scrollToTop(target.id)
                 return .handled
             }
-            // After installing fonts: the first of them, selected and in view at once (see `AppModel.jumpTargets`).
             .onChange(of: model.jumpTargets, initial: true) { _, targets in
                 guard let targets, let first = families.first(where: { targets.contains($0.id) }) else { return }
                 model.selectedIDs = [first.id]
@@ -174,13 +165,10 @@ struct FamilyKeys: ViewModifier {
                 lastJump = (first.id, .now)
                 model.jumpTargets = nil
             }
-            // A bar that comes with the jump, as Show Similar Fonts' does, moves the top of the view down a moment
-            // later, which would leave the family under it: to the top again.
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, _ in
                 guard let jump = lastJump, Date.now.timeIntervalSince(jump.date) < 1 else { return }
                 scrollToTop(jump.id)
             }
-            // Opened from the menu, or open while the view changes: several families go in the order this view shows them.
             .onChange(of: quickLook.isOpen, initial: true) { _, isOpen in
                 if isOpen { quickLook.updateOrder(families.map(\.id)) }
             }
@@ -191,7 +179,6 @@ struct FamilyKeys: ViewModifier {
     }
 
     private func open() -> KeyPress.Result {
-        // With Quick Look open, the family it shows, which may be one of several selected.
         if model.quickLook.isOpen, let shown = model.quickLook.shown {
             model.openFamilyID = shown.family.id
             return .handled
@@ -202,7 +189,6 @@ struct FamilyKeys: ViewModifier {
     }
 
     private func arrow(_ press: KeyPress) -> KeyPress.Result {
-        // ⌘↓ as in the Finder, now that the menu's Open has ⌘O while families are selected.
         if press.key == .downArrow, press.modifiers.contains(.command), press.modifiers.isDisjoint(with: [.shift, .option, .control]) {
             return open()
         }
@@ -215,12 +201,10 @@ struct FamilyKeys: ViewModifier {
             if vertical { step = columns }
         case .list, .specimens:
             guard vertical else {
-                // As in Finder's list view: through the selected families, while the selection stays.
                 guard model.quickLook.isOpen, !press.modifiers.contains(.shift) else { return .ignored }
                 model.quickLook.updateOrder(families.map(\.id))
                 return model.quickLook.step(forward ? 1 : -1) ? .handled : .ignored
             }
-            // The list moves the selection with ↑/↓ itself.
             if case .list = layout { return .ignored }
         }
         guard let target = FamilySelection.step(forward ? step : -step, in: families.map(\.id), selection: &model.selectedIDs,
@@ -259,9 +243,7 @@ struct FamilyItem: ViewModifier {
         content
             .id(family.id)
             .contentShape(.rect)
-            // One tap gesture, which the switch's own takes precedence over, so turning a family on or off leaves the
-            // selection as it is. The second click of a double-click opens the family; a gesture for two taps would
-            // hold every click back until it knew there was no second.
+            // One tap gesture, which the switch's own takes precedence over: a gesture for two taps would hold every click back until it knew there was no second.
             .onTapGesture {
                 focus()
                 model.click(family, in: order.families, anchor: &anchor)
@@ -270,7 +252,6 @@ struct FamilyItem: ViewModifier {
             .contextMenu {
                 FamilyMenu(families: model.targets(for: family), model: model)
             }
-            // The whole selection when the family is part of it, as for the menu.
             .fontDrag { FontDrag(families: model.targets(for: family).map(\.id)) } preview: {
                 FamilyDragPreview(family: family, count: model.targets(for: family).count)
             }

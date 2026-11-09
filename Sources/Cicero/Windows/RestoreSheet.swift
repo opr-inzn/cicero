@@ -51,8 +51,7 @@ struct RestoreSheet: View {
             }
             HStack {
                 Spacer()
-                // While restoring, the task closes the sheet once it has stopped: closing it discards
-                // the unzipped folder, which a copy may still be reading.
+                // While restoring, the task closes the sheet once it has stopped: closing it discards the unzipped folder, which a copy may still be reading.
                 Button("Cancel", role: .cancel) {
                     if let task { task.cancel() } else { dismiss() }
                 }

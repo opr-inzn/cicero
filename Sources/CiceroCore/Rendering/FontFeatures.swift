@@ -40,8 +40,6 @@ public struct FontFeatureGroup: Identifiable, Sendable {
             else { return nil }
             let isExclusive = feature[kCTFontFeatureTypeExclusiveKey as String] as? Bool ?? false
             let listed = selectors.compactMap { selector -> Option? in
-                // Not Text Spacing's No Kerning: fonts are made to be kerned. Without it, the group is only Default in
-                // most fonts and goes; Japanese, Chinese and Korean fonts keep their widths there.
                 guard let id = selector[kCTFontFeatureSelectorIdentifierKey as String] as? Int,
                       let name = selector[kCTFontFeatureSelectorNameKey as String] as? String,
                       selector[kCTFontOpenTypeFeatureTag as String] as? String != "kern"

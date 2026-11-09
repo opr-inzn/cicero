@@ -27,9 +27,7 @@ extension AppModel {
         let engine = importEngine
         let intoFontLibrary = data.installsIntoFontLibrary
         Task {
-            // With the question up, in the same turn, or not asked after all.
             defer { mayOfferEarlierImportCopy = false }
-            // Counted before asking, so the sheet says from the start how many it copies.
             let copying = await Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }.value
             guard !isImporting, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
             earlierImportPrompt = EarlierImportPrompt(folder: folder, name: data.folderNames[folder.id.uuidString] ?? folder.displayName,
@@ -46,11 +44,8 @@ extension AppModel {
         isImporting = true
         defer { isImporting = false }
         guard await saveSetupSnapshot(named: "Before Copying FontExplorer X’s Fonts", nothingWas: "copied") else { return nil }
-        // The copies are read in one go once they're all in, rather than with each batch.
         holdScans()
         defer { releaseScans() }
-        // The files with fonts on where they are go in on, as their copies would be turned on at the end (see
-        // `installOff`). Until then those fonts are on twice, from the location and from the copy.
         let onFiles = Set(library.faces(inFiles: Set(prompt.files)).filter { isOnWhereItIs($0) }.map(\.face.path))
         let installed = await importEngine.installOff(prompt.files, on: onFiles) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
@@ -74,7 +69,6 @@ extension AppModel {
                 model.data.records = result.records
             }
             model.forgetFolders([folder.id])
-            // The library with the copies in it and without the location, for the copies' faces.
             let input = model.scanInput
             let scanned = try? await model.scanner.scan(input) { progress in
                 switch progress {

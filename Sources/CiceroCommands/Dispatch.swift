@@ -31,7 +31,6 @@ public enum WriteDispatcher {
                 if let error = CommandError(answer: answer) { throw error }
                 return answer
             }
-            // Another cicero command is making a change.
             guard let lock = AppLock.wait(support: support, timeout: otherCommand) else {
                 throw CommandError(.busy, "The Cicero CLI is making another change. Nothing changed. Try again in a moment.")
             }
@@ -127,7 +126,6 @@ final class ClosedAppWriter: Writer {
 
     private func finish(_ result: ActivationResult, journal: Bool) {
         activated = true
-        // For the end-to-end test of a command that stops here, before the records are saved.
         if ProcessInfo.processInfo.environment["CICERO_STOP_BEFORE_RECORDS"] == "1" { exit(9) }
         update { data in
             data.records = result.records

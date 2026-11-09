@@ -12,7 +12,6 @@ struct CiceroApp: App {
     @State private var menuBarItem: MenuBarItem
 
     init() {
-        // Before the model reads the library, while its saved data still tells an update from the first launch.
         WhatsNew.shared.noteLaunch()
         let model = AppModel()
         let updates = Updates()
@@ -20,7 +19,6 @@ struct CiceroApp: App {
         _model = State(initialValue: model)
         _updates = State(initialValue: updates)
         _menuBarItem = State(initialValue: menuBarItem)
-        // At launch rather than as the main window appears: Cicero can open without it, at login or in the menu bar.
         NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 Appearance.applySaved()
@@ -36,7 +34,6 @@ struct CiceroApp: App {
     }
 
     var body: some Scene {
-        // Library in the Window menu, as in the window list and the Dock (see `WindowList`).
         Window("Library", id: WindowID.main) {
             MainWindow()
                 .environment(model)
@@ -53,8 +50,7 @@ struct CiceroApp: App {
                     MeasureRun.startIfAsked(model: model, preview: preview)
                     #endif
                 }
-                // Fonts opened from the Finder (Open With, or a double-click when Cicero opens fonts): SwiftUI
-                // hands the first of them here and the others to the delegate.
+                // SwiftUI hands the first of the fonts opened from the Finder here and the others to the delegate.
                 .onOpenURL { model.open([$0]) }
         }
         .defaultSize(width: 1440, height: 900)
@@ -79,7 +75,6 @@ struct CiceroApp: App {
         .restorationBehavior(.disabled)
         .handlesExternalEvents(matching: [])
 
-        // After an update, and from the Help menu (see `WhatsNew`). Not in the Window menu: it shows what it's given.
         Window("What’s New in Cicero", id: WindowID.whatsNew) {
             WhatsNewWindow()
         }
@@ -119,7 +114,6 @@ struct CiceroCommands: Commands {
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
                 .disabled(!updates.canCheckForUpdates)
-            // Says when it's done, as installing shows nothing else to see (see CommandLineTool).
             if CommandLineTool.State.shared.installed {
                 Button("Cicero CLI installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
             } else {
@@ -132,7 +126,6 @@ struct CiceroCommands: Commands {
             Button("Add Location", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Find Fonts in Document", systemImage: "doc.text.magnifyingglass") { model.presentFindFontsPanel() }
-            // The selected families go in, so the name says so, as the context menu's does.
             Button(model.selectedFamilies.isEmpty ? "New Folder" : "New Folder from Selection", systemImage: "folder") {
                 model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
@@ -153,14 +146,10 @@ struct CiceroCommands: Commands {
             Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
             Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
         }
-        // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
         SidebarCommands()
-        // Compare's size, while its window is in front, the one in its Preview Options. The menu bar matches ⌘+ to the
-        // keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
+        // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
         CommandGroup(after: .sidebar) {
             Divider()
-            // From a font page to the browser, as Esc and the toolbar's back button go. While the page's text is being
-            // typed in, ⌘← goes to the start of the line instead (see `TextEditingKeys`).
             Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
                 .disabled(model.openFamilyID == nil)
@@ -191,7 +180,6 @@ struct CiceroCommands: Commands {
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
                 .keyboardShortcut(opensSelection ? KeyboardShortcut("o") : KeyboardShortcut(.downArrow))
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
-            // What ⌘I does: it closes the panel only from the Info tab, else it shows that tab.
             let hidesInfo = model.isInfoPresented && model.infoTab == .info
             Button(hidesInfo ? "Hide Info" : "Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
@@ -205,8 +193,6 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(selection.isEmpty)
             Divider()
-            // Several families start over; one joins those there, so families far apart in the library can be put
-            // together one by one; none just opens the window.
             Button("Compare", systemImage: "rectangle.split.1x2") {
                 if selection.count > 1 { model.compare(selection) } else { _ = model.addToCompare(selection.map(\.id)) }
                 openWindow(id: WindowID.compare)
@@ -222,8 +208,6 @@ struct CiceroCommands: Commands {
             Button("Rebuild Library", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
             Button("Clear Font Caches", systemImage: "eraser") { model.ask { $0.isClearingCaches = true } }
         }
-        // What's new in this version, in its window; the user guide, the project's pages on GitHub and the privacy policy
-        // on the website, opened in the default browser.
         CommandGroup(replacing: .help) {
             Button("Cicero Help", systemImage: "questionmark.circle") {
                 NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/README.md")!)
@@ -232,7 +216,6 @@ struct CiceroCommands: Commands {
             Button("What’s New in Cicero", systemImage: "newspaper") {
                 if WhatsNew.shared.showLatest() { openWindow(id: WindowID.whatsNew) }
             }
-            // Every released version's notes on one page (scripts/make-version-history.sh writes it at each release).
             Button("Version History", systemImage: "doc.text") {
                 NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/version-history.md")!)
             }

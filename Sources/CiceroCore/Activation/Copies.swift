@@ -78,7 +78,6 @@ public enum CopyChooser {
         for index in candidates.indices { candidates[index].place = placed[index] }
         func key(_ candidate: Candidate) -> String { candidate.place.key }
 
-        // Places that hold a style that's in more than one.
         let byStyle = Dictionary(grouping: candidates, by: \.style.id)
         let keys = Set(byStyle.values.filter { Set($0.map(key)).count > 1 }.flatMap { $0.map(key) })
         guard !keys.isEmpty else { return [] }
@@ -91,8 +90,6 @@ public enum CopyChooser {
             let location = members[0].place.location
             return CopySource(id: key, location: location, name: location.last ?? "", choices: choices)
         }
-        // Places with the same name, like two watched folders called Fonts elsewhere, add the first folder above
-        // them whose names differ: "Acme Fonts (Dropbox)" and "Acme Fonts (Server)".
         for (_, same) in Dictionary(grouping: sources.indices, by: { sources[$0].name }) where same.count > 1 {
             let paths = same.map { sources[$0].id.split(separator: "/").map(String.init).dropLast() }
             var above = paths.map { _ in "" }
@@ -129,7 +126,6 @@ public enum CopyChooser {
         for choice in source.choices {
             let all = [FaceCopy(choice.style)] + choice.style.copies
             let chosen = choice.copy.face.path
-            // The chosen copy stays on, and so does a copy Cicero installed from it.
             let staying = Set([chosen] + all.filter { $0.state.isActive && records.installedCopies[$0.face.path] == chosen }.map(\.face.path))
             var others: [LibraryFace] = []
             for copy in all where copy.state.isActive && !staying.contains(copy.face.path) {
@@ -143,7 +139,6 @@ public enum CopyChooser {
             let target = choice.isInUse ? nil : choice.copy.libraryFace
             switches.append(CopySwitch(target: target, others: others))
         }
-        // Whatever else is on from the files going off goes off with them.
         let moving = Set(source.choices.map(\.style.id))
         var alsoTurnsOff: [String] = []
         for family in library.families {
@@ -163,7 +158,6 @@ public enum CopyChooser {
         case .active(.inPlace), .active(.temporary): return true
         case .inactive:
             if path.hasPrefix(locations.userFonts.path + "/") { return origin != nil }
-            // One off in /Library/Fonts, for every user, isn't Cicero's to turn on from there.
             return !path.hasPrefix(locations.allUsersFonts.path + "/")
         default: return false
         }

@@ -24,7 +24,6 @@ struct Cicero: AsyncParsableCommand {
             command = try parseAsRoot(arguments)
         } catch {
             guard exitCode(for: error) == .validationFailure else { Self.exit(withError: error) }
-            // `--json` before a `--`, after which every word is a name.
             if arguments.prefix(while: { $0 != "--" }).contains("--json") {
                 print(CommandError(.invalidArgument, message(for: error)).json.text())
             } else {
@@ -328,7 +327,6 @@ struct CoverageCheck: Answering {
     }
 
     func run() async throws {
-        // 3 when characters are missing, as `diff` exits 1 when files differ: a script can ask without reading the JSON.
         try await answer(common, text: Text.coverageCheck, exitCode: { Text.bool($0["covered"]) == false ? 3 : 0 }, result)
     }
 }

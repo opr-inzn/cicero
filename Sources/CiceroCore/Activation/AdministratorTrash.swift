@@ -11,7 +11,6 @@ enum AdministratorTrash {
             moves.append((url.path, destination(for: url, in: trash, taken: &taken)))
         }
         guard !moves.isEmpty else { return [] }
-        // The file stays the user's in the Trash, so they can open it or put it back without a password.
         let user = getuid()
         let script = moves.map { "/bin/mv -n \(quoted($0.source)) \(quoted($0.destination)) && /usr/sbin/chown \(user) \(quoted($0.destination))" }
             .joined(separator: "; ")

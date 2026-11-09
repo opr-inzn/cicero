@@ -44,12 +44,12 @@ public enum LocalizedNames {
                 language = tag < tags.count ? tags[tag] : nil
             }
             switch platform {
-            case 0, 3:  // Unicode and Windows: UTF-16
+            case 0, 3:
                 if language == nil, platform == 3 {
                     language = CFLocaleCreateLocaleIdentifierFromWindowsLocaleCode(nil, UInt32(languageID)).map { $0.rawValue as String }
                 }
                 text = String(data: data, encoding: .utf16BigEndian)
-            case 1:  // Mac: the script's encoding, which CoreFoundation numbers the same
+            case 1:  // The Mac's script encodings, which CoreFoundation numbers the same
                 if language == nil {
                     language = CFLocaleCreateCanonicalLocaleIdentifierFromScriptManagerCodes(nil, Int16(truncatingIfNeeded: languageID), -1).map { $0.rawValue as String }
                 }

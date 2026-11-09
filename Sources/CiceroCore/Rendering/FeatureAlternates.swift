@@ -73,7 +73,6 @@ public enum FeatureAlternates {
                       characters[entry.glyph] == nil, !excluding.contains(entry.glyph)
                 else { continue }
                 if let first = drawnFor[entry.glyph] {
-                    // Another feature that draws it for the same character.
                     if first == character, tags[entry.glyph]?.contains(feature) == false { tags[entry.glyph]?.append(feature) }
                     continue
                 }
@@ -82,9 +81,6 @@ public enum FeatureAlternates {
                 tags[entry.glyph] = [feature]
             }
         }
-        // Then from those alternates: a feature that draws another glyph for one, like Old-Style Figures' four.osf.ss01
-        // for Stylistic Set 1's four.ss01, or the set's for the four.osf, draws it with that one's features on, each
-        // glyph once, for the first way to it. Not from a glyph a character has, and each feature once on the way.
         let rankOf = Dictionary(uniqueKeysWithValues: features.enumerated().map { ($1, $0) })
         var frontier = Set(order)
         for _ in 1..<chainLength where !frontier.isEmpty {

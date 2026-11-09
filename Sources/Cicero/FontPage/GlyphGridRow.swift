@@ -44,19 +44,15 @@ struct GlyphGridRow: View {
         let drawing = GridRowDrawing(cells: cells, columns: columns, face: face, generation: generation, weight: weight,
                                      variations: variations, padding: padding, selected: selected, room: room)
         drawing.equatable()
-            // VoiceOver reads the cells from the events view over it.
             .accessibilityHidden(true)
-            // Out past the row, for text reaching past its cell, as `UnclippedText` lets it.
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
             .modifier(SquareRow(columns: columns))
-            // Where it is in the page, for the page to keep the row at its top in place as the squares change size.
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TopRowKeeper.space)) } action: { [keeper, key] in
                 keeper?.moved(key, to: $0)
             }
             .onDisappear { [keeper, key] in keeper?.gone(key) }
             .overlay {
                 GridRowEvents(labels: cells.map(\.label), columns: columns, actions: actions) { index, size, isDark, scale in
-                    // The cell as it's drawn, to drag.
                     let cell = GridRowDrawing(cells: [cells[index]], columns: 1, face: face, generation: generation, weight: weight,
                                               variations: variations, padding: padding, selected: nil, room: EdgeInsets())
                     let renderer = ImageRenderer(content: cell.frame(width: size.width, height: size.height)
@@ -166,19 +162,15 @@ private struct GridRowDrawing: View, Equatable {
         Canvas { context, size in
             let width = size.width - room.leading - room.trailing
             let side = GlyphGridRow.side(width: width, columns: columns)
-            // At the size the square is zoomed to: a CoreText font at that size, not the resting one scaled, for glyphs
-            // hinted and placed on pixels as text at that size is.
             let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize * GlyphGridRow.zoom(side: side), weight: weight,
                                               variations: variations)
-            // Glyphs by ID read from the file before it changed would be the new version's glyphs with those IDs; the
-            // cells stay empty until the page has read it again. Characters are drawn by character, which stays right.
+            // Glyphs by ID read from the file before it changed would be the new version's glyphs with those IDs; characters are drawn by character, which stays right.
             let isCurrent = generation == FontLoader.shared.generation(of: face.path)
             let scale = context.environment.displayScale
             let frames = GlyphGridRow.frames(width: width, columns: columns, count: cells.count, scale: scale)
             let unrounded = GlyphGridRow.frames(width: width, columns: columns, count: cells.count)
             let color = Color.ink.resolve(in: context.environment).cgColor
             let baseline = GlyphGridRow.baseline(in: side, font: font, scale: scale)
-            // A cell at a time, each over the one before, as when they were views of their own.
             for (index, cell) in cells.enumerated() {
                 let frame = frames[index].offsetBy(dx: room.leading, dy: room.top)
                 context.fill(Self.background.path(in: frame),
@@ -304,7 +296,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
 
     override func accessibilityChildren() -> [Any]? { elements }
 
-    // AppKit asks on the main thread, as for the rest.
+    // AppKit asks on the main thread.
     nonisolated override func accessibilityHitTest(_ point: NSPoint) -> Any? {
         MainActor.assumeIsolated { element(at: point) } ?? super.accessibilityHitTest(point)
     }
@@ -393,7 +385,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
         for item in items {
             let action = MenuAction(item.action)
             let menuItem = NSMenuItem(title: item.title, action: #selector(MenuAction.run), keyEquivalent: "")
-            // The item holds on to its action: a target alone it doesn't.
+            // The item holds on to its represented object, but not to its target.
             menuItem.target = action
             menuItem.representedObject = action
             menuItem.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)

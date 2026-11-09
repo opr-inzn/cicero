@@ -35,7 +35,6 @@ private struct SidebarTitle: ViewModifier {
                 widths.room = $0
                 fit.set(key, room: widths.room, title: widths.title)
             }
-            // The whole title, in the same font, measured where it can't be seen.
             .background(alignment: .leading) {
                 Text(title)
                     .fixedSize()
@@ -65,7 +64,6 @@ enum SidebarSnap {
         let previous = class_getInstanceMethod(type, selector).map { unsafeBitCast(method_getImplementation($0), to: Constrain.self) }
         let answer: @convention(block) (AnyObject, NSSplitView, CGFloat, Int) -> CGFloat = { delegate, splitView, proposed, index in
             let position = previous?(delegate, selector, splitView, proposed, index) ?? proposed
-            // Dragged far enough left to hide the sidebar: left to AppKit, which hides it.
             guard index == 0, let sidebar = splitView.arrangedSubviews.first,
                   position >= sidebar.frame.minX + SidebarWidth.hiding else { return position }
             var snapped = position
@@ -77,7 +75,6 @@ enum SidebarSnap {
             return min(max(snapped, sidebar.frame.minX + SidebarWidth.minimum), sidebar.frame.minX + SidebarWidth.maximum)
         }
         let implementation = imp_implementationWithBlock(answer)
-        // CGFloat, the split view, CGFloat, NSInteger: what NSSplitViewDelegate's method takes and returns.
         if !class_addMethod(type, selector, implementation, "d@:@dq"),
            let method = class_getInstanceMethod(type, selector) {
             method_setImplementation(method, implementation)
@@ -100,7 +97,6 @@ enum SidebarWidth {
               let item = controller.splitViewItems.first(where: { $0.behavior == .sidebar }) else { return }
         item.minimumThickness = minimum
         item.maximumThickness = maximum
-        // Once the window has laid out its columns.
         DispatchQueue.main.async {
             // A window opened without a saved width can give the sidebar less than its minimum, cutting its titles short, and save that.
             guard !item.isCollapsed, let sidebar = splitView.arrangedSubviews.first, sidebar.frame.width < minimum else { return }

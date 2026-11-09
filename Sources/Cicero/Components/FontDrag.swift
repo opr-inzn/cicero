@@ -19,14 +19,12 @@ nonisolated struct FontDrag: Codable, Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .ciceroFontStyle)
-        // Elsewhere it's the families' names, one per line, and names dropped from elsewhere come in the same way.
         ProxyRepresentation(exporting: { $0.families.joined(separator: "\n") },
                             importing: { FontDrag(families: $0.split(whereSeparator: \.isNewline).map(String.init)) })
     }
 }
 
 extension UTType {
-    // Declared in Info.plist.
     nonisolated static let ciceroFontStyle = UTType(exportedAs: "com.maximilianinzinger.cicero.font-style")
 }
 
@@ -35,7 +33,6 @@ struct FamilyDragPreview: View {
     let count: Int
 
     var body: some View {
-        // On one baseline, however high or low the family's letters sit in their line.
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             FontText(text: "Aa", face: family.regular.face, size: 16, weight: family.regular.face.styleWeight)
             Text(family.name)
@@ -55,7 +52,6 @@ struct FamilyDragPreview: View {
                     .offset(x: 8, y: -8)
             }
         }
-        // Room for the count, and for letters that reach beyond their line.
         .padding(10)
     }
 }
@@ -74,7 +70,6 @@ final class FontDragSource: NSObject, NSDraggingSource {
         let renderer = ImageRenderer(content: preview().environment(\.colorScheme, isDark ? .dark : .light))
         renderer.scale = window.backingScaleFactor
         guard let image = renderer.nsImage else { return }
-        // The pointer on the preview's left, where a family's Aa is, halfway down.
         let point = view.convert(event.locationInWindow, from: nil)
         let frame = NSRect(x: point.x - 24, y: point.y - image.size.height / 2, width: image.size.width, height: image.size.height)
         let dragging = NSDraggingItem(pasteboardWriter: item)

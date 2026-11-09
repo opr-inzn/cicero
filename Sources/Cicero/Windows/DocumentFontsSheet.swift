@@ -32,7 +32,6 @@ struct DocumentFontsSheet: View {
             Divider()
             HStack(spacing: 12) {
                 Spacer()
-                // Only when the library has some of them.
                 if !model.libraryFamilies(of: report).isEmpty {
                     Button("Show in Library") {
                         model.showInLibrary(report)
@@ -90,7 +89,6 @@ struct DocumentFontsSheet: View {
         if isOn(match) {
             Image(systemName: "checkmark.seal.fill").foregroundStyle(.green).accessibilityLabel("Active")
         } else if let app = appOnly(match) {
-            // In the red of the Proofing tag (see `StatusTag`).
             Image(systemName: "checkmark.seal").foregroundStyle(.red).accessibilityLabel("Active in \(app)")
         } else if match.face != nil {
             Image(systemName: "xmark.seal").foregroundStyle(.secondary).accessibilityLabel("Inactive")
@@ -108,7 +106,6 @@ struct DocumentFontsSheet: View {
     private func action(_ match: DocumentFontMatch) -> some View {
         if let face = match.face {
             if face.canActivate && !isOn(match) {
-                // As the family's menu says it (see `ActivationTitles`).
                 Button(face.app != nil ? "Activate in All Apps" : "Activate") {
                     model.activate([face], title: match.font.displayName)
                 }

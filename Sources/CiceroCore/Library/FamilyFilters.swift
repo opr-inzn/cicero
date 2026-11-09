@@ -97,7 +97,6 @@ public struct FamilyFilters {
         case .problems: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
         case .set(let id):
-            // Families it has only some styles of too.
             let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])
             return { members.contains($0.id) }
         case .smartSet(let id):
@@ -135,7 +134,6 @@ public struct FamilyFilters {
         }
         switch rule.field {
         case .name:
-            // The fonts' own name, or the one in the Mac's language a family shows.
             let lower = value.lowercased()
             func names(_ family: Family) -> [String] {
                 family.name == family.id ? [family.id.lowercased()] : [family.id.lowercased(), family.name.lowercased()]
@@ -154,7 +152,6 @@ public struct FamilyFilters {
             }
             return compare { foundryName($0) == value }
         case .designer:
-            // Any style's: a family's styles may credit different designers, or some of them none.
             let lower = value.lowercased()
             func designers(_ family: Family) -> [String] { family.faces.compactMap { $0.face.designer?.lowercased() } }
             switch rule.comparison {
@@ -169,7 +166,6 @@ public struct FamilyFilters {
             let tagged = data.families(tagged: value)
             return compare { tagged.contains($0.id) }
         case .note:
-            // Without text: whether the family has a note at all, as Has Note says, for sets made before there was one.
             let lower = value.lowercased()
             let notes = data.familyNotes.mapValues { $0.lowercased() }
             let contains = rule.comparison != .doesNotContain
@@ -181,7 +177,6 @@ public struct FamilyFilters {
             let noted = data.familyNotes
             return compare { noted[$0.id] != nil }
         case .rating:
-            // No rating is 0 stars.
             let ratings = data.familyRatings
             let stars = Int(value) ?? 0
             switch rule.comparison {
@@ -255,7 +250,6 @@ public struct FamilyFilters {
             default: return { activations[$0.id]?.count ?? 0 == number }
             }
         case .lastActivated:
-            // A family never turned on since Cicero began counting wasn't turned on in the last days either.
             let activations = data.activations
             let cutoff = now.addingTimeInterval(-Double(Int(value) ?? 0) * 86_400)
             let recent = rule.comparison != .notInLast

@@ -154,7 +154,6 @@ public struct LibraryBackup: Sendable {
         func add(_ path: String, state: FaceState?) {
             guard seen.insert(path).inserted, !ActivationEngine.isProtected(path) else { return }
             let (activation, origin) = activation(of: path, state: state, records: records)
-            // One on for now is off underneath: only fonts that are off go on for a while.
             let isOff = path.hasPrefix(locations.userFonts.path + "/")
                 && (!(state?.isActive ?? library.activePaths.contains(path)) || records.temporary[path] != nil)
             fonts.append(BackupFont(
@@ -165,7 +164,6 @@ public struct LibraryBackup: Sendable {
         for family in library.families {
             for face in family.faces {
                 add(face.face.path, state: face.state)
-                // Other copies have no state of their own; the records and the path say enough.
                 for copy in face.otherCopies { add(copy, state: nil) }
             }
         }
@@ -309,7 +307,6 @@ public struct LibraryBackup: Sendable {
                 result.skipped += 1
                 continue
             }
-            // Off in the Fonts folder: off in the Inactive folder until it goes in, off.
             if font.isOff == true, Self.isFontLocation(target, in: roots), target.hasPrefix(locations.userFonts.path + "/"),
                let folder = try? locations.inactiveFolderForNewFiles() {
                 let parked = ActivationEngine.uniqueURL(for: (target as NSString).lastPathComponent, in: folder).path
@@ -436,7 +433,6 @@ public struct LibraryBackup: Sendable {
         data.records.installedCopies = map(data.records.installedCopies).filter { copy, origin in
             (isFont(copy, in: locations.userFonts) || fontLibrary.map { isFont(copy, in: $0) } == true) && isFont(origin)
         }
-        // Also the files the user added where they are, which go on where they are again.
         let added = Set(data.fontFiles)
         data.records.inPlace = Set(data.records.inPlace.map(map).filter { path in
             isFont(path) || added.contains(path) && Self.isPlainPath(path) && Self.isFontFile(path) && !ActivationEngine.isProtected(path)
@@ -493,8 +489,7 @@ enum Archive {
                         continuation.resume(throwing: error)
                         return
                     }
-                    // Read before waiting: ditto with more to say than a pipe holds, about many files it couldn't
-                    // read say, waits until it's read.
+                    // Read before waiting: ditto, with more to say than a pipe holds, waits until it's read.
                     let message = errors.readDataToEndOfFile()
                     process.waitUntilExit()
                     continuation.resume(returning: (process.terminationStatus, message))

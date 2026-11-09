@@ -1,8 +1,5 @@
 import SwiftUI
 
-// What Cicero uses of macOS 26, with what macOS 15 has instead: there Cicero looks as apps do on macOS 15, with
-// materials where macOS 26 has glass.
-
 extension View {
     @ViewBuilder func glass(in shape: some Shape, interactive: Bool = false) -> some View {
         if #available(macOS 26, *) {

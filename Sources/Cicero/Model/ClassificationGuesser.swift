@@ -47,7 +47,6 @@ final class ClassificationGuesser {
     }
 
     private func work(found: @escaping () -> Void) async {
-        // Never started on macOS 15 (see `availability`).
         guard #available(macOS 26, *) else { return }
         var reported = ContinuousClock.now
         var changed = false
@@ -59,10 +58,8 @@ final class ClassificationGuesser {
         }
         while !pending.isEmpty {
             let question = pending.removeFirst()
-            // Asked for again while it was being asked about.
             guard guesses[question.name] == nil else { continue }
             let outcome = await Self.ask(question)
-            // Forgotten meanwhile: another task may be asking already.
             guard !Task.isCancelled else { return }
             switch outcome {
             case .answer(let classification):
@@ -71,7 +68,6 @@ final class ClassificationGuesser {
             case .notNow:
                 failed.insert(question.name)
             case .later:
-                // Busy, or the model went away: the next scan asks again.
                 pending = []
             }
             if ContinuousClock.now - reported > .seconds(1) { report() }
@@ -160,7 +156,6 @@ final class ClassificationGuesser {
         } catch let error as LanguageModelSession.GenerationError {
             switch error {
             case .rateLimited, .concurrentRequests, .assetsUnavailable: return .later
-            // Names the model won't talk about, or can't make sense of.
             case .guardrailViolation, .refusal, .decodingFailure, .unsupportedLanguageOrLocale, .exceededContextWindowSize: return .answer(.unclassified)
             default: return .notNow
             }

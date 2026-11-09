@@ -17,10 +17,9 @@ public enum SystemFontCaches {
         case .currentUser:
             let result = try await Process.run("/usr/bin/atsutil", ["databases", "-removeUser"])
             guard result.status == 0 else { throw Failure.failed(result.stderr) }
-            // fontd may not be running; it starts again on demand either way.
             _ = try? await Process.run("/usr/bin/killall", ["fontd"])
         case .allUsers:
-            // Run in Cicero, not by osascript, so the password dialog names Cicero, as AdministratorTrash's does.
+            // Run in Cicero, not by osascript, so the password dialog names Cicero.
             let script = "do shell script \"/usr/bin/atsutil databases -remove; /usr/bin/killall fontd || true\" with prompt \"Cicero wants to clear the macOS font caches for all users.\" with administrator privileges"
             let error = await MainActor.run { () -> (number: Int?, message: String)? in
                 var error: NSDictionary?
@@ -86,8 +85,7 @@ public enum AppFontCaches {
             // Acrobat names these with a literal backslash.
             "Library/Application Support/Adobe/Acrobat/DC/ProtectedView\\\\Adobe{Sys,Com,CMap}Fnt*.lst",
         ]
-        // Office keeps its caches in its app containers. Looking there makes macOS ask whether Cicero may access other
-        // apps' data, so the sheet looks only when the user chooses Office.
+        // Looking in Office's app containers makes macOS ask whether Cicero may access other apps' data, so the sheet looks only when the user chooses Office.
         case .office: [
             "Library/Group Containers/UBF8T346G9.Office/FontCache",
             "Library/Containers/com.microsoft.{Word,Excel,Powerpoint,Outlook,onenote.mac}/Data/Library/Application Support/Microsoft/{FontCache,FontPreviewCache}",

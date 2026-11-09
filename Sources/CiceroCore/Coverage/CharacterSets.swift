@@ -76,7 +76,6 @@ public final class CharacterSetCatalog: Sendable {
     public static let latinSeriesID = "koeberlin"
     public static let adobeSeriesID = "adobe"
 
-    // GF Latin African isn't among them: it adds to Core, not to Plus.
     private static let googleSeries = [
         ("gf-latin", "GF Latin", ["gf-latin-kernel", "gf-latin-core", "gf-latin-plus"]),
         ("gf-cyrillic", "GF Cyrillic", ["gf-cyrillic-core", "gf-cyrillic-plus", "gf-cyrillic-pro"]),

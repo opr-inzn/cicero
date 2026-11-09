@@ -10,7 +10,6 @@ public enum Names {
         let found = families.filter { fold($0.id) == key || fold($0.name) == key }
         if found.count == 1 { return found[0] }
         if found.count > 1 {
-            // Families shown under one name: the one whose own name it is, as typed, else ignoring case.
             if let own = found.first(where: { $0.id == typed }) { return own }
             let own = found.filter { fold($0.id) == key }
             if own.count == 1 { return own[0] }
@@ -97,7 +96,6 @@ public enum Names {
             if a.part != b.part { return a.part < b.part }
             return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
-        // A family's own name and the one it shows can both match: one of them is enough.
         return Array(ranked.prefix(suggestionCount).map(\.name))
     }
 
@@ -107,14 +105,11 @@ public enum Names {
         let wholeLimit = max(1, typed.count / 3)
         let whole = distance(typed, name, limit: wholeLimit)
         if whole <= wholeLimit { best = (whole, 0) }
-        // A part only counts when it's nearer than the whole name.
         let partLimit = min(max(1, typed.count / 4), (best?.count ?? .max) - 1)
         guard partLimit >= 0 else { return best }
         let letters = Array(name)
-        // The name's start, as long as what's typed, give or take the mistakes; none when the name is shorter.
         let shortest = max(1, typed.count - partLimit), longest = min(letters.count, typed.count + partLimit)
         var parts = shortest <= longest ? (shortest...longest).map { (String(letters.prefix($0)), 1) } : []
-        // Each word: what's typed is a whole word, or the start of one ("regualr", "bld").
         for word in name.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) where word.count < letters.count {
             parts.append((String(word), 2))
             if word.count > typed.count { parts.append((String(word.prefix(typed.count)), 2)) }

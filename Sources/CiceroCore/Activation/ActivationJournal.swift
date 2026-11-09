@@ -43,14 +43,12 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         let inactive = locations.inactiveFolders
         for entry in entries {
             let path = entry.path
-            // Turned on out of the Inactive folder, back into its app's folder.
             if let origin = records.appFolderOrigins[path] {
                 if !fm.fileExists(atPath: path), fm.fileExists(atPath: origin) { records.appFolderOrigins[path] = nil }
                 continue
             }
             if fontsFolders.contains(where: path.hasPrefix) { continue }
             let exists = fm.fileExists(atPath: path)
-            // Turned off out of an app's folder, into the Inactive folder.
             if !turningOn, !exists, WatchedFolder.detectAppName(forPath: path) != nil, let digest = entry.digest {
                 let known = Set(records.appFolderOrigins.keys)
                 let moved = inactive.lazy.flatMap { folder in Self.files(in: folder) }.first { candidate in

@@ -14,15 +14,13 @@ struct SidebarSettings: View {
                     Section {
                         switch section {
                         case .characterSets:
-                            // Each set is a row of the form, like the other sections' rows: a DisclosureGroup's
-                            // content is one row, its checkboxes packed together without lines between them.
+                            // Each set is a row of the form: a DisclosureGroup's content is one row, its checkboxes packed together without lines between them.
                             ForEach(model.characterSetGroups, id: \.id) { group in
                                 groupRow(group.id, title: group.title)
                                 if expanded.contains(group.id) {
                                     ForEach(group.rows) { checkbox($0, in: section).padding(.leading, 26) }
                                 }
                             }
-                        // A library can have hundreds: just the section's checkbox here.
                         case .foundries:
                             note("Hide individual foundries with Edit in the sidebar.")
                         default:
@@ -82,7 +80,6 @@ struct SidebarSettings: View {
     private func checkbox(_ row: SidebarRow, in section: SidebarSection? = nil) -> some View {
         Toggle(isOn: visibility(row.key)) {
             HStack(spacing: 6) {
-                // A fixed width keeps the titles lined up however wide each symbol is.
                 SidebarIcon(row: row)
                     .foregroundStyle(.secondary)
                     .frame(width: 20)

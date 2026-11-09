@@ -130,7 +130,6 @@ enum LegacyImport {
             let names = strings(tags)
             if !names.isEmpty { data.familyTags[family] = names }
         }
-        // Very old files had one "style" per family instead of tags.
         let styles = list(object["styles"]).reduce(into: [String: String]()) { names, style in
             if let id = style["id"] as? String, let name = style["name"] as? String { names[id] = name }
         }
@@ -142,7 +141,6 @@ enum LegacyImport {
         data.foundryOverrides = object["foundryOverrides"] as? [String: String] ?? [:]
         data.foundryRenames = object["foundryRenames"] as? [String: String] ?? [:]
         data.sidebar.hidden = Set(strings(object["hiddenSidebarItems"]).filter { !$0.hasPrefix("charset.") })
-        // Version 1 had no character set groups; the big ones start collapsed, as for a new user.
         if let collapsed = object["collapsedSections"] as? [String] {
             data.sidebar.collapsed = Set(collapsed).union(["charsetgroup.unicode", "charsetgroup.google"])
         }

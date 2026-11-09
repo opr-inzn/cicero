@@ -103,8 +103,6 @@ public enum LibraryImport {
             return faces(fonts).map(\.family).filter { seen.insert($0.id).inserted }
         }
 
-        // Sets: whole families where every style the library has is in it, else the styles. FontExplorer X's sets have
-        // files, so every style the library has in one.
         var setIDs: [String: UUID] = [:]
         let apps = AppFinder(folders: appFolders)
         for set in imported.sets where choices.sets.contains(set.id) {
@@ -154,7 +152,6 @@ public enum LibraryImport {
                 setIDs[set.id] = data.sets[index].id
                 changed = data.sets[index] != before
             } else if whole.isEmpty, styles.isEmpty, set.count > 0 {
-                // None of its fonts are here: it would come over empty.
                 summary.emptySets.append(set.name)
                 continue
             } else {
@@ -167,7 +164,6 @@ public enum LibraryImport {
             if set.isApplicationSet { summary.applicationSets += 1 } else { summary.sets += 1 }
         }
 
-        // Tags before smart sets, whose rules may name them.
         if choices.tags {
             for tag in imported.tags {
                 var changed = false
@@ -187,8 +183,6 @@ public enum LibraryImport {
             }
         }
 
-        // Smart sets, only whole: one without a rule would pick other fonts. One with the name of one that's there was
-        // brought in before.
         let setNames = Dictionary(imported.sets.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         for smart in imported.smartSets where choices.smartSets.contains(smart.id) {
             guard !data.smartSets.contains(where: { $0.name == smart.name }) else { continue }
@@ -214,7 +208,6 @@ public enum LibraryImport {
             summary.smartSets += 1
         }
 
-        // A family's rating is its highest-rated style's, unless it has one already.
         if choices.ratings {
             var stars: [String: Int] = [:]
             for rating in imported.ratings {
@@ -226,8 +219,6 @@ public enum LibraryImport {
             }
         }
 
-        // A family goes in the classification most of its styles have, as the user's choice, unless the user chose one
-        // already or its fonts say as much; the user's own ones from the other app come along.
         if choices.classifications {
             var votes: [String: [String: Int]] = [:]
             var families: [String: Family] = [:]
@@ -255,7 +246,6 @@ public enum LibraryImport {
             }
         }
 
-        // A family's note is its comments, each once, unless it has a note already.
         if choices.comments {
             var notes: [String: [String]] = [:]
             for comment in imported.comments {
@@ -269,7 +259,6 @@ public enum LibraryImport {
             }
         }
 
-        // How often a family was turned on: the most any of its files was, and when last; Cicero's counts if higher.
         if choices.history {
             var histories: [String: ActivationHistory] = [:]
             for entry in imported.history {
@@ -291,9 +280,6 @@ public enum LibraryImport {
         var activate: [LibraryFace] = []
         if choices.activate {
             var seen = Set<FaceID>()
-            // Also those in the copies that went in on (`ActivationEngine.installOff`): on already, turning them on again
-            // does nothing. Those that went in on with this import are its to count and to undo (see
-            // `AppModel.performImport`).
             activate = faces(imported.active).map(\.face)
                 .filter { ($0.canActivate || copiedInOn.contains($0.face.path)) && seen.insert($0.face.id).inserted }
         }

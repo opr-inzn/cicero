@@ -74,7 +74,6 @@ public struct Describer {
         var object = self.family(family)
         let faces = family.faces.map(\.face)
         let names = FileNames.read(faces)
-        // In the contract's order: after the family's own fields, before coverage.
         let coverage = object["coverage"]
         object["coverage"] = nil
         object.set("note", context.data.familyNotes[family.id])

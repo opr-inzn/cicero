@@ -176,7 +176,6 @@ public enum ProblemDetector {
             self.data = data
             self.locations = locations
             self.fileForName = fileForName
-            // With the names the user gave them, which problems describe files by.
             folders = data.scannedFolders().map(data.named)
             copies = SpareCopies(library)
         }
@@ -204,7 +203,6 @@ public enum ProblemDetector {
                 case .app: return "Comes with an app"
                 case .adobeFonts: return "Adobe Fonts"
                 case .fontsFolder:
-                    // A folder in it is often another app's, like FontBase's copies of the fonts it has on.
                     let inside = path.dropFirst(locations.userFonts.path.count + 1).split(separator: "/").dropLast()
                     return inside.isEmpty ? "In your Fonts folder" : "In “\(inside.joined(separator: "/"))” in your Fonts folder"
                 case .inPlace: return "Used where it is"
@@ -274,7 +272,6 @@ public enum ProblemDetector {
 
     private static func installedTwice(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
-        // Each problem's active copies of each style.
         var styles: [[[String]]] = []
         for family in context.library.families {
             var paths: [String] = []
@@ -287,7 +284,6 @@ public enum ProblemDetector {
                 for path in active where !paths.contains(path) { paths.append(path) }
                 if face.canDeactivate, deactivatable[face.face.path] == nil { deactivatable[face.face.path] = face.id }
             }
-            // Copies that all come with macOS are macOS's business: there's nothing to do about them.
             guard !paths.isEmpty, !paths.allSatisfy(ActivationEngine.isProtected) else { continue }
             paths.sort()
             var fileFixes: [String: [ProblemFix]] = [:]
@@ -305,8 +301,7 @@ public enum ProblemDetector {
                 fileFixes[path] = fixes
             }
             let files = paths.map { context.file($0) }
-            // Turning a folder's files off at once must leave every style active from another copy, and
-            // removing them every face in them a copy elsewhere.
+            // Turning a folder's files off at once must leave every style active from another copy, and removing them must leave every face in them a copy elsewhere.
             let folderFixes = folderFixes(paths, fileFixes) { folder, trashing in
                 copies.allSatisfy { $0.contains { !folder.contains($0) } } && (!trashing || context.copies.areSpare(folder))
             }
@@ -320,7 +315,6 @@ public enum ProblemDetector {
         }
         // The copy each style keeps, of every family: a collection one family keeps can be another's extra copy.
         let kept = Set(styles.joined().map { context.keeper(of: $0) })
-        // Spare all together, so every problem's extra copies can go at once.
         var extras: [String] = []
         for index in problems.indices {
             for path in problems[index].files.map(\.path) where !kept.contains(path) && !ActivationEngine.isProtected(path) {
@@ -366,7 +360,6 @@ public enum ProblemDetector {
             Set(faces.map(\.family)).count >= 2 && !faces.allSatisfy { ActivationEngine.isProtected($0.path) }
         }
 
-        // Families that share a name, and the families those share a name with, and so on.
         var components: [Set<String>] = []
         for faces in clashes.values {
             var linked = Set(faces.map(\.family))
@@ -394,7 +387,6 @@ public enum ProblemDetector {
                     file.id = Self.first(file.id, face.id)
                     files[face.path] = file
                 }
-                // An app asking for the name gets this file (or another active copy of the same face).
                 if let path = context.fileForName(name), let face = faces.first(where: { $0.path == path || $0.copies.contains(path) }) {
                     files[face.path]?.won.append(name)
                     if !files[face.path]!.wonStyles.contains(where: { $0.name == face.style }) { files[face.path]?.wonStyles.append((face.style, face.rank)) }
@@ -404,7 +396,6 @@ public enum ProblemDetector {
                 abridged(styles.sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.name < $1.name }.map(\.name)).listed()
             }
             let problemFiles = files.map { path, file in
-                // Getting only some of its names, a file says which: "Preferred" alone would read as all of them.
                 let isPartly = !file.won.isEmpty && file.won.count < file.names.count
                 return ProblemFile(path: path, version: nil, modified: nil, detail: context.detail(of: path),
                                    title: sorted(file.families).listed(), note: ordered(file.styles), preferredFor: file.won,
@@ -483,7 +474,6 @@ public enum ProblemDetector {
         let origins = Set(records.installedCopies.values)
         let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
         for family in context.library.families {
-            // The family's copies Use Copy From would list, each in its place.
             var copies: [(style: FaceID, folder: String)] = []
             var copyPaths: [(style: FaceID, path: String)] = []
             for face in family.faces {
@@ -525,8 +515,7 @@ public enum ProblemDetector {
             }
             guard !paths.isEmpty else { continue }
             paths.sort()
-            // A file goes only when every face in it keeps a copy without it and the extras before it: a
-            // collection can also hold styles, or other families, that have no duplicate.
+            // A file goes only when every face in it keeps a copy without it and the extras before it: a collection can also hold styles, or other families, that have no duplicate.
             var extras: [String] = []
             for path in paths where !keep.contains(path) && !ActivationEngine.isProtected(path) {
                 if context.copies.areSpare(Set(extras + [path])) { extras.append(path) }
@@ -549,7 +538,6 @@ public enum ProblemDetector {
     private static func missing(_ context: inout Context) -> [Problem] {
         let fm = FileManager.default
         var problems: [Problem] = []
-        // A file on a disk that isn't connected is under Fonts on External Disks instead.
         for path in context.data.records.inPlace.sorted() where !fm.fileExists(atPath: path) && context.unreachable(path) == nil {
             problems.append(Problem(
                 id: "missing.inplace.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
@@ -566,7 +554,6 @@ public enum ProblemDetector {
                 fixes: [.forgetInstalledCopy(path)], fileFixes: [:]
             ))
         }
-        // A family out of reach for now, on a disk that isn't connected, say, comes back with it.
         for set in context.data.sets {
             for family in set.memberFamilies where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
                 problems.append(Problem(
@@ -599,7 +586,6 @@ public enum ProblemDetector {
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
-        // Every file in a folder is on that folder's disk: its volume is asked about once.
         var volumes: [String: String?] = [:]
         var families: [String: Family]?
         for path in context.data.records.inPlace.sorted() where !(fontLibrary.map(path.hasPrefix) ?? false) {
@@ -609,12 +595,10 @@ public enum ProblemDetector {
                     id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
                     summary: "Used where it is, \(place).",
                     files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Out of reach for now")],
-                    // For a disk that's gone for good.
                     fixes: [.forgetInPlace(path)], fileFixes: [:]
                 ))
                 continue
             }
-            // A missing file has no volume.
             guard exists else { continue }
             let folder = (path as NSString).deletingLastPathComponent
             if volumes[folder] == nil { volumes[folder] = .some(externalVolumeName(of: path)) }
@@ -672,9 +656,7 @@ public struct SpareCopies: Sendable {
         for family in library.families {
             for face in family.faces {
                 let key = FaceKey(face.face)
-                // A copy from Adobe Fonts is Creative Cloud's to take away whenever it likes (when the font is turned
-                // off there, or the subscription ends), and one only Adobe apps load no other app has: it leaves no file
-                // of the user's spare.
+                // A copy from Adobe Fonts is Creative Cloud's to take away whenever it likes, and one only Adobe apps load no other app has: it leaves no file of the user's spare.
                 let paths = ([face.face.path] + face.otherCopies).filter { !ActiveSource.isAdobeFonts($0) }
                 files[key] = paths
                 for path in paths { faces[path, default: []].insert(key) }

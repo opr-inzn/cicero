@@ -84,8 +84,6 @@ extension ActivationEngine {
     public func copyPlan(_ files: [String]) -> CopyPlan {
         var plan = CopyPlan()
         var seen = Set<String>()
-        // Where a file of each name goes (folder/name, the name as the disk compares it: "Font.otf" and "FONT.OTF" are one
-        // name there) → the files to copy there under it. Kristoffer's FontBase folder had 36 such pairs of the same file.
         var named: [String: [String]] = [:]
         for path in files where seen.insert(path).inserted {
             if Task.isCancelled { break }
@@ -109,8 +107,7 @@ extension ActivationEngine {
     public func installOff(_ files: [String], on: Set<String> = [], keepOnWhenCancelled: Bool = false,
                            progress: @escaping @Sendable (Int, Int) -> Void) async
         -> (placed: [String: String], new: [String], failed: [String]) {
-        // Without it, macOS slows an app it can't see (App Nap) and lets the Mac sleep: every wait for fontd here then
-        // takes far longer, and an import of thousands of fonts left alone takes hours more.
+        // Without it, macOS slows an app it can't see (App Nap) and lets the Mac sleep, and every wait for fontd here takes far longer.
         let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
                                                              reason: "Copying fonts in")
         defer { ProcessInfo.processInfo.endActivity(activity) }
@@ -120,16 +117,12 @@ extension ActivationEngine {
         let total = plan.toCopy.count
         var placed = plan.inAlready
         var new: [String] = []
-        // The files to copy in on: those in `on`, and those that stand for one in `on`.
         let onSources = on.union(plan.sameAs.filter { on.contains($0.key) }.map(\.value))
-        // Staged copies that go in on, and those moved in on so far.
         var stagedOn = Set<String>()
         var onSoFar: [String] = []
-        // The copies moved into ~/Library/Fonts, off, and when they were last looked at (see `turnOffAgain`).
         var intoFontsFolderSoFar: [String] = []
         var lookedAt = TurnOffAgain()
         var lastLook = ContinuousClock.now
-        // Staged copies macOS didn't take in time → where they go in ~/Library/Fonts, and the file each is a copy of.
         var again: [String: (destination: String, source: String)] = [:]
         for start in stride(from: 0, to: total, by: Self.offBatchSize) {
             if Task.isCancelled { break }
@@ -138,13 +131,11 @@ extension ActivationEngine {
                 lastLook = .now
             }
             progress(start, total)
-            // Each staged copy → where it goes in ~/Library/Fonts, and the file it's a copy of.
             var intoFontsFolder: [String: String] = [:]
             var sources: [String: String] = [:]
             for (path, folder) in plan.toCopy[start..<min(start + Self.offBatchSize, total)] {
                 let name = (path as NSString).lastPathComponent
                 let same = folder.appendingPathComponent(name, isDirectory: false)
-                // One that went in since the plan was made.
                 if let there = installedAlready(path, into: folder) {
                     placed[path] = there
                     continue
@@ -154,10 +145,7 @@ extension ActivationEngine {
                 do {
                     try fm.createDirectory(at: staging, withIntermediateDirectories: true)
                     try fm.copyItem(at: Self.url(path), to: staged)
-                    // Without the downloaded-file tag the original has: with it, fontworker opens macOS's quarantine
-                    // database for each file it reads (and fails), so a read of the whole Fonts folder takes 6–9 times
-                    // as long, long enough for more copies to arrive and fontd to read it all again, and again (a storm,
-                    // Tests/E2E/fontbase-real-import "the quarantine tag"). The original keeps its tag.
+                    // Without the original's quarantine tag: with it, fontworker opens the quarantine database for each file it reads (and fails), so slowly that fontd reads the Fonts folder again and again.
                     removexattr(staged.path, "com.apple.quarantine", 0)
                 } catch {
                     continue
@@ -211,8 +199,7 @@ extension ActivationEngine {
             }
         }
         for staged in again.keys { try? fm.removeItem(atPath: staged) }
-        // Also once cancelled, as the copies stay: in a task of its own, where the waits aren't cut short. Once cancelled,
-        // the copies that went in on go off too, as the rest stay off until the import is done, unless they stay on.
+        // In a task of its own, also once cancelled, as the copies stay: in a cancelled task the waits would be cut short.
         let cancelled = Task.isCancelled
         let turningOff = cancelled && !keepOnWhenCancelled ? onSoFar : []
         if !intoFontsFolderSoFar.isEmpty || !turningOff.isEmpty {
@@ -224,7 +211,6 @@ extension ActivationEngine {
                 await engine.turnOffAtLast(paths, state: &lookedAt)
             }.value
         }
-        // The same files as those copied take their copies.
         for (path, original) in plan.sameAs { if let copy = placed[original] { placed[path] = copy } }
         if total > 0 { progress(total, total) }
         var seen = Set<String>()
@@ -327,7 +313,7 @@ extension ActivationEngine {
     public func trashStagingLeftovers() {
         let fm = FileManager.default
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
-        // To the Trash, not deleted: an import's originals may be gone since, as FontBase deletes its own copies as it quits.
+        // To the Trash, not deleted: an import's originals may be gone since.
         for name in (try? fm.contentsOfDirectory(atPath: staging.path)) ?? [] where name != ".DS_Store" {
             try? fm.trashItem(at: staging.appendingPathComponent(name, isDirectory: false), resultingItemURL: nil)
         }
@@ -361,7 +347,6 @@ extension ActivationEngine {
                 intoFontsFolder[path] = destination.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
                 continue
             }
-            // Fonts in Cicero's Library are on only while it has them registered: one put there is off.
             let target = Self.uniqueURL(for: (path as NSString).lastPathComponent, in: destination)
             do {
                 try fm.createDirectory(at: destination, withIntermediateDirectories: true)
@@ -374,7 +359,6 @@ extension ActivationEngine {
         placed.merge(await moveIntoFontsFolderOff(intoFontsFolder).placed) { first, _ in first }
         var records = records
         for (copy, original) in records.installedCopies {
-            // A copy whose original was a spare of it is the user's own again.
             if let moved = placed[original] { records.installedCopies[copy] = moved == copy ? nil : moved }
         }
         return (records, placed.count)
@@ -392,15 +376,12 @@ extension ActivationEngine {
         let fm = FileManager.default
         let folder = locations.inactiveFolder
         var moves: [String: String] = [:]
-        // What a launch that stopped moved, but maybe never saved the records of.
         if let data = try? Data(contentsOf: inactiveFolderMovesList), let listed = try? JSONDecoder().decode([String: String].self, from: data) {
             for (from, to) in listed where Self.exists(to) {
-                // One copied onto another disk whose original was still to go: nothing else had that name.
                 if Self.exists(from), !(Self.isIdenticalCopy(to, of: from) && (try? fm.removeItem(atPath: from)) != nil) { continue }
                 moves[from] = to
             }
         }
-        // A copy onto another disk that stopped halfway, under a hidden name nothing reads, in a folder there too.
         let halfCopies = (fm.enumerator(atPath: folder.path)?.allObjects as? [String] ?? [])
             .filter { ($0 as NSString).lastPathComponent.hasPrefix(Self.movingPrefix) }
         for path in halfCopies {
@@ -419,7 +400,6 @@ extension ActivationEngine {
                 if names.isEmpty { _ = Self.removeIfEmpty(former.path) }
                 continue
             }
-            // The whole folder, where nothing is in the way.
             if staying.isEmpty, !Self.exists(folder.path) || Self.removeIfEmpty(folder.path),
                (try? fm.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil {
                 let planned = Dictionary(uniqueKeysWithValues: names.map { (former.appendingPathComponent($0).path, folder.appendingPathComponent($0).path) })
@@ -431,7 +411,6 @@ extension ActivationEngine {
             }
             guard (try? fm.createDirectory(at: folder, withIntermediateDirectories: true)) != nil else { continue }
             var taken = Set(((try? fm.contentsOfDirectory(atPath: folder.path)) ?? []).map(Self.nameKey))
-            // Onto another disk a folder goes file by file (see `fileMoves`).
             let otherDisk = Self.disk(of: folder.path) != Self.disk(of: former.path)
             var items: [(from: URL, to: URL)] = []
             for name in movable {
@@ -447,7 +426,6 @@ extension ActivationEngine {
                 else { continue }
                 moves[from.path] = to.path
             }
-            // The folders the files left, and those made for files that couldn't go.
             for item in items {
                 Self.removeEmptyFolders(item.from.path)
                 Self.removeEmptyFolders(item.to.path)

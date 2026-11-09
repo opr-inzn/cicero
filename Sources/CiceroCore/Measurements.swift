@@ -1,5 +1,3 @@
-// Only in the app performance runs' builds (Tests/E2E/app-perf/build-perf-app.sh, `-D CICERO_MEASURE`): a release
-// has none of this, and scripts/build-app.sh refuses a binary that does.
 #if CICERO_MEASURE
 import Foundation
 import os
@@ -84,7 +82,6 @@ public enum Measurements {
         private let pending = Mutex<[String]>([])
 
         init?(path: String) {
-            // Appended to: the run's script writes its first line before the app starts.
             if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
             guard let handle = FileHandle(forWritingAtPath: path) else { return nil }
             handle.seekToEndOfFile()

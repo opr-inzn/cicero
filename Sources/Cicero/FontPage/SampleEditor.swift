@@ -21,11 +21,9 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(text: $text, glyphs: $glyphs, defaultText: defaultText) }
 
     func makeNSView(context: Context) -> NSTextView {
-        // TextKit 2, with a layout manager of its own for the insertion point (see `SampleLayoutManager`).
         let content = NSTextContentStorage()
         let manager = SampleLayoutManager()
-        // Lines exactly the Leading apart: TextKit added the font's own line gap below each line on top of it, so
-        // 100 % of a font with a gap of 20 % of the em set its lines 120 % apart, and each sat high in its room.
+        // Lines exactly the Leading apart: TextKit otherwise adds the font's own line gap below each line on top of it.
         manager.usesFontLeading = false
         content.addTextLayoutManager(manager)
         manager.textContainer = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
@@ -39,7 +37,6 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         view.isRichText = false
         view.importsGraphics = false
         view.allowsUndo = true
-        // The page sizes it; it neither grows by itself nor scrolls.
         view.isVerticallyResizable = false
         view.isHorizontallyResizable = false
         view.textContainer?.widthTracksTextView = true
@@ -72,7 +69,6 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         else { return nil }
         let lineWidth = width - 2 * margin
         if container.size.width != lineWidth { container.size = NSSize(width: lineWidth, height: .greatestFiniteMagnitude) }
-        // The extra line after a final line break, and the one empty text has, count too.
         var bottom: CGFloat = 0
         manager.enumerateTextLayoutFragments(from: manager.documentRange.location, options: [.ensuresLayout, .ensuresExtraLineFragment]) {
             bottom = max(bottom, $0.layoutFragmentFrame.maxY)
@@ -108,8 +104,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         let attributes = style.attributes
         view.typingAttributes = attributes
         view.defaultParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
-        // In one edit with the pasted glyphs, which setting the attributes takes off: the text is then drawn again,
-        // with the style's glyphs for them.
+        // In one edit with the pasted glyphs, which setting the attributes takes off.
         coordinator.isSettingText = true
         storage.beginEditing()
         storage.setAttributes(attributes, range: NSRange(location: 0, length: storage.length))
@@ -141,8 +136,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             paragraph.maximumLineHeight = lineHeight
             paragraph.alignment = alignment
             var attributes: [NSAttributedString.Key: Any] = [.font: font as NSFont, .paragraphStyle: paragraph, .foregroundColor: NSColor.textColor]
-            // Tracking is a kern added to the font's kerning, but a kern of 0 means no kerning at all, so pairs
-            // like Va stood apart. Not tracking, which breaks ligatures apart once it isn't 0.
+            // A kern of 0 means no kerning at all, so pairs like Va stood apart; and not tracking, which breaks ligatures apart once it isn't 0.
             if kerning != 0 { attributes[.kern] = kerning }
             return attributes
         }
@@ -303,7 +297,6 @@ private final class SampleTextView: NSTextView {
         }
         let range = rangeForUserTextChange
         guard range.location != NSNotFound, let storage = textStorage else { return false }
-        // Not with what was typed before it or after.
         breakUndoCoalescing()
         guard shouldChangeText(in: range, replacementString: clip.text) else { return false }
         let attributes = typingAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo }
@@ -373,7 +366,6 @@ nonisolated private final class UnclippedFragment: NSTextLayoutFragment {
             let string = line.attributedString.attributedSubstring(from: line.characterRange)
             let ink = CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(string), .useGlyphPathBounds)
             guard !ink.isNull, !ink.isEmpty else { return bounds }
-            // From the line's baseline, y up, to the paragraph's coordinates, y down.
             let x = line.typographicBounds.minX + line.glyphOrigin.x
             let baseline = line.typographicBounds.minY + line.glyphOrigin.y - raise
             let glyphs = CGRect(x: x + ink.minX, y: baseline - ink.maxY, width: ink.width, height: ink.height)

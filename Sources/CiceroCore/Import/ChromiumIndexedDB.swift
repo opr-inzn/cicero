@@ -7,7 +7,6 @@ public enum ChromiumIndexedDB {
 
     public static func values(in leveldb: URL, database: String, store: String) throws -> [String: JSValue] {
         let entries = try LevelDB.read(leveldb)
-        // Database IDs by name: global metadata (prefix 0, 0, 0), type 201, the origin, then the name.
         var databaseID: Int?
         for (key, value) in entries {
             var reader = IndexedDBBytes(key)
@@ -19,7 +18,6 @@ public enum ChromiumIndexedDB {
             if let id = try? valueReader.varint() { databaseID = id }
         }
         guard let databaseID else { throw Failure.notFound }
-        // Object store IDs by name: the database's metadata (prefix db, 0, 0), type 200, then the name.
         var storeID: Int?
         for (key, value) in entries {
             var reader = IndexedDBBytes(key)
@@ -31,7 +29,6 @@ public enum ChromiumIndexedDB {
         }
         guard let storeID else { throw Failure.notFound }
 
-        // Records (index 1) and the blobs of those kept in blob files (index 3), by key.
         var records: [String: [UInt8]] = [:]
         var blobs: [String: [UInt8]] = [:]
         for (key, value) in entries {
@@ -48,11 +45,9 @@ public enum ChromiumIndexedDB {
         var values: [String: JSValue] = [:]
         for (name, record) in records {
             var reader = IndexedDBBytes(record)
-            // The record's version, then the value as Blink wrote it.
             guard (try? reader.varint()) != nil else { continue }
             var bytes = Array(record[reader.offset...])
             if bytes.starts(with: [0xFF, 0x11, 0x01]) {
-                // Kept in a blob file: which one is in the record's blob entry.
                 var header = IndexedDBBytes(bytes)
                 header.offset = 3
                 guard (try? header.varint()) != nil, let index = try? header.varint(),
@@ -269,12 +264,12 @@ enum LevelDB {
             do {
                 while !reader.isAtEnd {
                     switch try reader.varint() {
-                    case 1: _ = try reader.take(try reader.varint())  // comparator
+                    case 1: _ = try reader.take(try reader.varint())
                     case 2: log = try reader.varint()
-                    case 3, 4: _ = try reader.varint()  // next file number, last sequence
-                    case 5: _ = try reader.varint(); _ = try reader.take(try reader.varint())  // compact pointer
-                    case 6: _ = try reader.varint(); tables.remove(try reader.varint())  // deleted file
-                    case 7:  // new file: level, number, size, smallest and largest keys
+                    case 3, 4: _ = try reader.varint()
+                    case 5: _ = try reader.varint(); _ = try reader.take(try reader.varint())
+                    case 6: _ = try reader.varint(); tables.remove(try reader.varint())
+                    case 7:
                         _ = try reader.varint()
                         tables.insert(try reader.varint())
                         _ = try reader.varint()
@@ -290,7 +285,6 @@ enum LevelDB {
             }
         }
         guard readAny, !failed else { return nil }
-        // Every table it names should be there; when one isn't, read them all rather than miss one.
         guard tables.allSatisfy({ number in names.contains { fileNumber($0) == number && ($0.hasSuffix(".ldb") || $0.hasSuffix(".sst")) } }) else {
             return nil
         }
@@ -360,7 +354,7 @@ enum LevelDB {
     static func readTable(_ bytes: [UInt8], _ keep: ([UInt8], UInt64, [UInt8]?) -> Void) throws {
         guard bytes.count >= 48 else { throw IndexedDBBytes.Failure.truncated }
         var footer = IndexedDBBytes(Array(bytes[(bytes.count - 48)...]))
-        _ = try footer.varint(); _ = try footer.varint()  // metaindex
+        _ = try footer.varint(); _ = try footer.varint()
         let indexOffset = try footer.varint()
         let indexSize = try footer.varint()
         let index = try block(bytes, offset: indexOffset, size: indexSize)
@@ -482,9 +476,9 @@ enum V8Value {
             while true {
                 let tag = try reader.byte()
                 switch tag {
-                case 0xFF: _ = try reader.varint()  // a version
-                case 0xFE: _ = try reader.take(12)  // Blink's trailer offset and size
-                case 0x00: continue  // padding
+                case 0xFF: _ = try reader.varint()
+                case 0xFE: _ = try reader.take(12)
+                case 0x00: continue
                 case UInt8(ascii: "_"), UInt8(ascii: "0"): return .null
                 case UInt8(ascii: "T"): return .bool(true)
                 case UInt8(ascii: "F"): return .bool(false)
@@ -493,7 +487,7 @@ enum V8Value {
                     return .number(Double((zigzag >> 1) ^ -(zigzag & 1)))
                 case UInt8(ascii: "U"): return .number(Double(try reader.varint()))
                 case UInt8(ascii: "N"): return .number(try double())
-                case UInt8(ascii: "\""): // Latin-1: each byte is the scalar of that number.
+                case UInt8(ascii: "\""):
                     return .string(String(String.UnicodeScalarView(try reader.take(try reader.varint()).map { Unicode.Scalar($0) })))
                 case UInt8(ascii: "S"): return .string(String(decoding: try reader.take(try reader.varint()), as: UTF8.self))
                 case UInt8(ascii: "c"):
@@ -521,7 +515,6 @@ enum V8Value {
                     guard count <= reader.bytes.count - reader.offset else { throw IndexedDBBytes.Failure.malformed }
                     var items: [JSValue] = []
                     for _ in 0..<count {
-                        // "-" is a hole.
                         if try reader.peek() == UInt8(ascii: "-") {
                             reader.offset += 1
                             items.append(.null)

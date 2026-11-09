@@ -161,15 +161,12 @@ private struct RuleRow: View {
         case .tag:
             options(model.data.tags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
         case .rating:
-            // The most stars first, as in the family's Rating menu.
             options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:
             options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No folders yet")
         case .folder:
             options(folderOptions, empty: "No locations yet")
         case .status:
-            // Active in Adobe Apps Only also while Proofing is hidden: Adobe Fonts that Adobe apps turned on for
-            // themselves are still listed.
             options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })

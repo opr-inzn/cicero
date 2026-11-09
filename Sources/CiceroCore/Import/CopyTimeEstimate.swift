@@ -19,7 +19,6 @@ public struct CopyTimeEstimate: Sendable {
         if let last = samples.last, done < last.done || time < last.time { samples.removeAll() }
         if samples.isEmpty { start = time }
         samples.append((time, done))
-        // Older ones only to keep the one that starts the window.
         while samples.count > 2, samples[1].time <= time - Self.paceWindow { samples.removeFirst() }
     }
 

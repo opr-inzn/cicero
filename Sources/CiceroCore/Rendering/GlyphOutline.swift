@@ -22,7 +22,6 @@ public struct GlyphOutline {
 
     public var svg: String {
         var data = ""
-        // SVG's y goes down.
         func point(_ point: CGPoint) -> String { "\(Self.number(point.x)) \(Self.number(-point.y))" }
         path.applyWithBlock { element in
             let points = element.pointee.points
@@ -80,7 +79,6 @@ public struct GlyphOutline {
                 current = points[0]
                 paths += "\(point(points[0])) lineto\n"
             case .addQuadCurveToPoint:
-                // PostScript's curves are cubic: TrueType's quadratic ones, raised.
                 let control = points[0], end = points[1]
                 let first = CGPoint(x: current.x + 2 / 3 * (control.x - current.x), y: current.y + 2 / 3 * (control.y - current.y))
                 let second = CGPoint(x: end.x + 2 / 3 * (control.x - end.x), y: end.y + 2 / 3 * (control.y - end.y))

@@ -14,7 +14,6 @@ struct InfoPanelOverlay: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        // Only the panel's way in and out, not what changes inside it or under it.
         content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoPresented ? 1 : 0)) }
     }
 
@@ -31,13 +30,11 @@ struct InfoPanelOverlay: ViewModifier {
                 if shown > 0 {
                     let shape = InfoPanelOverlay.shape
                     InfoPanel()
-                        // What changes in the panel shows at once. Under the slide, the rows filled in as it opened
-                        // faded in with it, and took as long.
+                        // Under the slide, the rows filled in as the panel opened faded in with it, and took as long.
                         .transaction { if $0.animation == InfoPanelOverlay.slide { $0.animation = nil } }
                         .frame(width: InfoPanelOverlay.width)
                         .frame(maxHeight: .infinity)
                         .background {
-                            // Opaque, over the page; the tint matches the sidebar.
                             shape.fill(Color.canvas)
                             shape.fill(.quaternary.opacity(0.5))
                         }
@@ -71,7 +68,6 @@ struct InfoPanelInset: ViewModifier {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: isCovered ? coveredShown ?? shown : shown)) }
             .onChange(of: isCovered, initial: true) { coveredShown = isCovered ? shown : nil }
-            // The toolbar and the gap around the panel show the page's colour from edge to edge.
             .background(Color.canvas)
     }
 
@@ -174,7 +170,6 @@ private struct InfoRows: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // First: what the user wrote about the family.
             NoteRow(family: family)
             row("Status", face.state.label)
             TagsRow(family: family)
@@ -211,8 +206,6 @@ private struct InfoRows: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Read now unless the file would keep the panel waiting, as samples are drawn: well under a millisecond, and the
-        // panel opens, or goes to another font, with the info in place rather than a moment of spinner.
         .loading($info, for: FileFace(face.face), cached: { [face = face.face] in
             CiceroCore.FontInfo.cached(face) ?? (FontLoader.shared.wouldWait(for: face.path) ? nil : CiceroCore.FontInfo.read(face))
         }) { [face = face.face] in
@@ -347,7 +340,6 @@ private struct NoteRow: View {
             save()
             load()
         }
-        // A note changed elsewhere, as by restoring a backup, unless it's being written here.
         .onChange(of: model.note(of: family)) { if !isFocused { load() } }
         .onChange(of: isFocused) { if !isFocused { save() } }
         .onDisappear(perform: save)
@@ -389,7 +381,6 @@ private struct FeatureControls: View {
                 EmptyState("No Features", systemImage: "textformat.abc",
                            description: Text("This font has no optional OpenType features to switch on or off."))
             } else if let groups {
-                // A box of switches per feature, like the system Typography panel.
                 Form {
                     ForEach(groups) { group in
                         Section(group.name) {
@@ -407,7 +398,6 @@ private struct FeatureControls: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // On the open font page, those it read as it opened (see `PageFeatures`).
         .loading($loaded, for: FileFace(face), cached: { [model, face] in model.pageFeatures.features(of: face) }) { [model, face] in
             if model.openFamilyID == family.id { return await model.pageFeatures.features(loading: face) }
             return await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
@@ -479,7 +469,6 @@ struct Loaded<Value> {
 extension View {
     func loading<ID: Hashable, Value>(_ state: Binding<Loaded<Value>?>, for id: ID, cached: @escaping @MainActor () -> Value? = { nil },
                                       _ work: @escaping @MainActor () async -> Value) -> some View {
-        // Both run before the frame they change is drawn.
         let useCached = {
             if state.wrappedValue?.id != AnyHashable(id), let value = cached() { state.wrappedValue = Loaded(id: id, value: value) }
         }

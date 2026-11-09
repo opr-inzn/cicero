@@ -14,14 +14,12 @@ enum UsageStatistics {
 
     static func sendLaunch() {
         let defaults = UserDefaults.standard
-        // A binary run from .build (swift run) has no version to send.
         guard isOn, !appID.isEmpty, Bundle.main.bundleURL.pathExtension == "app",
               let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
               let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String else { return }
         let id = defaults.string(forKey: idKey) ?? UUID().uuidString
         defaults.set(id, forKey: idKey)
         let isNew = !defaults.bool(forKey: newMacKey)
-        // Reading the code signature takes milliseconds the window, still being made, needs more.
         DispatchQueue.global(qos: .utility).async { send(id: id, version: version, build: build, isNew: isNew) }
     }
 
@@ -37,14 +35,11 @@ enum UsageStatistics {
             "TelemetryDeck.Device.systemVersion": "macOS \(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
             "TelemetryDeck.Device.systemMajorVersion": "macOS \(system.majorVersion)",
         ]
-        // TelemetryDeck's own signal and parameter names, which its dashboard charts.
         func signal(_ type: String, adding parameters: [String: String] = [:]) -> [String: Any] {
             ["appID": appID, "clientUser": clientUser, "sessionID": sessionID, "type": type, "isTestMode": isTestMode,
              "payload": payload.merging(parameters) { $1 }]
         }
         var signals = [signal("TelemetryDeck.Session.started")]
-        // Its Acquisition charts count new users by this signal, which its SDK sends on an app's first launch,
-        // with that day.
         if isNew {
             let today = ISO8601DateFormatter.string(from: .now, timeZone: .current, formatOptions: .withFullDate)
             signals.insert(signal("TelemetryDeck.Acquisition.newInstallDetected",
@@ -54,7 +49,6 @@ enum UsageStatistics {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: signals)
-        // Ephemeral, so no cookies or cache are kept.
         let session = URLSession(configuration: .ephemeral)
         session.dataTask(with: request) { _, response, _ in
             guard isNew, let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { return }

@@ -75,7 +75,7 @@ enum CommandLineTool {
             State.shared.refresh()
             switch outcome {
             case .installed: await showInstalled()
-            case .cancelled: break  // The user cancelled macOS's password dialog: they know.
+            case .cancelled: break
             case .failed:
                 let alert = NSAlert()
                 alert.alertStyle = .warning
@@ -90,7 +90,6 @@ enum CommandLineTool {
     private static func showInstalled() async {
         let tab = await TabCompletion.state()
         let offers = tab.map { !$0.isOn && !TabCompletion.hasLine($0.file) } ?? false
-        // The file as the user knows it: in the home folder, unless their setup keeps zsh's files elsewhere.
         let place = tab.map { $0.file.deletingLastPathComponent().path == NSHomeDirectory() ? "the file .zshrc in your home folder" : $0.file.path } ?? ""
         let alert = NSAlert()
         alert.messageText = "The Cicero CLI is installed"
@@ -133,7 +132,7 @@ enum CommandLineTool {
             let cancelled = await MainActor.run {
                 var error: NSDictionary?
                 _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
-                return error?[NSAppleScript.errorNumber] as? Int == -128  // userCanceledErr
+                return error?[NSAppleScript.errorNumber] as? Int == -128
             }
             if cancelled { return .cancelled }
         }

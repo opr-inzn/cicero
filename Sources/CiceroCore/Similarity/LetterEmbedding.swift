@@ -32,7 +32,6 @@ public final class LetterEmbedding: Sendable {
     }
 
     public func read(_ font: CTFont) -> Reading? {
-        // The words in strips and the large letters are drawn only for a model that takes them.
         let (takesStrips, takesDetails) = model.withLock { state -> (Bool, Bool) in
             if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
             guard case .loaded(let model) = state else { return (false, false) }

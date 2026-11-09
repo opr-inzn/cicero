@@ -108,7 +108,6 @@ public enum WriteRunner {
             if let existing = writer.data.tags.first(where: { Names.fold($0) == Names.fold(trimmed) }) {
                 return changes(changed: [], unchanged: [existing])
             }
-            // The colour the app's New Tag starts with: the first one no tag has.
             let made = tagColor ?? TagColor.next(after: writer.data.tagColors.values)
             writer.update { $0.addTag(named: trimmed, color: made) }
             return changes(changed: [trimmed], unchanged: [])
@@ -125,7 +124,6 @@ public enum WriteRunner {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw CommandError.invalid("A tag needs a name.") }
             if trimmed == tag { return changes(changed: [], unchanged: [tag]) }
-            // Names are found ignoring case, so two tags that differ only in capitals couldn't be told apart.
             if let other = writer.data.tags.first(where: { $0 != tag && Names.fold($0) == Names.fold(trimmed) }) {
                 throw CommandError.invalid("There’s already a tag called “\(other)”. Nothing changed.")
             }
@@ -140,7 +138,6 @@ public enum WriteRunner {
         case .folderCreate(let name):
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw CommandError.invalid("A folder needs a name.") }
-            // A second folder of the same name would make the name fit two folders: the command takes the one there.
             if let existing = writer.data.sets.first(where: { Names.fold($0.name) == Names.fold(trimmed) }) {
                 return changes(changed: [], unchanged: [existing.name])
             }
@@ -151,7 +148,6 @@ public enum WriteRunner {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw CommandError.invalid("A folder needs a name.") }
             if trimmed == set.name { return changes(changed: [], unchanged: [set.name]) }
-            // As folder create: a name another folder has would fit two folders.
             if let other = writer.data.sets.first(where: { $0.id != set.id && Names.fold($0.name) == Names.fold(trimmed) }) {
                 throw CommandError.invalid("There’s already a folder called “\(other.name)”. Nothing changed.")
             }
@@ -167,7 +163,6 @@ public enum WriteRunner {
             let adding = if case .folderAdd = request.command { true } else { false }
             let set = try Names.folder(typed, in: writer.data)
             let ids = try familyIDs(families, in: context)
-            // In: the family whole. A folder with only some of its styles gets the rest; taking it out takes those too.
             let changed = ids.filter { adding ? !set.families.contains($0) : (set.families.contains($0) || set.styles[$0] != nil) }
             if !changed.isEmpty { writer.update { $0.setMembership(adding, for: changed, in: set.id) } }
             return changes(changed: changed, unchanged: ids.filter { !changed.contains($0) })
@@ -184,7 +179,6 @@ public enum WriteRunner {
             let blank = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             let note: String?
             if append {
-                // Nothing to add: the note stays as it is.
                 note = blank ? old : old.map { $0 + "\n" + text } ?? text
             } else {
                 note = blank ? nil : text

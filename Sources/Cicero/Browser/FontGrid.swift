@@ -29,7 +29,6 @@ struct FontGrid: View {
         init(_ sample: String, size: Double) {
             let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: size)]))
             let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-            // Text with no letters, spaces say: a capital's height.
             above = ink.isEmpty ? size * 0.7 : max(ink.maxY, 0)
             below = ink.isEmpty ? 0 : max(-ink.minY, 0)
             width = CTLineGetTypographicBounds(line, nil, nil, nil)
@@ -64,7 +63,6 @@ struct FontGrid: View {
         let ratio = shown.ratio
         let (count, tile, restingTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
         let sampleHeight = max(measure.height(size: preview.size), restingTile * Self.sampleHeightPerWidth)
-        // Bigger or smaller by as much as the sidebar hidden or the Info panel open makes the tiles wider or narrower.
         let factor = tile != restingTile ? tile / restingTile : nil
         let fit = measure.fit(size: preview.size, ratio: ratio, restingTile: restingTile,
                               drawn: factor.map { GridScale.drawn(preview.size, factor: $0) } ?? preview.size)
@@ -80,8 +78,7 @@ struct FontGrid: View {
                 }
                 .scrollTargetLayout()
                 .frame(width: CGFloat(count) * (tile + Self.spacing) - Self.spacing)
-                // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as
-                // before the Info panel opened kept its columns and pushed the window's panes aside.
+                // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as before the Info panel opened kept its columns and pushed the window's panes aside.
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .onGeometryChange(for: GridRoom.self) { [infoShown] in GridRoom(width: $0.size.width, infoShown: infoShown) } action: { gridRoom = $0 }
                 .cardsPadding(infoShown: infoShown, scale: scale)
@@ -117,13 +114,10 @@ struct FontGrid: View {
 
     private func measureSamples(_ inputs: Int) async {
         let text = sampleText
-        // Measured already, as each time the grid shows again: no samples to make, which took 20 ms at 20,000 families.
         if SampleWidths.shared.hasMeasured(inputs) {
             shown = Shown(text: text, ratio: SampleWidths.shared.listRatio)
             return
         }
-        // Made off the main thread: at 20,000 families, 44 ms of it in the launch's first turn of work, as the window first
-        // shows. The Info panel's axes as `AppModel.variations(for:face:)` gives them.
         let families = model.library.families, data = model.data, weight = preview.weight
         let axes = model.familyAxes.mapValues { (face: $0.face, values: $0.values) }
         let samples = await Task.detached(priority: .userInitiated) {
@@ -134,7 +128,6 @@ struct FontGrid: View {
             }
         }.value
         guard !Task.isCancelled else { return }
-        // Should that take a while, as when the files are first read, the text in the meantime with the width as it is.
         let meanwhile = Task {
             try? await Task.sleep(for: .milliseconds(300))
             if !Task.isCancelled { shown = Shown(text: text, ratio: SampleWidths.shared.listRatio) }
@@ -207,7 +200,6 @@ final class SidebarRoom {
     @ObservationIgnored private var settling: Task<Void, Never>?
 
     var hiddenWidth: CGFloat {
-        // Shown: none, also while it's dragged wider or narrower and the browser's edge moves a step before it.
         guard isCollapsed || isShowing, let room, let detailStart else { return 0 }
         let hidden = room - detailStart
         return hidden >= 1 ? hidden : 0
@@ -226,7 +218,6 @@ final class SidebarRoom {
         isCollapsed = item.isCollapsed
         observation = item.observe(\.isCollapsed, options: [.new]) { [weak self] _, change in
             guard let collapsed = change.newValue else { return }
-            // At once, before the browser has moved, so it's still beside the sidebar when that starts to slide out.
             MainActor.assumeIsolated { self?.collapsedChanged(collapsed) }
         }
     }
@@ -310,9 +301,6 @@ private struct Tile: View {
                     .accessibilityHidden(true)
             }
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
-            // On one baseline in every tile, whatever each font's ascent and descent, where the sample's letters are centred
-            // (see `Measure`), at the preview size unless it's wider than the tiles have room for (see `SampleFit`). Not
-            // clipped: what reaches past it runs into the padding.
             let sample = SampleWidths.Sample(face: style.face, text: sampleText, weight: weight,
                                              variations: model.variations(for: family, face: style.id), features: model.searchFeatures)
             let text = model.scriptSamples.text(sample.text, for: style.face)
@@ -327,11 +315,8 @@ private struct Tile: View {
                         scale: { fit.scale(sample, text: text, in: $0) }
                     )
                     .foregroundStyle(Color.ink)
-                    // Only where its letters fit but its line doesn't: a font whose first or last letter leaves a lot of room
-                    // beside it.
                     .minimumScaleFactor(0.4)
-                    // Its whole line, though that's higher than the sample: proposed less, it shrank to fit, drawn below the
-                    // baseline it reported.
+                    // Its whole line, though that's higher than the sample: proposed less, it shrank to fit, drawn below the baseline it reported.
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
                 }
@@ -353,7 +338,6 @@ private struct Tile: View {
                         .lineLimit(1)
                         .help(family.rangeLabel)
                     Spacer(minLength: 0)
-                    // The kinds of file: the tag above says it's variable.
                     Text(family.fileKinds)
                         .foregroundStyle(.tertiary)
                         .fixedSize()

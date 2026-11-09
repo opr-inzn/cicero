@@ -18,7 +18,6 @@ public enum FirstStem {
             let xHeight = CTFontGetXHeight(font) > 0 ? CTFontGetXHeight(font) : CTFontGetSize(font) / 2
             let heights = xHeight * band.lowerBound...xHeight * band.upperBound
             for (glyph, position) in zip(glyphs, positions) {
-                // A space has no outline: the letter after it counts.
                 guard let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.isEmpty else { continue }
                 return position.x + edge(of: path, within: heights)
             }

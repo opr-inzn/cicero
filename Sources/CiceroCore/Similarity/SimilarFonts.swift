@@ -127,7 +127,6 @@ public struct SimilarFonts: Sendable {
             found.append((other, distance(reference, other)))
         }
         found.sort { $0.distance < $1.distance }
-        // The nearest copy of each design and none of the family's own.
         var listed: Set = [designs[reference]], nearest: [(index: Int, distance: Float)] = []
         for entry in found where listed.insert(designs[entry.index]).inserted {
             nearest.append(entry)

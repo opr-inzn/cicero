@@ -12,7 +12,6 @@ struct ActivationTitles {
         let temporary = families.allSatisfy { $0.temporaryScope != nil }
         let partial = families.contains { $0.hasActive && $0.temporaryScope == nil }
         activate = temporary ? "Activate Permanently" : app != nil ? "Activate in All Apps" : partial ? "Activate Remaining Styles" : "Activate"
-        // On in the app only, nothing is on in other apps: turning it off there is all deactivating does.
         deactivate = app.map { families.contains(where: \.hasActive) ? "Deactivate in All Apps" : "Deactivate in \($0)" } ?? "Deactivate"
     }
 }
@@ -31,7 +30,6 @@ struct FamilyMenu: View {
 
         let titles = ActivationTitles(families)
         let app = titles.app
-        // The symbols of the sidebar's Active and Inactive, and half for the switch's middle position.
         if families.contains(where: \.hasActivatable) {
             Button(titles.activate, systemImage: "checkmark.seal") { model.activate(families) }
         }
@@ -63,7 +61,6 @@ struct FamilyMenu: View {
 
         Divider()
 
-        // Measured once its letters are, a moment after it's added; never for one without Latin letters.
         if families.count == 1 {
             Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: families[0]) }
                 .disabled(!model.canShowSimilar(families[0]))
@@ -87,7 +84,6 @@ struct FamilyMenu: View {
 
         Divider()
 
-        // Added one at a time, they can leave the library and stay where they are.
         if model.canRemoveFromLibrary(families) {
             Button("Remove from Library", systemImage: "minus.circle") { model.removeFromLibrary(families) }
         }
@@ -95,7 +91,6 @@ struct FamilyMenu: View {
     }
 
     private var note: String? {
-        // One only Adobe apps use says so, like the fonts in Adobe's folders.
         if families.first?.isAdobeFonts == true, families.first?.state == .active { return "From Adobe Fonts" }
         return switch families.first?.state {
         case .appOnly(let app): "Available in \(FaceState.appDescription(app)) only"
@@ -110,7 +105,6 @@ struct OrganizingMenus: View {
     let model: AppModel
 
     var body: some View {
-        // The symbols of the sidebar's sections.
         Menu {
             ForEach(model.data.sets) { set in
                 Toggle(set.name, isOn: Binding(
@@ -223,7 +217,6 @@ struct RatingMenuItems: View {
             get: { families.allSatisfy { model.rating(of: $0) == nil } },
             set: { if $0 { model.setRating(nil, for: families) } }
         ))
-        // The most stars first.
         ForEach([5, 4, 3, 2, 1], id: \.self) { stars in
             Toggle(Rating.stars(stars), isOn: Binding(
                 get: { families.allSatisfy { model.rating(of: $0) == stars } },
@@ -276,7 +269,6 @@ struct ClassificationMenuItems: View {
     var body: some View {
         let overrides = model.data.classificationOverrides
         let automatic = families.allSatisfy { overrides[$0.id] == nil }
-        // One family says which classification Automatic is.
         let suggested = families.count == 1 ? model.suggestedClassification(of: families[0]) : nil
         Toggle(suggested.map { "Automatic (\(model.name(of: $0)))" } ?? "Automatic", isOn: Binding(
             get: { automatic },

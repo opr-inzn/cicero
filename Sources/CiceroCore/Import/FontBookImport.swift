@@ -37,7 +37,6 @@ public enum FontBookImport {
             library.notes.append(smart.count == 1 ? "the smart collection “\(smart[0])”"
                 : "the smart collections " + smart.map { "“\($0)”" }.listed())
         }
-        // Last, as the sheet lists the notes, so "which Cicero can't read" ends the line.
         if !unreadable.isEmpty {
             library.notes.append((unreadable.count == 1 ? "the file " : "the files ")
                 + unreadable.map { "“\($0)”" }.listed() + ", which Cicero can’t read")

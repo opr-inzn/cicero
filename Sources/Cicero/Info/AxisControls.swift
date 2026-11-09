@@ -9,7 +9,6 @@ struct AxisControls: View {
 
     var body: some View {
         let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
-        // A style on a server is read off the main thread first.
         ReadingFonts(paths: [style.face.path]) {
             let axes = FontLoader.shared.axes(of: style.face)
             if axes.isEmpty {
@@ -43,7 +42,6 @@ struct AxisControls: View {
                 }
             }
             if !hidden.isEmpty {
-                // Open when they're all the font has.
                 let isOpen = showsHidden || shown.isEmpty
                 Section {
                     if isOpen {
@@ -100,7 +98,6 @@ struct AxisControls: View {
             ValueSlider(value: value, range: range, step: axis.step)
                 .accessibilityLabel(axis.name)
         }
-        // Without a thousands separator, as fonts write axis values: 1000, not 1,000 or 1.000.
         .help("\(axis.name) (\(axis.tag)), from \(Self.number(axis.minimum)) to \(Self.number(axis.maximum)), \(Self.number(axis.defaultValue)) by default")
     }
 
@@ -118,7 +115,6 @@ struct AxisControls: View {
             return
         }
         if model.openFamilyID == family.id, let other = otherStyle(at: position, axes: axes, besides: style) {
-            // Automatic while that's the style it shows: back to it without a style chosen.
             let automatic = model.automaticStyle(of: family, weight: preview.weight)
             let isAutomatic = automatic.face.id == other.id && Self.isSame(place(of: automatic.face, weight: automatic.weight), position, on: axes)
             model.pageStyleID = isAutomatic ? nil : other.id

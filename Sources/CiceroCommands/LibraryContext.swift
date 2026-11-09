@@ -36,7 +36,6 @@ public final class LibraryContext: @unchecked Sendable {
                             savesScan: Bool = true) async throws -> LibraryContext {
         let saved = try loadUserData(environment)
         let data = shown.applied(to: saved)
-        // The saved library has the proofing fonts as Cicero's setting has them; the other way needs a scan of its own.
         let proofingDiffers = data.showAdobeAppFolders != saved.showAdobeAppFolders && !environment.appFontFolders.isEmpty
         let scans = rescan || proofingDiffers
         // Never while Cicero is open: it writes its caches itself, and would write over the tool's or keep showing its own.
@@ -50,7 +49,6 @@ public final class LibraryContext: @unchecked Sendable {
             library = try await scanner.scan(ScanInput(folders: data.scannedFolders(appFolders: environment.appFontFolders), files: data.fontFiles, records: data.records)) { _ in }
             if saves {
                 scanner.flush()
-                // As the app keeps it: the families its settings list.
                 await coverage?.update(library.families.filter(saved.lists)) { _, _ in }
                 coverage?.waitForSave()
             }
@@ -63,8 +61,6 @@ public final class LibraryContext: @unchecked Sendable {
             lastScan = saved.lastSaved
         }
         coverage?.loadSaved()
-        // The coverage the saved cache can lack: of what a scan that isn't saved found, and of fonts Cicero hides that
-        // this command shows. Worked out now, and not saved.
         let showsMore = (data.showSystemFonts && !saved.showSystemFonts) || (data.showCreativeCloudFonts && !saved.showCreativeCloudFonts)
         if (scans && !saves) || showsMore {
             await coverage?.update(library.families.filter(data.lists), saves: false) { _, _ in }
@@ -101,7 +97,7 @@ public final class LibraryContext: @unchecked Sendable {
     static func loadUserData(_ environment: ToolEnvironment) throws -> UserData {
         let url = environment.userDataURL
         var data: UserData
-        // A file that can't be read stops the command rather than start a new library over it: the app keeps such a file aside and starts again, which the tool leaves to it.
+        // A file that can't be read stops the command rather than start a new library over it.
         if let contents = try? Data(contentsOf: url) {
             do {
                 data = try JSONDecoder().decode(UserData.self, from: contents)
@@ -114,7 +110,6 @@ public final class LibraryContext: @unchecked Sendable {
         } else {
             data = .newLibrary
         }
-        // As the app does for files from before there was a Font Library.
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = environment.locations.defaultFontLibrary.path }
         return data
     }
