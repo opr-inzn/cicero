@@ -7,6 +7,11 @@ public enum Requests {
     }
 
     public static let takeWithin: Duration = .seconds(5)
+    public static let whileStarting: TimeInterval = 30
+
+    static func isStarting(support: URL) -> Bool {
+        AppLock.appStarted(support: support).map { Date.now.timeIntervalSince($0) < whileStarting } ?? false
+    }
 
     static func file(_ id: String, _ kind: String, in folder: URL) -> URL {
         folder.appendingPathComponent("\(id).\(kind).json", isDirectory: false)
@@ -37,15 +42,16 @@ public enum Requests {
             }
             let open = AppLock.isHeld(support: support)
             if fm.fileExists(atPath: waiting.path) {
-                if !open || ContinuousClock.now - start > takeWithin {
+                if !open || ContinuousClock.now - start > takeWithin && !isStarting(support: support) {
                     let withdrawn = folder.appendingPathComponent("\(id).withdrawn", isDirectory: false)
                     if (try? fm.moveItem(at: waiting, to: withdrawn)) != nil {
                         try? fm.removeItem(at: withdrawn)
                         if !open { return nil }
-                        throw CommandError(.busy, "Cicero is open but didn’t take the change within \(takeWithin.components.seconds) seconds. Nothing changed. Try again in a moment.")
+                        let waited = (ContinuousClock.now - start).components.seconds
+                        throw CommandError(.busy, "Cicero is open but didn’t take the change within \(waited) seconds. Nothing changed. Try again in a moment.")
                     }
                 }
-            } else if !fm.fileExists(atPath: taken.path) {
+            } else if !fm.fileExists(atPath: taken.path), !fm.fileExists(atPath: waiting.path) {
                 if let answer = readReply(reply) {
                     try? fm.removeItem(at: reply)
                     return answer
@@ -84,7 +90,7 @@ public enum Requests {
         let dated = waiting.map { url in
             (url, (try? fm.attributesOfItem(atPath: url.path))?[.creationDate] as? Date ?? .distantPast)
         }
-        let late = Date.now.addingTimeInterval(-Double(takeWithin.components.seconds) - 5)
+        let late = Date.now.addingTimeInterval(-max(Double(takeWithin.components.seconds), whileStarting) - 5)
         return dated.sorted { $0.1 < $1.1 }.compactMap { url, date in
             let id = String(url.lastPathComponent.dropLast(".request.json".count))
             // Its command would have withdrawn it by now, unless it was stopped: a change the user cancelled must never be made.

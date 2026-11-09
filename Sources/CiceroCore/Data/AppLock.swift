@@ -20,7 +20,7 @@ public final class AppLock: @unchecked Sendable {
         var text: String {
             switch self {
             case .command: "command\n"
-            case .app(let name): "app\n\(name)\n"
+            case .app(let name): "app\n\(name)\n\(Int(Date.now.timeIntervalSince1970))\n"
             }
         }
 
@@ -57,6 +57,12 @@ public final class AppLock: @unchecked Sendable {
 
     public static func holder(support: URL) -> Holder {
         Holder(text: (try? String(contentsOf: url(support: support), encoding: .utf8)) ?? "")
+    }
+
+    public static func appStarted(support: URL) -> Date? {
+        let lines = ((try? String(contentsOf: url(support: support), encoding: .utf8)) ?? "").split(separator: "\n")
+        guard lines.first == "app", lines.count > 2, let seconds = TimeInterval(lines[2]) else { return nil }
+        return Date(timeIntervalSince1970: seconds)
     }
 
     public static func wait(support: URL, timeout: Duration) async -> AppLock? {
