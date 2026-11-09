@@ -30,7 +30,6 @@ struct ToolbarPicker<Value: Hashable>: View {
     let symbol: ((Value) -> String)?
     let help: String?
     @Namespace private var lens
-    @Environment(\.colorScheme) private var colorScheme
 
     init(_ label: String, values: [Value], selection: Binding<Value>, title: @escaping (Value) -> String,
          symbol: ((Value) -> String)? = nil, help: String? = nil) {
@@ -74,16 +73,9 @@ struct ToolbarPicker<Value: Hashable>: View {
                 .buttonStyle(ToolbarButtonStyle(isOn: selection == value, segment: symbol == nil ? .title : .symbol))
                 .background {
                     if selection == value {
-                        if colorScheme == .dark {
-                            Capsule()
-                                .fill(.quaternary)
-                                .matchedGeometryEffect(id: "lens", in: lens)
-                        } else {
-                            Capsule()
-                                .fill(.quaternary)
-                                .glassEffect(.regular.interactive(), in: .capsule)
-                                .matchedGeometryEffect(id: "lens", in: lens)
-                        }
+                        Capsule()
+                            .fill(.quaternary)
+                            .matchedGeometryEffect(id: "lens", in: lens)
                     }
                 }
                 .help(help ?? "")
