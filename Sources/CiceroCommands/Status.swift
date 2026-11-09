@@ -1,8 +1,6 @@
 import CiceroCore
 import Foundation
 
-/// `cicero status`: the library. `cicero status <family>`: the family, its styles short; with `--style` that style with
-/// its details, with `--all-styles` every style with its details.
 public enum StatusCommand {
     public static func library(in context: LibraryContext) -> JSON {
         let families = context.listedFamilies
@@ -24,7 +22,6 @@ public enum StatusCommand {
         return answer.json
     }
 
-    /// `style`: a style name or PostScript name; `allStyles`: details for every style.
     public static func family(_ name: String, style: String?, allStyles: Bool, in context: LibraryContext) throws -> JSON {
         if style != nil, allStyles { throw CommandError.invalid("Use --style or --all-styles, not both.") }
         let family = try Names.family(name, in: context)
@@ -37,8 +34,6 @@ public enum StatusCommand {
     }
 }
 
-/// `cicero coverage <family> --set <id> | --text "…"`: whether the family's regular style has every character, and
-/// which it lacks.
 public enum CoverageCommand {
     public static func run(family name: String, set id: String?, text: String?, in context: LibraryContext) async throws -> JSON {
         guard (id == nil) != (text == nil) else { throw CommandError.invalid("Give --set <id> or --text \"…\", one of them.") }
@@ -75,7 +70,6 @@ public enum CoverageCommand {
     }
 }
 
-/// `cicero list families | tags | folders | locations | foundries | coverage`.
 public enum ListCommand {
     public enum What: String, CaseIterable, Sendable {
         case families, tags, folders, locations, foundries, coverage
@@ -139,7 +133,6 @@ public enum ListCommand {
         }
     }
 
-    /// The JSON's name for a set's group: `latin` (Latin S–XL), `adobeLatin`, `google`, `unicode`, `custom`.
     static func group(of set: CharacterSetDefinition) -> String {
         switch set.groupID {
         case CharacterSetCatalog.latinSeriesID: "latin"

@@ -1,22 +1,13 @@
 import CiceroCore
 import CoreText
 
-/// What a font page lists under its styles for one face: its characters and the glyphs its features draw, by group,
-/// and the ligatures it makes. A character whose glyph a ligature feature makes, like ﬁ, which fonts usually give
-/// U+FB01 (Alphabetic Presentation Forms) too, is listed once, as a ligature, which says the character.
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
-    /// The characters and feature glyphs by group, but characters listed as ligatures.
     let glyphs: [GlyphSection]
-    /// Every character the face draws, those listed as ligatures included.
     let characterCount: Int
-    /// The character a ligature's glyph is too, by glyph.
     let ligatureCharacters: [CGGlyph: UInt32]
-    /// The glyphs features offer in place of characters', by character.
     let alternates: [UInt32: [FeatureAlternate]]
-    /// The version of the face's file it was read from (see `FontLoader.generation(of:)`). Its glyphs are by ID, which
-    /// a new version can give other glyphs, as one with letters added did: its alternates were drawn as the letters
-    /// that took their IDs.
+    // Glyphs are by ID, and a new version of the file can give those IDs to other glyphs.
     let generation: Int
 
     init(ligatures: [LigatureGroup], glyphs: [GlyphSection], alternates: [UInt32: [FeatureAlternate]], font: CTFont, generation: Int) {
@@ -45,23 +36,16 @@ nonisolated struct PageContent: Sendable {
         ligatureCharacters = characters
     }
 
-    /// Whether it was read from the file as it is now.
     func isCurrent(for face: FontFace) -> Bool {
         generation == FontLoader.shared.generation(of: face.path)
     }
 }
 
-/// Font pages' ligatures and characters, worked out off the main thread and kept for the faces shown last. The
-/// browser starts on a family as soon as it's selected, so the page a double-click or Return opens has them in its
-/// first frame instead of filling in a section at a time.
 final class PageContents {
     private let coverage: CoverageIndex
     private var ready: [FaceID: PageContent] = [:]
-    /// The faces in `ready`, least recently used first.
     private var recent: [FaceID] = []
-    /// With the version of the file each is reading.
     private var loading: [FaceID: (generation: Int, task: Task<PageContent, Never>)] = [:]
-    /// Bumped when files change, so what was read from an old version of one is never kept.
     private var generation = 0
     private static let kept = 24
 
@@ -69,12 +53,10 @@ final class PageContents {
         self.coverage = coverage
     }
 
-    /// nil until worked out, and for a file that changed since.
     func content(of face: FontFace) -> PageContent? {
         ready[face.id].flatMap { $0.isCurrent(for: face) ? $0 : nil }
     }
 
-    /// Starts on a face's content, unless it's ready or under way.
     func prepare(_ face: FontFace) {
         if content(of: face) == nil { _ = task(for: face) }
     }
@@ -87,8 +69,6 @@ final class PageContents {
         return await task(for: face).value
     }
 
-    /// Reads the file as it is now. A file the scanner read anew has a new version before `forget` drops what was read
-    /// from the old one.
     private func task(for face: FontFace) -> Task<PageContent, Never> {
         let version = FontLoader.shared.generation(of: face.path)
         if let under = loading[face.id], under.generation == version { return under.task }
@@ -105,7 +85,6 @@ final class PageContents {
         return task
     }
 
-    /// Files a scan found changed: what was read from them goes, and so does anything still being read.
     func forget(paths: Set<String>) {
         guard !paths.isEmpty else { return }
         generation += 1
@@ -121,8 +100,6 @@ final class PageContents {
         if recent.count > Self.kept { ready[recent.removeFirst()] = nil }
     }
 
-    /// Both together, so the page never shows one without the other. Glyphs that draw nothing, like a trial font's
-    /// empty ones, are left out: a character's, a feature's, an alternate or a ligature.
     @concurrent
     private static func read(_ face: FontFace, version: Int, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
@@ -154,19 +131,14 @@ final class PageContents {
     }
 }
 
-/// The open font page's OpenType features, by face and version of its file, read as the page opens, so the Info
-/// panel's Features tab has them from its first frame instead of a spinner; kept while the page is open, forgotten
-/// when it closes (see `AppModel.openFamilyID`).
 final class PageFeatures {
     private var ready: [FileFace: [FontFeatureGroup]] = [:]
     private var loading: [FileFace: Task<[FontFeatureGroup], Never>] = [:]
 
-    /// nil until read.
     func features(of face: FontFace) -> [FontFeatureGroup]? {
         ready[FileFace(face)]
     }
 
-    /// Starts on a face's features, unless they're read or under way.
     func prepare(_ face: FontFace) {
         if features(of: face) == nil { _ = task(for: face) }
     }

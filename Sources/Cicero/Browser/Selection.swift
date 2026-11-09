@@ -8,19 +8,13 @@ extension AppModel {
     }
 }
 
-/// Where ⇧-clicks and ⇧-arrows extend the selection from, as in the Finder: the family clicked last, and
-/// what else was selected then, which stays while Shift adds the range from the anchor.
 struct SelectionAnchor {
     var id: String?
-    /// Selected apart from the anchor's range: families ⌘-clicked before it.
     var base: Set<String> = []
-    /// The end of the range away from the anchor, which ⇧-arrows move.
     var head: String?
 }
 
-/// How clicks and arrow keys select in every list of families, the browser's and the Character Toolbox's.
 enum FamilySelection {
-    /// Command toggles, Shift extends from the anchor, a plain click selects one.
     static func click(_ id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) {
         let modifiers = NSEvent.modifierFlags
         if modifiers.contains(.command) {
@@ -33,7 +27,6 @@ enum FamilySelection {
         anchor = SelectionAnchor(id: id)
     }
 
-    /// ↑ and ↓ move the selection a row, Shift extending it from the anchor. Returns the row to scroll to.
     static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor, extending: Bool) -> String? {
         guard !ids.isEmpty else { return nil }
         if extending, let start = anchor.id, selection.contains(start), let a = ids.firstIndex(of: start) {
@@ -56,8 +49,6 @@ enum FamilySelection {
         return ids[index]
     }
 
-    /// Selects from the anchor to `id` and keeps what was selected besides, so families ⌘-clicked before stay
-    /// while a range Shift made before gives way to the new one. False without an anchor in `ids`.
     private static func extend(to id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) -> Bool {
         guard let start = anchor.id, let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) else { return false }
         // Cleared or changed elsewhere since (Escape, a click between families): nothing of it to keep.
@@ -68,20 +59,12 @@ enum FamilySelection {
     }
 }
 
-/// How a browser view lays out its families, which decides what the arrow keys do.
 enum FamilyLayout {
-    /// Rows under column headers: the list moves the selection with ↑/↓ itself; ←/→ go through the families Quick Look
-    /// shows.
     case list
-    /// ↑/↓ move the selection; ←/→ go through the families Quick Look shows.
     case specimens
-    /// Rows of tiles: ←/→ move the selection a tile, ↑/↓ a row.
     case grid(columns: Int)
 }
 
-/// Clicking between families, or below the last, deselects them as Escape does, as in the Finder. For a scroll
-/// view's content: it fills the visible height (`visibleHeight(_:)`), so a click below a short list counts too,
-/// and the click target sits behind the families, which take their own clicks.
 struct DeselectsOnEmptyClick: ViewModifier {
     let model: AppModel
     let height: CGFloat
@@ -102,28 +85,20 @@ struct DeselectsOnEmptyClick: ViewModifier {
 }
 
 extension View {
-    /// For a scroll view: the height it shows, less what runs under the toolbar.
     func visibleHeight(_ height: Binding<CGFloat>) -> some View {
         onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { height.wrappedValue = $1 }
     }
 }
 
-/// Keyboard handling for the browser: Return and ⌘↓ open, Escape deselects, ⌘A selects all, typing the start of a name
-/// jumps to the first family starting with it (spaces included while typing), Space opens and closes Quick Look, and
-/// the arrow keys as the layout has them.
 struct FamilyKeys: ViewModifier {
     @Environment(AppModel.self) private var model
     let order: FamilyOrder
     @Binding var anchor: SelectionAnchor
     let proxy: ScrollViewProxy
     var layout = FamilyLayout.list
-    /// What's been typed so far, as in Finder: letters typed within a second of each other go together, so E and then d
-    /// jump to the first family starting with Ed.
     @State private var typed = ""
     @State private var lastTyped = Date.distantPast
-    /// Quick Look, opening unless a letter follows the space just typed.
     @State private var pendingQuickLook: Task<Void, Never>?
-    /// The family `jumpTargets` last brought to the top, and when.
     @State private var lastJump: (id: String, date: Date)?
 
     private var families: [Family] { order.families }
@@ -211,7 +186,6 @@ struct FamilyKeys: ViewModifier {
             }
     }
 
-    /// Brings a family to the top of the view at once, below the list's column headers.
     private func scrollToTop(_ id: String) {
         proxy.scrollTo(id, anchor: .top)
     }
@@ -258,11 +232,6 @@ struct FamilyKeys: ViewModifier {
     }
 }
 
-/// The families a browser view shows, in its order, for its keys and for each tile or row to select ranges in.
-/// SwiftUI compares a view's inputs whenever it updates, and comparing two arrays of families compares every
-/// family in them unless they're the same array: with one in every tile, a list made again with the same
-/// families (a classification guessed, coverage worked out, another layout) took most of a second. Equal only when
-/// it's the same array, which is enough to keep the views that hold it up to date.
 struct FamilyOrder: Equatable {
     let families: [Family]
 
@@ -270,6 +239,7 @@ struct FamilyOrder: Equatable {
         self.families = families
     }
 
+    // The same array only: SwiftUI compares a view's inputs whenever it updates, and comparing every family in every tile held up each new list.
     static func == (a: Self, b: Self) -> Bool {
         a.families.withUnsafeBufferPointer { x in
             b.families.withUnsafeBufferPointer { $0.baseAddress == x.baseAddress && $0.count == x.count }
@@ -277,7 +247,6 @@ struct FamilyOrder: Equatable {
     }
 }
 
-/// Clicking, double-clicking, dragging, the right-click menu and accessibility for one family's tile or row.
 struct FamilyItem: ViewModifier {
     let family: Family
     let order: FamilyOrder
@@ -313,17 +282,10 @@ struct FamilyItem: ViewModifier {
     }
 }
 
-/// Reads ahead the regular styles of the families around one that comes into view in the grid or the list, mostly those
-/// after it, which scrolling goes towards: their files are read in the background before their tiles draw (see
-/// `FontLoader.prefetch`). Scans and new lists read ahead only their first families (`AppModel.readAheadFirst`): reading
-/// every family's file at each launch took 4.7 s of CPU at 20,000 families, and filled the page cache other apps use.
 enum ReadAhead {
     static let before = 20
     static let after = 80
 
-    /// Where the last family asked about was, in which list: the next one is most often beside it, so it's looked for
-    /// from there outwards. A table of every family's place, made for each new list, took 10–20 ms at 20,000 families
-    /// on each search and view switch.
     private static var last: (order: FamilyOrder, index: Int)?
 
     static func around(_ family: Family, in families: [Family]) {
@@ -335,7 +297,6 @@ enum ReadAhead {
         FontLoader.shared.prefetch(near.map(\.regular.face))
     }
 
-    /// The family's place, looking from `start` outwards, one step each way at a time.
     private static func place(of id: String, in families: [Family], from start: Int) -> Int? {
         guard !families.isEmpty, start >= 0 else { return nil }
         var step = 0

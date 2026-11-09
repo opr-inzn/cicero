@@ -2,23 +2,13 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar, its
-/// top level with the first fonts. Not SwiftUI's inspector, which runs the full window height under the search
-/// field. Over the split view rather than in its detail column, whose stack swaps the whole column for a pushed
-/// font page; each page makes room for it with `InfoPanelInset`. It slides in from the window's edge and out again as the
-/// sidebar does, and the room for it opens and closes along with it, so the page narrows as the panel comes: with the room
-/// made at once, the panel slid into an empty strip, and sliding out it uncovered fonts already in place.
 struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
     static let width: CGFloat = 300
     static let gap: CGFloat = 8
-    /// Level with the first row of the grid and of specimens, which start this far below the toolbar.
     static let top: CGFloat = 16
-    /// As long as the sidebar takes to slide out or in, at its pace.
     static let slide = Animation.easeInOut(duration: 0.25)
 
-    /// The room a page makes for the panel `shown` of the way in, on whole pixels, so the grid can tell exactly how much
-    /// narrower its rows are (see `FontGrid.infoPanelNarrowing`).
     static func room(shown: CGFloat, scale: CGFloat) -> CGFloat {
         ((width + gap * 2) * shown * scale).rounded() / scale
     }
@@ -28,7 +18,6 @@ struct InfoPanelOverlay: ViewModifier {
         content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoPresented ? 1 : 0)) }
     }
 
-    /// The panel, `shown` of the way in from the window's edge: there while it slides out, too.
     private struct Panel: ViewModifier, Animatable {
         var shown: CGFloat
 
@@ -62,8 +51,6 @@ struct InfoPanelOverlay: ViewModifier {
         }
     }
 
-    /// Concentric with the window's corners on macOS 27, which tightens them; 20 pt on macOS 26, where
-    /// concentric comes out rounder than the panel has been.
     private static var shape: AnyShape {
         if #available(macOS 27, *) {
             AnyShape(ConcentricRectangle(corners: .concentric(minimum: 12), isUniform: true))
@@ -73,12 +60,8 @@ struct InfoPanelOverlay: ViewModifier {
     }
 }
 
-/// Makes room on a page of the detail column for the Info panel while it's open, opening and closing as the panel slides
-/// in and out (see `InfoPanelOverlay`), and tells the page how far it is in (`infoPanelShown`).
 struct InfoPanelInset: ViewModifier {
     @Environment(AppModel.self) private var model
-    /// Set for the browser under a font page: its room stays as it was, without sliding, until the page goes, when it's
-    /// set at once to the room the panel takes then (see `CoveredSize`).
     var isCovered = false
     @State private var coveredShown: CGFloat?
 
@@ -92,9 +75,6 @@ struct InfoPanelInset: ViewModifier {
             .background(Color.canvas)
     }
 
-    /// The room, `shown` of the panel's width and gaps. An inset rather than padding, so the page still runs under the
-    /// toolbar from edge to edge and the search field keeps the look it has over the page instead of turning flat above
-    /// the panel.
     private struct Room: ViewModifier, Animatable {
         @Environment(\.displayScale) private var scale
         var shown: CGFloat
@@ -106,6 +86,7 @@ struct InfoPanelInset: ViewModifier {
 
         func body(content: Content) -> some View {
             content
+                // Safe area, not padding, so the page still runs under the toolbar from edge to edge and the search field keeps the look it has over the page.
                 .safeAreaPadding(.trailing, InfoPanelOverlay.room(shown: shown, scale: scale))
                 .environment(\.infoPanelShown, shown)
         }
@@ -113,13 +94,9 @@ struct InfoPanelInset: ViewModifier {
 }
 
 extension EnvironmentValues {
-    /// How far the Info panel is in: 0 while it's shut, 1 while it's open, and in between while it slides.
     @Entry var infoPanelShown: CGFloat = 0
 }
 
-/// Keeps the family at the top of a grid or list there when its width changes, as when the Info panel
-/// opens or closes; otherwise the same scroll offset lands on other families once rows hold fewer or more.
-/// Needs `.scrollTargetLayout()`.
 struct KeepsTopOnResize: ViewModifier {
     // Applied by the scroll view as it lays out, so after the rows have reflowed (a proxy can jump too early).
     @State private var position = ScrollPosition(idType: String.self)
@@ -129,6 +106,7 @@ struct KeepsTopOnResize: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollPosition($position, anchor: .top)
+            // Needs .scrollTargetLayout() on the content.
             .onScrollTargetVisibilityChange(idType: String.self) { if let first = $0.first { topID = first } }
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top < 1 } action: { isAtTop = $1 }
             // Reported before the visible families update, so `topID` is still the one from before.
@@ -154,7 +132,6 @@ private struct InfoPanel: View {
     }
 }
 
-/// The family's name and the Info, Features and Axes tabs, for the style nearest the preview weight.
 private struct FamilyInfo: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -182,10 +159,8 @@ private struct FamilyInfo: View {
         }
     }
 
-    /// Axes only for a variable family.
     private var tabs: [InfoTab] { family.isVariable ? InfoTab.allCases : InfoTab.allCases.filter { $0 != .axes } }
 
-    /// Info in the place of Axes for a family that isn't variable, and Axes again for the next that is.
     private var tab: Binding<InfoTab> {
         Binding { model.infoTab == .axes && !family.isVariable ? .info : model.infoTab } set: { model.infoTab = $0 }
     }
@@ -257,7 +232,6 @@ private struct InfoRows: View {
     }
 }
 
-/// The family's classification, with a menu to put it in another.
 private struct ClassificationRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -282,7 +256,6 @@ private struct ClassificationRow: View {
     }
 }
 
-/// The family's tags, with a menu to change them.
 private struct TagsRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -315,7 +288,6 @@ private struct TagsRow: View {
     }
 }
 
-/// The family's rating: five stars to click, the one it has again to take it away.
 private struct RatingRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -352,14 +324,10 @@ private struct RatingRow: View {
     }
 }
 
-/// The family's note, to write in place. Return starts a new line, as in a note anywhere else, rather than ending the
-/// editing. Saved a moment after the typing stops, and at once when the field loses focus or the panel goes to another
-/// family, so a list searched or a smart set by notes doesn't change with every key.
 private struct NoteRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
     @State private var text = ""
-    /// The family `text` is the note of.
     @State private var editing: String?
     @FocusState private var isFocused: Bool
 
@@ -394,15 +362,12 @@ private struct NoteRow: View {
         text = model.note(of: family) ?? ""
     }
 
-    /// A line break where the text is selected, as Option-Return puts one in a text field, unless an input method is
-    /// still composing: its Return takes what's typed.
     private func newLine() -> KeyPress.Result {
         guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, !editor.hasMarkedText() else { return .ignored }
         editor.insertNewlineIgnoringFieldEditor(nil)
         return .handled
     }
 
-    /// Saves the text as the note of the family it was written for, which may be the one before.
     private func save() {
         guard let editing, let family = model.family(editing) else { return }
         model.setNote(text, for: family)
@@ -466,7 +431,6 @@ private struct FeatureControls: View {
         )
     }
 
-    /// Exclusive features: switching an option on picks it; switching the picked one off goes back to the default.
     private func choice(_ group: FontFeatureGroup, _ option: FontFeatureGroup.Option) -> Binding<Bool> {
         let picked = exclusive(group)
         let fallback = group.options.first(where: \.isDefault)?.selector ?? group.options[0].selector
@@ -478,8 +442,8 @@ private struct FeatureControls: View {
         )
     }
 
-    /// Independent features: the option's selector turns it on, the next one (CoreText's convention) turns it off.
     private func toggle(_ group: FontFeatureGroup, _ option: FontFeatureGroup.Option) -> Binding<Bool> {
+        // The selector after an option's turns it off, as CoreText numbers them.
         let off = option.selector + 1
         return Binding(
             get: {
@@ -497,9 +461,6 @@ private struct FeatureControls: View {
     }
 }
 
-/// A face as its file is now, which an Info panel row works out what it shows for: a file that changed, as Replace puts a
-/// newer version in under the same path, counts as another (see `FontLoader.generation(of:)`). By the face's ID alone, the
-/// panel went on showing the old version's details until another font was selected.
 struct FileFace: Hashable {
     let id: FaceID
     let generation: Int
@@ -510,18 +471,12 @@ struct FileFace: Hashable {
     }
 }
 
-/// Something an Info panel row works out for one font, and which font.
 struct Loaded<Value> {
     let id: AnyHashable
     let value: Value
 }
 
 extension View {
-    /// Works out `state` for the font `id` without clearing it first: going to another font keeps the last
-    /// one's on screen until the new one is ready, a moment later, so the panel doesn't flash its spinners.
-    /// One that takes longer than that clears it, for the row's spinner. What `cached` has for the font is there
-    /// from the first frame, as the panel opens or goes to the font, while `work` makes sure of it: otherwise the
-    /// panel opened with spinners, and the work waited for its slide.
     func loading<ID: Hashable, Value>(_ state: Binding<Loaded<Value>?>, for id: ID, cached: @escaping @MainActor () -> Value? = { nil },
                                       _ work: @escaping @MainActor () async -> Value) -> some View {
         // Both run before the frame they change is drawn.
@@ -542,7 +497,6 @@ extension View {
 }
 
 private extension View {
-    /// Info, Features and Axes are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
     @ViewBuilder func tabsPickerStyle() -> some View {
         if #available(macOS 27, *) { pickerStyle(.tabs) } else { pickerStyle(.segmented) }
     }

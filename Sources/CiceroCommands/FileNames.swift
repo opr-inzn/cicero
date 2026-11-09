@@ -2,8 +2,6 @@ import CiceroCore
 import CoreText
 import Foundation
 
-/// What a face's name table says that Cicero doesn't keep in its caches: copyright (name ID 0), description (10),
-/// designer URL (12), manufacturer URL (11), license (13) and license URL (14). Read from the file when asked.
 public struct FileNames: Sendable, Equatable {
     public var copyright: String?
     public var description: String?
@@ -26,7 +24,6 @@ public struct FileNames: Sendable, Equatable {
         )
     }
 
-    /// Each face's, read at the same time.
     public static func read(_ faces: [FontFace]) -> [FaceID: FileNames] {
         let read = faces.concurrentMap { ($0.id, FileNames.read($0)) }
         return Dictionary(read) { first, _ in first }
@@ -34,7 +31,6 @@ public struct FileNames: Sendable, Equatable {
 }
 
 extension Array where Element: Sendable {
-    /// Like `map`, the elements done at the same time.
     func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
         guard count > 1 else { return map(transform) }
         let results = UnsafeMutableBufferPointer<T?>.allocate(capacity: count)

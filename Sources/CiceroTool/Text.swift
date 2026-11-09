@@ -1,7 +1,6 @@
 import CiceroCommands
 import Foundation
 
-/// Answers as text for people, from the same values `--json` prints. Nothing is cut short.
 enum Text {
     static func string(_ value: JSON?) -> String? {
         if case .string(let text) = value { return text }
@@ -36,8 +35,6 @@ enum Text {
         "\(number(count)) \(count == 1 ? one : many)"
     }
 
-    /// An ISO 8601 date in the Mac's time zone, to the minute, as the Mac's settings write dates and times: with AM or
-    /// PM where the clock has 12 hours.
     static func date(_ value: JSON?) -> String? {
         guard let text = string(value), let date = try? Date(text, strategy: .iso8601) else { return nil }
         return date.formatted(date: .numeric, time: .shortened)
@@ -51,7 +48,6 @@ enum Text {
         }
     }
 
-    /// Rows of cells in columns as wide as their widest cell, two spaces apart.
     static func table(_ rows: [[String]]) -> String {
         guard let columns = rows.map(\.count).max() else { return "" }
         let widths = (0..<columns).map { column in rows.map { column < $0.count ? $0[column].count : 0 }.max() ?? 0 }
@@ -270,8 +266,6 @@ enum Text {
 // MARK: Changes
 
 extension Text {
-    /// What a change did, in the words of that change: "Turned on: Inter, Roboto." and what it didn't.
-    /// "1 star", "5 stars".
     static func stars(_ count: Int) -> String {
         count == 1 ? "1 star" : "\(count) stars"
     }

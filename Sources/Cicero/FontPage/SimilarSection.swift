@@ -1,17 +1,12 @@
 import CiceroCore
 import SwiftUI
 
-/// The families that look most like the page's, each its name set in itself, under the styles and titled as they are:
-/// a click opens one's page, and Show All lists as many as Show Similar Fonts does, right there. Left out for a family Cicero can't measure, like one without Latin letters.
-/// Not on the page for now, which leaves similar fonts to Show Similar Fonts; kept for when it comes back.
 struct SimilarSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
 
-    /// How many the page shows, until Show All shows `AppModel.similarListed`.
     static let shown = 6
-    /// Whether Show All was chosen, on this page only: every page opens with the six, the same family's again too.
     @State private var showsMore = false
 
     var body: some View {
@@ -42,7 +37,6 @@ struct SimilarSection: View {
         }
     }
 
-    /// Like the styles' title above, with Show All at the end when there are more than `shown` of `all`.
     private func header(all: Int) -> some View {
         Text("Similar")
             .font(.subheadline.weight(.semibold))

@@ -12,7 +12,6 @@ enum ToolboxTab: String, CaseIterable {
     }
 }
 
-/// Which fonts have every character of a text, and which support a language.
 struct ToolboxWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -37,7 +36,6 @@ struct ToolboxWindow: View {
 }
 
 extension LanguageCatalog {
-    /// The user's language when the catalog knows it, else English.
     var preferredLanguageID: String {
         let code = Locale.current.language.languageCode?.identifier(.alpha3) ?? "eng"
         return language(code) != nil ? code : "eng"
@@ -50,7 +48,6 @@ private struct TextTab: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     @Environment(\.openWindow) private var openWindow
-    /// Saved soon, not with each letter.
     @Bindable private var savedText = SavedSoon.toolboxText
     private var text: String { savedText.value }
     @AppStorage("toolbox.maxMissing") private var maxMissing = 0

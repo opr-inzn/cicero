@@ -4,10 +4,6 @@ import AppKit
 import CiceroCore
 import CoreText
 
-/// The app performance runs' scenario (Tests/E2E/app-perf): with `CICERO_MEASURE=<file>` and `CICERO_MEASURE_RUN=1`,
-/// Cicero times its launch, then types, searches, picks sidebar items, opens font pages, scrolls and rates by itself,
-/// each step timed until the main thread is quiet again (`MainSettle`), writes every timing to the file and quits.
-/// It drives the model as the views' bindings do, not with key presses. It never turns a font on or off.
 enum MeasureRun {
     private static var task: Task<Void, Never>?
 
@@ -15,9 +11,6 @@ enum MeasureRun {
         ProcessInfo.processInfo.environment["CICERO_MEASURE_RUN"] == "1" && Measurements.isRecording
     }
 
-    /// Called as the main window appears. With `CICERO_MEASURE` alone, as in the VM end-to-end runs, it only watches the
-    /// main thread for stalls (and the app records list rebuilds and main-thread reads); with `CICERO_MEASURE_RUN=1`
-    /// too, it runs the scenario. Without either, nothing.
     static func startIfAsked(model: AppModel, preview: PreviewSettings) {
         Measurements.watchMainThread()
         guard isAsked, task == nil else { return }
@@ -257,10 +250,6 @@ enum MeasureRun {
 
     // MARK: Warm launch
 
-    /// CICERO_MEASURE_PHASE 1, a first launch: the grid's sample widths are measured and saved. 2, the next launch: none
-    /// is measured; a fonts-changed notice replays every watched folder's walk; a font file added to the first location,
-    /// changed or removed shows, is measured alone, and its folder is walked again at the next notice. 3, with
-    /// CICERO_MEASURE_WALK_EVERY=0: a notice walks every folder. CICERO_MEASURE_EXTRA: a font file to add.
     private static func checkWarmLaunch(model: AppModel) async {
         let environment = ProcessInfo.processInfo.environment
         let phase = environment["CICERO_MEASURE_PHASE"] ?? "1"
@@ -278,7 +267,6 @@ enum MeasureRun {
             _ = await MainSettle.wait(quiet: .milliseconds(500))
             return LibraryScanner.lastScanDetail.withLock { $0 }
         }
-        /// "fontd, 3 of 4 folders replayed" → (3, 4).
         func replayed(_ detail: String) -> (Int, Int)? {
             let words = detail.split(separator: " ")
             guard detail.hasPrefix("fontd,"), words.count >= 4, let done = Int(words[1]), let all = Int(words[3]) else { return nil }
@@ -352,7 +340,6 @@ enum MeasureRun {
         Measurements.count("check", detail: "\(passed ? "PASS" : "FAIL")  \(what)")
     }
 
-    /// Waits for the queued operations, then for the scans they started to end and the window to be quiet.
     private static func settled(_ model: AppModel) async {
         await model.enqueued { _ in }
         let ended = model.endedScans
@@ -513,7 +500,6 @@ enum MeasureRun {
         Measurements.count("quitting", detail: paths(c).joined(separator: "|"))
     }
 
-    /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
     private static func scroll(mode: BrowserMode) async {
         guard let scrollView = browserScrollView() else { return Measurements.count("scroll.unavailable", detail: mode.rawValue) }
         let clip = scrollView.contentView
@@ -535,7 +521,6 @@ enum MeasureRun {
         }
     }
 
-    /// The main window's biggest scroll view that isn't the sidebar's outline: the browser's grid, list or specimens.
     private static func browserScrollView() -> NSScrollView? {
         guard let content = TextEditingKeys.mainWindow?.contentView else { return nil }
         var found: [NSScrollView] = []
@@ -547,14 +532,11 @@ enum MeasureRun {
         return found.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
     }
 
-    /// The families whose font pages the scenario opens: five evenly across the list the browser shows (first and last
-    /// included). The full scenario and ONLY=page both use these, so their page times are of the same pages.
     private static func pagePicks(_ model: AppModel) -> [Family] {
         let families = model.visibleFamilies
         return families.isEmpty ? [] : (0..<5).map { families[$0 * (families.count - 1) / 4] }
     }
 
-    /// Hides or shows the sidebar as its toolbar button does, sliding: the split view controller the window's sidebar is in.
     private static func toggleSidebar() {
         func controller(in view: NSView) -> NSSplitViewController? {
             if let split = view as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
@@ -568,7 +550,6 @@ enum MeasureRun {
         split.toggleSidebar(nil)
     }
 
-    /// Does `change`, then records how long the main thread took to be quiet again.
     private static func step(_ name: String, detail: String = "", _ change: () -> Void) async {
         // A signpost per step, so a profile's samples can be matched to it (`Step`, its name and detail in the message).
         let signpost = Measurements.signposter.beginInterval("Step", "\(name, privacy: .public) \(detail, privacy: .public)")
@@ -583,7 +564,6 @@ enum MeasureRun {
         Measurements.record("\(name).slow", ms: Double(settled.slowTurns), detail: detail)
     }
 
-    /// Records the time since the process started, until the main thread is quiet.
     private static func launchStep(_ name: String, detail: String = "") async {
         let settled = await MainSettle.wait()
         let end = Measurements.sinceProcessStart - (ContinuousClock.now - settled.end).milliseconds
@@ -600,21 +580,13 @@ enum MeasureRun {
     }
 }
 
-/// Waits until the main thread has had no stretch of work over 1 ms for `quiet`: a run loop turn from waking to
-/// waiting again, as CFRunLoop's observers see it (Core Animation's commit included, which runs before waiting).
-/// Several turns, so work that comes a moment later, like a read finished in the background, counts too.
-/// `begin` starts watching at once, in the turn the change is made in, so that turn's work counts.
 final class MainSettle {
     struct Result {
-        /// From the start to the end of the last busy turn.
         var ms: Double
         var end: ContinuousClock.Instant
         var timedOut: Bool
-        /// The main thread's time in turns over 1 ms, and its longest turn: what an animation's many short turns add
-        /// up to, and the most a click or a key press would have waited meanwhile.
         var workMs: Double
         var longestMs: Double
-        /// Turns over 16.7 ms, a frame at 60 Hz.
         var slowTurns: Int
     }
 
@@ -632,7 +604,6 @@ final class MainSettle {
         lastBusyEnd = start
     }
 
-    /// Starts watching now; the turn this is called in counts as busy.
     static func begin() -> MainSettle {
         let settle = MainSettle()
         let activities = CFRunLoopActivity.afterWaiting.rawValue | CFRunLoopActivity.beforeWaiting.rawValue

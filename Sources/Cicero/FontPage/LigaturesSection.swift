@@ -2,29 +2,17 @@ import CiceroCore
 import CoreText
 import SwiftUI
 
-/// The ligatures a style makes, by feature, among the glyphs (see `GlyphsSection`): each drawn from its glyph in a cell
-/// like a character's, in the same columns, the characters it stands for in its tooltip and popover, which copies them
-/// or its outline, as its right-click menu does, and dragged out as an SVG file. Like the glyphs' groups, rows of fixed
-/// cells in the page's stack, under a header per feature like a group's.
 struct LigaturesSection: View {
     @Environment(AppModel.self) private var model
-    /// The family's ID, for the ligatures copied (see `SampleGlyph`).
     let family: String
-    /// The style the page's text is set in, at its weight.
     let face: FontFace
     let weight: Double
-    /// Axes moved in the Info panel, by tag.
     let variations: [String: Double]
-    /// Cells per row: the glyphs'.
     let columns: Int
     let groups: [LigatureGroup]
-    /// The character a ligature's glyph is too, like U+FB01 for ﬁ.
     let characters: [CGGlyph: UInt32]
-    /// The version of the face's file they were read from (see `PageContent.generation`).
     let generation: Int
-    /// The clicked ligature: its feature and characters.
     @State private var popover: (tag: String, characters: [UInt32])?
-    /// Where its cell is in its row, from the click that opened the popover (see `cellPopover`).
     @State private var popoverCell: CGRect?
 
     private static var spacing: CGFloat { GlyphsSection.spacing }
@@ -51,7 +39,6 @@ struct LigaturesSection: View {
         }
     }
 
-    /// One popover per row, pointing at the clicked cell, and cells sharing out the row's width, as for the glyphs.
     private func ligatureRow(_ ligatures: ArraySlice<Ligature>, in group: LigatureGroup) -> some View {
         let column = popover.flatMap { shown in
             shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
@@ -70,7 +57,6 @@ struct LigaturesSection: View {
         }
     }
 
-    /// Its right-click menu, with Copy as Vector greyed out for one without an outline, as in the popover.
     private func menu(_ ligature: Ligature, in group: LigatureGroup) -> [GridMenuItem] {
         [
             GridMenuItem(title: "Copy Characters") { copyCharacters(ligature, in: group) },
@@ -116,21 +102,18 @@ struct LigaturesSection: View {
         .frame(maxWidth: 300)
     }
 
-    /// As for a glyph: copies, closes the popover and says what was copied.
     private func copy(_ text: String, shown: String) {
         GlyphsSection.copy(text)
         popover = nil
         model.showToast("\(shown) copied to clipboard")
     }
 
-    /// Its characters, which the page's text draws as the ligature where they're pasted there.
     private func copyCharacters(_ ligature: Ligature, in group: LigatureGroup) {
         sampleClip(ligature, in: group).copy()
         popover = nil
         model.showToast("“\(ligature.text)” copied to clipboard")
     }
 
-    /// What it pastes as in the page's text: its characters, the ligature drawn in their place (see `SampleGlyph`).
     private func sampleClip(_ ligature: Ligature, in group: LigatureGroup) -> SampleClip {
         SampleClip(text: ligature.text, glyph: SampleGlyph(family: family, characters: ligature.text, face: face,
                                                            glyph: ligature.glyph, features: [group.tag]))
@@ -147,24 +130,19 @@ struct LigaturesSection: View {
         GlyphVectors.outline(ligature.glyph, face: face, weight: weight, variations: variations)
     }
 
-    /// The ligature as an SVG file, named after the style and the glyph.
     private func dragItem(_ ligature: Ligature) -> NSItemProvider {
         GlyphVectors.dragItem(outline(ligature), style: face.fullName, fallback: Self.fileFallback(ligature))
     }
 
-    /// The same file, for a ligature dragged out of the grid.
     private func dragFile(_ ligature: Ligature) -> URL? {
         GlyphVectors.dragFile(outline(ligature), style: face.fullName, fallback: Self.fileFallback(ligature))
     }
 
-    /// What its file is called after when the font doesn't name the glyph: its characters, as in "Inter Regular f_i.svg".
     private static func fileFallback(_ ligature: Ligature) -> String {
         ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: "_")
     }
 }
 
-/// One glyph of a face, by its ID: a ligature or an alternate has no character of its own to set. Drawn as text is,
-/// centred on the font's ascender and descender and scaled down when it's wider than the room (see `GlyphDrawing`).
 struct GlyphImage: View {
     let face: FontFace
     let glyph: CGGlyph

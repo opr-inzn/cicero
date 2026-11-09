@@ -2,17 +2,6 @@ import CoreText
 import Foundation
 
 extension ActivationEngine {
-    /// Replace (see `AddedDuplicate.replacements`): each of the library's files goes to the Trash and a copy of the added
-    /// file takes its place, under its name, in its folder, on or off as it was. One that's on goes off for the moment
-    /// that takes and on again the way it was: in place, until Cicero quits, or from a Fonts folder. One that's off in a
-    /// Fonts folder has its copy go in off (see `moveIntoFontsFolderOff`), as macOS turns on whatever arrives there; see
-    /// `replaceOff`. With fonts installed into Cicero's Library, its copy goes there instead, off, as FontExplorer X
-    /// does it; see `replaceIntoLibrary`; and one Cicero installed from an original there that's replaced too just goes to
-    /// the Trash, as the original is the font. The copy is made in Cicero's staging folder first, so a file whose copy
-    /// can't be made or go in, or that can't go to the Trash, stays as it was. Its paths stay, so the records and
-    /// everything the user put it in do too, but for an off one that went in under another name or went for its original
-    /// (`placed` says where). `moving`, an added file that took every place it was meant for goes, as activating by
-    /// moving does.
     @concurrent
     public func replace(_ replacements: [FileReplacement], moving: Bool, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
@@ -41,6 +30,7 @@ extension ActivationEngine {
                 continue
             }
             let old = Self.url(replacement.old)
+            // The copy is made before the old file goes to the Trash, so one whose copy can't be made stays as it was.
             let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
             do {
                 try fm.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -131,9 +121,6 @@ extension ActivationEngine {
         return result
     }
 
-    /// The copies Replace just sends to the Trash, each with its original: with fonts installed into Cicero's Library, ones
-    /// Cicero installed in a Fonts folder that are off, whose originals in Cicero's Library take the added file too.
-    /// Nothing goes in for them, or the library would have the font twice; the original is the font.
     public func spareCopies(among replacements: [FileReplacement], records: ActivationRecords) -> [String: String] {
         guard installsIntoFontLibrary else { return [:] }
         let olds = Set(replacements.map(\.old))
@@ -145,13 +132,6 @@ extension ActivationEngine {
         return spare
     }
 
-    /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement). macOS keeps a
-    /// font off by its file's path and PostScript name, and lets go of a gone file's entry a moment later: a new file at
-    /// that path with those font names would come on with it (tested in a macOS 26 VM). So the new file takes the old
-    /// one's path only once macOS has let go of the old one: the old file waits in Cicero's Inactive folder meanwhile, where
-    /// it stays in the library, off, should Cicero stop, then goes to the Trash. One macOS hasn't let go of within
-    /// `forgetWait` gets "Name 2.otf" instead (`renameLater` says what for), as does an added file of another name its
-    /// own. Any that can't go in leave the old one as it was.
     func replaceOff(_ staged: [String: FileReplacement]) async
         -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String]) {
         let fm = FileManager.default
@@ -173,6 +153,7 @@ extension ActivationEngine {
                 continue
             }
             do {
+                // The old file waits in the Inactive folder, where it stays in the library, off, should Cicero stop.
                 let aside = Self.uniqueURL(for: old.lastPathComponent, in: try locations.inactiveFolderForNewFiles())
                 try Self.moveItem(old, to: aside)
                 waiting[replacement.old] = aside.path
@@ -181,6 +162,7 @@ extension ActivationEngine {
                 failed.append(replacement.old)
             }
         }
+        // macOS keeps a font off by its file's path and PostScript name, and lets go of a gone file's entry a moment later: a new file at that path would come on as it does.
         let remembered = await registrar.waitUntilForgotten(waiting.keys.sorted(), timeout: forgetWait, every: .milliseconds(100))
         for (path, replacement) in staged where waiting[replacement.old] != nil {
             let old = Self.url(replacement.old)
@@ -217,11 +199,6 @@ extension ActivationEngine {
         return (done, failed, placed, renameLater)
     }
 
-    /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement) when Cicero
-    /// installs fonts into its library: each copy goes into its family's folder there, under the old file's name, where
-    /// macOS turns nothing on by itself, so it's off without being turned off, and the old file goes to the Trash. Nothing
-    /// goes into the Fonts folder, so nothing waits for macOS to let go of the old file, or goes in as "Name 2". One whose
-    /// copy can't go in, or whose old file can't go to the Trash, stays as it was.
     func replaceIntoLibrary(_ staged: [String: FileReplacement]) -> (done: [FileReplacement], failed: [String], placed: [String: String]) {
         let fm = FileManager.default
         var done: [FileReplacement] = []
@@ -253,19 +230,11 @@ extension ActivationEngine {
         return (done, failed, placed)
     }
 
-    /// Waits, off the operation queue, until macOS no longer names these paths as fonts it has off (see
-    /// `FontRegistrar.waitUntilForgotten`). Returns the paths it still names.
     @concurrent
     public func waitUntilForgotten(_ paths: [String], timeout: Duration, every: Duration) async -> Set<String> {
         await registrar.waitUntilForgotten(paths, timeout: timeout, every: every)
     }
 
-    /// Files Replace put in as "Name 2.otf" (`ActivationResult.renameLater`: their path → the one meant for them) take
-    /// their name, once macOS has let go of the old file there: renamed, they'd lose being off, so each leaves for the
-    /// Inactive folder and goes in again the way `moveIntoFontsFolderOff` does it, on for a few hundredths of a second.
-    /// Only while nothing changed: the name is free, macOS no longer names it, and the file is still there in the Fonts
-    /// folder, off, and not on for a while; otherwise it stays as it is. One that won't go in stays in the Inactive
-    /// folder, off: put back as "Name 2", macOS would turn it on. Returns the files renamed, from → to.
     @concurrent
     public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> [String: String] {
         let fm = FileManager.default
@@ -279,6 +248,7 @@ extension ActivationEngine {
         // Where each waits → (its "Name 2" path, the path meant for it).
         var waiting: [String: (interim: String, original: String)] = [:]
         for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
+            // Renamed where it is, a file would lose being off, so it leaves for the Inactive folder and goes in again.
             guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
             let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
             guard (try? Self.moveItem(Self.url(interim), to: aside)) != nil else { continue }
@@ -293,9 +263,8 @@ extension ActivationEngine {
         return renamed
     }
 
-    /// An old file that waited in the Inactive folder goes back where it was, off; one macOS still remembers there stays in
-    /// the Inactive folder, off, as putting it back would have it come on with the entry going.
     private func putBack(_ aside: String, at old: String, remembered: Bool) async {
+        // One macOS still remembers stays in the Inactive folder: put back, it would come on as macOS lets go of the entry.
         guard !remembered else { return }
         _ = await moveIntoFontsFolderOff([aside: old])
     }

@@ -1,37 +1,27 @@
 import Foundation
 
-/// The ways the glyph map writes a character out for copying: its Unicode code ("U+00E9") and its HTML references, the
-/// named one where HTML has a name for it ("&eacute;") and the numeric one ("&#xE9;").
 public enum CharacterCodes {
-    /// "U+00E9": four hex digits at least, as Unicode writes them.
     public static func unicode(_ scalar: UInt32) -> String {
         String(format: "U+%04X", scalar)
     }
 
-    /// "U+0066 U+0069", for several characters, like a ligature's.
     public static func unicode(_ scalars: [UInt32]) -> String {
         scalars.map(unicode).joined(separator: " ")
     }
 
-    /// "&eacute;" for a character HTML names, else nil.
     public static func namedEntity(_ scalar: UInt32) -> String? {
         entityNames[scalar].map { "&\($0);" }
     }
 
-    /// "&#xE9;", which works for any character.
     public static func numericReference(_ scalar: UInt32) -> String {
         "&#x\(String(scalar, radix: 16, uppercase: true));"
     }
 
-    /// The reference to paste into HTML: the named one when there is one, as it reads better, else the numeric one.
     public static func htmlEntity(_ scalar: UInt32) -> String {
         namedEntity(scalar) ?? numericReference(scalar)
     }
 
-    /// The character entity references of HTML 4.01, which every browser knows, from Python's
-    /// `html.entities.codepoint2name`; all but &lang; and &rang;, which HTML5 gave to other characters (⟨ and ⟩, not
-    /// U+2329 and U+232A), so a browser today reads them as those. HTML5's thousands of other names are left out: most
-    /// are other names for these, or for characters few would look for by name.
+    // Not &lang; and &rang;, which HTML5 gave to ⟨ and ⟩, not U+2329 and U+232A, so a browser today reads them as those.
     static let entityNames: [UInt32: String] = [
         0x0022: "quot", 0x0026: "amp", 0x003C: "lt", 0x003E: "gt", 0x00A0: "nbsp", 0x00A1: "iexcl",
         0x00A2: "cent", 0x00A3: "pound", 0x00A4: "curren", 0x00A5: "yen", 0x00A6: "brvbar", 0x00A7: "sect",

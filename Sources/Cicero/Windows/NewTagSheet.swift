@@ -1,8 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for New Tag…: a name and a colour, one of the Finder's, sand or none. Left empty, the name is
-/// the colour's, as the Finder names its colour tags.
 struct NewTagSheet: View {
     let request: NewTagRequest
     @Environment(AppModel.self) private var model
@@ -15,7 +13,6 @@ struct NewTagSheet: View {
         _color = State(initialValue: request.color)
     }
 
-    /// What the tag is called: the name typed, else the colour's.
     private var tagName: String {
         let typed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return typed.isEmpty ? color?.title ?? "" : typed
@@ -50,7 +47,6 @@ struct NewTagSheet: View {
         .frame(width: 340)
     }
 
-    /// A colour to pick, or none: a dot, ringed when it's the one picked.
     private func swatch(_ option: TagColor?) -> some View {
         let picked = option == color
         return Button { color = option } label: {

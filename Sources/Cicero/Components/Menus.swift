@@ -2,10 +2,7 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// What activating and deactivating families are called, in their right-click menu and on a font page alike.
 struct ActivationTitles {
-    /// The app every family is one that loads from its own folder ("Adobe Apps"), where on and off mean in
-    /// every app, that one's included.
     let app: String?
     let activate: String
     let deactivate: String
@@ -20,7 +17,6 @@ struct ActivationTitles {
     }
 }
 
-/// The right-click menu for one or more families.
 struct FamilyMenu: View {
     let families: [Family]
     let model: AppModel
@@ -109,7 +105,6 @@ struct FamilyMenu: View {
     }
 }
 
-/// Add to Set, Tags, Rating and Classification, for families' menus and a style's, where they're the family's.
 struct OrganizingMenus: View {
     let families: [Family]
     let model: AppModel
@@ -138,8 +133,6 @@ struct OrganizingMenus: View {
     }
 }
 
-/// The right-click menu for one style of a family: the style's own actions and sets, then its family's sets, tag,
-/// rating and classification, which are the family's, not the style's.
 struct StyleMenu: View {
     let family: Family
     let face: LibraryFace
@@ -190,11 +183,8 @@ struct StyleMenu: View {
     }
 }
 
-/// Use Copy From, for styles that are in more than one place, like each client's folder: the places, the one
-/// in use checked. Picking one turns its copies on and the others Cicero turned on off.
 struct CopySourcesMenu: View {
     let styles: [LibraryFace]
-    /// What the styles are called: "Helvetica", "Helvetica Bold".
     let title: String
     let model: AppModel
 
@@ -214,7 +204,6 @@ struct CopySourcesMenu: View {
         }
     }
 
-    /// "Acme — version 1.002, 2 styles": the version, and how many styles when it hasn't them all.
     private func label(_ source: CopySource) -> String {
         var details: [String] = []
         if let version = source.version { details.append("version \(version)") }
@@ -225,7 +214,6 @@ struct CopySourcesMenu: View {
     }
 }
 
-/// One to five stars for families, or none, checked when they all have it.
 struct RatingMenuItems: View {
     let families: [Family]
     let model: AppModel
@@ -246,14 +234,12 @@ struct RatingMenuItems: View {
     }
 }
 
-/// How ratings read: stars in menus and lists, words for VoiceOver.
 enum Rating {
     static func stars(_ count: Int) -> String { String(repeating: "★", count: count) }
 
     static func description(_ count: Int) -> String { count == 1 ? "1 star" : "\(count) stars" }
 }
 
-/// A family's stars on its card in the grid and specimens; nothing without a rating.
 struct RatingStars: View {
     let rating: Int?
 
@@ -268,8 +254,6 @@ struct RatingStars: View {
     }
 }
 
-/// A small symbol on a family's card in the grid and specimens when it has a note, which shows as its tooltip;
-/// nothing without one.
 struct NoteMark: View {
     let note: String?
 
@@ -285,8 +269,6 @@ struct NoteMark: View {
     }
 }
 
-/// Which classification families are in: Automatic, the one their fonts suggest, or one the user puts them in, the
-/// one Automatic suggests too, which keeps them there whatever Cicero suggests later; and a new one.
 struct ClassificationMenuItems: View {
     let families: [Family]
     let model: AppModel

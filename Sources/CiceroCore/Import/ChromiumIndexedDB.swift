@@ -1,22 +1,10 @@
 import Foundation
 
-/// Reads an object store of a Chromium IndexedDB folder (an Electron app's `IndexedDB/file__0.indexeddb.leveldb`, with
-/// big values in `file__0.indexeddb.blob` next to it), for importing another app's library. Read-only, and only what
-/// the app last wrote: the LevelDB files the MANIFEST names (every one when it can't be read), newest write of each
-/// key winning. The files are anyone's: every read is checked, and what can't be read is left out rather than trusted.
-///
-/// The layers, outside in: LevelDB (a write-ahead `.log` of write batches, and sorted `.ldb` tables, either kind maybe
-/// Snappy-compressed); Chromium's keys (a prefix of database, object store and index IDs, then the encoded IndexedDB
-/// key); Blink's envelope (a value too big to keep inline is in a blob file, and may be Snappy-compressed); and V8's
-/// serialization of the JavaScript value itself.
 public enum ChromiumIndexedDB {
     public enum Failure: Error, Equatable {
-        /// No LevelDB there, or no database or object store of that name in it.
         case notFound
     }
 
-    /// The values of the object store `store` in the database `database`, by their string keys. Keys that aren't
-    /// strings and values that can't be read are left out.
     public static func values(in leveldb: URL, database: String, store: String) throws -> [String: JSValue] {
         let entries = try LevelDB.read(leveldb)
         // Database IDs by name: global metadata (prefix 0, 0, 0), type 201, the origin, then the name.
@@ -84,8 +72,6 @@ public enum ChromiumIndexedDB {
         return values
     }
 
-    /// The number of the `index`th blob in a record's blob entry: each is whether it's a file, its number, its type,
-    /// then its size, or a file's name and date.
     static func blobNumber(_ entry: [UInt8], index: Int) -> Int? {
         var reader = IndexedDBBytes(entry)
         for position in 0... {
@@ -101,7 +87,6 @@ public enum ChromiumIndexedDB {
         return nil
     }
 
-    /// The IDs a key starts with: one byte saying how many bytes each takes, then each, least significant first.
     struct KeyPrefix {
         var database: Int
         var store: Int
@@ -116,14 +101,12 @@ public enum ChromiumIndexedDB {
     }
 }
 
-/// A JavaScript value as V8 serialized it: what JSON has, and undefined.
 public indirect enum JSValue: Equatable, Sendable {
     case null
     case bool(Bool)
     case number(Double)
     case string(String)
     case array([JSValue])
-    /// Properties in the order they were written.
     case object([(key: String, value: JSValue)])
 
     public static func == (lhs: JSValue, rhs: JSValue) -> Bool {
@@ -164,7 +147,7 @@ public indirect enum JSValue: Equatable, Sendable {
     }
 }
 
-/// Bytes read from the front, each read checked.
+// The files are anyone's: check every read, and leave out what can't be read rather than trust it.
 struct IndexedDBBytes {
     enum Failure: Error { case truncated, malformed }
 
@@ -194,7 +177,6 @@ struct IndexedDBBytes {
         return bytes[offset..<offset + count]
     }
 
-    /// LevelDB's, Chromium's and V8's unsigned varints, up to 64 bits.
     mutating func varint() throws -> Int {
         var result: UInt64 = 0
         var shift: UInt64 = 0
@@ -219,7 +201,6 @@ struct IndexedDBBytes {
 
     mutating func uint32() throws -> UInt32 { UInt32(try littleEndian(4)) }
 
-    /// A Chromium string with its length: how many UTF-16 code units, then them, big-endian.
     mutating func stringWithLength() throws -> String {
         let count = try varint()
         guard count <= (bytes.count - offset) / 2 else { throw Failure.truncated }
@@ -237,7 +218,6 @@ struct IndexedDBBytes {
 
 // MARK: LevelDB
 
-/// The live entries of a LevelDB folder: each key's newest value, deleted ones left out.
 enum LevelDB {
     static func read(_ folder: URL) throws -> [[UInt8]: [UInt8]] {
         let fm = FileManager.default
@@ -273,7 +253,6 @@ enum LevelDB {
         return Int(name[..<dot])
     }
 
-    /// The tables the MANIFEST that CURRENT names has, and the first log still in use; nil when it can't be read.
     static func liveFiles(_ folder: URL, names: [String]) -> (tables: Set<Int>, log: Int)? {
         guard let current = try? String(contentsOf: folder.appendingPathComponent("CURRENT"), encoding: .utf8) else { return nil }
         let manifestName = current.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -318,7 +297,6 @@ enum LevelDB {
         return (tables, previousLog > 0 ? min(log, previousLog) : log)
     }
 
-    /// The write batches of a log: a sequence number, a count, then each put (1, key, value) or delete (0, key).
     static func readLog(_ bytes: [UInt8], _ keep: ([UInt8], UInt64, [UInt8]?) -> Void) {
         readLogRecords(bytes) { record in
             var reader = IndexedDBBytes(record)
@@ -338,8 +316,6 @@ enum LevelDB {
         }
     }
 
-    /// The records of a log file: 32 KB blocks of fragments, each with a checksum, its length and whether it's a
-    /// whole record or its first, a middle or its last part. A torn or damaged fragment ends its record.
     static func readLogRecords(_ bytes: [UInt8], _ body: ([UInt8]) -> Void) {
         let blockSize = 32768
         var offset = 0
@@ -381,8 +357,6 @@ enum LevelDB {
         }
     }
 
-    /// A table: the footer gives the index block, whose entries give the data blocks. A key ends with 8 bytes of
-    /// sequence number and kind (1 a value, 0 a deletion).
     static func readTable(_ bytes: [UInt8], _ keep: ([UInt8], UInt64, [UInt8]?) -> Void) throws {
         guard bytes.count >= 48 else { throw IndexedDBBytes.Failure.truncated }
         var footer = IndexedDBBytes(Array(bytes[(bytes.count - 48)...]))
@@ -408,7 +382,6 @@ enum LevelDB {
         }
     }
 
-    /// A block's contents, uncompressed: it's followed by its compression (0 none, 1 Snappy) and a checksum.
     private static func block(_ bytes: [UInt8], offset: Int, size: Int) throws -> [UInt8] {
         guard offset >= 0, size >= 0, offset <= bytes.count, size + 5 <= bytes.count - offset else { throw IndexedDBBytes.Failure.truncated }
         let contents = bytes[offset..<(offset + size)]
@@ -419,8 +392,6 @@ enum LevelDB {
         }
     }
 
-    /// A block's entries: each shares the start of the key before it. The restart points at its end aren't needed
-    /// to read it from the start.
     private static func entries(_ block: [UInt8], _ body: ([UInt8], [UInt8]) throws -> Void) throws {
         guard block.count >= 4 else { throw IndexedDBBytes.Failure.truncated }
         var tail = IndexedDBBytes(Array(block.suffix(4)))
@@ -441,7 +412,6 @@ enum LevelDB {
     }
 }
 
-/// CRC-32C, masked as LevelDB stores it.
 enum CRC32C {
     private static let table: [UInt32] = (0..<256).map { index in
         var crc = UInt32(index)
@@ -457,7 +427,6 @@ enum CRC32C {
     }
 }
 
-/// Snappy's raw format: the uncompressed length, then literals and copies of what came before.
 enum Snappy {
     static func decompress(_ input: ArraySlice<UInt8>) throws -> [UInt8] {
         var reader = IndexedDBBytes(Array(input))
@@ -498,9 +467,6 @@ enum Snappy {
 
 // MARK: V8
 
-/// A value as V8's ValueSerializer wrote it, inside Blink's envelope: Blink's version (with, from 21, the offset of a
-/// trailer), then V8's, then the value. Only what JSON has is read; other kinds (maps, typed arrays, regular
-/// expressions…) fail, and the value is left out.
 enum V8Value {
     static func read(_ bytes: [UInt8]) throws -> JSValue {
         var parser = Parser(reader: IndexedDBBytes(bytes))
@@ -509,7 +475,6 @@ enum V8Value {
 
     private struct Parser {
         var reader: IndexedDBBytes
-        /// Objects by the ID a later reference gives them, in the order they were begun; nil while one is being read.
         var objects: [JSValue?] = []
 
         mutating func value(depth: Int) throws -> JSValue {
@@ -583,7 +548,6 @@ enum V8Value {
             }
         }
 
-        /// Key and value pairs up to `terminator`; keys that are numbers are written as text.
         private mutating func properties(until terminator: UInt8, depth: Int) throws -> [(key: String, value: JSValue)] {
             var properties: [(key: String, value: JSValue)] = []
             while true {

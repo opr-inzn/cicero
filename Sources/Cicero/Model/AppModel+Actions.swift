@@ -8,9 +8,6 @@ extension AppModel {
         activate(families.flatMap(\.faces), title: Self.title(for: families))
     }
 
-    /// Turns fonts on where they are, whatever the install method says: it's for adding files (see `performActivation`).
-    /// Asks first whether to turn on so many when that's more than `UserData.manyFamilies` families, unless
-    /// `confirmed`.
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
@@ -20,11 +17,6 @@ extension AppModel {
         performActivation(targets)
     }
 
-    /// Never copying them: a font in a location or under Added Fonts goes on where it is, an installed one where it was
-    /// installed, and one an earlier version copied as that copy, while it's the same as its file (see
-    /// `ActivationEngine.activate`). `named`, for an import: the styles it turned on, which the toast names and Undo
-    /// turns off, also those on already as their copies went in on, and none of those on from before, which `faces` may
-    /// have. No toast when it names none and nothing failed.
     func performActivation(_ faces: [LibraryFace], named: [LibraryFace]? = nil) {
         let operation = expect(faces, at: .on)
         enqueue { model in
@@ -39,7 +31,6 @@ extension AppModel {
         activateTemporarily(families.flatMap(\.faces))
     }
 
-    /// Until Cicero quits. Asks first when that's many families, unless `confirmed`, like `activate`.
     func activateTemporarily(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canActivateTemporarily)
         guard !targets.isEmpty else { return showToast("Already on") }
@@ -53,12 +44,10 @@ extension AppModel {
         }
     }
 
-    /// A question for turning on more than `UserData.manyFamilies` families at once, while the user wants one.
     private func manyActivationPrompt(for faces: [LibraryFace], title: String, temporarily: Bool) -> ManyActivationPrompt? {
         ActivationQuestions.many(for: faces, title: title, temporarily: temporarily, data: data)
     }
 
-    /// Goes on with an activation the user agreed to.
     func confirm(_ prompt: ManyActivationPrompt) {
         if prompt.temporarily {
             activateTemporarily(prompt.faces, confirmed: true)
@@ -71,7 +60,6 @@ extension AppModel {
         deactivate(families.flatMap(\.faces))
     }
 
-    /// Asks first when that moves files out of a folder others share, unless `confirmed` (see `movingOutPrompt(for:)`).
     func deactivate(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canDeactivate)
         guard !targets.isEmpty else {
@@ -83,14 +71,10 @@ extension AppModel {
         performDeactivation(targets)
     }
 
-    /// A question for turning off fonts whose files would move out of a folder others share (see
-    /// `ActivationQuestions.movingOut`).
     private func movingOutPrompt(for faces: [LibraryFace]) -> MovingOutPrompt? {
         ActivationQuestions.movingOut(for: faces, data: data)
     }
 
-    /// Goes on with turning off fonts in a shared folder as the user chose: all of them, moving the files out
-    /// (`movingOut`), or all but those, which stay on in the app that loads them, where they are.
     func confirm(_ prompt: MovingOutPrompt, movingOut: Bool) {
         if movingOut { return deactivate(prompt.faces, confirmed: true) }
         let shared = Set(prompt.shared.map(\.id))
@@ -108,9 +92,6 @@ extension AppModel {
         }
     }
 
-    /// On ↔ off; fonts an app loads from its own folder go from on in that app to on everywhere, then
-    /// off everywhere, then back. A switch already moving waits for its operation.
-    /// The switch of one of several selected families turns them all the way it turns: off where it's on, else on.
     func toggle(_ family: Family) {
         guard expectedFamilyPositions[family.id] == nil else { return }
         let targets = targets(for: family).filter { expectedFamilyPositions[$0.id] == nil }
@@ -141,7 +122,6 @@ extension AppModel {
         }
     }
 
-    /// The engine has waited for macOS, so a scan now sees what the operation did.
     func finish(_ result: ActivationResult, operation: Int? = nil, undo: (() -> Void)? = nil) {
         var data = data
         data.records = result.records
@@ -152,10 +132,6 @@ extension AppModel {
         if let operation { settle(operation, after: scan) }
     }
 
-    /// The toast's Undo for an operation that turned `faces` off (`on` true: turns them on again) or on: the styles it
-    /// changed, those whose files didn't fail, found again in the library as it is when Undo is clicked, turned back the
-    /// usual way, so a font that went out of an app's folder goes back into it, and one turned on for now goes off.
-    /// Nil when it changed none.
     func undo(turning faces: [LibraryFace], on: Bool, failed: [String]) -> (() -> Void)? {
         let failed = Set(failed)
         let ids = Set(faces.filter { !failed.contains($0.face.path) }.map(\.id))
@@ -180,14 +156,10 @@ extension AppModel {
 
     // MARK: Copies
 
-    /// The places these styles can be used from, when some are in more than one, like each client's folder
-    /// (see `CopyChooser`).
     func copySources(of styles: [LibraryFace]) -> [CopySource] {
         CopyChooser.sources(of: styles, folders: data.namedFolders, records: data.records, locations: locations)
     }
 
-    /// Uses a place's copies of the styles it has and turns off the other copies of them Cicero turned on.
-    /// Asks first when that turns off other styles too.
     func useCopies(from source: CopySource, title: String) {
         let plan = CopyChooser.plan(source, records: data.records, library: library)
         guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name)") }
@@ -213,7 +185,6 @@ extension AppModel {
 
     // MARK: Font Library
 
-    /// Where a file is, as Cicero says it: "in your Fonts folder", "in Clients", "in “Downloads”".
     func placeName(of path: String) -> String {
         if path.hasPrefix(locations.userFonts.path + "/") { return "in your Fonts folder" }
         if locations.isInInactiveFolder(path) { return "in the Inactive folder" }
@@ -225,25 +196,17 @@ extension AppModel {
         return "in “\(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent)”"
     }
 
-    /// Where the files Replace sends to the Trash for an added family are: "in your Fonts folder and in Clients".
     func replacedPlaces(_ duplicate: AddedDuplicate) -> String { places(of: duplicate.replacements.map(\.old)) }
 
-    /// Where files are, each place once: "in your Fonts folder and in Clients".
     func places(of paths: [String]) -> String {
         let places = paths.map(placeName).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         return places.listed()
     }
 
-    /// Cicero's copies that Replace just sends to the Trash for an added family, as its file in Cicero's Library takes the
-    /// added one (see `ActivationEngine.spareCopies`).
     func spareCopies(_ duplicate: AddedDuplicate) -> [String] {
         engine.spareCopies(among: duplicate.replacements, records: data.records).keys.sorted()
     }
 
-    /// Whether Replace asks first for an added family, even with Replace chosen in Preferences: when it puts the added
-    /// file in more than one place, or in place of a file in one of the user's own folders, like a client's, which they
-    /// may not expect it to change. Files in the Fonts folder, the Inactive folder and Cicero's Library are Cicero's to
-    /// change.
     func warnsBeforeReplacing(_ duplicate: AddedDuplicate) -> Bool {
         duplicate.replacesSeveralCopies || duplicate.replacements.contains { replacement in
             let path = replacement.old
@@ -253,9 +216,6 @@ extension AppModel {
         }
     }
 
-    /// The sheet's warning for a family replaced in more than one place, or in one of the user's own folders: "Replaces 2
-    /// files: in your Fonts folder and in Clients", or "Replaces the file in Cicero’s Library, and Cicero’s copy in your Fonts
-    /// folder goes to the Trash".
     func replaceWarning(_ duplicate: AddedDuplicate) -> String {
         let spare = spareCopies(duplicate)
         let replaced = duplicate.replacements.map(\.old).filter { !spare.contains($0) }
@@ -265,9 +225,6 @@ extension AppModel {
         return "Replaces \(files), and \(copies) to the Trash"
     }
 
-    /// Installing into the Font Library on or off. Off, its folder becomes one of the user's locations while it has fonts,
-    /// so they stay listed, each on or off as it is; on again, that location is the library again. Neither moves a file
-    /// or turns a font on or off.
     func setInstallsIntoFontLibrary(_ on: Bool) {
         guard on != data.installsIntoFontLibrary else { return }
         var changed = data
@@ -281,18 +238,11 @@ extension AppModel {
         rescan()
     }
 
-    /// Whether the Font Library's folder has fonts to keep listed: font files in it, or, on a disk that isn't connected,
-    /// fonts Cicero turned on there.
     func fontLibraryHasFonts(_ folder: URL) -> Bool {
         let prefix = folder.path + "/"
         return ActivationEngine.hasFontFiles(in: folder) || data.records.inPlace.contains { $0.hasPrefix(prefix) }
     }
 
-    /// Asks where to keep the Font Library and moves it there, with its fonts, their registrations and the records: into
-    /// the folder chosen when it's empty, else into a new "Cicero Library" folder in it (see
-    /// `ActivationEngine.fontLibraryFolder`). A folder it can't go into is refused while the panel stays open, saying why
-    /// (see `ActivationEngine.refusal`), so another one can be chosen; one a cloud service keeps is used only after a
-    /// warning (see `FontLibraryFolderCheck`).
     func changeFontLibrary() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -354,11 +304,6 @@ extension AppModel {
         }
     }
 
-    /// Move to Trash's Undo: puts the files back where they were, never over a file that's there now; what Cicero
-    /// knew about where they came from (copies installed from others, files moved out of an app's folder); the folders,
-    /// tags, rating, note, activation count and foundry name of the families it forgot, where nothing took their
-    /// place since; and, once a scan has read them, each file on or off as it was: on where it is, or until Cicero
-    /// quits, and off again in the Fonts folder, where macOS turns a file that comes back on by itself.
     func putBack(_ trashed: [String: String], unknown: Int, as before: TrashUndo) {
         enqueue { model in
             let outcome = await model.engine.putBack(trashed, off: before.off)
@@ -376,6 +321,7 @@ extension AppModel {
                 if !on.isEmpty { model.data.records = await model.engine.activate(on, method: .inPlace, records: model.data.records).records }
                 let forNow = faces.filter { before.onForNow.contains($0.face.path) && $0.canActivateTemporarily }
                 if !forNow.isEmpty { model.data.records = await model.engine.activateTemporarily(forNow, records: model.data.records).records }
+                // macOS turns a file that comes back into the Fonts folder on by itself.
                 let off = faces.filter { before.off.contains($0.face.path) && $0.state.isActive && $0.canDeactivate }
                 if !off.isEmpty { model.data.records = await model.engine.deactivate(off, records: model.data.records).records }
             }
@@ -384,8 +330,6 @@ extension AppModel {
         }
     }
 
-    /// The families' folders, tags, rating, note, activation count and foundry name as `before` had them, where they
-    /// have none now: the user may have given one again since.
     private func restore(families names: [String], from before: UserData) {
         var data = self.data
         for name in names {
@@ -415,11 +359,9 @@ extension AppModel {
         return lead + ": " + reasons.joined(separator: ", ")
     }
 
-    /// What Move to Trash's Undo needs of things before the move: the user's data, and how each file was on or off.
     struct TrashUndo {
         let data: UserData
         let removedFamilies: [String]
-        /// On for good (where it is, in the Fonts folder, as an installed copy), until Cicero quits, and off.
         let on: Set<String>
         let onForNow: Set<String>
         let off: Set<String>
@@ -510,14 +452,12 @@ extension AppModel {
         removeFolders([id])
     }
 
-    /// Several at once with one rescan, as Settings → Locations removes the selected ones.
     func removeFolders(_ ids: Set<UUID>) {
         turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
         forgetFolders(ids)
         rescan()
     }
 
-    /// Takes locations out of the library's data: their sidebar rows, names and selection go with them.
     func forgetFolders(_ ids: Set<UUID>) {
         data.folders.removeAll { ids.contains($0.id) }
         for id in ids {
@@ -527,19 +467,14 @@ extension AppModel {
         deselect { item in ids.contains { item == .folder($0) } }
     }
 
-    /// Why a watched folder's fonts are out of reach, if they are.
     func availability(ofFolder id: UUID) -> FolderAvailability? {
         library.unavailableFolders[id]
     }
 
-    /// Font files in a watched folder (or among the added fonts) that a cloud service keeps online only.
     func onlineOnlyCount(inFolder id: UUID) -> Int {
         library.onlineOnlyFiles[id]?.count ?? 0
     }
 
-    /// Downloads the font files a cloud service keeps online only in a watched folder (or among the added
-    /// fonts), so the library lists them. The cloud service may take them off the Mac again later; making the
-    /// folder available offline in the Finder keeps them.
     func downloadOnlineOnlyFonts(inFolder id: UUID) {
         let paths = library.onlineOnlyFiles[id] ?? []
         guard !paths.isEmpty, downloads[id] == nil else { return }
@@ -559,14 +494,11 @@ extension AppModel {
         }
     }
 
-    /// System Settings at Privacy & Security → Files and Folders, where Cicero can be let into a folder.
     func openFilesAndFoldersSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders") else { return }
         NSWorkspace.shared.open(url)
     }
 
-    /// Inactive, Active (Cicero turns on every font in the folder where it is, and keeps new ones on: see
-    /// `activateAddedFonts`), or loaded by `app` by itself. Leaving Active turns off what it turned on.
     func setActivation(ofFolder id: UUID, active: Bool, app: String?) {
         guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
         let folder = data.folders[index]
@@ -580,8 +512,6 @@ extension AppModel {
         rescan()
     }
 
-    /// The library's fonts whose files are in these folders; not those in the Inactive folder, which is Cicero's, also
-    /// in a folder that holds it.
     func faces(in folders: [WatchedFolder]) -> [LibraryFace] {
         let prefixes = folders.map { $0.path + "/" }
         guard !prefixes.isEmpty else { return [] }
@@ -590,28 +520,22 @@ extension AppModel {
         }
     }
 
-    /// Turned on where they are, whatever When you add font files says: moving or copying them would take them out of
-    /// the folder that keeps them on.
     func keepOn(_ faces: [LibraryFace]) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return }
         performActivation(targets)
     }
 
-    /// What Cicero turned on where it is in these folders, as it does for Active ones.
     private func turnOffKeptFonts(in folders: [WatchedFolder]) {
         let targets = faces(in: folders).filter { $0.canDeactivate && data.records.inPlace.contains($0.face.path) }
         guard !targets.isEmpty else { return }
         performDeactivation(targets)
     }
 
-    /// Every added font file there is, for Reveal in Finder on Added Fonts.
     var addedFileURLs: [URL] {
         data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
-    /// What Reveal in Finder selects for a location: its folder; for Proofing, every folder Adobe apps load fonts from by
-    /// themselves; for Added Fonts, the files. Nothing for Adobe Fonts, whose files Creative Cloud keeps.
     func finderURLs(ofFolder id: UUID) -> [URL] {
         switch id {
         case WatchedFolder.adobeAppsID: WatchedFolder.appFontFolders().map(\.url)
@@ -620,25 +544,19 @@ extension AppModel {
         }
     }
 
-    /// Whether a location is one of the user's own, which Remove Location from Library takes out of the library.
     func isRemovableFolder(_ id: UUID) -> Bool {
         data.folders.contains { $0.id == id }
     }
 
-    /// The user's folder, or Cicero's Font Library, with the name the user gave it.
     func folder(_ id: UUID) -> WatchedFolder? {
         if id == WatchedFolder.fontLibraryID { return data.fontLibrary.map(data.named) }
         return data.folders.first { $0.id == id }.map(data.named)
     }
 
-    /// What the sidebar calls a folder or one of Cicero's own items (Proofing, Adobe Fonts, Added Fonts): the name the
-    /// user gave it, else its own.
     func folderName(_ id: UUID) -> String {
         (folder(id) ?? data.named(WatchedFolder(id: id, path: ""))).displayName
     }
 
-    /// Shows a folder under another name; the folder on disk keeps its own. An empty name, or the folder's own, goes
-    /// back to that.
     func renameFolder(_ id: UUID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         var own = folder(id) ?? WatchedFolder(id: id, path: "")
@@ -656,28 +574,23 @@ extension AppModel {
         data.renameSet(id, to: name)
     }
 
-    /// Several at once, as the sidebar deletes the selected ones.
     func deleteSets(_ ids: Set<UUID>) {
         data.deleteSets(ids)
         deselect { if case .set(let id) = $0 { ids.contains(id) } else { false } }
     }
 
-    /// Whether the set has the whole family.
     func isMember(_ family: Family, of setID: UUID) -> Bool {
         data.sets.first { $0.id == setID }?.families.contains(family.id) ?? false
     }
 
-    /// Puts the families in the set whole, in place of the styles of them it had, or takes them out with their styles.
     func setMembership(_ member: Bool, for families: [Family], in setID: UUID) {
         data.setMembership(member, for: families.map(\.id), in: setID)
     }
 
-    /// Whether the set has the style, on its own or with its whole family.
     func isMember(_ face: LibraryFace, of family: Family, in setID: UUID) -> Bool {
         data.sets.first { $0.id == setID }?.contains(style: face.face.postScriptName, of: family.id) ?? false
     }
 
-    /// Puts one style of a family in a set, or takes it out; a family the set has whole keeps its other styles.
     func setMembership(_ member: Bool, for face: LibraryFace, of family: Family, in setID: UUID) {
         guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
         if member {
@@ -687,8 +600,6 @@ extension AppModel {
         }
     }
 
-    /// The styles a sidebar row has: a set's own, which can be only some of a family's, and Temporary's, the ones on until
-    /// Cicero quits; else every style of its families.
     func faces(in item: SidebarItem) -> [LibraryFace] {
         let families = families(in: item)
         if item == .temporary { return families.flatMap { $0.faces.filter(\.isOnUntilQuit) } }
@@ -696,21 +607,17 @@ extension AppModel {
         return families.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }
     }
 
-    /// The families a sidebar row shows, without the search.
     func families(in item: SidebarItem) -> [Family] {
         let test = filter(for: item)
         return library.families.filter { data.lists($0) && test($0) }
     }
 
-    /// The styles sidebar rows have between them, each once.
     func faces(in items: [SidebarItem]) -> [LibraryFace] {
         guard items.count > 1 else { return items.first.map { faces(in: $0) } ?? [] }
         var seen = Set<FaceID>()
         return items.flatMap { faces(in: $0) }.filter { seen.insert($0.id).inserted }
     }
 
-    /// Activate Folder on a folder's or smart folder's menu, or on several selected: every font in them, asking how when
-    /// the install method is Ask.
     func activateFonts(in rows: [SidebarRow]) {
         let faces = faces(in: rows.map(\.item))
         let names = rows.map { "“\($0.title)”" }.listed()
@@ -789,7 +696,6 @@ extension AppModel {
 
     // MARK: Drag and drop
 
-    /// Sidebar rows that family names can be dropped onto: sets, tags, foundries and classifications.
     func takesFamilies(_ item: SidebarItem) -> Bool {
         switch item {
         case .set, .tag, .foundry, .classification: true
@@ -797,8 +703,6 @@ extension AppModel {
         }
     }
 
-    /// Families, or single styles of them, dropped onto a sidebar row. A set takes a style on its own; a tag, foundry or
-    /// classification is the whole family's, and a tag is given along with the ones the family has.
     func handleDrop(_ drags: [FontDrag], on item: SidebarItem) -> Bool {
         var seen = Set<String>()
         let families = drags.flatMap(\.families).compactMap { family($0) }.filter { seen.insert($0.id).inserted }
@@ -823,8 +727,6 @@ extension AppModel {
 
     // MARK: Sidebar
 
-    /// The sections below the library rows. They no longer move, but an order saved when they did is kept
-    /// (Reset Order puts them back).
     var sections: [SidebarSection] {
         data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
     }
@@ -847,10 +749,8 @@ extension AppModel {
         return data.sidebar.ordered(rows, in: "library", key: \.key)
     }
 
-    /// Whether any font is on until Cicero quits.
     var hasTemporaryFonts: Bool { library.hasFacesOnUntilQuit }
 
-    /// A section's rows in the user's order. Character sets are in groups, ordered in `characterSetGroups`.
     func rows(for section: SidebarSection) -> [SidebarRow] {
         let rows = unorderedRows(for: section)
         return section == .characterSets ? rows : data.sidebar.ordered(rows, in: section.rawValue, key: \.key)
@@ -896,7 +796,6 @@ extension AppModel {
         }
     }
 
-    /// The window title for the sidebar selection: with several items, their names.
     var selectionTitle: String {
         if let id = similarFamilyID { return "Similar to \(library.family(id)?.name ?? id)" }
         if let list = documentList { return "Fonts in “\(list.name)”" }
@@ -913,33 +812,23 @@ extension AppModel {
         return "Fonts"
     }
 
-    /// All Fonts, Active and Inactive always are, even where an earlier version hid them.
     func isVisible(_ key: String) -> Bool { SidebarRow.alwaysShown.contains(key) || !data.sidebar.hidden.contains(key) }
 
     func setVisible(_ key: String, _ visible: Bool) {
         if visible { data.sidebar.hidden.remove(key) } else { hide([key]) }
     }
 
-    /// Hides rows: Hide from Sidebar on a row's menu (on every selected row's, see `menuTargets`) or a group's title.
-    /// All Fonts, Active and Inactive stay.
     func hide(_ keys: [String]) {
         data.sidebar.hidden.formUnion(keys.filter { !SidebarRow.alwaysShown.contains($0) })
         deselect { !isShown($0) }
     }
 
-    /// What a sidebar row's menu acts on: the selected rows of its list, in their order, when it's one of several selected,
-    /// as the list rings them all and a family's menu takes the selected families; else the row alone.
     func menuTargets(of row: SidebarRow, selected: Set<SidebarItem>) -> [SidebarRow] {
         guard selected.count > 1, selected.contains(row.item) else { return [row] }
         let rows = rows(inList: sidebarList(of: row.item)).filter { selected.contains($0.item) }
         return rows.isEmpty ? [row] : rows
     }
 
-    /// What dragging rows out of the sidebar does, as their menus would: locations leave the library (Remove Location
-    /// from Library), folders and tags are deleted (Delete Folder, Delete Tag); Cicero's own locations, which can't be
-    /// removed, and every other row are hidden (Hide from Sidebar). All Fonts, Active and Inactive stay. Undo in the toast,
-    /// as a drag out is easily made by mistake, puts back the lists these change as they were, so what was changed in
-    /// them meanwhile goes too; fonts a removed location had on stay off.
     func dragOutOfSidebar(_ rows: [SidebarRow]) {
         let rows = rows.filter { $0.canHide && isVisible($0.key) }
         guard !rows.isEmpty else { return }
@@ -975,6 +864,7 @@ extension AppModel {
         showToast(message) { [weak self] in
             guard let self else { return }
             var data = self.data
+            // The lists as they were before the drag, so what was changed in them since is lost.
             data.folders = before.folders
             data.folderNames = before.folderNames
             data.sets = before.sets
@@ -988,8 +878,6 @@ extension AppModel {
         }
     }
 
-    /// What the sidebar list selects. Several items only within one list (a section, or a group of
-    /// character sets), so they can move together: Command-clicking in another list starts over there.
     func selectSidebarItems(_ items: Set<SidebarItem>) {
         let items = sidebarSelection(items, from: selectedItems)
         guard let any = items.first else { selection = nil; return }
@@ -1007,8 +895,6 @@ extension AppModel {
         }
     }
 
-    /// What the list's selection becomes when it goes from `current` to `items`: the items in the list of
-    /// the one just added (else of the one selected before), so that several are only ever in one list.
     func sidebarSelection(_ items: Set<SidebarItem>, from current: Set<SidebarItem>) -> Set<SidebarItem> {
         guard !items.isEmpty else { return [] }
         let added = items.subtracting(current)
@@ -1017,14 +903,12 @@ extension AppModel {
         return items.filter { sidebarList(of: $0) == list }
     }
 
-    /// Takes items that are gone, or hidden, out of the sidebar selection; All Fonts when none are left.
     func deselect(where remove: (SidebarItem) -> Bool) {
         let kept = selectedItems.filter { !remove($0) }
         guard kept != selectedItems else { return }
         if kept.isEmpty { selection = .all } else { selectSidebarItems(kept) }
     }
 
-    /// The list of the sidebar an item is in, named as in `SidebarPreferences.order`.
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
         case .all, .active, .inactive, .temporary, .system, .recent, .problems: "library"
@@ -1044,8 +928,6 @@ extension AppModel {
         return characterSetGroups.first { "charsetgroup.\($0.id)" == list }?.rows ?? []
     }
 
-    /// Character sets for the sidebar, in their groups (Latin S–XL, Adobe Latin, Unicode Blocks,
-    /// Google Fonts, then the user's own).
     var characterSetGroups: [(id: String, title: String, rows: [SidebarRow])] {
         func row(_ set: CharacterSetDefinition) -> SidebarRow {
             SidebarRow(key: "charset.\(set.id)", title: set.name, icon: set.isCustom ? "character.cursor.ibeam" : "textformat.abc", item: .characterSet(set.id))
@@ -1058,7 +940,6 @@ extension AppModel {
         return data.sidebar.ordered(ordered, in: SidebarSection.characterSets.rawValue) { "charsetgroup.\($0.id)" }
     }
 
-    /// Hides every set in a character set group, which takes the group out of the sidebar.
     func hideGroup(_ id: String) {
         guard let group = characterSetGroups.first(where: { $0.id == id }) else { return }
         hide(group.rows.map(\.key))
@@ -1074,8 +955,6 @@ extension AppModel {
         data.sidebar.hidden.removeAll()
     }
 
-    /// Moves items within one list of the sidebar (see `SidebarPreferences.order`), never into another.
-    /// `shown` is what the list shows, `all` the keys of every item it has.
     func moveSidebarItems(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
         data.sidebar.move(source, to: destination, shown: shown, all: all, in: list)
     }
@@ -1108,7 +987,6 @@ extension AppModel {
 
     // MARK: Compare
 
-    /// As many fonts as Compare has tints, so each has a colour of its own.
     static let compareLimit = 12
 
     var isCompareFull: Bool { compareEntries.count >= Self.compareLimit }
@@ -1118,8 +996,6 @@ extension AppModel {
         _ = addToCompare(families.map(\.id))
     }
 
-    /// Adds the families that aren't in Compare yet, in the style the preview weight picks, as many as there's room
-    /// for; a toast says when some didn't fit.
     func addToCompare(_ names: [String]) -> Bool {
         let new = names.filter { name in family(name) != nil && !compareEntries.contains { $0.familyID == name } }
         let added = new.prefix(Self.compareLimit - compareEntries.count)
@@ -1132,8 +1008,6 @@ extension AppModel {
         return !added.isEmpty
     }
 
-    /// The same family again, after it, in its first style not in `shown`: the styles Compare shows it in, those that
-    /// follow the preview weight included.
     func compareAnotherStyle(of id: UUID, besides shown: Set<FaceID>) {
         guard !isCompareFull, let index = compareEntries.firstIndex(where: { $0.id == id }),
               let family = family(compareEntries[index].familyID) else { return }
@@ -1141,7 +1015,6 @@ extension AppModel {
         compareEntries.insert(CompareEntry(familyID: family.id, style: style, tint: nextCompareTint), at: index + 1)
     }
 
-    /// nil: the style the preview weight picks.
     func setCompareStyle(_ style: FaceID?, of id: UUID) {
         guard let index = compareEntries.firstIndex(where: { $0.id == id }) else { return }
         compareEntries[index].style = style
@@ -1156,7 +1029,6 @@ extension AppModel {
         compareEntries.removeAll { $0.id == id }
     }
 
-    /// Adds the family, or takes it out in every style it's there in.
     func toggleInCompare(_ familyID: String) {
         if compareEntries.contains(where: { $0.familyID == familyID }) {
             compareEntries.removeAll { $0.familyID == familyID }
@@ -1165,21 +1037,18 @@ extension AppModel {
         }
     }
 
-    /// Puts a compared family where another one is, moving the others along.
     func moveInCompare(_ id: UUID, to target: UUID) {
         guard let from = compareEntries.firstIndex(where: { $0.id == id }), let to = compareEntries.firstIndex(where: { $0.id == target }),
               from != to else { return }
         compareEntries.insert(compareEntries.remove(at: from), at: to)
     }
 
-    /// The first tint no compared family has.
     private var nextCompareTint: Int {
         (0...).first { tint in !compareEntries.contains { $0.tint == tint } }!
     }
 
     // MARK: Font caches
 
-    /// Returns true when macOS's caches were cleared, which is when restarting helps.
     func clearCaches(scopes: [SystemFontCaches.Scope], apps: [AppFontCaches.App]) async -> Bool {
         var trashed: [String] = []
         var failures = 0
@@ -1219,7 +1088,6 @@ extension AppModel {
 
     // MARK: Problems
 
-    /// `family` is the family the problem is about, if any: removing files names the others in them.
     func apply(_ fix: ProblemFix, family: String? = nil) {
         switch fix {
         case .reveal(let paths):
@@ -1259,7 +1127,6 @@ extension AppModel {
         }
     }
 
-    /// Forget All: every problem's missing files at once, in one operation.
     func forgetAll(of problems: [Problem]) {
         var inPlace: [String] = [], copies: [String] = []
         for fix in problems.flatMap(\.fixes) {
@@ -1280,7 +1147,6 @@ extension AppModel {
         }
     }
 
-    /// Remove All Extra Copies: every problem's extra copies at once, after asking.
     func trashExtraCopies(of problems: [Problem]) {
         var seen = Set<String>()
         let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
@@ -1290,10 +1156,6 @@ extension AppModel {
     }
 }
 
-/// Checks the folder chosen for Cicero's Library as the open panel's Choose is clicked: one it can't go into is refused
-/// there, the panel saying why and staying open for another one. One a cloud service keeps gets a warning first, as a
-/// sheet on the panel: the service can take files off the Mac to make room, and fonts used from there can stop working.
-/// Choose Another Folder (the default) goes back to the panel; Use Anyway takes it.
 private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
     let refusal: (URL) -> String?
 

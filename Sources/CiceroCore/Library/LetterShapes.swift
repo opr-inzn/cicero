@@ -1,23 +1,18 @@
 import CoreText
 import Foundation
 
-/// Serif or sans serif from the shapes of a face's capital I and lowercase l, for faces whose files don't say.
-/// Each must be one straight stem. With feet reaching out to both sides at the baseline (the I's at the top too)
-/// the face is serif; with plain ends, sans serif. A font with capitals or lowercase only goes by the one it has.
-/// Anything else says nothing: Verdana's I has serifs and its l none, and a script's strokes curve. A wrong
-/// classification is worse than none. A face whose i, m and W are as wide is monospaced, whatever its I and l look
-/// like: monospaced styles give both serifs to tell them apart.
 enum LetterShapes {
-    /// How far past the stem, in stem widths, a serif reaches at least, and plain ends at most.
     private static let serif: CGFloat = 0.3
     private static let plain: CGFloat = 0.12
 
     static func classification(of font: CTFont) -> Classification? {
+        // Before the I and l: monospaced styles give both serifs to tell them apart.
         if isMonospaced(font) { return .monospaced }
         // How far italics lean: along for each unit up.
         let slant = tan(-CTFontGetSlantAngle(font) * .pi / 180)
         switch (Reading(font, "I", slant: slant), Reading(font, "l", slant: slant)) {
         case (.measured(let i), .measured(let l)):
+            // Both letters must agree: Verdana's I has serifs and its l none.
             if i.foot > serif && i.head > serif && l.foot > serif { return .serif }
             // A sans serif l may end in a tail to one side, but not in a foot to both.
             if i.reach < plain && l.foot < plain { return .sansSerif }
@@ -33,9 +28,6 @@ enum LetterShapes {
         return nil
     }
 
-    /// Whether a drawn i, m and W are exactly as wide (I, M and W, without lowercase), as in a monospaced style
-    /// the font doesn't flag as one. Fonts in three widths have i and m alike, and unfinished ones letters that
-    /// aren't drawn yet, all as wide.
     static func isMonospaced(_ font: CTFont) -> Bool {
         func drawn(_ characters: [Character]) -> [CGGlyph]? {
             let glyphs = characters.compactMap { character -> CGGlyph? in
@@ -45,6 +37,7 @@ enum LetterShapes {
             }
             return glyphs.count == characters.count ? glyphs : nil
         }
+        // W too, as fonts in three widths have i and m alike, and drawn ones only, as an unfinished font's undrawn letters are all as wide.
         guard var glyphs = drawn(["i", "m", "W"]) ?? drawn(["I", "M", "W"]) else { return false }
         var advances = [CGSize](repeating: .zero, count: glyphs.count)
         CTFontGetAdvancesForGlyphs(font, .horizontal, &glyphs, &advances, glyphs.count)
@@ -54,9 +47,7 @@ enum LetterShapes {
 
     private enum Reading {
         case measured(Letter)
-        /// The font hasn't got the letter.
         case missing
-        /// It isn't one straight stem leaning as the font does.
         case unclear
 
         init(_ font: CTFont, _ character: Character, slant: CGFloat) {
@@ -71,14 +62,10 @@ enum LetterShapes {
     }
 
     private struct Letter {
-        /// How far the ink near the baseline reaches past the stem on its shorter side, in stem widths.
         var foot: CGFloat
-        /// The same near the top.
         var head: CGFloat
-        /// The farthest the ink reaches past the stem at either end, to either side.
         var reach: CGFloat
 
-        /// nil when the font has no such letter, or it isn't one straight stem leaning as the font does.
         init?(_ font: CTFont, _ character: Character, slant: CGFloat) {
             // In thousandths of an em, whatever size the font was made at.
             var scale = CGAffineTransform(scaleX: 1000 / CTFontGetSize(font), y: 1000 / CTFontGetSize(font))
@@ -124,7 +111,6 @@ enum LetterShapes {
         }
     }
 
-    /// A flattened glyph outline as straight edges, to find the ink along a horizontal line.
     struct Outline {
         private struct Edge {
             var from: CGPoint
@@ -168,7 +154,6 @@ enum LetterShapes {
             self.contours = contours
         }
 
-        /// The ink along y, left to right, filled as glyphs are (non-zero winding).
         func runs(at y: CGFloat) -> [ClosedRange<CGFloat>] {
             var crossings: [(x: CGFloat, winding: Int)] = []
             for edge in edges {

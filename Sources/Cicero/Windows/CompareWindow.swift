@@ -13,31 +13,22 @@ enum CompareLayout: String, CaseIterable {
 }
 
 extension FocusedValues {
-    /// Compare's size, for View → Zoom In and Zoom Out while its window is in front.
     @Entry var compareSize: Binding<Double>?
 }
 
-/// Families next to each other, each in a style of its choosing: one row each on a shared baseline, or drawn over
-/// each other in tints, in a text and at a size of the window's own.
 struct CompareWindow: View {
     static let sizes: ClosedRange<Double> = 24...720
-    /// What the samples show while the window's text is empty.
     static let placeholder = "Hamburgefonstiv"
-    /// What View → Zoom In and Zoom Out step through, each a fifth to a third bigger than the one before; a size set in
-    /// between goes to the next one either way.
     static let steps: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
 
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
     @AppStorage("compare.size") private var size = 72.0
-    /// Its own, so typing here leaves the previews in the main window as they are; saved soon, not with each letter.
     @Bindable private var savedText = SavedSoon.compareText
     private var text: String { savedText.value }
-    /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
     @State private var read: Set<String> = []
     @State private var isAdding = false
-    /// On macOS 15, the part of the window the samples scroll in, which they fill so they sit at its top left (see `body`).
     @State private var viewport: CGSize = .zero
     @FocusState private var focused: Bool
 
@@ -116,18 +107,15 @@ struct CompareWindow: View {
 }
 
 extension CompareWindow {
-    /// The next of `steps` up from `size`.
     static func bigger(than size: Double) -> Double {
         steps.first { $0 > size } ?? sizes.upperBound
     }
 
-    /// The next of `steps` down from `size`.
     static func smaller(than size: Double) -> Double {
         steps.last { $0 < size } ?? sizes.lowerBound
     }
 }
 
-/// The toolbar button with Add Families.
 private struct AddFamiliesButton: View {
     @Binding var isPresented: Bool
 
@@ -143,16 +131,11 @@ private struct AddFamiliesButton: View {
     }
 }
 
-/// Every family the library lists, wherever it is in the library and whatever the main window shows, or those what's
-/// typed finds, as the main window's search does. Clicking one, or Return on the highlighted one, adds it to Compare,
-/// or takes it out when it's checked, there already; ↑ and ↓ move the highlight. It stays open for the next. While
-/// Compare is full, the families not in it are dimmed, and a line under them says why.
 private struct AddFamilies: View {
     @Environment(AppModel.self) private var model
     @Environment(\.self) private var environment
     @State private var text = ""
     @State private var families: [Family] = []
-    /// nil: the first family listed.
     @State private var highlighted: String?
     @FocusState private var isFocused: Bool
 
@@ -210,24 +193,20 @@ private struct AddFamilies: View {
         }
     }
 
-    /// The family highlighted, or else the first one found.
     private var current: String? {
         highlighted.flatMap { id in families.contains { $0.id == id } ? id : nil } ?? families.first?.id
     }
 
-    /// Adds the family, or takes it out; one not in Compare stays out while it's full.
     private func toggle(_ id: String) {
         guard !model.isCompareFull || model.compareEntries.contains(where: { $0.familyID == id }) else { return }
         model.toggleInCompare(id)
     }
 
-    /// "Aa" in its regular style, its name and a check while it's in Compare, as the search field's suggestions show
-    /// a family: the name in the label colour and "Aa" in the secondary one, resolved, as the popover's material
-    /// lightens a colour that changes with the appearance, and the highlighted one in white on the selection colour.
     private func row(_ family: Family, isCompared: Bool, isAvailable: Bool, isHighlighted: Bool) -> some View {
         HStack(spacing: 0) {
             // A fixed width keeps the names lined up however wide each family's letters are, as in the suggestions.
             FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
+                // Resolved, as the popover's material lightens a colour that changes with the appearance.
                 .foregroundStyle(isHighlighted ? Color.white : Color(Color.secondary.resolve(in: environment)))
                 .frame(width: 28)
                 .padding(.trailing, 3)
@@ -262,10 +241,7 @@ private struct AddFamilies: View {
     }
 }
 
-/// One family's sample, set in the style chosen for it, else the one nearest the preview weight.
 private struct CompareSample: Identifiable {
-    /// The tints the fonts get in turn, as they join, and that each font's colour menu offers: one for each font
-    /// Compare holds (`AppModel.compareLimit`).
     static let tints: [(title: String, color: Color)] = [
         ("Blue", .blue), ("Red", .red), ("Green", .green), ("Orange", .orange), ("Purple", .purple), ("Pink", .pink),
         ("Teal", .teal), ("Indigo", .indigo), ("Brown", .brown), ("Cyan", .cyan), ("Mint", .mint), ("Yellow", .yellow),
@@ -273,14 +249,10 @@ private struct CompareSample: Identifiable {
 
     let family: Family
     let face: LibraryFace
-    /// The style chosen; nil when it follows the preview weight.
     let style: FaceID?
     let line: TextLine
-    /// Room above the baseline as a type designer draws it: up to the font's ascenders (the tallest of b, d, h, k and
-    /// l), or to the tallest glyph if one reaches higher. The font's ascent is often far taller, as it keeps room for
-    /// accents and line spacing: 1,020 units in a font whose ascenders and capitals end at 700.
+    // Not the font's ascent, which often keeps room for accents and line spacing far above the ascenders.
     let letterAscent: CGFloat
-    /// Its place in `tints`.
     let tintIndex: Int
     let id: UUID
 
@@ -299,14 +271,10 @@ private struct CompareSample: Identifiable {
         tintIndex = entry.tint % Self.tints.count
     }
 
-    /// The room above the first baseline in either layout: the tallest `letterAscent` of all the fonts, whichever
-    /// comes first. Only the first font's, and the first line moved down as a taller font in Overlay, or one dragged
-    /// to the top, needed more.
     static func topAscent(of samples: [CompareSample]) -> CGFloat {
         samples.map(\.letterAscent).max() ?? 0
     }
 
-    /// The top of the tallest of b, d, h, k and l; nil for a font that has none of them, like an emoji font.
     static func ascenderHeight(of font: CTFont) -> CGFloat? {
         var characters = Array("bdhkl".utf16), glyphs = [CGGlyph](repeating: 0, count: characters.count)
         CTFontGetGlyphsForCharacters(font, &characters, &glyphs, characters.count)
@@ -316,20 +284,15 @@ private struct CompareSample: Identifiable {
         }.max()
     }
 
-    /// The style chosen for the family, if one was.
     static func chosenStyle(of entry: CompareEntry, in family: Family) -> LibraryFace? {
         entry.style.flatMap { style in family.faces.first { $0.id == style } }
     }
 
-    /// The style its sample is set in: the one chosen, else the one nearest the preview weight.
     static func face(for entry: CompareEntry, in family: Family, preview: PreviewSettings) -> LibraryFace {
         chosenStyle(of: entry, in: family) ?? family.face(nearestWeight: preview.weight)
     }
 }
 
-/// One row per font, as tall as its own sample reaches above and below its baseline, so a row stays where it is as
-/// fonts that reach further join or leave below it; the first row from the tallest font's ascenders up only, whichever
-/// font that is (see `CompareSample.topAscent`). Dragging a row changes the order.
 private struct StackedLayout: View {
     let samples: [CompareSample]
 
@@ -365,8 +328,6 @@ private struct StackedLayout: View {
     }
 }
 
-/// Every sample over the others, each in its tint, on a shared baseline, their first letters' first stems on each other
-/// (see `FirstStem`). Dragging a chip in the legend below changes the order; its dot changes the colour.
 private struct OverlayLayout: View {
     let samples: [CompareSample]
 
@@ -411,7 +372,6 @@ private struct OverlayLayout: View {
         }
     }
 
-    /// Around a chip's dot and name.
     private static let chipPadding = CGSize(width: 10, height: 5)
 
     private func chip(_ sample: CompareSample) -> some View {
@@ -422,21 +382,15 @@ private struct OverlayLayout: View {
     }
 }
 
-/// Samples laid out by `layout` that can be dragged to new places among each other. The dragged one follows
-/// the pointer, leaving a gap where it will land, and the others make way as it passes their middle.
 private struct Reorderable<Item: View, Lifted: View>: View {
     @Environment(AppModel.self) private var model
     let samples: [CompareSample]
     let layout: AnyLayout
-    /// The way samples pass each other: down a column of rows, or along lines of chips.
     let axis: Axis
-    /// A sample in its place.
     @ViewBuilder let item: (CompareSample) -> Item
-    /// The sample under the pointer while it's dragged.
     @ViewBuilder let lifted: (CompareSample) -> Lifted
     private static var space: String { "compare.reorderable" }
     @State private var drag: SampleDrag?
-    /// Where each sample is laid out, in this view's coordinates.
     @State private var frames: [UUID: CGRect] = [:]
 
     var body: some View {
@@ -461,7 +415,6 @@ private struct Reorderable<Item: View, Lifted: View>: View {
         }
     }
 
-    /// Picks the sample up and carries it under the pointer, moving it in Compare as it passes the others.
     private func reorder(_ id: UUID) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.space))
             .onChanged { value in
@@ -477,9 +430,6 @@ private struct Reorderable<Item: View, Lifted: View>: View {
             .onEnded { _ in settle() }
     }
 
-    /// The sample under `point` the dragged one should take the place of. Only once the pointer is past its
-    /// middle, coming from the dragged one's side, so a wide chip and a narrow one don't keep trading places.
-    /// A row counts all the way across.
     private func target(at point: CGPoint, dragging id: UUID) -> UUID? {
         let ids = model.compareEntries.map(\.id)
         guard let from = ids.firstIndex(of: id) else { return nil }
@@ -497,7 +447,6 @@ private struct Reorderable<Item: View, Lifted: View>: View {
         return nil
     }
 
-    /// Glides the dropped sample into its place, then shows it there.
     private func settle() {
         guard let drag, let frame = frames[drag.id] else {
             self.drag = nil
@@ -513,18 +462,13 @@ private struct Reorderable<Item: View, Lifted: View>: View {
     }
 }
 
-/// A row or chip being dragged.
 private struct SampleDrag: Equatable {
     let id: UUID
-    /// Where the pointer took hold of the sample, from its top-left corner.
     let grab: CGSize
-    /// The pointer, in the Reorderable's coordinates.
     var location: CGPoint
-    /// Dropped, and on its way into its place.
     var isSettling = false
 }
 
-/// Name, a menu of styles and a remove button, as a row caption or a legend chip.
 private struct SampleCaption: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -546,8 +490,6 @@ private struct SampleCaption: View {
         }
     }
 
-    /// The style shown, which opens the family's styles; Automatic follows the preview weight. Another of its styles
-    /// can join Compare too, to set them against each other.
     private var styleMenu: some View {
         Menu {
             Picker("Style", selection: Binding(get: { sample.style }, set: { model.setCompareStyle($0, of: sample.id) })) {
@@ -581,8 +523,6 @@ private struct SampleCaption: View {
     }
 }
 
-/// A legend chip's dot, which opens the tints to choose the font's colour from: an AppKit menu, from a view of its own
-/// over the dot. As the button of a SwiftUI menu, the dot lit up while the menu was open.
 private struct TintMenu: View {
     @Environment(AppModel.self) private var model
     @Environment(\.self) private var environment
@@ -601,13 +541,12 @@ private struct TintMenu: View {
             .padding(-3)
     }
 
-    /// A tint as this appearance shows it, as a menu's images don't change with it.
     private func resolved(_ color: Color) -> NSColor {
+        // Resolved now, as a menu's images don't change with the appearance.
         NSColor(cgColor: color.resolve(in: environment).cgColor) ?? .gray
     }
 }
 
-/// Opens the tints under the dot as the mouse goes down, as a pop-up button does, the one chosen checked.
 private struct TintMenuArea: NSViewRepresentable {
     let tints: [(title: String, image: NSImage)]
     let chosen: Int

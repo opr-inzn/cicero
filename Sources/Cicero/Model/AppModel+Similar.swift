@@ -1,7 +1,6 @@
 import CiceroCore
 import Foundation
 
-/// What `similarFonts` was made from.
 struct SimilarKey: Equatable {
     var fingerprint: Int
     var measurementRevision: Int
@@ -10,12 +9,8 @@ struct SimilarKey: Equatable {
 }
 
 extension AppModel {
-    /// How many families Show Similar Fonts lists after the one they look like.
     static let similarListed = SimilarFonts.longestList
 
-    /// The listed families side by side by their letters and the letters' embedding, with their classifications as the
-    /// sidebar has them. Made again when the library, its measurements or the user's data change, which takes a
-    /// millisecond or two.
     var similarFonts: SimilarFonts {
         let key = SimilarKey(fingerprint: library.fingerprint, measurementRevision: measurementRevision, dataRevision: dataRevision,
                              guessRevision: guessRevision)
@@ -28,7 +23,6 @@ extension AppModel {
         return table
     }
 
-    /// A family's classification as the sidebar has it, for similar fonts; nil for Unclassified.
     private func similarClassifier() -> (Family) -> String? {
         let classification = classificationNamer()
         let unclassified = data.classificationRenames[Classification.unclassified.rawValue] ?? Classification.unclassified.rawValue
@@ -38,18 +32,14 @@ extension AppModel {
         }
     }
 
-    /// The families that look most like this one, the closest first, without it.
     func similarFamilies(to family: Family, limit: Int) -> [Family] {
         similarFonts.nearest(to: family.id, limit: limit).compactMap(library.family)
     }
 
-    /// Whether the family's letters are measured, so that there are similar fonts to show.
     func canShowSimilar(_ family: Family) -> Bool {
         similarFonts.contains(family.id)
     }
 
-    /// Fills the browser with the family and the families that look most like it, the closest first, the way a
-    /// search does: the sidebar shows nothing selected, and selecting an item there goes back to it.
     func showSimilar(to family: Family) {
         if similarFamilyID == nil, documentList == nil {
             listReturn = selectedItems
@@ -64,8 +54,6 @@ extension AppModel {
         jumpTargets = [family.id]
     }
 
-    /// Back to what the sidebar had selected before, with the family selected there, and to the font page it was
-    /// asked for from, if any.
     func endSimilar() {
         guard let id = similarFamilyID else { return }
         returnFromList()
@@ -75,8 +63,6 @@ extension AppModel {
         }
     }
 
-    /// Back to what the sidebar had selected before Show Similar Fonts or Show in Library, and to the font page open
-    /// then, if any.
     func returnFromList() {
         let items = listReturn ?? [.all]
         let page = listReturnPage

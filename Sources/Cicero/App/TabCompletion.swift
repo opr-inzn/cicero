@@ -1,28 +1,16 @@
 import Foundation
 
-/// zsh's Tab completion, which macOS leaves off: zsh loads completion scripts, like the Cicero CLI's, only once
-/// `compinit` has run, and macOS's /etc/zshrc doesn't run it. Many users turn it on themselves, or through a framework
-/// like Oh My Zsh; the others are offered a line at the end of their .zshrc, after Install Cicero CLI.
-///
-/// Whether it's on is asked of the user's own zsh, started as Terminal starts it (a login shell, interactive), so it
-/// reads every file they and their frameworks set it up with; searching .zshrc for "compinit" would miss a framework's
-/// and count a line that's commented out.
 nonisolated enum TabCompletion {
-    /// What's added: `-i` leaves out folders others may write to, rather than asking about them in each new window, as
-    /// plain `compinit` does (Homebrew's /usr/local/share/zsh on Intel Macs is one).
     static let line = "autoload -Uz compinit && compinit -i"
     static let comment = "# Tab completion in Terminal, turned on by Cicero"
 
     struct State: Equatable {
         var isOn: Bool
-        /// The .zshrc zsh reads: in ZDOTDIR when the user's setup sets it, else in the home folder.
         var file: URL
     }
 
-    /// How long zsh may take to start before it counts as not answering.
     static let timeout: Duration = .seconds(10)
 
-    /// nil when the user's shell isn't zsh, or it didn't answer in time: then nothing is offered.
     @concurrent
     static func state() async -> State? {
         guard let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell else { return nil }
@@ -62,14 +50,10 @@ nonisolated enum TabCompletion {
                      file: URL(fileURLWithPath: String(folder), isDirectory: true).appendingPathComponent(".zshrc"))
     }
 
-    /// Whether the file has Cicero's line already: then it isn't offered again, even if something after it turns
-    /// completion off.
     static func hasLine(_ file: URL) -> Bool {
         (try? String(contentsOf: file, encoding: .utf8))?.split(separator: "\n").contains { $0 == line } ?? false
     }
 
-    /// Adds the line at the end of the file, through a link to it as an editor would (dotfiles kept elsewhere), making
-    /// the file when there's none. True when zsh, asked again, has completion on.
     @concurrent
     static func turnOn(_ file: URL) async -> Bool {
         let fm = FileManager.default
@@ -77,6 +61,7 @@ nonisolated enum TabCompletion {
         var text = existing.isEmpty ? "" : (existing.last == UInt8(ascii: "\n") ? "\n" : "\n\n")
         text += comment + "\n" + line + "\n"
         if fm.fileExists(atPath: file.path) {
+            // Appended in place, never written anew, which would put a file in place of a .zshrc that links into the user's dotfiles.
             guard let handle = try? FileHandle(forWritingTo: file) else { return false }
             defer { try? handle.close() }
             guard (try? handle.seekToEnd()) != nil, (try? handle.write(contentsOf: Data(text.utf8))) != nil else { return false }

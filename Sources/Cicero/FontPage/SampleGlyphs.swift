@@ -1,21 +1,13 @@
 import AppKit
 import CiceroCore
 
-/// A glyph copied from a font page's Glyphs, like a stylistic set's "a", a small capital or a ligature, that the
-/// page's text draws in place of the characters it stands for once it's pasted there. The text keeps the characters:
-/// the family's pages draw them as the glyph, in whichever style they show, and other pages as they are.
 nonisolated struct SampleGlyph: Codable, Hashable, Sendable {
-    /// The family it was copied from (`Family.id`).
     let family: String
-    /// The characters it's drawn for: one, or a ligature's.
     let characters: String
-    /// The style it was copied from, and its ID there.
     let path: String
     let index: Int
     let glyph: CGGlyph
-    /// Its name in the font, like "a.ss01", which the family's other styles mostly give their own.
     let name: String?
-    /// The features that draw it together, for a style that names its glyphs otherwise or not at all.
     let features: [String]
 
     init(family: String, characters: String, face: FontFace, glyph: CGGlyph, features: [String]) {
@@ -29,8 +21,6 @@ nonisolated struct SampleGlyph: Codable, Hashable, Sendable {
         self.features = features
     }
 
-    /// Its glyph in another of the family's styles: the same one in the same style, else the one with its name,
-    /// else the one its features draw for its characters.
     func glyph(in font: CTFont, face: FontFace) -> CGGlyph? {
         if face.id == FaceID(path: path, index: index) { return glyph }
         if let name {
@@ -40,7 +30,6 @@ nonisolated struct SampleGlyph: Codable, Hashable, Sendable {
         return drawn(in: font)
     }
 
-    /// The one glyph the features draw the characters as, when it isn't what they're drawn as without them.
     private func drawn(in font: CTFont) -> CGGlyph? {
         guard !features.isEmpty else { return nil }
         let settings = features.map { [kCTFontOpenTypeFeatureTag: $0, kCTFontOpenTypeFeatureValue: 1] as CFDictionary }
@@ -62,7 +51,6 @@ nonisolated struct SampleGlyph: Codable, Hashable, Sendable {
     }
 }
 
-/// A glyph pasted into the text, where its characters start, in UTF-16 units.
 nonisolated struct SampleGlyphRun: Codable, Hashable, Sendable {
     let location: Int
     let glyph: SampleGlyph
@@ -70,8 +58,6 @@ nonisolated struct SampleGlyphRun: Codable, Hashable, Sendable {
     var range: NSRange { NSRange(location: location, length: (glyph.characters as NSString).length) }
 }
 
-/// What Cicero puts on the clipboard along with characters for the font page's text: the glyphs it draws in their
-/// place, if any, like an alternate copied from Glyphs. The text pastes them as glyphs, and other apps as characters.
 struct SampleClip: Codable {
     let text: String
     let glyphs: [SampleGlyphRun]
@@ -81,14 +67,12 @@ struct SampleClip: Codable {
         self.glyphs = glyphs
     }
 
-    /// One glyph's characters, the glyph drawn in their place.
     init(text: String, glyph: SampleGlyph?) {
         self.init(text: text, glyphs: glyph.map { [SampleGlyphRun(location: 0, glyph: $0)] } ?? [])
     }
 
     var data: Data? { try? JSONEncoder().encode(self) }
 
-    /// On the clipboard, in place of what's there.
     func copy() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.declareTypes([.sampleClip, .string], owner: nil)
@@ -96,7 +80,6 @@ struct SampleClip: Codable {
         if let data { NSPasteboard.general.setData(data, forType: .sampleClip) }
     }
 
-    /// Along with the text a text view put on the pasteboard.
     func add(to pasteboard: NSPasteboard) {
         guard let data else { return }
         pasteboard.addTypes([.sampleClip], owner: nil)
@@ -113,12 +96,9 @@ extension NSPasteboard.PasteboardType {
 }
 
 extension NSAttributedString.Key {
-    /// The glyph pasted in place of these characters (`SampleGlyphValue`).
     nonisolated static let sampleGlyph = NSAttributedString.Key("CiceroSampleGlyph")
 }
 
-/// A `SampleGlyph` as an attribute's value, equal to another for the same glyph, so that copies pasted side by side
-/// share a run.
 nonisolated final class SampleGlyphValue: NSObject {
     let glyph: SampleGlyph
 
@@ -126,6 +106,7 @@ nonisolated final class SampleGlyphValue: NSObject {
         self.glyph = glyph
     }
 
+    // Equal for the same glyph, so that copies pasted side by side share a run.
     override func isEqual(_ object: Any?) -> Bool {
         (object as? SampleGlyphValue)?.glyph == glyph
     }
@@ -134,7 +115,6 @@ nonisolated final class SampleGlyphValue: NSObject {
 }
 
 nonisolated extension NSAttributedString {
-    /// The glyphs pasted into it whose characters are still there as pasted, in order.
     func sampleGlyphs(in range: NSRange? = nil) -> [SampleGlyphRun] {
         let string = self.string as NSString
         let range = range ?? NSRange(location: 0, length: length)
@@ -159,7 +139,6 @@ nonisolated extension NSAttributedString {
 }
 
 nonisolated extension NSMutableAttributedString {
-    /// Marks the glyphs' characters, those that are still there as pasted.
     func addSampleGlyphs(_ runs: [SampleGlyphRun]) {
         let string = self.string as NSString
         for run in runs where NSMaxRange(run.range) <= length && string.substring(with: run.range) == run.glyph.characters {

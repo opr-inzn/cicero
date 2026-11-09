@@ -1,8 +1,6 @@
 import Foundation
 
-/// Why an export or a backup didn't replace the item the save panel said to replace.
 public struct KeptItemError: Error, Sendable {
-    /// The item's name, e.g. "Fonts".
     public var name: String
     public var isFolder: Bool
 
@@ -11,18 +9,12 @@ public struct KeptItemError: Error, Sendable {
     }
 }
 
-/// Where an export or a backup is written before it takes the place the save panel chose: a private
-/// folder on the same disk. The new item moves into place only once it's complete, so a cancelled or
-/// failed one leaves nothing behind and the item it replaces stays until then. That item goes to the
-/// Trash, never under the new one, and never when it is, or holds, something Cicero must keep.
 struct ItemReplacement {
     let destination: URL
-    /// Where to write the new item: in the private folder, with the destination's name.
     let staged: URL
     private let folder: URL
     private let kept: [String]
 
-    /// Fails before anything is written when the item at `destination` is, or holds, one of `kept`.
     init(for destination: URL, keeping kept: [String]) throws {
         try Self.check(destination, keeping: kept)
         let fm = FileManager.default
@@ -36,20 +28,17 @@ struct ItemReplacement {
         staged = folder.appendingPathComponent(destination.lastPathComponent, isDirectory: false)
     }
 
-    /// Moves the finished item into place, after moving the one it replaces to the Trash.
     func commit(trash: (URL) throws -> Void) throws {
+        // The replaced item goes to the Trash, never under the new one, and never when it is, or holds, something Cicero must keep.
         try Self.check(destination, keeping: kept)
         if ActivationEngine.exists(destination.path) { try trash(destination) }
         try FileManager.default.moveItem(at: staged, to: destination)
     }
 
-    /// Removes the private folder and whatever is still in it; call when done, whether or not it was committed.
     func discard() {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    /// Throws when there's an item at `destination` that is one of `kept` or a folder holding one, by its path
-    /// or the path symbolic links lead to.
     static func check(_ destination: URL, keeping kept: [String]) throws {
         let path = destination.standardizedFileURL.path
         guard ActivationEngine.exists(path) else { return }

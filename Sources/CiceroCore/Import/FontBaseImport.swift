@@ -1,39 +1,21 @@
 import Foundation
 
-/// Reads FontBase's library. FontBase keeps one folder of fonts (`~/FontBase` unless moved, its `rootFolder`) and
-/// names each font by its PostScript name. It turns a font on by copying it to `~/Library/Fonts/FontBase/<PostScript
-/// name>.<ext>`, and, as it's set to at first, deletes the copies when it quits and makes them again when it opens: so
-/// what's on is what it remembers, not what's in that folder.
-///
-/// It remembers everything in IndexedDB (an Electron app's, in `~/Library/Application Support/FontBase`): the database
-/// "fontbase", object store "fontbase_db", one value per part of its state. `fontbase_settings.rootFolder`;
-/// `fontbase_pathsAll`, each file by its path under the folder (`id` its PostScript name, `url` where a provider's font
-/// is downloaded from); `fontbase_fontsAll`, each font's names; `fontbase_fontsStatus`, the path of each font that's on;
-/// `fontbase_collectionsAll`, its collections (`query.ids` their fonts; All, Recent, Active and Inactive are filters, of
-/// type "default"; Favorites is type "favorites"); `fontbase_fontsTagsUser`, the user's tags of each font.
-///
-/// FontBase writes these while it runs, a moment after each change, and last when it quits: read once it has quit.
 public enum FontBaseImport {
     public enum Failure: Error, Equatable {
-        /// No FontBase library there.
         case notALibrary
     }
 
     public static let bundleIdentifier = "com.dominiklevitsky.fontbase"
 
-    /// FontBase's folder on this Mac, when it has a library there.
     public static func folder(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
         let url = home.appendingPathComponent("Library/Application Support/FontBase", isDirectory: true)
         return leveldb(in: url) != nil ? url : nil
     }
 
-    /// The folder FontBase copies the fonts that are on into.
     public static func copiesFolder(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         home.appendingPathComponent("Library/Fonts/FontBase", isDirectory: true)
     }
 
-    /// The LevelDB folder of FontBase's folder, of its IndexedDB folder, or that folder itself, as a user may choose
-    /// any of them.
     static func leveldb(in url: URL) -> URL? {
         let name = "file__0.indexeddb.leveldb"
         let candidates = [url, url.appendingPathComponent(name), url.appendingPathComponent("IndexedDB").appendingPathComponent(name)]
@@ -43,8 +25,6 @@ public enum FontBaseImport {
         }
     }
 
-    /// Reads the library at `url`: FontBase's folder, or its IndexedDB. A folder in another account's home is taken as
-    /// being in `home`. FontBase's copies in the Fonts folder are only looked at for this Mac's own library.
     public static func read(_ url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> ImportedLibrary {
         guard let leveldb = leveldb(in: url) else { throw Failure.notALibrary }
         let values: [String: JSValue]
@@ -176,7 +156,6 @@ public enum FontBaseImport {
             return library
         }
 
-        /// What doesn't come over, for the sheet.
         private func notes(_ library: inout ImportedLibrary, otherCollections: [String], missing: Int, notDownloaded: [String: Int],
                            unreadable: [FontExplorerImport.UnreadableKind: Int]) {
             if !otherCollections.isEmpty {
@@ -207,7 +186,6 @@ public enum FontBaseImport {
             }
         }
 
-        /// FontBase's folder, as it's set, or where it is at first; in another account's home, in this one's.
         private func rootFolder() -> String {
             var root = values["fontbase_settings"]?["rootFolder"]?.string ?? home + "/FontBase"
             while root.count > 1, root.hasSuffix("/") { root.removeLast() }

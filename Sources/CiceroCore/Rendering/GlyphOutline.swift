@@ -2,21 +2,13 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-/// A glyph's outline, to copy or drag out of a font page as a vector: as SVG, and as PDF, which design apps paste as
-/// paths. Its frame runs from the font's descent to its ascent and across the glyph's advance, so glyphs taken from one
-/// font share a baseline and keep their side bearings; it grows where the outline reaches past that, so nothing of
-/// the glyph is cut off. Filled black, from the outline itself: a font's file never goes with it.
 public struct GlyphOutline {
-    /// The size outlines are taken at, in points: an em of 100 points, or pixels in SVG.
     public static let emSize: CGFloat = 100
 
-    /// In the font's size, y going up from the baseline at 0.
     public let path: CGPath
     public let frame: CGRect
-    /// The glyph's name in the font, like "a.ss01" or "f_i", if it has one.
     public let name: String?
 
-    /// Nothing for a glyph without an outline: a space, or a bitmap like an emoji's.
     public init?(glyph: CGGlyph, font: CTFont) {
         guard let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.isEmpty else { return nil }
         var glyph = glyph
@@ -28,7 +20,6 @@ public struct GlyphOutline {
         name = (CTFontCopyNameForGlyph(font, glyph) as String?).flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    /// An SVG document of the outline, as wide and high as its frame in pixels, the baseline where y is 0.
     public var svg: String {
         var data = ""
         // SVG's y goes down.
@@ -53,7 +44,6 @@ public struct GlyphOutline {
             """
     }
 
-    /// A one-page PDF of the outline, the page its frame, in points.
     public var pdf: Data {
         let data = NSMutableData()
         var page = CGRect(origin: .zero, size: frame.size)
@@ -72,11 +62,8 @@ public struct GlyphOutline {
         return data as Data
     }
 
-    /// The outline in Adobe Illustrator's clipboard format (AICB), which InDesign and Illustrator paste as paths of
-    /// their own, where they'd place a PDF as a graphic. They run it as PostScript: Illustrator's own copies define
-    /// its short operators first, in Adobe's procedure sets, so this one sticks to PostScript's: one black path,
-    /// filled, its frame's corner at 0, 0.
     public var aicb: String {
+        // InDesign and Illustrator run this as PostScript, where Illustrator's short operators exist only once its procedure sets define them: use PostScript's own.
         var paths = ""
         func point(_ point: CGPoint) -> String {
             "\(Self.number(point.x - frame.minX)) \(Self.number(point.y - frame.minY))"
@@ -129,14 +116,11 @@ public struct GlyphOutline {
             """
     }
 
-    /// "Inter Bold a.ss01.svg": the style's full name and the glyph's, or `fallback` for a glyph without a name, with
-    /// what the Finder can't have in a file name replaced.
     public func fileName(style: String, fallback: String, extension: String = "svg") -> String {
         let name = "\(style) \(name ?? fallback)".replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
         return "\(name).\(`extension`)"
     }
 
-    /// At most three decimals, without trailing zeros: "12.5", "-3", "0".
     static func number(_ value: CGFloat) -> String {
         let rounded = (value * 1000).rounded() / 1000
         guard rounded != 0 else { return "0" }

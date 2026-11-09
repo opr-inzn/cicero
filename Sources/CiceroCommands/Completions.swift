@@ -1,19 +1,12 @@
 import CiceroCore
 import Foundation
 
-/// The names the shell offers when the user presses Tab after a command that takes one: families, tags, folders and so
-/// on, as the commands look them up. Read from what Cicero saved, like the read commands, but lighter: no coverage,
-/// measurements or guessed classes, never a scan, and nothing written. Anything that goes wrong (Cicero hasn't scanned
-/// yet, its data can't be read) gives no names, as Tab must never print an error into the line being typed.
 public enum CompletionNames {
     public enum Kind: Sendable {
         case families, tags, folders, locations, foundries, classes, coverage
-        /// The styles of the family on the command line (`status <family> --style`).
         case styles
     }
 
-    /// `words` is the command line as typed so far, as the shell has it (quotes and backslashes in place); its flags
-    /// that show or hide fonts are followed, as the command will follow them.
     public static func names(_ kind: Kind, words: [String], environment: ToolEnvironment) -> [String] {
         let words = words.map(unquoted)
         guard let saved = try? LibraryContext.loadUserData(environment) else { return [] }
@@ -49,12 +42,10 @@ public enum CompletionNames {
         }
     }
 
-    /// True for `--name`, false for `--no-name`, nil for neither; the last one given wins, as the command has it.
     static func flag(_ name: String, in words: [String]) -> Bool? {
         words.last { $0 == "--\(name)" || $0 == "--no-\(name)" }.map { $0 == "--\(name)" }
     }
 
-    /// A word as the shell would pass it to the command: quotes taken off, backslashes before characters dropped.
     static func unquoted(_ word: String) -> String {
         var result = ""
         var quote: Character?

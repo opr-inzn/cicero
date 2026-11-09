@@ -1,10 +1,7 @@
 import CoreFoundation
 import Foundation
 
-/// Unicode scalars a face covers, as sorted closed ranges.
 public struct ScalarRanges: Sendable, Equatable {
-    /// Lower and upper bounds, alternating: sorted, non-overlapping and never adjacent, so every
-    /// lookup is a binary search over half the array.
     let bounds: [UInt32]
 
     public init(_ ranges: [ClosedRange<UInt32>]) {
@@ -21,13 +18,10 @@ public struct ScalarRanges: Sendable, Equatable {
         self.bounds = bounds
     }
 
-    /// Bounds already in canonical form (from the cache or the bitmap reader).
     init(bounds: [UInt32]) {
         self.bounds = bounds
     }
 
-    /// Reads a CoreText character set from its bitmap: 8192 bytes for the BMP, then a plane number
-    /// and 8192 bytes for every other plane with members. Bit n of byte b is scalar b * 8 + n.
     public init(characterSet: CFCharacterSet) {
         guard let data = CFCharacterSetCreateBitmapRepresentation(nil, characterSet) else {
             self.init(bounds: [])
@@ -103,7 +97,6 @@ public struct ScalarRanges: Sendable, Equatable {
         return low > 0 && scalar <= bounds[low * 2 - 1]
     }
 
-    /// How many of these sorted, unique scalars are missing (one pass over both lists).
     public func missingCount(sorted scalars: [UInt32]) -> Int {
         var missing = 0
         walk(sorted: scalars) { _, present in
@@ -120,7 +113,6 @@ public struct ScalarRanges: Sendable, Equatable {
         return missing
     }
 
-    /// Whether each of these sorted scalars is covered, in the same order.
     func presence(sorted scalars: [UInt32]) -> [Bool] {
         var present: [Bool] = []
         present.reserveCapacity(scalars.count)
@@ -137,7 +129,6 @@ public struct ScalarRanges: Sendable, Equatable {
         }
     }
 
-    /// The scalars `isIncluded` keeps.
     public func filter(_ isIncluded: (UInt32) -> Bool) -> ScalarRanges {
         var kept: [UInt32] = []
         for i in stride(from: 0, to: bounds.count, by: 2) {
@@ -153,7 +144,6 @@ public struct ScalarRanges: Sendable, Equatable {
         return ScalarRanges(bounds: kept)
     }
 
-    /// The scalars both cover. Each range the two have in common is whole in each, so the result is canonical too.
     public func intersection(_ other: ScalarRanges) -> ScalarRanges {
         var kept: [UInt32] = []
         var mine = 0, theirs = 0
@@ -170,7 +160,6 @@ public struct ScalarRanges: Sendable, Equatable {
         return ScalarRanges(bounds: kept)
     }
 
-    /// Every covered scalar, in order.
     public var scalars: [UInt32] {
         var all: [UInt32] = []
         all.reserveCapacity(count)

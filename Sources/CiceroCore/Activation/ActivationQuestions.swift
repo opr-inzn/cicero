@@ -1,9 +1,6 @@
 import Foundation
 
-/// The questions Cicero asks before some activations, as values: the app shows them in an alert, the `cicero` tool in
-/// the terminal, or `--yes` answers them.
 public enum ActivationQuestions {
-    /// A question for turning on more than `UserData.manyFamilies` families at once, while the user wants one.
     public static func many(for faces: [LibraryFace], title: String, temporarily: Bool, data: UserData) -> ManyActivationPrompt? {
         guard data.asksBeforeActivatingMany else { return nil }
         let families = Set(faces.map(\.face.familyName)).count
@@ -11,9 +8,6 @@ public enum ActivationQuestions {
         return ManyActivationPrompt(title: title, faces: faces, families: families, temporarily: temporarily)
     }
 
-    /// A question for turning off fonts an app loads from a folder that syncs with a cloud service or is on a server,
-    /// while the user wants one: turning one off moves its file out of the folder, for everyone who shares it. Not for
-    /// a folder Cicero can't move files out of, where turning off fails anyway.
     public static func movingOut(for faces: [LibraryFace], data: UserData) -> MovingOutPrompt? {
         guard data.asksBeforeMovingOutOfSharedFolders else { return nil }
         var checked: Set<String> = []
@@ -38,17 +32,11 @@ public enum ActivationQuestions {
     }
 }
 
-/// Turning off fonts whose files would move out of a folder others share, waiting for the user to say (see
-/// `ActivationQuestions.movingOut(for:data:)`).
 public struct MovingOutPrompt: Identifiable {
     public let id = UUID()
-    /// Everything to turn off.
     public var faces: [LibraryFace]
-    /// Those whose files would move out of a shared folder.
     public var shared: [LibraryFace]
-    /// The folder they're in, when it's one, and who shares it.
     public var folder: (path: String, sharing: FolderSharing)?
-    /// The app that loads them ("Adobe apps", "InDesign"), when it's one.
     public var app: String?
 
     public init(faces: [LibraryFace], shared: [LibraryFace], folder: (path: String, sharing: FolderSharing)?, app: String?) {
@@ -87,8 +75,6 @@ public struct MovingOutPrompt: Identifiable {
         }
     }
 
-    /// What the other choice is called: keeping the shared ones on in their app, where they are. Nil when that does
-    /// nothing, as for fonts on in that app only and nothing else to turn off.
     public var keepTitle: String? {
         let shared = Set(shared.map(\.id))
         guard self.shared.contains(where: { $0.position == .on }) || faces.contains(where: { !shared.contains($0.id) }) else { return nil }
@@ -97,14 +83,11 @@ public struct MovingOutPrompt: Identifiable {
     }
 }
 
-/// Turning on more families at once than `UserData.manyFamilies`.
 public struct ManyActivationPrompt: Identifiable {
     public let id = UUID()
-    /// What the activation was asked to call them.
     public var title: String
     public var faces: [LibraryFace]
     public var families: Int
-    /// Until Cicero quits.
     public var temporarily: Bool
 
     public init(title: String, faces: [LibraryFace], families: Int, temporarily: Bool) {

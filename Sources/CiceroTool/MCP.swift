@@ -4,8 +4,6 @@ import Foundation
 import MCP
 import System
 
-/// `cicero mcp`: the commands as tools for AI agents, over the Model Context Protocol on standard input and output.
-/// The agent app starts it and talks to it until it closes standard input.
 struct MCPServer: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "mcp",
@@ -56,31 +54,22 @@ struct MCPServer: AsyncParsableCommand {
     }
 }
 
-/// The tools, made from the commands' own definitions by one rule, never by hand: a tool for each command that
-/// `Answering`, named by its words with `_` between them (`tag_add`); its inputs are its arguments and options, in
-/// camelCase (`--all-styles` is `allStyles`). A call becomes the command line it stands for, parsed as the command
-/// line is, so a tool checks and answers exactly as its command does.
 enum MCPTools {
     struct Entry: Sendable {
         var tool: Tool
-        /// The command's words: `["tag", "add"]`.
         var words: [String]
         var inputs: [Input]
     }
 
-    /// One argument or option of a command.
     struct Input: Sendable {
         enum Kind: Sendable {
             case positional
             case option
-            /// `inverted`: it has a `--no-` form, so false means something too.
             case flag(inverted: Bool)
         }
 
         var kind: Kind
-        /// The input's name in the tool.
         var property: String
-        /// The option's name on the command line, without `--`.
         var option: String
         var repeating: Bool
         var required: Bool
@@ -107,13 +96,9 @@ enum MCPTools {
         mimeType: "application/json"
     )
 
-    /// Options the tools don't have: those only the terminal has a use for, and `compare`'s `--png`, with which a tool
-    /// marked as only reading could write over any file (an agent can be told to by text in a font file, like its
-    /// license). Without it, the picture goes in the temporary folder, and the answer says where.
+    // Without compare's --png, with which a tool marked as only reading could write over any file: an agent can be told to by text in a font file, like its license.
     static let notForAgents: Set<String> = ["help", "version", "json", "debug", "png"]
 
-    /// The largest picture `compare` sends; a larger one stays in its file. Agent apps take pictures up to 8000 pixels
-    /// on a side and 5 MB in base64.
     static let largestPicture = (side: 8000, bytes: 3_750_000)
 
     static func all(readOnly: Bool) -> [Entry] {
@@ -200,14 +185,12 @@ enum MCPTools {
         }
     }
 
-    /// `all-styles` → `allStyles`.
     static func camelCase(_ name: String) -> String {
         let parts = name.split(separator: "-")
         return parts.enumerated().map { $0.offset == 0 ? String($0.element) : $0.element.prefix(1).uppercased() + $0.element.dropFirst() }
             .joined()
     }
 
-    /// The help's `--all-styles` as the tool's `allStyles`.
     private static func described(_ text: String, _ inputs: [Input]) -> String {
         var text = text
         for input in inputs where input.kind.isOption {
@@ -216,8 +199,6 @@ enum MCPTools {
         return text
     }
 
-    /// The command line a call stands for: the command's words, the options, then `--` and the arguments, so no name
-    /// is read as an option.
     static func commandLine(_ entry: Entry, _ arguments: [String: Value]) throws -> [String] {
         let known = Set(entry.inputs.map(\.property))
         if let unknown = arguments.keys.sorted().first(where: { !known.contains($0) }) {
@@ -237,6 +218,7 @@ enum MCPTools {
                 positionals += try words(value, input)
             }
         }
+        // The arguments after --, so no name an agent gives, like --yes, is read as an option.
         return entry.words + options + ["--"] + positionals
     }
 
@@ -260,7 +242,6 @@ enum MCPTools {
         CommandError(.invalidArgument, "\(input.property) must be \(expected).")
     }
 
-    /// One call at a time, as one command at a time in Terminal: a change waits for the one before it.
     @MainActor private static var last: Task<CallTool.Result, Never>?
 
     @MainActor
@@ -293,7 +274,6 @@ enum MCPTools {
         }
     }
 
-    /// What the command line answers, as `cicero … --json` would.
     @MainActor
     private static func result(of commandLine: [String]) async throws -> JSON {
         let command: ParsableCommand
@@ -310,7 +290,6 @@ enum MCPTools {
         CallTool.Result(content: [.text(text: error.json.compactText(), annotations: nil, _meta: nil)], isError: true)
     }
 
-    /// `compare`'s picture, for the agent to look at.
     private static func picture(_ answer: JSON) -> [Tool.Content] {
         guard case .string(let path) = answer["png"], let data = FileManager.default.contents(atPath: path) else { return [] }
         let side = [answer["width"], answer["height"]].compactMap { if case .int(let value) = $0 { value } else { nil } }.max() ?? 0
@@ -321,7 +300,6 @@ enum MCPTools {
         return [.image(data: data.base64EncodedString(), mimeType: "image/png", annotations: nil, _meta: nil)]
     }
 
-    /// The `cicero://coverage` resource: what `list coverage` answers.
     @MainActor
     static func coverageSets() async -> String {
         do {
@@ -340,7 +318,6 @@ extension MCPTools.Input.Kind {
     }
 }
 
-/// What `_dumpHelp()` says about a command: the parts of ArgumentParser's `ToolInfoV0` the tools are made from.
 private struct HelpDump: Decodable {
     struct Command: Decodable {
         var abstract: String?

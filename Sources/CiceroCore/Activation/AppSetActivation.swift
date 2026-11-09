@@ -2,13 +2,6 @@ import CoreText
 import Foundation
 
 extension ActivationEngine {
-    /// Brings application sets' fonts in line with `wanted`: each file's path → the bundle IDs of the
-    /// open apps whose sets have it. Files that are off get registered for the session; files already on
-    /// for application sets keep going with the apps that still want them, and the ones no open app wants
-    /// are unregistered. Files that are on for any other reason are left alone, so an application set
-    /// never turns off a font the user turned on.
-    /// `faces` has each wanted file's face, for its current state. Like temporary activation, a file
-    /// counts as on only once macOS reports it active.
     @concurrent
     public func syncAppSets(_ wanted: [String: Set<String>], faces: [String: LibraryFace], records: ActivationRecords) async -> ActivationResult {
         var records = records

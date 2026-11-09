@@ -1,13 +1,7 @@
 import CoreFoundation
 import Foundation
 
-/// The names a font gives its family in other languages, read from its name table, so a family can show in the Mac's
-/// language. All of them are kept, not only the one for the Mac's language now, so the caches stay the same when
-/// that changes.
 public enum LocalizedNames {
-    /// Language, in full ("ja-Jpan-JP", "zh-Hans-CN") → the family's name in it, for the names in languages other than
-    /// English that differ from `familyName`. The typographic family names (name ID 16) when the table has any, as
-    /// CoreText's family names are, else the family names (ID 1). Empty without a name table.
     static func familyNames(_ table: Data?, besides familyName: String) -> [String: String] {
         guard let table, table.count >= 6 else { return [:] }
         func u16(_ offset: Int) -> Int? {
@@ -33,7 +27,6 @@ public enum LocalizedNames {
         struct Entry {
             var nameID: Int
             var language: String
-            /// Windows' and Unicode's names before the Mac's, which are in older encodings.
             var priority: Int
             var name: String
         }
@@ -66,6 +59,7 @@ public enum LocalizedNames {
                 continue
             }
             guard let language, !language.isEmpty, let name = text?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { continue }
+            // Windows' and Unicode's names before the Mac's, which are in older encodings.
             entries.append(Entry(nameID: nameID, language: language, priority: platform == 1 ? 1 : 0, name: name))
         }
         let nameID = entries.contains { $0.nameID == 16 } ? 16 : 1
@@ -81,18 +75,15 @@ public enum LocalizedNames {
         return names.compactMapValues { $0.name == familyName ? nil : $0.name }
     }
 
-    /// The Mac's languages, in the user's order.
     public static let preferredLanguages = Locale.preferredLanguages
 
-    /// The name for the first of `languages` the font has a name in: its own name (nil) when that's English, as a
-    /// font's own name is, or when it has none for any of them. A name for the language in another script doesn't
-    /// count ("zh_TW", Traditional Chinese, for Simplified); one for another region does, the language's own first.
     public static func name(in names: [String: String], for languages: [String] = preferredLanguages) -> String? {
         guard !names.isEmpty else { return nil }
         let candidates = names.keys.sorted().map { (language: Locale.Language(identifier: Locale.Language(identifier: $0).maximalIdentifier), name: names[$0]!) }
         for preferred in languages {
             let wanted = Locale.Language(identifier: Locale.Language(identifier: preferred).maximalIdentifier)
             if wanted.languageCode == .english { return nil }
+            // The script must match too: "zh_TW" is Traditional Chinese, no name for a Mac set to Simplified.
             let matches = candidates.filter { $0.language.languageCode == wanted.languageCode && $0.language.script == wanted.script }
             if let match = matches.first(where: { $0.language.region == wanted.region }) ?? matches.first { return match.name }
         }

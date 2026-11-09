@@ -1,17 +1,11 @@
 import CiceroCore
 import Foundation
 
-/// `Requests/` in Cicero's support folder: while Cicero is open (holding `AppLock`), the `cicero` command asks it there
-/// to make a change, so one program at a time writes Cicero's data. A request goes from `<id>.request.json` (written
-/// whole, then renamed into place) to `<id>.taken.json` when Cicero takes it, and Cicero answers in `<id>.reply.json`,
-/// the answer in the contract's JSON. Taking and withdrawing are renames of the same file, so only one of them happens:
-/// a request Cicero took is never made twice, and one it didn't is never made by both.
 public enum Requests {
     public static func folder(support: URL) -> URL {
         support.appendingPathComponent("Requests", isDirectory: true)
     }
 
-    /// How long Cicero has to take a request; after that the command waits as long as Cicero works on it.
     public static let takeWithin: Duration = .seconds(5)
 
     static func file(_ id: String, _ kind: String, in folder: URL) -> URL {
@@ -20,9 +14,6 @@ public enum Requests {
 
     // MARK: The command
 
-    /// Sends the request to Cicero and returns its answer. Nil when Cicero quit before taking it: the request is
-    /// withdrawn, and the caller makes the change itself. `busy` when Cicero is open but doesn't take it in time;
-    /// `failed` when Cicero quits after taking it without answering.
     static func send(_ request: WriteRequest, support: URL) async throws -> JSON? {
         let folder = folder(support: support)
         let fm = FileManager.default
@@ -82,13 +73,11 @@ public enum Requests {
 
     // MARK: Cicero
 
-    /// A request Cicero took: its id, and the request, nil when this version can't read it.
     public struct Taken: Sendable {
         public var id: String
         public var request: WriteRequest?
     }
 
-    /// Takes the requests waiting, oldest first; one the command withdrew meanwhile is left out.
     public static func take(support: URL) -> [Taken] {
         let folder = folder(support: support)
         let fm = FileManager.default
@@ -106,13 +95,13 @@ public enum Requests {
                 return nil
             }
             let taken = file(id, "taken", in: folder)
+            // Taking and withdrawing are renames of the same file, so only one happens: a request is never made twice, nor by both Cicero and the command.
             guard (try? fm.moveItem(at: url, to: taken)) != nil else { return nil }
             let request = (try? Data(contentsOf: taken)).flatMap { try? JSONDecoder().decode(WriteRequest.self, from: $0) }
             return Taken(id: id, request: request)
         }
     }
 
-    /// Answers a request Cicero took.
     public static func reply(_ answer: JSON, to id: String, support: URL) {
         let folder = folder(support: support)
         let staged = folder.appendingPathComponent("\(id).reply.staged", isDirectory: false)
@@ -124,12 +113,10 @@ public enum Requests {
         }
     }
 
-    /// The answer to a request this version can't read, as from a newer `cicero` command.
     public static var unreadable: JSON {
         CommandError(.failed, "This version of Cicero can’t read the change. Update Cicero.").json
     }
 
-    /// Takes away what's left of requests whose command stopped before reading the answer, older than an hour.
     public static func tidy(support: URL) {
         let folder = folder(support: support)
         let fm = FileManager.default

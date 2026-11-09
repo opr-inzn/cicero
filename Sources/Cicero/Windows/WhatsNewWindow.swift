@@ -4,22 +4,16 @@ import Observation
 import Sparkle
 import SwiftUI
 
-/// One version's notes from CHANGELOG.md, which build-app.sh puts in the app: its `## <version>` heading, the
-/// paragraphs under it and its `- ` items, each with its Markdown (bold, code, links) read.
 struct ReleaseNotes: Identifiable {
     let version: String
     var paragraphs: [AttributedString] = []
     var items: [AttributedString] = []
     var id: String { version }
 
-    /// Where the links in CHANGELOG.md, which are relative to it, point from the app: the files as they were in the
-    /// version's release, as on its GitHub release page. Not main, where a page a beta brings isn't yet.
     private static func base(_ version: String) -> URL? {
         URL(string: "https://github.com/opr-inzn/cicero/blob/v\(version)/")
     }
 
-    /// Every version's notes, newest first, as in the file. Headings that aren't a version, like `## Unreleased`, are
-    /// left out with what's under them.
     static func parse(_ text: String) -> [ReleaseNotes] {
         var versions: [ReleaseNotes] = []
         var current: ReleaseNotes?
@@ -72,7 +66,6 @@ struct ReleaseNotes: Identifiable {
         return text
     }
 
-    /// The notes in the app, nil for a binary run from .build (swift run), which has none.
     static var bundled: [ReleaseNotes]? {
         guard let url = Bundle.main.url(forResource: "CHANGELOG", withExtension: "md"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
@@ -80,27 +73,18 @@ struct ReleaseNotes: Identifiable {
     }
 }
 
-/// What's new since the version of Cicero that opened last: after an update, the main window opens the What's New
-/// window with the notes of each version since, newest first. Help → What's New in Cicero shows this version's again.
-/// At the first launch there's nothing new to show. After a Cicero from before What's New, which kept no version, it
-/// shows this version's notes and the version's before it, which that one couldn't show either; but not a beta's
-/// before a stable version, as only beta users had that one.
 @Observable
 final class WhatsNew {
     static let shared = WhatsNew()
-    /// The version that showed its notes last, or opened with none to show.
     static let lastVersionKey = "whatsNew.lastVersion"
 
-    /// What the window shows.
     private(set) var notes: [ReleaseNotes] = []
-    /// What the main window shows when it appears, as it doesn't at a launch at login or in the menu bar.
     @ObservationIgnored private var pending: [ReleaseNotes] = []
 
     private static var currentVersion: String? {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     }
 
-    /// At launch, before the library is read, so its saved data still tells a first launch from one after an update.
     func noteLaunch() {
         guard let current = Self.currentVersion, let all = ReleaseNotes.bundled else { return }
         let defaults = UserDefaults.standard
@@ -115,7 +99,6 @@ final class WhatsNew {
         if pending.isEmpty { defaults.set(current, forKey: Self.lastVersionKey) }
     }
 
-    /// The notes waiting for the main window, which it shows, once.
     func takePending() -> Bool {
         guard !pending.isEmpty else { return false }
         notes = pending
@@ -124,7 +107,6 @@ final class WhatsNew {
         return true
     }
 
-    /// This version's notes, or the newest before it, for the Help menu. False when the app has none.
     func showLatest() -> Bool {
         guard let current = Self.currentVersion,
               let latest = ReleaseNotes.bundled?.first(where: { !Self.isNewer($0.version, than: current) }) else { return false }
@@ -132,23 +114,18 @@ final class WhatsNew {
         return true
     }
 
-    /// As Sparkle compares them, so a beta like 0.12.0b1 comes before 0.12.0.
     private static func isNewer(_ version: String, than other: String) -> Bool {
         SUStandardVersionComparator.default.compareVersion(version, toVersion: other) == .orderedDescending
     }
 }
 
-/// The notes of the versions since the last one that opened, under a title, with Done under them. As tall as they are,
-/// up to a height where they scroll under Done.
 struct WhatsNewWindow: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var contentHeight: CGFloat = 0
     @State private var barHeight: CGFloat = 0
 
     private static let width: CGFloat = 560
-    /// Below the title bar.
     private static let maximumHeight: CGFloat = 600
-    /// Between one version's notes and the next: a line of the notes' text, as tall as AppKit sets it.
     private static let lineHeight = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .title3)).rounded()
 
     var body: some View {
@@ -188,7 +165,6 @@ struct WhatsNewWindow: View {
     }
 }
 
-/// "Cicero 0.11.0", the paragraphs under it, and its items, each after a dot.
 private struct VersionNotes: View {
     let notes: ReleaseNotes
 

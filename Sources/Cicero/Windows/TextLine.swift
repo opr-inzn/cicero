@@ -1,19 +1,12 @@
 import CoreText
 import Foundation
 
-/// One line of text laid out by CoreText, measured for layouts that share a baseline and drawn
-/// into a flipped (top-left origin) context in the context's fill colour.
 struct TextLine {
     let line: CTLine
-    /// From the start of the line to its end, or to the furthest a glyph reaches past it.
     let width: CGFloat
-    /// How far glyphs reach to the left of the line's start, like an italic's j.
     let overhang: CGFloat
-    /// Above and below the baseline: the font's ascent and descent, or as far as its glyphs go beyond them, so
-    /// room for the line never cuts off a descender.
     let ascent: CGFloat
     let descent: CGFloat
-    /// How far its glyphs reach above the baseline.
     let inkAscent: CGFloat
 
     init(_ text: String, font: CTFont, kerning: Double) {

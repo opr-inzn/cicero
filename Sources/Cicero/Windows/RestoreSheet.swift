@@ -2,14 +2,11 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Restore sheet for a backup read from disk.
     func restoreSheet(contents: Binding<BackupContents?>) -> some View {
         sheet(item: contents) { RestoreSheet(contents: $0) }
     }
 }
 
-/// Confirms restoring a backup: what's in it, whether to replace the setup and put the fonts
-/// back, and progress while the fonts are copied.
 struct RestoreSheet: View {
     let contents: BackupContents
     @Environment(AppModel.self) private var model
@@ -17,7 +14,6 @@ struct RestoreSheet: View {
     @State private var settings = true
     @State private var fonts = true
     @State private var isRestoring = false
-    /// Files put back so far, while the fonts are copied.
     @State private var progress: (done: Int, total: Int)?
     @State private var task: Task<Void, Never>?
 
@@ -70,7 +66,6 @@ struct RestoreSheet: View {
         .onDisappear { contents.discard() }
     }
 
-    /// "4 folders, 2 smart folders, 7 tags, 3 locations, 12 added fonts and 1 character set." and what restoring them does.
     private var settingsDetail: String {
         let data = contents.userData
         let counts = [

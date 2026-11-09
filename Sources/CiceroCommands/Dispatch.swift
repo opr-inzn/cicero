@@ -2,15 +2,9 @@ import AppKit
 import CiceroCore
 import Foundation
 
-/// Makes a change the one way it may be made now (Design B): while Cicero is open, Cicero makes it (`Requests`); while
-/// it's closed, the command makes it itself, holding `AppLock` so a Cicero that starts meanwhile waits for it.
 @MainActor
 public enum WriteDispatcher {
-    /// How long a Cicero that's open may leave the lock free before the command takes it for one that can't (a
-    /// version from before the command could write). A Cicero that's starting, or that waited for another command,
-    /// takes it within moments.
     static let startingCicero: TimeInterval = 15
-    /// How long the command waits for another `cicero` command's change.
     static let otherCommand: Duration = .seconds(60)
 
     public static func perform(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
@@ -45,15 +39,13 @@ public enum WriteDispatcher {
         }
     }
 
-    /// Asked of the process itself too: without a run loop, the command's list of running apps isn't told when one quits.
     static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
         NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).first {
+            // Asked of the process too: without a run loop, the command's list of running apps isn't told when one quits.
             !$0.isTerminated && kill($0.processIdentifier, 0) == 0
         }
     }
 
-    /// With Cicero closed and the lock held: the library scanned first when fonts turn on or off, so the files are where
-    /// the change finds them, and again after, so the saved library has what changed.
     private static func closed(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
         try repairIfNeeded(environment)
         let context = request.command.needsLibrary
@@ -70,8 +62,6 @@ public enum WriteDispatcher {
 }
 
 extension WriteDispatcher {
-    /// Repairs the records after a command that stopped while it turned fonts on or off (see `ActivationJournal`), with
-    /// the lock held.
     static func repairIfNeeded(_ environment: ToolEnvironment) throws {
         let support = environment.locations.support
         guard let journal = ActivationJournal.read(support: support) else { return }
@@ -83,14 +73,11 @@ extension WriteDispatcher {
     }
 }
 
-/// Makes changes while Cicero is closed, as Cicero would: user-data.json written as `UserDataStore` writes it, at once
-/// and onto the disk, and fonts turned on and off with the same `ActivationEngine`.
 @MainActor
 final class ClosedAppWriter: Writer {
     let environment: ToolEnvironment
     private let store: UserDataStore
     private(set) var data: UserData
-    /// Whether fonts turned on or off.
     private(set) var activated = false
     private(set) var saveFailed = false
 
@@ -108,7 +95,6 @@ final class ClosedAppWriter: Writer {
         if !store.flush(durably: true) { saveFailed = true }
     }
 
-    /// As the app has it (`AppModel.engine`).
     private var engine: ActivationEngine {
         var engine = ActivationEngine(locations: environment.locations, registrar: environment.registrar)
         engine.fontLibrary = data.fontLibrary?.url
@@ -134,13 +120,11 @@ final class ClosedAppWriter: Writer {
         _ = try? await LibraryContext.load(environment, rescan: true)
     }
 
-    /// What's about to turn, written down first (see `ActivationJournal`); false when it couldn't be.
     private func begin(_ faces: [LibraryFace], turningOn: Bool) -> Bool {
         let journal = ActivationJournal(turningOn: turningOn, paths: faces.map(\.face.path))
         return (try? journal.write(support: environment.locations.support)) != nil
     }
 
-    /// As the app's `finish`: the records saved, and added files a copy was installed of forgotten; then the journal goes.
     private func finish(_ result: ActivationResult, journal: Bool) {
         activated = true
         // For the end-to-end test of a command that stops here, before the records are saved.

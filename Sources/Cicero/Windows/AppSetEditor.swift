@@ -3,8 +3,6 @@ import CiceroCore
 import ServiceManagement
 import SwiftUI
 
-/// The apps of an application set: while one of them is open, Cicero activates the set's fonts.
-/// Changes apply as they're made.
 struct AppSetEditor: View {
     let setID: UUID
     @Environment(AppModel.self) private var model
@@ -62,7 +60,6 @@ struct AppSetEditor: View {
         }
     }
 
-    /// Application sets need Cicero to be open, so this offers to open it at login, next to Done.
     @ViewBuilder
     private var loginToggle: some View {
         Toggle("Open Cicero at login", isOn: Binding(
@@ -77,12 +74,9 @@ struct AppSetEditor: View {
     }
 }
 
-/// Opening Cicero when the user logs in, so application sets work from the start.
 enum LoginItem {
     static var status: SMAppService.Status { SMAppService.mainApp.status }
 
-    /// Returns the status afterwards. Outside the Applications folder, turning it on offers to move Cicero
-    /// there instead: a login item for a copy on a disk image or in Downloads breaks once that copy goes.
     static func set(_ enabled: Bool, model: AppModel) -> SMAppService.Status {
         if enabled, !ApplicationsFolder.isInApplicationsFolder {
             ApplicationsFolder.offerToMove(forOpenAtLogin: true)

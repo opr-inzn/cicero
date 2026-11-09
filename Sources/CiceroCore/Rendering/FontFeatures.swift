@@ -1,7 +1,6 @@
 import CoreText
 import Foundation
 
-/// A group of OpenType features as CoreText describes them for one face.
 public struct FontFeatureGroup: Identifiable, Sendable {
     public struct Option: Identifiable, Sendable {
         public let selector: Int
@@ -18,9 +17,7 @@ public struct FontFeatureGroup: Identifiable, Sendable {
 
     public let type: Int
     public let name: String
-    /// One option at a time (a menu) rather than independent switches.
     public let isExclusive: Bool
-    /// For a non-exclusive group, the "on" selectors; each is turned off with `selector + 1`.
     public let options: [Option]
     public var id: Int { type }
 
@@ -31,7 +28,6 @@ public struct FontFeatureGroup: Identifiable, Sendable {
         self.options = options
     }
 
-    /// The face's optional features; reads the font, so call off the main thread.
     public static func load(for face: FontFace) -> [FontFeatureGroup] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let features = CTFontCopyFeatures(font) as? [[String: Any]] else { return [] }
@@ -57,10 +53,8 @@ public struct FontFeatureGroup: Identifiable, Sendable {
         }
     }
 
-    /// AAT pairs each switch's "on" selector (even) with an "off" one (the next odd number), so a
-    /// switch is on by default when its on selector is the default or its off selector isn't.
-    /// nil when the selectors don't follow that pairing.
     private static func switches(_ listed: [Option]) -> [Option]? {
+        // AAT pairs each switch's on selector, an even number, with an off one, the next odd number.
         let on = listed.filter { $0.selector.isMultiple(of: 2) }
         let off = Dictionary(listed.filter { !$0.selector.isMultiple(of: 2) }.map { ($0.selector - 1, $0.isDefault) }, uniquingKeysWith: { a, _ in a })
         guard !on.isEmpty, off.keys.allSatisfy({ key in on.contains { $0.selector == key } }) else { return nil }

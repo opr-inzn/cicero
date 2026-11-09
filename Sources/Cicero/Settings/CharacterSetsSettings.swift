@@ -1,7 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// The user's own character sets, then the built-in ones by group, with a checkbox each for the sidebar.
 struct CharacterSetsSettings: View {
     @Environment(AppModel.self) private var model
     @State private var editing: CustomCharacterSet?
@@ -50,7 +49,6 @@ struct CharacterSetsSettings: View {
         }
     }
 
-    /// Rows of the form rather than a list of their own, so they scroll with the built-in sets.
     private var custom: some View {
         Section {
             ForEach(model.data.customCharacterSets) { set in

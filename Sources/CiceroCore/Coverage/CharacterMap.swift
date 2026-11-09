@@ -1,23 +1,17 @@
 import CoreText
 import Foundation
 
-/// The characters a font has: those its character map (the cmap table) gives a glyph. CoreText's character set adds
-/// some the font doesn't have, which it draws with another glyph: U+A789 MODIFIER LETTER COLON with the colon, U+2010
-/// and U+2011 with the hyphen, U+00A0, U+202F and the line and paragraph separators with the space, and so on.
 public enum CharacterMap {
-    /// CoreText's character set without the characters the font's character map leaves out. CoreText's own when the
-    /// font has no Unicode or symbol subtable to read, like a font with only a Mac Roman one, which CoreText maps itself.
     public static func characters(of font: CTFont) -> ScalarRanges {
+        // CoreText's character set adds characters the font draws with another glyph, like U+A789 with the colon, U+2010 and U+2011 with the hyphen, and U+00A0, U+202F and the line and paragraph separators with the space.
         let reported = ScalarRanges(characterSet: CTFontCopyCharacterSet(font))
+        // A font with only a Mac Roman subtable has none to read, and CoreText maps it itself.
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableCmap), []) as Data?,
               let mapped = mapped(in: table)
         else { return reported }
         return reported.intersection(mapped)
     }
 
-    /// The characters the table's Unicode and symbol subtables (formats 0, 4, 6, 10, 12 and 13) give a glyph other than
-    /// .notdef; nil when it has none it can read. Every offset and count is checked against the table, so a damaged one
-    /// gives fewer characters, never a crash.
     static func mapped(in table: Data) -> ScalarRanges? {
         let reader = GSUBSubstitutions.Reader(bytes: [UInt8](table))
         var ranges: [ClosedRange<UInt32>] = []

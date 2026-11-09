@@ -4,7 +4,6 @@ import SwiftUI
 struct FoldersSettings: View {
     @Environment(AppModel.self) private var model
     @State private var selection: Set<UUID> = []
-    /// The folder being marked as loaded by an app Cicero doesn't know.
     @State private var namingFolder: WatchedFolder?
     @State private var appName = ""
 
@@ -76,7 +75,6 @@ private struct FolderRow: View {
         .tag(folder.id)
     }
 
-    /// What's out of reach in the folder, if anything.
     @ViewBuilder
     private var status: some View {
         let onlineOnly = model.onlineOnlyCount(inFolder: folder.id)

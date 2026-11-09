@@ -27,6 +27,7 @@ struct CiceroApp: App {
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
                 menuBarItem.start()
+                // After the lock's message, SwiftUI doesn't open the Library window at launch by itself.
                 if LaunchWait.showedMessage {
                     DispatchQueue.main.async { menuBarItem.openWindow?(id: WindowID.main) }
                 }
@@ -107,8 +108,6 @@ struct CiceroCommands: Commands {
     @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
-    /// ⌘O opens the family selected in the browser, as in the Finder, and adds fonts while none is. ⌘↓ opens it
-    /// too, from the browser (see `FamilyKeys`).
     private var opensSelection: Bool { model.openFamilyID == nil && !model.selectedIDs.isEmpty }
 
     var body: some Commands {
@@ -243,8 +242,6 @@ struct CiceroCommands: Commands {
         }
     }
 
-    /// A link to Cicero's website under the version in the About panel. The panel puts the copyright
-    /// (NSHumanReadableCopyright, "© 2026 Maximilian Inzinger") below it, so the name isn't repeated here.
     private static var credits: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -257,13 +254,7 @@ struct CiceroCommands: Commands {
     }
 }
 
-/// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
-/// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
-/// Last in the responder chain, it takes Edit → Paste (⌘V) in the main window where nothing else does, as while the
-/// sidebar has the focus: font files and folders copied in the Finder are added as if dropped on it (see `FileDrop`).
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-    /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
     var model: AppModel? {
         didSet { flush() }
     }
@@ -281,7 +272,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         flush()
     }
 
-    /// Above the system's items, and the windows the Dock lists itself (see `WindowList`): Add Fonts, as in the File menu.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
@@ -290,8 +280,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return menu
     }
 
-    /// Brings Cicero forward, which opens the main window when none shows, so the fonts added show there, and asks
-    /// for them.
     @objc private func addFonts() {
         NSApp.bringForward()
         addsFonts = true
@@ -306,7 +294,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menuItem.action == #selector(paste(_:)) ? canPaste : true
     }
 
-    /// Files are on the pasteboard and the main window is in front, without a sheet over it.
     private var canPaste: Bool {
         model != nil && NSApp.keyWindow != nil && NSApp.keyWindow === TextEditingKeys.mainWindow && !AppModel.pastedFiles.isEmpty
     }
@@ -325,10 +312,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 }
 
-/// The Cicero menu's settings item, called Preferences. SwiftUI makes it, as for any app with a Settings scene, and
-/// calls it Settings… again whenever it updates the menu. It gives that title to whatever holds ⌘, (a command group of
-/// Cicero's own too, which leaves two), so its own item is named again whenever any menu changes (SwiftUI can put
-/// the Cicero menu in the menu bar whole, which only the menu bar hears of) and as one opens: a dozen items to look at.
 enum PreferencesItem {
     static let title = "Preferences"
     private static var observers: [NSObjectProtocol] = []
@@ -336,6 +319,7 @@ enum PreferencesItem {
 
     static func keepNamed() {
         guard observers.isEmpty else { return }
+        // SwiftUI names the item Settings… again whenever it updates a menu, and gives that title to whatever holds ⌘, (a command group of Cicero's own too).
         for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification, NSMenu.didBeginTrackingNotification] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
                 MainActor.assumeIsolated { rename() }
@@ -357,11 +341,6 @@ enum PreferencesItem {
     }
 }
 
-/// Cicero's windows in the Window menu's list of open windows, where the Dock finds the windows it lists in an app's
-/// menu, with their symbol and the frontmost checked. SwiftUI leaves its windows out of that list (it has a command for
-/// each scene above it instead), so each is added as it shows, under a name of its own: the main window as Library,
-/// rather than what its sidebar shows, and Settings as Preferences, rather than its tab. A window that closes leaves the
-/// list by itself.
 enum WindowList {
     private static var observers: [NSObjectProtocol] = []
 
@@ -387,7 +366,6 @@ enum WindowList {
         }
     }
 
-    /// nil for panels, sheets and the menu bar's own windows.
     private static func title(of window: NSWindow) -> String? {
         guard window.styleMask.contains(.titled), !(window is NSPanel), window.sheetParent == nil else { return nil }
         switch window.identifier?.rawValue {

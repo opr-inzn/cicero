@@ -1,14 +1,12 @@
 import CiceroCore
 import SwiftUI
 
-/// "213 languages, including English, German, …" with every language in a popover.
 struct LanguagesRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
     @State private var loaded: Loaded<FaceCoverage>?
     @State private var showsAll = false
 
-    /// The user's languages lead; then by number of speakers.
     private static let preferred: [String] = Locale.preferredLanguages.compactMap {
         Locale(identifier: $0).language.languageCode?.identifier(.alpha3)
     }
@@ -96,8 +94,6 @@ private struct LanguageList: View {
     }
 }
 
-/// The largest set of each series the face has, and how far it is from the next Latin size, with the characters it
-/// still needs for that in a popover.
 struct CharacterSetsRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
@@ -134,8 +130,6 @@ struct CharacterSetsRow: View {
         }
     }
 
-    /// The largest set of each series (Google's grouped by script); sets in none, like GF Latin African and
-    /// custom sets, each count on their own.
     private func supported(by ranges: ScalarRanges) -> [CharacterSetDefinition] {
         var best: [String: CharacterSetDefinition] = [:]
         var order: [String] = []
@@ -150,7 +144,6 @@ struct CharacterSetsRow: View {
 
     static let unicodeGroupID = "unicode"
 
-    /// The Latin size after the largest the face has; Latin S for one without any.
     private func nextLatin(after has: [CharacterSetDefinition]) -> CharacterSetDefinition? {
         guard let series = model.characterSetCatalog.groups.first(where: { $0.id == CharacterSetCatalog.latinSeriesID })?.sets else { return nil }
         let level = has.first { $0.groupID == CharacterSetCatalog.latinSeriesID }?.level ?? -1
@@ -158,8 +151,6 @@ struct CharacterSetsRow: View {
     }
 }
 
-/// The characters a face still needs for a set, each with its Unicode name and code, and a button that copies them,
-/// to paste into a font editor. They're drawn in the system font, as the face has none of them.
 private struct MissingCharacterList: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -207,18 +198,13 @@ private struct MissingCharacterList: View {
         .frame(width: 340, height: min(420, CGFloat(missing.count) * 30 + 4 + 14 + Self.buttonHeight + Self.barBottom))
     }
 
-    /// A plain list's.
     private static let background = Color(nsColor: .controlBackgroundColor)
-    /// StillPushButtonStyle's.
     private static let buttonHeight: CGFloat = 26
     private static let barBottom: CGFloat = 12
-    /// How far above the button the rows begin to fade, and how far down it they're back to what shows through.
     private static let fadeAbove: CGFloat = 15
     private static let fadeIntoButton: CGFloat = 10
-    /// The fade's strongest, where the blur starts, and what's left of it under the button.
     private static let fadeAtEdge = 0.5
     private static let fadeUnder = 0.15
-    /// Into the list's background, eased so it has no edge: up to the button's top, then back down.
     private static let fade: Gradient = {
         let height = fadeAbove + buttonHeight + barBottom
         let edge = fadeAbove / height
@@ -235,7 +221,6 @@ private struct MissingCharacterList: View {
         return Gradient(stops: up + down + [Gradient.Stop(color: background.opacity(fadeUnder), location: 1)])
     }()
 
-    /// The character; a mark on a dotted circle, as it has nothing to sit on.
     private static func drawn(_ scalar: UInt32) -> String {
         let text = GlyphsSection.text(scalar)
         switch Unicode.Scalar(scalar)?.properties.generalCategory {
@@ -244,15 +229,14 @@ private struct MissingCharacterList: View {
         }
     }
 
-    /// With spaces between them, so a mark doesn't stack on the letter before it.
     private func copy() {
+        // Spaced, so a combining mark doesn't stack on the letter before it.
         GlyphsSection.copy(missing.map(GlyphsSection.text).joined(separator: " "))
         dismiss()
         model.showToast(missing.count == 1 ? "1 character copied to clipboard" : "\(missing.count.plain) characters copied to clipboard")
     }
 }
 
-/// Which Unicode blocks the face covers completely, with every block's coverage in a popover.
 struct UnicodeBlocksRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
@@ -288,7 +272,6 @@ struct UnicodeBlocksRow: View {
         }
     }
 
-    /// Every block, with how many of its characters `ranges` has.
     private func blocks(covered ranges: ScalarRanges) -> [(block: CharacterSetDefinition, has: Int)] {
         let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
         return blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
@@ -314,8 +297,6 @@ struct UnicodeBlocksRow: View {
 }
 
 private extension View {
-    /// Room above a popover list's first row and below its last, clear of the popover's rounded corners: the list's
-    /// own insets, so its background still reaches the edges.
     func popoverListInsets(top: CGFloat = 5, bottom: CGFloat = 5) -> some View {
         safeAreaPadding(.top, top).safeAreaPadding(.bottom, bottom)
     }

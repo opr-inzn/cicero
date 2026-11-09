@@ -2,25 +2,18 @@ import AppKit
 import CiceroCore
 import UniformTypeIdentifiers
 
-/// Another font manager's library, read for the Import sheet, and where it was read from.
 struct ImportPrompt: Identifiable {
     let id = UUID()
     let library: ImportedLibrary
-    /// "FontExplorer X’s library on this Mac", or the file's name.
     let origin: String
-    /// What it was read from, to read it again.
     var urls: [URL] = []
-    /// The other app keeps writing to it while it's open: it can't be imported until the app has quit, and is read
-    /// again then. FontBase's own library on this Mac.
     var waitsForQuit = false
 
     var source: ImportedLibrary.Source { library.source }
 }
 
-/// Where an import is, for the sheet.
 enum ImportStage: Equatable {
     case copying(done: Int, total: Int)
-    /// Cancelled while copying: the copies made so far are being settled (turned off, or left on) before the sheet closes.
     case stopping
     case reading(done: Int, total: Int)
     case starting
@@ -29,26 +22,22 @@ enum ImportStage: Equatable {
 extension AppModel {
     // MARK: Finding a library
 
-    /// File → Import from FontExplorer X: its library on this Mac, else a database or backup the user picks.
     func importFromFontExplorer() {
         guard let database = FontExplorerImport.database() else { return chooseImportFile(for: .fontExplorer) }
         readImport([database], source: .fontExplorer, origin: "FontExplorer X’s library on this Mac")
     }
 
-    /// File → Import from Font Book: the collections on this Mac, else collection files the user picks.
     func importFromFontBook() {
         let collections = FontBookImport.collections()
         guard !collections.isEmpty else { return chooseImportFile(for: .fontBook) }
         readImport(collections, source: .fontBook, origin: "Font Book’s collections on this Mac")
     }
 
-    /// File → Import from FontBase: its library on this Mac, else its folder from another Mac, which the user picks.
     func importFromFontBase() {
         guard let folder = FontBaseImport.folder() else { return chooseImportFile(for: .fontBase) }
         readImport([folder], source: .fontBase, origin: "FontBase’s library on this Mac")
     }
 
-    /// Asks for FontExplorer X's database or a backup of it (a `.fexconfig` is a folder), or Font Book collections.
     func chooseImportFile(for source: ImportedLibrary.Source) {
         let panel = NSOpenPanel()
         panel.prompt = "Import"
@@ -77,8 +66,6 @@ extension AppModel {
         readImport(panel.urls, source: source, origin: origin)
     }
 
-    /// Files dropped on the window or opened from the Finder: FontExplorer X's database or backups, or Font Book
-    /// collections. Returns the ones that were.
     func importFiles(among urls: [URL]) -> Set<URL> {
         let fontExplorer = urls.filter { FontExplorerImport.fileExtensions.contains($0.pathExtension.lowercased()) }
         let fontBook = urls.filter { $0.pathExtension.lowercased() == FontBookImport.fileExtension }
@@ -91,7 +78,6 @@ extension AppModel {
         return Set(fontExplorer + fontBook)
     }
 
-    /// Reads the library off the main thread and shows the Import sheet, or says why it can't.
     private func readImport(_ urls: [URL], source: ImportedLibrary.Source, origin: String) {
         Task {
             let read = await Self.read(urls, source: source)
@@ -115,7 +101,6 @@ extension AppModel {
         }
     }
 
-    /// The library read again, as the other app left it on quitting; nil when it can't be read now.
     func reread(_ prompt: ImportPrompt) async -> ImportPrompt? {
         guard case .success(let library) = await Self.read(prompt.urls, source: prompt.source) else { return nil }
         return ImportPrompt(library: library, origin: prompt.origin, urls: prompt.urls, waitsForQuit: prompt.waitsForQuit)
@@ -136,18 +121,12 @@ extension AppModel {
 
     // MARK: Importing
 
-    /// The toast once copying is cancelled with `count` files copied in, which stay: off, but for `on` of them, on as they
-    /// were in `appName`.
     static func stoppedCopying(_ count: Int, on: Int = 0, appName: String = "", again: String) -> String {
         let files = count == 1 ? "font file" : "\(count.plain) font files"
         guard on > 0 else { return "Stopped. The \(files) copied in so far stay, off: \(again)" }
         return "Stopped. The \(files) copied in so far stay, \(on.plain) of them on, as in \(appName): \(again)"
     }
 
-    /// Saves the current setup to the Backups folder; copies the other app's fonts in, off, where installing puts them
-    /// (the long part, in the caller's task so it can be cancelled: the copies made so far stay, off, and importing again
-    /// takes them as they are); reads them in one queued operation; brings in the rest, matched against the copies; then turns on the fonts that were on. Nil when
-    /// nothing was done.
     func performImport(_ prompt: ImportPrompt, choices: ImportChoices, stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
         let imported = prompt.library
         isImporting = true
@@ -235,7 +214,6 @@ extension AppModel {
 }
 
 extension Library {
-    /// The folders of the files apps load from their own folders, like Adobe's, but Creative Cloud's Adobe Fonts.
     var appFontFolders: [URL] {
         var folders = Set<String>()
         for face in families.lazy.flatMap(\.faces) {
@@ -247,7 +225,6 @@ extension Library {
         return folders.sorted().map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
 
-    /// The styles in these files, each as that file, also where another copy stands for the style.
     func faces(inFiles paths: Set<String>) -> [LibraryFace] {
         families.flatMap(\.faces).flatMap { face in
             (paths.contains(face.face.path) ? [face] : []) + face.copies.filter { paths.contains($0.face.path) }.map(\.libraryFace)
@@ -256,7 +233,6 @@ extension Library {
 }
 
 extension LibraryFace {
-    /// The style as its file among `paths` that's off, when another file stands for it; else as it is.
     func copy(among paths: Set<String>) -> LibraryFace {
         guard !paths.contains(face.path) else { return self }
         return copies.first { paths.contains($0.face.path) && !$0.state.isActive }?.libraryFace ?? self
@@ -264,7 +240,6 @@ extension LibraryFace {
 }
 
 extension ImportedLibrary {
-    /// Nothing to bring in.
     var isEmpty: Bool {
         fontFolder == nil && otherFiles.isEmpty && sets.isEmpty && smartSets.isEmpty && tags.isEmpty && classifications.isEmpty && ratings.isEmpty
             && history.isEmpty && active.isEmpty

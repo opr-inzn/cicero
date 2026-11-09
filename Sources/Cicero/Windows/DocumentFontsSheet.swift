@@ -1,9 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// The fonts a document uses, each against the library: active, active in the apps that load them from their own
-/// folder only, in the library but inactive (both with Activate), or missing. Below, everything available turned on at
-/// once.
 struct DocumentFontsSheet: View {
     let report: DocumentFontsReport
     @Environment(AppModel.self) private var model
@@ -121,25 +118,22 @@ struct DocumentFontsSheet: View {
 
     // MARK: Helpers
 
-    /// The family and style as the library names them, else as the document does: a PDF gives only PostScript names.
     private func title(_ match: DocumentFontMatch) -> String {
+        // A PDF gives only PostScript names.
         guard let face = match.face else { return match.font.displayName }
         return "\(match.family ?? face.face.familyName) \(face.face.styleName)"
     }
 
-    /// On for apps: the library's face is on (in an app's own folder counts, for that app), or macOS has it.
     private func isOn(_ match: DocumentFontMatch) -> Bool {
         guard let face = match.face else { return match.isInstalled }
         return face.state.isActive
     }
 
-    /// "Adobe apps" or "InDesign" for a face on only in the apps that load it from their own folder, else nil.
     private func appOnly(_ match: DocumentFontMatch) -> String? {
         guard case .appOnly(let app) = match.face?.state else { return nil }
         return FaceState.appDescription(app)
     }
 
-    /// Missing first, then off, then on in some apps only, then on; each by name.
     private func sorted(_ matches: [DocumentFontMatch]) -> [DocumentFontMatch] {
         func rank(_ match: DocumentFontMatch) -> Int {
             match.face == nil && !match.isInstalled ? 0 : isOn(match) ? 3 : appOnly(match) != nil ? 2 : 1
@@ -149,8 +143,6 @@ struct DocumentFontsSheet: View {
         }
     }
 
-    /// "12 styles · 8 active · 2 in Adobe apps · 1 inactive · 1 missing", as the rest of the app says it: one count for
-    /// each app the fonts are on in only, in the order the rows have them.
     private func summary(_ total: Int, active: Int, inApps: [String], inactive: Int, missing: Int) -> String {
         var parts = [total == 1 ? "1 style" : "\(total) styles", "\(active) active"]
         var apps: [String] = []

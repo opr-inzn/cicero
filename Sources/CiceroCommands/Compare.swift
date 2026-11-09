@@ -5,14 +5,8 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// `cicero compare <names…>`: one PNG with the same text in each family's regular style (every style with
-/// `--all-styles`), or in styles named by their PostScript names, full names or family and style names, each under a label, so an assistant can look
-/// at the fonts and not only read their data. Fonts are drawn from their files, on or off. Characters a font lacks are
-/// drawn as its .notdef glyph, as the font draws it, never in another font, and listed in its label and in the answer.
 public enum CompareCommand {
-    /// Cicero's own sample text (the font page's).
     public static let defaultText = "Sphinx of black quartz, judge my vow."
-    /// More would make a picture too tall for an assistant to see the letters in.
     public static let maximumSamples = 50
     public static let sizes = 6...400
     public static let widths = 200...8000
@@ -23,7 +17,6 @@ public enum CompareCommand {
         public var text: String?
         public var size = 48
         public var width = 1200
-        /// Where the PNG goes; nil for a file in the temporary folder.
         public var png: String?
 
         public init() {}
@@ -76,8 +69,6 @@ public enum CompareCommand {
         return answer.json
     }
 
-    /// Each name a family (its regular style, or every style with `allStyles`), else a style by its PostScript name or
-    /// full name, or family and style name ("Inter-Bold", "Inter Bold"). A style named twice is drawn once.
     static func styles(_ names: [String], allStyles: Bool, in context: LibraryContext) throws -> [(Family, LibraryFace)] {
         guard !names.isEmpty else { throw CommandError.invalid("Give the families to compare, or styles by their PostScript names.") }
         var result: [(Family, LibraryFace)] = []
@@ -98,8 +89,6 @@ public enum CompareCommand {
         return result
     }
 
-    /// The style of a shown family with this PostScript name, full name, or family and style name ("Inter Variable
-    /// Bold", which a variable font's full name may not be), ignoring case; nil when none has it.
     static func style(_ typed: String, in context: LibraryContext) throws -> (Family, LibraryFace)? {
         let key = Names.fold(typed)
         let found = context.listedFamilies.flatMap { family in
@@ -112,7 +101,6 @@ public enum CompareCommand {
                            suggestions: found.map(\.0.id))
     }
 
-    /// The path given, from the current folder, or a file named after the names in the temporary folder.
     static func destination(_ path: String?, names: [String]) throws -> URL {
         if let path {
             guard !path.isEmpty else { throw CommandError.invalid("--png needs a file’s path.") }
@@ -134,8 +122,6 @@ public enum CompareCommand {
     }
 }
 
-/// One row of the picture: the style's font from its file, or nil when the file can't be read (a font CoreText would
-/// put in its place is never drawn), and the characters of the text it lacks.
 struct Sample {
     let family: Family
     let style: LibraryFace
@@ -146,6 +132,7 @@ struct Sample {
         self.family = family
         self.style = style
         let font = FontLoader.shared.font(style.face, size: size, cached: false)
+        // A file that can't be read gives a font CoreText puts in its place, which is never drawn.
         let isItself = CTFontCopyPostScriptName(font) as String == style.face.postScriptName
         self.font = isItself ? font : nil
         missing = isItself ? CoverageSearch.scalars(in: text).filter { !font.has($0) } : []
@@ -163,17 +150,12 @@ private extension CTFont {
     }
 }
 
-/// Draws the samples one under the other on white, each under a small grey label, with a hairline between them. The
-/// text wraps at the picture's width and keeps its line breaks; right-to-left text starts at the right. One pixel is a
-/// point, so `size` is the letters' size in pixels.
 enum SampleSheet {
     static let margin: CGFloat = 32
     static let labelSize: CGFloat = 14
     static let labelGap: CGFloat = 8
     static let rowGap: CGFloat = 20
-    /// Missing characters a label lists before it says how many more there are.
     static let listedMissing = 20
-    /// Higher, the picture takes gigabytes to draw, and no one sees its letters.
     static let maximumHeight = 30000
 
     static let ink = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
@@ -192,7 +174,6 @@ enum SampleSheet {
         var height: CGFloat { labelHeight + labelGap + sampleHeight }
     }
 
-    /// The PNG and its height in pixels; nil when CoreGraphics can't make it.
     static func png(_ samples: [Sample], text: String, size: CGFloat, width: Int) throws -> (Data, Int)? {
         let contentWidth = CGFloat(width) - 2 * margin
         let labelFont = CTFontCreateUIFontForLanguage(.system, labelSize, nil) ?? CTFontCreateWithName("Helvetica" as CFString, labelSize, nil)
@@ -249,8 +230,6 @@ enum SampleSheet {
         return (data as Data, height)
     }
 
-    /// "Family — Style" in grey; what it lacks, or that its file can't be read, in red after it. One line: the missing
-    /// characters after the first `listedMissing` are counted, not listed.
     private static func labelLine(_ sample: Sample, font: CTFont) -> CTLine {
         let string = NSMutableAttributedString(string: sample.label, attributes: [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
@@ -273,9 +252,6 @@ enum SampleSheet {
         return CTLineCreateWithAttributedString(string)
     }
 
-    /// The text in the sample's font, each character the font lacks (other than spaces and controls) a run of its own
-    /// as wide as the font's .notdef (its first glyph), so CoreText never takes it from another font and the line is as
-    /// long as the font would set it; `draw` puts the .notdef there.
     private static func sampleText(_ text: String, font: CTFont) -> CFAttributedString {
         var alignment = CTTextAlignment.natural
         let style = withUnsafeBytes(of: &alignment) { bytes in
@@ -314,9 +290,6 @@ enum SampleSheet {
         return string
     }
 
-    /// The frame's lines: the runs in the sample's font as they are, and in the place of each character the font lacks its
-    /// .notdef, as the font draws it (nothing, when it's empty). A run CoreText took from another font (only characters
-    /// that draw nothing, as spaces and joiners, can be: see `sampleText`) isn't drawn: no other font is.
     private static func draw(_ frame: CTFrame, in box: CGRect, font: CTFont, context: CGContext) {
         let lines = CTFrameGetLines(frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
@@ -349,7 +322,6 @@ enum SampleSheet {
     }
 }
 
-/// A font's .notdef (glyph 0): its width, and run delegates that make room for it in a line.
 struct Notdef {
     let width: CGFloat
     let ascent: CGFloat
@@ -374,7 +346,6 @@ struct Notdef {
         return CTRunDelegateCreate(&callbacks, Unmanaged.passRetained(Box(self)).toOpaque())!
     }
 
-    /// The metrics as an object, for the delegate's pointer.
     private final class Box {
         let metrics: Notdef
         init(_ metrics: Notdef) { self.metrics = metrics }

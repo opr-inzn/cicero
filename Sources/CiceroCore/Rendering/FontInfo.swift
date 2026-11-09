@@ -2,7 +2,6 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// The name table and other facts the Info panel shows, as label/value pairs in display order.
 public struct FontInfo: Sendable {
     public let rows: [(label: String, value: String)]
 
@@ -10,8 +9,6 @@ public struct FontInfo: Sendable {
         self.rows = rows
     }
 
-    /// What `read` found, by face and its file's generation (see `FontLoader.generation(of:)`), so a file that
-    /// changed is read again.
     private static let cache = Mutex<[CacheKey: FontInfo]>([:])
 
     private struct CacheKey: Hashable {
@@ -24,17 +21,11 @@ public struct FontInfo: Sendable {
         }
     }
 
-    /// What `read` found for the face, unless its file changed since. Doesn't read the font, so the main thread
-    /// can ask.
     public static func cached(_ face: FontFace) -> FontInfo? {
         let key = CacheKey(face)
         return cache.withLock { $0[key] }
     }
 
-    /// Family, Style, Full name, PostScript name, Version, Designer, Manufacturer, Vendor ID, Variable weight, Glyphs,
-    /// Format, Embedding, Copyright; no weight, as the style's read as the whole family's, and its name says it. Reads
-    /// the font, so call off the main thread unless the file wouldn't keep it waiting (see `FontLoader.wouldWait(for:)`),
-    /// and keeps what it finds for `cached`.
     public static func read(_ face: FontFace) -> FontInfo {
         let cacheKey = CacheKey(face)
         let font = FontLoader.shared.font(face, size: 12)

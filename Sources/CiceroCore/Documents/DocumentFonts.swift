@@ -2,15 +2,10 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-/// A font a document uses, as the document names it.
 public struct DocumentFont: Hashable, Sendable {
-    /// "MinionPro-Regular", without a PDF subset's "ABCDEF+" prefix.
     public var postScriptName: String?
-    /// "Minion Pro", when the document says.
     public var family: String?
-    /// "Regular", when the document says.
     public var style: String?
-    /// Whether a PDF carries the font itself; nil for documents that never do.
     public var isEmbedded: Bool?
 
     public init(postScriptName: String? = nil, family: String? = nil, style: String? = nil, isEmbedded: Bool? = nil) {
@@ -20,18 +15,12 @@ public struct DocumentFont: Hashable, Sendable {
         self.isEmbedded = isEmbedded
     }
 
-    /// The name to show: the family and style when known, else the PostScript name.
     public var displayName: String {
         if let family, let style { return "\(family) \(style)" }
         return family ?? postScriptName ?? "Unnamed font"
     }
 }
 
-/// Reads which fonts a document uses, without opening it in the app that made it and without anything
-/// leaving the Mac: PDFs (and Illustrator files, which are PDFs inside) from their pages' font resources,
-/// IDML from its font list, InDesign and Illustrator files from the font list in their XMP metadata, and Photoshop
-/// files from their text layers.
-/// Every reader trusts nothing in the file: what it can't read, it leaves out.
 public enum DocumentFonts {
     public enum Failure: Error, Equatable {
         case unreadable
@@ -40,7 +29,6 @@ public enum DocumentFonts {
 
     public static let fileExtensions: Set<String> = ["pdf", "ai", "idml", "indd", "indt", "psd", "psb"]
 
-    /// The fonts the document uses, each once, in the order found. Reads the file; call off the main thread.
     public static func read(_ url: URL) throws -> [DocumentFont] {
         let fonts: [DocumentFont]
         switch url.pathExtension.lowercased() {
@@ -66,7 +54,6 @@ public enum DocumentFonts {
         return data
     }
 
-    /// Each font once, by PostScript name or else family and style; what one entry knows fills the other's gaps.
     static func unique(_ fonts: [DocumentFont]) -> [DocumentFont] {
         var result: [DocumentFont] = []
         var index: [String: Int] = [:]
@@ -87,7 +74,6 @@ public enum DocumentFonts {
 
     // MARK: PDF
 
-    /// The fonts in every page's resources, and in the form XObjects and annotation appearances they use.
     static func pdf(_ url: URL) throws -> [DocumentFont] {
         guard let document = CGPDFDocument(url as CFURL) else { throw Failure.unreadable }
         guard !document.isEncrypted || document.unlockWithPassword("") else { throw Failure.unreadable }
@@ -113,7 +99,6 @@ public enum DocumentFonts {
         return collector.fonts
     }
 
-    /// "ABCDEF+MinionPro-Regular" → "MinionPro-Regular": a subset's tag is six capitals and a plus.
     static func withoutSubsetTag(_ name: String) -> String {
         let parts = name.split(separator: "+", maxSplits: 1)
         guard parts.count == 2, parts[0].count == 6, parts[0].allSatisfy({ $0.isASCII && $0.isUppercase }) else { return name }
@@ -122,12 +107,10 @@ public enum DocumentFonts {
 
     // MARK: IDML
 
-    /// The fonts an IDML package uses. Its Resources/Fonts.xml lists every style of each family the document
-    /// uses, so that list is narrowed to the families and styles its styles and stories apply. Read with unzip
-    /// to standard output, so nothing in the archive is written anywhere.
     static func idml(_ url: URL) throws -> [DocumentFont] {
         let fonts = try unzip(url, ["Resources/Fonts.xml"])
         guard !fonts.isEmpty else { throw Failure.unreadable }
+        // Fonts.xml lists every style of each family the document uses, so it's narrowed to the families and styles its styles and stories apply.
         let applied = (try? unzip(url, ["Resources/Styles.xml", "Stories/*.xml", "Spreads/*.xml", "MasterSpreads/*.xml"])) ?? Data()
         return idmlFonts(fonts, applying: applied)
     }
@@ -135,6 +118,7 @@ public enum DocumentFonts {
     private static func unzip(_ url: URL, _ members: [String]) throws -> Data {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        // To standard output, so nothing in the archive is written anywhere.
         process.arguments = ["-p", url.path] + members
         let output = Pipe()
         process.standardOutput = output
@@ -147,9 +131,6 @@ public enum DocumentFonts {
         return data
     }
 
-    /// `<Font FontFamily="Minion Pro" PostScriptName="MinionPro-Regular" FontStyleName="Regular" …/>` for the
-    /// families and styles applied in `applied` (the package's styles and stories, one after the other): its
-    /// `<AppliedFont type="string">Minion Pro</AppliedFont>` and `FontStyle="Regular"`. Without any, all of them.
     static func idmlFonts(_ fonts: Data, applying applied: Data) -> [DocumentFont] {
         let reader = ElementReader(names: ["Font"])
         reader.parse(fonts)
@@ -178,11 +159,10 @@ public enum DocumentFonts {
 
     // MARK: XMP
 
-    /// The fonts in an XMP packet's xmpTPg:Fonts list (InDesign and Illustrator write one), from the first
-    /// packet that has them. An InDesign file can hold others, from placed images, which don't.
     static func xmp(_ data: Data) -> [DocumentFont] {
         let start = Data("<x:xmpmeta".utf8), end = Data("</x:xmpmeta>".utf8)
         var from = data.startIndex
+        // The first packet with fonts: an InDesign file can hold others, from placed images, which don't list them.
         while let open = data.range(of: start, in: from..<data.endIndex),
               let close = data.range(of: end, in: open.upperBound..<data.endIndex) {
             let packet = data[open.lowerBound..<close.upperBound]
@@ -194,7 +174,6 @@ public enum DocumentFonts {
         return []
     }
 
-    /// Each rdf:li of xmpTPg:Fonts with its stFnt: fields, written as attributes or as elements.
     static func xmpFonts(_ packet: Data) -> [DocumentFont] {
         let reader = XMPFontReader()
         reader.parse(packet)
@@ -216,13 +195,10 @@ public enum DocumentFonts {
 
 // MARK: - Readers
 
-/// Walks PDF resource dictionaries for fonts, each dictionary once (pages share them, forms nest).
 private struct PDFFontCollector {
     var fonts: [DocumentFont] = []
-    /// The resource dictionaries walked, by address.
     private var seen = Set<Int>()
 
-    /// A page's, form's or appearance's Resources: its fonts, then its form XObjects' own resources.
     mutating func resources(of owner: CGPDFDictionaryRef) {
         var found: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(owner, "Resources", &found), let resources = found,
@@ -253,7 +229,6 @@ private struct PDFFontCollector {
         for form in forms { self.resources(of: form) }
     }
 
-    /// A font dictionary's BaseFont, and whether its descriptor (a composite font's descendant's) has a font file.
     private static func font(_ font: CGPDFDictionaryRef) -> DocumentFont? {
         var name: UnsafePointer<CChar>?
         guard CGPDFDictionaryGetName(font, "BaseFont", &name), let name else { return nil }  // Type 3 fonts have none
@@ -280,7 +255,6 @@ private struct PDFFontCollector {
     }
 }
 
-/// Collects the attributes of elements with some names.
 private final class ElementReader: NSObject, XMLParserDelegate {
     let names: Set<String>
     var elements: [[String: String]] = []
@@ -301,7 +275,6 @@ private final class ElementReader: NSObject, XMLParserDelegate {
     }
 }
 
-/// The stFnt: fields of each font in an XMP packet's xmpTPg:Fonts bag.
 private final class XMPFontReader: NSObject, XMLParserDelegate {
     var fonts: [[String: String]] = []
     private var inFonts = false
@@ -351,37 +324,32 @@ private final class XMPFontReader: NSObject, XMLParserDelegate {
 
 // MARK: - Matching
 
-/// A font a document uses, and the face in the library that is it, if there's one.
 public struct DocumentFontMatch: Sendable, Identifiable {
     public let font: DocumentFont
     public let family: String?
     public let face: LibraryFace?
-    /// Apps have the font: its face in the library is on, or macOS has it under that PostScript name though
-    /// the library doesn't list it (some fonts that come with macOS, like Times).
     public let isInstalled: Bool
 
     public var id: String { font.postScriptName ?? font.displayName }
 }
 
 extension DocumentFonts {
-    /// The library's face for each font: the one with its PostScript name, else the one whose family and style
-    /// names are the document's (ignoring case and spaces), else none.
     public static func match(_ fonts: [DocumentFont], in library: Library) -> [DocumentFontMatch] {
         match(fonts, using: FontMatcher(library))
     }
 
-    /// The same with a matcher made before for the library, as making one takes a while.
     public static func match(_ fonts: [DocumentFont], using matcher: FontMatcher) -> [DocumentFontMatch] {
         fonts.map { font in
             let named = ImportedFont(postScriptName: font.postScriptName, family: font.family, style: font.style)
             let found = matcher.faces(named, defaultStyle: "Regular").first
+            // macOS has some fonts under their PostScript name that the library doesn't list, like Times.
             let installed = found?.face.state.isActive ?? font.postScriptName.map(isInstalled) ?? false
             return DocumentFontMatch(font: font, family: found?.family.id, face: found?.face, isInstalled: installed)
         }
     }
 
-    /// Whether macOS has a font with exactly this PostScript name; asking for one it hasn't gives a stand-in.
     static func isInstalled(_ postScriptName: String) -> Bool {
+        // Asking CoreText for a font it hasn't gives a stand-in.
         CTFontCopyPostScriptName(CTFontCreateWithName(postScriptName as CFString, 12, nil)) as String == postScriptName
     }
 }

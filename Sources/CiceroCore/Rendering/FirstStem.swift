@@ -2,16 +2,9 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-/// Where a line's first letter has ink, low in the x-height, from the line's start: the left edge of its first stem,
-/// clear of any serifs, their brackets and crossbars, or a round's outer edge. Compare's Overlay lines its fonts up
-/// on it, so a serif font's stem stands on a sans one's, though its serif reaches further left.
 public enum FirstStem {
-    /// The heights that count, in fractions of the font's x-height above the baseline: the same in every letter, above
-    /// the serifs at its foot and their brackets, below the crossbars of t and f at the x-height. A band in fractions
-    /// of each letter's own height took some t's crossbar for its stem.
     static let band: ClosedRange<CGFloat> = 0.25...0.6
 
-    /// nil for a line without ink.
     public static func x(in line: CTLine) -> CGFloat? {
         for run in CTLineGetGlyphRuns(line) as? [CTRun] ?? [] {
             let count = CTRunGetGlyphCount(run)
@@ -33,8 +26,6 @@ public enum FirstStem {
         return nil
     }
 
-    /// The outline's ink furthest left between `heights` above the baseline, else anywhere, as in a period, with
-    /// nothing there.
     static func edge(of path: CGPath, within heights: ClosedRange<CGFloat>) -> CGFloat {
         let bounds = path.boundingBoxOfPath
         let slice = CGRect(x: bounds.minX - 1, y: heights.lowerBound, width: bounds.width + 2, height: heights.upperBound - heights.lowerBound)

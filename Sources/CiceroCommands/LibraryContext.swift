@@ -2,14 +2,9 @@ import AppKit
 import CiceroCore
 import Foundation
 
-/// Fonts Cicero's settings hide or show, which one command shows or hides instead; nil keeps Cicero's setting. It never
-/// changes the setting.
 public struct ShownFonts: Codable, Sendable, Equatable {
-    /// Those that come with macOS (Show system fonts).
     public var systemFonts: Bool?
-    /// Adobe Fonts from Creative Cloud (Show fonts from Creative Cloud).
     public var adobeFonts: Bool?
-    /// Those in the folders Adobe apps load by themselves (Show fonts installed for proofing in Adobe apps).
     public var proofingFonts: Bool?
 
     public init(systemFonts: Bool? = nil, adobeFonts: Bool? = nil, proofingFonts: Bool? = nil) {
@@ -18,7 +13,6 @@ public struct ShownFonts: Codable, Sendable, Equatable {
         self.proofingFonts = proofingFonts
     }
 
-    /// The user's data with these in place of Cicero's settings.
     func applied(to data: UserData) -> UserData {
         var data = data
         if let systemFonts { data.showSystemFonts = systemFonts }
@@ -28,27 +22,16 @@ public struct ShownFonts: Codable, Sendable, Equatable {
     }
 }
 
-/// What the read commands read, as Cicero saved it: the user's data, the library the last scan saved with each face on
-/// or off as macOS has it now, the coverage worked out so far and the guessed classifications. Reads never scan
-/// unless asked to (`rescan`), or unless the proofing fonts are to be shown or hidden other than as the saved library
-/// was scanned. Only a scan as Cicero makes it, while Cicero is closed, is saved: while it's open, Cicero writes its
-/// caches itself, and would write over the tool's or keep showing its own.
 public final class LibraryContext: @unchecked Sendable {
     public let environment: ToolEnvironment
-    /// The user's data, with the fonts the command's flags show or hide (see `ShownFonts`).
     public let data: UserData
-    /// The user's data as saved, with Cicero's own settings: what a change starts from.
     public let savedData: UserData
     public let library: Library
-    /// When the library was last scanned (saved by a scan).
     public let lastScan: Date?
     public let characterSets: CharacterSetCatalog?
     public let coverage: CoverageIndex?
-    /// The guessed classification of a family nothing in its files classifies, as the app has it.
     public let classificationGuess: (Family) -> Classification?
 
-    /// Loads everything; `rescan` scans first, saving what it finds while Cicero is closed, unless not `savesScan` (for a
-    /// command that doesn't hold `AppLock`). `shown` shows or hides fonts other than as Cicero's settings do.
     public static func load(_ environment: ToolEnvironment, rescan: Bool = false, shown: ShownFonts = ShownFonts(),
                             savesScan: Bool = true) async throws -> LibraryContext {
         let saved = try loadUserData(environment)
@@ -56,6 +39,7 @@ public final class LibraryContext: @unchecked Sendable {
         // The saved library has the proofing fonts as Cicero's setting has them; the other way needs a scan of its own.
         let proofingDiffers = data.showAdobeAppFolders != saved.showAdobeAppFolders && !environment.appFontFolders.isEmpty
         let scans = rescan || proofingDiffers
+        // Never while Cicero is open: it writes its caches itself, and would write over the tool's or keep showing its own.
         let saves = savesScan && scans && !proofingDiffers && !isAppOpen(environment)
         let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar, saves: saves)
         let languages = environment.resources.map { LanguageCatalog(contentsOf: $0.appendingPathComponent("Languages.json")) }
@@ -97,8 +81,6 @@ public final class LibraryContext: @unchecked Sendable {
                               characterSets: characterSets, coverage: coverage, classificationGuess: { rule($0)?.classification })
     }
 
-    /// Cicero's own library and data, for the changes the command asks it to make (see `Requests`): names are looked up
-    /// in what its window shows.
     public convenience init(library: Library, data: UserData, shown: ShownFonts, environment: ToolEnvironment) {
         self.init(environment: environment, data: shown.applied(to: data), savedData: data, library: library, lastScan: nil,
                   characterSets: nil, coverage: nil, classificationGuess: { _ in nil })
@@ -116,11 +98,10 @@ public final class LibraryContext: @unchecked Sendable {
         self.classificationGuess = classificationGuess
     }
 
-    /// user-data.json as the app reads it, but a file that can't be read stops the command: the app keeps such a file
-    /// aside and starts again, which the tool leaves to it.
     static func loadUserData(_ environment: ToolEnvironment) throws -> UserData {
         let url = environment.userDataURL
         var data: UserData
+        // A file that can't be read stops the command rather than start a new library over it: the app keeps such a file aside and starts again, which the tool leaves to it.
         if let contents = try? Data(contentsOf: url) {
             do {
                 data = try JSONDecoder().decode(UserData.self, from: contents)
@@ -138,20 +119,17 @@ public final class LibraryContext: @unchecked Sendable {
         return data
     }
 
-    /// Whether Cicero is open (for this user).
     public static func isAppOpen(_ environment: ToolEnvironment) -> Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).isEmpty
     }
 
     // MARK: What the app shows
 
-    /// The fonts this command hides, by Cicero's settings or its own flags: `systemFonts`, `adobeFonts`, `proofingFonts`.
     public var hidden: [String] {
         [("systemFonts", data.showSystemFonts), ("adobeFonts", data.showCreativeCloudFonts), ("proofingFonts", data.showAdobeAppFolders)]
             .filter { !$0.1 }.map(\.0)
     }
 
-    /// The families the app lists: not those that come with macOS or from Creative Cloud while they're hidden.
     public lazy var listedFamilies: [Family] = library.families.filter(data.lists)
 
     public lazy var filters = FamilyFilters(
@@ -169,24 +147,20 @@ public final class LibraryContext: @unchecked Sendable {
 
     // MARK: Coverage
 
-    /// The user's character sets, as definitions.
     public lazy var customSets: [CharacterSetDefinition] = data.customCharacterSets.enumerated().map {
         CharacterSetCatalog.definition(for: $1, level: $0)
     }
 
-    /// Built-in sets, then the user's.
     public var allSets: [CharacterSetDefinition] { (characterSets?.builtIn ?? []) + customSets }
 
     public func characterSet(_ id: String) -> CharacterSetDefinition? {
         id.hasPrefix("custom.") ? customSets.first { $0.id == id } : characterSets?.definition(id)
     }
 
-    /// The face's coverage as worked out so far; nil while not checked yet.
     public func faceCoverage(_ face: FontFace) -> FaceCoverage? {
         coverage?.coverage(of: face.id)
     }
 
-    /// The face's coverage, worked out now when it isn't yet (reading its file).
     public func faceCoverage(computing face: FontFace) async -> FaceCoverage? {
         guard let coverage else { return nil }
         return await coverage.coverage(computing: face)
@@ -194,7 +168,6 @@ public final class LibraryContext: @unchecked Sendable {
 
     private var missingCounts: [String: [FaceID: Int]] = [:]
 
-    /// How many of the set's characters the face lacks; nil while not checked yet.
     public func missingCount(_ set: CharacterSetDefinition, _ face: FontFace) -> Int? {
         if let known = missingCounts[set.id]?[face.id] { return known }
         guard let scalars = faceCoverage(face)?.scalars else { return nil }
@@ -203,7 +176,6 @@ public final class LibraryContext: @unchecked Sendable {
         return missing
     }
 
-    /// The largest set of a series the face has every character of.
     public func largest(in seriesID: String, for face: FontFace) -> CharacterSetDefinition? {
         guard let series = characterSets?.series.first(where: { $0.id == seriesID }) else { return nil }
         return series.sets.last { missingCount($0, face) == 0 }

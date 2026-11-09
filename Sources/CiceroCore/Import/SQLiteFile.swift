@@ -1,15 +1,12 @@
 import Foundation
 import SQLite3
 
-/// A SQLite database opened read-only, for reading another app's library. Opened as immutable, so SQLite never writes
-/// to it or looks for a journal; open a copy of a file another app may be writing to.
 final class SQLiteFile {
     enum Failure: Error, Equatable {
         case unreadable
         case query(String)
     }
 
-    /// One row, column name → value: Int64, Double, String, Data, or missing for NULL.
     typealias Row = [String: Any]
 
     private var handle: OpaquePointer?
@@ -18,6 +15,7 @@ final class SQLiteFile {
         var components = URLComponents()
         components.scheme = "file"
         components.path = url.path
+        // Immutable: SQLite never writes to the file or looks for a journal, so open only a copy of a file another app may be writing to.
         components.queryItems = [URLQueryItem(name: "immutable", value: "1")]
         guard let uri = components.string,
               sqlite3_open_v2(uri, &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK
@@ -31,13 +29,11 @@ final class SQLiteFile {
         sqlite3_close(handle)
     }
 
-    /// The table's columns, empty when there's no such table.
     func columns(of table: String) -> Set<String> {
         let rows = (try? self.rows("PRAGMA table_info(\(table))")) ?? []
         return Set(rows.compactMap { $0["name"] as? String })
     }
 
-    /// Every row the statement gives.
     func rows(_ sql: String) throws -> [Row] {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK else {
@@ -69,7 +65,6 @@ final class SQLiteFile {
 }
 
 extension Dictionary where Key == String, Value == Any {
-    /// A column as a whole number: an integer, a real, or text that is one; 0 when missing.
     func int(_ column: String) -> Int {
         switch self[column] {
         case let value as Int64: Int(value)
@@ -79,7 +74,6 @@ extension Dictionary where Key == String, Value == Any {
         }
     }
 
-    /// A column as a real number, for dates stored as seconds; 0 when missing.
     func double(_ column: String) -> Double {
         switch self[column] {
         case let value as Int64: Double(value)
@@ -89,7 +83,6 @@ extension Dictionary where Key == String, Value == Any {
         }
     }
 
-    /// A column as text, trimmed; nil when missing or empty.
     func text(_ column: String) -> String? {
         let text: String? = switch self[column] {
         case let value as String: value

@@ -3,8 +3,6 @@ import SwiftUI
 // Toolbar controls that highlight what's chosen or on, and light up under the pointer as AppKit's do, as the back
 // button does next to them. On macOS 15, which has no glass, the toolbar has the system's own controls instead.
 
-/// A toolbar item on AppKit's own glass, as the back button is. AppKit puts neighbouring items in one capsule, so
-/// one that follows another is `spaced`: a ToolbarSpacer before it gives it a capsule of its own, 16 pt from the last.
 struct ToolbarCapsule<Content: View>: ToolbarContent {
     var spaced = false
     @ViewBuilder let content: () -> Content
@@ -19,8 +17,6 @@ struct ToolbarCapsule<Content: View>: ToolbarContent {
     }
 }
 
-/// After the last capsule, the gap a `spaced` one has before it, so the search field stands as far from the capsules
-/// as they do from each other. Without it, AppKit leaves 8 pt there.
 struct ToolbarGap: ToolbarContent {
     var body: some ToolbarContent {
         if #available(macOS 26, *) {
@@ -29,16 +25,12 @@ struct ToolbarGap: ToolbarContent {
     }
 }
 
-/// A segmented picker for toolbars, its choice on a lens of glass that slides to the next one chosen, 3 pt inside the
-/// capsule all round. Segments show a symbol when there's one, else the title.
 struct ToolbarPicker<Value: Hashable>: View {
-    /// What VoiceOver calls the control.
     let label: String
     let values: [Value]
     @Binding var selection: Value
     let title: (Value) -> String
     let symbol: ((Value) -> String)?
-    /// Each segment's tooltip.
     let help: String?
     @Namespace private var lens
 
@@ -109,18 +101,12 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 }
 
-/// A toolbar button, highlighted while it's on or pressed, lit up a little less while it's under the pointer, and
-/// dimmed like AppKit's while it's disabled or its window is in the background. Sizes are AppKit's: a button fills
-/// its 36 pt glass capsule, and a picker's segments are inside it, `segmentInset` from its edges; the picker draws the
-/// chosen one's lens.
 struct ToolbarButtonStyle: ButtonStyle {
     var isOn = false
     fileprivate var segment: Segment?
 
-    /// A picker's segment, padded like AppKit's: less around a symbol than around a title.
     fileprivate enum Segment { case symbol, title }
 
-    /// Between a picker's segments and its capsule, at the ends as above and below.
     static let segmentInset: CGFloat = 3
 
     func makeBody(configuration: Configuration) -> some View {
@@ -128,7 +114,6 @@ struct ToolbarButtonStyle: ButtonStyle {
     }
 }
 
-/// `ToolbarButtonStyle`'s button, a view of its own to know when the pointer is over it.
 private struct ToolbarButton: View {
     let configuration: ButtonStyleConfiguration
     let isOn: Bool
@@ -155,7 +140,6 @@ private struct ToolbarButton: View {
     }
 }
 
-/// A toolbar toggle, highlighted while it's on.
 struct ToolbarToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         if #available(macOS 26, *) {
@@ -172,7 +156,6 @@ extension ButtonStyle where Self == ToolbarButtonStyle {
 }
 
 extension View {
-    /// `ToolbarButtonStyle` on macOS 26; the system's toolbar buttons on macOS 15.
     @ViewBuilder func toolbarButtonStyle() -> some View {
         if #available(macOS 26, *) { buttonStyle(.toolbar) } else { self }
     }

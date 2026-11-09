@@ -1,13 +1,10 @@
 import Foundation
 
-/// The names of OpenType's language system tags, like Bulgarian for BGR, those fonts give localized forms for; a tag
-/// the list doesn't have is shown as it is.
 public enum OpenTypeLanguages {
     public static func name(of tag: String) -> String {
         names[tag.trimmingCharacters(in: .whitespaces)] ?? tag
     }
 
-    /// "Serbian and Macedonian".
     public static func names(of tags: [String]) -> String {
         tags.map(name(of:)).listed()
     }

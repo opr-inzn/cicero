@@ -1,8 +1,5 @@
 import Foundation
 
-/// The library the last scan built, saved for the next launch, so the window opens with the fonts in it
-/// instead of waiting for that launch's first scan. Written like the face cache, which it takes faces from,
-/// and for the same reason: it's read before the window appears.
 enum LibraryCache {
     private static let magic: UInt32 = 0x4243_4C43  // "CLCB"
     private static let version: UInt32 = 1
@@ -72,8 +69,6 @@ enum LibraryCache {
         return writer.data
     }
 
-    /// nil when the data isn't a library this version saved. `current` gives a face's state now from the
-    /// saved one, the face's file and the app that loads it.
     static func decode(_ data: Data, current: (FaceState, String, String?) -> FaceState = { state, _, _ in state }) -> Library? {
         data.withUnsafeBytes { buffer -> Library? in
             var reader = ByteReader(buffer: buffer)
@@ -203,5 +198,4 @@ private extension ByteReader {
     }
 }
 
-/// A value the library cache doesn't know, as from a damaged file.
 private struct LibraryCacheUnknown: Error {}

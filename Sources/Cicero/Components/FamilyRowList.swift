@@ -1,20 +1,13 @@
 import CiceroCore
 import SwiftUI
 
-/// A titled group of families in a `FamilyRowList`.
 struct FamilyRowSection: Identifiable {
     var id: String
     var title: String?
     var families: [Family]
-    /// Shown when there are no families.
     var emptyText: String?
 }
 
-/// Families as rows with a selection of their own, for the Character Toolbox: click, ⌘- and ⇧-click and
-/// the arrow keys select, double-click or Return opens, right-click for the family menu. A lazy stack, not
-/// a Table or List: those make every row whenever an accessibility client walks the window, which keeps
-/// the app busy for minutes with a thousand families. Section titles scroll with the rows rather than pin, so rows
-/// only meet the bar above them, where they fade out (see `safeAreaBar`) instead of ending at a title's edge.
 struct FamilyRowList<Row: View>: View {
     @Environment(AppModel.self) private var model
     let sections: [FamilyRowSection]
@@ -28,6 +21,7 @@ struct FamilyRowList<Row: View>: View {
         let ids = sections.flatMap { $0.families.map(\.id) }
         ScrollViewReader { proxy in
             ScrollView {
+                // A lazy stack, not a Table or List: those make every row whenever an accessibility client walks the window.
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(sections) { section in
                         Section {
@@ -100,7 +94,6 @@ struct FamilyRowList<Row: View>: View {
             .accessibilityAction(named: "Select") { FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor) }
     }
 
-    /// What the menu and a drag take: the whole selection when the family is part of it.
     private func targets(for id: String, in ids: [String]) -> [String] {
         selection.contains(id) && selection.count > 1 ? ids.filter(selection.contains) : [id]
     }

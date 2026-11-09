@@ -1,38 +1,25 @@
 import CiceroCore
 import SwiftUI
 
-/// One row of the font list, with its sortable values worked out up front.
 nonisolated struct FontRow: Identifiable, Equatable, Sendable {
-    /// The family, in a box: the rows are copied as they're made and sorted, and a copy of a `Family` retains each of
-    /// its many fields, which was a quarter of making 20,000 rows again after a rating.
     private let box: FamilyBox
     var family: Family { box.family }
-    /// Kept apart: read through `family`, each id copied the family, and SwiftUI reads every row's id at each update.
     let id: String
     let name: String
     let foundry: String
     let styles: Int
     let classification: String
     let format: String
-    /// Active, then partly, then app-only, then off.
     let activation: Int
-    /// What each shown character set column says; nothing while the family is still being checked.
     let coverage: [FontListColumn: CoverageCell]
     let added: Date
-    /// 0 when the files don't say.
     let year: Int
-    /// 0 for none.
     let rating: Int
     let tags: [TagColor]
-    /// Its place in the list, for the stripes: set by `AppModel.fontRows` once sorted.
     var position = 0
-    /// Its place in the library, which keeps its families in the Finder order of the names they show (`Library.sorted`):
-    /// what the Name column sorts by. A localizedStandard sort of the names, the same order, took about 60 ms at
-    /// 20,000 families each time the rows were made, as after every rating.
     let libraryPosition: Int
 
 
-    /// A character set column's place to sort by: further along the series, or more of the set; −1 for none.
     subscript(rank column: FontListColumn) -> Int {
         switch coverage[column] {
         case .largest(_, let level): level
@@ -41,9 +28,6 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         }
     }
 
-    /// What the rows are made from, read from the model once for all of them: each read of an observed property goes
-    /// through observation, and `foundryName(of:)` and `classificationName(of:)` make their namers again each time.
-    /// Together, about half of making 20,000 rows.
     struct Inputs {
         let library: Library
         let foundryName: (Family) -> String?
@@ -86,7 +70,6 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         tags = inputs.tagDots[family.id] ?? []
     }
 
-    /// What a character set column says about the family; nil while it's being checked, or when it has none of the set.
     @MainActor static func cell(_ source: CoverageSource, for family: Family, model: AppModel) -> CoverageCell? {
         switch source {
         case .series(let series):
@@ -96,14 +79,12 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         }
     }
 
-    /// A set's name under its series' column: Latin M, AL 3, and Plus for GF Latin Plus.
     private static func label(_ set: CharacterSetDefinition, in series: CharacterSetSeries) -> String {
         if series.id == CharacterSetCatalog.adobeSeriesID { return set.name.replacingOccurrences(of: "Adobe Latin", with: "AL") }
         return set.name.hasPrefix(series.name + " ") ? String(set.name.dropFirst(series.name.count + 1)) : set.name
     }
 }
 
-/// A row's family, shared by the row's copies (see `FontRow`).
 nonisolated final class FamilyBox: Equatable, Sendable {
     let family: Family
 
@@ -112,33 +93,24 @@ nonisolated final class FamilyBox: Equatable, Sendable {
     static func == (lhs: FamilyBox, rhs: FamilyBox) -> Bool { lhs === rhs || lhs.family == rhs.family }
 }
 
-/// What a character set column reads its rows from.
 enum CoverageSource {
     case series(CharacterSetSeries)
     case set(CharacterSetDefinition)
 }
 
-/// What a character set column says about a family.
 nonisolated enum CoverageCell: Equatable, Sendable {
-    /// The largest set of the series the family has, as the column names it, and its place in the series.
     case largest(String, level: Int)
-    /// How many of the set's characters the family lacks, of how many; a family with none of them has no cell.
     case missing(Int, of: Int)
 }
 
-/// A column of the font list.
 nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
     case status, name, preview, styles, classification, foundry, year, rating, added, format
-    /// The largest set of a series the family has.
     case series(String)
-    /// Whether the family has every character of one set, else how many it lacks.
     case characterSet(String)
 
     static let latin = FontListColumn.series(CharacterSetCatalog.latinSeriesID)
     static let adobe = FontListColumn.series(CharacterSetCatalog.adobeSeriesID)
 
-    /// What the list's settings call it. Latin S–XL and Adobe Latin keep the names they had before other
-    /// series could be columns.
     var id: String {
         switch self {
         case .status: "status"
@@ -187,7 +159,6 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// nil for the preview, which takes the room the others leave.
     var defaultWidth: CGFloat? {
         switch self {
         case .status: 52
@@ -217,7 +188,6 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// Status, name and preview are always shown.
     var canHide: Bool { ![.status, .name, .preview].contains(self) }
 
     var isSeries: Bool {
@@ -228,7 +198,6 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         if case .characterSet = self { true } else { false }
     }
 
-    /// Shown unless hidden, where the year, the rating, the other series and single sets are hidden unless added.
     var isStandard: Bool {
         switch self {
         case .series(let id): id == CharacterSetCatalog.latinSeriesID || id == CharacterSetCatalog.adobeSeriesID
@@ -254,27 +223,17 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
     }
 }
 
-/// The visible families as rows under sortable column headers, with an on/off switch and a preview per
-/// row. A lazy stack like the grid's rather than a Table: a Table makes every row's cells whenever an
-/// accessibility client (a password manager's autofill, say) walks the window, and with a thousand
-/// families that kept the app busy for minutes each time it came to the front.
 struct FontList: View {
     @Environment(AppModel.self) private var model
     @State private var sortColumn = FontListColumn.name
     @State private var ascending = true
-    /// Similar fonts come the closest first, and Recents the latest first, until a column's header is clicked.
     @State private var keepsOwnOrder = true
-    /// Standard columns turned off.
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
-    /// The year, other series and single sets turned on.
     @AppStorage("fontList.characterSetColumns") private var addedColumns = ""
     @AppStorage("fontList.columnWidths") private var columnWidths = ""
     @State private var anchor = SelectionAnchor()
-    /// The column whose edge is being dragged, its width when the drag began, and how much wider it can get
-    /// before the preview is at its narrowest.
     @State private var resizing: (column: FontListColumn, start: CGFloat, room: CGFloat)?
     @FocusState private var focused: Bool
-    /// The rows' width: the scroll view's, less what the sidebar and Info panel cover.
     @State private var visibleWidth: CGFloat = 900
     @State private var visibleHeight: CGFloat = 0
 
@@ -287,6 +246,7 @@ struct FontList: View {
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
         ScrollViewReader { proxy in
             ScrollView {
+                // A lazy stack, not a Table: a Table makes every row's cells whenever an accessibility client, like a password manager's autofill, walks the window.
                 LazyVStack(spacing: 0) {
                     // The rows themselves, not Array(rows.enumerated()), which copied every row at each update.
                     ForEach(rows) { row in
@@ -329,15 +289,12 @@ struct FontList: View {
         return [comparator]
     }
 
-    /// Every column there is, in order: the year, the rating, the series, then single sets (the user's last), between Foundry
-    /// and Date Added.
     private var allColumns: [FontListColumn] {
         let series = model.characterSetCatalog.series.map { FontListColumn.series($0.id) }
         let sets = singleSetGroups.flatMap(\.sets).map(\.id) + model.data.customCharacterSets.map(\.setID)
         return [.status, .name, .preview, .styles, .classification, .foundry, .year, .rating] + series + sets.map(FontListColumn.characterSet) + [.added, .format]
     }
 
-    /// Built-in sets by group, less the ones in a series: its column says already.
     private var singleSetGroups: [(name: String, sets: [CharacterSetDefinition])] {
         let inSeries = Set(model.characterSetCatalog.series.flatMap(\.sets).map(\.id))
         return model.characterSetCatalog.groups
@@ -354,8 +311,6 @@ struct FontList: View {
         }
     }
 
-    /// Every shown column's width in the room there is: the preview takes what the others leave; when that's
-    /// less than its minimum, the others give way down to theirs, and past that every column shrinks alike.
     static func fit(_ columns: [FontListColumn], widths: [FontListColumn: CGFloat], in visible: CGFloat) -> [FontListColumn: CGFloat] {
         let room = visible - 2 * FontListRow.inset - FontListRow.spacing * CGFloat(columns.count - 1)
         let minimums = columns.reduce(0) { $0 + $1.minimumWidth }
@@ -377,7 +332,6 @@ struct FontList: View {
         return result
     }
 
-    /// Saved widths ("name:240,set.unicode-arrows:120"), else the defaults.
     private var widths: [FontListColumn: CGFloat] {
         var widths: [FontListColumn: CGFloat] = [:]
         for column in allColumns { widths[column] = column.defaultWidth }
@@ -398,7 +352,6 @@ struct FontList: View {
         return widths
     }
 
-    /// `sort` is nil while the families are in their own order.
     private func header(columns: [FontListColumn], widths: [FontListColumn: CGFloat], sort: FontListColumn?) -> some View {
         HStack(spacing: FontListRow.spacing) {
             ForEach(columns) { column in
@@ -479,15 +432,12 @@ struct FontList: View {
         return ids.sorted().joined(separator: ",")
     }
 
-    /// The edge of a column that drags to resize it: the one away from the preview, which gives or takes the
-    /// difference, so the edge stays under the pointer. Nil for the status and the preview.
     private func resizeEdge(_ column: FontListColumn, in columns: [FontListColumn]) -> HorizontalEdge? {
         guard column != .status, column.defaultWidth != nil, let index = columns.firstIndex(of: column),
               let preview = columns.firstIndex(of: .preview) else { return nil }
         return index < preview ? .trailing : .leading
     }
 
-    /// Makes a column `change` wider than it was when its edge was taken hold of, as far as the preview can give.
     private func resize(_ column: FontListColumn, by change: CGFloat, widths: [FontListColumn: CGFloat]) {
         if resizing?.column != column {
             // A narrow window may have the columns narrower than saved: from here on, what's shown is saved.
@@ -519,17 +469,13 @@ struct FontList: View {
     }
 }
 
-/// A column title: click to sort by it (again to reverse); drag the gap at its edge to resize it.
 private struct HeaderCell: View {
     let column: FontListColumn
     let title: String
-    /// nil when no column sorts the list.
     let sortColumn: FontListColumn?
     let ascending: Bool
-    /// Where the column's edge for resizing is, if it has one.
     let resizeEdge: HorizontalEdge?
     let sort: () -> Void
-    /// How much wider the column should be than when the drag began.
     let resize: (CGFloat) -> Void
     let endResize: () -> Void
 
@@ -565,7 +511,6 @@ private struct HeaderCell: View {
     }
 }
 
-/// One family's row: every shown column's value, the preview set in the font.
 private struct FontListRow: View {
     @Environment(PreviewSettings.self) private var preview
     let row: FontRow

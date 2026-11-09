@@ -2,15 +2,6 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// The font page's editable sample: a text view of its own rather than SwiftUI's TextEditor, which cuts off
-/// whatever reaches past the font's ascent and descent (descenders lower than the font says, swashes), and
-/// past each line when the lines are closer than the font is tall. Its lines draw every glyph wherever it
-/// reaches. It's as tall as its lines at the width the page gives it, and the room above and below them for
-/// glyphs reaching past them (`roomAbove`, `roomBelow`); `margin` at either side of the lines is room for glyphs
-/// reaching past their ends, as nothing is drawn outside the view. A right-click shows Cut, Copy and Paste, then
-/// `menu`. Left empty, it shows `defaultText` again. Glyphs copied from the page's Glyphs, like an alternate, are
-/// drawn as copied where they're pasted (`glyphs`, see `SampleGlyph`), in `face`, a style of `family`. A new `caseChange`
-/// converts the selection's case, or the whole text's with nothing selected, as a step to undo.
 struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     @Binding var text: String
     @Binding var glyphs: [SampleGlyphRun]
@@ -76,8 +67,6 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         }
     }
 
-    /// As tall as its lines, laid out at the width it's offered, and the room above and below them. Not sized by a hidden
-    /// SwiftUI copy of the text: that broke some lines elsewhere, so at some sizes the last line was cut off.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
         guard let width = proposal.width, width.isFinite, let manager = view.textLayoutManager, let container = view.textContainer
         else { return nil }
@@ -92,15 +81,12 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         return CGSize(width: width, height: bottom.rounded(.up) + roomAbove + roomBelow)
     }
 
-    /// Made at each right-click, so its checkmarks are up to date.
     private func setMenu(of view: NSTextView) {
         (view as? SampleTextView)?.makeMenu = { [menu] in
             NSHostingMenu(rootView: SampleMenu(view: view, content: menu()))
         }
     }
 
-    /// Sets the font, spacing and alignment when they change, not on every keystroke, which would upset typing
-    /// with an input method, and marks the pasted glyphs again when the text was set from outside.
     private func update(_ view: NSTextView, context: Context) {
         setMenu(of: view)
         view.textContainerInset = NSSize(width: margin, height: 0)
@@ -110,6 +96,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         let glyphStyle = GlyphStyle(family: family, face: face, font: font)
         guard let storage = view.textStorage else { return }
         let restyles = style != coordinator.style || storage.length != coordinator.styledLength
+        // Only on a change, not on every keystroke, which would upset typing with an input method.
         guard restyles || glyphStyle != coordinator.glyphStyle || glyphs != coordinator.markedGlyphs else { return }
         coordinator.style = style
         coordinator.glyphStyle = glyphStyle
@@ -132,7 +119,6 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         coordinator.styledLength = storage.length
     }
 
-    /// What the pasted glyphs are drawn in.
     struct GlyphStyle: Equatable {
         let family: String
         let face: FontFace
@@ -161,9 +147,6 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             return attributes
         }
 
-        /// How far each line is drawn above where TextKit sets it, the font's descent above the bottom of the line:
-        /// half of what the line height adds to the font's height, so it sits in the middle of the line, as on the
-        /// web. Below 0 when the lines are closer than the font is tall, which lowers it.
         var raise: CGFloat {
             (lineHeight - CTFontGetAscent(font).rounded() - CTFontGetDescent(font).rounded()) / 2
         }
@@ -179,18 +162,13 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         var glyphs: Binding<[SampleGlyphRun]>
         var defaultText: String
         var style: Style?
-        /// The text's length when the style was last set: text pasted since may have brought its own.
         var styledLength = 0
         var glyphStyle: GlyphStyle? {
             didSet { if glyphStyle != oldValue { shownGlyphs.removeAll() } }
         }
-        /// Each pasted glyph's in the style shown, nil for one it doesn't have.
         private var shownGlyphs: [SampleGlyph: CGGlyph?] = [:]
-        /// The pasted glyphs as last marked in the text, or as the text last told; nil once it's set from outside.
         var markedGlyphs: [SampleGlyphRun]?
-        /// While the text is set from outside, when the glyphs pasted into it aren't marked yet.
         var isSettingText = false
-        /// The case change last made, so that each is made once.
         var caseChange: CaseChange?
 
         init(text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
@@ -204,7 +182,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             styledLength = view.textStorage?.length ?? 0
         }
 
-        /// Every change to the text, an undone one too, which the text view doesn't tell its delegate about.
+        // Here, as the text view doesn't tell its delegate about a change that's undone.
         func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range: NSRange,
                          changeInLength: Int) {
             guard editedMask.contains(.editedCharacters), !isSettingText else { return }
@@ -214,14 +192,11 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             if pasted != glyphs.wrappedValue { glyphs.wrappedValue = pasted }
         }
 
-        /// What's typed next to a pasted glyph is typed as it is, not as the glyph.
         func textView(_ view: NSTextView, shouldChangeTypingAttributes oldAttributes: [String: Any],
                       toAttributes newAttributes: [NSAttributedString.Key: Any]) -> [NSAttributedString.Key: Any] {
             newAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo }
         }
 
-        /// A paragraph as drawn: its pasted glyphs in place of their characters, where the style has them. Only
-        /// drawn, so the text itself keeps its attributes as they are while typing.
         func textContentStorage(_ content: NSTextContentStorage, textParagraphWith range: NSRange) -> NSTextParagraph? {
             guard let storage = content.textStorage, let glyphStyle else { return nil }
             let pasted = storage.sampleGlyphs(in: range)
@@ -243,7 +218,6 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
             return shown
         }
 
-        /// Puts the default text back when the text is left with nothing to see, as a step of its own to undo.
         func textDidEndEditing(_ notification: Notification) {
             guard let view = notification.object as? NSTextView, let storage = view.textStorage,
                   view.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -261,15 +235,9 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     }
 }
 
-/// Esc goes back from the font page, as everywhere else on it, rather than offering completions. A right-click
-/// shows the page's menu, not the text view's. Glyphs copied from the page's Glyphs paste as glyphs, and those in
-/// its text copy as glyphs too.
 private final class SampleTextView: NSTextView {
-    /// The text, which the text view only points to.
     var content: NSTextContentStorage?
     var makeMenu: (() -> NSMenu)?
-    /// Where the lines start: below the room for glyphs reaching above them. Not a container inset, which would
-    /// leave as much room below.
     var roomAbove: CGFloat = 0 {
         didSet {
             guard roomAbove != oldValue else { return }
@@ -277,7 +245,6 @@ private final class SampleTextView: NSTextView {
             needsDisplay = true
         }
     }
-    /// The menu last shown, kept until the next: its items act once it has closed.
     private var shownMenu: NSMenu?
 
     override var textContainerOrigin: NSPoint { NSPoint(x: textContainerInset.width, y: roomAbove) }
@@ -302,9 +269,6 @@ private final class SampleTextView: NSTextView {
         return super.preferredPasteboardType(from: availableTypes, restrictedToTypesFrom: allowedTypes)
     }
 
-    /// The selection in another case, or the whole text with nothing selected, as one step to undo, selected afterwards
-    /// if it was before. ß in capitals is ẞ where `font` has it, SS where it doesn't. Pasted glyphs stay marked where
-    /// their characters are the same, as figures are; a letter in another case is another glyph.
     func convert(_ conversion: CaseConversion, in font: CTFont) {
         guard let storage = textStorage else { return }
         let selected = selectedRange()
@@ -333,7 +297,6 @@ private final class SampleTextView: NSTextView {
                                               : NSRange(location: min(selected.location, storage.length), length: 0))
     }
 
-    /// The characters with their glyphs marked, in place of the selection, as one step to undo.
     override func readSelection(from pasteboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
         guard type == .sampleClip, let clip = SampleClip.read(from: pasteboard) else {
             return super.readSelection(from: pasteboard, type: type)
@@ -366,7 +329,6 @@ private final class SampleTextView: NSTextView {
     }
 }
 
-/// The sample's right-click menu: editing the text, then what the page gives it.
 private struct SampleMenu<Content: View>: View {
     weak var view: NSTextView?
     let content: Content
@@ -383,13 +345,8 @@ private struct SampleMenu<Content: View>: View {
     }
 }
 
-/// Sets the insertion point on the font rather than on the line: from the font's ascent above the baseline to its
-/// descent below, as far apart as the lines may be, and raised with the line (`raise`, see `UnclippedFragment`).
-/// TextKit made it as tall as the line, so with the lines closer than the font is tall it started halfway up the
-/// capitals and reached below the descenders, and with them farther apart it reached high above the letters.
 nonisolated private final class SampleLayoutManager: NSTextLayoutManager {
     var font: CTFont?
-    /// How far each line is drawn above where TextKit sets it (see `SampleEditor.Style.raise`).
     var raise: CGFloat = 0
 
     override func enumerateTextSegments(in textRange: NSTextRange, type: SegmentType, options: SegmentOptions = [],
@@ -403,10 +360,6 @@ nonisolated private final class SampleLayoutManager: NSTextLayoutManager {
     }
 }
 
-/// A paragraph of the sample whose glyphs draw however far past their lines they reach, each line in the middle of
-/// its height. TextKit draws each paragraph within its rendering surface, which is only as tall as the font's ascent
-/// and descent, and sets each baseline the font's descent above the bottom of its line, so all the room a large
-/// line height added went above the letters: a single line sat at the bottom of the text.
 nonisolated private final class UnclippedFragment: NSTextLayoutFragment {
     private var raise: CGFloat { (textLayoutManager as? SampleLayoutManager)?.raise ?? 0 }
 

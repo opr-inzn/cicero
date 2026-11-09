@@ -3,10 +3,6 @@ import Foundation
 extension DocumentFonts {
     // MARK: Photoshop
 
-    /// The fonts a Photoshop file's text layers set their text in, PSD or PSB (large document). Each text layer keeps
-    /// its text engine's data, whose font list names, by PostScript name, every font the layer has, with Photoshop's
-    /// defaults among them; its runs of text say which of those they're set in. Reads the layer records only, not the
-    /// pixels. Text in smart objects, documents of their own placed in this one, is left out.
     static func photoshop(_ data: Data) throws -> [DocumentFont] {
         var reader = PhotoshopReader(data)
         guard reader.bytes(4) == Array("8BPS".utf8), let version = reader.uint(2), version == 1 || version == 2 else {
@@ -53,19 +49,16 @@ extension DocumentFonts {
         return fonts
     }
 
-    /// Additional layer information whose length a PSB gives in eight bytes rather than four.
     private static let longLayerInfoKeys: Set<String> = [
         "LMsk", "Lr16", "Lr32", "Layr", "Mt16", "Mt32", "Mtrn", "Alph", "FMsk", "lnk2", "FEid", "FXid", "PxSD",
     ]
 
-    /// The fonts a text layer's runs of text are set in, from its text engine data: the entries of the font list
-    /// (`/ResourceDict /FontSet`) that the runs (`/StyleRun /RunArray`) name with `/Font n`, and the default style's
-    /// font when a run names none. Never the invisible font Photoshop sets hidden characters in.
     static func textLayerFonts(_ bytes: [UInt8]) -> [DocumentFont] {
         guard let resources = find("/ResourceDict", in: bytes),
               let fontSet = find("/FontSet", in: bytes, from: resources)
         else { return [] }
         let names = fontNames(bytes, from: fontSet)
+        // The font list names every font the layer has, with Photoshop's defaults among them: only those its runs name are used.
         var used = Set<Int>()
         if let runs = find("/StyleRun", in: bytes), runs < resources {
             let region = Array(bytes[runs..<resources])
@@ -78,12 +71,12 @@ extension DocumentFonts {
             }
         }
         return used.sorted().compactMap { index in
+            // Never the invisible font Photoshop sets hidden characters in.
             guard names.indices.contains(index), names[index] != "AdobeInvisFont" else { return nil }
             return DocumentFont(postScriptName: names[index])
         }
     }
 
-    /// The `/Name (…)` strings in a font list, in order, up to the list's closing bracket.
     private static func fontNames(_ bytes: [UInt8], from start: Int) -> [String] {
         var names: [String] = []
         var at = start
@@ -108,7 +101,6 @@ extension DocumentFonts {
         return names
     }
 
-    /// The whole numbers after each `key` followed by a space, as in `/Font 0`, and not keys it begins (`/FontSize`).
     private static func numbers(after key: String, in bytes: [UInt8]) -> [Int] {
         var found: [Int] = []
         var at = 0
@@ -116,6 +108,7 @@ extension DocumentFonts {
             at = match + key.utf8.count
             var digits = at
             while digits < bytes.count, bytes[digits] == 0x20 || bytes[digits] == 0x09 { digits += 1 }
+            // A space must follow, so a key it begins, like /FontSize, doesn't count.
             guard digits > at else { continue }
             var value = 0
             var any = false
@@ -151,7 +144,6 @@ extension DocumentFonts {
     }
 }
 
-/// Reads big-endian numbers from data it doesn't trust: past the end, it gives nil.
 private struct PhotoshopReader {
     private let data: Data
     var offset = 0
@@ -171,7 +163,6 @@ private struct PhotoshopReader {
         return Array(data[start..<start + count])
     }
 
-    /// An unsigned number of `count` bytes; nil past the end, or too large to be an offset in the data.
     mutating func uint(_ count: Int) -> Int? {
         guard let bytes = bytes(count) else { return nil }
         var value: UInt64 = 0

@@ -1,30 +1,21 @@
 import CiceroCore
 import Foundation
 
-/// `cicero find [words] [filters]`, and `cicero list families`: families, as the app's search finds them, with filters
-/// for what the sidebar and smart folders test.
 public struct FindOptions: Sendable {
     public enum Sort: String, CaseIterable, Sendable {
-        /// A to Z, by the name shown.
         case name
-        /// The latest first, by when the family arrived on the Mac.
         case added
-        /// The latest first, by the year its earliest style came out; families without one last.
         case released
     }
 
     public var words: [String] = []
-    /// Families any of `words` finds, each word (or quoted phrase) a search of its own; else all of them, together.
     public var any = false
     public var foundry: String?
     public var classification: String?
-    /// "2019", "2015..2020", "2015..", "..2020".
     public var released: String?
-    /// "2024", "2024-03", "2024-03-15", or a range of them with "..".
     public var added: String?
     public var text: String?
     public var set: String?
-    /// How many characters of `text` or `set` a family may lack.
     public var missing: Int?
     public var tag: String?
     public var folder: String?
@@ -32,9 +23,7 @@ public struct FindOptions: Sendable {
     public var active = false
     public var inactive = false
     public var sort: Sort?
-    /// Style words, as the search field's tokens (see `SearchToken.named`).
     public var filters: [String] = []
-    /// 0: all.
     public var limit = 50
     public var offset = 0
 
@@ -56,7 +45,6 @@ public enum FindCommand {
         return answer.json
     }
 
-    /// The families that match, in the order asked for.
     public static func families(_ options: FindOptions, in context: LibraryContext) throws -> [Family] {
         let words = options.words.map(unquoted)
         if options.any, words.allSatisfy({ SearchQuery($0).isEmpty }) {
@@ -82,9 +70,6 @@ public enum FindCommand {
         return sorted(families, by: options.sort)
     }
 
-    /// A word with quote marks at both ends, without them. In Terminal the shell takes them away; an agent that calls the
-    /// MCP tool may type them too ("\"Maximilian Inzinger\""), and no font has them in its name. One in the middle stays
-    /// (Sukey's), and so does one at one end only.
     static func unquoted(_ word: String) -> String {
         let pairs: [(Character, Character)] = [("\"", "\""), ("'", "'"), ("“", "”"), ("„", "“"), ("‘", "’"), ("«", "»"), ("»", "«")]
         var word = word.trimmingCharacters(in: .whitespaces)
@@ -94,7 +79,6 @@ public enum FindCommand {
         return word
     }
 
-    /// Each family's licenses, license URLs, descriptions, and manufacturer and designer URLs, lowercased, each once.
     static func fileTexts(_ families: [Family]) -> [String: [String]] {
         let names = FileNames.read(families.flatMap { $0.faces.map(\.face) })
         var texts: [String: [String]] = [:]
@@ -126,7 +110,6 @@ public enum FindCommand {
         }
     }
 
-    /// The token a `--filter` word names.
     static func token(_ word: String, in context: LibraryContext) throws -> SearchToken {
         if let token = SearchToken.named(word) { return token }
         if context.characterSet(word) != nil {
@@ -135,7 +118,6 @@ public enum FindCommand {
         throw CommandError(.invalidArgument, "“\(word)” isn’t a style word. Use one of these.", suggestions: SearchToken.all.map { $0.title.lowercased() })
     }
 
-    /// The tests of every filter given but the words and style words.
     static func filters(_ options: FindOptions, in context: LibraryContext) throws -> [(Family) -> Bool] {
         var tests: [(Family) -> Bool] = []
         let filters = context.filters
@@ -197,7 +179,6 @@ public enum FindCommand {
         }
     }
 
-    /// A built-in or custom set by its id.
     static func characterSet(_ id: String, in context: LibraryContext) throws -> CharacterSetDefinition {
         if let set = context.characterSet(id) { return set }
         let byName = context.allSets.filter { Names.fold($0.name) == Names.fold(id) }
@@ -206,7 +187,6 @@ public enum FindCommand {
                            suggestions: Names.suggestions(for: id, among: context.allSets.map(\.id)))
     }
 
-    /// The name among `names` that's `typed`, ignoring case.
     static func exact(_ typed: String, among names: Set<String>, kind: String) throws -> String {
         if names.contains(typed) { return typed }
         let found = names.filter { Names.fold($0) == Names.fold(typed) }
@@ -216,7 +196,6 @@ public enum FindCommand {
 
     // MARK: Ranges
 
-    /// "2019", "2015..2020", "2015..", "..2020".
     static func years(_ text: String) throws -> ClosedRange<Int> {
         let (low, high) = try bounds(text, name: "--released")
         func year(_ part: String?, _ fallback: Int) throws -> Int {
@@ -229,8 +208,6 @@ public enum FindCommand {
         return range.0...range.1
     }
 
-    /// "2024", "2024-03", "2024-03-15", or a range of them: from the start of the first, in the Mac's time zone, to the
-    /// end of the second.
     static func dates(_ text: String) throws -> Range<Date> {
         let (low, high) = try bounds(text, name: "--added")
         let calendar = Calendar.current
@@ -253,7 +230,6 @@ public enum FindCommand {
         return start..<end
     }
 
-    /// The two ends of "a..b", "a..", "..b", or "a" for both.
     static func bounds(_ text: String, name: String) throws -> (String?, String?) {
         let text = text.trimmingCharacters(in: .whitespaces)
         guard let range = text.range(of: "..") else {

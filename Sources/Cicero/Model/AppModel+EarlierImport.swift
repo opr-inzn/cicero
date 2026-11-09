@@ -1,30 +1,18 @@
 import AppKit
 import CiceroCore
 
-/// FontExplorer X's Font Library as a location, as an import made it up to 0.10.13: offered at launch to be copied in,
-/// as imports copy fonts in now.
 struct EarlierImportPrompt: Identifiable {
     let id = UUID()
     let folder: WatchedFolder
-    /// The location's name when it was asked: the copying removes the location near the end, after which its folder's
-    /// own name ("Font Library") would show.
     let name: String
-    /// The font files in it the library lists.
     let files: [String]
-    /// How many of them are copied: not those in already, and one of the same files (see `ActivationEngine.copyPlan`).
     let copying: Int
-    /// Where `copying` was counted for: Cicero's Library, or the Fonts folder.
     let countedForFontLibrary: Bool
-    /// How many of those are on where they are.
     let onCount: Int
-    /// The smart folders with a rule about the location, which find nothing once it's gone.
     let smartSets: [String]
 }
 
 extension AppModel {
-    /// Once a launch, after its first scan: asks about FontExplorer X's Font Library when it's still one of the user's
-    /// locations with fonts in it. Not Now asks again at the next launch. Settles `mayOfferEarlierImportCopy`, as the
-    /// question is up or not to come.
     func offerEarlierImportCopy() {
         guard !askedAboutEarlierImport, !isImporting, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data)
@@ -50,18 +38,10 @@ extension AppModel {
         }
     }
 
-    /// On from its file where it is: by Cicero, or by FontExplorer X, which leaves its fonts on after it quits.
     func isOnWhereItIs(_ face: LibraryFace) -> Bool {
         data.records.inPlace.contains(face.face.path) || face.state.source == .otherApp
     }
 
-    /// Saves the current setup to the Backups folder; copies the location's fonts in, off (those on where they are, on),
-    /// where installing puts them
-    /// (the long part, in the caller's task so it can be cancelled: the copies made so far stay, off, and copying again
-    /// takes them as they are); then, in one queued
-    /// operation, turns off the location's fonts that were on, removes the location, reads the copies and turns on those
-    /// of the fonts that were on. Folders, tags and the rest go by family and PostScript name, so they stay as they are.
-    /// FontExplorer X's own files stay where they are. Returns how many files were copied; nil when nothing was done.
     func copyEarlierImport(_ prompt: EarlierImportPrompt, stage: @escaping @Sendable (ImportStage) -> Void) async -> Int? {
         isImporting = true
         defer { isImporting = false }

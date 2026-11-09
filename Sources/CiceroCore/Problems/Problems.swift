@@ -4,10 +4,8 @@ import Foundation
 public enum ProblemKind: String, CaseIterable, Sendable {
     case installedTwice, missing, unreadable, external, duplicates, sharedNames
 
-    /// Worth knowing, rarely worth acting on: not counted in the sidebar badge and shown collapsed.
     public var isMinor: Bool { self == .sharedNames }
 
-    /// Whether the files are copies of one font, shown by folder. Shared names lists different fonts, one file each.
     public var groupsFilesByFolder: Bool { self != .sharedNames }
 
     public var title: String {
@@ -21,7 +19,6 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         }
     }
 
-    /// One or two plain sentences shown above the group.
     public var explanation: String {
         switch self {
         case .installedTwice:
@@ -40,21 +37,14 @@ public enum ProblemKind: String, CaseIterable, Sendable {
     }
 }
 
-/// One file involved in a problem.
 public struct ProblemFile: Hashable, Sendable {
     public var path: String
     public var version: String?
     public var modified: Date?
-    /// Where it is or how it's active, e.g. "In your Fonts folder", "Used where it is".
     public var detail: String
-    /// Shown instead of the file name, e.g. the font's family.
     public var title: String?
-    /// What about the file matters here, e.g. the styles involved.
     public var note: String?
-    /// The PostScript names macOS gives this file when an app asks for them, of the names the problem is about.
     public var preferredFor: [String]
-    /// The styles behind `preferredFor` when macOS gives this file only some of its names and the rest to other files,
-    /// e.g. "Light Oblique and Bold Oblique".
     public var preferredStyles: String?
 
     public init(path: String, version: String?, modified: Date?, detail: String, title: String? = nil, note: String? = nil,
@@ -70,23 +60,15 @@ public struct ProblemFile: Hashable, Sendable {
     }
 }
 
-/// Something the user can do about a problem. The app carries these out.
 public enum ProblemFix: Hashable, Sendable {
     case reveal([String])
-    /// Deactivate these active copies (those in a Fonts folder are turned off there).
     case deactivate([FaceID])
-    /// Move these files to the Trash: never protected paths, and only spare copies (every face in them,
-    /// of every family, has a copy in another file), or files nothing can read.
+    // Never protected paths, and only spare copies (every face in them, of every family, has a copy in another file), or files nothing can read.
     case trash([String])
-    /// Forget a missing in-place registration and unregister it.
     case forgetInPlace(String)
-    /// Forget a missing installed copy.
     case forgetInstalledCopy(String)
     case removeFromSet(UUID, family: String)
-    /// Copy a font used from an external disk into ~/Library/Fonts and stop using it in place.
     case installCopy(String)
-    /// Open the page on Adobe Fonts' website of the family these files from Adobe Fonts are from, to remove them there:
-    /// Creative Cloud takes them away then.
     case removeFromAdobeFonts([String])
 
     public var title: String {
@@ -112,22 +94,14 @@ public enum ProblemFix: Hashable, Sendable {
 public struct Problem: Identifiable, Hashable, Sendable {
     public var id: String
     public var kind: ProblemKind
-    /// e.g. the family names involved.
     public var title: String
-    /// The family the problem is about, when it's about one: removing its files names the other families in them.
     public var family: String?
-    /// e.g. "Active from 2 files."
     public var summary: String
     public var files: [ProblemFile]
-    /// Fixes for the problem as a whole.
     public var fixes: [ProblemFix]
-    /// Fixes for single files, by path.
     public var fileFixes: [String: [ProblemFix]]
-    /// Fixes for all the files in a folder that holds more than one of them, by the folder's path.
     public var folderFixes: [String: [ProblemFix]]
-    /// The folder with the newest version, when every other folder's files are older: usually the copy to keep.
     public var newestFolder: String?
-    /// The files that can go so that one copy of each font is left: what Remove All Extra Copies moves to the Trash.
     public var extraCopies: [String]
 
     public init(id: String, kind: ProblemKind, title: String, family: String? = nil, summary: String, files: [ProblemFile], fixes: [ProblemFix],
@@ -146,7 +120,6 @@ public struct Problem: Identifiable, Hashable, Sendable {
         self.extraCopies = extraCopies
     }
 
-    /// The files by the folder they're in, in order.
     public var folders: [ProblemFolder] {
         var folders: [ProblemFolder] = []
         for file in files {
@@ -161,15 +134,12 @@ public struct Problem: Identifiable, Hashable, Sendable {
     }
 }
 
-/// The files of a problem that are in one folder.
 public struct ProblemFolder: Hashable, Sendable {
     public var path: String
     public var files: [ProblemFile]
 }
 
 public enum ProblemDetector {
-    /// Finds problems in the library. Reads font versions from disk for the files involved, so call it off the main thread.
-    /// `fileForName` is the file macOS uses for a PostScript name, if any.
     public static func detect(in library: Library, data: UserData, locations: Locations,
                               fileForName: @escaping (String) -> String? = activeFile(named:)) -> [Problem] {
         var context = Context(library: library, data: data, locations: locations, fileForName: fileForName)
@@ -186,7 +156,6 @@ public enum ProblemDetector {
         return problems
     }
 
-    /// The file macOS uses when an app asks for a font by PostScript name, or nil when no active font has the name.
     public static func activeFile(named postScriptName: String) -> String? {
         let font = CTFontCreateWithName(postScriptName as CFString, 12, nil)
         guard CTFontCopyPostScriptName(font) as String == postScriptName else { return nil }
@@ -199,7 +168,6 @@ public enum ProblemDetector {
         let locations: Locations
         let folders: [WatchedFolder]
         let fileForName: (String) -> String?
-        /// Which files can go without taking a face's last copy with them.
         var copies: SpareCopies
         private var versions: [String: String?] = [:]
 
@@ -253,8 +221,6 @@ public enum ProblemDetector {
             return "Inactive"
         }
 
-        /// Where a missing file may only be out of reach for now: "on “Server”, which isn’t connected" for a disk
-        /// under /Volumes that isn't there, or the like for a watched folder Cicero can't read. nil when it's just gone.
         func unreachable(_ path: String) -> String? {
             if let volume = Reachability.disconnectedVolume(of: path) { return "on “\(volume)”, which isn’t connected" }
             guard let folder = folders.first(where: { library.unavailableFolders[$0.id] != nil && path.hasPrefix($0.path + "/") }) else { return nil }
@@ -267,22 +233,17 @@ public enum ProblemDetector {
             locations.isInInactiveFolder(path) || folders.contains { path.hasPrefix($0.path + "/") }
         }
 
-        /// "Version 2.001" → [2.001], "Version 5.01.2" → [5.01, 2], for picking the newest copy: compare with
-        /// `lexicographicallyPrecedes`. Empty when there's no version.
         func versionNumber(of path: String) -> [Double] {
             guard let version = versions[path] ?? nil else { return [] }
             return FontVersion.number(version)
         }
 
-        /// The copy of a style active from several files to keep: the newest version. Of equal versions, one that
-        /// can't go anyway (macOS's or an app's), then one in the user's own folders, then one for all users, then one
-        /// in the user's Fonts folder, then one active only for now, and one from Adobe Fonts last: Creative Cloud
-        /// may take it away, so one of the user's own stays too (see `SpareCopies`).
         func keeper(of paths: [String]) -> String {
             func rank(_ path: String) -> Int {
                 let source = LibraryScanner.activeSource(of: path, locations: locations, records: data.records)
                 if source != .adobeFonts, ActivationEngine.isProtected(path) { return 5 }
                 switch source {
+                // Creative Cloud may take a copy from Adobe Fonts away, so one of the user's own stays too.
                 case .adobeFonts: return 0
                 case .macOS, .app: return 5
                 case .inPlace, .otherApp: return 4
@@ -300,7 +261,6 @@ public enum ProblemDetector {
             }!
         }
 
-        /// The folder whose files include the newest version, when every other folder's are all older.
         func newestFolder(of paths: [String]) -> String? {
             let ranked = Dictionary(grouping: paths) { ($0 as NSString).deletingLastPathComponent }
                 .mapValues { $0.map(versionNumber).max { $0.lexicographicallyPrecedes($1) } ?? [] }
@@ -312,7 +272,6 @@ public enum ProblemDetector {
 
     // MARK: Installed twice
 
-    /// The same font active from more than one file, grouped by family.
     private static func installedTwice(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         // Each problem's active copies of each style.
@@ -375,17 +334,12 @@ public enum ProblemDetector {
 
     // MARK: Shared names
 
-    /// Different families whose active faces use the same PostScript names (typically bare names like "Bold" that
-    /// variable fonts give their named instances). Families linked by any shared name are one problem: which of them
-    /// to keep on is one decision.
     private static func sharedNames(_ context: inout Context) -> [Problem] {
         struct Face {
             var path: String
             var copies: [String]
             var family: String
             var style: String
-            /// Upright before italic, then by weight (from the style name: a variable font's named styles share one OS/2
-            /// weight): the order styles are listed in.
             var rank: Int
             var id: FaceID?
         }
@@ -402,6 +356,7 @@ public enum ProblemDetector {
             for face in family.faces where face.state.isActive {
                 clashes[face.face.postScriptName, default: []].append(Face(
                     path: face.face.path, copies: face.otherCopies, family: family.id, style: face.face.styleName,
+                    // From the style name: a variable font's named styles share one OS/2 weight.
                     rank: (face.face.isItalic ? 10_000 : 0) + (StyleName(face.face.styleName).weight ?? face.face.weight),
                     id: face.canDeactivate ? face.id : nil
                 ))
@@ -478,19 +433,14 @@ public enum ProblemDetector {
         }
     }
 
-    /// The first six of more than seven items, then "N more".
     private static func abridged(_ items: [String]) -> [String] {
         items.count > 7 ? Array(items.prefix(6)) + ["\(items.count - 6) more"] : items
     }
 
-    /// In Finder's order.
     private static func sorted(_ names: [String]) -> [String] {
         names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    /// Reveal for each folder holding more than one of the paths, and the files' own Move to Trash or Deactivate
-    /// for all of them at once when every file has it and `canCombine` allows it for the folder's files (and
-    /// whether that's trashing them), or Remove in Adobe Fonts when every file has that.
     private static func folderFixes(_ paths: [String], _ fileFixes: [String: [ProblemFix]],
                                     canCombine: (_ files: Set<String>, _ trashing: Bool) -> Bool) -> [String: [ProblemFix]] {
         var result: [String: [ProblemFix]] = [:]
@@ -527,10 +477,6 @@ public enum ProblemDetector {
 
     // MARK: Duplicates
 
-    /// The same font more than once among the inactive files in one place in the user's folders. Copies in
-    /// different places, like each client's folder, are for Use Copy From to choose between (see
-    /// `CopyChooser.places`), not spares, and the Font Library's files never are: the library keeps its fonts while
-    /// they're off, copies of fonts in the user's folders among them.
     private static func duplicates(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         let records = context.data.records
@@ -558,9 +504,11 @@ public enum ProblemDetector {
             var keep = Set<String>()
             var styles = 0
             for face in family.faces {
+                // Never the Font Library's files: the library keeps its fonts while they're off, copies of fonts in the user's folders among them.
                 let inactive = ([face.face.path] + face.otherCopies).filter { path in
                     !context.library.activePaths.contains(path) && context.isInWatchedFolder(path) && !(fontLibrary.map(path.hasPrefix) ?? false)
                 }
+                // Copies in different places, like each client's folder, are for Use Copy From to choose between, not spares.
                 let spares = Dictionary(grouping: inactive) { place[$0] ?? ($0 as NSString).deletingLastPathComponent }.values.filter { $0.count >= 2 }
                 guard !spares.isEmpty else { continue }
                 styles += 1
@@ -648,8 +596,6 @@ public enum ProblemDetector {
 
     // MARK: External
 
-    /// Fonts used in place from disks that can go away, and from ones that are gone for now. Not the Font Library's: the
-    /// user chose where it is.
     private static func external(_ context: inout Context) -> [Problem] {
         var problems: [Problem] = []
         let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
@@ -689,7 +635,6 @@ public enum ProblemDetector {
         return problems
     }
 
-    /// The volume's name when it's removable, external or on the network; nil for the Mac's own disk (or a missing file).
     private static func externalVolumeName(of path: String) -> String? {
         let keys: Set<URLResourceKey> = [.volumeIsRemovableKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsEjectableKey, .volumeLocalizedNameKey]
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys) else { return nil }
@@ -698,10 +643,6 @@ public enum ProblemDetector {
     }
 }
 
-/// Tells whether font files are spare copies: whether every face in them, of every family, has a copy in
-/// another file that stays. Problems offers to remove a file only then. Which faces a file holds comes from
-/// the library; the file itself is read too, for faces the library leaves out (hidden families), and the
-/// other copies must still be there, and be other files rather than the same one by another path.
 public struct SpareCopies: Sendable {
     private struct FaceKey: Hashable {
         var family: String
@@ -720,11 +661,9 @@ public struct SpareCopies: Sendable {
         var inode: UInt64
     }
 
-    /// The faces the library knows in each file, and every file each face is in.
     private var faces: [String: Set<FaceKey>] = [:]
     private var files: [FaceKey: [String]] = [:]
     private let unreadable: Set<String>
-    /// Read from disk once per file.
     private var faceCounts: [String: Int] = [:]
     private var fileIDs: [String: FileID?] = [:]
 
@@ -743,9 +682,6 @@ public struct SpareCopies: Sendable {
         }
     }
 
-    /// Whether all of `paths` can go without taking the last copy of any face with them. A file nothing could
-    /// read, and still can't, holds nothing to lose; a file the library knows nothing else about holds
-    /// something unknown, so it can't go.
     public mutating func areSpare(_ paths: Set<String>) -> Bool {
         var removed = Set<FileID>()
         for path in paths {
@@ -753,6 +689,7 @@ public struct SpareCopies: Sendable {
         }
         for path in paths {
             guard let known = faces[path], !known.isEmpty else {
+                // A file nothing could read, and still can't, holds nothing to lose; one the library knows nothing else about holds something unknown.
                 if unreadable.contains(path) && faceCount(of: path) == 0 { continue }
                 return false
             }
@@ -765,12 +702,12 @@ public struct SpareCopies: Sendable {
 
     private mutating func hasCopy(of key: FaceKey, outside paths: Set<String>, removed: Set<FileID>) -> Bool {
         for other in files[key] ?? [] where !paths.contains(other) {
+            // The other copy must still be there, and be another file rather than the same one by another path.
             if let id = fileID(of: other), !removed.contains(id) { return true }
         }
         return false
     }
 
-    /// Distinct faces in the file, hidden families' included.
     private mutating func faceCount(of path: String) -> Int {
         if let count = faceCounts[path] { return count }
         let count = Set(FontFileReader.faces(atPath: path).map(FaceKey.init)).count
@@ -778,7 +715,6 @@ public struct SpareCopies: Sendable {
         return count
     }
 
-    /// The file a path leads to, through symbolic links; nil when there's none.
     private mutating func fileID(of path: String) -> FileID? {
         if let known = fileIDs[path] { return known }
         var info = stat()

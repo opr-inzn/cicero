@@ -1,7 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// The families of the sidebar selection as a list, a grid or specimens, or the Problems view.
 struct BrowserView: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -52,8 +51,6 @@ struct BrowserView: View {
         .navigationSubtitle(subtitle(families))
     }
 
-    /// A family selected on its own is the one a double-click or Return opens: its page's ligatures and characters
-    /// are worked out now, so the page has them as it opens.
     private func preparePage() {
         guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
         model.pageContents.prepare(model.previewStyle(of: family, weight: preview.weight).face.face)
@@ -75,15 +72,10 @@ struct BrowserView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Whether the list can still grow while coverage is being worked out.
     private var dependsOnCoverage: Bool { model.listDependsOnCoverage }
 
 }
 
-/// The browser's toolbar items: its view picker, Preview Options and Info. Declared on the browser from outside it
-/// (`MainWindow`), not in its body: there, under the view a switch swaps, they made SwiftUI make the whole toolbar again
-/// with each switch (`ToolbarBridge.preferencesDidChange`), 40–65 ms of the switch's main-thread work, and the glass of
-/// the items settling for most of a second after. On the split view they'd stand 8 pt further from the search field.
 struct BrowserToolbar: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarCapsule { BrowserModePicker() }
@@ -93,7 +85,6 @@ struct BrowserToolbar: ToolbarContent {
     }
 }
 
-/// The browser's List, Grid and Specimens picker, with the setting of its own, as the browser has.
 private struct BrowserModePicker: View {
     @AppStorage("browser.mode") private var mode: BrowserMode = .grid
 
@@ -103,7 +94,6 @@ private struct BrowserModePicker: View {
     }
 }
 
-/// The scanning capsule; its own view so progress messages don't re-render the list.
 private struct ScanCapsule: View {
     @Environment(AppModel.self) private var model
 
@@ -129,7 +119,6 @@ private struct ScanCapsule: View {
     }
 }
 
-/// Says that some of a folder's fonts are online only, so they aren't listed, with a button to download them.
 private struct OnlineOnlyBar: View {
     @Environment(AppModel.self) private var model
     let folderID: UUID
@@ -161,7 +150,6 @@ private struct OnlineOnlyBar: View {
     }
 }
 
-/// Says whose similar fonts the browser shows, with a button to go back to what the sidebar showed.
 private struct SimilarBar: View {
     @Environment(AppModel.self) private var model
     let familyID: String
@@ -184,8 +172,6 @@ private struct SimilarBar: View {
     }
 }
 
-/// Above a list the browser shows instead of a sidebar item's (Show Similar Fonts, Show in Library): what it is, and
-/// Done, the way back.
 private struct ListBar: View {
     let symbol: String
     let message: String
@@ -218,7 +204,6 @@ private struct ListBar: View {
     }
 }
 
-/// A watched folder Cicero can't read now, or one whose fonts are all online only.
 private struct FolderOutOfReach: View {
     @Environment(AppModel.self) private var model
     let folderID: UUID

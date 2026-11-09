@@ -3,19 +3,15 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Back Up Library sheet.
     func backupSheet(isPresented: Binding<Bool>) -> some View {
         sheet(isPresented: isPresented) { BackupSheet() }
     }
 }
 
-/// Says what a backup holds, offers to include the font files with their count and size, asks
-/// where to save it, and shows progress while it's written.
 struct BackupSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var includeFonts = true
-    /// nil while the library's files are still being counted.
     @State private var fonts: [BackupFont]?
     @State private var progress: BackupProgress?
     @State private var task: Task<Void, Never>?

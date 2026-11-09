@@ -4,16 +4,8 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// What a face's letters look like as `dimensions` numbers, from a small model that learned it from Google Fonts'
-/// families (scripts/embedding): it looks at the letters and their advances as `LetterImages` draws them (and the
-/// words it sets in strips and the large letters, for a model that takes them), and faces that look alike, scripts,
-/// stencils and outlines too, come out close together. The numbers have a length of 1, so two faces are 0 apart when
-/// alike and up to 2 when not. Next to the letter measurements in `SimilarFonts`. The model also says which of
-/// `classifications` the face is likely to be, for the families nothing in their files classifies.
 public final class LetterEmbedding: Sendable {
     private let url: URL
-    /// Loaded when first asked, which takes a fifth of a second, so in the background; it answers one question at a
-    /// time here.
     private let model = Mutex(Model.unloaded)
 
     private enum Model {
@@ -23,29 +15,22 @@ public final class LetterEmbedding: Sendable {
     }
 
     public static let dimensions = 128
-    /// The classifications the model tells apart, in the order of its answer. Monospaced faces it leaves to their
-    /// advances, and symbol fonts haven't the letters.
     public static let classifications: [Classification] = [.serif, .sansSerif, .script, .ornamental]
 
-    /// What the model says of a face.
     public struct Reading: Equatable, Sendable {
         public var embedding: [Float]
-        /// How likely each of `classifications` is, adding up to 1; nil from a model that doesn't say.
         public var classification: [Float]?
     }
 
-    /// The compiled model (LetterEmbedding.mlmodelc); nil when there's none.
     public init?(contentsOf url: URL?) {
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
         self.url = url
     }
 
-    /// nil for a face with too few of the letters, as `LetterImages` says, and when the model can't be loaded.
     public func embedding(of font: CTFont) -> [Float]? {
         read(font)?.embedding
     }
 
-    /// nil for a face with too few of the letters, as `LetterImages` says, and when the model can't be loaded.
     public func read(_ font: CTFont) -> Reading? {
         // The words in strips and the large letters are drawn only for a model that takes them.
         let (takesStrips, takesDetails) = model.withLock { state -> (Bool, Bool) in

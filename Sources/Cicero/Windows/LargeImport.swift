@@ -1,21 +1,13 @@
 import CiceroCore
 import SwiftUI
 
-/// What the sheets that copy another app's fonts in show about how long it takes (see `CopyTimeEstimate`): copying into
-/// ~/Library/Fonts gets slower with each font, into Cicero's Library it takes minutes. Past `threshold` fonts going into the
-/// Fonts folder, Cicero's Library is offered; choosing it turns on the setting, as Settings → General does, and the box
-/// then says so and can undo it. Shown only before the copying starts.
 struct FontLibraryOffer: View {
-    /// Fonts into the Fonts folder past which Cicero's Library is offered.
     static let threshold = 2_000
 
-    /// The fonts the copying would put into the Fonts folder.
     let count: Int
-    /// Cicero's Library was chosen in this box, so it can be undone in it.
     @Binding var chose: Bool
     @Environment(AppModel.self) private var model
 
-    /// Whether there's anything to show, so a sheet leaves out the space around it otherwise.
     static func isShown(count: Int, chose: Bool, installsIntoFontLibrary: Bool) -> Bool {
         installsIntoFontLibrary ? chose : count > threshold
     }
@@ -62,7 +54,6 @@ struct FontLibraryOffer: View {
         }
     }
 
-    /// The icon on the title's line, and everything else lined up under the title.
     private func notice<Content: View>(icon: Image, tint: some ShapeStyle, title: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             icon.foregroundStyle(tint)
@@ -77,15 +68,11 @@ struct FontLibraryOffer: View {
         .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
     }
 
-    /// "Less than a minute", "About 40 minutes".
     private static func about(_ seconds: Double) -> String {
         seconds < 60 ? "Less than a minute" : "About " + CopyTimeEstimate.phrase(seconds)
     }
 }
 
-/// "Copying fonts, 6,000 of 31,209" and, once `estimate` can tell, "About 30 minutes left": beside it, or `stacked` under
-/// it where the sheet is too narrow for both on one line, with the line there from the start, so the sheet doesn't grow
-/// when the estimate comes.
 struct CopyingProgressLine: View {
     let done: Int
     let total: Int

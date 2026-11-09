@@ -1,19 +1,12 @@
 import CryptoKit
 import Foundation
 
-/// What the `cicero` command is turning on or off while Cicero is closed, written down (onto the disk itself) before it
-/// starts and taken away once the activation records are saved. A command that stops in between (killed, the Mac
-/// switched off) leaves fonts on or off, or files moved, that the records don't know about. The next program to hold
-/// `AppLock`, the command or Cicero at launch, repairs the records from what's true now (`repair`) and takes the journal
-/// away. Nothing turns on or off again: the records follow what macOS and the files say.
 public struct ActivationJournal: Codable, Equatable, Sendable {
     public struct Entry: Codable, Equatable, Sendable {
         public var path: String
-        /// The file's contents, to find it again if it moves into the Inactive folder (out of an app's folder).
         public var digest: String?
     }
 
-    /// On, or off.
     public var turningOn: Bool
     public var entries: [Entry]
 
@@ -31,10 +24,10 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         (try? Data(contentsOf: url(support: support))).flatMap { try? JSONDecoder().decode(ActivationJournal.self, from: $0) }
     }
 
-    /// Written whole and onto the disk, before anything turns.
     public func write(support: URL) throws {
         let url = Self.url(support: support)
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        // Whole and onto the disk itself before anything turns, or a command stopped halfway leaves changes the records never learn of.
         try JSONEncoder().encode(self).write(to: url, options: .atomic)
         _ = UserDataStore.syncToDisk(url)
     }
@@ -43,10 +36,6 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         try? FileManager.default.removeItem(at: url(support: support))
     }
 
-    /// The records as they'd be had the command finished: each file turned on where it is that macOS has on is in
-    /// `inPlace`, each turned off isn't (nor on for a while); a file that went from an app's folder into the Inactive
-    /// folder has its origin noted, found by its contents; one that went back has it forgotten. Files in a Fonts folder
-    /// need nothing: macOS keeps whether they're on. Doing it again changes nothing more.
     public func repair(_ records: ActivationRecords, registrar: any FontRegistrar, locations: Locations) -> ActivationRecords {
         var records = records
         let fm = FileManager.default

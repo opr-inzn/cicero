@@ -1,6 +1,5 @@
 import Foundation
 
-/// A folder of font files, or a ZIP archive of one.
 public enum FontExportFormat: String, CaseIterable, Sendable {
     case folder, zip
 
@@ -12,24 +11,16 @@ public enum FontExportFormat: String, CaseIterable, Sendable {
     }
 }
 
-/// The files an export copies, worked out before the save panel: each face's own file once (a
-/// collection shared by several faces, or families, once), with the files Cicero never touches
-/// (macOS's fonts, fonts inside apps, Adobe Fonts) left out.
 public struct FontExportPlan: Sendable {
     public struct Item: Sendable {
         public var family: String
         public var paths: [String]
     }
 
-    /// Families with files to copy, in the order given.
     public var items: [Item]
-    /// Families with at least one file in the export, including ones whose only file is in another family's folder.
     public var exportedFamilies: [String]
-    /// Files left out because they come with macOS or an app.
     public var protectedCount: Int
 
-    /// `including` picks the faces of a family to export (all of them unless it says otherwise), for a set with only
-    /// some of a family's styles.
     public init(families: [Family], including: (Family, LibraryFace) -> Bool = { _, _ in true }) {
         var seen = Set<String>()
         var items: [Item] = []
@@ -57,8 +48,6 @@ public struct FontExportPlan: Sendable {
 
     public var isEmpty: Bool { items.isEmpty }
 
-    /// "Exported Inter", "Exported Inter and Roboto" or "Exported 12 families", with a note about files left out, for a
-    /// toast.
     public var completionMessage: String {
         var message = "Exported " + (FontNames.describe(families: exportedFamilies) ?? "the fonts")
         if protectedCount > 0 {
@@ -70,22 +59,15 @@ public struct FontExportPlan: Sendable {
     }
 }
 
-/// Copies font files into a folder, or a ZIP archive of one, for sending them to someone or a printer.
 public struct FontExporter: Sendable {
-    /// Moves the item the user chose to replace to the Trash. Tests replace it so they don't fill the user's Trash.
     public var trash: @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
 
     public init() {}
 
-    /// Writes the plan's files to `destination`: a folder (or, for `.zip`, an archive of one) with a
-    /// subfolder per family, or the files themselves when there's one family. It's built in a private
-    /// folder on the same disk and moved there once complete, so a cancelled or failed export leaves
-    /// nothing behind. The save panel has already confirmed replacing an item at `destination`; it goes
-    /// to the Trash then, never under the new one, unless it is or holds one of the exported files or of
-    /// `kept` (see `keptPaths`): then nothing moves and this throws `KeptItemError`.
     @concurrent
     public func export(_ plan: FontExportPlan, to destination: URL, format: FontExportFormat, keeping kept: [String] = []) async throws -> URL {
         let fm = FileManager.default
+        // The exported files are kept too: replacing a folder that holds them would move the library's own fonts to the Trash.
         let replacement = try ItemReplacement(for: destination, keeping: kept + plan.items.flatMap(\.paths))
         defer { replacement.discard() }
         switch format {
@@ -103,9 +85,7 @@ public struct FontExporter: Sendable {
         return destination
     }
 
-    /// What an export or backup must never move to the Trash to make room: every font file in the library
-    /// and every file Cicero's records name, the Fonts folders, Cicero's own folder and its Inactive folder,
-    /// and the scanned folders.
+    // An export or backup must never move any of these to the Trash to make room.
     public static func keptPaths(in library: Library, data: UserData, locations: Locations) -> [String] {
         var paths = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path]
             + data.scannedFolders().map(\.path)
@@ -119,7 +99,6 @@ public struct FontExporter: Sendable {
         return paths
     }
 
-    /// Copies with FileManager, which clones on APFS. `folder` doesn't exist yet.
     private static func copy(_ plan: FontExportPlan, into folder: URL) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -134,7 +113,6 @@ public struct FontExporter: Sendable {
         }
     }
 
-    /// A family name as a folder name: Finder shows ":" as "/".
     static func folderName(for family: String) -> String {
         family.replacingOccurrences(of: "/", with: ":")
     }

@@ -1,12 +1,8 @@
 import CoreText
 import Foundation
 
-/// A filter in the search field beside what's typed, chosen from its suggestions: a style the families have to have,
-/// which their previews then show (see `Family.previewStyle(for:tokens:weight:)`), figures they have to be able to
-/// set, which their previews then use, or variable styles. A family has to match every token, and the text.
 public enum SearchToken: Hashable, Identifiable, Sendable {
     case italic
-    /// On the OS/2 scale, a multiple of 100 from 100 to 900.
     case weight(Int)
     case condensed
     case extended
@@ -16,10 +12,8 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
 
     public var id: Self { self }
 
-    /// Every token, in the order the suggestions list them.
     public static let all: [SearchToken] = [.italic] + weights.map { .weight($0.weight) } + [.condensed, .extended, .tabularFigures, .oldStyleFigures, .variable]
 
-    /// The weights' names, and the other words for them.
     private static let weights: [(weight: Int, name: String, others: [String])] = [
         (100, "Thin", ["hairline"]), (200, "Extra Light", ["extralight", "ultra light", "ultralight"]), (300, "Light", []),
         (400, "Regular", []), (500, "Medium", []), (600, "Semibold", ["semi bold", "demibold", "demi bold"]), (700, "Bold", []),
@@ -38,8 +32,6 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// What the suggestions find it by, lowercased: its title, the usual other words for it, and what kind of filter
-    /// it is ("weight", "width", "numbers").
     var words: [String] {
         switch self {
         case .italic: ["italic", "italics", "oblique"]
@@ -52,9 +44,6 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The token a word names, as the `cicero` tool's `--filter` takes it: one of the words the suggestions find a token
-    /// by ("bold", "italic", "condensed", "tnum"), ignoring case, or a weight on the OS/2 scale ("700"); nil for
-    /// another. Words for a kind of token only ("weight", "width", "numbers") name none.
     public static func named(_ word: String) -> SearchToken? {
         let word = word.trimmingCharacters(in: .whitespaces).lowercased()
         if let weight = Int(word), weights.contains(where: { $0.weight == weight }) { return .weight(weight) }
@@ -63,7 +52,6 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         return all.first { $0.words.contains(word) }
     }
 
-    /// Tokens of a kind take each other's place: a style has one weight and one width.
     private var kind: Int {
         switch self {
         case .italic: 0
@@ -75,14 +63,10 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The tokens with only the last of each kind, in their order.
     public static func normalized(_ tokens: [SearchToken]) -> [SearchToken] {
         tokens.indices.filter { index in !tokens[(index + 1)...].contains { $0.kind == tokens[index].kind } }.map { tokens[$0] }
     }
 
-    /// The tokens to suggest for what's typed, but for those `chosen` already, each with what stays typed once it's
-    /// chosen: those that the last words typed, two letters at least, begin a word of, the most of them that do, and
-    /// the words before them stay ("sans ital" suggests Italic, leaving "sans").
     public static func suggestions(for typed: String, besides chosen: [SearchToken]) -> [(token: SearchToken, typed: String)] {
         let words = typed.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
         return all.filter { !chosen.contains($0) }.compactMap { token in
@@ -96,8 +80,6 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The style the tokens ask for, over the one the typed words name, if any: italic when either is, the tokens' weight
-    /// and width before the words'. Nil when neither names one.
     static func style(of tokens: [SearchToken], over typed: SearchQuery.Style? = nil) -> SearchQuery.Style? {
         var style = typed ?? SearchQuery.Style()
         for token in tokens {
@@ -112,7 +94,6 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
         return style == SearchQuery.Style() ? nil : style
     }
 
-    /// The features previews turn on for the figures the tokens ask for, as the Info panel's Features tab sets them.
     public static func features(of tokens: [SearchToken]) -> [FeatureSetting] {
         tokens.compactMap { token in
             switch token {
@@ -125,9 +106,6 @@ public enum SearchToken: Hashable, Identifiable, Sendable {
 }
 
 extension Family {
-    /// Whether the family has what the tokens ask for: a style that's everything the style tokens say, italic, of the
-    /// weight (a variable one whose weight axis reaches it, or one named for it), narrower or wider than normal, and
-    /// variable for Variable; and the figures, in any of its styles.
     public func matches(_ tokens: [SearchToken]) -> Bool {
         if tokens.contains(.tabularFigures), !faces.contains(where: { $0.face.figures.contains(.tabular) }) { return false }
         if tokens.contains(.oldStyleFigures), !faces.contains(where: { $0.face.figures.contains(.oldStyle) }) { return false }

@@ -1,11 +1,9 @@
 import Darwin
 import Foundation
 
-/// The font caches macOS keeps.
 public enum SystemFontCaches {
     public enum Scope: Sendable {
         case currentUser
-        /// Needs an administrator; macOS asks for the password itself.
         case allUsers
     }
 
@@ -14,7 +12,6 @@ public enum SystemFontCaches {
         case failed(String)
     }
 
-    /// Removes the caches and restarts the font service, which rebuilds them on demand.
     public static func clear(_ scope: Scope) async throws {
         switch scope {
         case .currentUser:
@@ -38,8 +35,6 @@ public enum SystemFontCaches {
     }
 }
 
-/// Font caches other apps keep and rebuild the next time they open. Only the files and folders
-/// matched here are ever touched, and only ever moved to the Trash.
 public enum AppFontCaches {
     public enum App: String, CaseIterable, Identifiable, Sendable {
         case adobe, office
@@ -53,7 +48,6 @@ public enum AppFontCaches {
             }
         }
 
-        /// Apps that read these caches and must be quit first.
         public var bundleIDs: Set<String> {
             switch self {
             case .adobe: ["com.adobe.InDesign", "com.adobe.illustrator", "com.adobe.Photoshop", "com.adobe.Acrobat.Pro", "com.adobe.Reader"]
@@ -76,7 +70,7 @@ public enum AppFontCaches {
         public var isEmpty: Bool { items.isEmpty }
     }
 
-    /// Where each app keeps its caches, relative to the home folder (glob patterns, braces allowed).
+    // Only what these patterns match may ever be touched, and only by moving it to the Trash.
     static func patterns(for app: App) -> [String] {
         switch app {
         case .adobe: [
@@ -101,7 +95,6 @@ public enum AppFontCaches {
         }
     }
 
-    /// What exists for `app`, with its size. Walks folders; call off the main thread.
     public static func find(_ app: App) -> Found {
         find(app, home: FileManager.default.homeDirectoryForCurrentUser)
     }
@@ -117,8 +110,6 @@ public enum AppFontCaches {
         return Found(app: app, items: items, size: size)
     }
 
-    /// Moves every found item to the Trash; returns how many couldn't be moved. Tests pass their own
-    /// `trash` so they don't fill the user's Trash.
     public static func trash(_ found: Found, using trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) -> Int {
         found.items.count { (try? trash($0)) == nil }
     }
@@ -141,7 +132,6 @@ public enum AppFontCaches {
         return escaped
     }
 
-    /// Bytes on disk of a file, or of everything inside a folder. Symbolic links count as themselves.
     private static func allocatedSize(of url: URL) -> Int64 {
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
         func size(_ url: URL) -> Int64 {
@@ -163,7 +153,6 @@ extension Process {
         var stderr: String
     }
 
-    /// Runs a tool to completion without blocking the caller.
     static func run(_ path: String, _ arguments: [String]) async throws -> Output {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {

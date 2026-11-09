@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// Finder-style checkboxes for every sidebar row and section, in the sidebar's order.
 struct SidebarSettings: View {
     @Environment(AppModel.self) private var model
-    /// The coverage groups that are open.
     @State private var expanded: Set<String> = []
 
     var body: some View {
@@ -57,7 +55,6 @@ struct SidebarSettings: View {
         }
     }
 
-    /// A coverage group's title, which opens and closes it.
     private func groupRow(_ id: String, title: String) -> some View {
         let isExpanded = expanded.contains(id)
         return Button {
@@ -82,7 +79,6 @@ struct SidebarSettings: View {
         Text(text).foregroundStyle(.secondary)
     }
 
-    /// Off while its section is: the row can't show then either way. All Fonts, Active and Inactive's stay on.
     private func checkbox(_ row: SidebarRow, in section: SidebarSection? = nil) -> some View {
         Toggle(isOn: visibility(row.key)) {
             HStack(spacing: 6) {

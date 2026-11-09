@@ -1,86 +1,44 @@
 import Foundation
 
-/// Everything the user has set up, saved as one JSON file. Version 2; version 1 (`library.json`)
-/// is imported once and never modified.
 public struct UserData: Codable, Equatable, Sendable {
     public var version = 2
     public var folders: [WatchedFolder] = []
-    /// Folder ID → the name the user gave it in the sidebar, in place of its own (`WatchedFolder.displayName`); the
-    /// folder on disk keeps its name. Cicero's own items (Proofing, Adobe Fonts, Added Fonts, Inactive) take one too.
     public var folderNames: [String: String] = [:]
-    /// Font files added one at a time (Add Fonts…, dropped on the window, or opened from the Finder), listed
-    /// where they are, like the fonts in a folder.
     public var fontFiles: [String] = []
-    /// Added files the last scans found gone, and since when (see `noteGoneFiles`).
     public var missingFontFiles: [String: Date] = [:]
     public var sets: [FontSet] = []
     public var smartSets: [SmartSet] = []
-    /// Tags, in the order they were made; the license tags to begin with (see `licenseTags`). From 0.5 to 0.6 they were
-    /// license statuses, one to a family; a family can have any number again.
     public var tags: [String] = []
-    /// Family name → its tags (see `tags`).
     public var familyTags: [String: [String]] = [:]
-    /// Tag → its colour. A tag without one has none.
     public var tagColors: [String: TagColor] = [:]
-    /// Family name → the stars the user gave it, 1…5. A family without any has no rating.
     public var familyRatings: [String: Int] = [:]
-    /// Family name → the user's note on it. A family without one has none, never an empty one.
     public var familyNotes: [String: String] = [:]
-    /// Family name → how often it was turned on, and when last, since Cicero began counting (see `recordActivations`).
     public var activations: [String: ActivationHistory] = [:]
-    /// False only for libraries saved before there were license tags (license statuses, as they were in 0.5), which get
-    /// them once as they load (see `updateLicenseTags`).
     public var licenseStatusesAdded = true
-    /// False only for libraries saved by 0.9.1 or before, which started with `formerLicenseTags` too, and lose them once
-    /// as they load (see `updateLicenseTags`).
     public var formerLicenseTagsRemoved = true
-    /// False only for libraries saved before a Font Library that fonts aren't installed into became one of the user's
-    /// locations: one with fonts becomes one once (see `keepFormerFontLibraryAsLocation`).
     public var fontLibraryLocationChecked = true
-    /// Family name → foundry, overriding the files' manufacturer.
     public var foundryOverrides: [String: String] = [:]
-    /// Manufacturer as the files name it → the name to show.
     public var foundryRenames: [String: String] = [:]
-    /// Classifications the user made, in the order they were made.
     public var classifications: [String] = []
-    /// Family name → the classification the user put it in, overriding the one its fonts suggest.
     public var classificationOverrides: [String: String] = [:]
-    /// A built-in classification (`Classification.rawValue`) → the name to show.
     public var classificationRenames: [String: String] = [:]
     public var customCharacterSets: [CustomCharacterSet] = []
     public var sidebar = SidebarPreferences()
     public var installMethod: InstallMethod = .copy
-    /// The fonts Cicero installs go into its Font Library (`fontLibraryPath`), a folder for each family, and are used from
-    /// there, rather than copied into ~/Library/Fonts (see `ActivationEngine.installsIntoFontLibrary`).
     public var installsIntoFontLibrary = false
-    /// Where Cicero's Font Library is: `Locations.defaultFontLibrary` unless the user moved it. Empty in files from before
-    /// there was one, until the app fills in the default.
     public var fontLibraryPath = ""
-    /// What to do with an added font file whose fonts the library has already, from another file.
     public var duplicateHandling: DuplicateHandling = .ask
-    /// Ask before turning on more than `manyFamilies` families at once.
     public var asksBeforeActivatingMany = true
-    /// How many families at once turning on can be without asking first (see `asksBeforeActivatingMany`).
     public static let manyFamilies = 100
-    /// Ask before turning off fonts an app loads from a folder that syncs with a cloud service or is on a server: their
-    /// files move out of the folder, which takes them away for everyone who shares it (see `ActivationEngine.sharing`).
     public var asksBeforeMovingOutOfSharedFolders = true
     public var showSystemFonts = true
-    /// List the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them,
-    /// as one Proofing item. Not Adobe Fonts from Creative Cloud (see `showCreativeCloudFonts`).
     public var showAdobeAppFolders = true
-    /// List the Adobe Fonts Creative Cloud turned on, as Adobe Fonts: those on in every app and those Adobe apps turned
-    /// on for themselves. A family the user also has a copy of is theirs, and listed either way. Not `showAdobeFonts`,
-    /// the key `showAdobeAppFolders` was saved as before.
     public var showCreativeCloudFonts = true
-    /// Turn on the fonts the documents open in InDesign, Illustrator and Photoshop use, while the app is open. Off
-    /// until the user turns it on, as macOS then asks whether Cicero may control each app.
     public var activatesDocumentFonts = false
     public var records = ActivationRecords()
 
     public init() {}
 
-    /// What a new library starts with: the license tags, in their colours, on no family.
     public static var newLibrary: UserData {
         var data = UserData()
         data.licenseStatusesAdded = false
@@ -88,20 +46,14 @@ public struct UserData: Codable, Equatable, Sendable {
         return data
     }
 
-    /// The tags a library starts with, for keeping track of what may be done with each family, in their order and
-    /// colours. Tags like any other: the user can rename or delete them.
     public static let licenseTags: [(name: String, color: TagColor)] = [
         ("Licensed", .green), ("Unlicensed", .red), ("Open Source", .blue), ("Trial", .orange),
     ]
 
-    /// The license tags a library started with up to 0.9.1, besides `licenseTags`.
     public static let formerLicenseTags: [(name: String, color: TagColor)] = [
         ("Licensed + Non-Commercial", .sand), ("Partially Licensed", .yellow), ("Public Domain", .purple),
     ]
 
-    /// Once, puts the license tags a library doesn't have yet first, in their colours; Red, Yellow and Green, the tags a
-    /// library started with before, go. Once, too, `formerLicenseTags` go. Each only when it's as it came (see
-    /// `removeUnusedTags`). Tags of the user's own stay, after these.
     public mutating func updateLicenseTags() {
         if !licenseStatusesAdded {
             licenseStatusesAdded = true
@@ -117,7 +69,6 @@ public struct UserData: Codable, Equatable, Sendable {
         }
     }
 
-    /// Deletes the tags that are as they came: in their colours, on no family and in no smart set.
     private mutating func removeUnusedTags(_ candidates: [(name: String, color: TagColor)]) {
         let used = Set(familyTags.values.joined())
             .union(smartSets.flatMap(\.rules).filter { $0.field == .tag }.map(\.value))
@@ -129,7 +80,6 @@ public struct UserData: Codable, Equatable, Sendable {
         }
     }
 
-    /// Missing keys take their defaults, so files from older versions keep loading.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = UserData()
@@ -197,12 +147,8 @@ public struct UserData: Codable, Equatable, Sendable {
         }
     }
 
-    /// How long an added file can be gone before it leaves the list of added files.
     public static let missingFileGrace: TimeInterval = 30 * 24 * 60 * 60
 
-    /// Takes the added files a scan found gone (deleted, or their folder moved): they're out of the library at once, but
-    /// stay listed for `missingFileGrace`, so one that's back by then, as after its folder is renamed back or a cloud
-    /// service is signed in to again, is in the library again. Files found again are no longer missing.
     public mutating func noteGoneFiles(_ gone: Set<String>, at now: Date = Date()) {
         var missing = missingFontFiles.filter { gone.contains($0.key) }
         for path in gone where missing[path] == nil && fontFiles.contains(path) { missing[path] = now }
@@ -214,7 +160,6 @@ public struct UserData: Codable, Equatable, Sendable {
         if missing != missingFontFiles { missingFontFiles = missing }
     }
 
-    /// Whether anything but the sidebar's choices (order, hidden and collapsed items) differs.
     public func differs(besidesSidebar other: UserData) -> Bool {
         var other = other
         other.sidebar = sidebar
@@ -223,38 +168,27 @@ public struct UserData: Codable, Equatable, Sendable {
 
     private enum FormerKeys: String, CodingKey { case showAdobeFonts }
 
-    /// Whether the library lists a family: those that come with macOS, and those from Creative Cloud, only when shown.
     public func lists(_ family: Family) -> Bool {
         (showSystemFonts || family.state != .system) && (showCreativeCloudFonts || !family.isAdobeFonts)
     }
 
-    /// The folders a scan reads: the user's, plus the ones Adobe apps load by themselves when shown, and the Font Library
-    /// while fonts are installed into it. `appFolders`: the folders Adobe apps load by themselves, which tests give.
     public func scannedFolders(appFolders: @autoclosure () -> [WatchedFolder] = WatchedFolder.appFontFolders()) -> [WatchedFolder] {
         folders + (showAdobeAppFolders ? appFolders() : []) + [fontLibrary].compactMap(\.self)
     }
 
-    /// Cicero's Font Library as a folder the scan reads, while fonts are installed into it. Otherwise its folder is a
-    /// folder like any, one of the user's locations while it has fonts (see `keepFontLibraryAsLocation`). nil until it
-    /// has a place.
     public var fontLibrary: WatchedFolder? {
         guard installsIntoFontLibrary, !fontLibraryPath.isEmpty else { return nil }
         return WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
     }
 
-    /// What the library's location was saved as before it was called as the library is.
     static let formerFontLibraryNames: Set<String> = ["Font Library", "Cicero’s Font Library"]
 
-    /// The user's location that is the Font Library's folder, as it is while fonts aren't installed into it.
     public var fontLibraryLocation: WatchedFolder? {
         guard !fontLibraryPath.isEmpty else { return nil }
         let path = URL(fileURLWithPath: fontLibraryPath).standardizedFileURL.path
         return folders.first { URL(fileURLWithPath: $0.path).standardizedFileURL.path == path }
     }
 
-    /// As installing into the Font Library goes off: its folder becomes one of the user's locations, named as the library
-    /// was, when it has fonts (`hasFonts`) and isn't one already, so they stay listed, each on or off as it is. Nothing
-    /// moves and nothing turns on or off. Returns the location.
     @discardableResult
     public mutating func keepFontLibraryAsLocation(hasFonts: Bool) -> WatchedFolder? {
         guard hasFonts, !fontLibraryPath.isEmpty, fontLibraryLocation == nil else { return nil }
@@ -265,8 +199,6 @@ public struct UserData: Codable, Equatable, Sendable {
         return location
     }
 
-    /// As installing into the Font Library goes on again: the location that's its folder is the library again, its fonts
-    /// each on or off as they are. Returns the location taken.
     @discardableResult
     public mutating func takeBackFontLibrary() -> WatchedFolder? {
         guard let location = fontLibraryLocation else { return nil }
@@ -276,8 +208,6 @@ public struct UserData: Codable, Equatable, Sendable {
         return location
     }
 
-    /// Once, for a library saved before a Font Library that fonts aren't installed into became a location: makes it one
-    /// while it has fonts (`hasFonts` asks of its folder), as turning installing off does now. It was listed apart before.
     public mutating func keepFormerFontLibraryAsLocation(hasFonts: (URL) -> Bool) {
         guard !fontLibraryLocationChecked else { return }
         fontLibraryLocationChecked = true
@@ -285,8 +215,6 @@ public struct UserData: Codable, Equatable, Sendable {
         keepFontLibraryAsLocation(hasFonts: hasFonts(URL(fileURLWithPath: fontLibraryPath, isDirectory: true)))
     }
 
-    /// A folder with the name the user gave it, if any, as its `displayName`; the location that's the Font Library's
-    /// folder is called as the library is ("Cicero’s Library") unless the user named it.
     public func named(_ folder: WatchedFolder) -> WatchedFolder {
         var folder = folder
         folder.customName = folderNames[folder.id.uuidString]
@@ -296,13 +224,8 @@ public struct UserData: Codable, Equatable, Sendable {
         return folder
     }
 
-    /// The user's folders, with the names given them.
     public var namedFolders: [WatchedFolder] { folders.map(named) }
 
-    /// Counts the families that came on between two libraries, the one before a scan and the one after: those with no
-    /// style on before (or not there before, as when they're installed) and some after, wherever they were turned on, by
-    /// Cicero, an application set or another app. Not those that come with macOS, nor ones on a disk that wasn't there
-    /// before; and none at all without a library before to compare with, as at the first launch.
     public mutating func recordActivations(from old: Library, to new: Library, at date: Date = Date()) {
         guard !old.families.isEmpty else { return }
         for family in new.families where family.hasActive && family.state != .system && !old.offlineFamilies.contains(family.id) {
@@ -314,14 +237,12 @@ public struct UserData: Codable, Equatable, Sendable {
         }
     }
 
-    /// The tags a family has, in the order they were made.
     public func tags(of family: String) -> [String] {
         guard let names = familyTags[family], !names.isEmpty else { return [] }
         return tags.filter(names.contains)
     }
 }
 
-/// How often a family was turned on, and when last.
 public struct ActivationHistory: Codable, Equatable, Sendable {
     public var count = 0
     public var last: Date?
@@ -332,11 +253,9 @@ public struct ActivationHistory: Codable, Equatable, Sendable {
     }
 }
 
-/// The colours a tag can have: the Finder's, and sand, a light brown that Licensed + Non-Commercial started in.
 public enum TagColor: String, Codable, CaseIterable, Sendable {
     case red, orange, yellow, green, blue, purple, gray, sand
 
-    /// The first colour no tag has yet, in this order, so new ones tell apart; red again once all are taken.
     public static func next(after taken: some Sequence<TagColor>) -> TagColor {
         let used = Set(taken)
         return allCases.first { !used.contains($0) } ?? .red
@@ -346,23 +265,14 @@ public enum TagColor: String, Codable, CaseIterable, Sendable {
 public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var path: String
-    /// When set, the folder's fonts count as active inside this app (e.g. "Adobe") rather than inactive.
     public var appName: String?
-    /// Active: Cicero keeps every font in the folder on, where it is, including ones added to it later.
     public var isActive: Bool
-    /// The name the user gave it (`UserData.folderNames`), set on copies made to show; not saved with the folder.
     public var customName: String?
 
-    /// Cicero's own folder for fonts it moved out of ~/Library/Fonts.
     public static let inactiveFolderID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
-    /// Cicero's Font Library (see `UserData.fontLibraryPath`).
     public static let fontLibraryID = UUID(uuidString: "00000000-0000-0000-0000-000000F0711B")!
-    /// The folders Adobe apps load fonts from by themselves. They share this ID: the sidebar shows
-    /// them as one item.
     public static let adobeAppsID = UUID(uuidString: "00000000-0000-0000-0000-00000000AD0B")!
-    /// Adobe Fonts from Creative Cloud, wherever it keeps them: an item of their own, apart from Adobe's folders.
     public static let adobeFontsID = UUID(uuidString: "00000000-0000-0000-0000-0000AD0BEF00")!
-    /// The font files added one at a time, which the sidebar lists as one item with the folders.
     public static let addedFilesID = UUID(uuidString: "00000000-0000-0000-0000-0000000ADDED")!
 
     public init(id: UUID = UUID(), path: String, appName: String? = nil, isActive: Bool = false) {
@@ -374,7 +284,6 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case id, path, appName, isActive }
 
-    /// Folders saved before there was Active have no `isActive`.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -385,9 +294,6 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
 
-    /// The name the user gave it; else "Inactive", "Cicero’s Library", "Proofing" (Adobe's folders, where type designers
-    /// test fonts), "Adobe Fonts" and "Added Fonts" for Cicero's own items, "<Parent> Fonts" for other folders called Fonts,
-    /// else the name.
     public var displayName: String {
         if let customName { return customName }
         if id == Self.inactiveFolderID { return "Inactive" }
@@ -402,9 +308,6 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 
     private static let adobeFolderSuffix = "/application support/adobe/fonts"
 
-    /// Which app loads a folder's fonts by itself, so they count as active there rather than inactive:
-    /// Adobe's shared font folders (all Adobe apps) and the Fonts folder next to an Adobe app
-    /// ("Adobe InDesign 2026/Fonts" → "InDesign").
     public static func detectAppName(forPath path: String) -> String? {
         let lower = path.lowercased()
         if lower.hasSuffix(adobeFolderSuffix) || lower.contains(adobeFolderSuffix + "/") { return "Adobe" }
@@ -412,8 +315,6 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
         return String(match.1)
     }
 
-    /// The folders on this Mac that Adobe apps load fonts from by themselves: Adobe's shared folder for
-    /// all users and for this account, and the Fonts folder next to any Adobe app (InDesign has one).
     public static func appFontFolders(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [WatchedFolder] {
         let fm = FileManager.default
         var paths = [
@@ -434,14 +335,10 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// A hand-picked group of families, or of some of their styles. With apps, it's an application set: Cicero activates its
-/// fonts while one of those apps is open.
 public struct FontSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
-    /// The families it has whole.
     public var families: [String]
-    /// Family name → the styles of it the set has, by PostScript name, for families only some of whose styles are in it.
     public var styles: [String: [String]]
     public var apps: [LinkedApp]
 
@@ -453,7 +350,6 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
         self.apps = apps
     }
 
-    /// Sets saved before apps, or styles, existed load without them.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -463,29 +359,24 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
         apps = try c.decodeIfPresent([LinkedApp].self, forKey: .apps) ?? []
     }
 
-    /// Every family it has, whole or in part: the whole ones in their order, then the others by name.
     public var memberFamilies: [String] {
         families + styles.filter { !$0.value.isEmpty && !families.contains($0.key) }.keys.sorted()
     }
 
-    /// Whether it has this style of the family (by PostScript name): the whole family, or that style.
     public func contains(style: String, of family: String) -> Bool {
         families.contains(family) || (styles[family] ?? []).contains(style)
     }
 
-    /// Puts families in whole, after the others, in place of the styles of them it had.
     public mutating func add(families names: [String]) {
         for name in names where !families.contains(name) { families.append(name) }
         for name in names { styles[name] = nil }
     }
 
-    /// Takes families out, whole or in part.
     public mutating func remove(families names: Set<String>) {
         families.removeAll { names.contains($0) }
         for name in names { styles[name] = nil }
     }
 
-    /// Adds a style of a family; a family it has whole stays so.
     public mutating func add(style: String, of family: String) {
         guard !families.contains(family) else { return }
         var list = styles[family] ?? []
@@ -493,7 +384,6 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
         styles[family] = list
     }
 
-    /// Takes a style out. A family it has whole keeps its other styles, `all` of them (by PostScript name) but this one.
     public mutating func remove(style: String, of family: String, all: [String]) {
         let left: [String]
         if let index = families.firstIndex(of: family) {
@@ -506,11 +396,9 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// An app an application set is for.
 public struct LinkedApp: Codable, Hashable, Identifiable, Sendable {
     public var bundleID: String
     public var name: String
-    /// Where the app was when it was picked; for its icon.
     public var path: String
 
     public init(bundleID: String, name: String, path: String) {
@@ -522,7 +410,6 @@ public struct LinkedApp: Codable, Hashable, Identifiable, Sendable {
     public var id: String { bundleID }
 }
 
-/// A set whose families are picked by rules.
 public struct SmartSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
@@ -536,7 +423,6 @@ public struct SmartSet: Codable, Hashable, Identifiable, Sendable {
         self.rules = rules
     }
 
-    /// A rule on a field, or with a comparison, a later version adds is left out here, rather than a file that doesn't load.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -546,8 +432,6 @@ public struct SmartSet: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// An element of a list as this version can read it; nil for one it can't, as one a later version saved, so the rest
-/// of the list loads.
 private struct Readable<Value: Decodable>: Decodable {
     var value: Value?
 
@@ -560,7 +444,6 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var field: Field
     public var comparison: Comparison
-    /// Text, a number, or the id of the chosen option, depending on the field.
     public var value: String
 
     public init(id: UUID = UUID(), field: Field = .name, comparison: Comparison? = nil, value: String = "") {
@@ -575,8 +458,6 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
         case name, foundry, designer, classification, tag, rating, note, hasNote, set, folder, status, kind, format, styles, feature, embedding
         case language, characterSet, added, timesActivated, lastActivated
 
-        /// The fields a new rule offers: not Times Activated and Last Activated, which sets that have them, made before
-        /// or imported from FontExplorer X, keep.
         public static let offered = allCases.filter { $0 != .timesActivated && $0 != .lastActivated }
 
         public var comparisons: [Comparison] {
@@ -598,7 +479,6 @@ public struct SmartRule: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// Values a smart rule's status, kind and format fields can take.
 public enum SmartRuleValue {
     public static let statuses = ["active", "partial", "inactive", "appOnly", "system"]
     public static let kinds = ["italics", "monospaced", "variable"]
@@ -607,7 +487,6 @@ public enum SmartRuleValue {
 public struct CustomCharacterSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
-    /// What the user typed or pasted: characters, U+ / 0x codes, ranges.
     public var characters: String
 
     public init(id: UUID = UUID(), name: String, characters: String) {
@@ -616,26 +495,16 @@ public struct CustomCharacterSet: Codable, Hashable, Identifiable, Sendable {
         self.characters = characters
     }
 
-    /// The id used for it among all character sets.
     public var setID: String { "custom.\(id.uuidString)" }
 }
 
 public struct SidebarPreferences: Codable, Equatable, Sendable {
-    /// Keys of hidden rows and sections: "library.all", "section.sets", "set.<uuid>", "smartset.<uuid>",
-    /// "tag.<name>", "foundry.<name>", "classification.<name>", "folder.<uuid>", "charset.<id>".
     public var hidden: Set<String> = []
-    /// Collapsed sections ("folders", "sets", "tags", "foundries", "classifications", "characterSets")
-    /// and character set groups ("charsetgroup.<group id>").
     public var collapsed: Set<String> = ["foundries", "characterSets", "charsetgroup.unicode", "charsetgroup.google"]
-    /// Keys in the order the user dragged them into, per list: "sections" (section keys, from when sections
-    /// could be dragged; still followed), "library",
-    /// a section's rows ("folders", "sets", "foundries", "classifications"), "characterSets" (group keys
-    /// "charsetgroup.<group id>") and a group's rows ("charsetgroup.<group id>").
     public var order: [String: [String]] = [:]
 
     public init() {}
 
-    /// Missing keys take their defaults, so files from before a key existed keep loading.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = SidebarPreferences()
@@ -644,7 +513,6 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
         order = try c.decodeIfPresent([String: [String]].self, forKey: .order) ?? d.order
     }
 
-    /// `items` in the user's order for `list`: the ones placed there, as placed, then the others as given.
     public func ordered<T>(_ items: [T], in list: String, key: (T) -> String) -> [T] {
         guard let saved = order[list], !saved.isEmpty else { return items }
         let rank = Dictionary(saved.enumerated().map { ($1, $0) }, uniquingKeysWith: min)
@@ -652,8 +520,6 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
         return placed.sorted { $0.1 < $1.1 }.map(\.0) + items.filter { rank[key($0)] == nil }
     }
 
-    /// Moves the items at `source` in `shown` to `destination`, as a list's onMove gives them. `shown`
-    /// is what the list shows, `all` every item in it in its current order: hidden ones keep their places.
     public mutating func move(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
         let moving = source.map { shown[$0] }
         var reordered = shown.indices.filter { !source.contains($0) }.map { shown[$0] }
@@ -663,8 +529,6 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
         setOrder(all.map { isShown.contains($0) ? next.next() ?? $0 : $0 }, of: list)
     }
 
-    /// Saves `keys` as the order of `list`. Keys saved before that it leaves out, for items that are
-    /// gone for now (System Fonts while system fonts are off), stay after the key they followed.
     public mutating func setOrder(_ keys: [String], of list: String) {
         var result = keys
         let present = Set(keys)
@@ -679,13 +543,11 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
         order[list] = result
     }
 
-    /// For an item that's gone for good.
     public mutating func forget(_ key: String) {
         hidden.remove(key)
         for list in order.keys { order[list]?.removeAll { $0 == key } }
     }
 
-    /// A renamed item stays hidden, and in its place.
     public mutating func rename(_ old: String, to new: String) {
         if hidden.remove(old) != nil { hidden.insert(new) }
         for list in order.keys { order[list] = order[list]?.map { $0 == old ? new : $0 } }
@@ -694,31 +556,19 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
 
 public enum InstallMethod: String, Codable, CaseIterable, Sendable {
     case ask
-    /// Copy into ~/Library/Fonts.
     case copy
-    /// Move files added one at a time into ~/Library/Fonts, leaving the folders they were in;
-    /// copy the rest, so the user's folders stay as they are.
     case move
-    /// Register the files where they are.
     case inPlace
 }
 
-/// What Cicero did to turn fonts on, so it can turn them off again correctly.
 public struct ActivationRecords: Codable, Equatable, Sendable {
-    /// Installed copy → the file it was copied from: in ~/Library/Fonts, or in Cicero's Font Library, where it's
-    /// registered where it is (in `inPlace`) while it's on.
     public var installedCopies: [String: String] = [:]
-    /// Files registered where they are (persistent).
     public var inPlace: Set<String> = []
-    /// Files registered for this session.
     public var temporary: [String: TemporaryRecord] = [:]
-    /// File in Cicero's Inactive folder → where it was in an app's own folder (Adobe's), which it
-    /// left so the app stops loading it.
     public var appFolderOrigins: [String: String] = [:]
 
     public init() {}
 
-    /// Missing keys take their defaults, so files from older versions keep loading.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         installedCopies = try c.decodeIfPresent([String: String].self, forKey: .installedCopies) ?? [:]
@@ -730,10 +580,7 @@ public struct ActivationRecords: Codable, Equatable, Sendable {
 
 public struct TemporaryRecord: Codable, Equatable, Sendable {
     public var scope: TemporaryScope
-    /// Identifies the login session it was made in (see `ActivationEngine.currentSession`), so an
-    /// application set's record from before a logout is forgotten.
     public var session: String
-    /// For `.whileAppsRun`: the bundle IDs of the open apps whose application sets have the file.
     public var apps: [String]?
 
     public init(scope: TemporaryScope, session: String, apps: [String]? = nil) {

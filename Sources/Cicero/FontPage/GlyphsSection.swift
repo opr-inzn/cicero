@@ -2,41 +2,23 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Every character a style draws, and the glyphs its features draw in place of characters', like small capitals and
-/// tabular figures, by group (see `GlyphGroup`), the ligatures it makes, by feature, in the Ligatures group's place,
-/// under headers like the groups'; with a filter by character, Unicode name or U+ code that takes in the ligatures and
-/// feature glyphs too.
-/// The alternates its features offer, like a stylistic set's, follow the characters or small capitals they're for,
-/// marked with a dot in the accent colour; figures go in rows by kind instead, lining, old-style, other alternates, then signs (see
-/// `GlyphSection.runs`).
-/// Several views in a row, so each group's cells are rows of the page's lazy stack.
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    /// The style whose glyphs these are: the text's, or the one before it while its glyphs are read.
     let face: FontFace
-    /// Cells per row, from the page's width.
     let columns: Int
-    /// The style's characters, but those listed as ligatures, and its feature glyphs.
     let sections: [GlyphSection]
-    /// All of them.
     let characterCount: Int
     let ligatures: [LigatureGroup]
-    /// The character a ligature's glyph is too, like U+FB01 for ﬁ.
     let ligatureCharacters: [CGGlyph: UInt32]
-    /// The glyphs features offer in place of characters', by character.
     let alternates: [UInt32: [FeatureAlternate]]
-    /// The version of the face's file they were read from (see `PageContent.generation`).
     let generation: Int
     @State private var query = ""
-    /// The cell whose popover is open. Only the rows read it, so a click updates the rows on screen, not the section.
     @State private var open = OpenCell()
 
     private typealias Cell = GlyphCell
 
-    /// The style the page's text is set in, chosen in its Style menu or the one for the preview weight, at its
-    /// weight and with its axes as moved: the glyphs are its.
     private struct Style {
         let face: FontFace
         let weight: Double
@@ -46,16 +28,11 @@ struct GlyphsSection: View {
     nonisolated static let cell: CGFloat = 52
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 24
-    /// A labelled row's label, like a localized form's language: one line of callout text, the line after the group's
-    /// title, or an empty line of it below the run before, and as far from its cells as the title is from its cells.
     static let labelLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .callout)).rounded(.up)
     static let labelGap: CGFloat = 4
-    /// Above a label after a run, which leaves `spacing` below its last row: an empty line, but 2 pt.
     static let runGap = labelLine - spacing - 2
-    /// The size a cell's character, or ligature, is set at.
     static let glyphSize: CGFloat = 26
 
-    /// How many cells fit across a page this wide.
     nonisolated static func columns(fitting width: CGFloat) -> Int {
         max(1, Int((width - 2 * inset + spacing) / (cell + spacing)))
     }
@@ -98,7 +75,6 @@ struct GlyphsSection: View {
         }
     }
 
-    /// Whether a filter's groups are at most `shortRows` rows, for a stack of their own (see `body`).
     private func isShort(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup]) -> Bool {
         guard !query.isEmpty else { return false }
         let filter = Filter(query)
@@ -112,7 +88,6 @@ struct GlyphsSection: View {
         return true
     }
 
-    /// The most rows a filter's groups have in a stack of their own: a few screens of them, drawn at once.
     private static let shortRows = 60
 
     @ViewBuilder
@@ -186,10 +161,6 @@ struct GlyphsSection: View {
         }
     }
 
-    /// "124 characters", and the ligatures and alternates when there are any:
-    /// "124 characters · 3 ligatures · 40 alternates", figures in another style, like old-style or tabular ones, not
-    /// among them. The alternates are those after characters and the glyphs features draw in the groups, like small
-    /// capitals, numerators, initial forms or a big set's (see `GlyphSection.glyphs`).
     private var count: String {
         let characters = characterCount
         let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
@@ -203,9 +174,6 @@ struct GlyphsSection: View {
         return parts.joined(separator: " · ")
     }
 
-    /// A row's cells, with `selected` the one whose popover is open, drawn darker (see `GlyphRow`). The cells share out
-    /// the row's width, so they reach the page's edge whatever it is, without the page drawing them again as it
-    /// changes; a short last row keeps their width.
     private func glyphRow(_ cells: [Cell], style: Style, selected: Int?) -> GlyphGridRow {
         let font = FontLoader.shared.font(style.face, size: Self.glyphSize, weight: style.weight, variations: style.variations)
         let open = open
@@ -215,8 +183,6 @@ struct GlyphsSection: View {
                             weight: style.weight, variations: style.variations, selected: selected, actions: actions)
     }
 
-    /// A character's name and codes, and buttons that copy it and its glyph's outline; for a feature's glyph, the
-    /// character's, and the feature's name.
     private func details(_ cell: Cell, style: Style) -> some View {
         VStack(spacing: 10) {
             switch cell {
@@ -284,9 +250,6 @@ struct GlyphsSection: View {
         .frame(maxWidth: 260)
     }
 
-    /// Copy Character, Copy as Vector, Copy Unicode and Copy HTML Entity, for a cell's right-click menu: a feature's
-    /// glyph copies the character it's drawn for, as text, and its own shape as a vector. Made as it opens, so Copy as
-    /// Vector is greyed out for a glyph without an outline, as in the popover.
     private func copyMenu(_ cell: Cell, style: Style) -> [GridMenuItem] {
         let scalar = Self.character(of: cell)
         return [
@@ -297,30 +260,24 @@ struct GlyphsSection: View {
         ]
     }
 
-    /// Copy as Vector, under Copy Character in a glyph's popover.
     private func copyVectorButton(_ cell: Cell, style: Style) -> some View {
         Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(cell, style: style) }
             .disabled(outline(cell, style: style) == nil)
             .help("Copies the glyph’s outline, to paste into a design app as a shape you can edit, or as SVG code")
     }
 
-    /// Puts text on the clipboard, closes the popover and says what was copied, at the bottom of the window, as when
-    /// fonts are turned on: "“g” copied to clipboard".
     private func copy(_ text: String, shown: String) {
         Self.copy(text)
         open.cell = nil
         model.showToast("\(shown) copied to clipboard")
     }
 
-    /// The cell's character, which the page's text draws as the cell's glyph where it's pasted there.
     private func copyCharacter(_ cell: Cell, style: Style) {
         sampleClip(cell, style: style).copy()
         open.cell = nil
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard")
     }
 
-    /// What the cell pastes as in the page's text: its character, and for a feature's glyph, the glyph drawn in its
-    /// place (see `SampleGlyph`).
     private func sampleClip(_ cell: Cell, style: Style) -> SampleClip {
         let text = Self.text(Self.character(of: cell))
         let glyph: SampleGlyph? = switch cell {
@@ -334,7 +291,6 @@ struct GlyphsSection: View {
         return SampleClip(text: text, glyph: glyph)
     }
 
-    /// The glyph's outline, as for text; a beep for a glyph without one.
     private func copyVector(_ cell: Cell, style: Style) {
         guard let outline = outline(cell, style: style) else { return NSSound.beep() }
         GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell), clip: sampleClip(cell, style: style))
@@ -342,8 +298,6 @@ struct GlyphsSection: View {
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
     }
 
-    /// A character as a toast names it: in quotes, a mark on a dotted circle, as it has nothing to sit on, and one you
-    /// can't see, like a space, by its name.
     static func shown(_ scalar: UInt32) -> String {
         guard let character = Unicode.Scalar(scalar) else { return CharacterCodes.unicode(scalar) }
         switch character.properties.generalCategory {
@@ -364,7 +318,6 @@ struct GlyphsSection: View {
         }
     }
 
-    /// The cell's glyph as a vector, in the page's style: the one the cell shows.
     private func outline(_ cell: Cell, style: Style) -> GlyphOutline? {
         let glyph = switch cell {
         case .character(let scalar): GlyphVectors.glyph(of: scalar, in: GlyphVectors.font(style.face, weight: style.weight, variations: style.variations))
@@ -374,18 +327,14 @@ struct GlyphsSection: View {
         return GlyphVectors.outline(glyph, face: style.face, weight: style.weight, variations: style.variations)
     }
 
-    /// The cell's glyph as an SVG file, named after the style and the glyph.
     private func dragItem(_ cell: Cell, style: Style) -> NSItemProvider {
         GlyphVectors.dragItem(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
     }
 
-    /// The same file, for a cell dragged out of the grid.
     private func dragFile(_ cell: Cell, style: Style) -> URL? {
         GlyphVectors.dragFile(outline(cell, style: style), style: style.face.fullName, fallback: Self.fileFallback(cell))
     }
 
-    /// What a glyph's file is called after when the font doesn't name the glyph: its character's code, and the features
-    /// that draw it, as in "Inter Regular U+0061.ss01.svg" or "U+0061.smcp.ss01" for a stylistic set's small capital.
     private static func fileFallback(_ cell: Cell) -> String {
         switch cell {
         case .character(let scalar): CharacterCodes.unicode(scalar)
@@ -394,20 +343,15 @@ struct GlyphsSection: View {
         }
     }
 
-    /// Puts text on the clipboard, as plain text.
     static func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
 
-    /// A character as text; nothing for a code that isn't one.
     static func text(_ scalar: UInt32) -> String {
         Unicode.Scalar(scalar).map { String(Character($0)) } ?? ""
     }
 
-    /// What a cell draws: a character as text, or from its glyph where it takes no room of its own (see `character`),
-    /// a feature's glyph or an alternate from its glyph, with a dot for an alternate, after the character's own glyph or
-    /// a small capital. VoiceOver reads the character, and the features of a glyph drawn in its place.
     private func gridCell(_ cell: Cell, in font: CTFont) -> GridCell {
         switch cell {
         case .character(let scalar):
@@ -424,12 +368,10 @@ struct GlyphsSection: View {
         }
     }
 
-    /// A character set in the font, for its popover. One that takes no room of its own is drawn from its outline instead:
-    /// a mark that combines with the character before it (an acute, a cedilla), or one a font keeps in private use, like a
-    /// Thai tone mark shifted left, set on its own has nothing to sit on and showed nothing.
     @ViewBuilder
     private func character(_ scalar: UInt32, style: Style, size: CGFloat) -> some View {
         let font = FontLoader.shared.font(style.face, size: size, weight: style.weight, variations: style.variations)
+        // A combining mark, or one a font keeps in private use, like a Thai tone mark shifted left, set on its own has nothing to sit on and shows nothing.
         if let glyph = GlyphVectors.glyph(of: scalar, in: font), Self.isCombining(scalar) || Self.takesNoRoom(glyph, in: font) {
             GlyphImage(face: style.face, glyph: glyph, size: size, weight: style.weight, variations: style.variations)
         } else {
@@ -451,7 +393,6 @@ struct GlyphsSection: View {
         }
     }
 
-    /// What's typed into the filter: a character, part of its Unicode name or a feature's, a U+ code or a feature's tag.
     private struct Filter {
         let trimmed: String
         let lower: String
@@ -477,8 +418,6 @@ struct GlyphsSection: View {
         }
     }
 
-    /// A character's alternates the filter lets through: all of them when it finds the character, else those of the
-    /// features it finds.
     private func shownAlternates(of scalar: UInt32, _ filter: Filter) -> [FeatureAlternate] {
         let all = alternates[scalar] ?? []
         guard !filter.isEmpty, !filter.matches(scalar) else { return all }
@@ -499,8 +438,6 @@ struct GlyphsSection: View {
         }
     }
 
-    /// The ligatures whose characters hold what's typed ("f" finds ff, fi and ffl), with that U+ code, or that are the
-    /// character typed.
     private func filtered(_ groups: [LigatureGroup]) -> [LigatureGroup] {
         let filter = Filter(query)
         guard !filter.isEmpty else { return groups }
@@ -518,17 +455,12 @@ struct GlyphsSection: View {
     }
 }
 
-/// The glyph cell whose popover is open, and where it is in its row, from the click that opened it (see `cellPopover`).
-/// An object of its own, read only by the rows (`GlyphRow`): opening or closing a popover then updates the rows on
-/// screen, not the whole section, whose body works out the rows of every group.
 @Observable
 final class OpenCell {
     var cell: GlyphCell?
     var rect: CGRect?
 }
 
-/// A row of a group's cells and the popover of the one clicked in it. The open cell is read here, in each row, not in
-/// the section: a click updates the rows on screen, not the section, whose body works out every group's rows.
 private struct GlyphRow<Details: View>: View {
     let open: OpenCell
     let cells: [GlyphCell]
@@ -549,8 +481,6 @@ private struct GlyphRow<Details: View>: View {
     }
 }
 
-/// A character's Unicode code and its HTML references (the named one, when HTML has a name for it, and the numeric
-/// one), each selectable.
 private struct CharacterCodesGrid: View {
     let scalar: UInt32
 

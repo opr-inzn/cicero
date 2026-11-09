@@ -137,7 +137,6 @@ struct GeneralSettings: View {
         .restoreSheet(contents: $restoring)
     }
 
-    /// Follows Apple Intelligence as it's turned on or off (see `ClassificationGuesser.availability`).
     private var guessingExplanation: String {
         let what = "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes and, with Apple Intelligence, from its name. Everything stays on this Mac."
         return switch ClassificationGuesser.availability {

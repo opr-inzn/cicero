@@ -1,17 +1,14 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for a new or existing custom character set: a name and the characters, typed or pasted.
 struct CharacterSetEditor: View {
     let original: CustomCharacterSet
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: CustomCharacterSet
     @State private var deleting: CustomCharacterSet?
-    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
     @State private var openedAsNew: Bool?
 
-    /// More than this and the preview stops being useful.
     private static let previewLimit = 600
 
     init(original: CustomCharacterSet) {
@@ -84,13 +81,11 @@ struct CharacterSetEditor: View {
 }
 
 extension View {
-    /// Asks before deleting the coverage set, then calls `deleted`.
     func confirmsCoverageSetDeletion(_ set: Binding<CustomCharacterSet?>, deleted: @escaping () -> Void = {}) -> some View {
         confirmsCoverageSetDeletion(Binding(get: { set.wrappedValue.map { [$0] } ?? [] }, set: { set.wrappedValue = $0.first }),
                                     deleted: deleted)
     }
 
-    /// Asks before deleting the coverage sets, all at once, then calls `deleted`.
     func confirmsCoverageSetDeletion(_ sets: Binding<[CustomCharacterSet]>, deleted: @escaping () -> Void = {}) -> some View {
         modifier(CoverageSetDeletion(sets: sets, deleted: deleted))
     }

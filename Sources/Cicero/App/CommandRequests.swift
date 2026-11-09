@@ -2,10 +2,6 @@ import CiceroCommands
 import CiceroCore
 import Foundation
 
-/// The changes the `cicero` command asks for while Cicero is open (Design B: one writer at a time). Cicero holds
-/// `AppLock`, so the command puts each change in `Requests/` instead of writing Cicero's data itself; Cicero takes it,
-/// makes it with the same functions as a click (so the window shows it at once, with a toast and Undo for fonts turned on
-/// or off), saves, and answers in the contract's JSON. One request at a time, in the order they came.
 final class CommandRequests {
     private let support: URL
     private weak var model: AppModel?
@@ -18,7 +14,6 @@ final class CommandRequests {
         support = model.locations.support
     }
 
-    /// Watches the folder, and takes what's there already: requests sent while Cicero was starting.
     func start() {
         let folder = Requests.folder(support: support)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -33,7 +28,6 @@ final class CommandRequests {
         look()
     }
 
-    /// As Cicero quits: requests not taken yet stay, and the command makes them itself once Cicero has let go of the lock.
     func stop() {
         source?.cancel()
         source = nil
@@ -86,7 +80,6 @@ final class CommandRequests {
     }
 }
 
-/// Cicero making a change the command asked for, as the same click would.
 final class AppRequestWriter: Writer {
     let model: AppModel
 
@@ -121,8 +114,6 @@ final class AppRequestWriter: Writer {
         }
     }
 
-    /// A scan of everything, as when Cicero becomes active, finished (or replaced by a later one that finished) before
-    /// the answer, so the command reads what it found.
     func rescan() async {
         let id = model.rescan()
         while model.lastEndedScan < id { try? await Task.sleep(for: .milliseconds(100)) }

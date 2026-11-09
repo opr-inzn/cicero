@@ -1,23 +1,12 @@
 import CoreText
 import Foundation
 
-/// What a face's glyphs are grouped by on its font page, in its order: the letters, A to Z then the rest, the small
-/// capitals its features draw for them, the ligatures, then the forms its features draw for languages, after the
-/// letters they're forms of, and a Latin font's forms for the start, middle and end of a word and for a letter alone,
-/// the figures, Roman numerals among them, then punctuation, which any text has, before
-/// currency and the other signs, then each other script, Greek first, as Unicode lists them, then what's in no
-/// script, like the private-use glyphs, and last the accents and marks, which have no letter to sit on and are looked
-/// for least. A font without Latin letters starts with its scripts (see `GlyphSection.sections`).
 public enum GlyphGroup: Hashable, Comparable, Sendable {
     case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, ligatures, localizedForms
     case initialForms, medialForms, finalForms, isolatedForms, proportionalFigures, tabularFigures
     case circledFigures, romanNumerals, punctuationAndSymbols, currency, mathematicalOperators, superscripts, subscripts, fractions, numerators, denominators, ordinals
     case caseSensitiveForms, arrows
-    /// A script's own characters, by its Unicode name, like "Arabic": its letters, figures, marks and punctuation, those
-    /// in the Unicode blocks for it.
     case script(String)
-    /// A stylistic set that draws most of a font's characters anew, like ABC Repro's ss15, "Smallsize Centered": its
-    /// glyphs, by its tag and the font's name for it (see `FeatureGlyph.bigSets`).
     case stylisticSet(tag: String, name: String)
     case graphical, diacriticalMarks, combiningMarks
 
@@ -63,15 +52,12 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         }
     }
 
-    /// What a group with a font's own name is, like "Stylistic Set 15" for ABC Repro's "Smallsize Centered"; nil when
-    /// the title says it already.
     public var kind: String? {
         guard case .stylisticSet(let tag, let name) = self else { return nil }
         let standard = FeatureAlternates.name(of: tag, in: [:])
         return standard.caseInsensitiveCompare(name) == .orderedSame ? nil : standard
     }
 
-    /// Scripts in the order Unicode lists them, by their first block.
     public static func < (left: GlyphGroup, right: GlyphGroup) -> Bool {
         if case .script(let a) = left, case .script(let b) = right {
             return (UnicodeBlock.firstCodePoint(of: a), a) < (UnicodeBlock.firstCodePoint(of: b), b)
@@ -118,8 +104,6 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         }
     }
 
-    /// The group a character goes in, in a font with as many letters of each script as `scripts` says (see `scripts(of:)`);
-    /// nil for those with nothing to show, like spaces and controls.
     public static func of(_ value: UInt32, in scripts: [String: Int]? = nil) -> GlyphGroup? {
         guard let scalar = Unicode.Scalar(value) else { return nil }
         let properties = scalar.properties
@@ -250,47 +234,38 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         }
     }
 
-    /// Whether Unicode names a number as one in a circle, in parentheses, or with a full stop or a comma after it, like
-    /// CIRCLED NUMBER TWENTY ONE, PARENTHESIZED DIGIT ONE, DIGIT ONE FULL STOP or DIGIT ZERO COMMA.
     static func isEnclosedNumber(_ name: String) -> Bool {
         name.contains("CIRCLED") || name.hasPrefix("PARENTHESIZED") || name.hasSuffix(" FULL STOP") || name.hasSuffix(" COMMA")
     }
 
-    /// The kind of a numbering character, its Unicode name without its number: "CIRCLED" for ⓪, ① and ㉑, "NEGATIVE
-    /// CIRCLED" for ⓿, ❶ and ⓫, "FULL STOP" for ⒈, "CIRCLED IDEOGRAPH" for ㊀. DINGBAT is left out too: Unicode keeps
-    /// ❶ to ❿ among the dingbats and ⓫ to ⓴ elsewhere, but they're one set.
     static func enclosureKind(of value: UInt32) -> String {
         let name = Unicode.Scalar(value)?.properties.name ?? ""
         return name.split(separator: " ").filter { !Self.numberWords.contains(String($0)) }.joined(separator: " ")
     }
 
+    // DINGBAT too: Unicode keeps ❶ to ❿ among the dingbats and ⓫ to ⓴ elsewhere, but they're one set.
     private static let numberWords: Set<String> = [
         "DINGBAT", "DIGIT", "NUMBER", "ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
         "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY",
         "THIRTY", "FORTY", "FIFTY", "SIXTY", "SEVENTY", "EIGHTY",
     ]
 
-    /// The order of the kinds' rows: those in circles, then in parentheses, then with a full stop or comma, the Chinese
-    /// ones last; a kind a later Unicode adds after them, by name.
     static let enclosureKinds = [
         "CIRCLED", "NEGATIVE CIRCLED", "DOUBLE CIRCLED", "CIRCLED SANS-SERIF", "NEGATIVE CIRCLED SANS-SERIF", "PARENTHESIZED",
         "FULL STOP", "COMMA", "CIRCLED ON BLACK SQUARE", "CIRCLED IDEOGRAPH", "PARENTHESIZED IDEOGRAPH",
     ]
 
-    /// The blocks of pictures, all of whose characters go in Graphical.
     static let pictureBlocks: Set<String> = [
         "Miscellaneous Symbols", "Dingbats", "Mahjong Tiles", "Domino Tiles", "Playing Cards",
         "Miscellaneous Symbols and Pictographs", "Emoticons", "Ornamental Dingbats", "Transport and Map Symbols",
         "Supplemental Symbols and Pictographs", "Chess Symbols", "Symbols and Pictographs Extended-A",
     ]
 
-    /// Whether Unicode names it a superscript or subscript, like ᵝ MODIFIER LETTER SMALL BETA or ₐ.
     private static func isRaisedOrLowered(_ name: String) -> Bool {
         name.contains("SUBSCRIPT") || name.contains("SUPERSCRIPT") || name.hasPrefix("MODIFIER LETTER SMALL")
             || name.hasPrefix("MODIFIER LETTER CAPITAL")
     }
 
-    /// How many letters of each script a font has, like 90 of Bengali and 300 of Latin for a Bengali font with Latin too.
     public static func scripts(of coverage: ScalarRanges) -> [String: Int] {
         var found: [String: Int] = [:]
         for range in coverage.ranges {
@@ -311,15 +286,11 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     }
 }
 
-/// A cell of the font page's glyph grid: a character, a glyph a feature draws for one in a group of its own, like a
-/// tabular figure, or an alternate after it.
 public enum GlyphCell: Hashable, Sendable {
     case character(UInt32)
     case feature(FeatureGlyph)
     case alternate(FeatureAlternate)
 
-    /// Whether it's an alternate of the cell before it, a character's or a feature glyph's, like a small capital's; a
-    /// figure in another style, like an old-style one, isn't: it starts a row of its own (see `GlyphSection.runs`).
     public var isAlternate: Bool {
         switch self {
         case .character: false
@@ -329,10 +300,8 @@ public enum GlyphCell: Hashable, Sendable {
     }
 }
 
-/// A font's private-use characters named after other characters (see `GlyphSection.privateUseNames`).
 public struct PrivateUseNames: Sendable {
     let groups: [UInt32: GlyphGroup]
-    /// The character each is a form of, like U+0E34 for uni0E34.alt1.
     let characters: [UInt32: UInt32]
 
     public static let none = PrivateUseNames(groups: [:], characters: [:])
@@ -340,7 +309,6 @@ public struct PrivateUseNames: Sendable {
     public subscript(value: UInt32) -> GlyphGroup? { groups[value] }
 }
 
-/// A face's glyphs in one group for the glyph grid: its characters, then the glyphs features draw in place of theirs.
 public struct GlyphSection: Identifiable, Sendable {
     public let group: GlyphGroup
     public let scalars: [UInt32]
@@ -355,14 +323,6 @@ public struct GlyphSection: Identifiable, Sendable {
         self.glyphs = glyphs
     }
 
-    /// The face's visible characters and the glyphs its features draw, by group, in `GlyphGroup`'s order, and in code
-    /// point order within a group, but for superscripts, subscripts and fractions (see `valueOrder`), and the accented
-    /// letters (see `letterOrder`), punctuation, symbols and operators (see `signOrder`), and Greek and Cyrillic (see
-    /// `glyphsGreekOrder`), as type designers list them;
-    /// private-use characters in the groups `privateUse` gives them, each right after the character it's a form of, or
-    /// where that one would go (see `privateUseNames`).
-    /// Characters `isEmpty` says the font draws nothing for are left out, as spaces are (see `EmptyGlyphs`); all the
-    /// others are listed, the tens of thousands of a CJK font too.
     public static func sections(for coverage: ScalarRanges, features: [FeatureGlyph] = [], privateUse: PrivateUseNames = .none,
                                 leavingOut isEmpty: (UInt32) -> Bool = { _ in false }) -> [GlyphSection] {
         var buckets: [GlyphGroup: [UInt32]] = [:]
@@ -373,7 +333,6 @@ public struct GlyphSection: Identifiable, Sendable {
                 buckets[group, default: []].append(value)
             }
         }
-        /// The characters by `key`, a private-use one by the key of the character it's a form of, right after that one.
         func ordered<Key>(_ values: [UInt32], by key: (UInt32) -> Key, _ precedes: (Key, Key) -> Bool) -> [UInt32] {
             values.map { value in
                 let base = privateUse.characters[value] ?? value
@@ -418,13 +377,6 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// Where a letter goes among others of its case, like the accented capitals: Latin, Greek and Cyrillic letters as
-    /// `glyphsLatinOrder`, `glyphsGreekOrder` and `glyphsCyrillicOrder` list them: Latin's by glyph name, as Glyphs
-    /// sorts them, so Á Ă Â Ä À Ā Ą Å Ã, then Æ, ß after the s's and ɛ among the e's, Greek's and Cyrillic's by
-    /// alphabet, α to ω, then ά; then those GlyphsInfo has nothing for and other scripts' letters, letter by letter,
-    /// each followed by its accented forms in code point order, a capital where its lowercase letter goes, after it.
-    /// Characters that aren't letters go by code point. Lists of both cases, like the small capitals, go by their
-    /// lowercase letters (see `FeatureGlyph.letterOrder`).
     static func letterOrder(of character: UInt32) -> (UInt32, UInt32, UInt32, Int, UInt32) {
         if let rank = glyphsRanks[character] { return (0, UInt32(rank), 0, 0, character) }
         guard let scalar = Unicode.Scalar(character), scalar.properties.isAlphabetic else { return (character, 0, character, 0, character) }
@@ -438,19 +390,13 @@ public struct GlyphSection: Identifiable, Sendable {
         return (base, kind, letter, character == letter ? 0 : 1, character)
     }
 
-    /// Each character's place in `glyphsLatinOrder`, `glyphsGreekOrder` or `glyphsCyrillicOrder`.
     private static let glyphsRanks: [UInt32: Int] = Dictionary(
         (glyphsLatinOrder + glyphsGreekOrder + glyphsCyrillicOrder).unicodeScalars.filter { $0 != "\n" }.enumerated()
             .map { ($1.value, $0) }
     ) { first, _ in first }
 
-    /// Where a superscript, subscript, numerator, denominator or fraction goes in its group, a character or the one a
-    /// feature's glyph is for. Superscripts, subscripts, numerators and denominators: the figures from 0 to 9, then the
-    /// signs, like ⁺, then the letters, like ʰ. Fractions: the fraction slash, then the fractions by value,
-    /// ⅒ to ⅞, then any without one. Each in code point order otherwise. Unicode keeps ¹ ² ³ and ¼ ½ ¾ in Latin-1 and
-    /// the others in blocks of their own, after letters like ʰ or with the slash between, so code point order alone
-    /// scattered them.
     static func valueOrder(of value: UInt32, in group: GlyphGroup) -> (Int, Double, UInt32) {
+        // Unicode keeps ¹ ² ³ and ¼ ½ ¾ in Latin-1 and the others in blocks of their own, so code point order alone scatters them.
         let properties = Unicode.Scalar(value)?.properties
         if group == .fractions {
             if value == 0x2044 { return (0, 0, value) }
@@ -462,18 +408,11 @@ public struct GlyphSection: Identifiable, Sendable {
         return (properties?.isAlphabetic == true ? 2 : 1, 0, value)
     }
 
-    /// Where a punctuation mark, symbol or operator goes in its group, as type designers list them: punctuation,
-    /// dashes, brackets, quotes, symbols, operators, then geometric shapes, each kind those `signs` has in its order,
-    /// then the others by code point. So . , : ; … ! ? come before # * / \, brackets in pairs, quotes from low to high,
-    /// then @ & ¶ § © ®, and + − × ÷ = ≠ with % ‰ last; code point order scattered them over Unicode's blocks, ! " # %
-    /// & first.
     static func signOrder(of value: UInt32) -> (Int, Int, UInt32) {
         if let place = signPlaces[value] { return (place.kind, place.index, value) }
         return (signKind(of: value).rawValue, .max, value)
     }
 
-    /// Whether a sign goes before another where several groups' are listed together, like the case-sensitive forms:
-    /// by group, then `signOrder`.
     static func signPrecedes(_ a: UInt32, _ b: UInt32) -> Bool {
         let (x, y) = (GlyphGroup.of(a) ?? .graphical, GlyphGroup.of(b) ?? .graphical)
         return x != y ? x < y : signOrder(of: a) < signOrder(of: b)
@@ -481,12 +420,6 @@ public struct GlyphSection: Identifiable, Sendable {
 
     private enum SignKind: Int { case punctuation, dash, bracket, quote, symbol, math, geometry }
 
-    /// The signs of the Latin character sets, each kind's common ones first, as type designers list them, then the
-    /// others by code point: . , : ; … ! ¡ ? ¿ · •, an inverted mark after its own; the hyphen, en and em dash, then
-    /// the low lines; parentheses, then the other brackets; quotes from low to high, double before single, then
-    /// guillemets and straight quotes; @ & ¶ § © ® ℗ ™ ° ′ ″ | ¦ † ‡; the arithmetic signs and comparisons, % ‰ ‱ last;
-    /// and shapes by kind, circles, diamonds, squares, then triangles, filled before outlined and large before small,
-    /// triangles pointing up, right, down, then left.
     private static let signs: [(SignKind, String)] = [
         (.punctuation, ".,:;…!¡?¿·•#*/\\‖‼‾‿"),
         // Hyphen-minus, en and em dash, hyphen, non-breaking hyphen, figure dash, horizontal bar, then the low lines.
@@ -502,11 +435,8 @@ public struct GlyphSection: Identifiable, Sendable {
         for (index, scalar) in run.1.unicodeScalars.enumerated() { places[scalar.value] = (run.0.rawValue, index) }
     }
 
-    /// Whether `signs` lists it, like ℓ among the symbols.
     static func isListedSign(_ value: UInt32) -> Bool { signPlaces[value] != nil }
 
-    /// The kind of a sign `signs` doesn't have, by its Unicode category: an interrobang with the punctuation, a fullwidth
-    /// bracket with the brackets, ∀ with the operators.
     private static func signKind(of value: UInt32) -> SignKind {
         let block = Self.block(of: value) ?? ""
         if block.hasPrefix("Geometric Shapes") { return .geometry }
@@ -524,13 +454,6 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// A font's private-use characters whose glyphs are named after a character, like the uni0E34.alt1 a Thai font keeps
-    /// at U+F701, a sara i shifted left: that character's group, so they're listed with the script they're for, right
-    /// after it, rather than as Graphical. A name like uni0E34 or u1F600 says the character; another, like the a in a.alt,
-    /// is the name of the glyph the font maps the character to. A suffix for superscripts, subscripts, numerators or
-    /// denominators, like h.superior, puts one in that group, a small capitals one, like a.smcp, a letter in Small Caps,
-    /// and a Latin ligature's name, like f_i, in Ligatures. Those named after nothing, like a foundry's logo, aren't
-    /// given one.
     public static func privateUseNames(in font: CTFont, coverage: ScalarRanges) -> PrivateUseNames {
         var named: [UInt32: (base: String, suffixes: [Substring], isLigature: Bool)] = [:]
         for range in coverage.ranges where range.upperBound >= 0xE000 {
@@ -566,24 +489,20 @@ public struct GlyphSection: Identifiable, Sendable {
         return PrivateUseNames(groups: groups, characters: bases)
     }
 
-    /// Whether it's a letter, not an accent Unicode counts as a modifier letter, like ˆ: a font's small capital accents,
-    /// like circumflex.sc, stay with the accents.
     private static func isLetter(_ character: UInt32) -> Bool {
         switch Unicode.Scalar(character)?.properties.generalCategory {
+        // Not modifier letters: Unicode counts accents like ˆ as ones, and a font's small capital accents, like circumflex.sc, stay with the accents.
         case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .otherLetter: true
         default: false
         }
     }
 
-    /// The groups glyph-name suffixes put a private-use character in, like the sc of a.sc.
     private static let suffixGroups: [String: GlyphGroup] = [
         "sc": .smallCaps, "smcp": .smallCaps, "c2sc": .smallCaps,
         "sups": .superscripts, "superior": .superscripts, "subs": .subscripts, "sinf": .subscripts, "inferior": .subscripts,
         "numr": .numerators, "numerator": .numerators, "dnom": .denominators, "denominator": .denominators,
     ]
 
-    /// The private-use characters a font maps to `glyphs`, like the U+F761 an older font keeps for its small capital a,
-    /// which is listed with the small capitals.
     public static func privateUse(in font: CTFont, coverage: ScalarRanges, drawing glyphs: Set<CGGlyph>) -> Set<UInt32> {
         guard !glyphs.isEmpty else { return [] }
         var found: Set<UInt32> = []
@@ -595,13 +514,11 @@ public struct GlyphSection: Identifiable, Sendable {
         return found
     }
 
-    /// The character a glyph name like uni0E34 or u1F600 says, its first in a ligature's uni0066006C: uni and groups of
-    /// four hex digits, or u and four to six, as the Adobe Glyph List has them. Others say none, like SF Pro's uni10003A
-    /// for a symbol, whose first four digits made it the Myanmar letter U+1000.
     static func character(named name: String) -> UInt32? {
         let hex: Substring
         if name.hasPrefix("uni") {
             let digits = name.dropFirst(3)
+            // Groups of four digits only: SF Pro's uni10003A, a symbol, would otherwise read as the Myanmar letter U+1000.
             guard !digits.isEmpty, digits.count % 4 == 0, digits.allSatisfy(\.isHexDigit) else { return nil }
             hex = digits.prefix(4)
         } else if name.hasPrefix("u") {
@@ -615,24 +532,12 @@ public struct GlyphSection: Identifiable, Sendable {
         return value
     }
 
-    /// How many of `shown`, some or all of a font's `sections` in their order, come before the ligatures it makes: the
-    /// letters, Latin's or those of the scripts a font without Latin starts with, the small capitals and the Ligatures
-    /// group's characters, like ﬀ.
     public static func beforeLigatures(_ shown: [GlyphSection], of sections: [GlyphSection]) -> Int {
         let leading = Set(sections.prefix { $0.group.isScript }.map(\.group))
         let start = shown.prefix { leading.contains($0.group) }.count
         return start + shown.dropFirst(start).prefix { $0.group <= .ligatures }.count
     }
 
-    /// The section's cells in runs, each starting a row of its own, with `alternates` giving a character's: in most
-    /// groups one run, each character followed by its alternates, then the glyphs features draw. Figures are lining
-    /// ones, then old-style ones, whichever the font's own are, each followed by its alternates in that style, like a
-    /// slashed zero after the zero or a stylistic set's old-style four after the old-style four (an alternate with no
-    /// figure of its own in its style at the run's end), then the signs a feature draws to go with them, by their own
-    /// groups, then in `signOrder`'s order (see `signPrecedes`): a tabular period, then a dollar, then a plus and a
-    /// percent. Up to 0.12.0b8 the alternates that weren't old-style or lining had a run of their own.
-    /// Roman numerals are capitals, then small ones; circled figures a run for each kind; localized forms a run for each
-    /// language.
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
         func withAlternates(_ scalars: [UInt32]) -> [GlyphCell] {
             scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) }
@@ -716,7 +621,6 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// The runs, each with the words above it on the page, if any: a localized form's languages, like "Bulgarian".
     public func labeledRuns(alternates: (UInt32) -> [FeatureAlternate]) -> [(label: String?, cells: [GlyphCell])] {
         let runs = runs(alternates: alternates)
         guard group == .localizedForms else { return runs.map { (nil, $0) } }
@@ -726,13 +630,11 @@ public struct GlyphSection: Identifiable, Sendable {
         }
     }
 
-    /// The Unicode name, e.g. "LATIN SMALL LETTER A WITH ACUTE".
     public static func name(of scalar: UInt32) -> String? {
         guard let scalar = Unicode.Scalar(scalar) else { return nil }
         return scalar.properties.name ?? scalar.properties.nameAlias
     }
 
-    /// The Unicode block a scalar is in, e.g. "Latin Extended-A".
     public static func block(of scalar: UInt32) -> String? {
         UnicodeBlock.containing(scalar)?.name
     }
@@ -750,7 +652,6 @@ extension UnicodeBlock {
         return all[low - 1]
     }
 
-    /// Where a script's first block starts, for listing scripts in Unicode's order.
     static func firstCodePoint(of script: String) -> UInt32 {
         firstCodePoints[script] ?? .max
     }

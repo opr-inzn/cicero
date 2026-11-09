@@ -1,7 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// Sidebar, the browser with font pages pushed over it, prompts and toasts.
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(BackupPrompts.self) private var backup
@@ -193,8 +192,6 @@ struct MainWindow: View {
     }
 }
 
-/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and
-/// while apps that keep a font's old version are open (`openAppsReplacePrompt`).
 private struct ReplaceAlerts: ViewModifier {
     @Environment(AppModel.self) private var model
 
@@ -226,7 +223,6 @@ private struct ReplaceAlerts: ViewModifier {
             }
     }
 
-    /// "Replace Fonts While InDesign Is Open?", "…While InDesign and Photoshop Are Open?".
     static func openAppsTitle(_ prompt: OpenAppsReplacePrompt) -> String {
         "Replace Fonts While \(prompt.apps.listed()) \(prompt.apps.count == 1 ? "Is" : "Are") Open?"
     }
@@ -237,8 +233,6 @@ private struct ReplaceAlerts: ViewModifier {
             : "\(prompt.apps.listed()) keep the old version until they restart, and documents open in them can show wrong letters. Quit them first, or restart them afterwards."
     }
 
-    /// "Replace Helvetica in 2 Places?", "Replace Helvetica in Clients?", or for several families "Replace Fonts in More
-    /// Than One Place?" or "Replace These Fonts?".
     private func replaceTitle(_ prompt: DuplicatePrompt) -> String {
         let warned = prompt.duplicates.filter(model.warnsBeforeReplacing)
         guard warned.count == 1 else {
@@ -249,10 +243,6 @@ private struct ReplaceAlerts: ViewModifier {
             : "Replace \(one.family) \(model.replacedPlaces(one))?"
     }
 
-    /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
-    /// For one file: "Helvetica is in Clients. The file goes to the Trash, and the added one takes its place."
-    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…takes its place. Cicero’s copy of Helvetica in
-    /// your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
     private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
         let several = prompt.duplicates.filter(model.warnsBeforeReplacing)
         var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
@@ -270,9 +260,7 @@ private struct ReplaceAlerts: ViewModifier {
     }
 }
 
-/// A page of the detail column: room for the Info panel, and files dropped on it.
 private struct DetailPage: ViewModifier {
-    /// Set for the browser while a font page is pushed over it (see `CoveredSize`).
     var isCovered = false
 
     func body(content: Content) -> some View {
@@ -284,12 +272,8 @@ private struct DetailPage: ViewModifier {
     }
 }
 
-/// The browser kept at the size it had while a font page is pushed over it, and laid out again at the size it has now once
-/// the page goes: under the page it can't be seen, but the stack keeps it, and every frame of the sidebar or the Info
-/// panel sliding laid out its rows again too, which made a slide over a page slower than over the browser itself.
 private struct CoveredSize: ViewModifier {
     let isCovered: Bool
-    /// The size it had before it was covered.
     @State private var size: CGSize?
 
     func body(content: Content) -> some View {
@@ -302,13 +286,9 @@ private struct CoveredSize: ViewModifier {
 }
 
 extension EnvironmentValues {
-    /// Whether a font page is pushed over the view: what it shows can't be seen, and so is kept as it is (see `CoveredSize`).
     @Entry var isCovered = false
 }
 
-/// Font files and folders dropped from the Finder onto the browser or a font page, or copied there and pasted with ⌘V,
-/// join the library, and the folder or tag the browser shows, or go into the location it shows (see
-/// `AppModel.targetForAddedFiles`). The page is outlined while files are over it.
 private struct FileDrop: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var isTargeted = false

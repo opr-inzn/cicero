@@ -1,7 +1,5 @@
 import Foundation
 
-/// A JSON value whose objects keep their fields in order, so every answer has `schema` first and its fields where the
-/// contract puts them. A field without a value is left out (see `JSONObject`), never written as null.
 public enum JSON: Equatable, Sendable {
     case string(String)
     case int(Int)
@@ -10,8 +8,6 @@ public enum JSON: Equatable, Sendable {
     case array([JSON])
     case object(JSONObject)
 
-    /// Indented by two spaces, a field per line, as `--json` prints it; `/` isn't escaped, other characters are written
-    /// as they are.
     public func text(indent: String = "") -> String {
         switch self {
         case .string(let value): return Self.quoted(value)
@@ -32,8 +28,6 @@ public enum JSON: Equatable, Sendable {
         }
     }
 
-    /// On one line, without spaces, as `cicero mcp` answers: the same fields in the same order as `text`, in fewer
-    /// tokens for the agent.
     public func compactText() -> String {
         switch self {
         case .string, .int, .double, .bool: return text()
@@ -60,14 +54,12 @@ public enum JSON: Equatable, Sendable {
         return out + "\""
     }
 
-    /// A field's value as JSON, for tests and the MCP server to read back.
     public subscript(key: String) -> JSON? {
         if case .object(let object) = self { return object.fields.first { $0.key == key }?.value }
         return nil
     }
 }
 
-/// An object's fields in the order they were set. Setting nil leaves the field out.
 public struct JSONObject: Equatable, Sendable {
     public private(set) var fields: [(key: String, value: JSON)] = []
 
@@ -93,12 +85,10 @@ public struct JSONObject: Equatable, Sendable {
     public mutating func set(_ key: String, _ value: Double?) { self[key] = value.map(JSON.double) }
     public mutating func set(_ key: String, _ value: Bool?) { self[key] = value.map(JSON.bool) }
     public mutating func set(_ key: String, _ value: Date?) { self[key] = value.map { .string(JSONDates.text($0)) } }
-    /// A list is written also when it's empty.
     public mutating func set(_ key: String, _ values: [String]) { self[key] = .array(values.map(JSON.string)) }
     public mutating func set(_ key: String, _ values: [JSON]) { self[key] = .array(values) }
     public mutating func set(_ key: String, _ object: JSONObject?) { self[key] = object.map(JSON.object) }
 
-    /// An answer: `"schema": 1` first.
     public static func answer() -> JSONObject {
         var object = JSONObject()
         object.set("schema", Contract.schema)
@@ -108,15 +98,12 @@ public struct JSONObject: Equatable, Sendable {
     public var json: JSON { .object(self) }
 }
 
-/// ISO 8601 in UTC, to the second: "2025-04-02T09:14:00Z".
 enum JSONDates {
     static func text(_ date: Date) -> String {
         date.formatted(Date.ISO8601FormatStyle(timeZone: .gmt))
     }
 }
 
-/// The JSON contract's version: renaming, removing or retyping a field raises it; new fields and new values of a field
-/// with a list of values don't.
 public enum Contract {
     public static let schema = 1
 }

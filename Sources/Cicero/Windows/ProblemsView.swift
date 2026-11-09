@@ -1,7 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// The Conflicts page: problems grouped by kind, each with an explanation, its files and what to do about them.
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
 
@@ -88,7 +87,6 @@ private struct ProblemGroup: View {
     }
 }
 
-/// Minor problems, at the bottom, open at first and closed with the arrow beside their title.
 private struct MinorProblemGroup: View {
     let kind: ProblemKind
     let problems: [Problem]
@@ -198,8 +196,6 @@ private struct FileRow: View {
     }
 }
 
-/// Several files in one folder, usually one copy of a whole family: one row for all of them, with the files
-/// themselves under a disclosure.
 private struct FolderRow: View {
     let folder: ProblemFolder
     let fixes: [ProblemFix]
@@ -264,7 +260,6 @@ private struct FolderRow: View {
         }
     }
 
-    /// What the files have in common, or the range when they don't.
     private var facts: String {
         var parts: [String] = []
         let versions = unique(folder.files.compactMap { $0.version.map(FontFace.displayVersion) })
@@ -284,7 +279,6 @@ private struct FolderRow: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Whether each file needs its own version, date and place.
     private var filesDiffer: Bool {
         Set(folder.files.map(FileRow.facts)).count > 1
     }
@@ -317,7 +311,6 @@ private struct FixButtons: View {
     @Environment(AppModel.self) private var model
     let fixes: [ProblemFix]
     let kind: ProblemKind
-    /// The family the problem is about, if any.
     let family: String?
 
     var body: some View {
@@ -329,7 +322,6 @@ private struct FixButtons: View {
         }
     }
 
-    /// Only in Installed Twice is a trashed file a spare copy of the same font.
     private func title(_ fix: ProblemFix) -> String {
         if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy" : "Remove Copies" }
         return fix.title

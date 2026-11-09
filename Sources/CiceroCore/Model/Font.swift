@@ -1,6 +1,5 @@
 import Foundation
 
-/// A face inside a font file: the file's path and the face's position in it (collections hold several).
 public struct FaceID: Hashable, Codable, Sendable, Comparable, CustomStringConvertible {
     public let path: String
     public let index: Int
@@ -15,7 +14,6 @@ public struct FaceID: Hashable, Codable, Sendable, Comparable, CustomStringConve
     public static func < (a: FaceID, b: FaceID) -> Bool { (a.path, a.index) < (b.path, b.index) }
 }
 
-/// The range of a variable font's weight axis.
 public struct WeightAxis: Hashable, Codable, Sendable {
     public var minimum: Double
     public var maximum: Double
@@ -28,14 +26,9 @@ public struct WeightAxis: Hashable, Codable, Sendable {
     }
 }
 
-/// One of a variable font's design axes, and where the face, one of the font's named instances, sits on it.
 public struct VariationAxis: Hashable, Codable, Sendable {
-    /// Four characters: a registered axis in lowercase (wght, wdth, ital, slnt, opsz), the designer's own in capitals (GRAD).
     public var tag: String
-    /// The name Cicero shows: its own for a registered axis, else the name the font gives the axis, else the tag (see
-    /// `AxisTag.name`). Also for one read from a cache with the name in another language.
     public var name: String
-    /// The instance's position on the axis ("Bold" at 700 on wght).
     public var value: Double
 
     public init(tag: String, name: String, value: Double) {
@@ -45,15 +38,12 @@ public struct VariationAxis: Hashable, Codable, Sendable {
     }
 }
 
-/// How far one of a variable font's axes goes, for a slider: Weight from 100 to 900, 400 by default.
 public struct AxisRange: Hashable, Sendable, Identifiable {
-    /// As `VariationAxis.tag`.
     public var tag: String
     public var name: String
     public var minimum: Double
     public var maximum: Double
     public var defaultValue: Double
-    /// Set for an axis the font asks apps not to show, like Roboto Flex's parametric ones; it still changes the letters.
     public var isHidden: Bool
 
     public var id: String { tag }
@@ -68,16 +58,10 @@ public struct AxisRange: Hashable, Sendable, Identifiable {
     }
 }
 
-/// What the font's license lets a document do with it, as the OS/2 table's embedding bits say: from the least
-/// restrictive to the most, the order `rank` follows.
 public enum Embedding: String, CaseIterable, Codable, Sendable {
-    /// May be embedded and installed for good on the reader's system.
     case installable
-    /// May be embedded, and the document edited.
     case editable
-    /// May be embedded to view and print the document, not to edit it.
     case previewAndPrint
-    /// Mustn't be embedded at all.
     case restricted
 
     public var title: String {
@@ -91,9 +75,8 @@ public enum Embedding: String, CaseIterable, Codable, Sendable {
 
     public var rank: Int { Self.allCases.firstIndex(of: self)! }
 
-    /// The usage permissions in an OS/2 fsType. A font may set more than one, which files from before version 3 of the
-    /// table did; the least restrictive applies.
     public init(fsType: UInt16) {
+        // Files from before version 3 of the OS/2 table can set more than one; the least restrictive applies.
         self = fsType & 0x0008 != 0 ? .editable
             : fsType & 0x0004 != 0 ? .previewAndPrint
             : fsType & 0x0002 != 0 ? .restricted
@@ -101,19 +84,15 @@ public enum Embedding: String, CaseIterable, Codable, Sendable {
     }
 }
 
-/// OpenType features a smart set can ask for, each one or more GSUB feature tags. Saved by their place in this list,
-/// so new ones go at its end.
+// Saved by their place in this list, so new ones go at its end.
 public enum OpenTypeFeature: String, CaseIterable, Sendable {
     case smallCaps = "smcp", capitalsToSmallCaps = "c2sc", petiteCaps = "pcap"
     case oldStyleFigures = "onum", liningFigures = "lnum", tabularFigures = "tnum", proportionalFigures = "pnum"
     case fractions = "frac", superscript = "sups", `subscript` = "subs", ordinals = "ordn", slashedZero = "zero"
     case caseSensitiveForms = "case", standardLigatures = "liga", discretionaryLigatures = "dlig"
     case contextualAlternates = "calt", stylisticAlternates = "salt"
-    /// Any of ss01–ss20.
     case stylisticSets = "ss"
-    /// Any of cv01–cv99.
     case characterVariants = "cv"
-    /// swsh, or cswh.
     case swashes = "swsh"
     case titling = "titl", historicalForms = "hist", localizedForms = "locl"
 
@@ -145,7 +124,6 @@ public enum OpenTypeFeature: String, CaseIterable, Sendable {
         }
     }
 
-    /// The feature a GSUB tag turns on, if it's one of these.
     public init?(tag: String) {
         guard tag.count == 4 else { return nil }
         if tag == "cswh" {
@@ -161,7 +139,6 @@ public enum OpenTypeFeature: String, CaseIterable, Sendable {
     }
 }
 
-/// The OpenType features a face has, of those in `OpenTypeFeature`, as bits by their place in it.
 public struct OpenTypeFeatures: OptionSet, Hashable, Codable, Sendable {
     public let rawValue: UInt64
 
@@ -173,7 +150,6 @@ public struct OpenTypeFeatures: OptionSet, Hashable, Codable, Sendable {
         rawValue = 1 << UInt64(OpenTypeFeature.allCases.firstIndex(of: feature)!)
     }
 
-    /// The features among GSUB feature tags.
     public init(tags: some Sequence<String>) {
         self = tags.reduce(into: []) { features, tag in
             if let feature = OpenTypeFeature(tag: tag) { features.insert(Self(feature)) }
@@ -185,8 +161,6 @@ public struct OpenTypeFeatures: OptionSet, Hashable, Codable, Sendable {
     }
 }
 
-/// The kinds of figure a face can set besides lining, proportional ones, as its plain figures are or a feature makes
-/// them (see `FontFileReader.figures(of:features:)`).
 public struct Figures: OptionSet, Hashable, Codable, Sendable {
     public let rawValue: UInt8
 
@@ -194,55 +168,34 @@ public struct Figures: OptionSet, Hashable, Codable, Sendable {
         self.rawValue = rawValue
     }
 
-    /// All as wide, for columns of numbers.
     public static let tabular = Figures(rawValue: 1)
-    /// Of the height of the lowercase, some reaching above it and some below the baseline, for figures in text.
     public static let oldStyle = Figures(rawValue: 2)
 }
 
-/// What a font file says about one of its faces. Read once and cached by file stamp.
 public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public let id: FaceID
     public var postScriptName: String
     public var familyName: String
     public var styleName: String
     public var fullName: String
-    /// OS/2 weight class, 1…1000.
     public var weight: Int
     public var isItalic: Bool
     public var isMonospaced: Bool
-    /// OS/2 family class (high byte of sFamilyClass); 0 when unknown.
     public var familyClass: Int
-    /// What the OS/2 table's PANOSE digits say the face is; nil when they say nothing.
     public var panose: Classification?
-    /// Serif or sans serif, as the shapes of its I and l say, or monospaced when its letters are all as wide (see
-    /// `LetterShapes`); nil when they don't tell, or weren't looked at because the family class or the monospaced
-    /// flag says what the face is.
     public var letterShape: Classification?
     public var manufacturer: String?
     public var version: String?
-    /// The designer the name table credits (name ID 9).
     public var designer: String?
-    /// The foundry's four-character vendor ID from the OS/2 table ("ADBE"), without padding.
     public var vendorID: String?
     public var weightAxis: WeightAxis?
-    /// OS/2 width class, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded).
     public var width: Int
-    /// A variable font's axes, without the ones it hides, with this instance's position on each; empty for a static font.
     public var axes: [VariationAxis]
-    /// Set for a variable font's named instance at the font's default, its origin, on every axis but weight, hidden
-    /// ones too: upright, at its normal width and default optical size. One of these stands for the family, at the
-    /// weight a preview asks for.
     public var isAtOrigin: Bool
-    /// When the face came out, as near as its file says (see `FontFileReader.year`).
     public var year: Int?
-    /// What its license lets a document do with it; nil without an OS/2 table.
     public var embedding: Embedding?
-    /// The OpenType features its GSUB table has, of those smart sets ask for.
     public var features: OpenTypeFeatures
     public var figures: Figures
-    /// Language → the family's name in it, for the languages besides English the font names its family in, where that
-    /// differs from `familyName` (see `LocalizedNames`).
     public var localizedFamilyNames: [String: String]
 
     public init(
@@ -278,33 +231,24 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
         self.localizedFamilyNames = localizedFamilyNames
     }
 
-    /// A style of ornaments or symbols rather than letters, like Hoefler Text's Ornaments: its OS/2 family class says
-    /// Symbolic, or its name says Ornaments or Dingbats. It doesn't stand for a family that has other styles.
     public var isOrnaments: Bool {
         let name = styleName.lowercased()
         return familyClass == 12 || name.contains("ornament") || name.contains("dingbat")
     }
 
-    /// The family's name in the Mac's language, when the font has one; else its own.
     public var displayFamilyName: String {
         LocalizedNames.name(in: localizedFamilyNames) ?? familyName
     }
 
-    /// Where the face sits on the weight scale: a variable font's named instance at its own place on the weight
-    /// axis, not the file's one weight class.
     public var styleWeight: Double {
         axes.first { $0.tag == "wght" }?.value ?? Double(weight)
     }
 
-    /// How wide the face is, as a percentage of normal: a variable font's named instance at its own place on the
-    /// width axis, else the OS/2 width class as the spec has it in percent.
     public var styleWidth: Double {
         if let value = axes.first(where: { $0.tag == "wdth" })?.value { return value }
         return [50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200][min(max(width, 1), 9) - 1]
     }
 
-    /// Where the face sits on an axis: on width, `styleWidth`; on another, a variable font's named instance's place;
-    /// nil on an axis it doesn't have.
     public func styleValue(on tag: String) -> Double? {
         tag == "wdth" ? styleWidth : axes.first { $0.tag == tag }?.value
     }
@@ -312,7 +256,6 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
     public var path: String { id.path }
     public var url: URL { URL(fileURLWithPath: id.path, isDirectory: false) }
 
-    /// "Version 1.001;FEAKit 1.0" → "1.001": the version string without its label or build notes.
     public static func displayVersion(_ version: String) -> String {
         var value = version.trimmingCharacters(in: .whitespaces)
         if value.lowercased().hasPrefix("version ") { value = String(value.dropFirst("version ".count)) }
@@ -324,40 +267,27 @@ public struct FontFace: Hashable, Codable, Sendable, Identifiable {
 // MARK: - State
 
 public enum TemporaryScope: String, Codable, Sendable, CaseIterable {
-    /// Activated temporarily: on until Cicero quits.
     case untilQuit
-    /// On for an application set while one of its apps is open.
     case whileAppsRun
 
-    /// A scope as saved. "untilLogout", a choice there used to be, ends when Cicero quits now.
     public init?(saved value: String) {
         self.init(rawValue: value == "untilLogout" ? Self.untilQuit.rawValue : value)
     }
 
-    /// A scope a later version adds ends when Cicero quits here, rather than a file that doesn't load.
     public init(from decoder: Decoder) throws {
+        // A scope a later version adds ends when Cicero quits here, rather than a file that doesn't load.
         self = Self(saved: try decoder.singleValueContainer().decode(String.self)) ?? .untilQuit
     }
 }
 
-/// Where an active face is activated from, which decides whether Cicero may turn it off.
 public enum ActiveSource: Hashable, Sendable {
-    /// Ships with macOS (/System/Library/Fonts, Apple's downloadable fonts).
     case macOS
-    /// /Library/Fonts.
     case allUsers
-    /// Inside an app bundle.
     case app
-    /// Adobe Fonts, the service: turned on in Creative Cloud, which syncs the files (CoreSync) and has macOS
-    /// use them. Not the fonts in Adobe apps' own Fonts folders, which are `FaceState.appOnly("Adobe")`.
     case adobeFonts
-    /// ~/Library/Fonts.
     case fontsFolder
-    /// Registered where it is by Cicero.
     case inPlace
-    /// Registered by Cicero for this session only.
     case temporary(TemporaryScope)
-    /// Registered by some other app.
     case otherApp
 
     public var canDeactivate: Bool {
@@ -367,8 +297,6 @@ public enum ActiveSource: Hashable, Sendable {
         }
     }
 
-    /// Whether a file is Creative Cloud's, from Adobe Fonts: those it turned on for every app, and those Adobe apps
-    /// turned on for themselves. Creative Cloud alone turns them on and off, and moves them.
     public static func isAdobeFonts(_ path: String) -> Bool {
         // Bytes, with memmem: String.contains compares characters, about 2 µs a path, which was half of reading the
         // saved library of 50,000 faces at launch (and the generic firstRange(of:) on bytes is slower still). The
@@ -387,7 +315,6 @@ public enum ActiveSource: Hashable, Sendable {
 public enum FaceState: Hashable, Sendable {
     case active(ActiveSource)
     case inactive
-    /// Not active for the system, but loaded by one app from its own folder (e.g. "Adobe").
     case appOnly(String)
 
     public var isActive: Bool {
@@ -405,7 +332,6 @@ public enum FaceState: Hashable, Sendable {
         return nil
     }
 
-    /// "Adobe apps" for Adobe's shared folders, else the app's name ("InDesign").
     public static func appDescription(_ app: String) -> String {
         app == "Adobe" ? "Adobe apps" : app
     }
@@ -425,24 +351,15 @@ public enum FaceState: Hashable, Sendable {
     }
 }
 
-/// A face as it is in the library: its state, other files with the same PostScript name, and
-/// when it arrived.
 public struct LibraryFace: Identifiable, Hashable, Sendable {
     public let face: FontFace
     public let state: FaceState
-    /// Other files containing the same PostScript name (e.g. the original of an installed copy).
     public let otherCopies: [String]
-    /// The same files with what the library found in each, when the scanner made the face.
     public let copies: [FaceCopy]
     public let dateAdded: Date?
-    /// The app that loads the file from its own folder ("Adobe", "InDesign"), also while Cicero keeps
-    /// it out of that folder to turn it off there.
     public let app: String?
-    /// The file is Creative Cloud's, from Adobe Fonts, so Cicero never switches it: neither one on for every app
-    /// nor one Adobe apps turned on for themselves, which stays on in Adobe apps only.
     public let isAdobeFonts: Bool
 
-    /// Given `copies`, `otherCopies` are their paths.
     public init(face: FontFace, state: FaceState, otherCopies: [String] = [], copies: [FaceCopy] = [], dateAdded: Date? = nil, app: String? = nil) {
         self.face = face
         self.state = state
@@ -455,27 +372,21 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
 
     public var id: FaceID { face.id }
     public var canActivate: Bool { !isAdobeFonts && (!state.isActive || state.temporaryScope != nil) }
-    /// Off, or on only while an application set's app is open.
     public var canActivateTemporarily: Bool { !isAdobeFonts && (!state.isActive || state.temporaryScope == .whileAppsRun) }
-    /// A face an app loads from its folder can be turned off there too, by moving it out.
     public var canDeactivate: Bool {
         if case .appOnly = state { return !isAdobeFonts }
         return state.source?.canDeactivate ?? false
     }
 
-    /// Off, on, or (for a face an app loads from its folder) on in that app only.
     public var position: SwitchPosition {
         if state.isActive { return .on }
         return app != nil && state != .inactive ? .app : .off
     }
 }
 
-/// Where an on/off switch sits. Fonts an app loads from its own folder have a third position, on in
-/// that app only, and their switch goes from there to on everywhere, then off everywhere, then back.
 public enum SwitchPosition: Sendable {
     case off, app, on
 
-    /// One position for several faces: all on, all off, else the middle (some on in the app, or a mix).
     init(_ positions: some Sequence<SwitchPosition>) {
         let all = Set(positions)
         self = all == [.on] ? .on : all.isEmpty || all == [.off] ? .off : .app
@@ -487,7 +398,6 @@ public enum FamilyState: Hashable, Sendable {
     case partial
     case inactive
     case appOnly(String)
-    /// Every face comes with macOS.
     case system
 }
 
@@ -500,7 +410,6 @@ public enum Classification: String, CaseIterable, Codable, Sendable {
     case symbol = "Symbol"
     case unclassified = "Unclassified"
 
-    /// A classification as saved. "Slab Serif", a classification there used to be, is part of Serif now.
     public init?(saved value: String) {
         self.init(rawValue: value == "Slab Serif" ? Self.serif.rawValue : value)
     }
@@ -514,7 +423,6 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     case mixed = "Mixed"
     case other = "Other"
 
-    /// The file extensions Cicero reads fonts from.
     public static var fileExtensions: Set<String> { FontFileReader.fontExtensions }
 
     public static func of(path: String) -> FontFormat {
@@ -528,12 +436,7 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     }
 }
 
-/// A font family with everything lists, sorting and filters need worked out once, when the library
-/// is built, so views never recompute it.
 public struct Family: Identifiable, Hashable, Sendable {
-    /// Its fields, in one object every copy of it shares, so a copy is one reference: lists of thousands of families are
-    /// copied all the time (each search makes one, SwiftUI copies each family to read its id), and copying each of its
-    /// fields took about 6 ms a list at 20,000 families. Read-only, so sharing changes nothing else.
     private let storage: Storage
 
     private final class Storage: Sendable {
@@ -605,48 +508,31 @@ public struct Family: Identifiable, Hashable, Sendable {
         }
     }
 
-    /// The family name, as the fonts give it; the user's data knows the family by it.
     public var id: String { storage.fields.id }
-    /// The name to show: the family's in the Mac's language, when its fonts have one (ヒラギノ角ゴシック for Hiragino Sans on a
-    /// Mac in Japanese), else `id`.
     public var name: String { storage.fields.name }
-    /// In `LibraryScanner.stylePrecedes`' order: lightest first, then along the designer's own axes, narrowest first,
-    /// the other registered axes, and each upright before its italic.
     public var faces: [LibraryFace] { storage.fields.faces }
     public var state: FamilyState { storage.fields.state }
-    /// Watched folders (and Cicero's Inactive folder) that contain the family.
     public var folderIDs: Set<UUID> { storage.fields.folderIDs }
-    /// The foundry the files name, tidied (no "Inc.", URLs or copyright lines). User renames are applied by the app.
     public var manufacturer: String? { storage.fields.manufacturer }
     public var dateAdded: Date? { storage.fields.dateAdded }
     public var classification: Classification { storage.fields.classification }
-    /// Set when the letters of some of its styles are serif and of others sans serif, as in a family with both
-    /// Sans and Serif styles: it stays unclassified rather than going by its name.
     public var mixesSerifAndSans: Bool { storage.fields.mixesSerifAndSans }
     public var format: FontFormat { storage.fields.format }
     public var isVariable: Bool { storage.fields.isVariable }
     public var isMonospaced: Bool { storage.fields.isMonospaced }
     public var hasItalics: Bool { storage.fields.hasItalics }
-    /// What the faces span, for tile captions: "9 Weights · 3 Widths", "8 Weights · 16 Styles".
     public var rangeLabel: String { storage.fields.rangeLabel }
-    /// The kinds of file the faces come in, variable ones apart, for the exported font list: "OTF", "Variable",
-    /// "OTF · Variable".
     public var formatLabel: String { storage.fields.formatLabel }
-    /// Set when one app loads every face from its own folder (Adobe's): the switch then has a middle position.
     public var app: String? { storage.fields.app }
-    /// Every face is from Adobe Fonts, which Creative Cloud manages, whether on in every app or in Adobe apps only.
     public var isAdobeFonts: Bool { storage.fields.isAdobeFonts }
     public var position: SwitchPosition { storage.fields.position }
-    /// The regular upright face, which stands for the family in previews and coverage.
     public var regular: LibraryFace { storage.fields.regular }
     public var activeCount: Int { storage.fields.activeCount }
     public var hasActive: Bool { storage.fields.hasActive }
     public var hasActivatable: Bool { storage.fields.hasActivatable }
     public var hasTemporarilyActivatable: Bool { storage.fields.hasTemporarilyActivatable }
     public var hasDeactivatable: Bool { storage.fields.hasDeactivatable }
-    /// Set when every active face is temporarily active with this scope.
     public var temporaryScope: TemporaryScope? { storage.fields.temporaryScope }
-    /// The kinds of file the faces come in, variable ones too, for tile captions: "OTF", "TTF", "OTF · TTF".
     public var fileKinds: String {
         Set(faces.map { ($0.face.path as NSString).pathExtension.uppercased() }).sorted().joined(separator: " · ")
     }
@@ -658,9 +544,6 @@ public struct Family: Identifiable, Hashable, Sendable {
     public func hash(into hasher: inout Hasher) { hasher.combine(storage.fields) }
 
     public var stylesLabel: String { faces.count == 1 ? "1 Style" : "\(faces.count) Styles" }
-    /// The axes besides weight its styles sit apart on, by tag and the font's name for them, in the order they're
-    /// listed by (see `LibraryScanner.stylePrecedes`): the designer's own, like a Serif axis, then width, a static
-    /// family's too, then the other registered ones, like optical size. Not italic or slant, which style names say.
     public var styleAxes: [(tag: String, name: String)] {
         var names = ["wdth": "Width"]
         var tags: [String] = []
@@ -674,19 +557,13 @@ public struct Family: Identifiable, Hashable, Sendable {
             .filter { tag in Set(faces.map { $0.face.styleValue(on: tag) }).count > 1 }
             .map { (tag: $0, name: names[$0] ?? $0) }
     }
-    /// Whether its styles are of more than one weight, to the whole number the Styles table gives them in (see
-    /// `FontFace.styleWeight`). A weight they all have tells them no more apart than an axis they're all at one place on.
     public var stylesDifferInWeight: Bool { Set(faces.map { Int($0.face.styleWeight.rounded()) }).count > 1 }
-    /// When the family came out: its earliest face's year.
     public var year: Int? { faces.lazy.compactMap(\.face.year).min() }
-    /// When its latest style arrived on the Mac, of those that didn't come with macOS or an app: their files are as new
-    /// as the last update of either. `dateAdded` is the earliest of them all.
     public var lastAdded: Date? {
+        // Files that come with macOS or an app are as new as the last update of either.
         faces.lazy.filter { $0.state.source != .macOS && $0.state.source != .app }.compactMap(\.dateAdded).max()
     }
 
-    /// The latest to arrive first, by `lastAdded`. Families that arrived less than ten minutes after the one before
-    /// came with it, as from one import, and keep their order among themselves.
     public static func latestFirst(_ families: [Family]) -> [Family] {
         let times = families.map { $0.lastAdded ?? .distantPast }
         let arrival = times.indices.sorted { times[$0] < times[$1] }
@@ -696,30 +573,22 @@ public struct Family: Identifiable, Hashable, Sendable {
         }
         return families.indices.sorted { batch[$0] != batch[$1] ? batch[$0] > batch[$1] : $0 < $1 }.map { families[$0] }
     }
-    /// What its license lets a document do with every one of its styles: the most restrictive of their embedding.
     public var embedding: Embedding? { faces.lazy.compactMap(\.face.embedding).max { $0.rank < $1.rank } }
-    /// The OpenType features any of its styles has.
     public var features: OpenTypeFeatures { faces.reduce([]) { $0.union($1.face.features) } }
 
     public init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
         storage = Storage(Fields(name: name, faces: faces, state: state, folderIDs: folderIDs, manufacturer: manufacturer))
     }
 
-    /// The switch position with some faces at other positions, worked out like `position`: for the app
-    /// to show where an operation in progress will put the switch.
     public func position(overriding faces: [FaceID: SwitchPosition]) -> SwitchPosition {
         let positions = self.faces.map { faces[$0.id] ?? $0.position }
         return app == nil ? (positions.contains(.on) ? .on : .off) : SwitchPosition(positions)
     }
 
-    /// The face to preview at a weight: a variable face when there is one, which draws any weight, else the closest
-    /// upright weight.
     public func face(nearestWeight weight: Double) -> LibraryFace {
         weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
     }
 
-    /// The upright style of the nearest weight, and of those the one at a variable font's origin, else the one nearest
-    /// the normal width (Futura's Medium rather than its Condensed Medium), and not one of ornaments.
     private static func nearest(_ weight: Double, in faces: [LibraryFace]) -> LibraryFace {
         // Not a style of ornaments, which ties with the Regular in Hoefler Text, unless that's all there is.
         let letters = faces.filter { !$0.face.isOrnaments }
@@ -751,10 +620,6 @@ public struct Family: Identifiable, Hashable, Sendable {
         return variable ?? best ?? faces[0]
     }
 
-    /// Counts the weights and widths. A variable font's styles are its named instances, placed by their axis
-    /// values; a static font's by its style names and classes. Families with more styles than weight and width
-    /// tell apart (italics, optical sizes, other axes, small caps cut as fonts of their own) also get the style count.
-    /// One weight goes unsaid, and a family with nothing else to tell gets its style count: "1 Style", "2 Styles".
     static func rangeLabel(of faces: [FontFace]) -> String {
         let styleNames = faces.map { StyleName($0.styleName) }
         func value(_ face: FontFace, _ tag: String) -> Double? { face.axes.first { $0.tag == tag }?.value }
@@ -789,14 +654,12 @@ public struct Family: Identifiable, Hashable, Sendable {
         return parts.joined(separator: " · ")
     }
 
-    /// The files' extensions in capitals, "Variable" for variable fonts whatever their extension, in alphabetical order.
     static func formatLabel(of faces: [FontFace]) -> String {
         Set(faces.map { face in face.axes.isEmpty ? (face.path as NSString).pathExtension.uppercased() : "Variable" })
             .sorted()
             .joined(separator: " · ")
     }
 
-    /// Each style's group, where styles at the same place or with the same word (when they have one) are one group.
     private static func groups<Word: Hashable>(_ keys: [(place: Double, word: Word?)]) -> [Int] {
         var parent = Array(keys.indices)
         func root(_ index: Int) -> Int {
@@ -815,19 +678,14 @@ public struct Family: Identifiable, Hashable, Sendable {
     }
 }
 
-/// The weight and width a style name spells out ("SemiBold Condensed", "U Lt", "Cn Bd"), on the OS/2 scales.
-/// Many files give every style the same classes, Bold and Light at 400 or Extended at normal width,
-/// so the name tells styles apart more reliably. Only abbreviations share a value: a family that uses
-/// two words ("Extrabold" and "Ultrabold") means two weights.
+// Many files give every style the same classes, Bold and Light at 400 or Extended at normal width, so the name tells styles apart more reliably.
 struct StyleName {
     var weight: Int?
     var width: Int?
-    /// The width words as written, with a run of X's kept on ("XXX Compressed" → xxxcompressed).
     var widthWords: [String] = []
     private var hasSlope = false
     private var hasOther = false
-    /// Nothing but width and slope words ("Extended", "X Compressed Italic"): the regular weight. A word Cicero
-    /// doesn't know may be a weight ("Buch Kursiv").
+    // A word Cicero doesn't know may be a weight, like Buch in "Buch Kursiv".
     var isRegular: Bool { weight == nil && !hasOther && (width != nil || hasSlope) }
 
     init(_ name: String) {
@@ -855,9 +713,6 @@ struct StyleName {
 
     private static let slopes: Set<String> = ["italic", "it", "ital", "oblique", "obl", "slanted", "slant", "inclined", "kursiv", "backslant"]
 
-    /// "SemiBold Cond-Italic" → semibold, cond, italic: split at anything but a letter and at a
-    /// lowercase-to-uppercase step, with a prefix (extra, ultra, semi, demi, x, u) joined to the
-    /// word after when that makes a known word.
     static func words(_ name: String) -> [String] {
         var words: [String] = []
         var word = ""
@@ -907,11 +762,6 @@ struct StyleName {
 }
 
 extension Classification {
-    /// The monospaced flag, the OS/2 family class of the upright face, then words in the name. For the families
-    /// none of those classify, the shapes of their letters, then their PANOSE digits, as far as the upright faces
-    /// (all the faces, in a family of italics) agree: those digits are often copied from another font, and where
-    /// both say something and differ, the letters are right. A family is monospaced by its letters only when all
-    /// of it is: a family's Mono styles don't count against its others.
     static func of(name: String, faces: [LibraryFace]) -> Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
         if let byClass = Classification(familyClass: judged(faces)[0].familyClass) { return byClass }
@@ -934,10 +784,10 @@ extension Classification {
         }
         if judged.allSatisfy({ $0.letterShape == .monospaced }) { return .monospaced }
         let shapes = judged.map(\.letterShape).filter { $0 != .monospaced }
+        // PANOSE digits are often copied from another font: where they and the letters differ, the letters are right.
         return agreed(shapes) ?? agreed(judged.map(\.panose)) ?? .unclassified
     }
 
-    /// What an OS/2 family class says; nil for one that says nothing Cicero has a classification for.
     init?(familyClass: Int) {
         switch familyClass {
         case 1, 2, 3, 4, 5, 7: self = .serif
@@ -949,8 +799,6 @@ extension Classification {
         }
     }
 
-    /// The faces whose OS/2 family class (the first one's), letters and PANOSE digits count: the upright ones, or all of
-    /// them in a family of italics, but for a style of ornaments, unless the family has nothing else (see `isOrnaments`).
     static func judged(_ faces: [LibraryFace]) -> [FontFace] {
         let letters = faces.map(\.face).filter { !$0.isOrnaments }
         let candidates = letters.isEmpty ? faces.map(\.face) : letters

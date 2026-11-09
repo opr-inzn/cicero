@@ -2,22 +2,10 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Cicero's icon in the menu bar, while Settings → General → Show Cicero in the menu bar is on (it is at first). A
-/// click opens the main window, and closes it when it's already open in front. A right-click, a click with two fingers
-/// or a Control-click opens a menu: the fonts on for open apps and until Cicero quits, the sets as the sidebar lists
-/// them, Add Fonts and Find Fonts in Current Document, Preferences and Quit. VoiceOver's Show Menu action opens it too.
-/// Nothing is in a submenu: an item of a submenu can't bring Cicero to the front, as asking how to activate needs.
-/// Files dropped on the icon open as files opened from the Finder do: fonts are added, a folder is watched, a document
-/// shows the fonts it uses.
-///
-/// With the icon there, Show Cicero in the Dock can be off: Cicero is then in the Dock and the app switcher only while
-/// one of its windows is open, so its menus and shortcuts are there while it's used, and leaves them when the last
-/// one closes.
 final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
     static let showsIconKey = "menuBar.showsIcon"
     static let showsDockIconKey = "menuBar.showsDockIcon"
 
-    /// Handed over by `CiceroCommands`, whose environment has them even while no window is open.
     var openWindow: OpenWindowAction?
     var openSettings: OpenSettingsAction?
 
@@ -34,13 +22,11 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         menu.delegate = self
     }
 
-    /// Hands over the window actions; returns nothing, so `CiceroCommands` can call it as it's made.
     func connect(openWindow: OpenWindowAction, openSettings: OpenSettingsAction) {
         self.openWindow = openWindow
         self.openSettings = openSettings
     }
 
-    /// At launch.
     func start() {
         guard observers.isEmpty else { return }
         let center = NotificationCenter.default
@@ -62,8 +48,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
 
     private var showsIcon: Bool { defaults.bool(forKey: Self.showsIconKey) }
 
-    /// Whether Cicero leaves the Dock while none of its windows is open: only with the icon in the menu bar, so it can
-    /// always be found.
     private var hidesDockIcon: Bool { showsIcon && !defaults.bool(forKey: Self.showsDockIconKey) }
 
     private func update() {
@@ -118,9 +102,8 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         }
     }
 
-    /// The main window, while it shows in front of Cicero's others with Cicero in front. A click on the icon doesn't
-    /// bring Cicero to the front, so this is as it was before the click.
     private var frontMainWindow: NSWindow? {
+        // A click on the icon doesn't bring Cicero to the front, so this is as it was before the click.
         guard NSApp.isActive, let window = NSApp.mainWindow ?? NSApp.keyWindow,
               window.identifier?.rawValue == WindowID.main, window.isVisible, !window.isMiniaturized
         else { return nil }
@@ -149,6 +132,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         let sets = setItems()
         if !sets.isEmpty {
             menu.addItem(.sectionHeader(title: "Folders"))
+            // Not in a submenu: an item of a submenu can't bring Cicero to the front, as asking how to activate needs.
             for item in sets { menu.addItem(item) }
             menu.addItem(.separator())
         }
@@ -165,8 +149,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         return item
     }
 
-    /// "Inter and Roboto on for InDesign", a line for each open app with fonts on for it (its application sets', and
-    /// its documents'), then "12 families on until Cicero quits".
     private func statusLines() -> [String] {
         let session = ActivationEngine.currentSession()
         let temporary = model.data.records.temporary.filter { $0.value.session == session }
@@ -194,12 +176,10 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         return lines
     }
 
-    /// nil for an app that isn't open.
     private func appName(_ bundleID: String) -> String? {
         NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.localizedName
     }
 
-    /// The sets and smart sets the sidebar shows, in its order, checked when all their fonts are on.
     private func setItems() -> [NSMenuItem] {
         guard model.isVisible(SidebarSection.sets.key) else { return [] }
         return model.rows(for: .sets).filter { model.isVisible($0.key) }.map { row in
@@ -215,7 +195,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
 
     // MARK: Actions
 
-    /// Turns a set's fonts off when they're all on, and on otherwise.
     @objc private func toggleSet(_ sender: NSMenuItem) {
         guard let row = sender.representedObject as? SidebarRow else { return }
         if sender.state == .on {
@@ -229,15 +208,12 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         }
     }
 
-    /// As in the File menu, with the main window, where what the panel brings shows.
     @objc private func addFonts() {
         NSApp.bringForward { openWindow?(id: WindowID.main) }
         // Once the window is there: the panel runs a loop of its own.
         DispatchQueue.main.async { self.model.presentAddFontsPanel() }
     }
 
-    /// The document in front in the app in front, which the menu leaves in front; with none Cicero can read, or with
-    /// Cicero in front, the File menu's panel.
     @objc private func findFontsInCurrentDocument() {
         guard let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getpid(),
               let bundleID = app.bundleIdentifier
@@ -289,7 +265,6 @@ extension MenuBarItem: NSDraggingDestination {
         statusItem?.button?.highlight(false)
     }
 
-    /// With the main window, where the fonts added or the document's fonts show.
     func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         statusItem?.button?.highlight(false)
         let urls = Self.fileURLs(sender)
@@ -305,15 +280,12 @@ extension MenuBarItem: NSDraggingDestination {
 }
 
 extension NSApplication {
-    /// Opens a window and brings Cicero to the front, in the Dock and with its menus. macOS 26 turns down an app's own
-    /// request to come forward, even from a click on its icon in the menu bar (`activate()` and
-    /// `NSRunningApplication.activate`, checked with real clicks), so Cicero also asks Launch Services, as the Dock does.
-    /// That sends Cicero a reopen, which opens the main window only when no other window shows.
     func bringForward(opening open: () -> Void = {}) {
         setActivationPolicy(.regular)
         unhide(nil)
         activate()
         open()
+        // macOS 26 turns down an app's own request to come forward, even from a click on its icon in the menu bar, so Cicero also asks Launch Services, as the Dock does.
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
         // This copy, as it runs: brought forward rather than opened again.

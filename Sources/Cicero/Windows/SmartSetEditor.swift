@@ -1,13 +1,11 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for a new or existing smart set: name, match all or any, and a row per rule.
 struct SmartSetEditor: View {
     let original: SmartSet
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SmartSet
-    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
     @State private var openedAsNew: Bool?
 
     init(original: SmartSet) {
@@ -66,7 +64,6 @@ struct SmartSetEditor: View {
     }
 }
 
-/// Field · comparison · value, with the value control the field needs.
 private struct RuleRow: View {
     @Environment(AppModel.self) private var model
     @Binding var rule: SmartRule
@@ -99,8 +96,6 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
-    /// The user's folders, then Proofing when its fonts are shown, Adobe Fonts when there are some and they're shown, and
-    /// Added Fonts when there are some. The Font Library, no longer a location, only for a rule that has it.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
@@ -109,12 +104,10 @@ private struct RuleRow: View {
         return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
     }
 
-    /// The fields a new rule offers, and the rule's own when it's one no longer offered.
     private var fields: [SmartRule.Field] {
         SmartRule.Field.offered.contains(rule.field) ? SmartRule.Field.offered : SmartRule.Field.offered + [rule.field]
     }
 
-    /// Changing the field resets the comparison and value to ones that make sense for it.
     private var field: Binding<SmartRule.Field> {
         Binding(get: { rule.field }, set: { new in
             guard new != rule.field else { return }
@@ -205,7 +198,6 @@ private struct RuleRow: View {
             .frame(minWidth: 140, maxWidth: 260)
     }
 
-    /// A pop-up of the options, each with the dot of its colour, if it has one, like a tag's.
     @ViewBuilder
     private func options(_ options: [(id: String, title: String)], empty: String = "", colors: [String: TagColor] = [:]) -> some View {
         if options.isEmpty {
@@ -226,7 +218,6 @@ private struct RuleRow: View {
         }
     }
 
-    /// A field for the number, with its unit after it where the field's name doesn't say it, like days.
     private func number(unit: String? = nil, in range: ClosedRange<Int>) -> some View {
         let number = Binding<Int>(
             get: { Int(rule.value) ?? range.lowerBound },
@@ -278,7 +269,6 @@ private struct RuleRow: View {
     }
 }
 
-/// A pop-up of Hyperglot's languages: searchable, sorted by speakers.
 private struct LanguagePicker: View {
     @Binding var selection: String
     let catalog: LanguageCatalog
@@ -364,8 +354,6 @@ private extension SmartRule.Field {
 }
 
 private extension SmartRule.Comparison {
-    /// The wording depends on the field: a set "is in", a language or an OpenType feature "is supported", coverage
-    /// "includes", Has Note is Yes or No. A tag "is" any of the family's.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"

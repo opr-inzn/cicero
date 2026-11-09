@@ -3,8 +3,6 @@ import CoreText
 import Observation
 import CiceroCore
 
-/// The app's state: the current library snapshot, the user's data and what the windows show.
-/// Work happens in CiceroCore off the main thread; this class applies the results.
 @Observable
 final class AppModel {
     // MARK: Services
@@ -12,16 +10,11 @@ final class AppModel {
     @ObservationIgnored let locations = Locations.standard
     @ObservationIgnored let scanner: LibraryScanner
     @ObservationIgnored let store: UserDataStore
-    /// Held from launch until Cicero quits, so the `cicero` command asks Cicero to make its changes (see `CommandRequests`);
-    /// nil when a command making a change while Cicero was closed didn't finish in time.
     @ObservationIgnored private let appLock: AppLock?
     @ObservationIgnored private var commandRequests: CommandRequests?
-    /// The latest scan that ended, applied or not; a scan that replaced others ends for them too.
     @ObservationIgnored private(set) var lastEndedScan = 0
-    /// The engine as made at launch; `engine` knows the Font Library.
     @ObservationIgnored private let launchEngine: ActivationEngine
     @ObservationIgnored let languages: LanguageCatalog
-    /// Text in a font's own script, for previews of a font with none of the letters asked for (see `ScriptSample`).
     @ObservationIgnored let scriptSamples: ScriptSamples
     @ObservationIgnored let characterSetCatalog: CharacterSetCatalog
     @ObservationIgnored let coverage: CoverageIndex
@@ -33,7 +26,6 @@ final class AppModel {
     @ObservationIgnored let quickLook = QuickLook()
     @ObservationIgnored let guesser: ClassificationGuesser
 
-    /// Turns fonts on and off, installing them into ~/Library/Fonts or the Font Library, as the user chose.
     var engine: ActivationEngine {
         var engine = launchEngine
         engine.fontLibrary = data.fontLibrary?.url
@@ -41,7 +33,6 @@ final class AppModel {
         return engine
     }
 
-    /// The engine an import copies with: a font the library has in an app's own folder is in already too.
     var importEngine: ActivationEngine {
         var engine = engine
         engine.appFontFolders = library.appFontFolders
@@ -50,8 +41,6 @@ final class AppModel {
 
     // MARK: Library
 
-    /// The library on screen. Until a scan has built one, the one the last scan saved, read in the background from the
-    /// start of the launch (see `restoreLibrary`): the first thing asking for it waits for the rest of the reading.
     private(set) var library: Library {
         get {
             access(keyPath: \.library)
@@ -64,37 +53,21 @@ final class AppModel {
         }
     }
     @ObservationIgnored private var storedLibrary = Library.empty
-    /// The saved library being read, until `library` is first asked for.
     @ObservationIgnored private var restoring: SavedLibraryRead?
     private(set) var hasScanned = false
-    /// nil when not scanning.
     private(set) var scanProgress: ScanProgress?
     private(set) var problems: [Problem] = []
-    /// Bumped whenever coverage results arrive; anything showing coverage depends on it.
     private(set) var coverageRevision = 0
-    /// Family → the classification Apple Intelligence guessed from its name (see `ClassificationGuesser`);
-    /// `.unclassified` where it couldn't tell.
     private(set) var classificationGuesses: [String: Classification] = [:]
-    /// Family → the classification the model sees in its letters, for the families nothing in their files
-    /// classifies, where it's at least `ClassificationGuesses.letterLikelihood` sure (see `MeasurementIndex.classification`).
     private(set) var letterGuesses: [String: Classification] = [:]
-    /// Bumped whenever guesses arrive or go; cached lists depend on it.
     private(set) var guessRevision = 0
-    /// nil when coverage is up to date.
     private(set) var coverageProgress: CoverageProgress?
-    /// Bumped whenever letter measurements arrive (see `MeasurementIndex`); similar fonts depend on it.
     private(set) var measurementRevision = 0
-    /// nil when every family's letters are measured.
     private(set) var measurementProgress: CoverageProgress?
     private(set) var foundryNames: [String] = []
-    /// The classifications the sidebar lists: built-in ones with fonts, and the user's.
     private(set) var presentClassifications: [String] = []
-    /// Cicero's own folder items that have fonts now (Proofing, Adobe Fonts while shown, Added Fonts): the sidebar lists them.
     private(set) var ownFoldersWithFonts: Set<UUID> = []
-    /// Watched folders (and Added Fonts) whose online-only fonts are downloading, and how far along they are.
     var downloads: [UUID: DownloadProgress] = [:]
-    /// Where operations in progress will put switches, shown from the click until the scan after the
-    /// operation confirms it (see `expect`).
     private(set) var expectedFamilyPositions: [String: SwitchPosition] = [:]
     private(set) var expectedFacePositions: [FaceID: SwitchPosition] = [:]
 
@@ -126,11 +99,7 @@ final class AppModel {
             if data.activatesDocumentFonts != oldValue.activatesDocumentFonts { openDocumentFonts.settingChanged() }
         }
     }
-    /// Bumped on every change to `data` but the sidebar's choices; cached lists depend on it.
     private(set) var dataRevision = 0
-    /// Settings → General → Classify fonts automatically: from the shapes of the letters (`letterGuesses`) and, with
-    /// Apple Intelligence, from the names (see `ClassificationGuesser`), for the families nothing in their files
-    /// classifies. Saved in user defaults.
     var guessesClassifications: Bool {
         didSet {
             guard guessesClassifications != oldValue else { return }
@@ -150,20 +119,13 @@ final class AppModel {
         }
     }
     static let guessesClassificationsKey = ClassificationGuesses.guessingKey
-    /// Whether to ask if Cicero should classify fonts automatically: from the first launch, until it's answered. The
-    /// sidebar's Classifications has an Organize row meanwhile, which asks (see `showsGuessingQuestion`), rather than an
-    /// alert as the window first opens. Nothing is guessed meanwhile. A library from before keeps guessing, as it did.
     private(set) var asksAboutGuessing = false
-    /// Whether the question is showing, from a click on the sidebar’s Organize row.
     var showsGuessingQuestion = false
     static let asksAboutGuessingKey = ClassificationGuesses.askingKey
-    /// Family → the colours of its tags, for the dots next to its name. Apart from `data`, so tiles and rows
-    /// don't draw again for every change to it.
     private(set) var tagDots: [String: [TagColor]] = [:]
 
     // MARK: Navigation
 
-    /// The sidebar item the browser's title and empty states follow. Setting it selects just that item.
     var selection: SidebarItem? = .all {
         didSet {
             // Showing a sidebar item again ends Show Similar Fonts and Show in Library.
@@ -176,11 +138,8 @@ final class AppModel {
             openFamilyID = nil
         }
     }
-    /// Every selected sidebar item, `selection` among them; the browser shows the fonts in any of them.
-    /// Change it with `selectSidebarItems`, which keeps several to one list of the sidebar.
     var selectedItems: Set<SidebarItem> = [.all]
     var selectedIDs: Set<String> = []
-    /// The family whose page is pushed over the browser.
     var openFamilyID: String? {
         didSet {
             if openFamilyID != oldValue {
@@ -189,16 +148,9 @@ final class AppModel {
             }
         }
     }
-    /// The style chosen in the open font page's Style menu; nil follows the preview weight.
     var pageStyleID: FaceID?
-    /// The family whose similar fonts the browser shows instead of a sidebar item's, the closest first (see
-    /// `showSimilar`); nil for a sidebar item's.
     var similarFamilyID: String?
-    /// The families a document uses that the library has, which the browser shows instead of a sidebar item's, from the
-    /// Fonts in Document sheet's Show in Library (see `showInLibrary`); nil otherwise.
     var documentList: DocumentList?
-    /// Families for the browser to go to, as after installing fonts: it selects the first of them in the order it shows
-    /// them, brings it into view, and clears this.
     var jumpTargets: Set<String>?
     var searchText = "" {
         didSet {
@@ -206,85 +158,57 @@ final class AppModel {
             if !searchText.isEmpty { lastTyped = searchText }
         }
     }
-    /// The search lists filter by: follows `searchText` after a short pause.
     private(set) var appliedSearch = ""
-    /// The filters beside the search's text, which lists filter by at once (see `SearchToken` and `setSearchTokens`).
     private(set) var searchTokens: [SearchToken] = []
-    /// What was last typed in the search field, for the words a token chosen from the suggestions takes the place of.
     @ObservationIgnored var lastTyped = ""
     var isEditingSidebar = false
     var isInfoPresented = false
     var infoTab: InfoTab = .info
-    /// OpenType features chosen in the Info panel, per family, applied wherever it's previewed.
     var familyFeatures: [String: [FeatureSetting]] = [:]
-    /// Where the Info panel's sliders put a variable family's axes, per family, applied wherever the style they were
-    /// moved on is previewed.
     var familyAxes: [String: AdjustedAxes] = [:]
 
     // MARK: Prompts
 
-    /// Font files being added, waiting for the user to say how to install them (while the install method is Ask).
     var installPrompt: InstallPrompt?
-    /// Turning on many families at once, waiting for the user to agree (see `UserData.asksBeforeActivatingMany`).
     var manyActivationPrompt: ManyActivationPrompt?
-    /// Turning off fonts in a shared folder, waiting for the user to say (see `UserData.asksBeforeMovingOutOfSharedFolders`).
     var movingOutPrompt: MovingOutPrompt?
-    /// A switch to other copies that turns off more styles than it moves, waiting for the user to agree.
     var copySwitchPrompt: CopySwitchRequest?
-    /// Added fonts the library has already, from other files, waiting for the user to say what to do with each.
     var duplicatePrompt: DuplicatePrompt?
-    /// Added fonts that would replace the library's copies in more than one place, waiting for the user's yes.
     var replacePrompt: DuplicatePrompt?
-    /// Fonts about to be replaced while apps that keep their old version are open, waiting for the user's yes.
     var openAppsReplacePrompt: OpenAppsReplacePrompt?
     var trashPlan: TrashPlan?
     var textPrompt: TextPrompt?
     var newTagRequest: NewTagRequest?
     var editingSmartSet: SmartSet?
-    /// The set whose apps the application set sheet shows.
     var editingAppsForSet: UUID?
     var editingCharacterSet: CustomCharacterSet?
-    /// The coverage sets the sidebar asks about deleting.
     var deletingCharacterSets: [CustomCharacterSet] = []
     var isClearingCaches = false
-    /// The document whose fonts the Fonts in Document sheet shows.
     var documentFonts: DocumentFontsReport?
-    /// Another font manager's library, read for the Import sheet. What reading one left in temporary folders goes
-    /// when the sheet closes or shows another.
     var importing: ImportPrompt? {
         didSet {
             if let oldValue, oldValue.id != importing?.id { oldValue.library.discard() }
             showHeldToast()
         }
     }
-    /// An import is under way, which a library read meanwhile mustn't take the place of.
     var isImporting = false
-    /// FontExplorer X's Font Library as a location, offered to be copied in (see `offerEarlierImportCopy`).
     var earlierImportPrompt: EarlierImportPrompt? {
         didSet { showHeldToast() }
     }
-    /// Asked about it this launch already.
     @ObservationIgnored var askedAboutEarlierImport = false
-    /// Until the first scan has asked about FontExplorer X's Font Library, or found nothing to ask: true at launch when
-    /// there's such a location. What's New waits for the question and its answer (see `MainWindow`).
     var mayOfferEarlierImportCopy = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
-    /// What the toast's Undo does; nil for a toast without one.
     private(set) var toastUndo: (() -> Void)?
-    /// A toast that came while an import's sheet was up, shown once it closes (see `showToast`).
     @ObservationIgnored private var heldToast: (message: String, undo: (() -> Void)?)?
 
     // MARK: Compare
 
-    /// What Compare shows, in order: families, each in a style, some more than once in other styles.
     var compareEntries: [CompareEntry] = []
 
     // MARK: Opening files
 
-    /// Files and folders opened or dropped, gathered for a moment so several arriving one by one are added together.
     @ObservationIgnored var openQueue: (urls: [URL], target: SidebarItem?, task: Task<Void, Never>?) = ([], nil, nil)
-    /// Files the browser shows once the scan that lists them is done.
     @ObservationIgnored var awaitingScan: [OpenedFiles] = []
 
     // MARK: Private
@@ -297,38 +221,25 @@ final class AppModel {
     @ObservationIgnored private var problemsTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
-    /// Activation, deactivation and trashing run one at a time, so their record changes never overwrite each other.
+    // Operations run one at a time, or their changes to the records would overwrite each other.
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var lastScan = Date.distantPast
-    /// While the first scan waits for files to move at launch (see `begin`).
     @ObservationIgnored private var movingAtLaunch = false
-    /// Numbers scans as they start, so results and expectations can tell which came first.
     @ObservationIgnored private var scanCount = 0
     @ObservationIgnored private var revealProgress: Task<Void, Never>?
-    /// The last progress a scan reported, shown once the scan has taken long enough to mention.
     @ObservationIgnored private var latestProgress: ScanProgress?
-    /// Whether the running scan has taken long enough for the capsule to mention it.
     @ObservationIgnored private var progressDue = false
     @ObservationIgnored private var runningOperations = 0
-    /// The scan that was the latest when a font change came in during an operation; the change is left to a
-    /// scan that starts after it, which the operation usually starts itself.
     @ObservationIgnored private var changeSeenBeforeScan: Int?
     @ObservationIgnored private var operationCount = 0
     @ObservationIgnored private var expectations: [Expectation] = []
     @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] changed in
         MainActor.assumeIsolated { self?.fontsChanged(changed.map(ScanScope.files) ?? .everything) }
     }
-    /// What changed since the last scan started, for the next one to look at instead of every folder; nil for nothing.
     @ObservationIgnored private var pendingScope: ScanScope?
-    /// The running scan's number, what it looks at, and whether it's a check (see `rescan`).
     @ObservationIgnored private var runningScan: (id: Int, scope: ScanScope, check: Bool)?
-    /// Files a watched folder said changed while a scan of every folder was running, looked at again once it's done
-    /// (see `rescan`).
     @ObservationIgnored private var changedDuringScan: Set<String> = []
-    /// Whether fonts were turned on or off while a scan of every folder was running, which may have asked fontd before:
-    /// it's asked again once the scan is done (see `rescan`).
     @ObservationIgnored private var fontdChangedDuringScan = false
-    /// A scan of everything a while after a file came or went in a Fonts folder, to see what macOS made of it.
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
     @ObservationIgnored var visibleCountsCache: (key: VisibleKey, active: Int, appOnly: [String])?
@@ -336,21 +247,13 @@ final class AppModel {
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
     @ObservationIgnored var customSetsCache: (sets: [CustomCharacterSet], definitions: [CharacterSetDefinition])?
     @ObservationIgnored var similarCache: (key: SimilarKey, table: SimilarFonts)?
-    /// What the sidebar had selected before Show Similar Fonts or Show in Library, to go back to.
     @ObservationIgnored var listReturn: Set<SidebarItem>?
-    /// The font page open before Show Similar Fonts or Show in Library, to go back to.
     @ObservationIgnored var listReturnPage: String?
-    /// The sidebar items the last scan found, as saved for the next launch.
     @ObservationIgnored private var savedGroups: ScannedGroups?
     #if CICERO_MEASURE
-    /// How many libraries coverage and measurements finished with, so the app performance runs (`MeasureRun`) start
-    /// their steps once the background work after a scan is done.
     @ObservationIgnored private(set) var measuredLibraries = 0
-    /// Called just before a search typed applies, after its pause: the app performance runs time it from there.
     @ObservationIgnored var searchApplies: (() -> Void)?
-    /// How many scans ended, applied or not, so the app performance runs can wait for the one a step started.
     @ObservationIgnored private(set) var endedScans = 0
-    /// Where the last Move to Trash put each file, for the Undo scenario: listing the Trash takes Full Disk Access.
     @ObservationIgnored var lastTrashed: [String: String] = [:]
     #endif
 
@@ -403,8 +306,6 @@ final class AppModel {
 
     // MARK: Lifecycle
 
-    /// At launch, before the window is made: the first scan runs meanwhile, and the window shows the library the
-    /// last one found until it's done.
     private func begin() {
         let center = NotificationCenter.default
         // Font changes and the watched folders are followed as they happen; this catches anything they miss,
@@ -455,18 +356,14 @@ final class AppModel {
         if !migrating && !renaming && !reassembling { rescan(check: true) }
     }
 
-    /// At launch, without a word: what's in the Inactive folder's former places moves to ~/Cicero/Inactive, and the
-    /// records and added files follow (see `ActivationEngine.moveFormerInactiveFolders`). What it wrote down about the
-    /// moves goes only once they're saved, so a launch that stops in between, or a save that fails, still has them.
     private func moveFormerInactiveFolders() async {
         let moved = await engine.moveFormerInactiveFolders(data.records)
         data.records = moved.records
         data.fontFiles = ActivationEngine.paths(data.fontFiles, following: moved.moves)
+        // The notes on the moves go only once they're saved, so a launch that stops in between, or a save that fails, still has them.
         if store.flush(durably: true) { engine.forgetInactiveFolderMoves() }
     }
 
-    /// Whether the Font Library is still in its former place, ~/Cicero/Font Library, or a library saved before one that
-    /// fonts aren't installed into became a location is yet to be looked at (see `migrateFontLibrary`).
     private var needsFontLibraryMigration: Bool {
         guard !data.fontLibraryPath.isEmpty else { return false }
         let path = URL(fileURLWithPath: data.fontLibraryPath).standardizedFileURL.path
@@ -474,10 +371,6 @@ final class AppModel {
         return former || !data.fontLibraryLocationChecked
     }
 
-    /// At launch, without a word: a Font Library still in ~/Cicero/Font Library moves to ~/Cicero/Library, fonts installed
-    /// into it or not, unless it's one of the user's locations (one that can't move stays where it is until the next
-    /// launch). Then, once, one that fonts aren't installed into becomes a location while it has fonts, as turning
-    /// installing off makes it now; it was listed apart before. Nothing turns on or off.
     private func migrateFontLibrary() async {
         var engine = self.engine
         engine.fontLibrary = data.fontLibraryLocation == nil ? URL(fileURLWithPath: data.fontLibraryPath, isDirectory: true) : nil
@@ -491,16 +384,12 @@ final class AppModel {
         data = checked
     }
 
-    /// Once the main window is there: files opened before it are added now.
     func start() {
         guard !started else { return }
         started = true
         openWaitingFiles()
     }
 
-    /// The library as the last scan found it, so the window opens with the fonts in it rather than empty until
-    /// this launch's first scan, which replaces it (see `apply`). Read off the main thread while AppKit and SwiftUI make
-    /// the app and its window, which took longer: at 20,000 families the reading took 120 ms of the main thread before.
     private func restoreLibrary() {
         let scanner = scanner, records = data.records
         restoring = SavedLibraryRead { scanner.savedLibrary(records: records) }
@@ -522,7 +411,6 @@ final class AppModel {
         FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
     }
 
-    /// Adobe's font folders used to be added to the user's folders; the Proofing switch covers them now.
     private func dropAdobeFolders() {
         data.folders.removeAll { WatchedFolder.detectAppName(forPath: $0.path) != nil }
     }
@@ -545,15 +433,10 @@ final class AppModel {
 
     // MARK: Scanning
 
-    /// What a scan reads now: the library's folders, its added files and the activation records.
     var scanInput: ScanInput {
         ScanInput(folders: data.scannedFolders(), files: data.fontFiles, records: data.records)
     }
 
-    /// Returns the scan's number. With `changes`, only those files are looked at again (see `LibraryScanner.scan`).
-    /// A `check` is a scan Cicero starts by itself to see whether anything changed: at launch, when it becomes active,
-    /// when fonts change. While the window lists fonts, its capsule doesn't say it's finding them, only that it reads
-    /// files, as nothing on screen changes otherwise.
     @discardableResult
     func rescan(changes: Set<String>? = nil, check: Bool = false) -> Int {
         rescan(changes.map(ScanScope.files) ?? .everything, check: check)
@@ -635,9 +518,6 @@ final class AppModel {
         return id
     }
 
-    /// Puts the scan's latest progress in the capsule once the scan has taken long enough to mention, or at once while
-    /// the capsule is up for the scan it replaced. A `check` finding the fonts while the window lists them leaves the
-    /// capsule as it is (see `rescan`).
     private func showProgress(check: Bool) {
         guard progressDue || scanProgress != nil, let progress = latestProgress else { return }
         if check, progress == .finding, !library.families.isEmpty { return }
@@ -665,12 +545,6 @@ final class AppModel {
         showOpenedFiles(after: id)
     }
 
-    /// CoreText's fonts-changed notification, or font files coming or going in a watched folder.
-    /// During an operation (whose own changes set these off) they wait for the scan the operation starts
-    /// when it finishes; `enqueue` scans afterwards when it started none.
-    /// `scope`: the files a watched folder says changed, or everything when it can't say, which are looked at again
-    /// almost at once; or, after CoreText's notice, fontd's list without walking the watched folders again (see
-    /// `ScanScope.fontd`), which waits a little, as CoreText's notifications tend to come in bursts.
     private func fontsChanged(_ scope: ScanScope) {
         if runningOperations > 0 {
             if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
@@ -696,7 +570,6 @@ final class AppModel {
         }
     }
 
-    /// The scan looks only at the files changed meanwhile, if it can.
     private func scheduleRescan(after delay: Double) {
         rescanTask?.cancel()
         rescanTask = Task { [weak self] in
@@ -706,7 +579,6 @@ final class AppModel {
         }
     }
 
-    /// Re-reads every font file instead of using cached details.
     func rebuildFontList() {
         scanner.clearCache()
         coverage.clearCache()
@@ -750,12 +622,9 @@ final class AppModel {
         updateProblems()
     }
 
-    /// Fonts in Active folders that weren't in the library before this scan, like files just put in one. Those that were
-    /// only out of reach, on a disk that was ejected say, are back as they were: on if Cicero had them on, off if they were
-    /// turned off. With nothing to compare against (no saved library at launch), none: a font turned off by hand would
-    /// come back on.
     private func activateAddedFonts(knowing known: Set<String>, offline: Set<String>) {
         let active = data.folders.filter(\.isActive)
+        // With nothing to compare against (no saved library at launch), none: a font turned off by hand would come back on.
         guard !active.isEmpty, !known.isEmpty || !offline.isEmpty else { return }
         keepOn(faces(in: active).filter { face in
             let path = face.face.path
@@ -790,7 +659,6 @@ final class AppModel {
         }
     }
 
-    /// Every family's letters, for similar fonts; after coverage, which lists wait for.
     private func updateMeasurements() {
         measurementTask?.cancel()
         let families = library.families
@@ -834,9 +702,6 @@ final class AppModel {
 
     // MARK: Search
 
-    /// Sets the search field's tokens, only the last of each kind (see `SearchToken.normalized`). A token chosen from the
-    /// suggestions takes the place of the words typed for it, and the words before them stay ("sans ital" and Italic
-    /// leave "sans"), though the field empties itself.
     func setSearchTokens(_ tokens: [SearchToken]) {
         let added = tokens.last { !searchTokens.contains($0) }
         searchTokens = SearchToken.normalized(tokens)
@@ -845,7 +710,6 @@ final class AppModel {
         Task { @MainActor in self.searchText = rest }
     }
 
-    /// Takes the text and the tokens out of the search field.
     func clearSearch() {
         searchText = ""
         searchTokens = []
@@ -874,7 +738,6 @@ final class AppModel {
 
     // MARK: Operations
 
-    /// Runs an activation-type operation after the previous one has finished.
     func enqueue(_ work: @escaping (AppModel) async -> Void) {
         let previous = operation
         runningOperations += 1
@@ -886,9 +749,6 @@ final class AppModel {
         }
     }
 
-    /// Until `releaseScans`, font changes are left to the scan after, as during an operation (see `fontsChanged`): an
-    /// import copying thousands of fonts into the Fonts folder, 20 at a time, would otherwise start a scan of everything
-    /// with each batch, and those scans would keep fontd too busy to take the next one.
     func holdScans() {
         runningOperations += 1
     }
@@ -911,12 +771,9 @@ final class AppModel {
         var operation: Int
         var faces: [FaceID: SwitchPosition]
         var families: Set<String>
-        /// The scan the operation started when it finished; nil while it runs.
         var scan: Int?
     }
 
-    /// Moves the switches of these faces and their families to `position` at once, ahead of the
-    /// operation that puts them there. Returns the number `finish` takes to have the next scan confirm it.
     func expect(_ faces: [LibraryFace], at position: SwitchPosition) -> Int {
         operationCount += 1
         expectations.append(Expectation(
@@ -927,7 +784,6 @@ final class AppModel {
         return operationCount
     }
 
-    /// The operation is done; the scan `id` shows what it did.
     func settle(_ operation: Int, after id: Int) {
         for index in expectations.indices where expectations[index].operation == operation {
             expectations[index].scan = id
@@ -938,8 +794,6 @@ final class AppModel {
         expectations.removeAll { ($0.scan ?? .max) <= id }
     }
 
-    /// The faces' expected positions, latest operation last, and their families' positions worked out
-    /// from the current library: an earlier operation that failed doesn't linger in a later one's family.
     private func mergeExpectations() {
         var faces: [FaceID: SwitchPosition] = [:]
         var names = Set<String>()
@@ -965,12 +819,8 @@ final class AppModel {
 
     // MARK: Toasts
 
-    /// How long a toast with Undo stays.
     static let undoTime = Duration.seconds(6)
 
-    /// With `undo`, the toast has an Undo button, and stays long enough to reach it (`undoTime`). While an import's sheet
-    /// is up, as with the toast for the fonts it turned on under its summary, the toast waits for the sheet to close:
-    /// under it, it would go unseen, and its Undo out of reach. The last one waiting shows.
     func showToast(_ message: String, undo: (() -> Void)? = nil) {
         if importing != nil || earlierImportPrompt != nil { return heldToast = (message, undo) }
         toast = message
@@ -984,14 +834,12 @@ final class AppModel {
         }
     }
 
-    /// The toast that waited for an import's sheet, once no import sheet is up.
     private func showHeldToast() {
         guard importing == nil, earlierImportPrompt == nil, let held = heldToast else { return }
         heldToast = nil
         showToast(held.message, undo: held.undo)
     }
 
-    /// The toast's Undo: does it, and the toast goes.
     func undoToast() {
         let undo = toastUndo
         toastTask?.cancel()
@@ -1011,7 +859,6 @@ final class AppModel {
         if dots != tagDots { tagDots = dots }
     }
 
-    /// Asks Apple Intelligence about the families nothing classifies, when it's on and the setting is.
     private func guessClassifications() {
         guard guessesClassifications else { return }
         // A family whose letters disagree is unclassified for a reason the name can't undo.
@@ -1025,8 +872,6 @@ final class AppModel {
         refreshGroups()
     }
 
-    /// Answers the Organize row’s question: whether to classify fonts automatically from now on. Either answer takes
-    /// the row away.
     func answerGuessing(_ guesses: Bool) {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Self.asksAboutGuessingKey)
@@ -1036,8 +881,6 @@ final class AppModel {
         guessesClassifications = guesses
     }
 
-    /// The classifications the model sees in the letters of the families nothing in their files classifies. They
-    /// count only while guessing is on (see `classificationGuess`), but are kept, as the measurements are, either way.
     private func refreshLetterGuesses() {
         let found = ClassificationGuesses.letters(of: library.families, measurements: measurements)
         guard found != letterGuesses else { return }
@@ -1085,8 +928,6 @@ final class AppModel {
         }
     }
 
-    /// The sidebar items a scan finds (Cicero's own folders, foundries and classifications) as the last scan
-    /// found them, so the window opens with them in place rather than having them appear a moment later.
     private func restoreGroups() {
         guard let saved = UserDefaults.standard.data(forKey: ScannedGroups.defaultsKey),
               let groups = try? JSONDecoder().decode(ScannedGroups.self, from: saved) else { return }
@@ -1097,7 +938,6 @@ final class AppModel {
     }
 }
 
-/// What `refreshGroups` last found, kept for the next launch.
 private struct ScannedGroups: Codable, Equatable {
     static let defaultsKey = "sidebar.scannedGroups"
     var ownFolders: Set<UUID>
@@ -1121,72 +961,50 @@ enum InfoTab: String, CaseIterable {
     case axes = "Axes"
 }
 
-/// The axes moved on a variable style's sliders, by tag, for that style only.
 struct AdjustedAxes: Equatable {
     let face: FaceID
     var values: [String: Double]
 }
 
-/// Font files being added while the install method is Ask, waiting for the user to say how (see `InstallSheet`).
 struct InstallPrompt: Identifiable {
     let id = UUID()
-    /// The files the library doesn't have yet, for the sheet's title.
     var files: [String]
-    /// Some of them can move: the user picked them, and no folder the library reads has them.
     var offersMove: Bool
-    /// The location they were dropped on, which copying or moving puts them into, rather than the Fonts folder.
     var location: DropLocation?
-    /// Adds the files the way the user chose.
     var add: (AppModel, InstallMethod) -> Void
 }
 
-/// A location the browser showed as font files were dropped on it or pasted into it: copied or moved, as the install
-/// method says, they go into its folder, rather than the Fonts folder, and are on or off there as its fonts are (see
-/// `AppModel.addFontFiles`).
 struct DropLocation: Equatable {
     var id: UUID
-    /// As the sidebar calls it: "Proofing".
     var name: String
     var folder: URL
-    /// Cicero keeps its fonts on (Active).
     var isActive: Bool
-    /// The app that loads its fonts by itself: "Adobe" for Adobe apps, "InDesign".
     var app: String?
 }
 
-/// Using a place's copies of some styles (see `AppModel.useCopies`).
 struct CopySwitchRequest: Identifiable {
     let id = UUID()
-    /// The place's name: "Acme".
     var source: String
-    /// What the activation sheet calls it: "Helvetica from Acme".
     var title: String
     var plan: CopySwitchPlan
 }
 
-/// Replacing fonts while InDesign, Illustrator or Photoshop is open (see `AppModel.openAppsKeepingFonts`): the apps, and
-/// what Replace goes on with.
 struct OpenAppsReplacePrompt: Identifiable {
     let id = UUID()
     var apps: [String]
     var replace: (AppModel) -> Void
 }
 
-/// Font files being added, some of them with fonts the library has already (see `AppModel.addCheckingDuplicates`).
 struct DuplicatePrompt: Identifiable {
     let id = UUID()
     var paths: [String]
     var duplicates: [AddedDuplicate]
-    /// The choice in Settings when the sheet asks, which each family starts at where it can.
     var handling: DuplicateHandling = .ask
-    /// How to bring the files in, when not as the install method says; and the location they go into (see `DropLocation`).
     var method: InstallMethod?
     var location: DropLocation?
-    /// What adding them does once they're in.
     var then: (AppModel, Set<String>, AddNote) -> Void
 }
 
-/// New Tag…: the families that get the tag, and the colour the sheet starts with.
 struct NewTagRequest: Identifiable {
     let id = UUID()
     var families: [Family]
@@ -1201,29 +1019,21 @@ struct TextPrompt: Identifiable {
     var action: (String) -> Void
 }
 
-/// What a scan looks at (see `AppModel.rescan`).
 enum ScanScope: Equatable {
-    /// Every folder, walked again, and fontd's list.
     case everything
-    /// Only these files, which a watched folder said changed.
     case files(Set<String>)
-    /// fontd's list again, after CoreText's fonts-changed notice: the folders FSEvents watches as the last scan walked
-    /// them, except those holding these files (see `LibraryScanner.scan`).
     case fontd(except: Set<String>)
 
-    /// How often, at most, a fonts-changed notice goes without walking every folder again: for whatever no watcher saw.
     #if CICERO_MEASURE
     static let walkEvery = ProcessInfo.processInfo.environment["CICERO_MEASURE_WALK_EVERY"].flatMap(TimeInterval.init) ?? 10 * 60
     #else
     static let walkEvery: TimeInterval = 10 * 60
     #endif
 
-    /// Whether the scan walks folders (at least those nothing watches), so files that change meanwhile wait for it.
     var walksFolders: Bool { !isFilesOnly }
     var walksAll: Bool { self == .everything }
     var isFilesOnly: Bool { if case .files = self { true } else { false } }
 
-    /// A scan that looks at what either looks at.
     func adding(_ other: ScanScope) -> ScanScope {
         switch (self, other) {
         case (.everything, _), (_, .everything): .everything
@@ -1234,10 +1044,8 @@ enum ScanScope: Equatable {
     }
 }
 
-/// The library the last scan saved, read on a thread of its own (see `AppModel.restoreLibrary`).
 nonisolated final class SavedLibraryRead: @unchecked Sendable {
     private let done = DispatchSemaphore(value: 0)
-    /// Written once before `done` is signalled, read only after waiting for it.
     private var library: Library?
 
     init(_ read: @escaping @Sendable () -> Library?) {
@@ -1247,14 +1055,12 @@ nonisolated final class SavedLibraryRead: @unchecked Sendable {
         }
     }
 
-    /// The library, once it's read.
     nonisolated func wait() -> Library? {
         done.wait()
         done.signal()
         return library
     }
 
-    /// Waits for the reading without holding up a thread of Swift's own.
     nonisolated func finished() async {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [self] in

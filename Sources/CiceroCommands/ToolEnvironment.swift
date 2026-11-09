@@ -2,34 +2,15 @@ import CiceroCore
 import CoreText
 import Foundation
 
-/// Where the tool finds Cicero's files, and what it asks macOS. Environment variables move it to other folders for the
-/// end-to-end tests (Tests/E2E/cli); they only ever change where it reads and writes.
-///
-/// - `CICERO_SUPPORT_DIR`: in place of ~/Library/Application Support/Cicero.
-/// - `CICERO_CACHES_DIR`: in place of ~/Library/Caches/Cicero.
-/// - `CICERO_FONTS_DIR`, `CICERO_ALL_USERS_FONTS_DIR`, `CICERO_SYSTEM_FONTS_DIR`: in place of ~/Library/Fonts,
-///   /Library/Fonts and /System/Library/Fonts.
-/// - `CICERO_DEFAULTS_DOMAIN`: the app's settings, in place of com.maximilianinzinger.Cicero.
-/// - `CICERO_RESOURCES`: the folder with CharacterSets.json and Languages.json, in place of the app bundle's.
-/// - `CICERO_FAKE_REGISTRAR`: a file listing the font files macOS has active, one path a line, in place of asking
-///   macOS; the tool then never changes the Mac's fonts.
-/// - `CICERO_NOW`: what "now" is (ISO 8601), for Recents.
-/// - `CICERO_PROOFING_DIRS`: the folders Adobe apps load fonts from by themselves (the proofing fonts), separated by
-///   colons, in place of those on the Mac.
 public struct ToolEnvironment: @unchecked Sendable {
     public var locations: Locations
-    /// The app's settings (`UserDefaults` is thread-safe).
     public var defaults: UserDefaults
-    /// The folder with CharacterSets.json and Languages.json; nil when it can't be found.
     public var resources: URL?
     public var registrar: any FontRegistrar
     public var now: Date
-    /// The app's bundle ID, to tell whether it's open.
     public var appBundleID: String
-    /// The folders Adobe apps load fonts from by themselves; nil for those on the Mac (`WatchedFolder.appFontFolders`).
     public var proofingFolders: [WatchedFolder]?
 
-    /// The folders Adobe apps load fonts from by themselves.
     public var appFontFolders: [WatchedFolder] { proofingFolders ?? WatchedFolder.appFontFolders() }
 
     public init(locations: Locations, defaults: UserDefaults, resources: URL?, registrar: any FontRegistrar, now: Date = .now,
@@ -44,7 +25,6 @@ public struct ToolEnvironment: @unchecked Sendable {
 
     public static let bundleID = "com.maximilianinzinger.Cicero"
 
-    /// The environment of this process, as the variables above change it.
     public static func current(_ variables: [String: String] = ProcessInfo.processInfo.environment) -> ToolEnvironment {
         func folder(_ name: String) -> URL? {
             variables[name].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true) }
@@ -69,8 +49,6 @@ public struct ToolEnvironment: @unchecked Sendable {
         return environment
     }
 
-    /// Cicero.app/Contents/Resources, from the tool in Cicero.app/Contents/Helpers, also through a link to it (as in
-    /// /usr/local/bin); else, for a build in the package's .build folder, the package's Resources.
     static func bundledResources() -> URL? {
         let executable = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
         let candidates = [Bundle.main.executableURL?.resolvingSymlinksInPath(), executable].compactMap { $0 }
@@ -96,8 +74,6 @@ public struct ToolEnvironment: @unchecked Sendable {
     public var userDataURL: URL { locations.support.appendingPathComponent("user-data.json", isDirectory: false) }
 }
 
-/// macOS's active font files as a list in a file, for tests: turning a font on or off adds its path to the list or takes
-/// it out, and nothing reaches macOS.
 struct ListedRegistrar: FontRegistrar {
     let file: String
 
@@ -114,7 +90,6 @@ struct ListedRegistrar: FontRegistrar {
         try? Data((paths.sorted().joined(separator: "\n") + "\n").utf8).write(to: URL(fileURLWithPath: file), options: .atomic)
     }
 
-    /// Nothing fails.
     private func change(_ urls: [URL], on: Bool) -> Set<String> {
         let changed = Set(urls.map { $0.path(percentEncoded: false) })
         write(on ? paths.union(changed) : paths.subtracting(changed))

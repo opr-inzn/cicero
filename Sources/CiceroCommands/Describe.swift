@@ -1,13 +1,9 @@
 import CiceroCore
 import Foundation
 
-/// Families and styles in the JSON of the contract (CLI-PLAN.md, section 0b). A family-level text field whose styles
-/// differ says "mixed"; a field without a value is left out; lists are written also when they're empty.
 public struct Describer {
     let context: LibraryContext
-    /// Family → the folders (`sets`) it's in, families it has only some styles of too.
     private let folders: [String: [FontSet]]
-    /// Bundle ID → an app's name, from the application sets.
     private let appNames: [String: String]
 
     public static let mixed = "mixed"
@@ -24,7 +20,6 @@ public struct Describer {
         self.appNames = appNames
     }
 
-    /// One value for every style, "mixed" when they differ; nil when none has one.
     static func shared(_ values: [String?]) -> String? {
         var found: String?
         for value in values.compactMap({ $0 }) {
@@ -35,7 +30,6 @@ public struct Describer {
 
     // MARK: Families
 
-    /// A family as `find` and `list families` give it.
     public func family(_ family: Family) -> JSONObject {
         var object = JSONObject()
         let faces = family.faces.map(\.face)
@@ -76,8 +70,6 @@ public struct Describer {
         return object
     }
 
-    /// A family as `status <family>` gives it: the fields of `family(_:)`, its note, what its files' name tables say,
-    /// the sets its regular style covers completely, and its styles, each with its details when `details` asks.
     public func familyStatus(_ family: Family, details: (LibraryFace) -> Bool) -> JSONObject {
         var object = self.family(family)
         let faces = family.faces.map(\.face)
@@ -101,7 +93,6 @@ public struct Describer {
 
     // MARK: Styles
 
-    /// A style, short; with `details` (what its file's name table says), its details too.
     public func style(_ libraryFace: LibraryFace, details: FileNames?) -> JSONObject {
         let face = libraryFace.face
         var object = JSONObject()
@@ -145,8 +136,6 @@ public struct Describer {
         return object
     }
 
-    /// Where an active style is on from: `cicero` for Cicero's Library while fonts are installed into it, `inLocation`
-    /// for other files Cicero turned on where they are.
     func activeFrom(_ source: ActiveSource, path: String) -> String {
         switch source {
         case .macOS: return "macOS"
@@ -166,7 +155,6 @@ public struct Describer {
         }
     }
 
-    /// A variable style's axes, as its file says how far each goes, without those the font hides; none for a static style.
     func axes(of face: FontFace) -> [JSON] {
         guard !face.axes.isEmpty else { return [] }
         return FontLoader.shared.axes(of: face).filter { !$0.isHidden }.map { range in
@@ -183,11 +171,8 @@ public struct Describer {
 
     // MARK: Coverage
 
-    /// The series whose largest step `coverage.largest` gives, by their keys in the JSON.
     static let largestSeries: [(key: String, id: String)] = [("latin", CharacterSetCatalog.latinSeriesID), ("adobeLatin", CharacterSetCatalog.adobeSeriesID)]
 
-    /// What a face covers: how many characters, the largest step of each series it covers completely (a list with one
-    /// id, or none), and with `sets` every set it covers completely. nil while it isn't checked yet.
     func coverage(of face: FontFace, sets: Bool) -> JSONObject? {
         guard let coverage = context.faceCoverage(face) else { return nil }
         var object = JSONObject()

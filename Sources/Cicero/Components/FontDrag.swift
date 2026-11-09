@@ -4,12 +4,8 @@ import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Families, or one style of one, being dragged onto the sidebar. The browser's grid and lists and the Character Toolbox
-/// drag every selected family when the one dragged is selected, else just that one; a font page's style rows drag one
-/// style, which a set takes on its own.
 nonisolated struct FontDrag: Codable, Transferable {
     var families: [String]
-    /// The style's PostScript name, of the one family; none for whole families.
     var style: String?
 
     init(families: [String]) {
@@ -30,13 +26,10 @@ nonisolated struct FontDrag: Codable, Transferable {
 }
 
 extension UTType {
-    /// Declared in Info.plist.
+    // Declared in Info.plist.
     nonisolated static let ciceroFontStyle = UTType(exportedAs: "com.maximilianinzinger.cicero.font-style")
 }
 
-/// What families being dragged look like: "Aa" in the letters of the one under the pointer and its name, small, as the
-/// Finder's sidebar shows a file dragged over it, rather than the whole card or row, with how many there are when it's
-/// several, as the Finder counts files.
 struct FamilyDragPreview: View {
     let family: Family
     let count: Int
@@ -67,18 +60,10 @@ struct FamilyDragPreview: View {
     }
 }
 
-/// Starts dragging families, or a style, with AppKit rather than SwiftUI's `draggable`, so what's dragged is its small
-/// preview at the pointer from start to end. `draggable` gives the dragged item the frame of the whole card or row,
-/// however small its preview, where the pointer took it, and once it's dropped the preview, shown at the pointer while
-/// dragging, slides off to that frame's corner. Drops take it as they take a `FontDrag`.
 final class FontDragSource: NSObject, NSDraggingSource {
     static let shared = FontDragSource()
-    /// Where the gesture that started the drag under way began, in the window: one drag per gesture, and a drag that
-    /// never hears it ended doesn't hold up the next.
     private var started: CGPoint?
 
-    /// Starts the drag from the mouse event being handled, as a drag gesture that began at `start` changes, unless it
-    /// has started one already.
     func begin<Preview: View>(_ drag: FontDrag, from start: CGPoint, @ViewBuilder preview: () -> Preview) {
         guard start != started, let event = NSApp.currentEvent, event.type == .leftMouseDragged,
               let window = event.window, let view = window.contentView, let data = try? JSONEncoder().encode(drag) else { return }
@@ -108,7 +93,6 @@ final class FontDragSource: NSObject, NSDraggingSource {
 }
 
 extension View {
-    /// Drags `drag` with `FontDragSource` once the pointer moves with the button down.
     func fontDrag<Preview: View>(_ drag: @escaping () -> FontDrag, @ViewBuilder preview: @escaping () -> Preview) -> some View {
         simultaneousGesture(DragGesture(minimumDistance: 3, coordinateSpace: .global).onChanged { value in
             FontDragSource.shared.begin(drag(), from: value.startLocation, preview: preview)
@@ -116,11 +100,7 @@ extension View {
     }
 }
 
-/// Takes families, or a style, dropped on what it's behind, as AppKit takes a drop: the drag ends the moment it's
-/// dropped, as in the Finder. SwiftUI's drop destination keeps the dragged label up a third of a second longer.
-/// Behind a view, it leaves clicks to it: AppKit finds where a drag is over by the types registered there.
 struct FontDropTarget: NSViewRepresentable {
-    /// Hears as a drag that can be dropped comes over and leaves.
     var isOver: ((Bool) -> Void)?
     var perform: ([FontDrag]) -> Void
 
@@ -140,6 +120,7 @@ struct FontDropTarget: NSViewRepresentable {
         var isOver: ((Bool) -> Void)?
         var perform: ([FontDrag]) -> Void = { _ in }
 
+        // Clicks go to the view in front, and drags still find this one: AppKit finds where a drag is over by the types registered here.
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
         override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation { operation(for: sender) }
@@ -164,7 +145,6 @@ struct FontDropTarget: NSViewRepresentable {
             return takes ? .copy : []
         }
 
-        /// What `FontDragSource` puts on the pasteboard, or names from elsewhere, one per line.
         static func drags(on pasteboard: NSPasteboard) -> [FontDrag] {
             (pasteboard.pasteboardItems ?? []).compactMap { item in
                 if let data = item.data(forType: types[0]), let drag = try? JSONDecoder().decode(FontDrag.self, from: data) {

@@ -3,45 +3,29 @@ import CiceroCore
 import SwiftUI
 
 extension Color {
-    /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-    /// Specimen text on it: the text colour, full black or white, as in the type tester, rather than the labels' grey.
     static let ink = Color(nsColor: .textColor)
-    /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
-    /// system green in light mode, which is too light for small text on its own tint.
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
     })
-    /// The App Folder tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
     static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
             : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
     })
-    /// Solar, the sidebar's Organize row's: an orange, HSL 22° 100% 52%, the same in light and dark mode.
     static let solar = Color(nsColor: NSColor(srgbRed: 1, green: 0.392, blue: 0.04, alpha: 1))
 }
 
-/// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
-/// a cloud service keeps online only, is read off the main thread first, with room kept for the text: a server that's slow
-/// to answer, or stopped answering, never holds up the window.
 struct FontText: View {
     let text: String
     let face: FontFace
     let size: Double
     var weight: Double = 400
-    /// Axes moved in the Info panel, by tag.
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     var lineLimit: Int? = 1
-    /// For text that runs over several lines, the distance from one line's baseline to the next in points; nil for the
-    /// font's own line spacing.
     var lineHeight: Double?
-    /// What to multiply the size by, for the font at the size: the grid draws fonts too wide for its tiles smaller.
     var scale: ((CTFont) -> CGFloat)?
-    /// False makes the font without keeping it, for text whose size changes smoothly, as Quick Look's does while its
-    /// panel is resized: kept, every size would push fonts on screen out of the cache, which keeps sizes to half a point
-    /// and so would hand back a font a little bigger or smaller.
     var cached = true
     @State private var readPath: String?
 
@@ -70,12 +54,6 @@ struct FontText: View {
     }
 }
 
-/// One line of text in a font face, drawn with CoreText, for the font list's previews: as `FontText` sets it with a line
-/// limit of one, a "…" where it doesn't fit, but without SwiftUI's text layout, which for each row went through TextKit
-/// to size the text and again to draw it. Typing in Preview Options with the list showing took about 30 % less, and a
-/// switch to the list 25–40 ms less (measured in a VM, 2026-11-01). As tall as `height` for layout, with room above
-/// and below for glyphs reaching past the font's ascent and descent, as `UnclippedText` gives; the baseline where
-/// `Text`'s is (see `line`). A file on a server is read off the main thread first, as for `FontText`.
 struct FontLine: View {
     let text: String
     let face: FontFace
@@ -85,7 +63,6 @@ struct FontLine: View {
     var features: [FeatureSetting] = []
     let height: CGFloat
     @State private var readPath: String?
-    /// Read so the line draws again in the other appearance, in its colour.
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
 
@@ -125,10 +102,6 @@ struct FontLine: View {
         }
     }
 
-    /// Where `Text` puts its line in a frame of `height`, from the frame's top: the ascent rounded to a whole point, the
-    /// line as tall as that and the descent, down to a whole pixel, centred, its top down to a whole pixel, the leading
-    /// split above and below so it doesn't count. Measured: SwiftUI's baseline in a 22 pt frame for each of the 703
-    /// font families on a Mac with macOS 26, at 2x, every one as this says (a probe of Text in an NSHostingView).
     private static func line(of font: CTFont, in height: CGFloat, scale: CGFloat) -> (top: CGFloat, height: CGFloat, baseline: CGFloat) {
         let pixel = { (value: CGFloat) in (value * scale).rounded(.down) / scale }
         let ascent = CTFontGetAscent(font).rounded()
@@ -153,10 +126,6 @@ struct FontLine: View {
     }
 }
 
-/// Its content once the font files it draws from have been read, so making their fonts never reads a file on the main
-/// thread: at once when they're on the Mac's own disks or were read before, as almost all are; for files on a server,
-/// or online only, once they've been read in the background, with empty room in its place meanwhile (see
-/// `FontLoader.wouldWait`).
 struct ReadingFonts<Content: View>: View {
     let paths: [String]
     @ViewBuilder let content: () -> Content
@@ -176,16 +145,13 @@ struct ReadingFonts<Content: View>: View {
     }
 }
 
-/// Draws text as usual, but with room above and below its lines for glyphs reaching past the font's ascent
-/// and descent, like a descender lower than the font says or a swash, which SwiftUI otherwise cuts off: as far
-/// as any of the font's glyphs reach, and at least half the size, for the fonts that stand in for missing
-/// characters. None at the sides, where text isn't cut off, and room there puts a "…" out of place.
 nonisolated struct UnclippedText: TextRenderer {
     let room: EdgeInsets
 
     init(font: CTFont) {
         let box = CTFontGetBoundingBox(font)
         let half = CTFontGetSize(font) / 2
+        // None at the sides, where text isn't cut off: room there puts a "…" out of place.
         room = EdgeInsets(top: max(box.maxY - CTFontGetAscent(font), half), leading: 0,
                           bottom: max(-box.minY - CTFontGetDescent(font), half), trailing: 0)
     }
@@ -197,8 +163,6 @@ nonisolated struct UnclippedText: TextRenderer {
     }
 }
 
-/// A small switch drawn in SwiftUI. Lists show one per family, and a native switch per row made
-/// building a list much slower. The middle position (on in one app only) puts the knob halfway.
 struct MiniSwitch: View {
     let position: SwitchPosition
     let isEnabled: Bool
@@ -237,8 +201,6 @@ struct MiniSwitch: View {
     }
 }
 
-/// On/off for a whole family. Gets the model passed in rather than from the environment: AppKit
-/// builds table cells outside SwiftUI's update, where the environment isn't there yet.
 struct ActivationSwitch: View {
     let family: Family
     let model: AppModel
@@ -274,13 +236,9 @@ struct ActivationSwitch: View {
     }
 }
 
-/// A small tinted capsule with a word or two, never shortened: a name next to it gives way instead. (A list
-/// cell lays its row out again at the row's own width, where a stack offers each text half of what's left,
-/// so beside a name about as wide as itself, "Adobe" got less than it needs.)
 struct Tag: View {
     let text: String
     let tint: Color
-    /// A symbol before the text.
     var systemImage: String?
 
     var body: some View {
@@ -310,8 +268,6 @@ struct Tag: View {
 
     private static let font = Font.system(size: 9, weight: .semibold)
 
-    /// How far the middle of the capitals sits below the middle of the text's line: SwiftUI puts the line's height and
-    /// baseline on whole points, as NSLayoutManager does, which leaves them a third of a point low.
     private static let capitalsDrop: CGFloat = {
         let font = NSFont.systemFont(ofSize: 9, weight: .semibold)
         let layout = NSLayoutManager()
@@ -320,8 +276,6 @@ struct Tag: View {
 
     private static var inkDrops: [String: CGFloat] = [:]
 
-    /// How far the middle of a symbol's drawing sits below the middle of its frame, measured once per symbol: some
-    /// frames leave room the drawing doesn't use, like app.badge.checkmark's, which drew it 0.35 pt high.
     private static func inkDrop(of symbol: String) -> CGFloat {
         if let drop = inkDrops[symbol] { return drop }
         let scale = 20
@@ -347,8 +301,6 @@ struct Tag: View {
     }
 }
 
-/// Marks a variable family wherever it's listed, apart from the kinds of file, with the symbol of its axes and, on
-/// hover, their names.
 struct VariableTag: View {
     let family: Family
 
@@ -359,7 +311,6 @@ struct VariableTag: View {
         }
     }
 
-    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in the font's order.
     private var help: String {
         var axes: [VariationAxis] = []
         for face in family.faces {
@@ -369,7 +320,6 @@ struct VariableTag: View {
     }
 }
 
-/// A small capsule for families that aren't simply on or off.
 struct StatusTag: View {
     let family: Family
 
@@ -406,9 +356,6 @@ struct StatusTag: View {
     }
 }
 
-/// ContentUnavailableView with its symbol nearer the title: macOS leaves 22 pt between them, so they looked like two
-/// separate things. The same symbol and title otherwise, to the pixel on macOS 26, in light and dark. The description
-/// is 4 pt nearer the title, and the buttons 6 pt further from it.
 struct EmptyState<Actions: View>: View {
     let title: LocalizedStringKey
     let systemImage: String
@@ -441,14 +388,12 @@ extension EmptyState where Actions == EmptyView {
         self.init(title, systemImage: systemImage, description: description) {}
     }
 
-    /// The system's search one: no families match what's typed or the filter tokens.
     static func search(text: String = "") -> Self {
         EmptyState(text.isEmpty ? "No Results" : "No Results for “\(text)”", systemImage: "magnifyingglass",
                    description: Text("Check the spelling or try a new search."))
     }
 }
 
-/// ContentUnavailableView's own label, which can't be given a spacing (or a style from outside the view).
 private struct EmptyStateLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         VStack(spacing: 8) {
@@ -458,9 +403,6 @@ private struct EmptyStateLabelStyle: LabelStyle {
     }
 }
 
-/// The system slider on macOS 27, which draws it itself, and one drawn by Cicero before that: macOS 26's slider's
-/// glass knob disappears in toolbar popovers. Continuous, rounded to the step: a stepped system slider can
-/// show a tick for every step.
 struct ValueSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -471,6 +413,7 @@ struct ValueSlider: View {
 
     var body: some View {
         if #available(macOS 27, *) {
+            // Rounded here rather than given the step: a stepped system slider can show a tick for every step.
             Slider(value: Binding(get: { value }, set: { value = rounded($0) }), in: range)
         } else {
             drawn
@@ -512,17 +455,12 @@ struct ValueSlider: View {
     }
 }
 
-/// The number beside a slider, which takes one typed in as well: on Return, or when it loses focus, it's kept to
-/// the slider's range and rounded to its step. ↑ and ↓ step it, ten steps with ⇧.
 struct ValueField: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double = 1
-    /// After the number: " pt", "%".
     var unit = ""
-    /// Where the number sits in the field's width: trailing lines values up in a column, 52 pt wide; leading keeps it
-    /// as close to the slider as a label is on the other side, in a field as wide as the widest value the range allows.
     var alignment = HorizontalAlignment.trailing
     @State private var text = ""
     @FocusState private var isFocused: Bool
@@ -586,22 +524,17 @@ struct ValueField: View {
         }
     }
 
-    /// What's typed, with a decimal comma or point whatever the Mac's language (a parse in its format stops at the other
-    /// mark, taking 12.5 for 12 in German), else as the Mac's language writes numbers, for another decimal mark.
     private var typed: Double? {
         let text = text.trimmingCharacters(in: .whitespaces)
+        // A parse in the Mac's format stops at the other decimal mark, taking 12.5 for 12 in German.
         return Double(text.replacing(",", with: ".")) ?? (try? Double(text, format: .number.grouping(.never)))
     }
 
-    /// Leaving the field, or Return, with its text as it was changes nothing: read back, a number shown rounded would
-    /// move the value (and the style menu would say Custom).
     private func commit() {
         guard text != formatted(value) else { return }
         if let typed { set(typed) } else { text = formatted(value) }
     }
 
-    /// Only a different number changes the value: leaving the field, or Return, with the number it had says nothing
-    /// moved (an axis set to where it was would make the style menu say Custom).
     private func set(_ new: Double) {
         let new = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
         // Within a thousandth of a step: rounding to the step can leave the same number a hair apart.
@@ -613,17 +546,12 @@ struct ValueField: View {
         Self.formatted(value, step: step)
     }
 
-    /// With the Mac's decimal mark ("12,5" in German), no thousands separator, as fonts write axis values (1000, not
-    /// 1.000), and only the decimals the value has, up to as many as the step has, as the Styles table writes them: 12,
-    /// not 12,0. A whole step still shows a value between two to one decimal: a style at 112.5 on a width axis reads
-    /// 112,5, not 112.
     private static func formatted(_ value: Double, step: Double) -> String {
         let decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0
         return value.formatted(.number.grouping(.never).precision(.fractionLength(0...max(decimals, 1))))
     }
 }
 
-/// A checkbox with a line under its title that says what it does, as the backup, restore and font cache sheets have.
 struct DetailToggle: View {
     let title: String
     let detail: String
@@ -646,15 +574,12 @@ struct DetailToggle: View {
     }
 }
 
-/// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
 struct StillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.contentShape(.rect)
     }
 }
 
-/// A push button the same as the default one, to the pixel on macOS 26, in light and dark, that stays the same while
-/// it's held down rather than darkening. Greyed out within a point or two of the default one.
 struct StillPushButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         StillPushButton(label: configuration.label)
@@ -675,8 +600,6 @@ struct StillPushButtonStyle: ButtonStyle {
     }
 }
 
-/// A borderless + or − under a list, as in System Settings. The default button style gives each
-/// a glass capsule on macOS 26, narrower when disabled.
 struct ListEditButton: View {
     let title: String
     let systemImage: String
@@ -699,7 +622,6 @@ struct ListEditButton: View {
     }
 }
 
-/// A + or − under a list in a card (see `inCard`).
 struct CardListButton {
     let title: String
     let help: String
@@ -707,8 +629,6 @@ struct CardListButton {
 }
 
 extension View {
-    /// A list in a card with + and − along its bottom, like the lists in System Settings: Settings → Locations,
-    /// and the apps of an application set. Its rows take `cardRow`.
     func inCard(add: CardListButton, remove: CardListButton, canRemove: Bool) -> some View {
         VStack(spacing: 0) {
             listStyle(.plain)
@@ -732,21 +652,17 @@ extension View {
         .clipShape(.rect(cornerRadius: 12, style: .continuous))
     }
 
-    /// Every other row tinted, without separators. A list's own stripes are opaque and would hide the card.
     func cardRow(_ index: Int) -> some View {
         listRowBackground(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
             .listRowSeparator(.hidden)
     }
 }
 
-/// What a folder's fonts are, in its row in Settings → Locations and its menu in the sidebar: Inactive, Active
-/// (Cicero keeps them on), or active in an app that loads the folder by itself. `askForApp` asks for that app's name.
 struct FolderActivationPicker: View {
     let folder: WatchedFolder
     let askForApp: () -> Void
     @Environment(AppModel.self) private var model
 
-    /// Tags that aren't app names.
     private static let active = "\u{0}active", specificApp = "\u{0}app"
 
     var body: some View {
@@ -775,8 +691,6 @@ struct FolderActivationPicker: View {
     }
 }
 
-/// A pop-up menu that always shows its background. In grouped forms on macOS 26, a SwiftUI Picker
-/// (and a plain NSPopUpButton) is only its text and a chevron until the pointer is over it.
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value
@@ -799,7 +713,6 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
         context.coordinator.onChoose = { index in selection = options[index].value }
     }
 
-    /// As wide as its widest choice, whichever is chosen.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
         nsView.intrinsicContentSize
     }
@@ -815,10 +728,6 @@ final class PopUpTarget: NSObject {
     }
 }
 
-/// Icons side by side, one of them chosen, always the same width. A SwiftUI segmented picker (and an NSSegmentedControl
-/// sizing its own segments) measures 77 pt before it's in a window and 74 pt once it is, so a font page drew it wider
-/// at first, then narrower the next time the page was laid out: it, and the size beside it, moved as the page filled
-/// in. Segments of a set width measure the same either way.
 struct IconSegments<Value: Hashable>: NSViewRepresentable {
     let title: String
     let options: [(title: String, systemImage: String, value: Value)]
@@ -829,6 +738,7 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
         let images = options.map { NSImage(systemSymbolName: $0.systemImage, accessibilityDescription: $0.title) ?? NSImage() }
         let control = NSSegmentedControl(images: images, trackingMode: .selectOne, target: context.coordinator,
                                          action: #selector(SegmentTarget.choose(_:)))
+        // A set width: segments that size themselves measure 77 pt before the control is in a window and 74 pt once it is.
         for index in options.indices {
             control.setWidth(segmentWidth, forSegment: index)
         }
@@ -848,8 +758,6 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
     func makeCoordinator() -> SegmentTarget { SegmentTarget() }
 }
 
-/// Capitals, each word capitalised, or lowercase: a change to the text itself, as Convert Case makes it, not to how it's
-/// shown, so a text changed so can be saved as a preset, and what's typed after it is typed as it is.
 enum CaseConversion: CaseIterable {
     case upper, title, lower
 
@@ -869,10 +777,9 @@ enum CaseConversion: CaseIterable {
         }
     }
 
-    /// Without the Mac's language, which would put a Turkish user's i in capitals as İ. In capitals, ß is SS, unless
-    /// `capitalSharpS`, for a font that has the capital ẞ.
     func apply(to text: String, capitalSharpS: Bool = false) -> String {
         switch self {
+        // Not in the Mac's language, which would put a Turkish user's i in capitals as İ.
         case .upper: (capitalSharpS ? text.replacingOccurrences(of: "ß", with: "ẞ") : text).uppercased()
         case .title: text.capitalized
         case .lower: text.lowercased()
@@ -880,7 +787,6 @@ enum CaseConversion: CaseIterable {
     }
 }
 
-/// A case conversion asked for, numbered so that asking for the same one again is a change too.
 struct CaseChange: Equatable {
     let conversion: CaseConversion
     let number: Int
@@ -890,12 +796,8 @@ struct CaseChange: Equatable {
     }
 }
 
-/// AA, Aa and aa side by side, as one control, each a button rather than a choice that stays chosen. Segments of a set
-/// width, as in `IconSegments`, from the widest label: macOS 26 cuts AA to "…" below its width plus 12 pt (macOS 15 fits
-/// it in less), and its own measure leaves more room than that, wider than the alignment's segments look beside it.
 struct CaseButtons: NSViewRepresentable {
     let convert: (CaseConversion) -> Void
-    /// Room beside the widest label: 2 pt more than macOS 26 needs.
     private let labelPadding: CGFloat = 14
 
     func makeNSView(context: Context) -> NSSegmentedControl {
@@ -935,10 +837,6 @@ final class SegmentTarget: NSObject {
 }
 
 extension View {
-    /// A bar over the top of the scroll view in this view, on the window's background, which what scrolls under it
-    /// fades into just below it, as under the main window's title, rather than meeting at an edge. The system's soft
-    /// edge fades less far than a tall bar reaches, so rows showed behind its lower half. macOS 15 has no edge effect to
-    /// hide, and an inset that what scrolls goes under does the same there.
     @ViewBuilder func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
         let fade: CGFloat = 18
         let fadingBar = bar()
@@ -961,33 +859,24 @@ extension View {
         }
     }
 
-    /// For a section footer in a grouped form: moves it closer to its card than the default gap.
     func formFooter() -> some View {
         padding(.top, -4)
     }
 
-    /// For a grouped-form row with a button, pop-up or segmented picker: macOS 26 sets those 2 pt
-    /// above the middle of the row (6 pt above, 10 below), and the label with them.
     func formRowCentered() -> some View {
         offset(y: 2)
     }
 }
 
-/// Lays children out left to right, wrapping onto new lines, each line's children on its first text's baseline: a
-/// family's styles, each set in itself, would otherwise sit as high as each face's ascent puts it.
 struct FlowLayout: Layout {
     var spacing: CGFloat
     var lineSpacing: CGFloat
 
-    /// A child's size and how far down its first text's baseline is.
     struct Child {
         var size: CGSize
         var baseline: CGFloat
     }
 
-    /// The children measured once per update rather than for every proposal and again to place them: specimens are
-    /// a lazy stack's rows, which it measures over and over while scrolling, and each child is text in a face of its
-    /// own.
     func makeCache(subviews: Subviews) -> [Child] {
         subviews.map { subview in
             let dimensions = subview.dimensions(in: .unspecified)
@@ -1020,8 +909,6 @@ struct FlowLayout: Layout {
         }
     }
 
-    /// The children on a line, its width, its baseline, as far down as the lowest of theirs, and its height, down to
-    /// the lowest of their bottoms below that.
     private struct Line {
         var children: [Int] = []
         var width: CGFloat = 0
@@ -1048,18 +935,13 @@ struct FlowLayout: Layout {
     }
 }
 
-/// A text and size of a window's own, as Compare has, in place of the previews', so the window leaves the previews
-/// as they are.
 struct OwnPreviewOptions {
     var text: Binding<String>
-    /// What the window shows while the text is empty.
     var placeholder: String
     var size: Binding<Double>
     var sizeRange: ClosedRange<Double>
 }
 
-/// The toolbar button with sample text and size. No Leading: the list, grid and specimens set each sample on one line,
-/// and Quick Look sets its sample with the font's own line spacing.
 struct PreviewOptionsButton: View {
     var own: OwnPreviewOptions?
     @State private var isPresented = false
@@ -1143,7 +1025,6 @@ private struct PreviewOptions: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// A preset as its menu item shows it: a long one cut short, so the menu isn't as wide as the text.
     private static func title(of preset: String) -> String {
         preset.count > 48 ? String(preset.prefix(47)) + "…" : preset
     }
@@ -1159,19 +1040,16 @@ private struct PreviewOptions: View {
 }
 
 extension View {
-    /// A grouped form's margins in a popover as macOS 26 has them, 10 pt: macOS 15 leaves 20 pt around the sections,
-    /// too much for a popover. Its content margins add to those rather than replace them.
     @ViewBuilder func popoverFormMargins() -> some View {
         if #available(macOS 26, *) {
             self
         } else {
+            // Not contentMargins, which add to the 20 pt macOS 15 leaves around a popover's sections rather than replace them.
             padding(-10)
         }
     }
 }
 
-/// The Info panel toggle, highlighted while the panel is open, like the view picker's choice; toolbars
-/// give it a capsule of its own.
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 

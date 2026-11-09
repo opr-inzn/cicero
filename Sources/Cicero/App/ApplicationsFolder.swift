@@ -2,31 +2,21 @@ import AppKit
 import CiceroCore
 import DiskArbitration
 
-/// Moving Cicero into the Applications folder. Open at Login (which application sets need) points at the
-/// copy that's running, and Sparkle replaces that copy, so neither works from a disk image (read-only,
-/// ejected later), Downloads, or an App Translocation path (random and read-only). At launch Cicero asks
-/// once to move itself, and turning on Open at Login asks again instead of adding a login item that breaks.
 enum ApplicationsFolder {
     private static let dontAskKey = "applicationsFolder.dontAsk"
-    /// Set when the move was for Open at Login, so the moved copy turns it on.
     private static let openAtLoginKey = "applicationsFolder.openAtLoginAfterMove"
     private static var hasCheckedAtLaunch = false
 
-    /// The copy the user opened: where it runs from, or where it was before it was translocated. nil for a
-    /// binary run from .build (swift run), which there's nothing to move for.
     private static var openedBundle: URL? {
         let bundle = Bundle.main.bundleURL
         return bundle.pathExtension == "app" ? AppLocation.originalURL(of: bundle) : nil
     }
 
-    /// Whether Cicero runs from /Applications or ~/Applications (or from .build).
     static var isInApplicationsFolder: Bool {
         guard let bundle = openedBundle else { return true }
         return AppLocation.isInApplicationsFolder(bundle, home: .homeDirectory)
     }
 
-    /// Offers to move Cicero, unless it's already in place or the user said not to ask again; a copy that
-    /// was moved for Open at Login turns it on.
     static func checkAtLaunch(model: AppModel) {
         guard !hasCheckedAtLaunch else { return }
         hasCheckedAtLaunch = true
@@ -42,8 +32,6 @@ enum ApplicationsFolder {
         }
     }
 
-    /// Asks to move Cicero into the Applications folder and, if the user agrees, moves it, quits and opens
-    /// the moved copy. The prompt for Open at Login has no "Don’t ask again": the user just asked for it.
     static func offerToMove(forOpenAtLogin: Bool) {
         let alert = NSAlert()
         alert.messageText = "Move Cicero to the Applications Folder?"
@@ -94,8 +82,6 @@ enum ApplicationsFolder {
         NSApp.terminate(nil)
     }
 
-    /// Opens the moved copy once these processes have quit (waiting up to 30 seconds for each), detaching
-    /// the disk image Cicero ran from first.
     private static func relaunch(_ app: URL, detaching diskImage: URL?, after processes: [pid_t]) throws {
         let script = """
             app=$1 image=$2

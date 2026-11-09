@@ -1,10 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// Asks what to do with added fonts the library has already, from other files, family by family: leave them out, add
-/// them as other copies, or put them in place of the library's copies, which go to the Trash. Each starts at replacing
-/// when the added one is newer (adding it as another copy when that can't be done), else leaving it out. Files with no
-/// such fonts are added either way.
 struct DuplicatesSheet: View {
     let prompt: DuplicatePrompt
     @Environment(AppModel.self) private var model
@@ -101,13 +97,10 @@ struct DuplicatesSheet: View {
         .padding(.vertical, 10)
     }
 
-    /// A row's height: a line more for one that can't be replaced, or that warns what it replaces. With the title and
-    /// the bar below (146), the sheet is as tall as its rows, up to 540.
     private func rowHeight(_ duplicate: AddedDuplicate) -> CGFloat {
         duplicate.replaceBlock != nil || model.warnsBeforeReplacing(duplicate) ? 73 : 54
     }
 
-    /// "4 styles · In your library: 1.002, on in your Fonts folder · Added: 2.000".
     private func detail(_ duplicate: AddedDuplicate) -> String {
         let styles = duplicate.styles.count == 1 ? "1 style" : "\(duplicate.styles.count) styles"
         let places = duplicate.styles.map(place).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
@@ -119,7 +112,6 @@ struct DuplicatesSheet: View {
         versions.isEmpty ? "no version" : versions.joined(separator: ", ")
     }
 
-    /// Whether a style is on and where its copy is: "on in your Fonts folder", "off in Clients".
     private func place(_ style: LibraryFace) -> String {
         let path = style.face.path
         switch style.state {

@@ -2,16 +2,10 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Quick Look: a floating panel with the family selected in the browser, opened and closed with Space or ⌘Y.
-/// With several selected it shows one at a time. The panel never takes the keyboard, so the browser's arrow
-/// keys go on moving the selection and the panel follows. The model owns it; `QuickLookHost` in the main
-/// window hands it the window and the selection's changes.
 @Observable
 final class QuickLook {
     private(set) var isOpen = false
-    /// The browser's families in the order it shows them, so several selected ones go in that order.
     private(set) var order: [String] = []
-    /// The family added to the selection last (a click, an arrow key) or gone to with ‹ ›; shown while it's selected.
     private var currentID: String?
 
     @ObservationIgnored private weak var model: AppModel?
@@ -20,14 +14,11 @@ final class QuickLook {
     @ObservationIgnored private var mainWindowObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var panel: QuickLookPanel?
 
-    /// Saved once the user resizes it, under a key of its own: "quickLook.size" was written on every close, so for most
-    /// it held the old default.
     private static let sizeKey = "quickLook.panelSize"
     static let defaultSize = NSSize(width: 520, height: 440)
 
     // MARK: What it shows
 
-    /// The selected families, in the browser's order.
     var families: [Family] {
         guard let model else { return [] }
         let selected = model.selectedIDs
@@ -41,7 +32,6 @@ final class QuickLook {
         return ids.compactMap(model.family)
     }
 
-    /// The family the panel shows, its place among the selected ones and how many there are.
     var shown: (family: Family, index: Int, count: Int)? {
         let families = families
         guard !families.isEmpty else { return nil }
@@ -54,8 +44,6 @@ final class QuickLook {
         if ids != order { order = ids }
     }
 
-    /// Goes to the next or previous of several selected families, round to the first after the last.
-    /// False when there's only one.
     func step(_ delta: Int) -> Bool {
         let families = families
         guard isOpen, families.count > 1 else { return false }
@@ -64,7 +52,6 @@ final class QuickLook {
         return true
     }
 
-    /// Follows the browser: shows a family that's just been added to the selection, and closes when nothing is selected.
     func selectionChanged(from old: Set<String>, to new: Set<String>) {
         let added = new.subtracting(old)
         // Several at once (⌘A, a ⇧-click) keep the one shown.
@@ -78,12 +65,10 @@ final class QuickLook {
 
     // MARK: Opening and closing
 
-    /// `order` is the browser's families in the order it shows them.
     func toggle(order: [String]? = nil) {
         if isOpen { close() } else { open(order: order) }
     }
 
-    /// Opens over the main window, unless nothing is selected or a font page is open.
     func open(order: [String]? = nil) {
         guard !isOpen, let model, let preview, model.openFamilyID == nil, !model.selectedIDs.isEmpty else { return }
         if let order { updateOrder(order) }
@@ -103,7 +88,6 @@ final class QuickLook {
         panel?.title = title
     }
 
-    /// The main window: the panel opens centred over it, closes with it, and steps aside while it shows a sheet.
     func attach(to window: NSWindow, model: AppModel, preview: PreviewSettings) {
         self.model = model
         self.preview = preview
@@ -156,7 +140,6 @@ final class QuickLook {
         return panel
     }
 
-    /// Centres the panel over the main window, at the size it was last left at, on the main window's screen.
     private func place(_ panel: NSPanel) {
         var size = NSSizeFromString(UserDefaults.standard.string(forKey: Self.sizeKey) ?? "")
         if size.width < panel.minSize.width || size.height < panel.minSize.height { size = Self.defaultSize }
@@ -175,9 +158,6 @@ final class QuickLook {
     }
 }
 
-/// A floating panel that never becomes key: the main window keeps the keyboard, so the browser's arrow
-/// keys move the selection while the panel shows it. Hides while Cicero isn't the active app. A full title
-/// bar, not a utility window's, whose buttons and title are smaller than other windows'.
 final class QuickLookPanel: NSPanel {
     convenience init(size: NSSize) {
         self.init(contentRect: NSRect(origin: .zero, size: size),
@@ -204,15 +184,12 @@ final class QuickLookPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// Only resized by its edges: a double-click on the title bar doesn't fill the screen with it.
     override func zoom(_ sender: Any?) {}
 
-    /// The page's colour, under the title bar and the specimen alike: the text background's grey as an sRGB colour.
-    /// SwiftUI draws that grey as if it were sRGB, lighter in dark mode than AppKit draws it, and the title bar stood
-    /// out from the page.
     static let page = NSColor(name: nil) { appearance in
         var page = NSColor.textBackgroundColor
         appearance.performAsCurrentDrawingAppearance {
+            // As an sRGB colour, as SwiftUI draws this grey, lighter in dark mode than AppKit draws it.
             if let grey = NSColor.textBackgroundColor.usingColorSpace(.genericGamma22Gray) {
                 page = NSColor(srgbRed: grey.whiteComponent, green: grey.whiteComponent, blue: grey.whiteComponent, alpha: grey.alphaComponent)
             }
@@ -226,12 +203,11 @@ final class QuickLookPanel: NSPanel {
 
     private let titleLabel = NSTextField(labelWithString: "")
 
-    /// Finder's Quick Look's title bar: a close button in place of the window's own, which a panel that's never key shows
-    /// grey and empty, and the title beside it. A title of its own: AppKit sets its title after the buttons it shows, and
-    /// elsewhere once the title bar has views of its own.
     private func addTitleBar() {
         guard let close = standardWindowButton(.closeButton), let bar = close.superview else { return }
+        // A title of its own: AppKit sets its title after the buttons it shows, and elsewhere once the title bar has views of its own.
         titleVisibility = .hidden
+        // A panel that's never key shows its own close button grey and empty.
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             standardWindowButton(kind)?.isHidden = true
         }
@@ -258,14 +234,9 @@ final class QuickLookPanel: NSPanel {
     }
 }
 
-/// A grey circle with an × cut out, drawn as Finder's Quick Look draws its close button: a 12 pt circle, an × of round
-/// strokes. Drawn here rather than as a tinted symbol, which AppKit greys in a window that isn't key, as this one never
-/// is. It takes the first click in the panel.
 private final class QuickLookTitleButton: NSButton {
     static let diameter: CGFloat = 12
-    /// Room to click around the circle.
     static let side: CGFloat = 16
-    /// Finder's greys, measured from its Quick Look on screen: black or white, partly see-through.
     private static let circle = grey(light: 0.55, dark: 0.8)
     private static let pressedCircle = grey(light: 0.72, dark: 0.92)
     static let titleColor = grey(light: 0.71, dark: 0.74)
@@ -314,13 +285,10 @@ private final class QuickLookTitleButton: NSButton {
     }
 }
 
-/// Takes a click in a window that isn't key as a click, not as a request to bring the window forward:
-/// the panel is never key, so every click in it is a first click.
 private final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-/// In the main window: hands Quick Look the window and has it follow the selection, closing when a font page opens.
 struct QuickLookHost: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -332,7 +300,6 @@ struct QuickLookHost: View {
     }
 }
 
-/// Calls `found` with the window the view is in, once it's in one.
 struct WindowReader: NSViewRepresentable {
     let found: (NSWindow) -> Void
 
@@ -360,7 +327,6 @@ final class WindowReaderView: NSView {
 
 // MARK: - Content
 
-/// The panel's content, while it's open, in the panel's width, which its type follows.
 private struct QuickLookView: View {
     @Environment(AppModel.self) private var model
 
@@ -376,7 +342,6 @@ private struct QuickLookView: View {
     }
 }
 
-/// A large sample in the regular style, every style set in itself, and a line about the family with its switch.
 private struct FamilyQuickLook: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -385,18 +350,12 @@ private struct FamilyQuickLook: View {
     let index: Int
     let count: Int
     let width: CGFloat
-    /// How tall the title bar is, over the top of the page on macOS 26.
     let titleBar: CGFloat
-    /// Whether the page is scrolled down, under the title bar.
     @State private var isScrolled = false
 
-    /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
 
-    /// How much bigger than in the panel at its first width the type and the room around it are: they grow and shrink
-    /// with the panel's width smoothly, set at sizes in fractions of a point, the margins at the sides staying as they
-    /// are. (Zoomed as a picture, the type was blurred; at whole points, lines jumped from one size to the next.)
     private var scale: Double {
         max(0.1, (width - 2 * Self.inset) / (QuickLook.defaultSize.width - 2 * Self.inset))
     }
@@ -438,8 +397,6 @@ private struct FamilyQuickLook: View {
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
 
-    /// On the left. The sample text with the font's own line spacing, on every macOS, whatever the font page's Leading
-    /// is; the alphabet, three lines of letters rather than text, 120 % of its size apart.
     private func sample(scale: Double) -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
@@ -494,7 +451,6 @@ private struct FamilyQuickLook: View {
         .padding(12)
     }
 
-    /// "Foundry · OpenType PostScript · Variable · 12 styles · Active".
     private var summary: String {
         var parts: [String] = []
         if let foundry = model.foundryName(of: family) { parts.append(foundry) }
@@ -505,7 +461,6 @@ private struct FamilyQuickLook: View {
         return parts.joined(separator: " · ")
     }
 
-    /// The styles' status when they share one ("Inactive", "Active until Cicero quits"), else how many are on.
     private var status: String {
         let labels = Set(family.faces.map(\.state.label))
         if labels.count == 1, let label = labels.first { return label }
@@ -514,9 +469,6 @@ private struct FamilyQuickLook: View {
 }
 
 private extension View {
-    /// The page under the title bar, as under a window's toolbar: on macOS 26 it runs on under the title bar `height` tall,
-    /// which stays the page's colour while the page is at the top and, scrolled, turns translucent over it, with a line
-    /// under it. macOS 15 keeps the page below the title bar, and draws the line.
     @ViewBuilder func underTitleBar(_ height: CGFloat, isScrolled: Bool) -> some View {
         if #available(macOS 26, *) {
             // A bar that draws something, however faint: a clear one gets no edge effect under it.
@@ -534,8 +486,6 @@ private extension View {
     }
 }
 
-/// `FontText` once its face's file has been read. Until then the file is read off the main thread, with room
-/// kept for the text, so stepping onto a family whose files nothing has read yet never holds up the selection.
 private struct QuickLookText: View {
     let text: String
     let face: FontFace

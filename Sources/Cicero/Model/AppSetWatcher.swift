@@ -2,28 +2,17 @@ import AppKit
 import CiceroCore
 import Observation
 
-/// Keeps application sets' fonts on while their apps are open, and the fonts an app's documents asked for (see
-/// `DocumentFontWatcher`) while that app is open. Follows which apps are running, and syncs when that, the sets, the
-/// requests or the library change.
 @Observable
 final class AppSetWatcher {
-    /// Bundle IDs of the apps running now.
     private(set) var running: Set<String> = []
 
     @ObservationIgnored private weak var model: AppModel?
     @ObservationIgnored private var observation: NSKeyValueObservation?
     @ObservationIgnored private var pending: Task<Void, Never>?
-    /// Files on for application sets after the last sync → the PostScript names of their faces.
     @ObservationIgnored private var managed: [String: Set<String>] = [:]
-    /// PostScript names of fonts the user turned off, or on for good, while an app wanted them: left
-    /// alone until no open app wants them, so the next time the app opens they come on again. Names,
-    /// not paths: turning off a font from an app's folder moves its file.
     @ObservationIgnored private var dismissed: Set<String> = []
-    /// Files that wouldn't turn on, with the apps that wanted them: tried again only once those change.
     @ObservationIgnored private var failed: [String: Set<String>] = [:]
-    /// Bundle ID of an open app → the PostScript names of the fonts its documents use that it asked for.
     @ObservationIgnored private var requested: [String: Set<String>] = [:]
-    /// Whether `requested` has been taken up again from the records since Cicero opened (see `restoreRequests`).
     @ObservationIgnored private var restoredRequests = false
 
     func start(_ model: AppModel) {
@@ -42,14 +31,12 @@ final class AppSetWatcher {
         running.contains(app.bundleID)
     }
 
-    /// Keeps these fonts on for the app until it quits, along with the ones it asked for before.
     func request(_ postScriptNames: Set<String>, for bundleID: String) {
         guard running.contains(bundleID), !postScriptNames.isSubset(of: requested[bundleID] ?? []) else { return }
         requested[bundleID, default: []].formUnion(postScriptNames)
         scheduleSync(after: .zero)
     }
 
-    /// Lets go of the fonts apps' documents asked for: they turn off, unless a set wants them.
     func forgetRequests() {
         guard !requested.isEmpty else { return }
         requested = [:]
@@ -68,7 +55,6 @@ final class AppSetWatcher {
         if !changed.isDisjoint(with: linked) { scheduleSync(after: .zero) }
     }
 
-    /// Syncs after the sets, the records or the library change.
     private func track() {
         guard let model else { return }
         withObservationTracking {
@@ -141,9 +127,6 @@ final class AppSetWatcher {
         }
     }
 
-    /// The fonts open apps' documents asked for before Cicero last quit, from the records, which keep the apps that
-    /// wanted each file. Otherwise they'd go off until the app is next in front and asked, and an app in the background
-    /// would find the fonts of its open documents gone. A style an application set of the app has is the set's.
     private func restoreRequests() {
         restoredRequests = true
         guard let model, model.data.activatesDocumentFonts else { return }
@@ -166,8 +149,6 @@ final class AppSetWatcher {
         }
     }
 
-    /// Each file the open apps' sets have, or their documents asked for → those apps, and its face. Leaves out fonts
-    /// Cicero can't turn on or off, the ones the user dismissed, and ones that failed for the same apps before.
     private func plan() -> (wanted: [String: Set<String>], faces: [String: LibraryFace]) {
         guard let model else { return ([:], [:]) }
         var wanted: [String: Set<String>] = [:]
@@ -201,13 +182,11 @@ final class AppSetWatcher {
         return (wanted, faces)
     }
 
-    /// The library's faces in these files.
     private func faces(inFiles paths: Set<String>) -> [LibraryFace] {
         guard let model, !paths.isEmpty else { return [] }
         return model.library.families.flatMap(\.faces).filter { paths.contains($0.face.path) }
     }
 
-    /// PostScript names of the library's faces in a file.
     private func names(in path: String) -> [String] {
         guard let model else { return [] }
         return model.library.families.lazy.flatMap(\.faces).filter { $0.face.path == path }.map(\.face.postScriptName)

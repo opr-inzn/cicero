@@ -1,17 +1,11 @@
 import Foundation
 import Synchronization
 
-/// Why a watched folder's fonts are out of reach for now.
 public enum FolderAvailability: Hashable, Sendable {
-    /// It isn't there: it was moved, renamed or deleted, or it's on a disk or server Cicero can't tell isn't connected.
     case notFound
-    /// It's on this disk or server under /Volumes (its name), which isn't connected. Found out by the scan, as asking a
-    /// server that stopped answering takes a while.
     case disconnected(String)
-    /// macOS doesn't let Cicero read it, as for a cloud folder Cicero wasn't allowed into.
     case noAccess
 
-    /// nil when the folder can be read.
     public static func of(_ path: String) -> FolderAvailability? {
         var info = stat()
         guard stat(path, &info) == 0 else { return errno == EACCES || errno == EPERM ? .noAccess : notFound(path) }
@@ -27,12 +21,7 @@ public enum FolderAvailability: Hashable, Sendable {
     }
 }
 
-/// Font files that are on the Mac only some of the time: on a disk or server that comes and goes, or in a
-/// folder a cloud service (iCloud Drive, Dropbox, Google Drive) keeps in sync, which can leave a file online
-/// only, its name on the Mac but not its contents.
 public enum Reachability {
-    /// The name of the disk a path is on when that's one under /Volumes that isn't connected, like a server
-    /// or an external disk that was ejected.
     public static func disconnectedVolume(of path: String) -> String? {
         let parts = path.split(separator: "/")
         guard parts.count >= 2, parts[0] == "Volumes" else { return nil }
@@ -45,16 +34,12 @@ public enum Reachability {
         return volume.st_dev == volumes.st_dev ? name : nil
     }
 
-    /// Whether a file is gone for good: deleted, or its folder moved. Not when macOS won't let Cicero look (it
-    /// may well be there), nor when its disk isn't connected.
     public static func isGone(_ path: String) -> Bool {
         var info = stat()
         guard lstat(path, &info) != 0 else { return false }
         return (errno == ENOENT || errno == ENOTDIR) && disconnectedVolume(of: path) == nil
     }
 
-    /// Whether a path is on one of the Mac's own disks rather than on a server, going by the list of mounted disks macOS
-    /// keeps, which asks none of them: a server that stopped answering holds up whatever asks it anything.
     public static func isOnLocalDisk(_ path: String) -> Bool {
         var closest = (length: 0, isLocal: true)
         for mount in mounts() where mount.prefix.count > closest.length && path.hasPrefix(mount.prefix) {
@@ -63,12 +48,10 @@ public enum Reachability {
         return closest.isLocal
     }
 
-    /// The mounted disks, each mount point with a "/" at the end, as macOS last listed them: listed again once the list
-    /// is 2 s old. Measuring the grid's samples asks for each file, and listing every mount each time took seconds of
-    /// CPU at 20,000 families on a Mac with many (simulator runtimes are disks too).
     private static func mounts() -> [(prefix: String, isLocal: Bool)] {
         let now = ContinuousClock.now
         if let listed = mountList.withLock({ $0 }), now - listed.at < .seconds(2) { return listed.mounts }
+        // macOS's own list of mounted disks, which asks none of them: a server that stopped answering holds up whatever asks it anything.
         let count = getfsstat(nil, 0, MNT_NOWAIT)
         guard count > 0 else { return [] }
         var entries: [statfs] = Array(repeating: .init(), count: Int(count))
@@ -85,7 +68,6 @@ public enum Reachability {
 
     private static let mountList = Mutex<(at: ContinuousClock.Instant, mounts: [(prefix: String, isLocal: Bool)])?>(nil)
 
-    /// Whether a cloud service has taken the file's contents off the Mac. Reading it would download it.
     public static func isOnlineOnly(_ path: String) -> Bool {
         var info = stat()
         return lstat(path, &info) == 0 && info.st_flags & UInt32(SF_DATALESS) != 0
@@ -98,9 +80,6 @@ public enum Reachability {
         return queue
     }()
 
-    /// Downloads online-only files by reading them, as an app opening them would, four at a time, and
-    /// returns the ones that didn't download (offline, say). `progress` gets the number done so far. A file
-    /// the cloud service hasn't brought down in two minutes counts as not downloaded.
     public static func download(_ paths: [String], progress: @escaping @Sendable (Int) -> Void) async -> [String] {
         await withTaskGroup(of: (String, Bool).self) { group in
             var pending = paths[...]
@@ -121,11 +100,11 @@ public enum Reachability {
         }
     }
 
-    /// A coordinated read has the cloud service bring the file down first; reading it makes sure it's all there.
     private static func download(_ path: String, timeout: Duration) async -> Bool {
         let intent = NSFileAccessIntent.readingIntent(with: URL(fileURLWithPath: path, isDirectory: false), options: [])
         return await withCheckedContinuation { continuation in
             let answer = Answer(continuation)
+            // A coordinated read has the cloud service bring the file down first; reading it then makes sure it's all there.
             NSFileCoordinator().coordinate(with: [intent], queue: downloads) { error in
                 answer.give(error == nil && (try? Data(contentsOf: intent.url)) != nil)
             }
@@ -136,7 +115,6 @@ public enum Reachability {
         }
     }
 
-    /// Resumes a continuation with the first answer only: the download's, or the timeout's.
     private final class Answer: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<Bool, Never>?

@@ -4,7 +4,6 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Clear Font Caches sheet, and offers a restart afterwards when macOS’s caches were cleared.
     func fontCacheSheet(isPresented: Binding<Bool>) -> some View {
         modifier(FontCacheSheetModifier(isPresented: isPresented))
     }
@@ -36,7 +35,6 @@ private struct FontCacheSheetModifier: ViewModifier {
             }
     }
 
-    /// Asks loginwindow to restart, which asks apps to quit first; false when macOS refused.
     private static func restart() -> Bool {
         var error: NSDictionary?
         _ = NSAppleScript(source: "tell application \"loginwindow\" to «event aevtrrst»")?.executeAndReturnError(&error)
@@ -44,9 +42,7 @@ private struct FontCacheSheetModifier: ViewModifier {
     }
 }
 
-/// Which font caches to clear: macOS’s for this account or every user, Adobe’s and Office’s.
 struct FontCacheSheet: View {
-    /// Called before the sheet closes with whether macOS’s caches were cleared.
     let onCleared: (Bool) -> Void
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -54,7 +50,6 @@ struct FontCacheSheet: View {
     @State private var allUsers = false
     @State private var apps: Set<AppFontCaches.App> = []
     @State private var adobeCaches: AppFontCaches.Found?
-    /// The name of a running app that reads each cache, while one is running.
     @State private var runningApps: [AppFontCaches.App: String] = [:]
     @State private var isClearing = false
 

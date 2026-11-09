@@ -2,10 +2,6 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// What the search field suggests as something is typed: the filters whose names the last words begin (see
-/// `SearchToken`), each with a sample of what it asks for, which choosing makes a token in the field; then the families,
-/// each with "Aa" in its regular style, of which choosing one puts its whole name in the field, which selects it among
-/// the matches and brings it into view.
 struct SearchSuggestions: View {
     @Environment(AppModel.self) private var model
 
@@ -49,9 +45,6 @@ struct SearchSuggestions: View {
     }
 }
 
-/// A section's title, nearer its own rows than the ones before it, each title alike: 20 points from its first row and 30
-/// from the row before, where the list puts 24 between them. Its row is 2 points taller than the others for that; with
-/// less padding the list would centre it in a row as tall as theirs.
 private struct SuggestionsHeader: View {
     let title: String
 
@@ -62,9 +55,6 @@ private struct SuggestionsHeader: View {
     }
 }
 
-/// What a filter asks for, in the system's fonts: "Aa" in italic, of a weight or of a width, "123" in tabular or
-/// old-style figures (in New York, as the system's sans serif has none of those); for Variable, the symbol of its tag
-/// (see `VariableTag`).
 private struct TokenSample: View {
     let token: SearchToken
 

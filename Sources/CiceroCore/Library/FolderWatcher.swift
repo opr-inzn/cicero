@@ -1,23 +1,14 @@
 import CoreServices
 import Foundation
 
-/// Says when font files come or go in some folders (FSEvents), so the library follows files added or
-/// removed in Finder, and when some single files change. Events arrive on the main queue: the first right
-/// away, any after it coalesced over half a second. Use it from the main thread only.
 public final class FolderWatcher: @unchecked Sendable {
-    /// Given the files that changed, as the scan finds them (by the folder's path as given, not with its
-    /// symlinks resolved), or nil when FSEvents can't say, as for a folder moved in or out.
     private let onChange: @Sendable (Set<String>?) -> Void
     private var stream: FSEventStreamRef?
     private var watched: [String] = []
-    /// The watched folders, the folders watched only for files in them, and those files, symlinks resolved
-    /// as FSEvents reports them.
     private var folders: [String] = []
     private var fileFolders: [String] = []
     private var files: Set<String> = []
-    /// Watched folders whose fonts have hidden names, like Creative Cloud's.
     private var hiddenFolders: [String] = []
-    /// Each watched folder's resolved path and its path as given, both with a "/" at the end, longest first.
     private var aliases: [(resolved: String, given: String)] = []
 
     public init(onChange: @escaping @Sendable (Set<String>?) -> Void) {
@@ -28,10 +19,6 @@ public final class FolderWatcher: @unchecked Sendable {
         stop()
     }
 
-    /// Watches these folders, and these files, instead of the ones before. A file is watched through its
-    /// folder, which only says something when the file changes; files right in the home folder (or above
-    /// it) aren't watched, as everything in it would go through the watcher. In `hidden` folders, files with
-    /// hidden names count too.
     public func watch(_ paths: [String], files: [String] = [], hidden: [String] = []) {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let parents = Set(files.map { ($0 as NSString).deletingLastPathComponent }).filter { !(home + "/").hasPrefix($0 + "/") }
@@ -81,8 +68,6 @@ public final class FolderWatcher: @unchecked Sendable {
         self.stream = nil
     }
 
-    /// A font file, a folder (which may hold fonts), or a change FSEvents couldn't follow file by file; in a
-    /// folder watched only for files in it, just those files.
     private func matters(_ path: String, _ flags: FSEventStreamEventFlags) -> Bool {
         let rescan = FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged)
         if flags & rescan != 0 || files.contains(path) { return true }
@@ -94,8 +79,6 @@ public final class FolderWatcher: @unchecked Sendable {
         return FontFileReader.fontExtensions.contains((name as NSString).pathExtension.lowercased())
     }
 
-    /// A file's path as the scan finds it, when FSEvents followed it file by file; nil for a folder, a symlink,
-    /// or a change it couldn't follow.
     private func followed(_ path: String, _ flags: FSEventStreamEventFlags) -> String? {
         let whole = FSEventStreamEventFlags(
             kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged | kFSEventStreamEventFlagItemIsDir | kFSEventStreamEventFlagItemIsSymlink

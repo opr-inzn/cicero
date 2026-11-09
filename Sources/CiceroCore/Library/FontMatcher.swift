@@ -1,8 +1,5 @@
 import Foundation
 
-/// Finds the library's styles that a document or another font manager names: by the file, by PostScript name, or by
-/// family and style names, ignoring case, spaces, hyphens and underscores. Where several styles fit, the first one the
-/// library lists.
 public struct FontMatcher: Sendable {
     private var byPath: [String: [(family: Family, face: LibraryFace)]] = [:]
     private var byPostScriptName: [String: (family: Family, face: LibraryFace)] = [:]
@@ -23,16 +20,10 @@ public struct FontMatcher: Sendable {
         }
     }
 
-    /// "Minion Pro" and "minionpro" alike.
     static func key(_ text: String) -> String {
         text.lowercased().filter { !$0.isWhitespace && $0 != "-" && $0 != "_" }
     }
 
-    /// The styles a font is. With a file, the file's: the one with its PostScript name (spelled otherwise too, see
-    /// `letters`), or all of them when it gives none or `wholeFile` asks for all, as for a set that has files rather
-    /// than styles. Else, or when the file has no such style, the one with its PostScript name, else the one with its
-    /// family and style names (`defaultStyle` for a font that names its family alone), else, when it gives a file, all
-    /// the file's styles. Empty when the library has none.
     public func faces(_ font: ImportedFont, defaultStyle: String? = nil, wholeFile: Bool = false) -> [(family: Family, face: LibraryFace)] {
         let postScriptName = font.postScriptName?.lowercased()
         let inFile = font.path.flatMap { byPath[$0] }
@@ -53,12 +44,10 @@ public struct FontMatcher: Sendable {
         return inFile ?? []
     }
 
-    /// A name's letters and digits, in lowercase: "BONIFACE(19-10-18)" and "boniface191018" alike.
     static func letters(_ name: String) -> String {
         String(name.lowercased().filter { $0.isLetter || $0.isNumber })
     }
 
-    /// The family with this name.
     public func family(named name: String) -> Family? {
         byFamily[Self.key(name)]
     }

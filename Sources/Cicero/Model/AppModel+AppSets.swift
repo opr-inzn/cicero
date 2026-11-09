@@ -3,7 +3,6 @@ import CiceroCore
 import UniformTypeIdentifiers
 
 extension AppModel {
-    /// Asks for a name, makes the set and shows its apps, so the next step is picking one.
     func newApplicationSet(with families: [Family] = []) {
         prompt("New App Folder", confirm: "Create") { name in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -16,7 +15,6 @@ extension AppModel {
         }
     }
 
-    /// Picks apps for a set from /Applications.
     func presentAppPicker(for setID: UUID) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.application]

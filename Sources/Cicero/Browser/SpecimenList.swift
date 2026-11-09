@@ -1,8 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// Full-width specimens on cards like the grid's: the sample at the preview size, with the family's styles set
-/// in themselves.
 struct SpecimenList: View {
     @Environment(AppModel.self) private var model
     @Environment(\.infoPanelShown) private var infoShown
@@ -36,10 +34,6 @@ struct SpecimenList: View {
         }
     }
 
-    /// Scans prefetch each family's regular face, which the grid and list show. Specimens also set every style's
-    /// name in the style, and with files not read since the Mac started, reading them as cards came into view held
-    /// up scrolling: the cards around one that appears have their styles read in the background, mostly those it
-    /// scrolls towards. Only those, not every card's: reading thousands of files at once slowed drawing down.
     private func prefetchStyles(near family: Family) {
         guard let index = families.firstIndex(where: { $0.id == family.id }) else { return }
         let near = families[max(0, index - 4) ..< min(families.count, index + 12)]
@@ -54,7 +48,6 @@ private struct Specimen: View {
     let isSelected: Bool
     let model: AppModel
 
-    /// Long families show their first styles and a count, so rows stay a readable height.
     static let styleLimit = 14
 
     var body: some View {

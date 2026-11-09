@@ -16,7 +16,6 @@ extension TagColor {
         }
     }
 
-    /// A light brown between the Finder's colours, Licensed's toned down, that Licensed + Non-Commercial started in.
     private static let sand = Color(nsColor: NSColor(name: "sand") { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0.82, green: 0.75, blue: 0.62, alpha: 1)
@@ -25,13 +24,11 @@ extension TagColor {
 
     var title: String { rawValue.capitalized }
 
-    /// A dot for menus (see `NSImage.menuDot`).
     var menuImage: NSImage { .menuDot(NSColor(color)) }
 }
 
 extension NSImage {
-    /// A dot for menus, which draw SF Symbols as templates, in one colour. Its label needs `.titleAndIcon`: built
-    /// with the macOS 27 SDK, menus hide every other image.
+    // Not an SF Symbol, which menus draw as a template in one colour. Its label needs .titleAndIcon: built with the macOS 27 SDK, menus hide every other image.
     static func menuDot(_ color: NSColor, size: CGFloat = 12, inset: CGFloat = 1) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
             color.setFill()
@@ -43,7 +40,6 @@ extension NSImage {
     }
 }
 
-/// A family's tags as small dots in their colours, side by side.
 struct TagDots: View {
     let colors: [TagColor]
 
@@ -62,8 +58,6 @@ struct TagDots: View {
     }
 }
 
-/// The Tags submenu of a family's menu and the Info panel: the tags, checked when every family has it, Remove All
-/// Tags, and New Tag…. Choosing a tag gives it to the families, or takes it off them; they keep their other tags.
 struct TagMenuItems: View {
     let families: [Family]
     let model: AppModel

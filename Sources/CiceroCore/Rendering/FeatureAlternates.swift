@@ -1,18 +1,11 @@
 import CoreText
 import Foundation
 
-/// A glyph a feature offers in place of a character's own, like a single-storey a in a stylistic set, a swash or an
-/// old-style figure, or several features together, like a stylistic set's old-style four: the font page lists it after
-/// the character's, marked as an alternate.
 public struct FeatureAlternate: Hashable, Sendable {
     public let glyph: CGGlyph
-    /// The character whose glyph it replaces.
     public let character: UInt32
-    /// The features that draw it for the character, by tag ("ss01") and by name ("Single-storey a"), in the same order:
-    /// any one of them, or with `alongWith` on too, the one.
     public let features: [String]
     public let featureNames: [String]
-    /// The features it takes on top of that one, like Old-Style Figures for a four.osf.ss01, with their names.
     public let alongWith: [String]
     public let alongWithNames: [String]
 
@@ -28,25 +21,14 @@ public struct FeatureAlternate: Hashable, Sendable {
             && alongWith.allSatisfy(FeatureAlternates.figureStyles.contains)
     }
 
-    /// The features to turn on to draw it: the first that draws it, and those it takes along with it.
     public var drawnWith: [String] { Array(features.prefix(1)) + alongWith }
-    /// All its features and their names, in the same order: those that draw it, then those it takes along with them.
     public var allFeatures: [String] { features + alongWith }
     public var allFeatureNames: [String] { featureNames + alongWithNames }
-    /// The features' names as words: "Single-storey a or Stylistic Alternates", "Stylistic Set 1 and Old-Style Figures".
     public var listedNames: String { alongWith.isEmpty ? featureNames.listed("or") : allFeatureNames.listed() }
-    /// Whether it's a figure in another style, like an old-style one: a set of figures of its own, not an alternate of
-    /// the font's own figure, drawn by a figure style's feature (see `FeatureAlternates.figureStyles`) and no other.
-    /// Worked out once, as it's made: the font page asks for each of its cells, and its count asks for every
-    /// alternate, each time the page updates, and finding a character's group took most of a glyph click's time on a
-    /// page of thousands of glyphs, like ABC Repro's.
     public let isFigureStyle: Bool
 }
 
 public enum FeatureAlternates {
-    /// The features that offer another design of a character, in the order a character's alternates are listed. Those
-    /// that shape a script, set vertical text or the forms of East Asian characters are left out, and so are those with
-    /// groups of their own (`FeatureGlyph`), like the forms by place in a word, and the ligatures'.
     static func rank(of tag: String) -> Int? {
         func numbered(_ prefix: String, through last: Int) -> Bool {
             tag.hasPrefix(prefix) && Int(tag.dropFirst(2)).map { (1...last).contains($0) } == true
@@ -64,10 +46,6 @@ public enum FeatureAlternates {
         }
     }
 
-    /// The face's alternates by character, all of them, each glyph once, for the character its first feature draws it for; a
-    /// glyph a character has too is left to the character, as are those in `excluding`, like the glyphs listed in
-    /// groups of their own. After a character's alternates, those that several of the features draw together, from
-    /// another of its alternates (see `chainLength`). Reads the font's GSUB table; call off the main thread.
     public static func read(_ face: FontFace, excluding: Set<CGGlyph> = []) -> [UInt32: [FeatureAlternate]] {
         let font = FontLoader.shared.font(face, size: 12)
         guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableGSUB), []) as Data? else { return [:] }
@@ -78,11 +56,8 @@ public enum FeatureAlternates {
                        names: names(in: font))
     }
 
-    /// The features that draw figures in another style: old-style, lining or proportional ones.
     public static let figureStyles: Set<String> = ["onum", "lnum", "pnum"]
 
-    /// The most features an alternate takes together, like a stylistic set's old-style four (four.osf.ss01) or a zero
-    /// with two sets on (zero.ss01.ss11).
     static let chainLength = 3
 
     static func resolve(_ found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32], excluding: Set<CGGlyph>,
@@ -90,7 +65,6 @@ public enum FeatureAlternates {
         var order: [CGGlyph] = []
         var drawnFor: [CGGlyph: UInt32] = [:]
         var tags: [CGGlyph: [String]] = [:]
-        /// The features a glyph drawn from another alternate takes together, in `features`' order.
         var together: [CGGlyph: [String]] = [:]
         let features = found.keys.sorted { (rank(of: $0) ?? .max, $0) < (rank(of: $1) ?? .max, $1) }
         for feature in features {
@@ -149,12 +123,10 @@ public enum FeatureAlternates {
         return result
     }
 
-    /// The names the font gives its OpenType features, as CoreText reads them, by tag: a stylistic set's own, like
-    /// "Single-storey a", where it has one. A feature CoreText has no type of its own for, like a character variant,
-    /// has its name on the feature, with On and Off as its options; the others on their option.
     static func names(in font: CTFont) -> [String: String] {
         var names: [String: String] = [:]
         for feature in CTFontCopyFeatures(font) as? [[String: Any]] ?? [] {
+            // A feature CoreText has no type of its own for, like a character variant, has its tag and name on the feature, with On and Off as its options; the others have them on their option.
             if let tag = feature[kCTFontOpenTypeFeatureTag as String] as? String,
                let name = feature[kCTFontFeatureTypeNameKey as String] as? String {
                 if names[tag] == nil { names[tag] = name }
@@ -171,7 +143,6 @@ public enum FeatureAlternates {
         return names
     }
 
-    /// A feature's name: the font's, else the one the OpenType specification gives it.
     static func name(of tag: String, in names: [String: String]) -> String {
         if let name = names[tag] { return name }
         if let number = Int(tag.dropFirst(2)) {

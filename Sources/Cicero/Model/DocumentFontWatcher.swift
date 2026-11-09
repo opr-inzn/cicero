@@ -1,12 +1,6 @@
 import AppKit
 import CiceroCore
 
-/// Turns on the fonts that documents open in InDesign, Illustrator and Photoshop use, while the app is open. None of
-/// them asks macOS for a font a document uses, so while one of them is in front Cicero asks it, over Apple Events,
-/// twice a second: InDesign for its documents' fonts, Illustrator and Photoshop for their documents' files, whose
-/// fonts `DocumentFonts` reads. The ones the library has and are off go to `AppSetWatcher`, which keeps them on until
-/// the app quits. InDesign and Illustrator answer while their Missing Fonts dialog is open, and take up the fonts once
-/// it's closed; Photoshop shows none, and takes them up within seconds.
 final class DocumentFontWatcher {
     nonisolated private enum App: String, CaseIterable {
         case inDesign = "com.adobe.InDesign"
@@ -14,23 +8,16 @@ final class DocumentFontWatcher {
         case photoshop = "com.adobe.Photoshop"
     }
 
-    /// The apps asked which fonts their documents use.
     static let bundleIDs = Set(App.allCases.map(\.rawValue))
 
     private weak var model: AppModel?
     private var observers: [NSObjectProtocol] = []
     private var polling: Task<Void, Never>?
-    /// While the screens sleep, no one opens a document, and asking would keep waking the app.
     private var isAsleep = false
-    /// Apps that didn't let Cicero ask them (Automation in Privacy & Security), left alone until Cicero opens again.
     private var refused: Set<App> = []
-    /// What each app's documents used when it was asked last, so the same answer isn't matched again.
     private var lastFonts: [App: [DocumentFont]] = [:]
-    /// The library's fonts by name, made again only when the library changed: making it takes tens of milliseconds.
     private var matcher: (fingerprint: Int, matcher: FontMatcher)?
-    /// Illustrator and Photoshop files read before → when they were last saved then, and their fonts.
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
-    /// Often: asking takes a few milliseconds, and costs the app hardly any time.
     private static let interval: Duration = .milliseconds(500)
 
     func start(_ model: AppModel) {
@@ -52,7 +39,6 @@ final class DocumentFontWatcher {
         frontmostChanged()
     }
 
-    /// The setting changed, in Settings or with a backup restored.
     func settingChanged() {
         lastFonts = [:]
         if model?.data.activatesDocumentFonts == false { model?.appSets.forgetRequests() }
@@ -105,7 +91,6 @@ final class DocumentFontWatcher {
         if !wanted.isEmpty { model.appSets.request(Set(wanted.map(\.face.postScriptName)), for: app.rawValue) }
     }
 
-    /// The fonts the files use, read again only once a file's been saved since.
     private func fonts(inFiles paths: [String]) async -> [DocumentFont] {
         var fonts: [DocumentFont] = []
         for path in paths {
@@ -132,9 +117,6 @@ final class DocumentFontWatcher {
         case files([String])
     }
 
-    /// The fonts the app's open documents use, or their files; nil when it won't let Cicero ask. Sends the Apple Events
-    /// itself, to the app's process: AppleScript would spend most of the time compiling, and both compiling and running
-    /// a script open an app that has quit. Asks off the main thread: an app that's busy can take its time to answer.
     @concurrent
     private static func ask(_ app: App, _ pid: pid_t) async -> Answer? {
         let documents = every("docu", of: .null())
@@ -172,9 +154,8 @@ final class DocumentFontWatcher {
         }
     }
 
-    /// What the specifier points to, from the app's process, waiting up to 10 s; throws the app's error. macOS asks the
-    /// user first whether Cicero may, the first time.
     nonisolated private static func get(_ specifier: NSAppleEventDescriptor, from pid: pid_t) throws -> NSAppleEventDescriptor {
+        // To the app's process, not through AppleScript, which opens an app that has quit, both to compile a script and to run it.
         let event = NSAppleEventDescriptor(
             eventClass: AEEventClass(kAECoreSuite), eventID: AEEventID(kAEGetData),
             targetDescriptor: NSAppleEventDescriptor(processIdentifier: pid),
@@ -188,14 +169,12 @@ final class DocumentFontWatcher {
         return reply.paramDescriptor(forKeyword: keyDirectObject) ?? .list()
     }
 
-    /// `every <class> of <container>`, with the class's code from the app's dictionary.
     nonisolated private static func every(_ type: String, of container: NSAppleEventDescriptor) -> NSAppleEventDescriptor {
         var all = DescType(kAEAll)
         let data = NSAppleEventDescriptor(descriptorType: DescType(typeAbsoluteOrdinal), bytes: &all, length: 4)!
         return specifier(of: code(type), form: DescType(formAbsolutePosition), data: data, in: container)
     }
 
-    /// `<property> of <container>`.
     nonisolated private static func property(_ name: String, of container: NSAppleEventDescriptor) -> NSAppleEventDescriptor {
         specifier(of: DescType(typeProperty), form: DescType(formPropertyID), data: NSAppleEventDescriptor(typeCode: code(name)), in: container)
     }
@@ -215,16 +194,14 @@ final class DocumentFontWatcher {
         text.utf8.reduce(0) { $0 << 8 | DescType($1) }
     }
 
-    /// The items in a result, in lists in lists too: InDesign gives one list per document.
     nonisolated private static func items(_ descriptor: NSAppleEventDescriptor) -> [NSAppleEventDescriptor] {
         guard descriptor.descriptorType == typeAEList else { return [descriptor] }
         guard descriptor.numberOfItems > 0 else { return [] }
         return (1...descriptor.numberOfItems).flatMap { descriptor.atIndex($0).map(items) ?? [] }
     }
 
-    /// The text of each item, empty for one that has none, such as a font with no style name, so that InDesign's
-    /// lists still line up.
     nonisolated private static func strings(_ descriptor: NSAppleEventDescriptor) -> [String] {
+        // Empty for an item with no text, such as a font with no style name, so InDesign's lists still line up.
         items(descriptor).map { $0.stringValue ?? "" }
     }
 }
@@ -232,19 +209,11 @@ final class DocumentFontWatcher {
 // MARK: - The document in front
 
 extension DocumentFontWatcher {
-    /// What the app in front says about its document in front, for Find Fonts in Current Document.
     nonisolated enum FrontDocument: Sendable {
-        /// A file Cicero reads the fonts of.
         case file(URL)
-        /// The fonts InDesign says its document uses, live rather than as last saved, and the document's name.
         case fonts([DocumentFont], name: String)
     }
 
-    /// The document in front in an app: InDesign's active document, Illustrator's and Photoshop's current one, Acrobat's
-    /// active one, and for any other app (Preview, say) the document of its front window, as its file. nil when it has
-    /// none, the file isn't saved or isn't one Cicero reads, or the app doesn't say; throws `errAEEventNotPermitted`
-    /// when Cicero may not ask it. macOS asks the user first whether Cicero may, the first time for each app, and this
-    /// waits for the answer.
     @concurrent
     static func frontDocument(ofApp bundleID: String, pid: pid_t) async throws -> FrontDocument? {
         // Codes from each app's dictionary.

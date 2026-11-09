@@ -2,18 +2,10 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// Text in a font's own script for its previews, when it has none of the letters of the text they ask for, like a Syriac
-/// font asked for Latin, which macOS would set in another font, with that font's weights rather than the font's own axes:
-/// the names of the most spoken languages written in its script, in their own letters, that the font has every character
-/// of, like ܣܘܪܝܝܐ; or else its first letters of that script.
 public struct ScriptSample: Hashable, Sendable {
-    /// One name, or a few letters, for small previews like a grid tile.
     public let short: String
-    /// A few names, or more letters, for the font page's text.
     public let long: String
 
-    /// Whether a font needs one for `text`: when the text has letters, and the font, which `has` says has a character or
-    /// not, none of them.
     public static func isNeeded(for text: String, has: (Unicode.Scalar) -> Bool) -> Bool {
         var hasLetters = false
         for scalar in text.unicodeScalars where scalar.properties.isAlphabetic {
@@ -23,8 +15,6 @@ public struct ScriptSample: Hashable, Sendable {
         return hasLetters
     }
 
-    /// The sample for a font with `characters`, from `languages`; nil for one without letters of a script other than
-    /// Latin, like a symbol font.
     public init?(characters: ScalarRanges, languages: [Language]) {
         let scripts = GlyphGroup.scripts(of: characters).filter { $0.key != "Latin" }
         guard let script = scripts.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key else { return nil }
@@ -60,9 +50,6 @@ public struct ScriptSample: Hashable, Sendable {
     }
 }
 
-/// Each face's `ScriptSample`, worked out the first time a preview needs it, and again once its file changed, as Replace
-/// puts a newer version in under the same path (see `FontLoader.generation(of:)`): by the face's ID alone, a tile went on
-/// asking for the old version's letters, which macOS then drew in another font.
 public final class ScriptSamples: Sendable {
     private let languages: LanguageCatalog
     private let samples = Mutex<[FaceID: (generation: Int, sample: ScriptSample?)]>([:])
@@ -71,9 +58,6 @@ public final class ScriptSamples: Sendable {
         self.languages = languages
     }
 
-    /// What a preview of `face` sets: `text`, or, when the face has none of its letters, text in its own script (see
-    /// `ScriptSample`), `long` or short. `text` while the face's file hasn't been read, as reading it could take a while.
-    /// `cached` false for asking about many faces once, as measuring every family's sample does (see `FontLoader.font`).
     public func text(_ text: String, for face: FontFace, long: Bool = false, cached: Bool = true) -> String {
         guard !FontLoader.shared.wouldWait(for: face.path) else { return text }
         // Before the font, so a sample from a file that changed meanwhile is worked out again next time.

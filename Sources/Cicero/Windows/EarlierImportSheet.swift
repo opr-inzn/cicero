@@ -1,19 +1,14 @@
 import CiceroCore
 import SwiftUI
 
-/// Offers to copy FontExplorer X's Font Library in, where an import up to 0.10.13 made it a location (see
-/// `AppModel.offerEarlierImportCopy`), then shows the copying. Not Now leaves it a location until the next launch.
 struct EarlierImportSheet: View {
     let prompt: EarlierImportPrompt
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
-    /// How long the copying has left, from when Copy Fonts is pressed.
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
-    /// Cicero's Library was chosen in this sheet, so it can be undone here.
     @State private var choseFontLibrary = false
-    /// How many files it copies, counted again when they'd go elsewhere (see `EarlierImportPrompt.copying`).
     @State private var copying: Int
 
     init(prompt: EarlierImportPrompt) {
@@ -73,7 +68,6 @@ struct EarlierImportSheet: View {
 
     private var name: String { prompt.name }
 
-    /// What happens: where the files go, what stays on, what's kept, and that the location goes.
     private var detail: String {
         let total = prompt.files.count
         let place = model.installPlace

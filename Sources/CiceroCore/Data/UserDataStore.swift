@@ -1,9 +1,6 @@
 import Foundation
 import Synchronization
 
-/// Loads and saves `UserData` (`user-data.json` in `Locations.support`). The first load imports the
-/// version 1 file (`library.json`) when there's no version 2 file yet, and never modifies it. Saves
-/// are coalesced and written off the main thread, atomically, in order.
 public final class UserDataStore: Sendable {
     private let fileURL: URL
     private let legacyURL: URL
@@ -12,11 +9,9 @@ public final class UserDataStore: Sendable {
 
     private struct Pending {
         var data: UserData?
-        /// Counts saves, so a scheduled write knows when a later save has superseded it.
         var generation = 0
     }
 
-    /// How long changes are collected before one write.
     static let coalescingDelay: TimeInterval = 0.25
 
     public init(locations: Locations) {
@@ -24,14 +19,11 @@ public final class UserDataStore: Sendable {
         legacyURL = locations.support.appendingPathComponent("library.json", isDirectory: false)
     }
 
-    /// Whether there's a library saved from before, as there isn't at the first launch.
     public var hasSavedData: Bool {
         let fm = FileManager.default
         return fm.fileExists(atPath: fileURL.path) || fm.fileExists(atPath: legacyURL.path)
     }
 
-    /// A library from before there were license tags gets them, and one from 0.9.1 or before loses the former ones it
-    /// never used (see `UserData.updateLicenseTags`).
     public func load() -> UserData {
         if let data = try? Data(contentsOf: fileURL) {
             if var decoded = try? JSONDecoder().decode(UserData.self, from: data) {
@@ -42,6 +34,7 @@ public final class UserDataStore: Sendable {
             setAside()
             return UserData()
         }
+        // Only read the version 1 file (library.json), never modify it.
         if let legacy = try? Data(contentsOf: legacyURL),
            let object = (try? JSONSerialization.jsonObject(with: legacy)) as? [String: Any] {
             let imported = LegacyImport.userData(from: object)
@@ -51,8 +44,6 @@ public final class UserDataStore: Sendable {
         return .newLibrary
     }
 
-    /// Moves a file this version can't read out of the way, to user-data.unreadable.json, or, when one was kept
-    /// before, user-data.unreadable 2.json and so on: never over another.
     private func setAside() {
         let fm = FileManager.default
         for number in 1...1000 {
@@ -64,7 +55,6 @@ public final class UserDataStore: Sendable {
         }
     }
 
-    /// Schedules a save of this value (the latest one wins).
     public func save(_ data: UserData) {
         let generation = pending.withLock { pending in
             pending.data = data
@@ -74,15 +64,11 @@ public final class UserDataStore: Sendable {
         queue.asyncAfter(deadline: .now() + Self.coalescingDelay) { [self] in writePending(for: generation) }
     }
 
-    /// Writes any pending save now; call when the app quits. Returns false when it couldn't be written. `durably`: onto
-    /// the disk itself too, what an earlier save wrote as well, not only into its cache (see `syncToDisk`).
     @discardableResult
     public func flush(durably: Bool = false) -> Bool {
         queue.sync { writePending(for: nil) && (!durably || Self.syncToDisk(fileURL)) }
     }
 
-    /// Has the disk keep what's written to the file for good, so a power cut can't take it back (F_FULLFSYNC, else
-    /// fsync where the disk can't). Returns false when it couldn't.
     public static func syncToDisk(_ url: URL) -> Bool {
         let file = open(url.path, O_RDONLY)
         guard file >= 0 else { return false }
@@ -90,8 +76,6 @@ public final class UserDataStore: Sendable {
         return fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0
     }
 
-    /// Writes what's pending unless a later save has already been scheduled (nil: write regardless). Returns false when
-    /// it couldn't be written.
     @discardableResult
     private func writePending(for generation: Int?) -> Bool {
         let data = pending.withLock { pending -> UserData? in
@@ -110,7 +94,6 @@ public final class UserDataStore: Sendable {
         return (try? encoded.write(to: fileURL, options: .atomic)) != nil
     }
 
-    /// The JSON the store writes; backups hold the same.
     public static func encoded(_ data: UserData) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -118,7 +101,6 @@ public final class UserDataStore: Sendable {
     }
 }
 
-/// Reads the version 1 file (`library.json`). Any key may be missing.
 enum LegacyImport {
     static func userData(from object: [String: Any]) -> UserData {
         var data = UserData()
