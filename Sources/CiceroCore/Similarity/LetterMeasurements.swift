@@ -23,6 +23,7 @@ public struct LetterMeasurements: Equatable, Sendable {
         case doubleStoryA
         case doubleStoryG
         case monospaced
+        case rounded
     }
 
     init(values: [Float]) {
@@ -109,6 +110,13 @@ public struct LetterMeasurements: Equatable, Sendable {
         if let a = letter("a") { set(.doubleStoryA, a.mostCrossings(at: [0.45, 0.5, 0.55]) >= 3 ? 1 : 0) }
         if let g = letter("g") { set(.doubleStoryG, g.mostCrossings(at: [0.4, 0.5, 0.6]) >= 4 ? 1 : 0) }
         set(.monospaced, LetterShapes.isMonospaced(font) ? 1 : 0)
+        let reach = (stem ?? capHeight * 0.08) * 0.25
+        let ends = "HEILTlik".compactMap { letter($0) }
+        if ends.count >= 4 {
+            let dotted = "HOn".compactMap { letter($0) }.count { $0.contours >= 5 } >= 2
+            let corners = ends.map { $0.sharpCorners(within: reach) }
+            set(.rounded, !dotted && CGFloat(corners.reduce(0, +)) / CGFloat(corners.count) < 0.5 ? 1 : 0)
+        }
 
         guard values.count(where: { !$0.isNaN }) >= fewest else { return nil }
         return LetterMeasurements(values: values)
@@ -127,6 +135,8 @@ private struct Letter {
     private let horizontal: LetterShapes.Outline
     private let vertical: LetterShapes.Outline
     private let edges: [(CGPoint, CGPoint)]
+    private let path: CGPath
+    private let polygons: [[CGPoint]]
 
     init?(_ font: CTFont, _ character: Character) {
         guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, nil) else { return nil }
@@ -143,7 +153,11 @@ private struct Letter {
         horizontal = LetterShapes.Outline(flat)
         vertical = LetterShapes.Outline(swapped)
         edges = Self.edges(of: flat)
+        self.path = flat
+        polygons = Self.polygons(of: flat)
     }
+
+    var contours: Int { horizontal.contours }
 
     func rows(at y: CGFloat) -> [ClosedRange<CGFloat>] { horizontal.runs(at: y) }
 
@@ -265,6 +279,74 @@ private struct Letter {
             if !edges.contains(where: { Self.cross(origin, end, $0.0, $0.1) }) { open += 1 }
         }
         return CGFloat(open) / CGFloat(directions)
+    }
+
+    // Corners rounded off much less than the stem is thick still count: Adobe Caslon and Garamond Premier round every serif's corners by a few units.
+    func sharpCorners(within reach: CGFloat) -> Int {
+        var count = 0
+        for points in polygons {
+            let n = points.count
+            var area: CGFloat = 0
+            for index in 0..<n { area += points[index].x * points[(index + 1) % n].y - points[(index + 1) % n].x * points[index].y }
+            let outward: CGFloat = area > 0 ? 1 : -1
+            var turns: [CGFloat] = [], lengths: [CGFloat] = []
+            for index in 0..<n {
+                let a = points[(index + n - 1) % n], b = points[index], c = points[(index + 1) % n]
+                var turn = atan2(c.y - b.y, c.x - b.x) - atan2(b.y - a.y, b.x - a.x)
+                if turn > .pi { turn -= 2 * .pi } else if turn < -.pi { turn += 2 * .pi }
+                turns.append(turn * outward)
+                lengths.append(hypot(c.x - b.x, c.y - b.y))
+            }
+            var start = 0
+            while start < n {
+                var turned: CGFloat = 0, length: CGFloat = 0, end = start
+                while length <= reach, end < start + n {
+                    turned += turns[end % n]
+                    length += lengths[end % n]
+                    end += 1
+                }
+                if turned > .pi / 3, !isInside(points[start], by: max(reach * 0.2, 2)) {
+                    count += 1
+                    start = end
+                } else {
+                    start += 1
+                }
+            }
+        }
+        return count
+    }
+
+    // Variable fonts keep their contours overlapping, so a crossbar's corners can sit inside the stems.
+    private func isInside(_ point: CGPoint, by distance: CGFloat) -> Bool {
+        (0..<8).allSatisfy { step in
+            let angle = CGFloat(step) * .pi / 4
+            return path.contains(CGPoint(x: point.x + cos(angle) * distance, y: point.y + sin(angle) * distance), using: .winding)
+        }
+    }
+
+    private static func polygons(of path: CGPath) -> [[CGPoint]] {
+        var polygons: [[CGPoint]] = [], current: [CGPoint] = []
+        func finish() {
+            if current.count > 1, current.first == current.last { current.removeLast() }
+            if current.count > 2 { polygons.append(current) }
+            current = []
+        }
+        path.applyWithBlock { element in
+            let element = element.pointee
+            switch element.type {
+            case .moveToPoint:
+                finish()
+                current = [element.points[0]]
+            case .addLineToPoint:
+                if element.points[0] != current.last { current.append(element.points[0]) }
+            case .closeSubpath:
+                finish()
+            default:
+                break
+            }
+        }
+        finish()
+        return polygons
     }
 
     private static func edges(of path: CGPath) -> [(CGPoint, CGPoint)] {

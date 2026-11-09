@@ -578,6 +578,12 @@ public struct Family: Identifiable, Hashable, Sendable {
         return app == nil ? (positions.contains(.on) ? .on : .off) : SwitchPosition(positions)
     }
 
+    public var italic: LibraryFace? {
+        if regular.face.isItalic { return regular }
+        let italics = faces.filter { $0.face.isItalic && !$0.face.isOrnaments }
+        return italics.isEmpty ? nil : Self.nearest(400, in: italics)
+    }
+
     public func face(nearestWeight weight: Double) -> LibraryFace {
         weight == 400 || regular.face.weightAxis != nil ? regular : Self.nearest(weight, in: faces)
     }

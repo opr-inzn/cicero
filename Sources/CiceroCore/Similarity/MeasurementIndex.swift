@@ -8,7 +8,7 @@ public final class MeasurementIndex: Sendable {
     private let state = Mutex(State())
     private let saveQueue = DispatchQueue(label: "Cicero.MeasurementIndex.save", qos: .utility)
 
-    public static let version = 7
+    public static let version = 8
 
     private struct Entry: Sendable {
         var stamp: CoverageStamp
@@ -32,7 +32,8 @@ public final class MeasurementIndex: Sendable {
         let signpost = Signposts.library.beginInterval("Letters")
         defer { Signposts.library.endInterval("Letters", signpost) }
         loadIfNeeded()
-        let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
+        let faces = Self.measuredFaces(of: families)
+        let stamped = faces.map { ($0, CoverageStamp.of(path: $0.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
         }
@@ -63,8 +64,14 @@ public final class MeasurementIndex: Sendable {
                 }
             }
         }
-        if let entries = entriesToSave(keeping: Set(families.map(\.regular.face.id))) {
+        if let entries = entriesToSave(keeping: Set(faces.map(\.id))) {
             saveQueue.async { self.write(entries) }
+        }
+    }
+
+    static func measuredFaces(of families: [Family]) -> [FontFace] {
+        families.flatMap { family in
+            [family.regular.face] + (family.italic.map { $0.face.id == family.regular.face.id ? [] : [$0.face] } ?? [])
         }
     }
 

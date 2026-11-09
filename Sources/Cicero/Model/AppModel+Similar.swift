@@ -18,6 +18,8 @@ extension AppModel {
         let measurements = measurements
         let table = SimilarFonts(families: library.families.filter(data.lists), measurements: { measurements.measurements(of: $0.regular.face.id) },
                                  embeddings: { measurements.embedding(of: $0.regular.face.id) },
+                                 italicMeasurements: { $0.italic.flatMap { measurements.measurements(of: $0.face.id) } },
+                                 italicEmbeddings: { $0.italic.flatMap { measurements.embedding(of: $0.face.id) } },
                                  classification: similarClassifier())
         similarCache = (key, table)
         return table

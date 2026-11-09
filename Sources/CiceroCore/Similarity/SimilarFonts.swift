@@ -8,6 +8,10 @@ public struct SimilarFonts: Sendable {
     private let classifications: [String?]
     private let sizes: [OpticalSize?]
     private let designs: [String]
+    private let uprightDesigns: [String]
+    private let italicRows: [Int?]
+    private let italicOnly: [Bool]
+    private let rounded: [Bool]
     private let scales: [Float]
     private let weights: [Float]
     private let embeddingWeight: Float
@@ -31,6 +35,10 @@ public struct SimilarFonts: Sendable {
     public static let embeddingStep: Float = 0.1
 
     public static let otherClassification: Float = 1
+    public static let notRounded: Float = 4
+
+    static let slanted: Float = 0.1
+    static let roundedWords: Set<String> = ["rounded", "round", "rnd"]
 
     public enum OpticalSize: Sendable {
         case text
@@ -67,10 +75,18 @@ public struct SimilarFonts: Sendable {
             }
         }
         stripCopies()
-        guard words.count > 1, ["italic", "italics", "oblique"].contains(words.last!) else { return words.joined(separator: " ") }
+        guard words.count > 1, slopeWords.contains(words.last!) else { return words.joined(separator: " ") }
         let slope = words.removeLast()
         stripCopies()
         return (words + [slope]).joined(separator: " ")
+    }
+
+    static let slopeWords: Set<String> = ["italic", "italics", "oblique"]
+
+    static func uprightDesign(of name: String) -> String {
+        var words = design(of: name).split(separator: " ")
+        if words.count > 1, slopeWords.contains(String(words.last!)) { words.removeLast() }
+        return words.joined(separator: " ")
     }
 
     private static func isVersion(_ word: String) -> Bool {
@@ -82,21 +98,44 @@ public struct SimilarFonts: Sendable {
     public static let longestList = 12
 
     public init(families: [Family], measurements: (Family) -> LetterMeasurements?, embeddings: ((Family) -> [Float]?)? = nil,
+                italicMeasurements: ((Family) -> LetterMeasurements?)? = nil, italicEmbeddings: ((Family) -> [Float]?)? = nil,
                 classification: (Family) -> String?,
                 weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
                 embeddingWeight: Float = SimilarFonts.embeddingWeight, otherClassification: Float = SimilarFonts.otherClassification) {
         let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
         var ids: [String] = [], values: [Float] = [], vectors: [Float] = [], classifications: [String?] = [], sizes: [OpticalSize?] = []
-        var designs: [String] = []
+        var designs: [String] = [], uprightDesigns: [String] = [], italicOnly: [Bool] = [], rounded: [Bool] = []
+        var italics: [(family: Int, values: [Float], embedding: [Float])] = []
+        func usable(_ measured: LetterMeasurements?, _ embedded: [Float]?) -> Bool {
+            (measured != nil || !measuring) && (embedded != nil || !embedding) && (measured != nil || embedded != nil)
+        }
         for family in families {
             let measured = measurements(family), embedded = embedding ? embeddings?(family) : nil
-            guard measured != nil || !measuring, embedded != nil || !embedding, measured != nil || embedded != nil else { continue }
+            guard usable(measured, embedded) else { continue }
+            let isItalic = family.regular.face.isItalic
+            if !isItalic, let italicMeasurements {
+                let italicMeasured = italicMeasurements(family), italicEmbedded = embedding ? italicEmbeddings?(family) : nil
+                if usable(italicMeasured, italicEmbedded) {
+                    italics.append((ids.count, italicMeasured?.values ?? Array(repeating: .nan, count: Self.measures), italicEmbedded ?? []))
+                }
+            }
             ids.append(family.id)
             values += measured?.values ?? Array(repeating: .nan, count: Self.measures)
             vectors += embedded ?? []
             classifications.append(classification(family))
             sizes.append(OpticalSize(name: family.id))
             designs.append(Self.design(of: family.id))
+            uprightDesigns.append(Self.uprightDesign(of: family.id))
+            italicOnly.append(isItalic)
+            let words = Set(family.id.lowercased().split { !$0.isLetter }.map(String.init))
+            rounded.append(measured?[.rounded] == 1 || !words.isDisjoint(with: Self.roundedWords))
+        }
+        let slant = LetterMeasurements.Measure.slant.rawValue
+        var italicRows: [Int?] = italicOnly.indices.map { italicOnly[$0] || abs(values[$0 * Self.measures + slant]) > Self.slanted ? $0 : nil }
+        for (offset, italic) in italics.enumerated() {
+            italicRows[italic.family] = ids.count + offset
+            values += italic.values
+            vectors += italic.embedding
         }
         self.ids = ids
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
@@ -105,6 +144,10 @@ public struct SimilarFonts: Sendable {
         self.classifications = classifications
         self.sizes = sizes
         self.designs = designs
+        self.uprightDesigns = uprightDesigns
+        self.italicRows = italicRows
+        self.italicOnly = italicOnly
+        self.rounded = rounded
         scales = LetterMeasurements.Measure.allCases.map { Self.steps[$0] ?? 1 }
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
@@ -121,14 +164,17 @@ public struct SimilarFonts: Sendable {
 
     public func nearestWithDistances(to id: String, limit: Int) -> [(id: String, distance: Float)] {
         guard let reference = positions[id] else { return [] }
+        let italic = italicOnly[reference]
         var found: [(index: Int, distance: Float)] = []
         found.reserveCapacity(ids.count)
         for other in ids.indices where other != reference {
-            found.append((other, distance(reference, other)))
+            guard let row = italic ? italicRows[other] : other else { continue }
+            found.append((other, distance(reference, other, row: row)))
         }
         found.sort { $0.distance < $1.distance }
-        var listed: Set = [designs[reference]], nearest: [(index: Int, distance: Float)] = []
-        for entry in found where listed.insert(designs[entry.index]).inserted {
+        let keys = italic ? uprightDesigns : designs
+        var listed: Set = [keys[reference]], nearest: [(index: Int, distance: Float)] = []
+        for entry in found where listed.insert(keys[entry.index]).inserted {
             nearest.append(entry)
             if nearest.count == max(limit, Self.longestList) { break }
         }
@@ -143,9 +189,9 @@ public struct SimilarFonts: Sendable {
 
     static let oneMissing: Float = 1.5
 
-    private func distance(_ a: Int, _ b: Int) -> Float {
+    private func distance(_ a: Int, _ b: Int, row: Int) -> Float {
         var sum: Float = 0
-        let base = a * Self.measures, other = b * Self.measures
+        let base = a * Self.measures, other = row * Self.measures
         for measure in 0..<Self.measures where weights[measure] > 0 {
             let x = values[base + measure], y = values[other + measure]
             let steps: Float = switch (x.isNaN, y.isNaN) {
@@ -159,12 +205,14 @@ public struct SimilarFonts: Sendable {
             var squares: Float = 0
             let dimensions = LetterEmbedding.dimensions
             for index in 0..<dimensions {
-                let difference = embeddings[a * dimensions + index] - embeddings[b * dimensions + index]
+                let difference = embeddings[a * dimensions + index] - embeddings[row * dimensions + index]
                 squares += difference * difference
             }
             sum += embeddingWeight * squares / (Self.embeddingStep * Self.embeddingStep)
         }
-        if let first = classifications[a], let second = classifications[b], first != second { return sum.squareRoot() + otherClassification }
-        return sum.squareRoot()
+        var apart = sum.squareRoot()
+        if let first = classifications[a], let second = classifications[b], first != second { apart += otherClassification }
+        if rounded[a], !rounded[b] { apart += Self.notRounded }
+        return apart
     }
 }
