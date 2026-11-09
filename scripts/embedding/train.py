@@ -297,8 +297,8 @@ def merge_alike(designs, letters, device):
 
 def held_out(name, fold=0):
     """Whether the family is in the tenth held out, `fold` of ten, by the first word of its name, so that its
-    siblings are too."""
-    return zlib.crc32(name.split()[0].lower().encode()) % 10 == fold
+    siblings are too; none is for a fold below 0, to learn from them all."""
+    return fold >= 0 and zlib.crc32(name.split()[0].lower().encode()) % 10 == fold
 
 
 def augment(batch, advances, strips=None, details=None):
@@ -642,7 +642,8 @@ def train(arguments):
             losses.append(loss.item())
         if epoch % arguments.every == arguments.every - 1 or epoch == arguments.epochs - 1:
             judged = average.module if average is not None else model
-            scores = evaluate(model_distance(judged, drawn, device), designs, tag_names, measurements)
+            scores = evaluate(model_distance(judged, drawn, device), designs, tag_names, measurements) \
+                if any(design["held_out"] for design in designs) else {}
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
             torch.save({"model": judged.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores, "fold": arguments.fold,
                         "together": arguments.together, "strips": arguments.strips, "details": arguments.details}, out)
@@ -670,7 +671,7 @@ def classify(arguments):
     check = [(design["regular"], design["label"]) for design in labelled if design["held_out"]]
     inputs = embed(model, drawn, [row for row, _ in learn], device)
     targets = torch.tensor([label for _, label in learn], device=device)
-    held = embed(model, drawn, [row for row, _ in check], device)
+    held = embed(model, drawn, [row for row, _ in check], device) if check else None
     answers = torch.tensor([label for _, label in check], device=device)
     # Every family counts as much (--balance 0): counting the rare ornamental ones for more had the model say
     # ornamental of heavy and rounded sans serifs.
@@ -686,18 +687,19 @@ def classify(arguments):
         loss.backward()
         optimizer.step()
     head.eval()
-    with torch.no_grad():
-        chances = F.softmax(head(held), dim=1)
-    sure, guess = chances.max(1)
-    print(f"{len(learn)} styles of {sum(not design['held_out'] for design in labelled)} designs learned from; "
-          f"{len(check)} held out, right {float((guess == answers).float().mean()):.3f}")
-    for name, index in zip(CLASSES, range(len(CLASSES))):
-        mine = answers == index
-        print(f"  {name}: {int(mine.sum())}, right {float((guess[mine] == index).float().mean()):.3f}; "
-              f"said of {int((guess == index).sum())}, right {float((answers[guess == index] == index).float().mean()):.3f}")
-    for threshold in (0.5, 0.6, 0.7, 0.8, 0.9):
-        said = sure >= threshold
-        print(f"  sure at least {threshold}: says {float(said.float().mean()):.3f}, right {float((guess[said] == answers[said]).float().mean()):.3f}")
+    print(f"{len(learn)} styles of {sum(not design['held_out'] for design in labelled)} designs learned from; {len(check)} held out")
+    if check:
+        with torch.no_grad():
+            chances = F.softmax(head(held), dim=1)
+        sure, guess = chances.max(1)
+        print(f"  right {float((guess == answers).float().mean()):.3f}")
+        for name, index in zip(CLASSES, range(len(CLASSES))):
+            mine = answers == index
+            print(f"  {name}: {int(mine.sum())}, right {float((guess[mine] == index).float().mean()):.3f}; "
+                  f"said of {int((guess == index).sum())}, right {float((answers[guess == index] == index).float().mean()):.3f}")
+        for threshold in (0.5, 0.6, 0.7, 0.8, 0.9):
+            said = sure >= threshold
+            print(f"  sure at least {threshold}: says {float(said.float().mean()):.3f}, right {float((guess[said] == answers[said]).float().mean()):.3f}")
     saved["classifier"] = {key: value.cpu() for key, value in head.state_dict().items()}
     torch.save(saved, checkpoint)
     print(f"saved the classifier in {checkpoint}")
@@ -768,7 +770,7 @@ def main():
     training.add_argument("--name", default="model.pt", help="of the model saved in the work folder")
     training.add_argument("--every", type=int, default=10)
     training.add_argument("--seed", type=int, default=1)
-    training.add_argument("--fold", type=int, default=0, help="which tenth of the families to hold out, 0 to 9")
+    training.add_argument("--fold", type=int, default=0, help="which tenth of the families to hold out, 0 to 9, or -1 for none, to learn from them all")
     training.add_argument("--share", type=float, default=1.0, help="the share of the other families to learn from")
     training.add_argument("--invariant", action="store_true", help="learn a design's weights and widths as one, as the "
                           "measurements tell them: every weight, widths and siblings named for one, drawn wider, narrower, bolder and lighter")
