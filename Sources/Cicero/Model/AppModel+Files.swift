@@ -149,7 +149,7 @@ extension AppModel {
             if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(id) }
         }
         addCheckingDuplicates(files, method: method, into: location) { model, paths, note in
-            model.awaitingScan = OpenedFiles(scan: model.rescan(), paths: paths, target: target, note: note)
+            model.awaitingScan.append(OpenedFiles(scan: model.rescan(), paths: paths, target: target, note: note))
         }
     }
 
@@ -174,15 +174,23 @@ extension AppModel {
             let handling = data.duplicateHandling
             let chosen = duplicates.map { $0.choice(for: handling) }
             guard !chosen.contains(nil) else {
-                duplicatePrompt = prompt
-                return
+                return whenNotAsking { $0.duplicatePrompt = prompt }
             }
             if handling == .replace, duplicates.contains(where: warnsBeforeReplacing) {
-                replacePrompt = prompt
-                return
+                return whenNotAsking { $0.replacePrompt = prompt }
             }
             addFontFiles(paths, resolving: duplicates, choices: Dictionary(uniqueKeysWithValues: zip(duplicates.map(\.id), chosen.compactMap(\.self))),
                          method: method, into: location, then: then)
+        }
+    }
+
+    // One question at a time: set while another is up, a prompt would take its place, and the files it was for would never be added.
+    private func whenNotAsking(_ ask: @escaping (AppModel) -> Void) {
+        Task {
+            while duplicatePrompt != nil || replacePrompt != nil || openAppsReplacePrompt != nil || installPrompt != nil {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            ask(self)
         }
     }
 
@@ -234,8 +242,7 @@ extension AppModel {
                 model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, into: location, then: then,
                                    askedAboutOpenApps: true)
             }
-            Task { openAppsReplacePrompt = prompt }
-            return
+            return whenNotAsking { $0.openAppsReplacePrompt = prompt }
         }
         // A file only of skipped families stays out, and one that takes the library's copies' places is in as those.
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
@@ -401,8 +408,12 @@ extension AppModel {
     /// and the browser stays there rather than going to All Fonts (see `targetForAddedFiles`).
     /// The browser goes to the first of them, selected, rather than a font page opening.
     func showOpenedFiles(after id: Int) {
-        guard let opened = awaitingScan, id >= opened.scan else { return }
-        awaitingScan = nil
+        let ready = awaitingScan.filter { $0.scan <= id }
+        awaitingScan.removeAll { $0.scan <= id }
+        for opened in ready { showOpenedFiles(opened) }
+    }
+
+    private func showOpenedFiles(_ opened: OpenedFiles) {
         let paths = opened.paths
         let found = library.families.filter { family in
             family.faces.contains { paths.contains($0.face.path) || $0.otherCopies.contains(where: paths.contains) }

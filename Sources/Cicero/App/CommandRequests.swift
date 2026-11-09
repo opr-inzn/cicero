@@ -61,11 +61,14 @@ final class CommandRequests {
         if let request = taken.request {
             // Names are looked up in the library this launch's first scan found, not in one saved before, or none.
             if request.command.needsLibrary {
-                while !model.hasScanned { try? await Task.sleep(for: .milliseconds(100)) }
+                while !model.hasScanned, model.lastEndedScan == 0 { try? await Task.sleep(for: .milliseconds(100)) }
             }
             let environment = ToolEnvironment(locations: model.locations, defaults: .standard, resources: nil, registrar: CoreTextRegistrar())
             let context = LibraryContext(library: model.library, data: model.data, shown: request.shown, environment: environment)
             do {
+                guard model.hasScanned || !request.command.needsLibrary else {
+                    throw CommandError(.failed, "Cicero couldn’t read the library. Try again in a moment.")
+                }
                 answer = try await WriteRunner.run(request, in: context, writer: AppRequestWriter(model: model))
             } catch let error as CommandError {
                 answer = error.json
@@ -76,8 +79,10 @@ final class CommandRequests {
             answer = Requests.unreadable
         }
         // On the disk before the answer, so the command's next read has it.
-        model.store.flush()
-        Requests.reply(answer, to: taken.id, support: support)
+        let saved = model.store.flush()
+        let failed = CommandError(answer: answer) != nil
+        Requests.reply(saved || failed ? answer : CommandError(.failed, "Cicero made the change but couldn’t save it. Check that the disk has space and can be written to.").json,
+                       to: taken.id, support: support)
     }
 }
 

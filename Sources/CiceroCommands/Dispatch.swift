@@ -62,6 +62,9 @@ public enum WriteDispatcher {
         let writer = ClosedAppWriter(environment: environment, data: context.savedData)
         let answer = try await WriteRunner.run(request, in: context, writer: writer)
         if writer.activated { _ = try? await LibraryContext.load(environment, rescan: true) }
+        if writer.saveFailed {
+            throw CommandError(.failed, "The change couldn’t be saved in \(environment.locations.support.appendingPathComponent("user-data.json").path). Check that the disk has space and can be written to.")
+        }
         return answer
     }
 }
@@ -89,6 +92,7 @@ final class ClosedAppWriter: Writer {
     private(set) var data: UserData
     /// Whether fonts turned on or off.
     private(set) var activated = false
+    private(set) var saveFailed = false
 
     init(environment: ToolEnvironment, data: UserData) {
         self.environment = environment
@@ -101,7 +105,7 @@ final class ClosedAppWriter: Writer {
     func update(_ change: (inout UserData) -> Void) {
         change(&data)
         store.save(data)
-        store.flush(durably: true)
+        if !store.flush(durably: true) { saveFailed = true }
     }
 
     /// As the app has it (`AppModel.engine`).
@@ -145,6 +149,7 @@ final class ClosedAppWriter: Writer {
             data.records = result.records
             data.forgetInstalledAddedFiles()
         }
-        if journal { ActivationJournal.remove(support: environment.locations.support) }
+        // Kept when the records couldn't be saved, so the next program to hold the lock repairs them.
+        if journal, !saveFailed { ActivationJournal.remove(support: environment.locations.support) }
     }
 }

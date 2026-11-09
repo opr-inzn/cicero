@@ -33,6 +33,7 @@ extension ActivationEngine {
         var failed: [String] = []
         var succeeded = 0
         if !register.isEmpty {
+            Self.stopKeepingOff(register)
             let session = Self.currentSession()
             let stuck = await registerAndConfirm(register, scope: .session)
             for path in register {

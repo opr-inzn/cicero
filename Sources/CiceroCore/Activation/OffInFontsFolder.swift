@@ -1,12 +1,30 @@
 import CoreText
 import Foundation
+import Synchronization
 
 extension ActivationEngine {
     /// How many files `moveIntoFontsFolderOff` registers at once.
     static let offBatchSize = 20
 
+    static let keptOff = Mutex<Set<String>>([])
+
+    static func stopKeepingOff(_ paths: some Sequence<String>) {
+        keptOff.withLock { $0.subtract(paths) }
+    }
+
     /// Where `moveIntoFontsFolderOff` writes the files on their way in, until they're off.
     var turningOffList: URL { locations.support.appendingPathComponent("turning-off.json", isDirectory: false) }
+
+    // One for each call: an import, a Replace and a Put Back can move files in at the same time.
+    private func newTurningOffList() -> URL {
+        locations.support.appendingPathComponent("turning-off-\(UUID().uuidString).json", isDirectory: false)
+    }
+
+    var turningOffLists: [URL] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: locations.support.path)) ?? []
+        return names.filter { $0 == "turning-off.json" || $0.hasPrefix("turning-off-") && $0.hasSuffix(".json") }
+            .map { locations.support.appendingPathComponent($0, isDirectory: false) }
+    }
 
     /// Moves files into a Fonts folder, off. macOS turns on whatever arrives in one, a second or so later, so each batch is
     /// registered at once and turned off as soon as macOS shows it on: its fonts are on for a few hundredths of a second
@@ -23,6 +41,7 @@ extension ActivationEngine {
         var placed: [String: String] = [:]
         var failed: [String] = []
         let all = moves.sorted { $0.key < $1.key }
+        let list = newTurningOffList()
         for start in stride(from: 0, to: all.count, by: Self.offBatchSize) {
             var moved: [(from: String, to: String)] = []
             for (from, to) in all[start..<min(start + Self.offBatchSize, all.count)] {
@@ -35,14 +54,17 @@ extension ActivationEngine {
                 do {
                     try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
                     let goingOff = moved.filter { !staysOn.contains($0.from) }.map(\.to)
-                    try noteTurningOff(goingOff + (staysOn.contains(from) ? [] : [destination.path]))
+                    try noteTurningOff(goingOff + (staysOn.contains(from) ? [] : [destination.path]), in: list)
                     try Self.moveItem(Self.url(from), to: destination)
                     moved.append((from, destination.path))
                 } catch {
                     failed.append(from)
                 }
             }
-            guard !moved.isEmpty else { continue }
+            guard !moved.isEmpty else {
+                try? fm.removeItem(at: list)
+                continue
+            }
             let paths = moved.map(\.to)
             let on = Set(moved.filter { staysOn.contains($0.from) }.map(\.to))
             // Turned off only once macOS shows it on: before that, turning it off wouldn't stick.
@@ -58,7 +80,7 @@ extension ActivationEngine {
                 try? Self.moveItem(Self.url(to), to: Self.url(from))
                 failed.append(from)
             }
-            try? fm.removeItem(at: turningOffList)
+            try? fm.removeItem(at: list)
         }
         return (placed, failed)
     }
@@ -197,7 +219,12 @@ extension ActivationEngine {
                 guard let source = sources[staged] else { continue }
                 placed[source] = destination
                 new.append(destination)
-                if stagedOn.contains(staged) { onSoFar.append(destination) } else { intoFontsFolderSoFar.append(destination) }
+                if stagedOn.contains(staged) {
+                    onSoFar.append(destination)
+                } else {
+                    intoFontsFolderSoFar.append(destination)
+                    Self.keptOff.withLock { _ = $0.insert(destination) }
+                }
             }
             for staged in moved.failed {
                 if let source = sources[staged], let destination = intoFontsFolder[staged] { again[staged] = (destination, source) }
@@ -211,7 +238,12 @@ extension ActivationEngine {
                 guard let source = again[staged]?.source else { continue }
                 placed[source] = destination
                 new.append(destination)
-                if stagedOn.contains(staged) { onSoFar.append(destination) } else { intoFontsFolderSoFar.append(destination) }
+                if stagedOn.contains(staged) {
+                    onSoFar.append(destination)
+                } else {
+                    intoFontsFolderSoFar.append(destination)
+                    Self.keptOff.withLock { _ = $0.insert(destination) }
+                }
             }
         }
         for staged in again.keys { try? fm.removeItem(atPath: staged) }
@@ -221,6 +253,7 @@ extension ActivationEngine {
         let turningOff = cancelled && !keepOnWhenCancelled ? onSoFar : []
         if !intoFontsFolderSoFar.isEmpty || !turningOff.isEmpty {
             let engine = self, paths = intoFontsFolderSoFar + turningOff, earlier = lookedAt
+            Self.keptOff.withLock { $0.formUnion(turningOff) }
             await Task {
                 var lookedAt = earlier
                 if !turningOff.isEmpty { _ = await engine.registrar.setEnabled(turningOff.map(Self.url), false) }
@@ -276,6 +309,7 @@ extension ActivationEngine {
                 try? await Task.sleep(for: .seconds(10))
                 await engine.turnOffAgain(paths, state: &state, atMost: .max)
             }
+            Self.stopKeepingOff(paths)
         }
     }
 
@@ -292,6 +326,8 @@ extension ActivationEngine {
     /// to turn off or register.
     @discardableResult
     func turnOffAgain(_ paths: [String], state: inout TurnOffAgain, atMost: Int = Self.lookingAtMost) async -> Int {
+        let kept = Self.keptOff.withLock { $0 }
+        let paths = paths.filter(kept.contains)
         guard !paths.isEmpty else { return 0 }
         let off = registrar.offFontPaths()
         guard !off.isEmpty else { return 0 }
@@ -303,7 +339,8 @@ extension ActivationEngine {
         let unregistered = unlisted.filter { !on.contains($0) && state.tries[$0, default: 0] < Self.registeringAgainAtMost }
         for path in unregistered { state.tries[path, default: 0] += 1 }
         let taken = unregistered.isEmpty ? [] : await Set(unregistered).subtracting(registerAndConfirm(unregistered, scope: .persistent))
-        let turningOff = on + unregistered.filter(taken.contains)
+        let keptNow = Self.keptOff.withLock { $0 }
+        let turningOff = (on + unregistered.filter(taken.contains)).filter(keptNow.contains)
         guard !turningOff.isEmpty else { return unregistered.count }
         let stillOn = await registrar.setEnabled(turningOff.map(Self.url), false)
         state.settled.formUnion(unregistered.filter { taken.contains($0) && !stillOn.contains($0) })
@@ -335,20 +372,31 @@ extension ActivationEngine {
         return nil
     }
 
-    private func noteTurningOff(_ paths: [String]) throws {
+    private func noteTurningOff(_ paths: [String], in list: URL) throws {
         try FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
-        try JSONEncoder().encode(paths).write(to: turningOffList, options: .atomic)
+        try JSONEncoder().encode(paths).write(to: list, options: .atomic)
     }
 
     /// At launch: files `moveIntoFontsFolderOff` was moving when Cicero stopped are turned off where they are, those that
     /// went on.
     public func finishTurningOff() async {
         let fm = FileManager.default
-        guard let data = try? Data(contentsOf: turningOffList) else { return }
-        let paths = (try? JSONDecoder().decode([String].self, from: data)) ?? []
+        let lists = turningOffLists
+        let paths = lists.flatMap { list in
+            (try? Data(contentsOf: list)).flatMap { try? JSONDecoder().decode([String].self, from: $0) } ?? []
+        }
         let on = paths.filter { isInsideFontsFolder($0) && fm.fileExists(atPath: $0) && registrar.isActive(Self.url($0)) }
         if !on.isEmpty { _ = await registrar.setEnabled(on.map(Self.url), false) }
-        try? fm.removeItem(at: turningOffList)
+        for list in lists { try? fm.removeItem(at: list) }
+    }
+
+    public func trashStagingLeftovers() {
+        let fm = FileManager.default
+        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
+        // To the Trash, not deleted: an import's originals may be gone since, as FontBase deletes its own copies as it quits.
+        for name in (try? fm.contentsOfDirectory(atPath: staging.path)) ?? [] where name != ".DS_Store" {
+            try? fm.trashItem(at: staging.appendingPathComponent(name, isDirectory: false), resultingItemURL: nil)
+        }
     }
 
     /// At launch: fonts earlier versions turned off by moving them out of ~/Library/Fonts into the Inactive folder (or

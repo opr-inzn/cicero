@@ -92,3 +92,47 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         return walker.compactMap { ($0 as? String).map { folder.appendingPathComponent($0).path } }
     }
 }
+
+public struct AppFolderMoves: Codable, Sendable {
+    struct Move: Codable, Sendable {
+        var moved: String
+        var origin: String
+        var digest: String?
+    }
+
+    var moves: [Move] = []
+
+    static func url(support: URL) -> URL {
+        support.appendingPathComponent("moved-out-of-app-folders.json", isDirectory: false)
+    }
+
+    static func note(moved: String, origin: String, support: URL) {
+        let url = url(support: support)
+        var list = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(AppFolderMoves.self, from: $0) } ?? AppFolderMoves()
+        list.moves.append(Move(moved: moved, origin: origin, digest: ActivationJournal.digest(of: origin)))
+        try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        guard (try? JSONEncoder().encode(list).write(to: url, options: .atomic)) != nil else { return }
+        _ = UserDataStore.syncToDisk(url)
+    }
+
+    public static func exists(support: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url(support: support).path)
+    }
+
+    public static func recover(_ records: ActivationRecords, support: URL) -> ActivationRecords {
+        guard let data = try? Data(contentsOf: url(support: support)),
+              let list = try? JSONDecoder().decode(AppFolderMoves.self, from: data) else { return records }
+        var records = records
+        let fm = FileManager.default
+        for move in list.moves where records.appFolderOrigins[move.moved] == nil && fm.fileExists(atPath: move.moved) {
+            // The Inactive folder has other files too, set aside by Replace or a restore, which may have taken the same name since.
+            guard let digest = move.digest, ActivationJournal.digest(of: move.moved) == digest else { continue }
+            records.appFolderOrigins[move.moved] = move.origin
+        }
+        return records
+    }
+
+    public static func remove(support: URL) {
+        try? FileManager.default.removeItem(at: url(support: support))
+    }
+}

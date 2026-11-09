@@ -55,6 +55,12 @@ public enum Requests {
                         throw CommandError(.busy, "Cicero is open but didn’t take the change within \(takeWithin.components.seconds) seconds. Nothing changed. Try again in a moment.")
                     }
                 }
+            } else if !fm.fileExists(atPath: taken.path) {
+                if let answer = readReply(reply) {
+                    try? fm.removeItem(at: reply)
+                    return answer
+                }
+                throw CommandError(.busy, "Cicero didn’t take the change in time. Nothing changed. Try again in a moment.")
             } else if !open {
                 // Taken, and Cicero went away: an answer written just before is read once more.
                 if let answer = readReply(reply) {
@@ -91,8 +97,14 @@ public enum Requests {
         let dated = waiting.map { url in
             (url, (try? fm.attributesOfItem(atPath: url.path))?[.creationDate] as? Date ?? .distantPast)
         }
-        return dated.sorted { $0.1 < $1.1 }.compactMap { url, _ in
+        let late = Date.now.addingTimeInterval(-Double(takeWithin.components.seconds) - 5)
+        return dated.sorted { $0.1 < $1.1 }.compactMap { url, date in
             let id = String(url.lastPathComponent.dropLast(".request.json".count))
+            // Its command would have withdrawn it by now, unless it was stopped: a change the user cancelled must never be made.
+            if date < late {
+                try? fm.removeItem(at: url)
+                return nil
+            }
             let taken = file(id, "taken", in: folder)
             guard (try? fm.moveItem(at: url, to: taken)) != nil else { return nil }
             let request = (try? Data(contentsOf: taken)).flatMap { try? JSONDecoder().decode(WriteRequest.self, from: $0) }
@@ -122,7 +134,13 @@ public enum Requests {
         let folder = folder(support: support)
         let fm = FileManager.default
         let hourAgo = Date.now.addingTimeInterval(-3600)
-        for name in (try? fm.contentsOfDirectory(atPath: folder.path)) ?? [] where !name.hasSuffix(".request.json") {
+        let names = (try? fm.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in names where name.hasSuffix(".taken.json") {
+            let id = String(name.dropLast(".taken.json".count))
+            guard !names.contains("\(id).reply.json") else { continue }
+            reply(CommandError(.failed, "Cicero quit before it said whether it made the change. Check with cicero status.").json, to: id, support: support)
+        }
+        for name in names where !name.hasSuffix(".request.json") {
             let url = folder.appendingPathComponent(name, isDirectory: false)
             if let date = (try? fm.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date, date < hourAgo {
                 try? fm.removeItem(at: url)

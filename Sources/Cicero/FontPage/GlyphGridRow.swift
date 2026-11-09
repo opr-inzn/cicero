@@ -440,7 +440,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
             let point = point(of: event)
             guard hypot(point.x - start.x, point.y - start.y) >= 3 else { return }
             press = .moved
-            guard let file = actions?.file(index) else { return }
+            guard frames.indices.contains(index), let file = actions?.file(index) else { return }
             let frame = frames[index]
             let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let item = NSDraggingItem(pasteboardWriter: file as NSURL)

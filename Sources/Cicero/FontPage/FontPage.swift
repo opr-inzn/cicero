@@ -90,7 +90,9 @@ struct FontPage: View {
         }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
         .task(id: Reading(face: face.id, generation: FontLoader.shared.generation(of: face.path))) {
-            loaded = (face.id, await model.pageContents.content(loading: face))
+            let content = await model.pageContents.content(loading: face)
+            guard !Task.isCancelled else { return }
+            loaded = (face.id, content)
         }
         .background(Color.canvas)
         // The page takes focus when it opens, rather than the first field on it, the type tester's size.

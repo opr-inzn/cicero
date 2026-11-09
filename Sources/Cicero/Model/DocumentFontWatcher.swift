@@ -83,7 +83,8 @@ final class DocumentFontWatcher {
         switch await Self.ask(app, pid) {
         case nil:
             refused.insert(app)
-            polling?.cancel()
+            // This app's task, which `polling` may no longer be: another app may have come to the front while it asked.
+            withUnsafeCurrentTask { $0?.cancel() }
             return
         case .fonts(let fonts)?:
             answer = fonts

@@ -106,7 +106,11 @@ extension ActivationEngine {
         let fm = FileManager.default
         var records = records
         let place = (destination.path as NSString).abbreviatingWithTildeInPath
-        if let fontLibrary, hasLibraryMove { _ = await finishLibraryMove(libraryPath: fontLibrary.path, records: records) }
+        // A new move would write over the journal of one not yet put back, and lose the files still to go back.
+        if let fontLibrary, hasLibraryMove, await !finishLibraryMove(libraryPath: fontLibrary.path, records: records) {
+            return ActivationResult(records: records, succeeded: 0, failed: [fontLibrary.path],
+                                    message: "Couldn’t move Cicero’s Library to \(place): an earlier move isn’t finished. Check that its disk is connected.")
+        }
         guard let fontLibrary, fm.fileExists(atPath: fontLibrary.path) else {
             // Nothing in it yet: it's just somewhere else from now on.
             return ActivationResult(records: records, succeeded: 0, failed: [], message: "Cicero’s Library moved to \(place)")

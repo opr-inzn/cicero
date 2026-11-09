@@ -135,6 +135,11 @@ final class AppModel {
         didSet {
             guard guessesClassifications != oldValue else { return }
             UserDefaults.standard.set(guessesClassifications, forKey: Self.guessesClassificationsKey)
+            if asksAboutGuessing {
+                UserDefaults.standard.removeObject(forKey: Self.asksAboutGuessingKey)
+                asksAboutGuessing = false
+                showsGuessingQuestion = false
+            }
             if guessesClassifications {
                 guessClassifications()
             } else {
@@ -280,7 +285,7 @@ final class AppModel {
     /// Files and folders opened or dropped, gathered for a moment so several arriving one by one are added together.
     @ObservationIgnored var openQueue: (urls: [URL], target: SidebarItem?, task: Task<Void, Never>?) = ([], nil, nil)
     /// Files the browser shows once the scan that lists them is done.
-    @ObservationIgnored var awaitingScan: OpenedFiles?
+    @ObservationIgnored var awaitingScan: [OpenedFiles] = []
 
     // MARK: Private
 
@@ -379,6 +384,11 @@ final class AppModel {
             store.save(data)
             if store.flush(durably: true) { ActivationJournal.remove(support: locations.support) }
         }
+        if appLock != nil, AppFolderMoves.exists(support: locations.support) {
+            data.records = AppFolderMoves.recover(data.records, support: locations.support)
+            store.save(data)
+            if store.flush(durably: true) { AppFolderMoves.remove(support: locations.support) }
+        }
         // Files from before there was a Font Library get its first place, saved with the next change.
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
         mayOfferEarlierImportCopy = FontExplorerImport.earlierImportLocation(in: data) != nil
@@ -430,6 +440,7 @@ final class AppModel {
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
             if renaming { await model.moveFormerInactiveFolders() }
             await model.engine.finishTurningOff()
+            model.engine.trashStagingLeftovers()
             let tidied = await model.engine.tidyInactiveFolder(model.data.records)
             model.data.records = tidied.records
             if migrating { await model.migrateFontLibrary() }

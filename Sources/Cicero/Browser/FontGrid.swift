@@ -175,7 +175,13 @@ struct FontGrid: View {
             if !Task.isCancelled { shown = Shown(text: text, ratio: SampleWidths.shared.listRatio) }
         }
         defer { meanwhile.cancel() }
-        let ratio = await SampleWidths.shared.measure(inputs, samples: samples, scriptSamples: model.scriptSamples)
+        // A `Task` isn't cancelled with the one that made it: left to run, it would show this text after newer text.
+        let scriptSamples = model.scriptSamples
+        let ratio = await withTaskCancellationHandler {
+            await SampleWidths.shared.measure(inputs, samples: samples, scriptSamples: scriptSamples)
+        } onCancel: {
+            meanwhile.cancel()
+        }
         guard !Task.isCancelled else { return }
         shown = Shown(text: text, ratio: ratio)
     }

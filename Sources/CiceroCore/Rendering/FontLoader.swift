@@ -204,12 +204,12 @@ public final class FontLoader: Sendable {
             }
             return path
         }) {
-            guard state.withLock({ $0.pending.contains(path) }) else { continue }
+            guard let generation = state.withLock({ $0.pending.contains(path) ? $0.generations[path] ?? 0 : nil }) else { continue }
             Self.readAhead(path)
             let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
-                // Still pending means nothing read or invalidated the file in the meantime.
-                if state.pending.remove(path) != nil { state.keep(descriptors, for: path) }
+                // Still pending, and the same generation, means nothing read or invalidated the file in the meantime.
+                if state.generations[path] ?? 0 == generation, state.pending.remove(path) != nil { state.keep(descriptors, for: path) }
             }
         }
     }
@@ -296,8 +296,10 @@ public final class FontLoader: Sendable {
         let measuring = Thread.isMainThread ? Measurements.begin("mainThreadFileRead") : nil
         defer { measuring?.end(detail: path) }
         #endif
+        let generation = state.withLock { $0.generations[path] ?? 0 }
         let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
         state.withLock { state in
+            guard state.generations[path] ?? 0 == generation else { return }
             state.keep(descriptors, for: path)
             state.pending.remove(path)
         }

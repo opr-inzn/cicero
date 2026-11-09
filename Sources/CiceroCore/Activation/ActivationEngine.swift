@@ -388,6 +388,7 @@ public struct ActivationEngine: Sendable {
         var toRegister: [(path: String, record: Bool)] = []
         let targets = Self.uniqueByPath(faces.map { currentVersion(of: installedCopy(of: $0, records: records), records: records) })
             .filter(\.canActivate)
+        Self.stopKeepingOff(targets.map(\.face.path))
         // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder ends
         // only once the file is on there (below): ending it first would take the file off macOS's list of fonts it has
         // off, and leave it off.
@@ -560,6 +561,7 @@ public struct ActivationEngine: Sendable {
         let session = Self.currentSession()
         // An old copy whose file has changed gives way to the new version, where it is, as `activate` copies it.
         let targets = Self.uniqueByPath(faces.map { currentVersion(of: $0, records: records) })
+        Self.stopKeepingOff(targets.map(\.face.path))
         // Never one of Creative Cloud's: one only Adobe apps load would be on in every app.
         for face in targets where !face.isAdobeFonts {
             let path = face.face.path
@@ -922,6 +924,10 @@ public struct ActivationEngine: Sendable {
         // Files that stayed where they were stay in use.
         let kept = persistent.filter(failed.contains)
         if !kept.isEmpty { _ = await registrar.register(kept.map(Self.url), scope: .persistent) }
+        let keptSession = session.filter(failed.contains)
+        if !keptSession.isEmpty {
+            for path in await registerAndConfirm(keptSession, scope: .session) { records.temporary[path] = nil }
+        }
         let message: String
         if failed.isEmpty {
             message = succeeded <= 1 ? "Moved to the Trash" : "Moved \(succeeded) files to the Trash"
@@ -1041,8 +1047,8 @@ public struct ActivationEngine: Sendable {
             }
         }
         if !leftovers.isEmpty {
-            _ = await endSessionRegistrations(leftovers)
-            for path in leftovers { records.temporary[path] = nil }
+            let stillOn = await endSessionRegistrations(leftovers)
+            for path in leftovers where !stillOn.contains(path) || records.inPlace.contains(path) { records.temporary[path] = nil }
         }
         // An application set's registration from before a logout ended with it. One in a Fonts folder is off there again;
         // one that's on was turned on for good along the way, and goes off.
@@ -1104,7 +1110,7 @@ public struct ActivationEngine: Sendable {
         let elsewhere = paths.filter { !isInsideFontsFolder($0) }
         if !inFontsFolders.isEmpty { registrar.disableNow(inFontsFolders.map(Self.url)) }
         if !elsewhere.isEmpty { registrar.unregisterNow(elsewhere.map(Self.url), scope: .session) }
-        for path in paths { records.temporary[path] = nil }
+        for path in paths where records.inPlace.contains(path) || !registrar.isActive(Self.url(path)) { records.temporary[path] = nil }
         return records
     }
 
@@ -1293,6 +1299,7 @@ public struct ActivationEngine: Sendable {
     /// and remembers where it was.
     private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
         let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: try locations.inactiveFolderForNewFiles())
+        AppFolderMoves.note(moved: destination.path, origin: path, support: locations.support)
         try Self.moveItem(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
