@@ -14,7 +14,9 @@ struct GridCell: Hashable {
 }
 
 struct GridRowActions {
-    let open: (Int, CGRect?) -> Void
+    let open: (Int) -> Void
+    let details: (Int) -> AnyView
+    let closed: () -> Void
     let menu: (Int) -> [GridMenuItem]
     let file: (Int) -> URL?
     var help: ((Int) -> String)?
@@ -61,6 +63,8 @@ struct GlyphGridRow: View {
                     return renderer.nsImage
                 }
             }
+            // Never shown, but without a popover on each row the page's lazy stack stopped making the glyph rows below the first groups on macOS 26.
+            .popover(isPresented: .constant(false)) { EmptyView() }
     }
 
     private var key: Int {
@@ -134,14 +138,75 @@ private struct SquareRowLayout: Layout {
     }
 }
 
-extension View {
-    func cellPopover<Content: View>(column: Int?, columns: Int, cell: CGRect?, close: @escaping () -> Void,
-                                    @ViewBuilder content: @escaping () -> Content) -> some View {
-        // The cell's frame comes with the click: a GeometryReader over each row to measure it left rows in the middle of the page undrawn on macOS 15.
-        let anchor: PopoverAttachmentAnchor = cell.map { .rect(.rect($0)) }
-            ?? .point(UnitPoint(x: (CGFloat(column ?? 0) + 0.5) / CGFloat(columns), y: 1))
-        return popover(isPresented: Binding(get: { column != nil }, set: { if !$0 { close() } }), attachmentAnchor: anchor,
-                       content: content)
+@MainActor
+final class CellPopover: NSObject, NSPopoverDelegate {
+    static let shared = CellPopover()
+
+    private struct Shown {
+        let popover: NSPopover
+        let host: NSHostingController<AnyView>
+        weak var row: GridRowEventView?
+        let index: Int
+        let closed: () -> Void
+    }
+
+    private var shown: Shown?
+    private var lastClosed: (row: ObjectIdentifier, index: Int, event: TimeInterval)?
+    private var escape: Any?
+
+    func show(_ content: AnyView, from row: GridRowEventView, index: Int, at rect: CGRect, closed: @escaping () -> Void) {
+        close(animated: false)
+        let host = NSHostingController(rootView: content)
+        host.sizingOptions = .preferredContentSize
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = host
+        popover.delegate = self
+        shown = Shown(popover: popover, host: host, row: row, index: index, closed: closed)
+        popover.show(relativeTo: rect, of: row, preferredEdge: .minY)
+        // The popover doesn't become the key window, so Escape would go to the page and take it back to the fonts.
+        escape = escape ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, let self, self.shown != nil else { return event }
+            self.close()
+            return nil
+        }
+    }
+
+    func close(animated: Bool = true) {
+        guard let shown else { return }
+        forget()
+        shown.closed()
+        shown.popover.animates = animated
+        shown.popover.close()
+    }
+
+    func index(shownFrom row: GridRowEventView) -> Int? {
+        shown.flatMap { $0.row === row ? $0.index : nil }
+    }
+
+    func closed(_ index: Int, of row: GridRowEventView, by event: NSEvent) -> Bool {
+        lastClosed.map { $0.row == ObjectIdentifier(row) && $0.index == index && $0.event == event.timestamp } ?? false
+    }
+
+    func update(_ content: AnyView?, at rect: CGRect) {
+        guard let shown else { return }
+        if let content { shown.host.rootView = content }
+        shown.popover.positioningRect = rect
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        guard let shown, notification.object as? NSPopover === shown.popover else { return }
+        if let row = shown.row, let event = NSApp.currentEvent {
+            lastClosed = (ObjectIdentifier(row), shown.index, event.timestamp)
+        }
+        forget()
+        shown.closed()
+    }
+
+    private func forget() {
+        shown = nil
+        if let escape { NSEvent.removeMonitor(escape) }
+        escape = nil
     }
 }
 
@@ -264,7 +329,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
     private var press: Press?
 
     private enum Press {
-        case cell(Int, CGPoint)
+        case cell(Int, CGPoint, wasOpen: Bool)
         case moved
         case passedOn
     }
@@ -273,12 +338,35 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
 
     fileprivate func update(labels: [String], columns: Int, actions: GridRowActions, picture: @escaping (Int, CGSize, Bool, CGFloat) -> NSImage?) {
         let hadHelp = self.actions?.help != nil
-        if labels != self.labels, cellElements != nil {
+        let changed = labels != self.labels
+        if changed, cellElements != nil {
             cellElements = nil
             NSAccessibility.post(element: self, notification: .layoutChanged)
         }
         (self.labels, self.columns, self.actions, self.picture) = (labels, columns, actions, picture)
         if hadHelp || actions.help != nil { updateToolTips() }
+        if let index = CellPopover.shared.index(shownFrom: self) {
+            let frames = frames
+            if changed || !frames.indices.contains(index) {
+                CellPopover.shared.close(animated: false)
+            } else {
+                CellPopover.shared.update(actions.details(index), at: frames[index])
+            }
+        }
+    }
+
+    private func open(_ index: Int) {
+        let frames = frames
+        guard let actions, frames.indices.contains(index) else { return }
+        CellPopover.shared.show(actions.details(index), from: self, index: index, at: frames[index], closed: actions.closed)
+        actions.open(index)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil, CellPopover.shared.index(shownFrom: self) != nil {
+            CellPopover.shared.close(animated: false)
+        }
     }
 
     // MARK: - Accessibility
@@ -313,9 +401,8 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
     }
 
     fileprivate func press(_ index: Int) -> Bool {
-        let frames = frames
-        guard let actions, frames.indices.contains(index) else { return false }
-        actions.open(index, frames[index])
+        guard actions != nil, frames.indices.contains(index) else { return false }
+        if CellPopover.shared.index(shownFrom: self) != index { open(index) }
         return true
     }
 
@@ -340,7 +427,9 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
     override func mouseDown(with event: NSEvent) {
         let point = point(of: event)
         if let index = index(at: point) {
-            press = .cell(index, point)
+            // A transient popover closes itself on a mouse down outside it, so this cell's popover may be closed already.
+            let wasOpen = CellPopover.shared.index(shownFrom: self) == index || CellPopover.shared.closed(index, of: self, by: event)
+            press = .cell(index, point, wasOpen: wasOpen)
         } else {
             press = .passedOn
             super.mouseDown(with: event)
@@ -349,7 +438,7 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
 
     override func mouseDragged(with event: NSEvent) {
         switch press {
-        case .cell(let index, let start):
+        case .cell(let index, let start, _):
             let point = point(of: event)
             guard hypot(point.x - start.x, point.y - start.y) >= 3 else { return }
             press = .moved
@@ -369,8 +458,12 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
     override func mouseUp(with event: NSEvent) {
         defer { press = nil }
         switch press {
-        case .cell(let index, _) where index == self.index(at: point(of: event)):
-            actions?.open(index, frames[index])
+        case .cell(let index, _, let wasOpen) where index == self.index(at: point(of: event)):
+            if !wasOpen {
+                open(index)
+            } else if CellPopover.shared.index(shownFrom: self) == index {
+                CellPopover.shared.close()
+            }
         case .passedOn:
             super.mouseUp(with: event)
         default:
@@ -402,6 +495,9 @@ final class GridRowEventView: NSView, NSDraggingSource, NSViewToolTipOwner {
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         if actions?.help != nil { updateToolTips() }
+        if let index = CellPopover.shared.index(shownFrom: self), frames.indices.contains(index) {
+            CellPopover.shared.update(nil, at: frames[index])
+        }
     }
 
     private func updateToolTips() {

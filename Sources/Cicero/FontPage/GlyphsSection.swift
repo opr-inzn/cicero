@@ -122,10 +122,8 @@ struct GlyphsSection: View {
             // Rows of the page's lazy stack, all one height: it guesses unplaced rows' heights from placed ones, so a LazyVGrid per group re-laid it out at full CPU, and rows in stacks of their own drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in
                 let above = row == 0 ? 0 : Self.runGap
-                GlyphRow(open: open, cells: rows[row].cells, columns: columns) { selected in
+                GlyphRow(open: open, cells: rows[row].cells) { selected in
                     glyphRow(rows[row].cells, style: style, selected: selected)
-                } details: { cell in
-                    details(cell, style: style)
                 }
                 .padding(.top, rows[row].label == nil ? 0 : above + Self.labelLine + Self.labelGap)
                 .overlay(alignment: .topLeading) {
@@ -171,7 +169,9 @@ struct GlyphsSection: View {
     private func glyphRow(_ cells: [Cell], style: Style, selected: Int?) -> GlyphGridRow {
         let font = FontLoader.shared.font(style.face, size: Self.glyphSize, weight: style.weight, variations: style.variations)
         let open = open
-        let actions = GridRowActions(open: { (open.cell, open.rect) = (cells[$0], $1) }, menu: { copyMenu(cells[$0], style: style) },
+        let actions = GridRowActions(open: { open.cell = cells[$0] },
+                                     details: { AnyView(details(cells[$0], style: style).environment(model).environment(preview)) },
+                                     closed: { open.cell = nil }, menu: { copyMenu(cells[$0], style: style) },
                                      file: { dragFile(cells[$0], style: style) })
         return GlyphGridRow(cells: cells.map { gridCell($0, in: font) }, columns: columns, face: style.face, generation: generation,
                             weight: style.weight, variations: style.variations, selected: selected, actions: actions)
@@ -255,13 +255,13 @@ struct GlyphsSection: View {
 
     private func copy(_ text: String, shown: String) {
         Self.copy(text)
-        open.cell = nil
+        CellPopover.shared.close()
         model.showToast("\(shown) copied to clipboard")
     }
 
     private func copyCharacter(_ cell: Cell, style: Style) {
         sampleClip(cell, style: style).copy()
-        open.cell = nil
+        CellPopover.shared.close()
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard")
     }
 
@@ -281,7 +281,7 @@ struct GlyphsSection: View {
     private func copyVector(_ cell: Cell, style: Style) {
         guard let outline = outline(cell, style: style) else { return NSSound.beep() }
         GlyphVectors.copy(outline, style: style.face.fullName, fallback: Self.fileFallback(cell), clip: sampleClip(cell, style: style))
-        open.cell = nil
+        CellPopover.shared.close()
         model.showToast("\(Self.shown(Self.character(of: cell))) copied to clipboard as a vector")
     }
 
@@ -442,25 +442,15 @@ struct GlyphsSection: View {
 @Observable
 final class OpenCell {
     var cell: GlyphCell?
-    var rect: CGRect?
 }
 
-private struct GlyphRow<Details: View>: View {
+private struct GlyphRow: View {
     let open: OpenCell
     let cells: [GlyphCell]
-    let columns: Int
     let row: (_ selected: Int?) -> GlyphGridRow
-    @ViewBuilder let details: (GlyphCell) -> Details
 
     var body: some View {
-        let column = open.cell.flatMap { cells.firstIndex(of: $0) }
-        let mine = column.map { cells[$0] }
-        row(column)
-            .cellPopover(column: column, columns: columns, cell: open.rect, close: { if open.cell == mine { open.cell = nil } }) {
-                if let cell = open.cell {
-                    details(cell)
-                }
-            }
+        row(open.cell.flatMap { cells.firstIndex(of: $0) })
     }
 }
 

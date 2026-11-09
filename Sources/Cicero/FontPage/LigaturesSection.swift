@@ -13,7 +13,6 @@ struct LigaturesSection: View {
     let characters: [CGGlyph: UInt32]
     let generation: Int
     @State private var popover: (tag: String, characters: [UInt32])?
-    @State private var popoverCell: CGRect?
 
     private static var spacing: CGFloat { GlyphsSection.spacing }
     private static var inset: CGFloat { GlyphsSection.inset }
@@ -44,18 +43,13 @@ struct LigaturesSection: View {
             shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
         }.map { $0 - ligatures.startIndex }
         let shown = Array(ligatures)
-        let actions = GridRowActions(open: { (popover, popoverCell) = ((group.tag, shown[$0].characters), $1) }, menu: { menu(shown[$0], in: group) },
+        let actions = GridRowActions(open: { popover = (group.tag, shown[$0].characters) },
+                                     details: { AnyView(details(shown[$0], in: group).environment(model)) },
+                                     closed: { popover = nil }, menu: { menu(shown[$0], in: group) },
                                      file: { dragFile(shown[$0]) }, help: { shown[$0].text })
         return GlyphGridRow(cells: shown.map { GridCell(content: .glyph($0.glyph), label: "Ligature of \($0.text)") }, columns: columns,
                             face: face, generation: generation, weight: weight, variations: variations, padding: 2, selected: column,
                             actions: actions)
-        .cellPopover(column: column, columns: columns, cell: popoverCell, close: {
-            if let shown = popover, shown.tag == group.tag, ligatures.contains(where: { $0.characters == shown.characters }) { popover = nil }
-        }) {
-            if let column {
-                details(ligatures[ligatures.startIndex + column], in: group)
-            }
-        }
     }
 
     private func menu(_ ligature: Ligature, in group: LigatureGroup) -> [GridMenuItem] {
@@ -103,13 +97,13 @@ struct LigaturesSection: View {
 
     private func copy(_ text: String, shown: String) {
         GlyphsSection.copy(text)
-        popover = nil
+        CellPopover.shared.close()
         model.showToast("\(shown) copied to clipboard")
     }
 
     private func copyCharacters(_ ligature: Ligature, in group: LigatureGroup) {
         sampleClip(ligature, in: group).copy()
-        popover = nil
+        CellPopover.shared.close()
         model.showToast("“\(ligature.text)” copied to clipboard")
     }
 
@@ -121,7 +115,7 @@ struct LigaturesSection: View {
     private func copyVector(_ ligature: Ligature, in group: LigatureGroup) {
         guard let outline = outline(ligature) else { return NSSound.beep() }
         GlyphVectors.copy(outline, style: face.fullName, fallback: Self.fileFallback(ligature), clip: sampleClip(ligature, in: group))
-        popover = nil
+        CellPopover.shared.close()
         model.showToast("“\(ligature.text)” copied to clipboard as a vector")
     }
 
