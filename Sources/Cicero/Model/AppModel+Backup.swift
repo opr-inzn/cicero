@@ -120,7 +120,7 @@ extension AppModel {
         let fontLibrary = settings && !contents.userData.fontLibraryPath.isEmpty ? nil : current.fontLibraryPath
         var fontResult: FontRestoreResult?
         if fonts { fontResult = await backup.restoreFonts(contents, fontLibrary: fontLibrary, progress: progress) }
-        let fallbackFolder = (fontResult?.fallback ?? 0) > 0 ? backup.fallbackFolder : nil
+        let fallbackFolder = (fontResult?.fallbackPaths.isEmpty ?? true) ? nil : backup.fallbackFolder
         if let fontResult, fontResult.cancelled {
             if let fallbackFolder { addFallbackFolder(fallbackFolder) }
             rescan()
@@ -132,6 +132,7 @@ extension AppModel {
             restored.fontFiles = restored.fontFiles.map { moved[$0] ?? $0 }
             restored.records.inPlace = Set(restored.records.inPlace.map { moved[$0] ?? $0 })
         }
+        let formerLibrary = current.fontLibraryPath
         await enqueued { [restored] model in
             if settings {
                 var data = restored
@@ -149,6 +150,7 @@ extension AppModel {
                 LibraryBackup.mergedRecords(current: current, backup: restored.records, written: written) { FileManager.default.fileExists(atPath: $0) }
             }.value
             model.data.records = merged.records
+            model.keepFontLibrariesAsLocations(former: formerLibrary)
             if !merged.reactivate.isEmpty {
                 let input = model.scanInput
                 if let library = try? await model.scanner.scan(input, progress: { _ in }) {
@@ -163,6 +165,20 @@ extension AppModel {
             model.rescan()
             model.showToast(Self.restoreSummary(settings: settings, data: restored, fonts: fontResult))
         }
+    }
+
+    private func keepFontLibrariesAsLocations(former: String) {
+        var changed = data
+        if !changed.installsIntoFontLibrary, !changed.fontLibraryPath.isEmpty {
+            changed.keepFontLibraryAsLocation(hasFonts: fontLibraryHasFonts(URL(fileURLWithPath: changed.fontLibraryPath, isDirectory: true)))
+        }
+        func standard(_ path: String) -> String { URL(fileURLWithPath: path).standardizedFileURL.path }
+        if !former.isEmpty, standard(former) != standard(changed.fontLibraryPath),
+           !changed.folders.contains(where: { standard($0.path) == standard(former) }),
+           fontLibraryHasFonts(URL(fileURLWithPath: former, isDirectory: true)) {
+            changed.folders.append(WatchedFolder(path: former))
+        }
+        if changed != data { data = changed }
     }
 
     private func addFallbackFolder(_ folder: URL) {
