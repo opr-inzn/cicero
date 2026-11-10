@@ -88,6 +88,9 @@ struct BackupSheet: View {
             } catch let refusal as KeptItemError {
                 progress = nil
                 model.showToast(refusal.message)
+            } catch let failure as LibraryBackup.Failure {
+                progress = nil
+                model.showToast(failure.message)
             } catch {
                 progress = nil
                 model.showToast("Couldn’t write the backup")

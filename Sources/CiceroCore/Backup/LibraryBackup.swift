@@ -93,12 +93,15 @@ public struct LibraryBackup: Sendable {
         case notABackup
         case newerFormat
         case archive(String)
+        case noSpace(needed: Int64, disk: String?)
 
         public var message: String {
             switch self {
             case .notABackup: "This file isn’t a Cicero backup"
             case .newerFormat: "This backup was made by a newer version of Cicero"
             case .archive: "Couldn’t read or write the archive"
+            case .noSpace(let needed, let disk):
+                "Not enough free space on \(disk.map { "“\($0)”" } ?? "the disk"). This needs \(ByteCountFormatter.string(fromByteCount: needed, countStyle: .file))"
             }
         }
     }
@@ -198,6 +201,8 @@ public struct LibraryBackup: Sendable {
             + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) } + kept
         let replacement = try ItemReplacement(for: destination, keeping: kept)
         defer { replacement.discard() }
+        let bytes = includeFonts ? fonts.reduce(Int64(0)) { $0 + max(0, $1.size) } : 0
+        try Self.checkSpace([(fm.temporaryDirectory, bytes), (replacement.staged.deletingLastPathComponent(), bytes)])
         let staging = fm.temporaryDirectory.appendingPathComponent("Cicero Backup \(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: staging) }
         let folder = staging.appendingPathComponent(destination.deletingPathExtension().lastPathComponent, isDirectory: true)
@@ -228,6 +233,21 @@ public struct LibraryBackup: Sendable {
         try replacement.commit(trash: trash)
     }
 
+    static func checkSpace(_ needs: [(folder: URL, bytes: Int64)]) throws {
+        var byDisk: [dev_t: (folder: URL, bytes: Int64)] = [:]
+        for need in needs {
+            guard let disk = ActivationEngine.disk(of: need.folder.path) else { continue }
+            byDisk[disk, default: (need.folder, 0)].bytes += need.bytes
+        }
+        let margin: Int64 = 50_000_000
+        for need in byDisk.values {
+            guard let values = try? need.folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeLocalizedNameKey]),
+                  let free = values.volumeAvailableCapacityForImportantUsage, free < need.bytes + margin
+            else { continue }
+            throw Failure.noSpace(needed: need.bytes + margin, disk: values.volumeLocalizedName)
+        }
+    }
+
     public func saveSnapshot(_ data: UserData, named name: String = "Before Restore", date: Date = Date()) throws -> URL {
         let fm = FileManager.default
         try fm.createDirectory(at: snapshotsFolder, withIntermediateDirectories: true)
@@ -254,6 +274,7 @@ public struct LibraryBackup: Sendable {
     @concurrent
     public static func open(_ archive: URL) async throws -> BackupContents {
         let fm = FileManager.default
+        if let bytes = Archive.unzippedSize(of: archive) { try checkSpace([(fm.temporaryDirectory, bytes)]) }
         let root = fm.temporaryDirectory.appendingPathComponent("Cicero Restore \(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         do {
@@ -474,6 +495,52 @@ public struct LibraryBackup: Sendable {
 enum Archive {
     static func zip(_ folder: URL, to destination: URL) async throws {
         try await ditto(["-c", "-k", "--keepParent", "--norsrc", folder.path, destination.path])
+    }
+
+    static func unzippedSize(of archive: URL) -> Int64? {
+        guard let file = try? FileHandle(forReadingFrom: archive) else { return nil }
+        defer { try? file.close() }
+        guard let length = try? file.seekToEnd(), length >= 22 else { return nil }
+        func read(_ offset: UInt64, _ count: Int) -> [UInt8]? {
+            guard offset <= length, UInt64(count) <= length - offset, (try? file.seek(toOffset: offset)) != nil,
+                  let data = try? file.read(upToCount: count), data.count == count else { return nil }
+            return [UInt8](data)
+        }
+        func number(_ bytes: [UInt8], _ at: Int, _ size: Int) -> UInt64 {
+            (0..<size).reduce(UInt64(0)) { $0 | UInt64(bytes[at + $1]) << (8 * UInt64($1)) }
+        }
+        let tailStart = length - min(length, 65_557)
+        guard let tail = read(tailStart, Int(length - tailStart)),
+              let end = stride(from: tail.count - 22, through: 0, by: -1).first(where: { number(tail, $0, 4) == 0x0605_4b50 })
+        else { return nil }
+        var entries = number(tail, end + 10, 2), directorySize = number(tail, end + 12, 4), directoryStart = number(tail, end + 16, 4)
+        if entries == 0xFFFF || directorySize == 0xFFFF_FFFF || directoryStart == 0xFFFF_FFFF {
+            guard end >= 20, number(tail, end - 20, 4) == 0x0706_4b50,
+                  let record = read(number(tail, end - 12, 8), 56), number(record, 0, 4) == 0x0606_4b50 else { return nil }
+            entries = number(record, 32, 8)
+            directorySize = number(record, 40, 8)
+            directoryStart = number(record, 48, 8)
+        }
+        guard directorySize <= 1 << 30, let directory = read(directoryStart, Int(directorySize)) else { return nil }
+        var total: UInt64 = 0
+        var at = 0
+        for _ in 0..<entries {
+            guard at + 46 <= directory.count, number(directory, at, 4) == 0x0201_4b50 else { return nil }
+            var size = number(directory, at + 24, 4)
+            let name = Int(number(directory, at + 28, 2)), extra = Int(number(directory, at + 30, 2)), comment = Int(number(directory, at + 32, 2))
+            guard at + 46 + name + extra + comment <= directory.count else { return nil }
+            if size == 0xFFFF_FFFF {
+                var field = at + 46 + name
+                while field + 4 <= at + 46 + name + extra {
+                    let id = number(directory, field, 2), fieldSize = Int(number(directory, field + 2, 2))
+                    if id == 1, fieldSize >= 8, field + 12 <= directory.count { size = number(directory, field + 4, 8) }
+                    field += 4 + fieldSize
+                }
+            }
+            total = total.addingReportingOverflow(size).overflow ? .max : total + size
+            at += 46 + name + extra + comment
+        }
+        return Int64(clamping: total)
     }
 
     static func unzip(_ archive: URL, to folder: URL) async throws {
