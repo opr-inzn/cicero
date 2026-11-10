@@ -79,9 +79,13 @@ extension ActivationEngine {
         var records = records
         let place = (destination.path as NSString).abbreviatingWithTildeInPath
         // A new move would write over the journal of one not yet put back, and lose the files still to go back.
-        if let fontLibrary, hasLibraryMove, await !finishLibraryMove(libraryPath: fontLibrary.path, records: records) {
-            return ActivationResult(records: records, succeeded: 0, failed: [fontLibrary.path],
+        if hasLibraryMove, await !finishedEarlierMove(records: records) {
+            return ActivationResult(records: records, succeeded: 0, failed: [fontLibrary?.path ?? destination.path],
                                     message: "Couldn’t move Cicero’s Library to \(place): an earlier move isn’t finished. Check that its disk is connected.")
+        }
+        if let fontLibrary, !Self.diskIsThere(fontLibrary.path) {
+            return ActivationResult(records: records, succeeded: 0, failed: [fontLibrary.path],
+                                    message: "Couldn’t move Cicero’s Library: the disk it’s on isn’t connected")
         }
         guard let fontLibrary, fm.fileExists(atPath: fontLibrary.path) else {
             return ActivationResult(records: records, succeeded: 0, failed: [], message: "Cicero’s Library moved to \(place)")
@@ -132,6 +136,11 @@ extension ActivationEngine {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
         }
         return ActivationResult(records: records, succeeded: 1, failed: [], message: "Cicero’s Library moved to \(place)")
+    }
+
+    private func finishedEarlierMove(records: ActivationRecords) async -> Bool {
+        guard let fontLibrary else { return false }
+        return await finishLibraryMove(libraryPath: fontLibrary.path, records: records)
     }
 
     static func moveItems(in old: String, to new: String, except kept: Set<String>) -> Bool {
