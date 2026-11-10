@@ -30,11 +30,14 @@ public final class UserDataStore: Sendable {
 
     public func load() -> UserData {
         if let data = try? Data(contentsOf: fileURL) {
+            let newer = UserData.isFromNewerVersion(data)
+            if newer { readOnly.withLock { $0 = true } }
             if var decoded = try? JSONDecoder().decode(UserData.self, from: data) {
-                if decoded.isFromNewerVersion { readOnly.withLock { $0 = true } }
                 decoded.updateLicenseTags()
                 return decoded
             }
+            // Never a newer Cicero's file, which only holds what this one can't read: it stays, untouched, for that Cicero.
+            if newer { return UserData() }
             // Keep a damaged file for the user instead of silently writing over it.
             setAside()
             return UserData()

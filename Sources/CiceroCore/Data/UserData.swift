@@ -7,6 +7,11 @@ public struct UserData: Codable, Equatable, Sendable {
 
     public var version = currentVersion
     public var isFromNewerVersion: Bool { version > Self.currentVersion }
+
+    public static func isFromNewerVersion(_ file: Data) -> Bool {
+        struct Saved: Decodable { var version: Int? }
+        return ((try? JSONDecoder().decode(Saved.self, from: file))?.version ?? 0) > currentVersion
+    }
     public var folders: [WatchedFolder] = []
     public var folderNames: [String: String] = [:]
     public var fontFiles: [String] = []

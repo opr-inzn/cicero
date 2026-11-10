@@ -102,6 +102,7 @@ public final class LibraryContext: @unchecked Sendable {
             do {
                 data = try JSONDecoder().decode(UserData.self, from: contents)
             } catch {
+                if UserData.isFromNewerVersion(contents) { throw CommandError(.failed, UserData.newerVersionMessage) }
                 throw CommandError(.unreadableUserData, "Cicero’s data can’t be read (\(url.path)). Open Cicero: it keeps the file aside and starts again.")
             }
             data.updateLicenseTags()
