@@ -18,6 +18,7 @@ final class DocumentFontWatcher {
     private var matcher: (fingerprint: Int, matcher: FontMatcher)?
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
     private static let interval: Duration = .milliseconds(500)
+    private static let busyInterval: Duration = .seconds(10)
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
@@ -54,27 +55,29 @@ final class DocumentFontWatcher {
         let pid = running.processIdentifier
         polling = Task { [weak self] in
             await previous?.value
-            while !Task.isCancelled {
-                await self?.ask(app, pid)
-                try? await Task.sleep(for: Self.interval, tolerance: .milliseconds(100))
+            guard !Task.isCancelled, await Self.mayAsk(pid) else { return }
+            while !Task.isCancelled, let answered = await self?.ask(app, pid) {
+                try? await Task.sleep(for: answered ? Self.interval : Self.busyInterval, tolerance: .milliseconds(100))
             }
         }
     }
 
     // MARK: Asking
 
-    private func ask(_ app: App, _ pid: pid_t) async {
+    private func ask(_ app: App, _ pid: pid_t) async -> Bool {
         let answer: [DocumentFont]
         switch await Self.ask(app, pid) {
         case nil:
             withUnsafeCurrentTask { $0?.cancel() }
-            return
+            return true
+        case .busy?:
+            return false
         case .fonts(let fonts)?:
             answer = fonts
         case .files(let paths)?:
             answer = await fonts(inFiles: paths)
         }
-        guard !Task.isCancelled, answer != lastFonts[app], let model, model.hasScanned else { return }
+        guard !Task.isCancelled, answer != lastFonts[app], let model, model.hasScanned else { return true }
         lastFonts[app] = answer
         if matcher?.fingerprint != model.library.fingerprint { matcher = (model.library.fingerprint, FontMatcher(model.library)) }
         let wanted = DocumentFonts.match(answer, using: matcher!.matcher).compactMap(\.face).filter { face in
@@ -83,6 +86,7 @@ final class DocumentFontWatcher {
             return (forApps || !face.state.isActive) && (face.app == nil || parked) && !face.isAdobeFonts
         }
         if !wanted.isEmpty { model.appSets.request(Set(wanted.map(\.face.postScriptName)), for: app.rawValue) }
+        return true
     }
 
     private func fonts(inFiles paths: [String]) async -> [DocumentFont] {
@@ -109,6 +113,14 @@ final class DocumentFontWatcher {
     nonisolated private enum Answer {
         case fonts([DocumentFont])
         case files([String])
+        case busy
+    }
+
+    @concurrent
+    private static func mayAsk(_ pid: pid_t) async -> Bool {
+        // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would give up after its timeout and take the question away with it.
+        guard let address = NSAppleEventDescriptor(processIdentifier: pid).aeDesc else { return true }
+        return AEDeterminePermissionToAutomateTarget(address, AEEventClass(kAECoreSuite), AEEventID(kAEGetData), true) != errAEEventNotPermitted
     }
 
     @concurrent
@@ -141,6 +153,8 @@ final class DocumentFontWatcher {
             }
         } catch let error as NSError where error.code == errAEEventNotPermitted {
             return nil
+        } catch let error as NSError where error.code == errAETimeout {
+            return .busy
         } catch {
             return app == .inDesign ? .fonts([]) : .files([])
         }
@@ -218,12 +232,7 @@ extension DocumentFontWatcher {
             else { return nil }
             return .file(url)
         }
-        // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would give up after its timeout and take the question away with it.
-        let target = NSAppleEventDescriptor(processIdentifier: pid)
-        if let address = target.aeDesc,
-           AEDeterminePermissionToAutomateTarget(address, AEEventClass(kAECoreSuite), AEEventID(kAEGetData), true) == errAEEventNotPermitted {
-            throw NSError(domain: NSOSStatusErrorDomain, code: Int(errAEEventNotPermitted))
-        }
+        guard await mayAsk(pid) else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(errAEEventNotPermitted)) }
         do {
             switch bundleID {
             case App.inDesign.rawValue:

@@ -107,15 +107,18 @@ struct FamilyKeys: ViewModifier {
         let quickLook = model.quickLook
         content
             .onKeyPress(.return) {
+                guard model.openFamilyID == nil else { return .ignored }
                 stopTyping()
                 return open()
             }
             .onKeyPress(.escape) {
+                guard model.openFamilyID == nil else { return .ignored }
                 stopTyping()
                 if quickLook.isOpen { quickLook.close() } else { model.selectedIDs = [] }
                 return .handled
             }
             .onKeyPress(.space, phases: [.down, .repeat]) { press in
+                guard model.openFamilyID == nil else { return .ignored }
                 guard press.modifiers.isDisjoint(with: [.command, .option, .control, .shift]) else { return .ignored }
                 guard press.phase == .down else { return .handled }
                 if pendingQuickLook == nil, !typed.hasSuffix(" "), !typed.isEmpty, Date.now.timeIntervalSince(lastTyped) <= 1,
@@ -140,10 +143,12 @@ struct FamilyKeys: ViewModifier {
                 return .handled
             }
             .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { press in
+                guard model.openFamilyID == nil else { return .ignored }
                 stopTyping()
                 return arrow(press)
             }
             .onKeyPress(characters: .alphanumerics, phases: .down) { press in
+                guard model.openFamilyID == nil else { return .ignored }
                 if press.modifiers.contains(.command) {
                     guard press.characters == "a" else { return .ignored }
                     model.selectedIDs = Set(families.map(\.id))

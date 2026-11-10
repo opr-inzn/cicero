@@ -14,7 +14,6 @@ enum ToolboxTab: String, CaseIterable {
 
 struct ToolboxWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @AppStorage("toolbox.tab") private var tab: ToolboxTab = .text
 
     var body: some View {
@@ -29,8 +28,6 @@ struct ToolboxWindow: View {
                 ToolbarPicker("View", values: ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
-        .onChange(of: model.manyActivationPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
-        .onChange(of: model.movingOutPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
     }
 }
 

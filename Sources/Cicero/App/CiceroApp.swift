@@ -18,9 +18,12 @@ struct CiceroApp: App {
         _model = State(initialValue: model)
         _updates = State(initialValue: updates)
         _menuBarItem = State(initialValue: menuBarItem)
+        AppDelegate.launchModel = model
         NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 Appearance.applySaved()
+                model.start()
+                LibraryFocus.shared.start()
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
                 menuBarItem.start()
@@ -100,7 +103,7 @@ struct CiceroCommands: Commands {
     @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
-    private var opensSelection: Bool { model.openFamilyID == nil && !model.shownSelection.isEmpty }
+    private var opensSelection: Bool { LibraryFocus.shared.isKey && model.openFamilyID == nil && !model.shownSelection.isEmpty }
 
     var body: some Commands {
         // The menu bar's commands are made at launch and have these even while no window is open.
@@ -174,7 +177,7 @@ struct CiceroCommands: Commands {
             .disabled(compareSize.map { $0 <= CompareWindow.sizes.lowerBound } ?? true)
         }
         CommandMenu("Fonts") {
-            let selection = model.selectedFamilies
+            let selection = LibraryFocus.shared.isKey ? model.selectedFamilies : []
             Button("Activate", systemImage: "checkmark.seal") { model.activate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
@@ -191,9 +194,10 @@ struct CiceroCommands: Commands {
             let hidesInfo = model.isInfoPresented && model.shownInfoTab == .info
             Button(hidesInfo ? "Hide Info" : "Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
+                .disabled(!LibraryFocus.shared.isKey)
             Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look", systemImage: "eye") { model.quickLook.toggle() }
                 .keyboardShortcut("y", modifiers: .command)
-                .disabled(!model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
+                .disabled(!LibraryFocus.shared.isKey || !model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
             Button("Reveal in Finder", systemImage: "finder") { model.reveal(selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
@@ -206,6 +210,7 @@ struct CiceroCommands: Commands {
                 openWindow(id: WindowID.compare)
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
+            .disabled(!LibraryFocus.shared.isKey)
             Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") {
                 model.showSimilar(to: selection[0], style: model.shownStyle(of: selection[0]))
             }
@@ -248,6 +253,7 @@ struct CiceroCommands: Commands {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+    @MainActor static var launchModel: AppModel?
     var model: AppModel? {
         didSet { flush() }
     }
@@ -255,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var addsFonts = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if model == nil { model = Self.launchModel }
         UsageStatistics.sendLaunch()
         PreferencesItem.keepNamed()
         WindowList.start()
@@ -318,6 +325,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // Not while the main window is still appearing: the panel runs a loop of its own.
             DispatchQueue.main.async { model.presentAddFontsPanel() }
         }
+    }
+}
+
+@Observable
+final class LibraryFocus {
+    static let shared = LibraryFocus()
+    private(set) var isKey = false
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+
+    func start() {
+        guard observers.isEmpty else { return }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                DispatchQueue.main.async { LibraryFocus.shared.update() }
+            })
+        }
+        update()
+    }
+
+    private func update() {
+        let isKey = NSApp.keyWindow.map { $0 === TextEditingKeys.mainWindow } ?? false
+        if isKey != self.isKey { self.isKey = isKey }
     }
 }
 

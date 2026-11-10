@@ -108,7 +108,7 @@ final class AppRequestWriter: Writer {
                 let result = untilQuit
                     ? await model.engine.activateTemporarily(faces, records: model.data.records)
                     : await model.engine.activate(faces, method: .inPlace, records: model.data.records)
-                model.finish(result, operation: operation, undo: model.undo(turning: faces, on: false, failed: result.failed))
+                model.finish(result, operation: operation, undo: model.undo(restoring: faces, failed: result.failed))
                 continuation.resume(returning: result)
             }
             if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: model.store.readOnlyMessage)) }
@@ -125,7 +125,7 @@ final class AppRequestWriter: Writer {
         return await withCheckedContinuation { continuation in
             let queued = model.enqueue { model in
                 let result = await model.engine.deactivate(faces, records: model.data.records)
-                model.finish(result, operation: operation, undo: model.undo(turning: faces, on: true, failed: result.failed))
+                model.finish(result, operation: operation, undo: model.undo(restoring: faces, failed: result.failed))
                 continuation.resume(returning: result)
             }
             if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: model.store.readOnlyMessage)) }

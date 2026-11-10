@@ -434,6 +434,7 @@ struct ValueField: View {
     var unit = ""
     var alignment = HorizontalAlignment.trailing
     @State private var text = ""
+    @State private var owner: Binding<Double>?
     @FocusState private var isFocused: Bool
 
     init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "", alignment: HorizontalAlignment = .trailing) {
@@ -467,7 +468,14 @@ struct ValueField: View {
         .monospacedDigit()
         .onAppear { text = formatted(value) }
         .onChange(of: value) { text = formatted($1) }
-        .onChange(of: isFocused) { if !$1 { commit() } }
+        .onChange(of: isFocused) {
+            if $1 {
+                owner = $value
+            } else {
+                commit()
+                owner = nil
+            }
+        }
     }
 
     @ViewBuilder
@@ -496,14 +504,16 @@ struct ValueField: View {
     }
 
     private func commit() {
-        guard text != formatted(value) else { return }
-        if let typed { set(typed) } else { text = formatted(value) }
+        let target = owner ?? $value
+        guard text != formatted(target.wrappedValue) else { return }
+        if let typed { set(typed, on: target) } else { text = formatted(value) }
     }
 
-    private func set(_ new: Double) {
+    private func set(_ new: Double, on target: Binding<Double>? = nil) {
+        let target = target ?? owner ?? $value
         let new = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
         // Within a thousandth of a step: rounding to the step can leave the same number a hair apart.
-        if abs(new - value) > step / 1000 { value = new }
+        if abs(new - target.wrappedValue) > step / 1000 { target.wrappedValue = new }
         text = formatted(value)
     }
 
@@ -636,7 +646,7 @@ struct FolderActivationPicker: View {
                 switch choice {
                 case Self.specificApp: askForApp()
                 case Self.active: model.setActivation(ofFolder: folder.id, active: true, app: nil)
-                default: model.setActivation(ofFolder: folder.id, active: false, app: choice)
+                default: model.setActivation(ofFolder: folder.id, active: false, app: choice.isEmpty ? nil : choice)
                 }
             }
         )) {

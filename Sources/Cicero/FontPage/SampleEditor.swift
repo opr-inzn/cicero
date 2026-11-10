@@ -51,11 +51,12 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         coordinator.text = $text
         coordinator.glyphs = $glyphs
         coordinator.defaultText = defaultText
-        if view.string != text {
+        if view.string != text, !view.hasMarkedText() {
             coordinator.isSettingText = true
             view.string = text
             coordinator.isSettingText = false
             coordinator.markedGlyphs = nil
+            coordinator.undoManager.removeAllActions()
         }
         update(view, context: context)
         if caseChange != coordinator.caseChange {
@@ -164,12 +165,15 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         var markedGlyphs: [SampleGlyphRun]?
         var isSettingText = false
         var caseChange: CaseChange?
+        let undoManager = UndoManager()
 
         init(text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
             self.text = text
             self.glyphs = glyphs
             self.defaultText = defaultText
         }
+
+        func undoManager(for view: NSTextView) -> UndoManager? { undoManager }
 
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? NSTextView else { return }

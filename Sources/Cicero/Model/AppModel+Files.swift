@@ -37,8 +37,11 @@ extension AppModel {
     }
 
     func open(_ urls: [URL], into target: SidebarItem? = nil) {
-        openQueue.urls += urls
-        openQueue.target = openQueue.target ?? target
+        if let last = openQueue.batches.indices.last, openQueue.batches[last].target == target {
+            openQueue.batches[last].urls += urls
+        } else {
+            openQueue.batches.append((urls, target))
+        }
         openQueue.task?.cancel()
         openQueue.task = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
@@ -74,9 +77,13 @@ extension AppModel {
     }
 
     func openWaitingFiles() {
-        guard started, !openQueue.urls.isEmpty else { return }
-        let (urls, target, _) = openQueue
-        openQueue = ([], nil, nil)
+        guard started, !openQueue.batches.isEmpty, hasScanned || !library.families.isEmpty else { return }
+        let batches = openQueue.batches
+        openQueue.batches = []
+        for batch in batches { open(batch.urls, target: batch.target) }
+    }
+
+    private func open(_ urls: [URL], target: SidebarItem?) {
         let fm = FileManager.default
         var folders: [URL] = []
         var files: [String] = []

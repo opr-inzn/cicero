@@ -85,8 +85,12 @@ extension AppModel {
         }
     }
 
+    private func isInSidebar(_ item: SidebarItem) -> Bool {
+        libraryRows.contains { $0.item == item } || SidebarSection.allCases.contains { rows(for: $0).contains { $0.item == item } }
+    }
+
     func returnFromList() {
-        let items = listReturn ?? [.all]
+        let items = (listReturn ?? [.all]).filter(isInSidebar)
         let page = listReturnPage
         listReturn = nil
         listReturnPage = nil

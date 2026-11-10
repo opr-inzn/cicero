@@ -38,6 +38,12 @@ final class AppSetWatcher {
         scheduleSync(after: .zero)
     }
 
+    func allow(_ postScriptNames: Set<String>) {
+        guard !postScriptNames.isDisjoint(with: dismissed) else { return }
+        dismissed.subtract(postScriptNames)
+        scheduleSync(after: .zero)
+    }
+
     func forgetRequests() {
         guard !requested.isEmpty else { return }
         requested = [:]
