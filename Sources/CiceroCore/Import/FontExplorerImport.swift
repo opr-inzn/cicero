@@ -379,9 +379,14 @@ private struct Reader {
         var missing = 0
         var inLibrary: [String] = []
         var absentLibrary: (path: String, files: Int)?
+        let libraryIsHere = backupFolder == nil && newLibrary.map { fm.fileExists(atPath: $0) } == true
         for id in order {
             guard let container = containers[id], !container.isSystem, !container.isCloud else { continue }
             if let newLibrary, container.path.hasPrefix(newLibrary + "/") {
+                if libraryIsHere, !fm.fileExists(atPath: container.path) {
+                    missing += 1
+                    continue
+                }
                 library.fontFolderCount += 1
                 inLibrary.append(String(container.path.dropFirst(newLibrary.count + 1)))
             } else if fm.fileExists(atPath: container.path) {
