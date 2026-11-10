@@ -119,10 +119,10 @@ func answer(_ common: CommonOptions, text: (JSON) -> String, exitCode: (JSON) ->
         if common.json {
             print(error.json.text())
         } else {
-            var message = "cicero: \(error.message)"
+            var message = "cicero: \(Text.clean(error.message, lines: true))"
             if !error.suggestions.isEmpty {
                 message += "\n" + (error.code == .notFound ? "Did you mean:" : "It can be:") + "\n"
-                    + error.suggestions.map { "  \($0)" }.joined(separator: "\n")
+                    + error.suggestions.map { "  \(Text.clean($0))" }.joined(separator: "\n")
             }
             FileHandle.standardError.write(Data((message + "\n").utf8))
         }
@@ -427,7 +427,7 @@ func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts
                 return try await WriteDispatcher.perform(request, environment: .current())
             } catch let error as CommandError where error.code == .needsConfirmation && !request.confirmed && !common.json
                 && isatty(STDIN_FILENO) == 1 && isatty(STDERR_FILENO) == 1 {
-                let question = error.question.map { "\($0.title)\n\($0.message)\n" } ?? error.message + "\n"
+                let question = Text.clean(error.question.map { "\($0.title)\n\($0.message)\n" } ?? error.message + "\n", lines: true)
                 FileHandle.standardError.write(Data((question + "Go on? [y/N] ").utf8))
                 guard let reply = readLine()?.trimmingCharacters(in: .whitespaces).lowercased(), ["y", "yes"].contains(reply) else {
                     throw CommandError(.needsConfirmation, "Nothing changed.")
