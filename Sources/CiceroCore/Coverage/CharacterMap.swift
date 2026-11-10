@@ -16,10 +16,11 @@ public enum CharacterMap {
         let reader = GSUBSubstitutions.Reader(bytes: [UInt8](table))
         var ranges: [ClosedRange<UInt32>] = []
         var read = false
+        var seen = Set<Int>()
 
         func add(_ low: Int, _ high: Int) {
             let high = min(high, 0x10FFFF)
-            guard low <= high else { return }
+            guard low <= high, ranges.count < 0x20000 else { return }
             if let last = ranges.last, Int(last.upperBound) + 1 == low {
                 ranges[ranges.count - 1] = last.lowerBound...UInt32(high)
             } else {
@@ -31,7 +32,7 @@ public enum CharacterMap {
             let at = 4 + record * 8
             guard let platform = reader.u16(at), let encoding = reader.u16(at + 2), let start = reader.u32(at + 4),
                   platform == 0 || (platform == 3 && [0, 1, 10].contains(encoding)),
-                  let format = reader.u16(start)
+                  seen.insert(start).inserted, let format = reader.u16(start)
             else { continue }
             switch format {
             case 0:
