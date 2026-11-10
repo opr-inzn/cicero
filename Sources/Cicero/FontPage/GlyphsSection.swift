@@ -5,7 +5,7 @@ import SwiftUI
 struct GlyphsSection: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
-    @Environment(\.glyphsTitleMoved) private var titleMoved
+    @Environment(\.glyphsTitle) private var title
     let family: Family
     let face: FontFace
     let columns: Int
@@ -55,7 +55,7 @@ struct GlyphsSection: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 280)
         }
-        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(TopRowKeeper.space)).minY } action: { [titleMoved] in titleMoved($0) }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(TopRowKeeper.space)).minY } action: { [title] y in if title?.y != y { title?.y = y } }
         .padding(.horizontal, Self.inset)
         .padding(.top, Self.titleGap)
         .padding(.bottom, 4)

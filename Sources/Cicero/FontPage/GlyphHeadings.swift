@@ -21,8 +21,13 @@ extension EnvironmentValues {
     @Entry var pinsHeadings = true
 }
 
+@Observable
+final class GlyphsTitle {
+    var y: CGFloat?
+}
+
 extension EnvironmentValues {
-    @Entry var glyphsTitleMoved: (CGFloat) -> Void = { _ in }
+    @Entry var glyphsTitle: GlyphsTitle?
 }
 
 private struct WhenPinned: ViewModifier {

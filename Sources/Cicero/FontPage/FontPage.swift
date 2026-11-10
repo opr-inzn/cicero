@@ -16,7 +16,7 @@ struct FontPage: View {
     @FocusState private var focused: Bool
     @State private var position = ScrollPosition()
     @State private var keeper = TopRowKeeper()
-    @State private var titleY: CGFloat?
+    @State private var title = GlyphsTitle()
     @State private var solidTop = false
 
     var body: some View {
@@ -60,12 +60,12 @@ struct FontPage: View {
             }
             .modifier(GlyphColumnsReader(columns: $glyphColumns))
             .environment(\.topRowKeeper, keeper)
-            .environment(\.glyphsTitleMoved, { y in if titleY != y { titleY = y } })
+            .environment(\.glyphsTitle, title)
             .coordinateSpace(.named(TopRowKeeper.space))
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
-        .onScrollGeometryChange(for: Bool.self) { [titleY] geometry in titleY.map { geometry.contentOffset.y >= $0 - GlyphsSection.titleGap + 2 } ?? false } action: { solidTop = $1 }
+        .onScrollGeometryChange(for: Bool.self) { [titleY = title.y] geometry in titleY.map { geometry.contentOffset.y >= $0 - GlyphsSection.titleGap + 2 } ?? false } action: { solidTop = $1 }
         .hardTopScrollEdge(solidTop)
         .overlay(alignment: .top) {
             if solidTop {
