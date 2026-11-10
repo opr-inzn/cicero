@@ -309,7 +309,10 @@ public struct ActivationEngine: Sendable {
         failed.append(contentsOf: stuckInSession.sorted())
         for face in targets where !stuckInSession.contains(face.face.path) {
             let path = face.face.path
-            if records.appFolderOrigins[path] != nil {
+            if hasGoneAppFolder(path, records: records) {
+                records.appFolderOrigins[path] = nil
+                toCopy.append((path, face.face.familyName))
+            } else if records.appFolderOrigins[path] != nil {
                 do {
                     toRegister.append((try moveBackToAppFolder(path, records: &records), true))
                 } catch {
@@ -1113,6 +1116,11 @@ public struct ActivationEngine: Sendable {
         AppFolderMoves.note(moved: destination.path, origin: path, support: locations.support)
         try move(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
+    }
+
+    func hasGoneAppFolder(_ path: String, records: ActivationRecords) -> Bool {
+        guard let origin = records.appFolderOrigins[path] else { return false }
+        return Reachability.isGone(Self.url(origin).deletingLastPathComponent().path)
     }
 
     private func moveBackToAppFolder(_ path: String, records: inout ActivationRecords) throws -> String {

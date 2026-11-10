@@ -337,6 +337,10 @@ extension ActivationEngine {
 
     public func emptyInactiveFolder(_ records: ActivationRecords) async -> (records: ActivationRecords, moved: Int) {
         let fm = FileManager.default
+        var records = records
+        for path in records.appFolderOrigins.keys where isInInactiveFolder(path) && hasGoneAppFolder(path, records: records) {
+            records.appFolderOrigins[path] = nil
+        }
         let all = locations.inactiveFolders.flatMap { folder in
             ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? []).sorted().map { folder.appendingPathComponent($0, isDirectory: false).path }
         }
@@ -373,7 +377,6 @@ extension ActivationEngine {
             }
         }
         placed.merge(await moveIntoFontsFolderOff(intoFontsFolder).placed) { first, _ in first }
-        var records = records
         for (copy, original) in records.installedCopies {
             if let moved = placed[original] { records.installedCopies[copy] = moved == copy ? nil : moved }
         }
