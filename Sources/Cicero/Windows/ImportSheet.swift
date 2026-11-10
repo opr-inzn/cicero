@@ -48,6 +48,7 @@ struct ImportSheet: View {
             }
         }
         .frame(width: 600)
+        .interactiveDismissDisabled(stage != nil)
         .onAppear { appIsOpen = isAppRunning }
         .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
