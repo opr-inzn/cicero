@@ -93,7 +93,7 @@ public enum CopyChooser {
         for (_, same) in Dictionary(grouping: sources.indices, by: { sources[$0].name }) where same.count > 1 {
             let paths = same.map { sources[$0].id.split(separator: "/").map(String.init).dropLast() }
             var above = paths.map { _ in "" }
-            for level in 1...(paths.map(\.count).max() ?? 1) {
+            for level in 1...Swift.max(1, paths.map(\.count).max() ?? 1) {
                 let names = paths.map { $0.count >= level ? $0[$0.count - level] : "" }
                 if Set(names).count == names.count {
                     above = names
