@@ -104,13 +104,14 @@ final class AppRequestWriter: Writer {
     func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult {
         let operation = model.expect(faces, at: .on)
         return await withCheckedContinuation { continuation in
-            model.enqueue { model in
+            let queued = model.enqueue { model in
                 let result = untilQuit
                     ? await model.engine.activateTemporarily(faces, records: model.data.records)
                     : await model.engine.activate(faces, method: .inPlace, records: model.data.records)
                 model.finish(result, operation: operation, undo: model.undo(turning: faces, on: false, failed: result.failed))
                 continuation.resume(returning: result)
             }
+            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: UserData.newerVersionMessage)) }
         }
     }
 
@@ -122,11 +123,12 @@ final class AppRequestWriter: Writer {
     func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
         let operation = model.expect(faces, at: .off)
         return await withCheckedContinuation { continuation in
-            model.enqueue { model in
+            let queued = model.enqueue { model in
                 let result = await model.engine.deactivate(faces, records: model.data.records)
                 model.finish(result, operation: operation, undo: model.undo(turning: faces, on: true, failed: result.failed))
                 continuation.resume(returning: result)
             }
+            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: UserData.newerVersionMessage)) }
         }
     }
 }

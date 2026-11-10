@@ -173,10 +173,11 @@ extension AppModel {
 
     func enqueued(_ work: @escaping (AppModel) async -> Void) async {
         await withCheckedContinuation { continuation in
-            enqueue { model in
+            let queued = enqueue { model in
                 await work(model)
                 continuation.resume()
             }
+            if !queued { continuation.resume() }
         }
     }
 

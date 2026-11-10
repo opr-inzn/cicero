@@ -14,6 +14,8 @@ final class AppSetWatcher {
     @ObservationIgnored private var failed: [String: Set<String>] = [:]
     @ObservationIgnored private var requested: [String: Set<String>] = [:]
     @ObservationIgnored private var restoredRequests = false
+    @ObservationIgnored private var queued = false
+    @ObservationIgnored private var syncsAgain = false
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
@@ -80,6 +82,7 @@ final class AppSetWatcher {
 
     private func sync() {
         guard let model, model.hasScanned else { return }
+        guard !queued else { return syncsAgain = true }
         if !restoredRequests { restoreRequests() }
         let current = Self.onForAppSets(model.data.records)
         for (path, names) in managed where !current.contains(path) { dismissed.formUnion(names) }
@@ -102,8 +105,15 @@ final class AppSetWatcher {
         }
         for (position, faces) in off { operations.append(model.expect(faces, at: position)) }
 
-        model.enqueue { [weak self] model in
+        queued = model.enqueue { [weak self] model in
             guard let self else { return }
+            defer {
+                self.queued = false
+                if self.syncsAgain {
+                    self.syncsAgain = false
+                    self.scheduleSync(after: .zero)
+                }
+            }
             let (wanted, faces) = self.plan()
             let result = await model.engine.syncAppSets(wanted, faces: faces, records: model.data.records)
             model.data.records = result.records

@@ -736,8 +736,12 @@ final class AppModel {
 
     // MARK: Operations
 
-    func enqueue(_ work: @escaping (AppModel) async -> Void) {
-        guard !store.isReadOnly else { return showToast(UserData.newerVersionMessage) }
+    @discardableResult
+    func enqueue(_ work: @escaping (AppModel) async -> Void) -> Bool {
+        guard !store.isReadOnly else {
+            showToast(UserData.newerVersionMessage)
+            return false
+        }
         let previous = operation
         runningOperations += 1
         queuedOperations += 1
@@ -748,6 +752,7 @@ final class AppModel {
             self.queuedOperations -= 1
             self.endOperation()
         }
+        return true
     }
 
     var isWorking: Bool { queuedOperations > 0 || commandRequests?.isAnswering == true }
