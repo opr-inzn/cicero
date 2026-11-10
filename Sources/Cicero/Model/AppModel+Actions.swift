@@ -393,7 +393,7 @@ extension AppModel {
             model.data.records = records
             model.restore(families: before.removedFamilies, from: before.data)
             if !back.isEmpty, let library = try? await model.scanner.scan(model.scanInput, progress: { _ in }) {
-                let faces = library.families.flatMap(\.faces).filter { back.contains($0.face.path) }
+                let faces = library.families.flatMap(\.faces).flatMap { [$0] + $0.copies.map(\.libraryFace) }.filter { back.contains($0.face.path) }
                 let on = faces.filter { before.on.contains($0.face.path) && $0.canActivate }
                 if !on.isEmpty { model.data.records = await model.engine.activate(on, method: .inPlace, records: model.data.records).records }
                 let forNow = faces.filter { before.onForNow.contains($0.face.path) && $0.canActivateTemporarily }
@@ -448,11 +448,14 @@ extension AppModel {
             removedFamilies = plan.removedFamilies
             let paths = Set(plan.paths)
             var on: Set<String> = [], onForNow: Set<String> = [], off: Set<String> = []
-            for face in library.families.lazy.flatMap(\.faces) where paths.contains(face.face.path) {
-                switch face.position {
-                case .on: if face.isOnUntilQuit { onForNow.insert(face.face.path) } else { on.insert(face.face.path) }
-                case .off: off.insert(face.face.path)
-                case .app: break
+            for face in library.families.lazy.flatMap(\.faces) {
+                for copy in [face] + face.copies.map(\.libraryFace) where paths.contains(copy.face.path) {
+                    switch (copy.position, copy.state.temporaryScope) {
+                    case (.on, .untilQuit): onForNow.insert(copy.face.path)
+                    case (.on, .whileAppsRun), (.off, _): off.insert(copy.face.path)
+                    case (.on, nil): on.insert(copy.face.path)
+                    case (.app, _): break
+                    }
                 }
             }
             (self.on, self.onForNow, self.off) = (on, onForNow, off)
