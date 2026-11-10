@@ -61,8 +61,9 @@ final class CommandRequests {
                 while !model.hasScanned, model.lastEndedScan == 0 { try? await Task.sleep(for: .milliseconds(100)) }
             }
             let environment = ToolEnvironment(locations: model.locations, defaults: .standard, resources: nil, registrar: CoreTextRegistrar())
-            let context = LibraryContext(library: model.library, data: model.data, shown: request.shown, environment: environment)
             do {
+                let proofing = request.command.needsLibrary ? try await LibraryContext.scanForProofing(model.data, shown: request.shown, environment: environment) : nil
+                let context = LibraryContext(library: proofing ?? model.library, data: model.data, shown: request.shown, environment: environment)
                 // Asked again after the wait for the library: a change the user cancelled meanwhile must never be made.
                 if let sender = request.sender, !sender.isRunning { throw CommandError(.failed, "The command stopped, so nothing changed.") }
                 guard !model.store.isReadOnly || request.command == .rescan else { throw CommandError(.failed, UserData.newerVersionMessage) }

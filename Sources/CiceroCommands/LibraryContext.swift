@@ -36,7 +36,7 @@ public final class LibraryContext: @unchecked Sendable {
                             savesScan: Bool = true) async throws -> LibraryContext {
         let saved = try loadUserData(environment)
         let data = shown.applied(to: saved)
-        let proofingDiffers = data.showAdobeAppFolders != saved.showAdobeAppFolders && !environment.appFontFolders.isEmpty
+        let proofingDiffers = proofingDiffers(data, from: saved, environment: environment)
         let scans = rescan || proofingDiffers
         // Never while Cicero is open: it writes its caches itself, and would write over the tool's or keep showing its own.
         let saves = savesScan && scans && !proofingDiffers && !isAppOpen(environment)
@@ -75,6 +75,17 @@ public final class LibraryContext: @unchecked Sendable {
         )
         return LibraryContext(environment: environment, data: data, savedData: saved, library: library, lastScan: lastScan,
                               characterSets: characterSets, coverage: coverage, classificationGuess: { rule($0)?.classification })
+    }
+
+    static func proofingDiffers(_ data: UserData, from saved: UserData, environment: ToolEnvironment) -> Bool {
+        data.showAdobeAppFolders != saved.showAdobeAppFolders && !environment.appFontFolders.isEmpty
+    }
+
+    public static func scanForProofing(_ saved: UserData, shown: ShownFonts, environment: ToolEnvironment) async throws -> Library? {
+        let data = shown.applied(to: saved)
+        guard proofingDiffers(data, from: saved, environment: environment) else { return nil }
+        let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar, saves: false)
+        return try await scanner.scan(ScanInput(folders: data.scannedFolders(appFolders: environment.appFontFolders), files: data.fontFiles, records: data.records)) { _ in }
     }
 
     public convenience init(library: Library, data: UserData, shown: ShownFonts, environment: ToolEnvironment) {
