@@ -10,16 +10,9 @@ What changed in each version of Cicero, newest first. To download a version, see
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](command-line.md#use-it-in-claude-and-codex) says.
 - `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
 - **Faster with large libraries:** Cicero opens, scans, searches and switches views faster, and uses much less memory.
-- **Glyphs** lists every glyph in a font, with no limit.
-- **Glyphs are sorted better:** figures first, each alternate after its glyph, alternates that several features draw together (like an old-style figure from a stylistic set), and pictures, math letters and arrows grouped by kind.
 - **Importing is more reliable:** Cancel keeps the fonts copied so far, the fonts that were on come in on, fonts are found when FontBase or FontExplorer X spells their names otherwise, and the Mac stays awake while fonts are copied.
-- **Undo** in the message after you turn fonts on or off, or move them to the Trash. After Move to Trash, it puts the files back where they were, and gives the families back their folders, tags, rating and note.
-- The import sheet calls font files that are the same as others **duplicates**, and says how many there are.
-- Numbers have no thousands separator: “1174 families”, not “1,174 families”.
-- The axis fields show a style’s exact value, like 12.5, not 13. The **Style** menu shows the style the axes match, not **Custom**.
-- Axes have Cicero’s English names, like **Width**, whatever the Mac’s language.
-- **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
-- **Help → Version History** opens every version’s notes on one page, in place of Release Notes.
+- **Glyphs are grouped by script:** Latin first, then figures, symbols and forms, then each other script, like Greek or Cyrillic, with its own capitals, small letters and accents. The name of the group you’re in stays at the top while you scroll.
+- Performance improvements and bug fixes.
 
 ## 0.11.0
 
