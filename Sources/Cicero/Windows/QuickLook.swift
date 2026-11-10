@@ -13,6 +13,7 @@ final class QuickLook {
     @ObservationIgnored private weak var mainWindow: NSWindow?
     @ObservationIgnored private var mainWindowObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var panel: QuickLookPanel?
+    @ObservationIgnored private var opening = 0
 
     private static let sizeKey = "quickLook.panelSize"
     static let defaultSize = NSSize(width: 520, height: 440)
@@ -73,6 +74,19 @@ final class QuickLook {
         isOpen = true
         place(panel)
         panel.orderFront(nil)
+        opening += 1
+        closeWhenNothingShows(opening)
+    }
+
+    private func closeWhenNothingShows(_ opening: Int) {
+        withObservationTracking {
+            _ = shown?.family.id
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.isOpen, self.opening == opening else { return }
+                if self.shown == nil { self.close() } else { self.closeWhenNothingShows(opening) }
+            }
+        }
     }
 
     func close() {
