@@ -91,7 +91,7 @@ public final class CoverageIndex: Sendable {
                 }
             }
         }
-        if saves, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
+        if saves, !Task.isCancelled, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
             saveQueue.async { self.write(entries) }
         }
     }
@@ -122,6 +122,7 @@ public final class CoverageIndex: Sendable {
         state.withLock {
             $0.entries = [:]
             $0.dirty = false
+            $0.loaded = true
         }
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
     }

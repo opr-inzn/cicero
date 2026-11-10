@@ -66,7 +66,7 @@ public final class MeasurementIndex: Sendable {
                 }
             }
         }
-        if let entries = entriesToSave(keeping: Set(faces.map(\.id))) {
+        if !Task.isCancelled, let entries = entriesToSave(keeping: Set(faces.map(\.id))) {
             saveQueue.async { self.write(entries) }
         }
     }
@@ -108,6 +108,7 @@ public final class MeasurementIndex: Sendable {
         state.withLock {
             $0.entries = [:]
             $0.dirty = false
+            $0.loaded = true
         }
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
     }
