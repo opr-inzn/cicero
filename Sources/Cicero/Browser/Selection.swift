@@ -49,7 +49,7 @@ enum FamilySelection {
     }
 
     private static func extend(to id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) -> Bool {
-        guard let start = anchor.id, let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) else { return false }
+        guard !selection.isEmpty, let start = anchor.id, let a = ids.firstIndex(of: start), let b = ids.firstIndex(of: id) else { return false }
         if !anchor.base.isSubset(of: selection) { anchor.base = [] }
         selection = anchor.base.union(ids[min(a, b)...max(a, b)])
         anchor.head = id
@@ -106,8 +106,12 @@ struct FamilyKeys: ViewModifier {
     func body(content: Content) -> some View {
         let quickLook = model.quickLook
         content
-            .onKeyPress(.return) { open() }
+            .onKeyPress(.return) {
+                stopTyping()
+                return open()
+            }
             .onKeyPress(.escape) {
+                stopTyping()
                 if quickLook.isOpen { quickLook.close() } else { model.selectedIDs = [] }
                 return .handled
             }
@@ -135,7 +139,10 @@ struct FamilyKeys: ViewModifier {
                 quickLook.toggle(order: families.map(\.id))
                 return .handled
             }
-            .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { arrow($0) }
+            .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { press in
+                stopTyping()
+                return arrow(press)
+            }
             .onKeyPress(characters: .alphanumerics, phases: .down) { press in
                 if press.modifiers.contains(.command) {
                     guard press.characters == "a" else { return .ignored }
@@ -174,6 +181,12 @@ struct FamilyKeys: ViewModifier {
             .onChange(of: quickLook.isOpen, initial: true) { _, isOpen in
                 if isOpen { quickLook.updateOrder(families.map(\.id)) }
             }
+    }
+
+    private func stopTyping() {
+        pendingQuickLook?.cancel()
+        pendingQuickLook = nil
+        typed = ""
     }
 
     private func scrollToTop(_ id: String) {
