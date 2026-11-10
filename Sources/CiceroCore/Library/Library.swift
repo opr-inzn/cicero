@@ -194,7 +194,9 @@ public final class LibraryScanner: Sendable {
         var restored: Library?
         var savedFingerprint: Int?
         var onDisk: Library?
-        var rereadAll = false
+        var rereadsAsked = 0
+        var rereadsDone = 0
+        var lastBuiltScan = 0
         var lastFind: Find?
         var lastFindScan = 0
         var scans = 0
@@ -299,9 +301,9 @@ public final class LibraryScanner: Sendable {
         }
         #endif
         progress(.finding)
-        let (number, last, rereadAll) = state.withLock { state in
+        let (number, last, rereads, rereadAll) = state.withLock { state in
             state.scans += 1
-            return (state.scans, state.lastFind, state.rereadAll)
+            return (state.scans, state.lastFind, state.rereadsAsked, state.rereadsAsked > state.rereadsDone)
         }
         let finding = signposter.beginInterval("Find")
         let known = loadCache()
@@ -349,13 +351,19 @@ public final class LibraryScanner: Sendable {
         try Task.checkCancellation()
 
         let files = updateCache(found: found, parsed: parsed, keeping: reach)
-        if rereadAll { state.withLock { $0.rereadAll = false } }
+        if rereadAll { state.withLock { $0.rereadsDone = max($0.rereadsDone, rereads) } }
         let inputs = Self.inputHash(found: found, records: input.records, reach: reach)
         if parsed.isEmpty, let last = state.withLock({ $0.last }), last.inputs == inputs {
             return last.library
         }
         let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys)) }
-        state.withLock { $0.last = (inputs, library) }
+        let newest = state.withLock { state in
+            guard number > state.lastBuiltScan else { return false }
+            state.lastBuiltScan = number
+            state.last = (inputs, library)
+            return true
+        }
+        guard newest else { return library }
         let save = { [self] in
             signposter.withIntervalSignpost("Save cache") {
                 saveCacheIfNeeded()
@@ -443,7 +451,7 @@ public final class LibraryScanner: Sendable {
 
     public func clearCache() {
         state.withLock {
-            $0.rereadAll = true
+            $0.rereadsAsked += 1
             $0.dirty = true
             $0.last = nil
             $0.savedFingerprint = nil
