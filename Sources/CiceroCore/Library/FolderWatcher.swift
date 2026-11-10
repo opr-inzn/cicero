@@ -24,14 +24,14 @@ public final class FolderWatcher {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let parents = Set(files.map { ($0 as NSString).deletingLastPathComponent }).filter { !(home + "/").hasPrefix($0 + "/") }
         let watched = paths + hidden + parents.sorted()
+        // Every symlink resolved, as FSEvents reports paths (e.g. /private/var for /var).
+        self.files = Set(files.map(LibraryScanner.realPath))
+        hiddenFolders = hidden.map { LibraryScanner.realPath($0) + "/" }
         guard watched != self.watched else { return }
         stop()
         self.watched = watched
-        // Every symlink resolved, as FSEvents reports paths (e.g. /private/var for /var).
         folders = (paths + hidden).map { LibraryScanner.realPath($0) + "/" }
-        hiddenFolders = hidden.map { LibraryScanner.realPath($0) + "/" }
         fileFolders = parents.map { LibraryScanner.realPath($0) + "/" }
-        self.files = Set(files.map(LibraryScanner.realPath))
         aliases = Set(watched).map { (LibraryScanner.realPath($0) + "/", $0 + "/") }.sorted { $0.resolved.count > $1.resolved.count }
         guard !watched.isEmpty else { return }
         var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
