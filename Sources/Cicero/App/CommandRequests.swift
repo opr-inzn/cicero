@@ -55,6 +55,10 @@ final class CommandRequests {
             let context = LibraryContext(library: model.library, data: model.data, shown: request.shown, environment: environment)
             do {
                 guard !model.store.isReadOnly || request.command == .rescan else { throw CommandError(.failed, UserData.newerVersionMessage) }
+                // A restore replaces the setup with the backup's when it ends, and a change made meanwhile would be lost.
+                guard model.job != .restoring || request.command == .rescan else {
+                    throw CommandError(.busy, "Cicero is restoring a backup. Nothing changed. Try again when it’s done.")
+                }
                 guard model.hasScanned || !request.command.needsLibrary else {
                     throw CommandError(.failed, "Cicero couldn’t read the library. Try again in a moment.")
                 }
