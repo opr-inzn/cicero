@@ -7,7 +7,7 @@ public final class UserDataStore: Sendable {
     private let queue = DispatchQueue(label: "Cicero.UserDataStore", qos: .utility)
     private let pending = Mutex<Pending>(Pending())
     private let failureHandler = Mutex<(@Sendable () -> Void)?>(nil)
-    private let readOnly = Mutex(false)
+    private let readOnly = Mutex<String?>(nil)
 
     private struct Pending {
         var data: UserData?
@@ -26,12 +26,20 @@ public final class UserDataStore: Sendable {
         return fm.fileExists(atPath: fileURL.path) || fm.fileExists(atPath: legacyURL.path)
     }
 
-    public var isReadOnly: Bool { readOnly.withLock { $0 } }
+    public var isReadOnly: Bool { readOnly.withLock { $0 != nil } }
+
+    public var readOnlyMessage: String { readOnly.withLock { $0 } ?? UserData.newerVersionMessage }
 
     public func load() -> UserData {
-        if let data = try? Data(contentsOf: fileURL) {
+        var exists = stat()
+        if lstat(fileURL.path, &exists) == 0 {
+            // A file that is there but can't be read is never written over: the next save would replace the user's data.
+            guard let data = try? Data(contentsOf: fileURL) else {
+                readOnly.withLock { $0 = UserData.unreadableMessage }
+                return .newLibrary
+            }
             let newer = UserData.isFromNewerVersion(data)
-            if newer { readOnly.withLock { $0 = true } }
+            if newer { readOnly.withLock { $0 = UserData.newerVersionMessage } }
             if var decoded = try? JSONDecoder().decode(UserData.self, from: data) {
                 decoded.updateLicenseTags()
                 return decoded
@@ -39,28 +47,30 @@ public final class UserDataStore: Sendable {
             // Never a newer Cicero's file, which only holds what this one can't read: it stays, untouched, for that Cicero.
             if newer { return UserData() }
             // Keep a damaged file for the user instead of silently writing over it.
-            setAside()
-            return UserData()
+            if !setAside() { readOnly.withLock { $0 = UserData.unreadableMessage } }
+            return .newLibrary
         }
         // Only read the version 1 file (library.json), never modify it.
         if let legacy = try? Data(contentsOf: legacyURL),
            let object = (try? JSONSerialization.jsonObject(with: legacy)) as? [String: Any] {
-            let imported = LegacyImport.userData(from: object)
+            var imported = LegacyImport.userData(from: object)
+            imported.licenseStatusesAdded = false
+            imported.updateLicenseTags()
             _ = queue.sync { write(imported) }
             return imported
         }
         return .newLibrary
     }
 
-    private func setAside() {
+    private func setAside() -> Bool {
         let fm = FileManager.default
         for number in 1...1000 {
             let name = number == 1 ? "user-data.unreadable.json" : "user-data.unreadable \(number).json"
             let destination = fileURL.deletingLastPathComponent().appendingPathComponent(name, isDirectory: false)
             guard !fm.fileExists(atPath: destination.path) else { continue }
-            try? fm.moveItem(at: fileURL, to: destination)
-            return
+            return (try? fm.moveItem(at: fileURL, to: destination)) != nil
         }
+        return false
     }
 
     public func save(_ data: UserData) {

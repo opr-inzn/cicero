@@ -83,7 +83,7 @@ final class AppModel {
                 revertingData = true
                 data = oldValue
                 revertingData = false
-                return showToast(UserData.newerVersionMessage)
+                return showToast(store.readOnlyMessage)
             }
             store.save(data)
             // The activation records at once: macOS has the change already, and a Cicero that stopped in that moment (killed, crashed, the Mac switched off) would find fonts on that it didn't know it had turned on, and those on until it quits left on.
@@ -338,7 +338,7 @@ final class AppModel {
             MainActor.assumeIsolated { self?.fontsChanged(.fontd(except: [])) }
         }
         if store.isReadOnly {
-            showToast(UserData.newerVersionMessage)
+            showToast(store.readOnlyMessage)
             rescan(check: true)
             return
         }
@@ -738,7 +738,7 @@ final class AppModel {
     @discardableResult
     func enqueue(_ work: @escaping (AppModel) async -> Void) -> Bool {
         guard !store.isReadOnly else {
-            showToast(UserData.newerVersionMessage)
+            showToast(store.readOnlyMessage)
             return false
         }
         let previous = operation
@@ -906,7 +906,7 @@ final class AppModel {
 
     func startJob(_ new: LibraryJob) -> Bool {
         guard !store.isReadOnly else {
-            showToast(UserData.newerVersionMessage)
+            showToast(store.readOnlyMessage)
             return false
         }
         if let job {

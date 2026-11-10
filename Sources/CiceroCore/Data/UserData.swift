@@ -4,6 +4,7 @@ public struct UserData: Codable, Equatable, Sendable {
     // Raised with each key an older build would drop when it saves: an older build then leaves the file alone, rather than lose what only newer ones know.
     public static let currentVersion = 2
     public static let newerVersionMessage = "This library was saved by a newer version of Cicero. Update Cicero to make changes."
+    public static let unreadableMessage = "Cicero can’t read its saved data, so it saves no changes. Check the disk, then open Cicero again"
 
     public var version = currentVersion
     public var isFromNewerVersion: Bool { version > Self.currentVersion }

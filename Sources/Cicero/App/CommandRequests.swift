@@ -56,7 +56,7 @@ final class CommandRequests {
             do {
                 // Asked again after the wait for the library: a change the user cancelled meanwhile must never be made.
                 if let sender = request.sender, !sender.isRunning { throw CommandError(.failed, "The command stopped, so nothing changed.") }
-                guard !model.store.isReadOnly || request.command == .rescan else { throw CommandError(.failed, UserData.newerVersionMessage) }
+                guard !model.store.isReadOnly || request.command == .rescan else { throw CommandError(.failed, model.store.readOnlyMessage) }
                 // A restore replaces the setup with the backup's when it ends, and a change made meanwhile would be lost.
                 guard model.job != .restoring || request.command == .rescan else {
                     throw CommandError(.busy, "Cicero is restoring a backup. Nothing changed. Try again when it’s done.")
@@ -111,7 +111,7 @@ final class AppRequestWriter: Writer {
                 model.finish(result, operation: operation, undo: model.undo(turning: faces, on: false, failed: result.failed))
                 continuation.resume(returning: result)
             }
-            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: UserData.newerVersionMessage)) }
+            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: model.store.readOnlyMessage)) }
         }
     }
 
@@ -128,7 +128,7 @@ final class AppRequestWriter: Writer {
                 model.finish(result, operation: operation, undo: model.undo(turning: faces, on: true, failed: result.failed))
                 continuation.resume(returning: result)
             }
-            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: UserData.newerVersionMessage)) }
+            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: model.store.readOnlyMessage)) }
         }
     }
 }
