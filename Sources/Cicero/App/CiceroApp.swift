@@ -138,20 +138,20 @@ struct CiceroCommands: Commands {
                 Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
                 Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
             }
-            .disabled(model.job != nil)
+            .disabled(model.job != nil || model.isShowingPrompt)
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             Divider()
             Button("Back Up Library", systemImage: "externaldrive") { model.ask { $0.showsBackupSheet = true } }
-                .disabled(model.job != nil)
+                .disabled(model.job != nil || model.isShowingPrompt)
             Button("Restore Library", systemImage: "clock.arrow.circlepath") {
                 Task {
                     guard let contents = await model.chooseBackupToRestore() else { return }
                     model.ask { $0.restorePrompt = contents }
                 }
             }
-            .disabled(model.job != nil)
+            .disabled(model.job != nil || model.isShowingPrompt)
         }
         SidebarCommands()
         // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.

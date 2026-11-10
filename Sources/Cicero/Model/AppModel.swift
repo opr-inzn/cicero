@@ -887,6 +887,8 @@ final class AppModel {
         }
     }
 
+    var isShowingPrompt: Bool { isAsking(overActivationSheets: false) }
+
     private func isAsking(overActivationSheets: Bool) -> Bool {
         let hosts = overActivationSheets ? false : installPrompt != nil || documentFonts != nil
         return hosts || manyActivationPrompt != nil || movingOutPrompt != nil || copySwitchPrompt != nil || duplicatePrompt != nil
