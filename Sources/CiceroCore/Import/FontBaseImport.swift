@@ -129,19 +129,19 @@ public enum FontBaseImport {
             }
             library.tags = tagOrder.map { ImportedTag(name: $0, color: nil, fonts: tagged[$0] ?? []) }
 
-            var active = Set<String>()
+            var active: [String: String] = [:]
             for (id, relative) in values["fontbase_fontsStatus"]?.properties ?? [] {
                 guard let relative = relative.string, relative.hasPrefix("/") else { continue }
                 library.active.append(font(id, at: relative))
-                if located[relative] != nil { active.insert(id) }
+                if let path = located[relative] { active[id] = path }
             }
 
             if let copies, let files = try? fm.contentsOfDirectory(at: copies, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
-                library.leftoverCopies = files.filter { file in
-                    FontFormat.fileExtensions.contains(file.pathExtension.lowercased())
-                        && active.contains(file.deletingPathExtension().lastPathComponent)
+                for file in files where FontFormat.fileExtensions.contains(file.pathExtension.lowercased()) {
+                    guard let origin = active[file.deletingPathExtension().lastPathComponent] else { continue }
+                    library.leftoverCopyOrigins[file.path] = origin
                 }
-                .map(\.path).sorted()
+                library.leftoverCopies = library.leftoverCopyOrigins.keys.sorted()
             }
 
             notes(&library, otherCollections: otherCollections, missing: missing, notDownloaded: notDownloaded, unreadable: unreadable)

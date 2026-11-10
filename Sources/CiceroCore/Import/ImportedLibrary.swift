@@ -43,6 +43,7 @@ public struct ImportedLibrary: Sendable {
     public var history: [ImportedHistory] = []
     public var active: [ImportedFont] = []
     public var leftoverCopies: [String] = []
+    public var leftoverCopyOrigins: [String: String] = [:]
     public var bundledFonts: (folder: URL, files: [String])?
     public var notes: [String] = []
     var temporaryFolder: URL?

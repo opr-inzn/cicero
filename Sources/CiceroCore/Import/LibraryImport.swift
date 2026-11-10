@@ -75,10 +75,11 @@ public enum LibraryImport {
         return files
     }
 
-    public static func removeCopies(_ imported: ImportedLibrary) -> Int {
-        // Only the copies the reader found, and only font files, may go to the Trash.
+    public static func removeCopies(_ imported: ImportedLibrary, keeping isInLibrary: (_ origin: String) -> Bool) -> Int {
+        // Only the copies the reader found, only font files, and only of fonts Cicero has now, may go to the Trash.
         imported.leftoverCopies.count { path in
-            FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased())
+            imported.leftoverCopyOrigins[path].map(isInLibrary) == true
+                && FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased())
                 && (try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)) != nil
         }
     }

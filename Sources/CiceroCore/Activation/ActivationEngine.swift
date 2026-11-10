@@ -956,6 +956,10 @@ public struct ActivationEngine: Sendable {
         return records
     }
 
+    public func isOn(_ path: String) -> Bool {
+        registrar.isActive(Self.url(path))
+    }
+
     public static func currentSession() -> String {
         var boot = timeval()
         var size = MemoryLayout<timeval>.size

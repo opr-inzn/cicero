@@ -133,7 +133,6 @@ extension AppModel {
         guard startJob(.importing) else { return nil }
         defer { endJob(.importing) }
         guard await saveSetupSnapshot(named: "Before Import", nothingWas: "imported") else { return nil }
-        let removed = choices.removeCopies ? LibraryImport.removeCopies(imported) : 0
         var data = data
         let files = LibraryImport.fontFiles(imported, choices: choices, data: &data, locations: locations)
         self.data.showAdobeAppFolders = data.showAdobeAppFolders
@@ -150,7 +149,7 @@ extension AppModel {
             stage(.copying(done: done, total: total))
         }
         if Task.isCancelled {
-            let onCount = keepOn ? Set(on.compactMap { installed.placed[$0] }).intersection(installed.new).count : 0
+            let onCount = keepOn ? Set(on.compactMap { installed.placed[$0] }).intersection(installed.new).count { importEngine.isOn($0) } : 0
             if !installed.new.isEmpty {
                 showToast(Self.stoppedCopying(installed.new.count, on: onCount, appName: imported.source.appName, again: "import again to finish"))
             }
@@ -183,7 +182,6 @@ extension AppModel {
             let turnedOn = faces.filter { $0.canActivate || copiedInOnNow.contains($0.face.path) }
             result.fonts = installed.new.count
             result.notCopied = installed.failed.count
-            result.removedCopies = removed
             if result.sets + result.applicationSets + result.smartSets > 0 { updated.sidebar.hidden.remove(SidebarSection.sets.key) }
             if result.tags > 0 { updated.sidebar.hidden.remove(SidebarSection.tags.key) }
             if result.classifiedFamilies > 0 { updated.sidebar.hidden.remove(SidebarSection.classifications.key) }
@@ -194,6 +192,12 @@ extension AppModel {
                 : (scanned ?? model.library).families.flatMap(\.faces).filter { takingOver.contains($0.face.path) && $0.canActivate }
             if !faces.isEmpty || !more.isEmpty { model.performActivation(faces + more, named: turnedOn + more) }
             result.activated = turnedOn.count
+            if choices.removeCopies {
+                let found = scanned ?? model.library
+                result.removedCopies = LibraryImport.removeCopies(imported) { origin in
+                    installed.placed[origin] != nil || !found.faces(inFiles: [origin]).isEmpty
+                }
+            }
             summary = result
         }
         return summary
