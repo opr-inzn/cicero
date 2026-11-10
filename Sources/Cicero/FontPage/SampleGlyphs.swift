@@ -17,12 +17,19 @@ nonisolated struct SampleGlyph: Codable, Hashable, Sendable {
         index = face.id.index
         self.glyph = glyph
         let font = FontLoader.shared.font(face, size: 12)
-        name = (CTFontCopyNameForGlyph(font, glyph) as String?).flatMap { $0.isEmpty ? nil : $0 }
+        name = Self.name(of: glyph, in: font)
         self.features = features
     }
 
+    private static func name(of glyph: CGGlyph, in font: CTFont) -> String? {
+        (CTFontCopyNameForGlyph(font, glyph) as String?).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
     func glyph(in font: CTFont, face: FontFace) -> CGGlyph? {
-        if face.id == FaceID(path: path, index: index) { return glyph }
+        // The same path can hold a file exported again with a new glyph order.
+        if face.id == FaceID(path: path, index: index), CFIndex(glyph) < CTFontGetGlyphCount(font), Self.name(of: glyph, in: font) == name {
+            return glyph
+        }
         if let name {
             let named = CTFontGetGlyphWithName(font, name as CFString)
             if named != 0 { return named }
