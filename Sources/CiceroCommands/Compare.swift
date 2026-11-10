@@ -156,6 +156,7 @@ enum SampleSheet {
     static let rowGap: CGFloat = 20
     static let listedMissing = 20
     static let maximumHeight = 30000
+    static let maximumPixels = 36_000_000
 
     static let ink = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
     static let grey = CGColor(srgbRed: 0.42, green: 0.42, blue: 0.42, alpha: 1)
@@ -193,6 +194,9 @@ enum SampleSheet {
         let height = Int(ceil(2 * margin + rows.reduce(0) { $0 + $1.height } + CGFloat(max(rows.count - 1, 0)) * (2 * rowGap + 1)))
         guard height <= maximumHeight else {
             throw CommandError.invalid("The picture would be \(height) pixels high, more than \(maximumHeight). Use fewer styles, a shorter text, a smaller --size or a wider --width.")
+        }
+        guard width * height <= maximumPixels else {
+            throw CommandError.invalid("The picture would be \(width) × \(height) pixels, more than \(maximumPixels / 1_000_000) million. Use fewer styles, a shorter text, a smaller --size or a narrower --width.")
         }
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
@@ -261,11 +265,11 @@ enum SampleSheet {
         var missing: [Int] = []
         let scalars = Array(text.unicodeScalars)
         let breaks = { (scalar: Unicode.Scalar) in scalar.properties.isWhitespace || scalar.properties.generalCategory == .control }
+        let checked = Set(CoverageSearch.scalars(in: text))
         for (index, scalar) in scalars.enumerated() {
             if !checked.contains(scalar.value) || font.has(scalar.value) {
                 layout.unicodeScalars.append(scalar)
                 continue
-        let checked = Set(CoverageSearch.scalars(in: text))
             }
             if index > 0, !breaks(scalars[index - 1]) { layout.unicodeScalars.append("\u{2060}") }
             missing.append(layout.utf16.count)
