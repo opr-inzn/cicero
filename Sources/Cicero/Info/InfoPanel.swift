@@ -341,7 +341,7 @@ private struct NoteRow: View {
             save()
             load()
         }
-        .onChange(of: model.note(of: family)) { if !isFocused || text == loaded { load() } }
+        .onChange(of: model.note(of: family)) { if editing == family.id, !isFocused || text == loaded { load() } }
         .onChange(of: isFocused) { if !isFocused { save() } }
         .onDisappear(perform: save)
         .task(id: text) {
