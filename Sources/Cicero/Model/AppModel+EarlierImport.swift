@@ -28,9 +28,7 @@ extension AppModel {
         guard job == nil, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data), !Self.declinedEarlierImport(folder)
         else { return mayOfferEarlierImportCopy = false }
-        let faces = faces(in: [folder])
-        let prefix = folder.path + "/"
-        let files = Set(faces.flatMap { [$0.face.path] + $0.otherCopies }).filter { $0.hasPrefix(prefix) }.sorted()
+        let files = earlierImportFiles(in: folder)
         guard !files.isEmpty else { return mayOfferEarlierImportCopy = false }
         let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
@@ -50,6 +48,12 @@ extension AppModel {
         }
     }
 
+    private func earlierImportFiles(in folder: WatchedFolder) -> [String] {
+        let prefix = folder.path + "/"
+        return Set(faces(in: [folder]).flatMap { [$0.face.path] + $0.otherCopies })
+            .filter { $0.hasPrefix(prefix) && FileManager.default.fileExists(atPath: $0) }.sorted()
+    }
+
     func isOnWhereItIs(_ face: LibraryFace) -> Bool {
         data.records.inPlace.contains(face.face.path) || face.state.source == .otherApp
     }
@@ -60,18 +64,22 @@ extension AppModel {
         guard await saveSetupSnapshot(named: "Before Copying FontExplorer X’s Fonts", nothingWas: "copied") else { return nil }
         // Copied outside the queue, so only after what's in it: the launch's tidying trashes what it finds in Staging, where the copies wait.
         stage(.waiting)
-        await enqueued { _ in }
+        var files: [String] = []
+        var onFiles = Set<String>()
+        await enqueued { model in
+            files = model.earlierImportFiles(in: prompt.folder)
+            onFiles = Set(model.library.faces(inFiles: Set(files)).filter { model.isOnWhereItIs($0) }.map(\.face.path))
+        }
         if Task.isCancelled { return nil }
         holdScans()
         defer { releaseScans() }
-        let onFiles = Set(library.faces(inFiles: Set(prompt.files)).filter { isOnWhereItIs($0) }.map(\.face.path))
-        let installed = await importEngine.installOff(prompt.files, on: onFiles) { done, total in stage(.copying(done: done, total: total)) }
+        let installed = await importEngine.installOff(files, on: onFiles) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
             if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "Cicero offers the rest at the next launch")) }
             return nil
         }
         // Every file has to be in: a location whose fonts aren't all copied would lose some as it goes.
-        let missing = prompt.files.filter { installed.placed[$0] == nil }
+        let missing = files.filter { installed.placed[$0] == nil }
         guard missing.isEmpty else {
             for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
             showToast(missing.count == 1 ? "Couldn’t copy “\((missing[0] as NSString).lastPathComponent)”, so nothing changed"
@@ -80,8 +88,9 @@ extension AppModel {
         }
         stage(.starting)
         let folder = prompt.folder
+        let copied = Set(files)
         await enqueued { model in
-            let on = model.library.faces(inFiles: Set(prompt.files)).filter { model.isOnWhereItIs($0) }
+            let on = model.library.faces(inFiles: copied).filter { model.isOnWhereItIs($0) }
             if !on.isEmpty {
                 let result = await model.engine.deactivate(on, records: model.data.records)
                 model.data.records = result.records
