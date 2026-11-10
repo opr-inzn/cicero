@@ -92,15 +92,6 @@ public final class AppLock: @unchecked Sendable {
         return Date(timeIntervalSince1970: seconds)
     }
 
-    public static func wait(support: URL, timeout: Duration) async -> AppLock? {
-        let deadline = ContinuousClock.now + timeout
-        while true {
-            if let lock = take(support: support) { return lock }
-            if ContinuousClock.now >= deadline || Task.isCancelled { return nil }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-    }
-
     public static func isHeld(support: URL) -> Bool {
         guard FileManager.default.fileExists(atPath: url(support: support).path) else { return false }
         guard let lock = take(support: support) else { return true }
