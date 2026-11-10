@@ -146,6 +146,10 @@ extension AppModel {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
+        return unchosenStyle(of: family, weight: weight)
+    }
+
+    func unchosenStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
         if let style = similarStyle, let source = similarFamilyID.flatMap(library.family), appliedSearch.isEmpty, searchTokens.isEmpty {
             if family.id == source.id { return (style, style.face.styleWeight) }
             return (family.face(for: source.kind(of: style), weight: style.face.styleWeight), style.face.styleWeight)

@@ -234,7 +234,7 @@ private struct TypeTester: View {
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
             TesterControls {
-                stylePicker(isAdjusted: !variations.isEmpty)
+                stylePicker(face: face, isAdjusted: !variations.isEmpty)
                 sliders
                 buttons(hasAxes: !face.face.axes.isEmpty)
             }
@@ -251,11 +251,9 @@ private struct TypeTester: View {
     }
 
     @ViewBuilder
-    private func stylePicker(isAdjusted: Bool) -> some View {
+    private func stylePicker(face: LibraryFace, isAdjusted: Bool) -> some View {
         if family.faces.count > 1 {
-            Picker("Style", selection: choice(isAdjusted: isAdjusted)) {
-                Text("Automatic").tag(StyleChoice.automatic)
-                Divider()
+            Picker("Style", selection: choice(face: face, isAdjusted: isAdjusted)) {
                 ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
                 if isAdjusted {
                     Divider()
@@ -263,7 +261,7 @@ private struct TypeTester: View {
                 }
             }
             .fixedSize()
-            .help("Which style to show; Automatic shows the regular style, or a style the search names, like Italic")
+            .help("Which style to show; until you pick one, it is the regular style, or a style the search names, like Italic")
             .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
         }
     }
@@ -304,22 +302,18 @@ private struct TypeTester: View {
         }
     }
 
-    private func choice(isAdjusted: Bool) -> Binding<StyleChoice> {
+    private func choice(face: LibraryFace, isAdjusted: Bool) -> Binding<StyleChoice> {
         Binding {
-            isAdjusted ? .custom : model.pageStyleID.map(StyleChoice.style) ?? .automatic
+            isAdjusted ? .custom : .style(face.id)
         } set: { choice in
-            switch choice {
-            case .automatic: model.pageStyleID = nil
-            case .style(let id): model.pageStyleID = id
-            case .custom: return
-            }
+            guard case .style(let id) = choice else { return }
+            model.pageStyleID = id == model.unchosenStyle(of: family, weight: preview.weight).face.id ? nil : id
             model.familyAxes[family.id] = nil
         }
     }
 }
 
 private enum StyleChoice: Hashable {
-    case automatic
     case style(FaceID)
     case custom
 }

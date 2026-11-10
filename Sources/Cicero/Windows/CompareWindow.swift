@@ -472,18 +472,16 @@ private struct SampleCaption: View {
     }
 
     private var styleMenu: some View {
-        Menu {
-            Picker("Style", selection: Binding(get: { sample.style }, set: { model.setCompareStyle($0, of: sample.id) })) {
-                Text("Automatic").tag(FaceID?.none)
-                Divider()
-                ForEach(sample.family.faces) { Text($0.face.styleName).tag(Optional($0.id)) }
+        let automatic = sample.family.face(nearestWeight: preview.weight).id
+        return Menu {
+            Picker("Style", selection: Binding(get: { sample.face.id }, set: { model.setCompareStyle($0 == automatic ? nil : $0, of: sample.id) })) {
+                ForEach(sample.family.faces) { Text($0.face.styleName).tag($0.id) }
             }
             .pickerStyle(.inline)
             .labelsHidden()
             if sample.family.faces.count > 1 {
                 Divider()
                 Button("Another Style", systemImage: "plus") {
-                    let automatic = sample.family.face(nearestWeight: preview.weight).id
                     let shown = model.compareEntries.filter { $0.familyID == sample.family.id }.map { $0.style ?? automatic }
                     model.compareAnotherStyle(of: sample.id, besides: Set(shown))
                 }
