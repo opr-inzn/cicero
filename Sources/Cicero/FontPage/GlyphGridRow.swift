@@ -152,7 +152,7 @@ final class CellPopover: NSObject, NSPopoverDelegate {
 
     private var shown: Shown?
     private var lastClosed: (row: ObjectIdentifier, index: Int, event: TimeInterval)?
-    private var escape: Any?
+    private var monitor: Any?
 
     func show(_ content: AnyView, from row: GridRowEventView, index: Int, at rect: CGRect, closed: @escaping () -> Void) {
         close(animated: false)
@@ -164,9 +164,19 @@ final class CellPopover: NSObject, NSPopoverDelegate {
         popover.delegate = self
         shown = Shown(popover: popover, host: host, row: row, index: index, closed: closed)
         popover.show(relativeTo: rect, of: row, preferredEdge: .minY)
-        // The popover doesn't become the key window, so Escape would go to the page and take it back to the fonts.
-        escape = escape ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53, let self, self.shown != nil else { return event }
+        monitor = monitor ?? NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .scrollWheel]) { [weak self] event in
+            guard let self, let shown = self.shown else { return event }
+            if event.type == .scrollWheel {
+                let page = shown.row?.enclosingScrollView
+                let isOnPopover = event.window != nil && event.window === shown.host.view.window
+                self.close(animated: false)
+                // The popover is a window of its own, so a scroll on it would never reach the page under it.
+                guard isOnPopover, let page else { return event }
+                page.scrollWheel(with: event)
+                return nil
+            }
+            // The popover doesn't become the key window, so Escape would go to the page and take it back to the fonts.
+            guard event.keyCode == 53 else { return event }
             self.close()
             return nil
         }
@@ -205,8 +215,8 @@ final class CellPopover: NSObject, NSPopoverDelegate {
 
     private func forget() {
         shown = nil
-        if let escape { NSEvent.removeMonitor(escape) }
-        escape = nil
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
     }
 }
 
