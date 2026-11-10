@@ -1,7 +1,12 @@
 import Foundation
 
 public struct UserData: Codable, Equatable, Sendable {
-    public var version = 2
+    // Raised with each key an older build would drop when it saves: an older build then leaves the file alone, rather than lose what only newer ones know.
+    public static let currentVersion = 2
+    public static let newerVersionMessage = "This library was saved by a newer version of Cicero. Update Cicero to make changes."
+
+    public var version = currentVersion
+    public var isFromNewerVersion: Bool { version > Self.currentVersion }
     public var folders: [WatchedFolder] = []
     public var folderNames: [String: String] = [:]
     public var fontFiles: [String] = []

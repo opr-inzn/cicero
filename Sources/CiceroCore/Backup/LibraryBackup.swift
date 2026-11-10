@@ -269,6 +269,7 @@ public struct LibraryBackup: Sendable {
             guard let data = try? Data(contentsOf: folder.appendingPathComponent("user-data.json")),
                   let userData = try? JSONDecoder().decode(UserData.self, from: data)
             else { throw Failure.notABackup }
+            guard !userData.isFromNewerVersion else { throw Failure.newerFormat }
             return BackupContents(manifest: manifest, userData: userData, folder: folder, tempRoot: root)
         } catch {
             try? fm.removeItem(at: root)

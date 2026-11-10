@@ -76,6 +76,11 @@ final class AppModel {
     var data: UserData {
         didSet {
             guard data != oldValue else { return }
+            // Kept as it was saved: a newer Cicero's data, written by this one, would lose what only the newer one knows.
+            if store.isReadOnly {
+                data = oldValue
+                return showToast(UserData.newerVersionMessage)
+            }
             store.save(data)
             // The activation records at once: macOS has the change already, and a Cicero that stopped in that moment (killed, crashed, the Mac switched off) would find fonts on that it didn't know it had turned on, and those on until it quits left on.
             if data.records != oldValue.records { store.flush() }
@@ -283,12 +288,12 @@ final class AppModel {
         guessesClassifications = !asks && defaults.object(forKey: Self.guessesClassificationsKey) as? Bool ?? true
         data = store.load()
         // Only with the lock: without it, the command may still be at work. `data`'s observer doesn't run in init.
-        if appLock != nil, let journal = ActivationJournal.read(support: locations.support) {
+        if appLock != nil, !store.isReadOnly, let journal = ActivationJournal.read(support: locations.support) {
             data.records = journal.repair(data.records, registrar: CoreTextRegistrar(), locations: locations)
             store.save(data)
             if store.flush(durably: true) { ActivationJournal.remove(support: locations.support) }
         }
-        if appLock != nil, AppFolderMoves.exists(support: locations.support) {
+        if appLock != nil, !store.isReadOnly, AppFolderMoves.exists(support: locations.support) {
             data.records = AppFolderMoves.recover(data.records, support: locations.support)
             store.save(data)
             if store.flush(durably: true) { AppFolderMoves.remove(support: locations.support) }
@@ -327,6 +332,11 @@ final class AppModel {
             forName: Notification.Name(kCTFontManagerRegisteredFontsChangedNotification as String), object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.fontsChanged(.fontd(except: [])) }
+        }
+        if store.isReadOnly {
+            showToast(UserData.newerVersionMessage)
+            rescan(check: true)
+            return
         }
         let migrating = needsFontLibraryMigration
         let renaming = launchEngine.hasFormerInactiveFolders
@@ -720,6 +730,7 @@ final class AppModel {
     // MARK: Operations
 
     func enqueue(_ work: @escaping (AppModel) async -> Void) {
+        guard !store.isReadOnly else { return showToast(UserData.newerVersionMessage) }
         let previous = operation
         runningOperations += 1
         queuedOperations += 1
@@ -767,6 +778,7 @@ final class AppModel {
 
     func expect(_ faces: [LibraryFace], at position: SwitchPosition) -> Int {
         operationCount += 1
+        guard !store.isReadOnly else { return operationCount }
         expectations.append(Expectation(
             operation: operationCount, faces: Dictionary(faces.map { ($0.id, position) }) { a, _ in a },
             families: Set(faces.map(\.face.familyName))
@@ -880,6 +892,10 @@ final class AppModel {
     }
 
     func startJob(_ new: LibraryJob) -> Bool {
+        guard !store.isReadOnly else {
+            showToast(UserData.newerVersionMessage)
+            return false
+        }
         if let job {
             showToast(job.waitMessage)
             return false

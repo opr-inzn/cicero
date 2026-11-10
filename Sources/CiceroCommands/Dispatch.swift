@@ -46,6 +46,7 @@ public enum WriteDispatcher {
     }
 
     private static func closed(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
+        if try LibraryContext.loadUserData(environment).isFromNewerVersion { throw CommandError(.failed, UserData.newerVersionMessage) }
         try repairIfNeeded(environment)
         let context = request.command.needsLibrary
             ? try await LibraryContext.load(environment, rescan: request.command.activates, shown: request.shown)

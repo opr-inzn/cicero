@@ -7,6 +7,7 @@ public final class UserDataStore: Sendable {
     private let queue = DispatchQueue(label: "Cicero.UserDataStore", qos: .utility)
     private let pending = Mutex<Pending>(Pending())
     private let failureHandler = Mutex<(@Sendable () -> Void)?>(nil)
+    private let readOnly = Mutex(false)
 
     private struct Pending {
         var data: UserData?
@@ -25,9 +26,12 @@ public final class UserDataStore: Sendable {
         return fm.fileExists(atPath: fileURL.path) || fm.fileExists(atPath: legacyURL.path)
     }
 
+    public var isReadOnly: Bool { readOnly.withLock { $0 } }
+
     public func load() -> UserData {
         if let data = try? Data(contentsOf: fileURL) {
             if var decoded = try? JSONDecoder().decode(UserData.self, from: data) {
+                if decoded.isFromNewerVersion { readOnly.withLock { $0 = true } }
                 decoded.updateLicenseTags()
                 return decoded
             }
@@ -101,6 +105,9 @@ public final class UserDataStore: Sendable {
 
     @discardableResult
     private func write(_ data: UserData) -> Bool {
+        guard !isReadOnly else { return false }
+        var data = data
+        data.version = UserData.currentVersion
         guard let encoded = try? Self.encoded(data) else { return false }
         try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         return (try? encoded.write(to: fileURL, options: .atomic)) != nil
