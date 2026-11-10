@@ -440,7 +440,8 @@ enum MeasureRun {
         check(bPaths.allSatisfy { !FileManager.default.fileExists(atPath: $0) }, "\(b), which macOS won't take, isn't in the Fonts folder")
         check(!bTrash.isEmpty && bTrash.allSatisfy { FileManager.default.fileExists(atPath: $0) }, "\(b)'s file is still in the Trash, where it was")
         check(aPaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } && position(model, a) == .on, "\(a) is back, on")
-        check(!FileManager.default.fileExists(atPath: model.locations.support.appendingPathComponent("turning-off.json").path), "no list of files turning off left behind")
+        let lists = ((try? FileManager.default.contentsOfDirectory(atPath: model.locations.support.path)) ?? []).filter { $0.hasPrefix("turning-off") && $0.hasSuffix(".json") }
+        check(lists.isEmpty, "no list of files turning off left behind: \(lists)")
         let message = model.toast ?? ""
         check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved", "the toast: \(message)")
         check(took < 15_000, "Undo took \(Int(took)) ms")
