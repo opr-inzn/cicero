@@ -60,7 +60,11 @@ public struct FontExportPlan: Sendable {
 }
 
 public struct FontExporter: Sendable {
-    public var trash: @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+    public var trash: @Sendable (URL) throws -> URL? = { url in
+        var location: NSURL?
+        try FileManager.default.trashItem(at: url, resultingItemURL: &location)
+        return location as URL?
+    }
 
     public init() {}
 

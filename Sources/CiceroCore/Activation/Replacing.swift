@@ -28,32 +28,22 @@ extension ActivationEngine {
                 continue
             }
             let old = Self.url(replacement.old)
-            // The copy is made before the old file goes to the Trash, so one whose copy can't be made stays as it was.
-            let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
-            do {
-                try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                try fm.copyItem(at: Self.url(replacement.added), to: staged)
-            } catch {
-                try? fm.removeItem(at: staged)
-                failed.append(replacement.old)
-                continue
-            }
             if off.contains(replacement.old) {
+                let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
+                do {
+                    try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+                    try fm.copyItem(at: Self.url(replacement.added), to: staged)
+                } catch {
+                    try? fm.removeItem(at: staged)
+                    failed.append(replacement.old)
+                    continue
+                }
                 if installsIntoFontLibrary, fontLibrary != nil { intoLibrary[staged.path] = replacement } else { goingInOff[staged.path] = replacement }
                 continue
             }
-            do {
-                _ = try trash(old)
-            } catch {
-                try? fm.removeItem(at: staged)
-                failed.append(replacement.old)
-                continue
-            }
-            do {
-                try fm.moveItem(at: staged, to: old)
+            if replaceInPlace(old, with: Self.url(replacement.added)) {
                 done.append(replacement)
-            } catch {
-                try? fm.removeItem(at: staged)
+            } else {
                 failed.append(replacement.old)
             }
         }
@@ -123,6 +113,30 @@ extension ActivationEngine {
             spare[old] = original
         }
         return spare
+    }
+
+    func replaceInPlace(_ old: URL, with added: URL) -> Bool {
+        let fm = FileManager.default
+        // The old file goes to the Trash only once its replacement is whole beside it, and comes back should the last step fail: a font must never be left gone from its place.
+        let staged = old.deletingLastPathComponent().appendingPathComponent(Self.movingPrefix + UUID().uuidString, isDirectory: false)
+        do {
+            try fm.copyItem(at: added, to: staged)
+            Self.unlock(staged)
+        } catch {
+            try? fm.removeItem(at: staged)
+            return false
+        }
+        let trashed: URL?
+        do {
+            trashed = try trash(old)
+        } catch {
+            try? fm.removeItem(at: staged)
+            return false
+        }
+        if renamex_np(staged.path, old.path, UInt32(RENAME_EXCL)) == 0 { return true }
+        try? fm.removeItem(at: staged)
+        if let trashed { try? Self.moveItem(trashed, to: old) }
+        return false
     }
 
     func replaceOff(_ staged: [String: FileReplacement]) async

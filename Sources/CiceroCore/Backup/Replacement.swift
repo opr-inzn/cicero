@@ -28,11 +28,16 @@ struct ItemReplacement {
         staged = folder.appendingPathComponent(destination.lastPathComponent, isDirectory: false)
     }
 
-    func commit(trash: (URL) throws -> Void) throws {
+    func commit(trash: (URL) throws -> URL?) throws {
         // The replaced item goes to the Trash, never under the new one, and never when it is, or holds, something Cicero must keep.
         try Self.check(destination, keeping: kept)
-        if ActivationEngine.exists(destination.path) { try trash(destination) }
-        try FileManager.default.moveItem(at: staged, to: destination)
+        let trashed = ActivationEngine.exists(destination.path) ? try trash(destination) : nil
+        do {
+            try FileManager.default.moveItem(at: staged, to: destination)
+        } catch {
+            if let trashed { try? FileManager.default.moveItem(at: trashed, to: destination) }
+            throw error
+        }
     }
 
     func discard() {
