@@ -44,7 +44,10 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         for entry in entries {
             let path = entry.path
             if let origin = records.appFolderOrigins[path] {
-                if !fm.fileExists(atPath: path), fm.fileExists(atPath: origin) { records.appFolderOrigins[path] = nil }
+                if !fm.fileExists(atPath: path), fm.fileExists(atPath: origin) {
+                    records.appFolderOrigins[path] = nil
+                    if turningOn, registrar.isActive(URL(fileURLWithPath: origin, isDirectory: false)) { records.inPlace.insert(origin) }
+                }
                 continue
             }
             if fontsFolders.contains(where: path.hasPrefix) { continue }

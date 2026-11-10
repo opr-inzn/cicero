@@ -103,16 +103,16 @@ final class ClosedAppWriter: Writer {
     }
 
     func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult {
-        let journal = begin(faces, turningOn: true)
+        guard begin(faces, turningOn: true) else { return unjournaled(faces) }
         let result = await engine.activate(faces, method: .inPlace, records: data.records)
-        finish(result, journal: journal)
+        finish(result)
         return result
     }
 
     func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
-        let journal = begin(faces, turningOn: false)
+        guard begin(faces, turningOn: false) else { return unjournaled(faces) }
         let result = await engine.deactivate(faces, records: data.records)
-        finish(result, journal: journal)
+        finish(result)
         return result
     }
 
@@ -120,12 +120,18 @@ final class ClosedAppWriter: Writer {
         _ = try? await LibraryContext.load(environment, rescan: true)
     }
 
+    // Nothing turns without the note: a command stopped halfway would leave changes the records never learn of.
+    private func unjournaled(_ faces: [LibraryFace]) -> ActivationResult {
+        ActivationResult(records: data.records, succeeded: 0, failed: faces.map(\.face.path),
+                         message: "Couldn’t write a note in \(environment.locations.support.path) before the change, so nothing changed. Check that the disk has space and can be written to.")
+    }
+
     private func begin(_ faces: [LibraryFace], turningOn: Bool) -> Bool {
         let journal = ActivationJournal(turningOn: turningOn, paths: faces.map(\.face.path))
         return (try? journal.write(support: environment.locations.support)) != nil
     }
 
-    private func finish(_ result: ActivationResult, journal: Bool) {
+    private func finish(_ result: ActivationResult) {
         activated = true
         if ProcessInfo.processInfo.environment["CICERO_STOP_BEFORE_RECORDS"] == "1" { exit(9) }
         update { data in
@@ -133,6 +139,6 @@ final class ClosedAppWriter: Writer {
             data.forgetInstalledAddedFiles()
         }
         // Kept when the records couldn't be saved, so the next program to hold the lock repairs them.
-        if journal, !saveFailed { ActivationJournal.remove(support: environment.locations.support) }
+        if !saveFailed { ActivationJournal.remove(support: environment.locations.support) }
     }
 }
