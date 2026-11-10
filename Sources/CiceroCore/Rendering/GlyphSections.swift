@@ -745,12 +745,16 @@ public struct GlyphSection: Identifiable, Sendable {
     public static func shownName(of scalar: UInt32) -> String? {
         name(of: scalar).map { name in
             name.capitalized.split(separator: " ", omittingEmptySubsequences: false).enumerated()
-                .map { $0 > 0 && smallWords.contains($1.lowercased()) ? $1.lowercased() : String($1) }
+                .map { index, word in
+                    guard index > 0 else { return String(word) }
+                    if word == "And" { return "&" }
+                    return smallWords.contains(word.lowercased()) ? word.lowercased() : String(word)
+                }
                 .joined(separator: " ")
         }
     }
 
-    private static let smallWords: Set = ["with", "and", "or", "of", "for", "to", "in", "on"]
+    private static let smallWords: Set = ["with", "or", "of", "for", "to", "in", "on"]
 
     public static func block(of scalar: UInt32) -> String? {
         UnicodeBlock.containing(scalar)?.name
