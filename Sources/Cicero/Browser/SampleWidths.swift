@@ -12,6 +12,7 @@ final class SampleWidths {
     @ObservationIgnored private var measuredInputs: Int?
     @ObservationIgnored private var saved: [String: CGFloat]?
     @ObservationIgnored private var saving: Task<Void, Never>?
+    @ObservationIgnored private var clears = 0
     #if CICERO_MEASURE
     @ObservationIgnored private(set) var measuredLog: [(new: Int, all: Int)] = []
     static var savedURL: URL { Saved.url }
@@ -51,9 +52,14 @@ final class SampleWidths {
 
     func measure(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
         guard inputs != measuredInputs else { return listRatio }
-        if saved == nil { saved = await Saved.read() ?? [:] }
+        let clearsBefore = clears
+        if saved == nil {
+            let read = await Saved.read() ?? [:]
+            if clears == clearsBefore { saved = read }
+        }
         let known = saved ?? [:]
-        guard let measured = await Self.listRatio(samples, known: known, scriptSamples: scriptSamples), !Task.isCancelled else { return listRatio }
+        guard let measured = await Self.listRatio(samples, known: known, scriptSamples: scriptSamples), !Task.isCancelled,
+              clears == clearsBefore else { return listRatio }
         #if CICERO_MEASURE
         Measurements.record("sampleWidths", ms: 0, detail: "\(measured.new) measured, \(measured.used.count) saved")
         measuredLog.append((measured.new, measured.used.count))
@@ -70,6 +76,7 @@ final class SampleWidths {
     }
 
     func clearSaved() {
+        clears += 1
         saved = [:]
         measuredInputs = nil
         save([:])
