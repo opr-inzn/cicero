@@ -6,6 +6,7 @@ public final class UserDataStore: Sendable {
     private let legacyURL: URL
     private let queue = DispatchQueue(label: "Cicero.UserDataStore", qos: .utility)
     private let pending = Mutex<Pending>(Pending())
+    private let failureHandler = Mutex<(@Sendable () -> Void)?>(nil)
 
     private struct Pending {
         var data: UserData?
@@ -64,6 +65,10 @@ public final class UserDataStore: Sendable {
         queue.asyncAfter(deadline: .now() + Self.coalescingDelay) { [self] in writePending(for: generation) }
     }
 
+    public func onFailedWrite(_ handler: @escaping @Sendable () -> Void) {
+        failureHandler.withLock { $0 = handler }
+    }
+
     @discardableResult
     public func flush(durably: Bool = false) -> Bool {
         queue.sync { writePending(for: nil) && (!durably || Self.syncToDisk(fileURL)) }
@@ -78,13 +83,20 @@ public final class UserDataStore: Sendable {
 
     @discardableResult
     private func writePending(for generation: Int?) -> Bool {
-        let data = pending.withLock { pending -> UserData? in
+        let taken = pending.withLock { pending -> (data: UserData, generation: Int)? in
             if let generation, generation != pending.generation { return nil }
-            defer { pending.data = nil }
-            return pending.data
+            return pending.data.map { ($0, pending.generation) }
         }
-        guard let data else { return true }
-        return write(data)
+        guard let taken else { return true }
+        // Cleared only once written: a write that fails keeps the data for the next one, and flush says so, so no caller drops a journal the file doesn't yet cover.
+        guard write(taken.data) else {
+            failureHandler.withLock { $0 }?()
+            return false
+        }
+        pending.withLock { pending in
+            if pending.generation == taken.generation { pending.data = nil }
+        }
+        return true
     }
 
     @discardableResult

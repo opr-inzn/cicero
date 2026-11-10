@@ -305,6 +305,9 @@ final class AppModel {
     // MARK: Lifecycle
 
     private func begin() {
+        store.onFailedWrite { [weak self] in
+            Task { @MainActor in self?.showToast("Cicero couldn’t save the last change. Check that the disk has space and can be written to.") }
+        }
         let center = NotificationCenter.default
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
