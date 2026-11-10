@@ -1,4 +1,5 @@
 import CiceroCore
+import CryptoKit
 import Foundation
 import Observation
 import Sparkle
@@ -9,6 +10,11 @@ struct ReleaseNotes: Identifiable {
     var paragraphs: [AttributedString] = []
     var items: [AttributedString] = []
     var id: String { version }
+
+    var checksum: String {
+        let text = (paragraphs + items).map { String($0.characters) }.joined(separator: "\n")
+        return SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 
     private static func base(_ version: String) -> URL? {
         URL(string: "https://github.com/opr-inzn/cicero/blob/v\(version)/")
@@ -75,6 +81,7 @@ struct ReleaseNotes: Identifiable {
 final class WhatsNew {
     static let shared = WhatsNew()
     static let lastVersionKey = "whatsNew.lastVersion"
+    static let lastNotesKey = "whatsNew.lastNotes"
 
     private(set) var notes: [ReleaseNotes] = []
     @ObservationIgnored private var pending: [ReleaseNotes] = []
@@ -89,17 +96,26 @@ final class WhatsNew {
         let last = defaults.string(forKey: Self.lastVersionKey)
         if let last {
             pending = all.filter { Self.isNewer($0.version, than: last) && !Self.isNewer($0.version, than: current) }
+            if pending.isEmpty, last == current, let notes = all.first(where: { $0.version == current }),
+               defaults.string(forKey: Self.lastNotesKey) != notes.checksum {
+                pending = [notes]
+            }
         } else if UserDataStore(locations: .standard).hasSavedData, let notes = all.first(where: { $0.version == current }) {
             pending = [notes]
         }
-        if pending.isEmpty { defaults.set(current, forKey: Self.lastVersionKey) }
+        if pending.isEmpty { Self.remember(current, notes: all) }
+    }
+
+    private static func remember(_ current: String, notes all: [ReleaseNotes]?) {
+        UserDefaults.standard.set(current, forKey: lastVersionKey)
+        UserDefaults.standard.set(all?.first(where: { $0.version == current })?.checksum, forKey: lastNotesKey)
     }
 
     func takePending() -> Bool {
         guard !pending.isEmpty else { return false }
         notes = pending
         pending = []
-        if let current = Self.currentVersion { UserDefaults.standard.set(current, forKey: Self.lastVersionKey) }
+        if let current = Self.currentVersion { Self.remember(current, notes: ReleaseNotes.bundled) }
         return true
     }
 
