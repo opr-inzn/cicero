@@ -115,6 +115,7 @@ struct CiceroCommands: Commands {
                 Button("Cicero CLI installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
             } else {
                 Button("Install Cicero CLI", systemImage: "terminal") { CommandLineTool.install(model: model) }
+                    .disabled(CommandLineTool.State.shared.isInstalling)
             }
         }
         CommandGroup(after: .newItem) {

@@ -7,6 +7,7 @@ enum CommandLineTool {
     final class State {
         static let shared = State()
         private(set) var installed = false
+        var isInstalling = false
 
         private init() {
             refresh()
@@ -54,6 +55,7 @@ enum CommandLineTool {
     }
 
     static func install(model: AppModel) {
+        guard !State.shared.isInstalling else { return }
         guard let tool, let links else { return model.showToast("This build of Cicero has no Cicero CLI") }
         guard ApplicationsFolder.isInApplicationsFolder else {
             return ApplicationsFolder.offerToMove(forOpenAtLogin: false)
@@ -70,8 +72,10 @@ enum CommandLineTool {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        State.shared.isInstalling = true
         Task {
             let outcome = await make(links.filter { !$0.isMade })
+            State.shared.isInstalling = false
             State.shared.refresh()
             switch outcome {
             case .installed: await showInstalled()
