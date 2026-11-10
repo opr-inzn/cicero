@@ -32,7 +32,7 @@ extension ActivationEngine {
             if off.contains(replacement.old) {
                 let staged: URL
                 do {
-                    staged = try newStagedFile(named: old.lastPathComponent)
+                    staged = try newStagedFile(named: Self.replacementName(of: old, by: Self.url(replacement.added)))
                     stagedFiles.append(staged)
                     try fm.copyItem(at: Self.realFile(Self.url(replacement.added)), to: staged)
                 } catch {
@@ -42,8 +42,9 @@ extension ActivationEngine {
                 if installsIntoFontLibrary, fontLibrary != nil { intoLibrary[staged.path] = replacement } else { goingInOff[staged.path] = replacement }
                 continue
             }
-            if replaceInPlace(old, with: Self.url(replacement.added)) {
+            if let new = replaceInPlace(old, with: Self.url(replacement.added)) {
                 done.append(replacement)
+                if new != replacement.old { placed[replacement.old] = new }
             } else {
                 failed.append(replacement.old)
             }
@@ -116,26 +117,36 @@ extension ActivationEngine {
         return spare
     }
 
+    static func replacementName(of old: URL, by added: URL) -> String {
+        let ext = added.pathExtension.isEmpty ? old.pathExtension : added.pathExtension
+        let base = old.deletingPathExtension().lastPathComponent
+        return ext.isEmpty ? base : base + "." + ext
+    }
+
     private struct Replacing: Codable {
         var staged: String
         var old: String
+        var new: String?
     }
 
     private var replacingNotes: URL { locations.support.appendingPathComponent("Replacing", isDirectory: true) }
 
-    func replaceInPlace(_ old: URL, with added: URL) -> Bool {
+    func replaceInPlace(_ old: URL, with added: URL) -> String? {
         let fm = FileManager.default
+        let name = Self.replacementName(of: old, by: added)
+        let new = name.compare(old.lastPathComponent, options: .caseInsensitive) == .orderedSame
+            ? old : Self.uniqueURL(for: name, in: old.deletingLastPathComponent())
         // The old file goes to the Trash only once its replacement is whole beside it, and comes back should the last step fail: a font must never be left gone from its place.
         let staged = old.deletingLastPathComponent().appendingPathComponent(Self.movingPrefix + UUID().uuidString, isDirectory: false)
         // Noted first, so a Cicero that stops partway finishes the replacement at its next launch, or takes the copy away.
         let note = replacingNotes.appendingPathComponent(UUID().uuidString + ".json", isDirectory: false)
         do {
             try fm.createDirectory(at: replacingNotes, withIntermediateDirectories: true)
-            try JSONEncoder().encode(Replacing(staged: staged.path, old: old.path)).write(to: note, options: .atomic)
+            try JSONEncoder().encode(Replacing(staged: staged.path, old: old.path, new: new.path)).write(to: note, options: .atomic)
             guard UserDataStore.syncToDisk(note) else { throw CocoaError(.fileWriteUnknown) }
         } catch {
             try? fm.removeItem(at: note)
-            return false
+            return nil
         }
         defer { try? fm.removeItem(at: note) }
         do {
@@ -143,19 +154,19 @@ extension ActivationEngine {
             Self.unlock(staged)
         } catch {
             try? fm.removeItem(at: staged)
-            return false
+            return nil
         }
         let trashed: URL?
         do {
             trashed = try trash(old)
         } catch {
             try? fm.removeItem(at: staged)
-            return false
+            return nil
         }
-        if Self.renameExclusively(staged.path, to: old.path) { return true }
+        if Self.renameExclusively(staged.path, to: new.path) { return new.path }
         try? fm.removeItem(at: staged)
         if let trashed, (try? move(trashed, to: old)) == nil { try? fm.moveItem(at: trashed, to: old) }
-        return false
+        return nil
     }
 
     func finishReplacing() {
@@ -164,7 +175,7 @@ extension ActivationEngine {
             let note = replacingNotes.appendingPathComponent(name, isDirectory: false)
             if let replacing = (try? Data(contentsOf: note)).flatMap({ try? JSONDecoder().decode(Replacing.self, from: $0) }),
                (replacing.staged as NSString).lastPathComponent.hasPrefix(Self.movingPrefix), Self.exists(replacing.staged) {
-                if Self.exists(replacing.old) || !Self.renameExclusively(replacing.staged, to: replacing.old) {
+                if Self.exists(replacing.old) || !Self.renameExclusively(replacing.staged, to: replacing.new ?? replacing.old) {
                     try? fm.removeItem(atPath: replacing.staged)
                 }
             }
@@ -179,15 +190,18 @@ extension ActivationEngine {
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
+        func name(_ replacement: FileReplacement) -> String {
+            Self.replacementName(of: Self.url(replacement.old), by: Self.url(replacement.added))
+        }
         func sameName(_ replacement: FileReplacement) -> Bool {
-            Self.url(replacement.added).lastPathComponent.compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
+            name(replacement).compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
         }
         var waiting: [String: String] = [:]
         var moves: [String: String] = [:]
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
             let old = Self.url(replacement.old)
             guard sameName(replacement) else {
-                moves[path] = Self.uniqueURL(for: Self.url(replacement.added).lastPathComponent, in: old.deletingLastPathComponent()).path
+                moves[path] = Self.uniqueURL(for: name(replacement), in: old.deletingLastPathComponent()).path
                 continue
             }
             do {
@@ -240,7 +254,7 @@ extension ActivationEngine {
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
             let old = Self.url(replacement.old)
             let folder = installFolder(for: replacement.added, family: nil)
-            let new = Self.uniqueURL(for: old.lastPathComponent, in: folder)
+            let new = Self.uniqueURL(for: Self.replacementName(of: old, by: Self.url(replacement.added)), in: folder)
             do {
                 try fm.createDirectory(at: folder, withIntermediateDirectories: true)
                 try fm.moveItem(at: Self.url(path), to: new)
