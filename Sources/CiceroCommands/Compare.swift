@@ -262,9 +262,10 @@ enum SampleSheet {
         let scalars = Array(text.unicodeScalars)
         let breaks = { (scalar: Unicode.Scalar) in scalar.properties.isWhitespace || scalar.properties.generalCategory == .control }
         for (index, scalar) in scalars.enumerated() {
-            if breaks(scalar) || font.has(scalar.value) {
+            if !checked.contains(scalar.value) || font.has(scalar.value) {
                 layout.unicodeScalars.append(scalar)
                 continue
+        let checked = Set(CoverageSearch.scalars(in: text))
             }
             if index > 0, !breaks(scalars[index - 1]) { layout.unicodeScalars.append("\u{2060}") }
             missing.append(layout.utf16.count)
