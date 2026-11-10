@@ -269,6 +269,31 @@ extension ActivationEngine {
         await registrar.waitUntilForgotten(paths, timeout: timeout, every: every)
     }
 
+    private var renamesLaterList: URL { locations.support.appendingPathComponent("renaming-later.json", isDirectory: false) }
+
+    public var renamesLater: [String: String] {
+        (try? Data(contentsOf: renamesLaterList)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+    }
+
+    public func noteRenamesLater(_ pending: [String: String]) {
+        writeRenamesLater(renamesLater.merging(pending) { _, new in new })
+    }
+
+    public func forgetRenamesLater(_ interims: some Sequence<String>) {
+        var list = renamesLater
+        for interim in interims { list[interim] = nil }
+        writeRenamesLater(list)
+    }
+
+    private func writeRenamesLater(_ list: [String: String]) {
+        guard !list.isEmpty else {
+            try? FileManager.default.removeItem(at: renamesLaterList)
+            return
+        }
+        try? FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(list).write(to: renamesLaterList, options: .atomic)
+    }
+
     @concurrent
     public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> [String: String] {
         let fm = FileManager.default

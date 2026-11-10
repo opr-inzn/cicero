@@ -262,12 +262,14 @@ extension AppModel {
 
     func renameBackLater(_ pending: [String: String]) {
         let engine = engine
+        engine.noteRenamesLater(pending)
         Task { [weak self] in
             let remembered = await engine.waitUntilForgotten(Array(pending.values), timeout: engine.renameBackWait, every: .seconds(1))
             let ready = pending.filter { !remembered.contains($0.value) }
             guard !ready.isEmpty, let self else { return }
             self.enqueue { model in
                 let renamed = await model.engine.renameBack(ready, records: model.data.records)
+                model.engine.forgetRenamesLater(ready.keys)
                 if !renamed.isEmpty { model.rescan() }
             }
         }

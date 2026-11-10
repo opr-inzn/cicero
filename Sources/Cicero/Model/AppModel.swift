@@ -359,6 +359,8 @@ final class AppModel {
             let emptied = await model.engine.emptyInactiveFolder(model.data.records)
             model.data.records = emptied.records
             model.movingAtLaunch = false
+            let renames = model.engine.renamesLater
+            if !renames.isEmpty { model.renameBackLater(renames) }
             if migrating || renaming || reassembling || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
         }
         dropAdobeFolders()
