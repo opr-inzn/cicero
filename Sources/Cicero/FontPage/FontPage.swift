@@ -464,6 +464,8 @@ private struct TesterText: View {
     let caseChange: CaseChange?
     @Binding var ownScript: OwnScriptText?
     @Bindable private var store = TesterTextStore.shared
+    @State private var decided: (face: FaceID, sample: String?)?
+    @State private var typed: String?
 
     private var text: String {
         get { store.text }
@@ -494,11 +496,24 @@ private struct TesterText: View {
                     store.glyphs = []
                 }
             }
+            .onChange(of: face.id, initial: true) { decided = (face.id, freshSample) }
+            .onChange(of: store.text) { _, new in if new != typed { decided = (face.id, freshSample) } }
+    }
+
+    private var freshSample: String? {
+        let sample = model.scriptSamples.text(text, for: face, long: true)
+        return sample == text ? nil : sample
     }
 
     private var shownText: (text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
-        let sample = model.scriptSamples.text(text, for: face, long: true)
-        guard sample != text else { return ($store.text, $store.glyphs, Self.defaultText) }
+        let decided = decided.flatMap { $0.face == face.id ? $0 : nil }
+        guard let sample = decided.map(\.sample) ?? freshSample else {
+            let text = Binding { store.text } set: {
+                typed = $0
+                store.text = $0
+            }
+            return (text, $store.glyphs, Self.defaultText)
+        }
         let family = family.id
         func own() -> OwnScriptText? { ownScript.flatMap { $0.family == family ? $0 : nil } }
         let text = Binding { own()?.text ?? sample } set: {

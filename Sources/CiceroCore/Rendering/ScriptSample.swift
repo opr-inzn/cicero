@@ -6,6 +6,8 @@ public struct ScriptSample: Hashable, Sendable {
     public let short: String
     public let long: String
 
+    static let minimumLetters = 20
+
     public static func isNeeded(for text: String, has: (Unicode.Scalar) -> Bool) -> Bool {
         var hasLetters = false
         for scalar in text.unicodeScalars where scalar.properties.isAlphabetic {
@@ -16,7 +18,7 @@ public struct ScriptSample: Hashable, Sendable {
     }
 
     public init?(characters: ScalarRanges, languages: [Language]) {
-        let scripts = GlyphGroup.scripts(of: characters).filter { $0.key != "Latin" }
+        let scripts = GlyphGroup.scripts(of: characters).filter { $0.key != "Latin" && $0.value >= Self.minimumLetters }
         guard let script = scripts.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key else { return nil }
         var names: [String] = []
         for language in languages.filter(\.isCurrent).sorted(by: { $0.speakers > $1.speakers }) {
