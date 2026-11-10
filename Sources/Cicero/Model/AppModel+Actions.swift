@@ -22,7 +22,7 @@ extension AppModel {
         enqueue { model in
             var result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
             if let named, result.failed.isEmpty { result.message = FontNames.describe(named).map { "\($0) activated" } ?? "" }
-            model.finish(result, operation: operation, undo: model.undo(turning: named ?? faces, on: false, failed: result.failed))
+            model.finish(result, operation: operation, undo: model.undo(restoring: named ?? faces, failed: result.failed))
         }
     }
 
@@ -39,7 +39,7 @@ extension AppModel {
         let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, records: model.data.records)
-            model.finish(result, operation: operation, undo: model.undo(turning: targets, on: false, failed: result.failed))
+            model.finish(result, operation: operation, undo: model.undo(restoring: targets, failed: result.failed))
         }
     }
 
@@ -87,7 +87,7 @@ extension AppModel {
         let operation = expect(faces, at: .off)
         enqueue { model in
             let result = await model.engine.deactivate(faces, records: model.data.records)
-            model.finish(result, operation: operation, undo: model.undo(turning: faces, on: true, failed: result.failed))
+            model.finish(result, operation: operation, undo: model.undo(restoring: faces, failed: result.failed))
         }
     }
 
@@ -121,30 +121,110 @@ extension AppModel {
         }
     }
 
-    func finish(_ result: ActivationResult, operation: Int? = nil, undo: (() -> Void)? = nil) {
+    func finish(_ result: ActivationResult, operation: Int? = nil, operations: [Int] = [], undo: (() -> Void)? = nil) {
         var data = data
         data.records = result.records
         data.forgetInstalledAddedFiles()
         self.data = data
         if !result.message.isEmpty { showToast(result.message, undo: undo) }
         let scan = rescan()
-        if let operation { settle(operation, after: scan) }
+        for operation in [operation].compactMap(\.self) + operations { settle(operation, after: scan) }
     }
 
-    func undo(turning faces: [LibraryFace], on: Bool, failed: [String]) -> (() -> Void)? {
-        let failed = Set(failed)
-        let ids = Set(faces.filter { !failed.contains($0.face.path) }.map(\.id))
-        guard !ids.isEmpty else { return nil }
-        return { [weak self] in
-            guard let self else { return }
-            let families = self.library.families.filter { $0.faces.contains { ids.contains($0.id) } }
-            let current = families.flatMap(\.faces).filter { ids.contains($0.id) }
-            guard !current.isEmpty else { return }
-            if on {
-                self.activate(current, title: Self.title(for: families), confirmed: true)
-            } else {
-                self.deactivate(current)
+    enum EarlierState {
+        case off, app, untilQuit, whileAppsRun, on
+
+        init(_ face: LibraryFace) {
+            switch face.state.temporaryScope {
+            case .untilQuit: self = .untilQuit
+            case .whileAppsRun: self = .whileAppsRun
+            case nil: self = switch face.position { case .on: .on; case .app: .app; case .off: .off }
             }
+        }
+
+        func matches(_ face: LibraryFace) -> Bool {
+            switch self {
+            case .untilQuit: face.state.temporaryScope == .untilQuit
+            case .whileAppsRun: face.state.temporaryScope == .whileAppsRun
+            case .on: face.position == .on && face.state.temporaryScope == nil
+            case .app: face.position == .app
+            case .off: face.position == .off
+            }
+        }
+    }
+
+    func undo(restoring faces: [LibraryFace], failed: [String]) -> (() -> Void)? {
+        let failed = Set(failed)
+        let changed = faces.filter { !failed.contains($0.face.path) }
+        guard !changed.isEmpty else { return nil }
+        return { [weak self] in self?.restore(changed) }
+    }
+
+    func restore(_ earlier: [LibraryFace]) {
+        let found = findAgain(earlier)
+        guard !found.isEmpty else { return showToast("Couldn’t undo: these fonts are no longer in your library") }
+        var off: [LibraryFace] = [], app: [LibraryFace] = [], on: [LibraryFace] = [], untilQuit: [LibraryFace] = []
+        var forApps = Set<String>()
+        for (old, current) in found {
+            let state = EarlierState(old)
+            guard !state.matches(current) else { continue }
+            switch state {
+            case .off: if current.canDeactivate { off.append(current) }
+            case .app: if current.app != nil { app.append(current) }
+            case .on: if current.canActivate { on.append(current) }
+            case .untilQuit, .whileAppsRun:
+                if current.state.isActive {
+                    if current.app != nil {
+                        app.append(current)
+                    } else if current.canDeactivate {
+                        off.append(current)
+                    } else {
+                        continue
+                    }
+                }
+                if state == .untilQuit { untilQuit.append(current) } else { forApps.insert(current.face.postScriptName) }
+            }
+        }
+        guard !off.isEmpty || !app.isEmpty || !on.isEmpty || !untilQuit.isEmpty || !forApps.isEmpty else { return }
+        let operations = [(off, SwitchPosition.off), (app, .app), (on + untilQuit, .on)].filter { !$0.0.isEmpty }.map { expect($0.0, at: $0.1) }
+        let named = found.map(\.current)
+        enqueue { model in
+            var records = model.data.records
+            var failed: [String] = []
+            var failure: String?
+            func take(_ result: ActivationResult) {
+                records = result.records
+                failed += result.failed
+                if !result.failed.isEmpty, failure == nil { failure = result.message }
+            }
+            if !off.isEmpty { take(await model.engine.deactivate(off, records: records)) }
+            if !app.isEmpty { take(await model.engine.useInAppOnly(app, records: records)) }
+            if !on.isEmpty { take(await model.engine.activate(on, method: .inPlace, records: records)) }
+            let temporary = untilQuit.filter { !failed.contains($0.face.path) }.map { face in
+                face.state.isActive ? LibraryFace(face: face.face, state: face.app.map(FaceState.appOnly) ?? .inactive, copies: face.copies, app: face.app) : face
+            }
+            if !temporary.isEmpty { take(await model.engine.activateTemporarily(temporary, records: records)) }
+            let message = failure ?? "\(FontNames.describe(named) ?? "Fonts") back as before"
+            model.finish(ActivationResult(records: records, succeeded: 0, failed: failed, message: message), operations: operations)
+            model.appSets.allow(forApps)
+        }
+    }
+
+    private func findAgain(_ earlier: [LibraryFace]) -> [(old: LibraryFace, current: LibraryFace)] {
+        let names = Set(earlier.map(\.face.postScriptName))
+        var byID: [FaceID: LibraryFace] = [:]
+        var byName: [String: [LibraryFace]] = [:]
+        for face in library.families.lazy.flatMap(\.faces) where names.contains(face.face.postScriptName) {
+            byID[face.id] = face
+            for copy in face.copies { byID[copy.face.id] = face }
+            byName[face.face.familyName + "\u{0}" + face.face.postScriptName, default: []].append(face)
+        }
+        var seen = Set<FaceID>()
+        return earlier.compactMap { old in
+            let candidates = byName[old.face.familyName + "\u{0}" + old.face.postScriptName] ?? []
+            guard let current = byID[old.id] ?? candidates.first(where: { $0.id.index == old.id.index }) ?? candidates.first,
+                  seen.insert(current.id).inserted else { return nil }
+            return (old, current)
         }
     }
 
