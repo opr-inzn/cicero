@@ -192,6 +192,7 @@ public final class LibraryScanner: Sendable {
         var lastStamps: [String: FaceStamp] = [:]
         var built = false
         var restored: Library?
+        var offlineKnown: [String: Set<String>] = [:]
         var savedFingerprint: Int?
         var onDisk: Library?
         var rereadsAsked = 0
@@ -955,11 +956,19 @@ public final class LibraryScanner: Sendable {
 
         var offline = Set<String>()
         var offlinePaths = Set<String>()
-        for (path, file) in files where found[path] == nil && reach.keeps(path) {
+        var offlineKnown: [String: Set<String>] = [:]
+        func keepOffline(_ path: String, families: Set<String>) {
             if !reach.onlineOnlyPaths.contains(path) { offlinePaths.insert(path) }
-            for face in file.faces where byFamily[face.familyName] == nil && !face.familyName.hasPrefix(".") && !face.familyName.isEmpty {
-                offline.insert(face.familyName)
-            }
+            offlineKnown[path] = families
+            for name in families where byFamily[name] == nil { offline.insert(name) }
+        }
+        for (path, file) in files where found[path] == nil && reach.keeps(path) {
+            keepOffline(path, families: Set(file.faces.map(\.familyName).filter { !$0.hasPrefix(".") && !$0.isEmpty }))
+        }
+        // What was out of reach before stays so while its disk is away, also when the face cache doesn't know it (deleted, or from an older version).
+        let carried = state.withLock { state in state.restored.map(Self.offlineKnown) ?? state.offlineKnown }
+        for (path, families) in carried where found[path] == nil && files[path] == nil && reach.keeps(path) {
+            keepOffline(path, families: families)
         }
 
         var hasher = Hasher()
@@ -989,11 +998,21 @@ public final class LibraryScanner: Sendable {
             state.built = true
             state.lastStamps = found.mapValues(\.stamp)
             state.restored = nil
+            state.offlineKnown = offlineKnown
             return changed
         }
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
                        unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
                        goneFiles: reach.goneFiles)
+    }
+
+    private static func offlineKnown(in library: Library) -> [String: Set<String>] {
+        var known: [String: Set<String>] = [:]
+        for face in library.families.lazy.flatMap(\.faces) {
+            for copy in [FaceCopy(face)] + face.copies { known[copy.face.path, default: []].insert(copy.face.familyName) }
+        }
+        for path in library.offlinePaths where known[path] == nil { known[path] = library.offlineFamilies }
+        return known
     }
 
     static func stylePrecedes(_ a: FontFace, _ b: FontFace) -> Bool {

@@ -53,17 +53,19 @@ enum FaceCache {
             do {
                 guard try reader.u32() == magic else { return nil }
                 let saved = try reader.u32()
-                guard saved == version else { return nil }
+                guard saved == version || saved == withoutFigures else { return nil }
                 let count = Int(try reader.u32())
                 var files: [String: CachedFile] = [:]
-                files.reserveCapacity(count)
+                files.reserveCapacity(min(count, reader.remaining / 32))
                 for _ in 0..<count {
                     let path = try reader.string()
-                    let stamp = FaceStamp(modified: try reader.i64(), size: try reader.i64())
+                    var stamp = FaceStamp(modified: try reader.i64(), size: try reader.i64())
+                    // Kept for what it says of files out of reach; one there is read again for what the older layout lacks.
+                    if saved == withoutFigures { stamp.size = -1 }
                     let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
                     let faceCount = Int(try reader.u32())
                     var faces: [FontFace] = []
-                    faces.reserveCapacity(faceCount)
+                    faces.reserveCapacity(min(faceCount, reader.remaining / 16))
                     for _ in 0..<faceCount { faces.append(try reader.face(path: path)) }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
                 }
@@ -167,6 +169,8 @@ struct ByteReader {
     init(buffer: UnsafeRawBufferPointer) {
         self.buffer = buffer
     }
+
+    var remaining: Int { buffer.count - offset }
 
     private mutating func take(_ count: Int) throws -> Int {
         guard count >= 0, offset + count <= buffer.count else { throw Truncated() }
