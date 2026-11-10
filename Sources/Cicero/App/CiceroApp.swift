@@ -261,7 +261,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // A change half made when Cicero quits would leave fonts on or off that its records don't know about.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model, model.isWorking else { return .terminateNow }
+        guard let model else { return .terminateNow }
+        if let job = model.job {
+            NSApp.bringForward()
+            model.showToast(job.waitMessage)
+            return .terminateCancel
+        }
+        guard model.isWorking else { return .terminateNow }
         Task {
             await model.finishWork(within: .seconds(30))
             sender.reply(toApplicationShouldTerminate: true)
