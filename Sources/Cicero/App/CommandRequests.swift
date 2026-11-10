@@ -7,7 +7,6 @@ final class CommandRequests {
     private weak var model: AppModel?
     private var source: DispatchSourceFileSystemObject?
     private var working = false
-    private var lookAgain = false
 
     init(model: AppModel) {
         self.model = model
@@ -34,18 +33,12 @@ final class CommandRequests {
     }
 
     private func look() {
-        guard source != nil else { return }
-        guard !working else { return lookAgain = true }
-        let taken = Requests.take(support: support)
-        guard !taken.isEmpty else { return }
+        guard source != nil, !working, let taken = Requests.take(support: support) else { return }
         working = true
         Task {
-            for request in taken { await answer(request) }
+            await answer(taken)
             working = false
-            if lookAgain {
-                lookAgain = false
-                look()
-            }
+            look()
         }
     }
 

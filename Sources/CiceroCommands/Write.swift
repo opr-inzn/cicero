@@ -37,6 +37,7 @@ public struct WriteRequest: Codable, Sendable, Equatable {
     public var command: WriteCommand
     public var confirmed: Bool
     public var shown: ShownFonts
+    public var sender: Requests.Sender?
 
     public init(_ command: WriteCommand, confirmed: Bool = false, shown: ShownFonts = ShownFonts()) {
         self.command = command

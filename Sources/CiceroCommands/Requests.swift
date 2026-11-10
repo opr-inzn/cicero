@@ -19,6 +19,24 @@ public enum Requests {
 
     // MARK: The command
 
+    public struct Sender: Codable, Sendable, Equatable {
+        var process: Int32
+        var started: Int
+
+        static var current: Sender? { started(getpid()).map { Sender(process: getpid(), started: $0) } }
+
+        var isRunning: Bool { Self.started(process) == started }
+
+        private static func started(_ process: pid_t) -> Int? {
+            var info = kinfo_proc()
+            var size = MemoryLayout<kinfo_proc>.stride
+            var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, process]
+            guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0, info.kp_proc.p_pid == process else { return nil }
+            let start = info.kp_proc.p_un.__p_starttime
+            return start.tv_sec * 1_000_000 + Int(start.tv_usec)
+        }
+    }
+
     static func send(_ request: WriteRequest, support: URL) async throws -> JSON? {
         let folder = folder(support: support)
         let fm = FileManager.default
@@ -26,6 +44,9 @@ public enum Requests {
         let id = UUID().uuidString
         let staged = folder.appendingPathComponent("\(id).staged", isDirectory: false)
         let waiting = file(id, "request", in: folder), taken = file(id, "taken", in: folder), reply = file(id, "reply", in: folder)
+        let withdrawn = folder.appendingPathComponent("\(id).withdrawn", isDirectory: false)
+        var request = request
+        request.sender = .current
         do {
             try JSONEncoder().encode(request).write(to: staged, options: .atomic)
             try fm.moveItem(at: staged, to: waiting)
@@ -43,7 +64,6 @@ public enum Requests {
             let open = AppLock.isHeld(support: support)
             if fm.fileExists(atPath: waiting.path) {
                 if !open || ContinuousClock.now - start > takeWithin && !isStarting(support: support) {
-                    let withdrawn = folder.appendingPathComponent("\(id).withdrawn", isDirectory: false)
                     if (try? fm.moveItem(at: waiting, to: withdrawn)) != nil {
                         try? fm.removeItem(at: withdrawn)
                         if !open { return nil }
@@ -66,7 +86,12 @@ public enum Requests {
                 try? fm.removeItem(at: taken)
                 throw CommandError(.failed, "Cicero quit before it said whether it made the change. Check with cicero status.")
             }
-            try await Task.sleep(for: .milliseconds(50))
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                if (try? fm.moveItem(at: waiting, to: withdrawn)) != nil { try? fm.removeItem(at: withdrawn) }
+                throw error
+            }
         }
     }
 
@@ -82,7 +107,7 @@ public enum Requests {
         public var request: WriteRequest?
     }
 
-    public static func take(support: URL) -> [Taken] {
+    public static func take(support: URL) -> Taken? {
         let folder = folder(support: support)
         let fm = FileManager.default
         let names = (try? fm.contentsOfDirectory(atPath: folder.path)) ?? []
@@ -91,19 +116,21 @@ public enum Requests {
             (url, (try? fm.attributesOfItem(atPath: url.path))?[.creationDate] as? Date ?? .distantPast)
         }
         let late = Date.now.addingTimeInterval(-max(Double(takeWithin.components.seconds), whileStarting) - 5)
-        return dated.sorted { $0.1 < $1.1 }.compactMap { url, date in
+        for (url, date) in dated.sorted(by: { $0.1 < $1.1 }) {
             let id = String(url.lastPathComponent.dropLast(".request.json".count))
-            // Its command would have withdrawn it by now, unless it was stopped: a change the user cancelled must never be made.
-            if date < late {
+            let sender = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(WriteRequest.self, from: $0) }?.sender
+            // A change the user cancelled must never be made: its command has stopped (Ctrl-C, a closed terminal or agent), or would have withdrawn it by now.
+            if sender.map({ !$0.isRunning }) == true || date < late {
                 try? fm.removeItem(at: url)
-                return nil
+                continue
             }
             let taken = file(id, "taken", in: folder)
             // Taking and withdrawing are renames of the same file, so only one happens: a request is never made twice, nor by both Cicero and the command.
-            guard (try? fm.moveItem(at: url, to: taken)) != nil else { return nil }
+            guard (try? fm.moveItem(at: url, to: taken)) != nil else { continue }
             let request = (try? Data(contentsOf: taken)).flatMap { try? JSONDecoder().decode(WriteRequest.self, from: $0) }
             return Taken(id: id, request: request)
         }
+        return nil
     }
 
     public static func reply(_ answer: JSON, to id: String, support: URL) {
