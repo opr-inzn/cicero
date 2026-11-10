@@ -78,7 +78,11 @@ final class AppModel {
             guard data != oldValue else { return }
             // Kept as it was saved: a newer Cicero's data, written by this one, would lose what only the newer one knows.
             if store.isReadOnly {
+                // Setting it here runs this observer again: an @Observable property's didSet isn't skipped for a set from inside it.
+                guard !revertingData else { return }
+                revertingData = true
                 data = oldValue
+                revertingData = false
                 return showToast(UserData.newerVersionMessage)
             }
             store.save(data)
@@ -101,6 +105,7 @@ final class AppModel {
         }
     }
     private(set) var dataRevision = 0
+    @ObservationIgnored private var revertingData = false
     var guessesClassifications: Bool {
         didSet {
             guard guessesClassifications != oldValue else { return }
