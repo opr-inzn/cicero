@@ -63,6 +63,11 @@ nonisolated struct SampleGlyphRun: Codable, Hashable, Sendable {
     let glyph: SampleGlyph
 
     var range: NSRange { NSRange(location: location, length: (glyph.characters as NSString).length) }
+
+    func isIn(_ string: NSString) -> Bool {
+        let length = (glyph.characters as NSString).length
+        return location >= 0 && location <= string.length - length && string.substring(with: range) == glyph.characters
+    }
 }
 
 struct SampleClip: Codable {
@@ -147,7 +152,7 @@ nonisolated extension NSAttributedString {
 nonisolated extension NSMutableAttributedString {
     func addSampleGlyphs(_ runs: [SampleGlyphRun]) {
         let string = self.string as NSString
-        for run in runs where NSMaxRange(run.range) <= length && string.substring(with: run.range) == run.glyph.characters {
+        for run in runs where run.isIn(string) {
             addAttribute(.sampleGlyph, value: SampleGlyphValue(run.glyph), range: run.range)
         }
     }
