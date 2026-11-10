@@ -1,8 +1,9 @@
 import CoreServices
 import Foundation
 
-public final class FolderWatcher: @unchecked Sendable {
-    private let onChange: @Sendable (Set<String>?) -> Void
+@MainActor
+public final class FolderWatcher {
+    private let onChange: (Set<String>?) -> Void
     private var stream: FSEventStreamRef?
     private var watched: [String] = []
     private var folders: [String] = []
@@ -11,11 +12,11 @@ public final class FolderWatcher: @unchecked Sendable {
     private var hiddenFolders: [String] = []
     private var aliases: [(resolved: String, given: String)] = []
 
-    public init(onChange: @escaping @Sendable (Set<String>?) -> Void) {
+    public init(onChange: @escaping (Set<String>?) -> Void) {
         self.onChange = onChange
     }
 
-    deinit {
+    isolated deinit {
         stop()
     }
 
@@ -36,16 +37,19 @@ public final class FolderWatcher: @unchecked Sendable {
         var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
         let callback: FSEventStreamCallback = { _, info, count, eventPaths, eventFlags, _ in
             guard let info else { return }
-            let watcher = Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue()
             let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String] ?? []
-            let flags = UnsafeBufferPointer(start: eventFlags, count: count)
-            var changed: Set<String>? = []
-            var matters = false
-            for (path, flag) in zip(paths, flags) where watcher.matters(path, flag) {
-                matters = true
-                if let given = watcher.followed(path, flag) { changed?.insert(given) } else { changed = nil }
+            let flags = Array(UnsafeBufferPointer(start: eventFlags, count: count))
+            // On the main queue, which FSEventStreamSetDispatchQueue below sets.
+            MainActor.assumeIsolated {
+                let watcher = Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue()
+                var changed: Set<String>? = []
+                var matters = false
+                for (path, flag) in zip(paths, flags) where watcher.matters(path, flag) {
+                    matters = true
+                    if let given = watcher.followed(path, flag) { changed?.insert(given) } else { changed = nil }
+                }
+                if matters { watcher.onChange(changed) }
             }
-            if matters { watcher.onChange(changed) }
         }
         let flags = FSEventStreamCreateFlags(
             kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot | kFSEventStreamCreateFlagNoDefer

@@ -247,7 +247,7 @@ final class AppModel {
     @ObservationIgnored private var operationCount = 0
     @ObservationIgnored private var expectations: [Expectation] = []
     @ObservationIgnored private lazy var folderWatcher = FolderWatcher { [weak self] changed in
-        MainActor.assumeIsolated { self?.fontsChanged(changed.map(ScanScope.files) ?? .everything) }
+        self?.fontsChanged(changed.map(ScanScope.files) ?? .everything)
     }
     @ObservationIgnored private var pendingScope: ScanScope?
     @ObservationIgnored private var runningScan: (id: Int, scope: ScanScope, check: Bool)?
