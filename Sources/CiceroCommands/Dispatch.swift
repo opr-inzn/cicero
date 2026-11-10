@@ -10,6 +10,7 @@ public enum WriteDispatcher {
     public static func perform(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
         let support = environment.locations.support
         var freeSince: Date?
+        var commandSince: ContinuousClock.Instant?
         while true {
             if let lock = AppLock.take(support: support) {
                 guard runningApp(environment) != nil else {
@@ -26,16 +27,24 @@ public enum WriteDispatcher {
                 continue
             }
             freeSince = nil
-            if runningApp(environment) != nil, AppLock.holder(support: support) != .command {
+            if runningApp(environment) != nil, !commandHolds(support: support) {
+                commandSince = nil
                 guard let answer = try await Requests.send(request, support: support) else { continue }
                 if let error = CommandError(answer: answer) { throw error }
                 return answer
             }
-            guard let lock = await AppLock.wait(support: support, timeout: otherCommand) else {
+            let since = commandSince ?? .now
+            if ContinuousClock.now - since > otherCommand {
                 throw CommandError(.busy, "The Cicero CLI is making another change. Nothing changed. Try again in a moment.")
             }
-            lock.release()
+            commandSince = since
+            try await Task.sleep(for: .milliseconds(50))
         }
+    }
+
+    static func commandHolds(support: URL) -> Bool {
+        let text = (try? String(contentsOf: AppLock.url(support: support), encoding: .utf8)) ?? ""
+        return text.split(separator: "\n", omittingEmptySubsequences: false).first == "command"
     }
 
     static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
