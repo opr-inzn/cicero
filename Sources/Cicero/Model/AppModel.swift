@@ -610,6 +610,7 @@ final class AppModel {
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
+        if compareEntries.contains(where: { new.family($0.familyID) == nil }) { compareEntries.removeAll { new.family($0.familyID) == nil } }
         if let similar = similarFamilyID, new.family(similar) == nil { endSimilar() }
         FontLoader.shared.invalidate(paths: new.changedPaths)
         pageContents.forget(paths: new.changedPaths)
