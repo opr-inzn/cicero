@@ -100,6 +100,9 @@ final class ClosedAppWriter: Writer {
 
     func update(_ change: (inout UserData) -> Void) {
         change(&data)
+        if !store.hasSavedData, environment.defaults.object(forKey: ClassificationGuesses.guessingKey) == nil {
+            environment.defaults.set(true, forKey: ClassificationGuesses.askingKey)
+        }
         store.save(data)
         if !store.flush(durably: true) { saveFailed = true }
     }
