@@ -112,7 +112,7 @@ public struct FontExporter: Sendable {
             for path in item.paths {
                 try Task.checkCancellation()
                 let source = URL(fileURLWithPath: path, isDirectory: false)
-                try fm.copyItem(at: source, to: ActivationEngine.uniqueURL(for: source.lastPathComponent, in: target))
+                try fm.copyItem(at: ActivationEngine.realFile(source), to: ActivationEngine.uniqueURL(for: source.lastPathComponent, in: target))
             }
         }
     }

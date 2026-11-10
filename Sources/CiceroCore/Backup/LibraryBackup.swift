@@ -213,7 +213,7 @@ public struct LibraryBackup: Sendable {
                 let archivePath = "Fonts/\(index)/\(source.lastPathComponent)"
                 let target = folder.appendingPathComponent(archivePath, isDirectory: false)
                 try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try fm.copyItem(at: source, to: target)
+                try fm.copyItem(at: ActivationEngine.realFile(source), to: target)
                 manifest.fonts[index].archivePath = archivePath
             }
             progress(.copying(done: fonts.count, total: fonts.count))

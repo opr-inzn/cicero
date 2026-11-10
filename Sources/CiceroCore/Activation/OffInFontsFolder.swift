@@ -128,7 +128,6 @@ extension ActivationEngine {
                                                              reason: "Copying fonts in")
         defer { ProcessInfo.processInfo.endActivity(activity) }
         let fm = FileManager.default
-        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         let plan = copyPlan(files)
         let total = plan.toCopy.count
         var placed = plan.inAlready
@@ -140,6 +139,8 @@ extension ActivationEngine {
         var lookedAt = TurnOffAgain()
         var lastLook = ContinuousClock.now
         var again: [String: (destination: String, source: String)] = [:]
+        var stagedFiles: [URL] = []
+        defer { for staged in stagedFiles { _ = Self.removeIfEmpty(staged.deletingLastPathComponent().path) } }
         for start in stride(from: 0, to: total, by: Self.offBatchSize) {
             if Task.isCancelled { break }
             if ContinuousClock.now - lastLook > Self.lookAgainEvery {
@@ -157,10 +158,11 @@ extension ActivationEngine {
                     continue
                 }
                 // Copied into Cicero's staging folder first and moved in from there, so a Fonts folder never has half a file.
-                let staged = staging.appendingPathComponent(UUID().uuidString + "-" + name, isDirectory: false)
+                let staged: URL
                 do {
-                    try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                    try fm.copyItem(at: Self.url(path), to: staged)
+                    staged = try newStagedFile(named: name)
+                    stagedFiles.append(staged)
+                    try fm.copyItem(at: Self.realFile(Self.url(path)), to: staged)
                     // Without the original's quarantine tag: with it, fontworker opens the quarantine database for each file it reads (and fails), so slowly that fontd reads the Fonts folder again and again.
                     removexattr(staged.path, "com.apple.quarantine", 0)
                 } catch {
@@ -179,7 +181,7 @@ extension ActivationEngine {
                     placed[path] = destination.path
                     new.append(destination.path)
                 } catch {
-                    try? fm.removeItem(at: staged)
+                    Self.removeStaged(staged)
                 }
             }
             let moved = await moveIntoFontsFolderOff(intoFontsFolder, staysOn: stagedOn)
@@ -214,7 +216,7 @@ extension ActivationEngine {
                 }
             }
         }
-        for staged in again.keys { try? fm.removeItem(atPath: staged) }
+        for staged in again.keys { Self.removeStaged(Self.url(staged)) }
         // In a task of its own, also once cancelled, as the copies stay: in a cancelled task the waits would be cut short.
         let cancelled = Task.isCancelled
         let turningOff = cancelled && !keepOnWhenCancelled ? onSoFar : []
@@ -331,7 +333,9 @@ extension ActivationEngine {
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         // To the Trash, not deleted: an import's originals may be gone since.
         for name in (try? fm.contentsOfDirectory(atPath: staging.path)) ?? [] where name != ".DS_Store" {
-            try? fm.trashItem(at: staging.appendingPathComponent(name, isDirectory: false), resultingItemURL: nil)
+            let item = staging.appendingPathComponent(name)
+            if Self.isFolder(item.path), Self.removeIfEmpty(item.path) { continue }
+            try? fm.trashItem(at: item, resultingItemURL: nil)
         }
     }
 

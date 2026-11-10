@@ -1033,15 +1033,13 @@ public struct ActivationEngine: Sendable {
             return PlacedCopy(destination: first.path, source: path, isNew: false)
         }
         // Copied into the staging folder first and then moved in, so macOS never sees a half-written file.
-        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
-        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-        let staged = staging.appendingPathComponent(UUID().uuidString + "-" + name, isDirectory: false)
+        let staged = try newStagedFile(named: name)
+        defer { Self.removeStaged(staged) }
         let destination = Self.uniqueURL(for: name, in: folder)
         do {
-            try fm.copyItem(at: source, to: staged)
+            try fm.copyItem(at: Self.realFile(source), to: staged)
             try fm.moveItem(at: staged, to: destination)
         } catch {
-            try? fm.removeItem(at: staged)
             removeEmptyFolders(around: destination.path)
             throw error
         }
@@ -1150,6 +1148,23 @@ public struct ActivationEngine: Sendable {
               (copy.st_flags | source.st_flags) & UInt32(SF_DATALESS) == 0
         else { return false }
         return FileManager.default.contentsEqual(atPath: path, andPath: original)
+    }
+
+    func newStagedFile(named name: String) throws -> URL {
+        let folder = locations.support.appendingPathComponent("Staging", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent(name, isDirectory: false)
+    }
+
+    static func removeStaged(_ staged: URL) {
+        try? FileManager.default.removeItem(at: staged)
+        _ = removeIfEmpty(staged.deletingLastPathComponent().path)
+    }
+
+    // A copy of a symbolic link would be a link, broken when it was relative.
+    static func realFile(_ url: URL) -> URL {
+        url.resolvingSymlinksInPath()
     }
 
     static func dateAdded(of url: URL) -> Date? {

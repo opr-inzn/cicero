@@ -14,7 +14,8 @@ extension ActivationEngine {
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
 
-        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
+        var stagedFiles: [URL] = []
+        defer { for staged in stagedFiles { Self.removeStaged(staged) } }
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
@@ -29,12 +30,12 @@ extension ActivationEngine {
             }
             let old = Self.url(replacement.old)
             if off.contains(replacement.old) {
-                let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
+                let staged: URL
                 do {
-                    try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                    try fm.copyItem(at: Self.url(replacement.added), to: staged)
+                    staged = try newStagedFile(named: old.lastPathComponent)
+                    stagedFiles.append(staged)
+                    try fm.copyItem(at: Self.realFile(Self.url(replacement.added)), to: staged)
                 } catch {
-                    try? fm.removeItem(at: staged)
                     failed.append(replacement.old)
                     continue
                 }
@@ -138,7 +139,7 @@ extension ActivationEngine {
         }
         defer { try? fm.removeItem(at: note) }
         do {
-            try fm.copyItem(at: added, to: staged)
+            try fm.copyItem(at: Self.realFile(added), to: staged)
             Self.unlock(staged)
         } catch {
             try? fm.removeItem(at: staged)
