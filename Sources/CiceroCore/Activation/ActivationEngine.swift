@@ -1111,7 +1111,7 @@ public struct ActivationEngine: Sendable {
 
     private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
         let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-        AppFolderMoves.note(moved: destination.path, origin: path, support: locations.support)
+        try AppFolderMoves.note(moved: destination.path, origin: path, support: locations.support)
         try move(Self.url(path), to: destination)
         records.appFolderOrigins[destination.path] = path
     }
