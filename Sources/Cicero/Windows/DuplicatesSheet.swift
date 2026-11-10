@@ -9,7 +9,7 @@ struct DuplicatesSheet: View {
 
     init(prompt: DuplicatePrompt) {
         self.prompt = prompt
-        _choices = State(initialValue: Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.startingChoice(for: prompt.handling)) }))
+        _choices = State(initialValue: Dictionary(prompt.duplicates.map { ($0.id, $0.startingChoice(for: prompt.handling)) }, uniquingKeysWith: { first, _ in first }))
     }
 
     var body: some View {

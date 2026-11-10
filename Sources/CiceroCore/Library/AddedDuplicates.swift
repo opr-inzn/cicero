@@ -33,6 +33,7 @@ public enum ReplaceBlock: Sendable {
 }
 
 public struct AddedDuplicate: Identifiable, Hashable, Sendable {
+    public let familyID: String
     public let family: String
     public let paths: [String]
     public let styles: [LibraryFace]
@@ -41,7 +42,7 @@ public struct AddedDuplicate: Identifiable, Hashable, Sendable {
     public let replacements: [FileReplacement]
     public let replaceBlock: ReplaceBlock?
 
-    public var id: String { family }
+    public var id: String { familyID }
 
     public var canReplace: Bool { replaceBlock == nil }
 
@@ -114,14 +115,14 @@ public enum AddedDuplicates {
         return matched.keys.sorted().map { index in
             let entry = matched[index]!
             let (replacements, block) = replacements(of: entry.styles, by: entry.paths, added: added, namesIn: namesIn, copyAt: copyAt)
-            return AddedDuplicate(family: library.families[index].name, paths: entry.paths, styles: entry.styles, addedFaces: entry.faces,
+            return AddedDuplicate(familyID: library.families[index].id, family: library.families[index].name, paths: entry.paths, styles: entry.styles, addedFaces: entry.faces,
                                   version: compare(entry.faces, with: entry.styles), replacements: replacements, replaceBlock: block)
         }
     }
 
     private static func replacements(of styles: [LibraryFace], by paths: [String], added: [String: [FontFace]],
                                      namesIn: [String: Set<String>], copyAt: [String: FaceCopy]) -> ([FileReplacement], ReplaceBlock?) {
-        let addedNames = Dictionary(uniqueKeysWithValues: paths.map { ($0, Set((added[$0] ?? []).map(\.postScriptName))) })
+        let addedNames = Dictionary(paths.map { ($0, Set((added[$0] ?? []).map(\.postScriptName))) }, uniquingKeysWith: { first, _ in first })
         var olds: [String] = []
         for path in styles.flatMap({ [$0.face.path] + $0.otherCopies }) where !olds.contains(path) && addedNames[path] == nil {
             olds.append(path)

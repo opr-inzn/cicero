@@ -143,7 +143,7 @@ extension AppModel {
             if handling == .replace, duplicates.contains(where: warnsBeforeReplacing) {
                 return ask { $0.replacePrompt = prompt }
             }
-            addFontFiles(paths, resolving: duplicates, choices: Dictionary(uniqueKeysWithValues: zip(duplicates.map(\.id), chosen.compactMap(\.self))),
+            addFontFiles(paths, resolving: duplicates, choices: Dictionary(zip(duplicates.map(\.id), chosen.compactMap(\.self)), uniquingKeysWith: { first, _ in first }),
                          method: method, into: location, then: then)
         }
     }
@@ -155,7 +155,7 @@ extension AppModel {
     }
 
     func replaceEverywhere(_ prompt: DuplicatePrompt) {
-        let choices = Dictionary(uniqueKeysWithValues: prompt.duplicates.map { ($0.id, $0.choice(for: .replace) ?? $0.suggestion) })
+        let choices = Dictionary(prompt.duplicates.map { ($0.id, $0.choice(for: .replace) ?? $0.suggestion) }, uniquingKeysWith: { first, _ in first })
         addFontFiles(prompt.paths, resolving: prompt.duplicates, choices: choices, method: prompt.method, into: prompt.location,
                      then: prompt.then)
     }
