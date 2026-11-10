@@ -26,7 +26,8 @@ public enum FontBookImport {
                 continue
             }
             // Font Book shows a collection by its file's name; the one inside can be another, as Fixed Width's is.
-            let name = fileName == "com.apple.Favorites" ? "Favorites" : fileName
+            // A "/" in a name the Finder shows is a ":" in the file's name on disk.
+            let name = fileName == "com.apple.Favorites" ? "Favorites" : fileName.replacingOccurrences(of: ":", with: "/")
             guard let set = collection.set(id: url.lastPathComponent, name: name, isBuiltIn: builtInNames.contains(fileName)) else {
                 smart.append(name)
                 continue
