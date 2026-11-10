@@ -14,7 +14,6 @@ final class DocumentFontWatcher {
     private var observers: [NSObjectProtocol] = []
     private var polling: Task<Void, Never>?
     private var isAsleep = false
-    private var refused: Set<App> = []
     private var lastFonts: [App: [DocumentFont]] = [:]
     private var matcher: (fingerprint: Int, matcher: FontMatcher)?
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
@@ -46,14 +45,15 @@ final class DocumentFontWatcher {
     }
 
     private func frontmostChanged() {
-        polling?.cancel()
-        polling = nil
+        let previous = polling
+        previous?.cancel()
         guard let model, model.data.activatesDocumentFonts, !isAsleep, let running = NSWorkspace.shared.frontmostApplication,
-              let app = running.bundleIdentifier.flatMap(App.init), !refused.contains(app)
+              let app = running.bundleIdentifier.flatMap(App.init)
         else { return }
         lastFonts[app] = nil
         let pid = running.processIdentifier
         polling = Task { [weak self] in
+            await previous?.value
             while !Task.isCancelled {
                 await self?.ask(app, pid)
                 try? await Task.sleep(for: Self.interval, tolerance: .milliseconds(100))
@@ -67,7 +67,6 @@ final class DocumentFontWatcher {
         let answer: [DocumentFont]
         switch await Self.ask(app, pid) {
         case nil:
-            refused.insert(app)
             withUnsafeCurrentTask { $0?.cancel() }
             return
         case .fonts(let fonts)?:
