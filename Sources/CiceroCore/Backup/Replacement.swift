@@ -3,9 +3,13 @@ import Foundation
 public struct KeptItemError: Error, Sendable {
     public var name: String
     public var isFolder: Bool
+    public var noTrash = false
 
     public var message: String {
-        "“\(name)” \(isFolder ? "holds fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or place"
+        if noTrash {
+            return "“\(name)” \(isFolder ? "isn’t empty" : "is a font") and that disk has no Trash, so it wasn’t replaced. Choose another name or place"
+        }
+        return "“\(name)” \(isFolder ? "holds fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or place"
     }
 }
 
@@ -31,13 +35,46 @@ struct ItemReplacement {
     func commit(trash: (URL) throws -> URL?) throws {
         // The replaced item goes to the Trash, never under the new one, and never when it is, or holds, something Cicero must keep.
         try Self.check(destination, keeping: kept)
-        let trashed = ActivationEngine.exists(destination.path) ? try trash(destination) : nil
+        let fm = FileManager.default
+        var trashed: URL?
+        if ActivationEngine.exists(destination.path) {
+            do {
+                trashed = try trash(destination)
+            } catch let error where (error as? CocoaError)?.code == .featureUnsupported || !Self.hasTrash(for: destination) {
+                try replaceWithoutTrash()
+                return
+            }
+        }
         do {
-            try FileManager.default.moveItem(at: staged, to: destination)
+            try fm.moveItem(at: staged, to: destination)
         } catch {
-            if let trashed { try? FileManager.default.moveItem(at: trashed, to: destination) }
+            if let trashed { try? fm.moveItem(at: trashed, to: destination) }
             throw error
         }
+    }
+
+    private func replaceWithoutTrash() throws {
+        let fm = FileManager.default
+        var info = stat()
+        let isFolder = lstat(destination.path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+        let isLink = info.st_mode & S_IFMT == S_IFLNK
+        // Deleted for good with no Trash to take it, so never a font, nor a folder with anything in it.
+        let folderItems = isFolder ? ((try? fm.contentsOfDirectory(atPath: destination.path)) ?? [""]).filter { $0 != ".DS_Store" } : []
+        let holdsFonts = !isLink && (isFolder ? !folderItems.isEmpty : FontFileReader.fontExtensions.contains(destination.pathExtension.lowercased()))
+        guard !holdsFonts else { throw KeptItemError(name: destination.lastPathComponent, isFolder: isFolder, noTrash: true) }
+        let aside = destination.deletingLastPathComponent().appendingPathComponent(ActivationEngine.movingPrefix + UUID().uuidString)
+        try fm.moveItem(at: destination, to: aside)
+        do {
+            try fm.moveItem(at: staged, to: destination)
+        } catch {
+            try? fm.moveItem(at: aside, to: destination)
+            throw error
+        }
+        try? fm.removeItem(at: aside)
+    }
+
+    private static func hasTrash(for url: URL) -> Bool {
+        (try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask, appropriateFor: url, create: false)) != nil
     }
 
     func discard() {
