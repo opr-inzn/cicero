@@ -42,6 +42,13 @@ struct NameTable {
         return .some(trimmed)
     }
 
+    func english(_ nameID: Int) -> String? {
+        let all = records.filter { $0.nameID == nameID }
+        let ranked = all.filter { $0.platform == 3 && $0.language == 0x409 } + all.filter { $0.platform == 1 && $0.language == 0 }
+            + all.filter { $0.platform == 0 } + all
+        return ranked.lazy.compactMap { self.text(of: $0).flatMap(Self.trimmed) }.first
+    }
+
     private static func isEnglish(_ record: Record) -> Bool {
         record.platform == 0
             || record.platform == 1 && record.encoding == 0 && record.language == 0

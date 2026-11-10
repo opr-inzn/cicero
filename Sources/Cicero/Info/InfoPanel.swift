@@ -194,7 +194,7 @@ private struct InfoRows: View {
             }
             if !face.otherCopies.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    label("Other copies")
+                    label("Other Copies")
                     ForEach(face.otherCopies, id: \.self) { path in
                         Button(path) { model.reveal(path: path) }
                             .buttonStyle(.link)
