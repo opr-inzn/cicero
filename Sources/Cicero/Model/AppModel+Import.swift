@@ -135,6 +135,8 @@ extension AppModel {
         var data = data
         let files = LibraryImport.fontFiles(imported, choices: choices, data: &data, locations: locations)
         self.data.showAdobeAppFolders = data.showAdobeAppFolders
+        // Copied outside the queue, so only after what's in it: the launch's tidying trashes what it finds in Staging, where the copies wait.
+        await enqueued { _ in }
         holdScans()
         defer { releaseScans() }
         let activePaths = choices.activate ? Set(imported.active.compactMap(\.path)) : []
