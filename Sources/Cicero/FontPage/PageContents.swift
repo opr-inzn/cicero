@@ -17,16 +17,26 @@ nonisolated struct PageContent: Sendable {
         let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
         var listed: Set<UInt32> = []
-        for scalar in made.isEmpty ? [] : glyphs.flatMap(\.scalars).reversed() {
-            guard let character = Unicode.Scalar(scalar) else { continue }
-            var units = Array(String(Character(character)).utf16)
-            var glyph = [CGGlyph](repeating: 0, count: units.count)
-            if CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), made.contains(glyph[0]) {
-                characters[glyph[0]] = scalar
-                listed.insert(scalar)
+        var ownGlyphs: Set<CGGlyph> = []
+        for section in made.isEmpty ? [] : glyphs.reversed() {
+            for scalar in section.scalars.reversed() {
+                guard let character = Unicode.Scalar(scalar) else { continue }
+                var units = Array(String(Character(character)).utf16)
+                var glyph = [CGGlyph](repeating: 0, count: units.count)
+                guard CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), made.contains(glyph[0]) else { continue }
+                if section.group == .ligatures || character.properties.generalCategory == .privateUse {
+                    characters[glyph[0]] = scalar
+                    listed.insert(scalar)
+                } else {
+                    ownGlyphs.insert(glyph[0])
+                }
             }
         }
-        self.ligatures = ligatures
+        let kept = ownGlyphs.subtracting(characters.keys)
+        self.ligatures = kept.isEmpty ? ligatures : ligatures.compactMap { group in
+            let left = group.ligatures.filter { !kept.contains($0.glyph) }
+            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
+        }
         self.glyphs = listed.isEmpty ? glyphs : glyphs.compactMap { section in
             let left = section.scalars.filter { !listed.contains($0) }
             return left.isEmpty && section.glyphs.isEmpty ? nil : GlyphSection(group: section.group, scalars: left, glyphs: section.glyphs)
