@@ -121,7 +121,7 @@ private struct InfoPanel: View {
         if let family = model.inspectedFamily {
             FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
         } else {
-            let count = model.selectedIDs.count
+            let count = model.shownSelection.count
             EmptyState(count > 1 ? "\(count.plain) Families Selected" : "No Selection", systemImage: "info.circle",
                        description: Text("Select a single family to see its info."))
         }

@@ -190,8 +190,9 @@ struct FamilyKeys: ViewModifier {
             model.openFamilyID = shown.family.id
             return .handled
         }
-        guard model.selectedIDs.count == 1 else { return .ignored }
-        model.openFamilyID = model.selectedIDs.first
+        let shown = model.shownSelection
+        guard shown.count == 1 else { return .ignored }
+        model.openFamilyID = shown.first
         return .handled
     }
 

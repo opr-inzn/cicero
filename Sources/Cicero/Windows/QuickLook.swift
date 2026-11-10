@@ -21,7 +21,7 @@ final class QuickLook {
 
     var families: [Family] {
         guard let model else { return [] }
-        let selected = model.selectedIDs
+        let selected = model.shownSelection
         if selected.count == 1, let id = selected.first { return model.family(id).map { [$0] } ?? [] }
         var ids = order.filter(selected.contains)
         if ids.count < selected.count {
@@ -67,7 +67,7 @@ final class QuickLook {
     }
 
     func open(order: [String]? = nil) {
-        guard !isOpen, let model, let preview, model.openFamilyID == nil, !model.selectedIDs.isEmpty else { return }
+        guard !isOpen, let model, let preview, model.openFamilyID == nil, !model.shownSelection.isEmpty else { return }
         if let order { updateOrder(order) }
         let panel = panel ?? makePanel(model: model, preview: preview)
         isOpen = true

@@ -95,14 +95,22 @@ extension AppModel {
 
     var openFamily: Family? { openFamilyID.flatMap(family) }
 
+    var shownSelection: Set<String> {
+        guard !selectedIDs.isEmpty else { return [] }
+        _ = visibleFamilies
+        let shown = visibleCache?.ids ?? []
+        return selectedIDs.filter(shown.contains)
+    }
+
     var selectedFamilies: [Family] {
         if let open = openFamily { return [open] }
-        return inLibraryOrder(selectedIDs)
+        return inLibraryOrder(shownSelection)
     }
 
     func targets(for family: Family) -> [Family] {
-        guard selectedIDs.contains(family.id), selectedIDs.count > 1 else { return [family] }
-        return inLibraryOrder(selectedIDs)
+        let shown = shownSelection
+        guard shown.contains(family.id), shown.count > 1 else { return [family] }
+        return inLibraryOrder(shown)
     }
 
     private func inLibraryOrder(_ ids: Set<String>) -> [Family] {
@@ -111,7 +119,8 @@ extension AppModel {
 
     var inspectedFamily: Family? {
         if let open = openFamily { return open }
-        guard selectedIDs.count == 1, let id = selectedIDs.first else { return nil }
+        let shown = shownSelection
+        guard shown.count == 1, let id = shown.first else { return nil }
         return family(id)
     }
 
@@ -162,7 +171,7 @@ extension AppModel {
         #else
         let families = computeVisibleFamilies()
         #endif
-        visibleCache = (key, families)
+        visibleCache = (key, families, Set(families.map(\.id)))
         return families
     }
 

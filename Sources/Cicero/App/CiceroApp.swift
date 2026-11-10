@@ -103,7 +103,7 @@ struct CiceroCommands: Commands {
     @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
 
-    private var opensSelection: Bool { model.openFamilyID == nil && !model.selectedIDs.isEmpty }
+    private var opensSelection: Bool { model.openFamilyID == nil && !model.shownSelection.isEmpty }
 
     var body: some Commands {
         // The menu bar's commands are made at launch and have these even while no window is open.

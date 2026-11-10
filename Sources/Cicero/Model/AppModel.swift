@@ -242,7 +242,7 @@ final class AppModel {
     @ObservationIgnored private var changedDuringScan: Set<String> = []
     @ObservationIgnored private var fontdChangedDuringScan = false
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
-    @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family])?
+    @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family], ids: Set<String>)?
     @ObservationIgnored var visibleCountsCache: (key: VisibleKey, active: Int, appOnly: [String])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
