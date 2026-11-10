@@ -532,17 +532,56 @@ extension AppModel {
     }
 
     func removeFolders(_ ids: Set<UUID>) {
-        turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
+        let removed = data.folders.filter { ids.contains($0.id) }
+        guard !removed.isEmpty else { return }
+        let before = data
+        let keptOn = removingFolders(ids)
+        let names = removed.count > 3 ? "\(removed.count) locations" : removed.map { data.named($0).displayName }.listed()
+        showToast("\(names) removed from the library") { [weak self] in
+            guard let self else { return }
+            var data = self.data
+            data.folders = before.folders
+            data.folderNames = before.folderNames
+            data.smartSets = before.smartSets
+            data.sidebar = before.sidebar
+            self.data = data
+            self.rescan()
+            self.turnOnAgain(keptOn)
+        }
+    }
+
+    func removingFolders(_ ids: Set<UUID>) -> [LibraryFace] {
+        let keptOn = turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive }, silently: true)
+        let values = Set(ids.map(\.uuidString))
+        for index in data.smartSets.indices where data.smartSets[index].rules.contains(where: { $0.field == .folder && values.contains($0.value) }) {
+            data.smartSets[index].rules.removeAll { $0.field == .folder && values.contains($0.value) }
+        }
         forgetFolders(ids)
         rescan()
+        return keptOn
+    }
+
+    func turnOnAgain(_ faces: [LibraryFace]) {
+        guard !faces.isEmpty else { return }
+        let paths = Set(faces.map(\.face.path))
+        let operation = expect(faces, at: .on)
+        enqueue { model in
+            let library = (try? await model.scanner.scan(model.scanInput, progress: { _ in })) ?? model.library
+            let on = library.families.flatMap(\.faces).filter { paths.contains($0.face.path) && $0.canActivate }
+            let result = on.isEmpty ? ActivationResult(records: model.data.records, succeeded: 0, failed: [], message: "")
+                : await model.engine.activate(on, method: .inPlace, records: model.data.records)
+            model.finish(result, operation: operation)
+        }
     }
 
     func forgetFolders(_ ids: Set<UUID>) {
+        var data = data
         data.folders.removeAll { ids.contains($0.id) }
         for id in ids {
             data.sidebar.forget("folder.\(id)")
             data.folderNames[id.uuidString] = nil
         }
+        self.data = data
         deselect { item in ids.contains { item == .folder($0) } }
     }
 
@@ -605,10 +644,21 @@ extension AppModel {
         performActivation(targets)
     }
 
-    private func turnOffKeptFonts(in folders: [WatchedFolder]) {
+    @discardableResult
+    private func turnOffKeptFonts(in folders: [WatchedFolder], silently: Bool = false) -> [LibraryFace] {
         let targets = faces(in: folders).filter { $0.canDeactivate && data.records.inPlace.contains($0.face.path) }
-        guard !targets.isEmpty else { return }
-        performDeactivation(targets)
+        guard !targets.isEmpty else { return [] }
+        guard silently else {
+            performDeactivation(targets)
+            return targets
+        }
+        let operation = expect(targets, at: .off)
+        enqueue { model in
+            var result = await model.engine.deactivate(targets, records: model.data.records)
+            if result.failed.isEmpty { result.message = "" }
+            model.finish(result, operation: operation)
+        }
+        return targets
     }
 
     var addedFileURLs: [URL] {
@@ -745,11 +795,19 @@ extension AppModel {
     func renameFoundry(_ old: String, to new: String) {
         let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != old else { return }
+        var data = data
         for family in library.families where family.manufacturer.map({ data.foundryRenames[$0] ?? $0 }) == old {
             if let raw = family.manufacturer { data.foundryRenames[raw] = trimmed }
         }
         for (family, foundry) in data.foundryOverrides where foundry == old { data.foundryOverrides[family] = trimmed }
+        for set in data.smartSets.indices {
+            for rule in data.smartSets[set].rules.indices where data.smartSets[set].rules[rule].field == .foundry
+                && data.smartSets[set].rules[rule].comparison != .contains && data.smartSets[set].rules[rule].value == old {
+                data.smartSets[set].rules[rule].value = trimmed
+            }
+        }
         data.sidebar.rename("foundry.\(old)", to: "foundry.\(trimmed)")
+        self.data = data
         if selectedItems.contains(.foundry(old)) {
             selectSidebarItems(Set(selectedItems.map { $0 == .foundry(old) ? .foundry(trimmed) : $0 }))
         }
@@ -912,9 +970,7 @@ extension AppModel {
             default: hidden.append(row)
             }
         }
-        if !locations.isEmpty {
-            removeFolders(Set(locations.compactMap { if case .folder(let id) = $0.item { id } else { nil } }))
-        }
+        let keptOn = locations.isEmpty ? [] : removingFolders(Set(locations.compactMap { if case .folder(let id) = $0.item { id } else { nil } }))
         let sets = Set(deleted.compactMap { if case .set(let id) = $0.item { id } else { nil } })
         if !sets.isEmpty { deleteSets(sets) }
         let smartSets = Set(deleted.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
@@ -945,7 +1001,10 @@ extension AppModel {
             data.tagColors = before.tagColors
             data.sidebar = before.sidebar
             self.data = data
-            if !locations.isEmpty { rescan() }
+            if !locations.isEmpty {
+                self.rescan()
+                self.turnOnAgain(keptOn)
+            }
         }
     }
 

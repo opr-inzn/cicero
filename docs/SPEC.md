@@ -56,7 +56,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   where it is keeps the date it arrived in its folder, so an old one doesn't show; one Cicero installs a copy of does.
 - Sections, each collapsible and hideable:
   - **Locations** (`SidebarSection.folders`, the watched folders; called Folders until sets took that name; + "Add a folder of fonts"). The folders Adobe apps load fonts from by themselves — /Library/Application Support/Adobe/Fonts, ~/Library/Application Support/Adobe/Fonts (all Adobe apps) and the Fonts folder next to any Adobe app, like /Applications/Adobe InDesign 2026/Fonts (that app only) — are one "Proofing" item (`WatchedFolder.adobeAppsID`; called Testing before, which read like trial fonts), shown while it has fonts (row menu: Reveal in Finder). Adobe Fonts (every CoreSync file, on for every app or only in Adobe apps) are one "Adobe Fonts" item (`adobeFontsID`), shown while it has fonts, whatever the switch (row menu: Manage in Creative Cloud; no Export Fonts); a family is in it when any copy is, like a location. Type designers export fonts there to test them; they're unrelated to Adobe Fonts from Creative Cloud (CoreSync), which are always listed and tagged "Adobe Fonts", never "Adobe". They aren't among the user's locations: Settings → General → Library → "Show fonts installed for proofing in Adobe apps" (on by default; saved as `showAdobeAppFolders`, formerly `showAdobeFonts`) switches them, and only them; adding one of them with + turns the switch on. Every row's menu here starts with Rename Location (a prompt with the current name; the name lives in `UserData.folderNames` by folder ID, the folder on disk keeps its own; empty or the folder's own name removes it; shown wherever a location's name is: sidebar and window title, Settings → Locations, smart folder rules, Conflicts, Use Copy From; Cicero's own items take one too; forgotten when the folder is removed). Row menu for the user's own locations: Reveal in Finder; "Fonts in This Location" picker —
-    "Inactive" / "Active" / "Active in Adobe Apps" / "Active in Specific App" (asks for its name); Remove Location from Library.
+    "Inactive" / "Active" / "Active in Adobe Apps" / "Active in Specific App" (asks for its name); Remove Location from Library (and out of smart folder rules).
     Cicero's own "Added Fonts" (doc) appears here when it has fonts, the files added one at a time (see Opening and
     adding files; row menu: Reveal in Finder, which selects them). Never its Inactive folder (Inactive lists those
     fonts) nor its Font Library (see Activation), which takes the place of ~/Library/Fonts.
@@ -75,7 +75,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
     Rename Tag (a name that's taken says so), Color (None, Red, Orange, Yellow, Green, Blue, Purple, Gray,
     Sand; each with its dot, as are tags in a family's Tag menu: `.titleAndIcon`, since menus built
     with the macOS 27 SDK hide images otherwise), Delete Tag (off every family, and out of smart folder rules).
-  - **Foundries**. Menu: Rename Foundry
+  - **Foundries**. Menu: Rename Foundry (smart folder rules "Foundry is / is not" the old name follow it)
   - **Classifications** (+ new classification). Serif, Sans Serif, Monospaced, Script, Ornamental, Symbol — only the ones
     with families — then the user's own (always shown, in the order they were made), then Unclassified. A family's
     classification is the one its fonts suggest unless the user put it in another: the family menu's Classification
@@ -98,7 +98,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   app folders and tags are deleted (Delete Folder, Delete Tag), and Cicero's own locations, which can't be removed, and
   every other row are hidden; with a toast, "Recents hidden from the sidebar", "Trial deleted", "Downloads removed
   from the library" ("4 items", "4 tags", "4 locations" for more than three; joined with "and" when a drag does two),
-  with Undo, which puts back the lists they changed as they were (fonts a removed location had on stay off). While they're outside, the pointer
+  with Undo, which puts back the lists they changed as they were and turns on again the fonts a removed location had on (they go off silently as it leaves; Remove Location from Library shows the same toast and Undo). While they're outside, the pointer
   has Finder's × (`NSCursor.disappearingItem`, set at each move from the outline view's `draggedImage:movedTo:`)
   and they don't slide back. Escape, or letting go back in the list, keeps them; the picture never slides back to where the rows were (`animatesToStartingPositionsOnCancelOrFail` off), so rows let go where nothing changes, as in their own place, are there again at once rather than after half a second of the picture sliding back and fading. A dragged row is drawn by Cicero,
   its symbol and title in the label colour at the row's size (`SidebarDrag.picture`), at 88 % as Finder's rows
