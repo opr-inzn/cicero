@@ -68,7 +68,7 @@ extension Dictionary where Key == String, Value == Any {
     func int(_ column: String) -> Int {
         switch self[column] {
         case let value as Int64: Int(value)
-        case let value as Double where value.isFinite: Int(value)
+        case let value as Double: Int(exactly: value.rounded(.towardZero)) ?? 0
         case let value as String: Int(value.trimmingCharacters(in: .whitespaces)) ?? 0
         default: 0
         }
@@ -77,8 +77,8 @@ extension Dictionary where Key == String, Value == Any {
     func double(_ column: String) -> Double {
         switch self[column] {
         case let value as Int64: Double(value)
-        case let value as Double: value
-        case let value as String: Double(value.trimmingCharacters(in: .whitespaces)) ?? 0
+        case let value as Double: value.isFinite ? value : 0
+        case let value as String: Double(value.trimmingCharacters(in: .whitespaces)).flatMap { $0.isFinite ? $0 : nil } ?? 0
         default: 0
         }
     }

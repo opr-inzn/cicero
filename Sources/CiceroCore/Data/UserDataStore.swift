@@ -127,6 +127,12 @@ public final class UserDataStore: Sendable {
     }
 
     public static func encoded(_ data: UserData) throws -> Data {
+        var data = data
+        // JSONEncoder refuses a date that isn't a finite number, and would then refuse every later save too.
+        for (family, history) in data.activations where history.last.map({ !$0.timeIntervalSinceReferenceDate.isFinite }) == true {
+            data.activations[family]?.last = nil
+        }
+        data.missingFontFiles = data.missingFontFiles.filter { $0.value.timeIntervalSinceReferenceDate.isFinite }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try encoder.encode(data)

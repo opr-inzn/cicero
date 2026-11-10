@@ -315,7 +315,7 @@ private struct Reader {
                 isSystem: row.int("isSystemFont") != 0 || row.int("isInSystemFolder") != 0 || path.hasPrefix("/System/") || hidden.contains(id),
                 isCloud: row.int("isSkyFont") != 0 || row.int("isTypekit") != 0 || row.int("isMLSFont") != 0,
                 isActive: row.int("activate") == 1, count: max(row.int("count"), 0),
-                lastActivated: last > 0 ? Date(timeIntervalSinceReferenceDate: last) : nil,
+                lastActivated: last > 0 && last < Date.now.timeIntervalSinceReferenceDate + 86400 ? Date(timeIntervalSinceReferenceDate: last) : nil,
                 label: row.int("labelColorID"), comment: row.text("comment"),
                 hasLicense: ["licenseName", "licenseLocation", "licenseComment"].contains { row.text($0) != nil }
             )

@@ -377,7 +377,7 @@ enum LevelDB {
     }
 
     private static func block(_ bytes: [UInt8], offset: Int, size: Int) throws -> [UInt8] {
-        guard offset >= 0, size >= 0, offset <= bytes.count, size + 5 <= bytes.count - offset else { throw IndexedDBBytes.Failure.truncated }
+        guard offset >= 0, size >= 0, offset <= bytes.count, size <= bytes.count - offset - 5 else { throw IndexedDBBytes.Failure.truncated }
         let contents = bytes[offset..<(offset + size)]
         switch bytes[offset + size] {
         case 0: return Array(contents)
@@ -472,7 +472,7 @@ enum V8Value {
         var objects: [JSValue?] = []
 
         mutating func value(depth: Int) throws -> JSValue {
-            guard depth < 256 else { throw IndexedDBBytes.Failure.malformed }
+            guard depth < 64 else { throw IndexedDBBytes.Failure.malformed }
             while true {
                 let tag = try reader.byte()
                 switch tag {
@@ -527,10 +527,10 @@ enum V8Value {
                     return end(id, .array(items))
                 case UInt8(ascii: "a"):
                     let id = begin()
-                    let count = try reader.varint()
+                    let count = min(try reader.varint(), reader.bytes.count)
                     let properties = try self.properties(until: UInt8(ascii: "@"), depth: depth)
                     _ = try reader.varint(); _ = try reader.varint()
-                    var items = [JSValue](repeating: .null, count: min(count, properties.count == 0 ? 0 : count))
+                    var items = [JSValue](repeating: .null, count: properties.isEmpty ? 0 : count)
                     for (key, item) in properties {
                         if let index = Int(key), index >= 0, index < items.count { items[index] = item }
                     }
