@@ -34,8 +34,12 @@ public enum FontBaseImport {
             throw Failure.notALibrary
         }
         guard values["fontbase_pathsAll"] != nil || values["fontbase_settings"] != nil else { throw Failure.notALibrary }
-        let isThisMacs = folder(home: home).map { leveldb.standardizedFileURL.path.hasPrefix($0.standardizedFileURL.path + "/") } ?? false
-        return Reader(values: values, home: home.path).library(copies: isThisMacs ? copiesFolder(home: home) : nil)
+        return Reader(values: values, home: home.path).library(copies: isThisMacs(url, home: home) ? copiesFolder(home: home) : nil)
+    }
+
+    public static func isThisMacs(_ url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+        guard let leveldb = leveldb(in: url), let folder = folder(home: home) else { return false }
+        return leveldb.standardizedFileURL.path.hasPrefix(folder.standardizedFileURL.path + "/")
     }
 
     struct Reader {

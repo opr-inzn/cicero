@@ -89,7 +89,7 @@ extension AppModel {
                 library.discard()
                 showToast(source == .fontBook ? "No collections Cicero can import" : "Nothing in it Cicero can import")
             case .success(let library):
-                let waits = source == .fontBase && urls == [FontBaseImport.folder()].compactMap { $0 }
+                let waits = source == .fontBase && urls.count == 1 && FontBaseImport.isThisMacs(urls[0])
                 let prompt = ImportPrompt(library: library, origin: origin, urls: urls, waitsForQuit: waits)
                 if importing != nil { importing = prompt } else { ask { $0.importing = prompt } }
             case .failure:
