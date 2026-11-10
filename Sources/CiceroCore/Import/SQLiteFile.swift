@@ -11,14 +11,13 @@ final class SQLiteFile {
 
     private var handle: OpaquePointer?
 
-    init(_ url: URL) throws {
+    // Opened for writing, so SQLite takes in a copied log: only ever open Cicero's own copy, never another app's file.
+    init(copy url: URL) throws {
         var components = URLComponents()
         components.scheme = "file"
         components.path = url.path
-        // Immutable: SQLite never writes to the file or looks for a journal, so open only a copy of a file another app may be writing to.
-        components.queryItems = [URLQueryItem(name: "immutable", value: "1")]
         guard let uri = components.string,
-              sqlite3_open_v2(uri, &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK
+              sqlite3_open_v2(uri, &handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_URI, nil) == SQLITE_OK
         else {
             sqlite3_close(handle)
             throw Failure.unreadable

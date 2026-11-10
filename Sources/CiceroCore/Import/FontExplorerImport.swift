@@ -64,13 +64,18 @@ public enum FontExplorerImport {
             guard fm.fileExists(atPath: database.path) else { throw Failure.notALibrary }
             let copy = temporary.appendingPathComponent("Copy.db")
             do { try fm.copyItem(at: database, to: copy) } catch { throw Failure.notALibrary }
+            // The log of a database FontExplorer X has open holds its newest changes; never its shared memory file, which only that process may use.
+            for suffix in ["-wal", "-journal"] {
+                let log = URL(fileURLWithPath: database.path + suffix)
+                if fm.fileExists(atPath: log.path) { try? fm.copyItem(at: log, to: URL(fileURLWithPath: copy.path + suffix)) }
+            }
             let preferences = settings.flatMap { NSDictionary(contentsOf: $0) as? [String: Any] } ?? [:]
             let file: SQLiteFile
-            do { file = try SQLiteFile(copy) } catch { throw Failure.notALibrary }
+            do { file = try SQLiteFile(copy: copy) } catch { throw Failure.notALibrary }
             var library = try Reader(file: file, preferences: preferences, home: home.path, backupFolder: backupFolder).library()
             library.temporaryFolder = temporary
             if backupFolder == nil {
-                try? fm.removeItem(at: copy)
+                for suffix in ["", "-wal", "-shm", "-journal"] { try? fm.removeItem(atPath: copy.path + suffix) }
             }
             return library
         } catch {
