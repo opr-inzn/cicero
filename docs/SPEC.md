@@ -342,7 +342,9 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 - Settings → General → "Auto-activate fonts in Adobe apps" (`activatesDocumentFonts`, off at first, as
   macOS then asks for Automation once per app): while InDesign, Illustrator or Photoshop is frontmost,
   `DocumentFontWatcher` asks it every 0.5 s (none while the screens sleep) for its open documents' fonts or files,
-  sending the `core/getd` Apple Events itself, off the main thread, to the app's process (10 s timeout): no
+  sending the `core/getd` Apple Events itself, off the main thread, to the app's process (10 s timeout; 10 s until
+  the next after one timed out; first `AEDeterminePermissionToAutomateTarget`, which waits for the user's answer to
+  macOS's question, and no polling of an app Cicero may not control): no
   AppleScript to compile (~25 ms a time, and compiling or running a script opens an app that has quit), a few ms a
   check, and no measurable CPU in the app. InDesign: `fPSN`, `fFam` and `fSty` of every `FonT` of every `docu`
   (codes from InDesign itself, which has no sdef; a missing value counts as "", so the lists line up). Illustrator
