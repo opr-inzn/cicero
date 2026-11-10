@@ -58,6 +58,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
     }
 
     private func showLibraryForPrompt() {
+        guard model.earlierImportPrompt == nil else { return }
         let front = NSApp.keyWindow.map { $0.sheetParent ?? $0 }
         guard !NSApp.isActive || front?.identifier?.rawValue != WindowID.main else { return }
         NSApp.bringForward { openWindow?(id: WindowID.main) }
