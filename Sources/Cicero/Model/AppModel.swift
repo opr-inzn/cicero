@@ -534,7 +534,7 @@ final class AppModel {
         pendingScope = pendingScope.map { $0.adding(scope) } ?? scope
         scheduleRescan(after: pendingScope?.isFilesOnly == true ? 0.05 : 0.3)
         let changed: Set<String>? = if case .files(let changed) = scope { changed } else { nil }
-        // macOS takes a few seconds to turn on a font put in a Fonts folder and says so with a notification that scans everything; this scan comes in case it says nothing, as when it doesn't take the font.
+        // macOS turns on a font put in a Fonts folder a few seconds later and says so, but says nothing when it doesn't take the font: look again then.
         let fontsFolders = [locations.userFonts.path + "/", locations.allUsersFonts.path + "/"]
         if let changed, changed.contains(where: { path in fontsFolders.contains { path.hasPrefix($0) } }) {
             fontsFolderCheck?.cancel()

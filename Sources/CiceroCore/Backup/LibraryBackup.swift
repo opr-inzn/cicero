@@ -428,7 +428,7 @@ public struct LibraryBackup: Sendable {
         data.fontFiles = data.fontFiles.map(map)
         data.missingFontFiles = [:]
         data.fontLibraryPath = libraries.restored
-        // Records only about fonts in font locations: activating moves a file back to the folder its record names, so a backup's records must not lead anywhere else.
+        // Records only about fonts in font locations or among the files the user added: activating moves a file back to the folder its record names, so a backup's records must not lead anywhere else.
         let roots = fontLocations(watching: data.folders, fontLibrary: data.fontLibraryPath)
         func isFont(_ path: String) -> Bool { Self.isFontLocation(path, in: roots) }
         func isFont(_ path: String, in folder: URL) -> Bool { path.hasPrefix(folder.path + "/") && isFont(path) }

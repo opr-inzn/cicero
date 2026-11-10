@@ -110,7 +110,7 @@ public enum DocumentFonts {
     static func idml(_ url: URL) throws -> [DocumentFont] {
         let fonts = try unzip(url, ["Resources/Fonts.xml"])
         guard !fonts.isEmpty else { throw Failure.unreadable }
-        // Fonts.xml lists every style of each family the document uses, so it's narrowed to the families and styles its styles and stories apply.
+        // Fonts.xml lists every style of each family the document uses, not only the styles it applies.
         let applied = (try? unzip(url, ["Resources/Styles.xml", "Stories/*.xml", "Spreads/*.xml", "MasterSpreads/*.xml"])) ?? Data()
         return idmlFonts(fonts, applying: applied)
     }

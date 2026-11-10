@@ -734,7 +734,7 @@ public final class LibraryScanner: Sendable {
             func addNext() {
                 guard let (path, stamp) = pending.popFirst() else { return }
                 group.addTask {
-                    // Its descriptors aren't kept, so fonts made from the path before are out of date: a file moved away and back would still draw from no file, which macOS answers with its "?" font.
+                    // Fonts FontLoader made from this path before are out of date: a file moved away and back would still draw from no file, which macOS answers with its "?" font.
                     let faces = FontFileReader.faces(atPath: path)
                     FontLoader.shared.invalidate(paths: [path])
                     return (path, CachedFile(stamp: stamp, dateAdded: FontFileReader.dateAdded(atPath: path), faces: faces))

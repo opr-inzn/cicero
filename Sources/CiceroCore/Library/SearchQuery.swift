@@ -173,7 +173,7 @@ extension Family {
         let size = SimilarFonts.OpticalSize(name: id)
         if hasOpticalSize || size == .text { terms.append("text") }
         if hasOpticalSize || size == .display { terms.append("display") }
-        // On a width axis, against the regular's place on it, as not every font's is in percent (Skia's goes from 0.62 to 1.3); else by the OS/2 width class.
+        // Against the regular's place on the width axis, as not every font's is in percent (Skia's goes from 0.62 to 1.3).
         let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
         let widths = faces.map { face in
             face.axes.first { $0.tag == "wdth" }.map { $0.value < normal ? -1 : $0.value > normal ? 1 : 0 } ?? (face.width - 5).signum()

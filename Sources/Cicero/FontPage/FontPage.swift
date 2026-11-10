@@ -43,7 +43,7 @@ struct FontPage: View {
                 if family.faces.count > 1 {
                     StyleRows(family: family)
                 }
-                // Only rows of about one height go in this lazy stack: it guesses the height of rows it hasn't placed from those it has, and with the styles in it too the guesses swung so far that the page laid itself out again and again at full CPU.
+                // Not the styles in this lazy stack: their rows, far taller than glyph rows, made it lay the page out again and again at full CPU.
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
                     if let shown {
                         if let glyphColumns {
@@ -643,7 +643,7 @@ private struct StyleRows: View {
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         let showsWeight = family.stylesDifferInWeight
-        // Not lazy: a lazy stack guesses the height of rows it hasn't made from those it has, and as each row is as high as its own font's line, the page below moved by its guesses, and with it the glyph row `TopRowKeeper` keeps at the top.
+        // Not lazy: in a lazy stack, rows each as high as their own font's line moved the page below, and with it the glyph row `TopRowKeeper` keeps at the top.
         VStack(spacing: 0) {
             row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
                 Text("Styles")

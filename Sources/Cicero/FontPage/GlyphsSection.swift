@@ -64,7 +64,7 @@ struct GlyphsSection: View {
                        description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else if isShort(shown, shownLigatures) {
-            // A few rows in a stack of their own, one row of the page's lazy stack: under the tall title, the lazy stack's guesses at the heights of rows it hadn't placed swung back and forth, and it laid the page out again and again at full CPU.
+            // In one stack: as rows of the page's lazy stack under the tall title, a few rows made it lay the page out again and again at full CPU.
             VStack(alignment: .leading, spacing: 0) {
                 groups(shown, shownLigatures, style: style)
             }

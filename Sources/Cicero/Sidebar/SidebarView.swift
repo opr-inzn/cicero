@@ -531,7 +531,7 @@ private struct SidebarLabel: View {
     var body: some View {
         let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
             : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
-        // On the symbol too: a sidebar styles symbols itself. A status's dot keeps its own colour.
+        // On the symbol too: a sidebar styles symbols itself. A tag's dot keeps its own colour.
         Label { Text(row.title).lineLimit(1).foregroundStyle(style).sidebarTitle(row.title, key: row.key, fit: fit) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
     }
 }
@@ -619,7 +619,6 @@ private struct GroupDrop: ViewModifier {
                     }
                 }
         } else {
-            // macOS 15 has no drop configurations; a delegate proposes the operation instead.
             content.onDrop(of: [.ciceroSidebarGroup], delegate: Delegate(group: group, dragged: dragged, target: $target, move: move))
         }
     }

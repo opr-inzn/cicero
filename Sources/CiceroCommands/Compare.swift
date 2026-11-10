@@ -106,7 +106,7 @@ public enum CompareCommand {
             guard !path.isEmpty else { throw CommandError.invalid("--png needs a file’s path.") }
             return URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
         }
-        // TMPDIR, as other command-line tools have it; Foundation's temporary folder ignores it.
+        // TMPDIR first: Foundation's temporary folder ignores it.
         let temporary = ProcessInfo.processInfo.environment["TMPDIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true) }
             ?? FileManager.default.temporaryDirectory
         let folder = temporary.appendingPathComponent("cicero", isDirectory: true)
@@ -201,7 +201,6 @@ enum SampleSheet {
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         context.textMatrix = .identity
 
-        // From the top: CoreGraphics counts y from the bottom.
         var top = margin
         for (index, row) in rows.enumerated() {
             if index > 0 {
