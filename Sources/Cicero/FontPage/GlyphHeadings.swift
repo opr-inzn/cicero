@@ -7,24 +7,18 @@ nonisolated struct GlyphHeading: Hashable, Sendable {
     let name: String?
     let detail: String
     let startsCategory: Bool
-    let labelFollows: Bool
 
-    init(index: Int, category: String, name: String, detail: String, after previous: String?, labelFollows: Bool = false) {
+    init(index: Int, category: String, name: String, detail: String, after previous: String?) {
         self.index = index
         self.category = category
         self.name = name == category ? nil : name
         self.detail = detail
         startsCategory = previous != category
-        self.labelFollows = labelFollows
     }
 }
 
 extension EnvironmentValues {
     @Entry var pinsHeadings = true
-}
-
-@Observable final class HeadingCovers {
-    var covered: [Int: CGFloat] = [:]
 }
 
 extension EnvironmentValues {
@@ -47,30 +41,26 @@ struct GlyphHeader: View {
     static let line = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .headline)).rounded(.up)
     static let barHeight = line + 4
     static let headingHeight = line + 8
-    static let labelledHeight = barHeight + line
 
     @Environment(\.pinsHeadings) private var pins
     let heading: GlyphHeading
-    var covers: HeadingCovers?
 
     var body: some View {
-        let nameHeight = heading.labelFollows ? Self.line : Self.headingHeight
-        let height = heading.name == nil ? Self.barHeight : Self.barHeight + nameHeight
-        let cover = heading.labelFollows && heading.name != nil ? covers?.covered[heading.index] ?? Self.headingHeight - Self.line : 0
+        let height = heading.name == nil ? Self.barHeight : Self.barHeight + Self.headingHeight
         VStack(alignment: .leading, spacing: 0) {
             CategoryBar(heading: heading)
                 .modifier(WhenPinned(always: heading.startsCategory || heading.name == nil))
                 .accessibilityHidden(!heading.startsCategory && heading.name != nil)
             if let name = heading.name {
                 HStack(spacing: 4) {
-                    Text(name).font(.headline)
+                    Text(name).font(.headline).foregroundStyle(.primary.opacity(0.82))
                         .accessibilityLabel("\(heading.category), \(name)")
                         .accessibilityAddTraits(.isHeader)
                     Text(heading.detail).font(.callout).foregroundStyle(.secondary)
                     Spacer()
                 }
                 .padding(.horizontal, GlyphsSection.inset)
-                .frame(height: nameHeight, alignment: .top)
+                .frame(height: Self.headingHeight, alignment: .top)
             }
         }
         .background(Color.canvas)
@@ -78,14 +68,7 @@ struct GlyphHeader: View {
             Color.canvas.frame(height: 200).alignmentGuide(.top) { $0[.bottom] }
                 .modifier(WhenPinned(always: false, below: -200))
         }
-        .overlay(alignment: .bottom) {
-            VStack(spacing: 0) {
-                Color.canvas.frame(height: cover)
-                Divider()
-            }
-            .alignmentGuide(.bottom) { $0[.bottom] - cover }
-            .modifier(WhenPinned(always: false, below: height - 1))
-        }
+        .overlay(alignment: .bottom) { Divider().modifier(WhenPinned(always: false, below: height - 1)) }
         .visualEffect { [pins, height] content, proxy in
             let y = proxy.frame(in: .scrollView).minY
             let pushed = pins && y < 0.5 && y > -height + 0.5
@@ -100,7 +83,7 @@ private struct CategoryBar: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(heading.category).font(.headline).foregroundStyle(.primary.opacity(0.82))
+            Text(heading.category).font(.headline)
                 .accessibilityAddTraits(.isHeader)
             if heading.name == nil {
                 Text(heading.detail).font(.callout).foregroundStyle(.secondary)
