@@ -8,6 +8,8 @@ public enum Requests {
 
     public static let takeWithin: Duration = .seconds(5)
     public static let whileStarting: TimeInterval = 30
+    public static let beat: Duration = .seconds(2)
+    static let silentFor: TimeInterval = 60
 
     static func isStarting(support: URL) -> Bool {
         AppLock.appStarted(support: support).map { Date.now.timeIntervalSince($0) < whileStarting } ?? false
@@ -45,6 +47,7 @@ public enum Requests {
         let id = UUID().uuidString
         let staged = folder.appendingPathComponent("\(id).staged", isDirectory: false)
         let waiting = file(id, "request", in: folder), taken = file(id, "taken", in: folder), reply = file(id, "reply", in: folder)
+        let unanswered = file(id, "unanswered", in: folder)
         let withdrawn = folder.appendingPathComponent("\(id).withdrawn", isDirectory: false)
         var request = request
         request.sender = .current
@@ -77,7 +80,19 @@ public enum Requests {
                     try? fm.removeItem(at: reply)
                     return answer
                 }
+                if fm.fileExists(atPath: unanswered.path) {
+                    try? fm.removeItem(at: unanswered)
+                    throw CommandError(.failed, "Cicero couldn’t write its answer, so it may or may not have made the change. Check that the disk has space, then check with cicero status.")
+                }
                 throw CommandError(.busy, "Cicero didn’t take the change in time. Nothing changed. Try again in a moment.")
+            } else if open, let since = modified(taken), Date.now.timeIntervalSince(since) > silentFor {
+                if let answer = readReply(reply) {
+                    try? fm.removeItem(at: reply)
+                    try? fm.removeItem(at: taken)
+                    return answer
+                }
+                try? fm.removeItem(at: taken)
+                throw CommandError(.failed, "Cicero stopped answering while it made the change, so it may or may not have made it. Check with cicero status.")
             } else if !open {
                 if let answer = readReply(reply) {
                     try? fm.removeItem(at: reply)
@@ -100,7 +115,12 @@ public enum Requests {
         let names = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
         return names.contains { name in
             name.hasSuffix(".taken.json") && !name.hasPrefix(id + ".") && !names.contains(name.dropLast(".taken.json".count) + ".reply.json")
+                && modified(folder.appendingPathComponent(name, isDirectory: false)).map { Date.now.timeIntervalSince($0) <= silentFor } == true
         }
+    }
+
+    private static func modified(_ url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     private static func readReply(_ url: URL) -> JSON? {
@@ -139,21 +159,34 @@ public enum Requests {
             let taken = file(id, "taken", in: folder)
             // Taking and withdrawing are renames of the same file, so only one happens: a request is never made twice, nor by both Cicero and the command.
             guard (try? fm.moveItem(at: url, to: taken)) != nil else { continue }
+            stillAnswering(id, support: support)
             let request = (try? Data(contentsOf: taken)).flatMap { try? JSONDecoder().decode(WriteRequest.self, from: $0) }
             return Taken(id: id, request: request)
         }
         return nil
     }
 
-    public static func reply(_ answer: JSON, to id: String, support: URL) {
+    public static func stillAnswering(_ id: String, support: URL) {
+        try? FileManager.default.setAttributes([.modificationDate: Date.now], ofItemAtPath: file(id, "taken", in: folder(support: support)).path)
+    }
+
+    @discardableResult
+    public static func reply(_ answer: JSON, to id: String, support: URL) -> Bool {
         let folder = folder(support: support)
+        let fm = FileManager.default
         let staged = folder.appendingPathComponent("\(id).reply.staged", isDirectory: false)
-        do {
-            try Data(answer.text().utf8).write(to: staged, options: .atomic)
-            try FileManager.default.moveItem(at: staged, to: file(id, "reply", in: folder))
-        } catch {
-            try? FileManager.default.removeItem(at: staged)
+        for attempt in 0..<3 {
+            if attempt > 0 { usleep(200_000) }
+            do {
+                try Data(answer.text().utf8).write(to: staged, options: .atomic)
+                try fm.moveItem(at: staged, to: file(id, "reply", in: folder))
+                return true
+            } catch {
+                try? fm.removeItem(at: staged)
+            }
         }
+        _ = try? fm.moveItem(at: file(id, "taken", in: folder), to: file(id, "unanswered", in: folder))
+        return false
     }
 
     public static var unreadable: JSON {

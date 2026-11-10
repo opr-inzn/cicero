@@ -37,8 +37,17 @@ final class CommandRequests {
     private func look() {
         guard source != nil, !working, let taken = Requests.take(support: support) else { return }
         working = true
+        let support = support
+        // On the main actor, so a Cicero that hangs stops telling the command it's still at work.
+        let beat = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Requests.beat)
+                Requests.stillAnswering(taken.id, support: support)
+            }
+        }
         Task {
             await answer(taken)
+            beat.cancel()
             working = false
             look()
         }
