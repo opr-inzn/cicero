@@ -217,7 +217,7 @@ final class AppModel {
 
     // MARK: Opening files
 
-    @ObservationIgnored var openQueue: (urls: [URL], target: SidebarItem?, task: Task<Void, Never>?) = ([], nil, nil)
+    @ObservationIgnored var openQueue: (batches: [(urls: [URL], target: SidebarItem?)], task: Task<Void, Never>?) = ([], nil)
     @ObservationIgnored var awaitingScan: [OpenedFiles] = []
 
     // MARK: Private
@@ -603,7 +603,10 @@ final class AppModel {
         library = new
         activateAddedFonts(knowing: known, offline: offline)
         endScan(id)
-        if first { offerEarlierImportCopy() }
+        if first {
+            offerEarlierImportCopy()
+            openWaitingFiles()
+        }
         refreshGroups()
         selectedIDs = selectedIDs.filter { new.family($0) != nil }
         if let open = openFamilyID, new.family(open) == nil { openFamilyID = nil }
