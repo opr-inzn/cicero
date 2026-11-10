@@ -48,7 +48,8 @@ struct FamilyRowList<Row: View>: View {
             .focused($focused)
             .focusEffectDisabled()
             .onKeyPress(.return) {
-                guard selection.count == 1, let id = selection.first else { return .ignored }
+                let shown = selection.filter(ids.contains)
+                guard shown.count == 1, let id = shown.first else { return .ignored }
                 open(id)
                 return .handled
             }
