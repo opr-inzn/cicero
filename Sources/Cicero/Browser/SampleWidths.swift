@@ -18,7 +18,22 @@ final class SampleWidths {
     static var savedURL: URL { Saved.url }
     #endif
     private static let savedKey = "grid.sampleWidthRatio"
-    nonisolated private static let ratios = Mutex<[String: CGFloat]>([:])
+    nonisolated private static let ratios = Mutex(Ratios())
+
+    nonisolated private struct Ratios {
+        static let texts = 4
+        var byText: [String: [String: CGFloat]] = [:]
+        var recent: [String] = []
+
+        func value(_ key: String, text: String) -> CGFloat? { byText[text]?[key] }
+
+        mutating func add(_ ratios: [String: CGFloat], text: String) {
+            recent.removeAll { $0 == text }
+            recent.append(text)
+            byText[text, default: [:]].merge(ratios) { first, _ in first }
+            while recent.count > Self.texts { byText[recent.removeFirst()] = nil }
+        }
+    }
 
     private init() {
         listRatio = (UserDefaults.standard.object(forKey: Self.savedKey) as? Double).map { CGFloat($0) }
@@ -118,9 +133,9 @@ final class SampleWidths {
 
     nonisolated static func ratio(of sample: Sample, text: String, in font: CTFont) -> CGFloat {
         let key = sample.key(text: text)
-        if let ratio = ratios.withLock({ $0[key] }) { return ratio }
+        if let ratio = ratios.withLock({ $0.value(key, text: sample.text) }) { return ratio }
         let ratio = width(of: text, in: font) / CTFontGetSize(font)
-        ratios.withLock { $0[key] = ratio }
+        ratios.withLock { $0.add([key: ratio], text: sample.text) }
         return ratio
     }
 
@@ -172,8 +187,10 @@ final class SampleWidths {
     nonisolated private static func widths(of samples: ArraySlice<Sample>, known: [String: CGFloat], scriptSamples: ScriptSamples) -> Lane? {
         var lane = Lane()
         lane.widths.reserveCapacity(samples.count)
-        var measured: [String: CGFloat] = [:]
-        defer { if !measured.isEmpty { ratios.withLock { $0.merge(measured) { first, _ in first } } } }
+        var measured: [String: [String: CGFloat]] = [:]
+        defer {
+            if !measured.isEmpty { ratios.withLock { ratios in for (text, found) in measured { ratios.add(found, text: text) } } }
+        }
         for (index, sample) in samples.enumerated() {
             if index % 32 == 0, Task.isCancelled { return nil }
             let path = sample.face.path
@@ -196,13 +213,13 @@ final class SampleWidths {
             let text = scriptSamples.text(sample.text, for: sample.face, cached: false)
             let key = sample.key(text: text)
             let ratio: CGFloat
-            if let known = measured[key] ?? ratios.withLock({ $0[key] }) {
+            if let known = measured[sample.text]?[key] ?? ratios.withLock({ $0.value(key, text: sample.text) }) {
                 ratio = known
             } else {
                 let font = FontLoader.shared.font(sample.face, size: 100, weight: sample.weight, variations: sample.variations,
                                                   features: sample.features, cached: false)
                 ratio = width(of: text, in: font) / CTFontGetSize(font)
-                measured[key] = ratio
+                measured[sample.text, default: [:]][key] = ratio
             }
             lane.widths.append(ratio)
             if let savedKey { lane.used[savedKey] = ratio }
