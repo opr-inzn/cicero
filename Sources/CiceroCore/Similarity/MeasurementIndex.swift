@@ -16,6 +16,7 @@ public final class MeasurementIndex: Sendable {
         var measurements: LetterMeasurements?
         var embedding: [Float]?
         var classification: [Float]?
+        var undrawable = false
     }
 
     private struct State: Sendable {
@@ -36,28 +37,34 @@ public final class MeasurementIndex: Sendable {
         loadIfNeeded()
         let faces = Self.measuredFaces(of: families, weights: weights)
         let stamped = faces.map { ($0, CoverageStamp.of(path: $0.path)) }
+        let retries = embedder.map { !$0.hasFailed } ?? false
         let work = state.withLock { state in
-            stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
+            stamped.filter { face, stamp in
+                guard let entry = state.entries[face.id], entry.stamp == stamp else { return true }
+                return retries && entry.embedding == nil && entry.measurements != nil && !entry.undrawable
+            }
         }
         if !work.isEmpty, !Task.isCancelled {
             let total = work.count
             progress(0, total)
             var done = 0
             let embedder = embedder
-            await withTaskGroup(of: (FaceID, CoverageStamp, LetterMeasurements?, LetterEmbedding.Reading?).self) { group in
+            await withTaskGroup(of: (FaceID, CoverageStamp, LetterMeasurements?, LetterEmbedding.Outcome?).self) { group in
                 var pending = work.makeIterator()
                 func addNext() {
                     guard !Task.isCancelled, let (face, stamp) = pending.next() else { return }
                     group.addTask(priority: .utility) {
                         let font = Self.font(face)
-                        return (face.id, stamp, font.flatMap(LetterMeasurements.measure), font.flatMap { embedder?.read($0) })
+                        return (face.id, stamp, font.flatMap(LetterMeasurements.measure), font.flatMap { embedder?.outcome($0) })
                     }
                 }
                 for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
-                for await (id, stamp, measurements, reading) in group {
+                for await (id, stamp, measurements, outcome) in group {
+                    let reading: LetterEmbedding.Reading? = if case .read(let reading) = outcome { reading } else { nil }
+                    let undrawable = if case .undrawable = outcome { true } else { false }
                     state.withLock {
                         $0.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: reading?.embedding,
-                                               classification: reading?.classification)
+                                               classification: reading?.classification, undrawable: undrawable)
                         $0.dirty = true
                     }
                     done += 1
@@ -152,7 +159,8 @@ public final class MeasurementIndex: Sendable {
                     stamp: CoverageStamp(modified: entry.modified, size: entry.size),
                     measurements: values.isEmpty ? nil : LetterMeasurements(values: values),
                     embedding: embedding.isEmpty ? nil : embedding,
-                    classification: classification.isEmpty ? nil : classification
+                    classification: classification.isEmpty ? nil : classification,
+                    undrawable: entry.undrawable ?? false
                 )
             }
         }
@@ -174,7 +182,7 @@ public final class MeasurementIndex: Sendable {
         let cache = CacheFile(version: Self.version, entries: entries.map { id, entry in
             CacheEntry(path: id.path, index: id.index, modified: entry.stamp.modified, size: entry.stamp.size,
                        values: Data(array: entry.measurements?.values ?? []), embedding: Data(array: entry.embedding ?? []),
-                       classification: Data(array: entry.classification ?? []))
+                       classification: Data(array: entry.classification ?? []), undrawable: entry.undrawable ? true : nil)
         })
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
@@ -196,5 +204,6 @@ public final class MeasurementIndex: Sendable {
         var values: Data
         var embedding: Data
         var classification: Data
+        var undrawable: Bool?
     }
 }
