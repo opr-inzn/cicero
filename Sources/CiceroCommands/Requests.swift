@@ -25,13 +25,14 @@ public enum Requests {
 
         static var current: Sender? { started(getpid()).map { Sender(process: getpid(), started: $0) } }
 
-        var isRunning: Bool { Self.started(process) == started }
+        public var isRunning: Bool { Self.started(process) == started }
 
         private static func started(_ process: pid_t) -> Int? {
             var info = kinfo_proc()
             var size = MemoryLayout<kinfo_proc>.stride
             var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, process]
-            guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0, info.kp_proc.p_pid == process else { return nil }
+            guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0, info.kp_proc.p_pid == process,
+                  info.kp_proc.p_stat != SZOMB else { return nil }
             let start = info.kp_proc.p_un.__p_starttime
             return start.tv_sec * 1_000_000 + Int(start.tv_usec)
         }
@@ -63,7 +64,7 @@ public enum Requests {
             }
             let open = AppLock.isHeld(support: support)
             if fm.fileExists(atPath: waiting.path) {
-                if !open || ContinuousClock.now - start > takeWithin && !isStarting(support: support) {
+                if !open || ContinuousClock.now - start > takeWithin && !isStarting(support: support) && !isAnswering(besides: id, in: folder) {
                     if (try? fm.moveItem(at: waiting, to: withdrawn)) != nil {
                         try? fm.removeItem(at: withdrawn)
                         if !open { return nil }
@@ -92,6 +93,13 @@ public enum Requests {
                 if (try? fm.moveItem(at: waiting, to: withdrawn)) != nil { try? fm.removeItem(at: withdrawn) }
                 throw error
             }
+        }
+    }
+
+    private static func isAnswering(besides id: String, in folder: URL) -> Bool {
+        let names = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+        return names.contains { name in
+            name.hasSuffix(".taken.json") && !name.hasPrefix(id + ".") && !names.contains(name.dropLast(".taken.json".count) + ".reply.json")
         }
     }
 

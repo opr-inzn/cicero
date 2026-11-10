@@ -54,6 +54,8 @@ final class CommandRequests {
             let environment = ToolEnvironment(locations: model.locations, defaults: .standard, resources: nil, registrar: CoreTextRegistrar())
             let context = LibraryContext(library: model.library, data: model.data, shown: request.shown, environment: environment)
             do {
+                // Asked again after the wait for the library: a change the user cancelled meanwhile must never be made.
+                if let sender = request.sender, !sender.isRunning { throw CommandError(.failed, "The command stopped, so nothing changed.") }
                 guard !model.store.isReadOnly || request.command == .rescan else { throw CommandError(.failed, UserData.newerVersionMessage) }
                 // A restore replaces the setup with the backup's when it ends, and a change made meanwhile would be lost.
                 guard model.job != .restoring || request.command == .rescan else {
