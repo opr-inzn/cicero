@@ -323,6 +323,7 @@ public final class LibraryScanner: Sendable {
             for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
             try confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
             confirmRegistered(&found, records: input.records)
+            leaveOutWhatWent(input, found: &found, reach: &reach)
             reach.leaveOut(found)
             find = Find(input: input, found: found, reach: reach, listed: !activeURLs.isEmpty, walks: walks)
         }
@@ -331,7 +332,7 @@ public final class LibraryScanner: Sendable {
             state.lastFind = find
             state.lastFindScan = number
         }
-        let (found, reach) = (find.found, find.reach)
+        var (found, reach) = (find.found, find.reach)
         signposter.endInterval("Find", finding)
         try Task.checkCancellation()
 
@@ -349,6 +350,11 @@ public final class LibraryScanner: Sendable {
             signposter.endInterval("Parse", parsing)
         }
         try Task.checkCancellation()
+        if leaveOutWhatWent(input, found: &found, reach: &reach) {
+            reach.leaveOut(found)
+            parsed = parsed.filter { found[$0.key] != nil }
+            state.withLock { state in if state.lastFindScan == number { state.lastFind = nil } }
+        }
 
         let files = updateCache(found: found, parsed: parsed, keeping: reach)
         if rereadAll { state.withLock { $0.rereadsDone = max($0.rereadsDone, rereads) } }
@@ -530,6 +536,27 @@ public final class LibraryScanner: Sendable {
             }
             onlineOnlyPaths = Set(onlineOnly.values.joined())
         }
+    }
+
+    @discardableResult
+    private func leaveOutWhatWent(_ input: ScanInput, found: inout [String: FoundFile], reach: inout OutOfReach) -> Bool {
+        var went: [String] = []
+        for folder in input.folders where folder.id != WatchedFolder.adobeAppsID && reach.folders[folder.id] == nil {
+            guard let availability = FolderAvailability.of(folder.path),
+                  folder.id != WatchedFolder.fontLibraryID || availability != .notFound
+            else { continue }
+            reach.folders[folder.id] = availability
+            reach.folderPaths.append(folder.path + "/")
+            went.append(folder.path + "/")
+        }
+        if !went.isEmpty { found = found.filter { path, _ in !went.contains(where: path.hasPrefix) } }
+        var disconnected = false
+        for path in input.files where found[path] != nil && Reachability.disconnectedVolume(of: path) != nil {
+            found[path] = nil
+            reach.disconnectedFiles.insert(path)
+            disconnected = true
+        }
+        return !went.isEmpty || disconnected
     }
 
     private static func holds(_ path: String, any paths: Set<String>) -> Bool {
@@ -736,8 +763,9 @@ public final class LibraryScanner: Sendable {
         let total = files.count
         var results: [String: CachedFile] = [:]
         results.reserveCapacity(total)
+        var done = 0
         var saved = ContinuousClock.now
-        await withTaskGroup(of: (String, CachedFile).self) { group in
+        await withTaskGroup(of: (String, CachedFile?).self) { group in
             var pending = files.map { ($0.key, $0.value.stamp) }[...]
             func addNext() {
                 guard let (path, stamp) = pending.popFirst() else { return }
@@ -745,16 +773,21 @@ public final class LibraryScanner: Sendable {
                     // Fonts FontLoader made from this path before are out of date: a file moved away and back would still draw from no file, which macOS answers with its "?" font.
                     let faces = FontFileReader.faces(atPath: path)
                     FontLoader.shared.invalidate(paths: [path])
+                    // Nothing read from a file whose disk went away meanwhile or that changed while read: kept as unreadable, it would never be read again.
+                    if faces.isEmpty, !Self.isStill(path, stamp: stamp) { return (path, nil) }
                     return (path, CachedFile(stamp: stamp, dateAdded: FontFileReader.dateAdded(atPath: path), faces: faces))
                 }
             }
             for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
             while let (path, file) = await group.next() {
-                results[path] = file
-                keep(path, file)
-                if results.count % 200 == 0 || results.count == total {
-                    progress(results.count)
-                    if results.count < total, ContinuousClock.now - saved > .seconds(2) {
+                done += 1
+                if let file {
+                    results[path] = file
+                    keep(path, file)
+                }
+                if done % 200 == 0 || done == total {
+                    progress(done)
+                    if done < total, ContinuousClock.now - saved > .seconds(2) {
                         saved = .now
                         saving.async { [self] in saveCacheIfNeeded() }
                     }
@@ -763,6 +796,13 @@ public final class LibraryScanner: Sendable {
             }
         }
         return results
+    }
+
+    private static func isStill(_ path: String, stamp: FaceStamp) -> Bool {
+        let file = open(path, O_RDONLY | O_CLOEXEC)
+        guard file >= 0 else { return false }
+        close(file)
+        return Self.stamp(ofPath: path) == stamp
     }
 
     private func listsAlready(_ files: [String: FoundFile]) -> Bool {
