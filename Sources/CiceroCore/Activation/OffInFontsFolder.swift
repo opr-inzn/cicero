@@ -5,10 +5,26 @@ import Synchronization
 extension ActivationEngine {
     static let offBatchSize = 20
 
-    static let keptOff = Mutex<Set<String>>([])
+    private static let keptOff = Mutex<[String: Int]>([:])
+
+    static func keepOff(_ paths: some Sequence<String>) {
+        keptOff.withLock { kept in for path in paths { kept[path, default: 0] += 1 } }
+    }
+
+    static func letGoOfKeptOff(_ paths: some Sequence<String>) {
+        keptOff.withLock { kept in
+            for path in paths {
+                if let count = kept[path] { kept[path] = count > 1 ? count - 1 : nil }
+            }
+        }
+    }
 
     static func stopKeepingOff(_ paths: some Sequence<String>) {
-        keptOff.withLock { $0.subtract(paths) }
+        keptOff.withLock { kept in for path in paths { kept[path] = nil } }
+    }
+
+    static func isKeptOff(_ path: String) -> Bool {
+        keptOff.withLock { $0[path] != nil }
     }
 
     var turningOffList: URL { locations.support.appendingPathComponent("turning-off.json", isDirectory: false) }
@@ -175,7 +191,7 @@ extension ActivationEngine {
                     onSoFar.append(destination)
                 } else {
                     intoFontsFolderSoFar.append(destination)
-                    Self.keptOff.withLock { _ = $0.insert(destination) }
+                    Self.keepOff([destination])
                 }
             }
             for staged in moved.failed {
@@ -194,7 +210,7 @@ extension ActivationEngine {
                     onSoFar.append(destination)
                 } else {
                     intoFontsFolderSoFar.append(destination)
-                    Self.keptOff.withLock { _ = $0.insert(destination) }
+                    Self.keepOff([destination])
                 }
             }
         }
@@ -204,7 +220,7 @@ extension ActivationEngine {
         let turningOff = cancelled && !keepOnWhenCancelled ? onSoFar : []
         if !intoFontsFolderSoFar.isEmpty || !turningOff.isEmpty {
             let engine = self, paths = intoFontsFolderSoFar + turningOff, earlier = lookedAt
-            Self.keptOff.withLock { $0.formUnion(turningOff) }
+            Self.keepOff(turningOff)
             await Task {
                 var lookedAt = earlier
                 if !turningOff.isEmpty { _ = await engine.registrar.setEnabled(turningOff.map(Self.url), false) }
@@ -245,14 +261,13 @@ extension ActivationEngine {
                 try? await Task.sleep(for: .seconds(10))
                 await engine.turnOffAgain(paths, state: &state, atMost: .max)
             }
-            Self.stopKeepingOff(paths)
+            Self.letGoOfKeptOff(paths)
         }
     }
 
     @discardableResult
     func turnOffAgain(_ paths: [String], state: inout TurnOffAgain, atMost: Int = Self.lookingAtMost) async -> Int {
-        let kept = Self.keptOff.withLock { $0 }
-        let paths = paths.filter(kept.contains)
+        let paths = paths.filter(Self.isKeptOff)
         guard !paths.isEmpty else { return 0 }
         let off = registrar.offFontPaths()
         // An empty list means it couldn't be read: the files turned off are on it.
@@ -266,8 +281,7 @@ extension ActivationEngine {
         for path in unregistered { state.tries[path, default: 0] += 1 }
         // Turning off a file macOS doesn't have doesn't stick, so it's registered first.
         let taken = unregistered.isEmpty ? [] : await Set(unregistered).subtracting(registerAndConfirm(unregistered, scope: .persistent))
-        let keptNow = Self.keptOff.withLock { $0 }
-        let turningOff = (on + unregistered.filter(taken.contains)).filter(keptNow.contains)
+        let turningOff = (on + unregistered.filter(taken.contains)).filter(Self.isKeptOff)
         guard !turningOff.isEmpty else { return unregistered.count }
         let stillOn = await registrar.setEnabled(turningOff.map(Self.url), false)
         state.settled.formUnion(unregistered.filter { taken.contains($0) && !stillOn.contains($0) })
