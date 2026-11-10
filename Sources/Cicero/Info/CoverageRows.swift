@@ -160,7 +160,7 @@ private struct MissingCharacterList: View {
                 Text(Self.drawn(scalar))
                     .font(.system(size: 18))
                     .frame(width: 30, alignment: .leading)
-                Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed")
+                Text(GlyphSection.shownName(of: scalar) ?? "Unnamed")
                     .textSelection(.enabled)
                 Spacer()
                 Text(CharacterCodes.unicode(scalar))

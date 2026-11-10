@@ -76,7 +76,7 @@ struct LigaturesSection: View {
                 .textSelection(.enabled)
             Text("\(group.name) (\(group.tag))").font(.callout).foregroundStyle(.secondary)
             if let character = characters[ligature.glyph] {
-                Text("Also \(CharacterCodes.unicode(character))\(GlyphSection.name(of: character).map { ", \($0.capitalized)" } ?? "")")
+                Text("Also \(CharacterCodes.unicode(character))\(GlyphSection.shownName(of: character).map { ", \($0)" } ?? "")")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

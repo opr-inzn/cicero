@@ -185,7 +185,7 @@ struct GlyphsSection: View {
                     .frame(maxWidth: .infinity, minHeight: 130)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
-                Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
+                Text(GlyphSection.shownName(of: scalar) ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: scalar)
                 VStack {
                     Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
@@ -199,7 +199,7 @@ struct GlyphsSection: View {
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
                 VStack(spacing: 0) {
-                    Text(GlyphSection.name(of: glyph.character)?.capitalized ?? "Unnamed")
+                    Text(GlyphSection.shownName(of: glyph.character) ?? "Unnamed")
                     Text(zip(glyph.featureNames, glyph.featureTags).map { "\($0) (\($1))" }.joined(separator: "\n"))
                         .foregroundStyle(.secondary)
                 }
@@ -219,7 +219,7 @@ struct GlyphsSection: View {
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
                 VStack(spacing: 0) {
-                    Text(GlyphSection.name(of: alternate.character)?.capitalized ?? "Unnamed")
+                    Text(GlyphSection.shownName(of: alternate.character) ?? "Unnamed")
                     Text(zip(alternate.allFeatureNames, alternate.allFeatures).map { "\($0) (\($1))" }.joined(separator: "\n"))
                         .foregroundStyle(.secondary)
                 }
@@ -289,7 +289,7 @@ struct GlyphsSection: View {
         guard let character = Unicode.Scalar(scalar) else { return CharacterCodes.unicode(scalar) }
         switch character.properties.generalCategory {
         case .spaceSeparator, .lineSeparator, .paragraphSeparator, .control, .format:
-            return GlyphSection.name(of: scalar)?.capitalized ?? CharacterCodes.unicode(scalar)
+            return GlyphSection.shownName(of: scalar) ?? CharacterCodes.unicode(scalar)
         case .nonspacingMark, .enclosingMark, .spacingMark:
             return "“\u{25CC}\(Character(character))”"
         default:
