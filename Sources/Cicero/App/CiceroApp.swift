@@ -18,9 +18,11 @@ struct CiceroApp: App {
         _model = State(initialValue: model)
         _updates = State(initialValue: updates)
         _menuBarItem = State(initialValue: menuBarItem)
+        AppDelegate.launchModel = model
         NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 Appearance.applySaved()
+                model.start()
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
                 menuBarItem.start()
@@ -248,6 +250,7 @@ struct CiceroCommands: Commands {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+    @MainActor static var launchModel: AppModel?
     var model: AppModel? {
         didSet { flush() }
     }
@@ -255,6 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var addsFonts = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if model == nil { model = Self.launchModel }
         UsageStatistics.sendLaunch()
         PreferencesItem.keepNamed()
         WindowList.start()

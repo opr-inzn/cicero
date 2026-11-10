@@ -42,6 +42,25 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
             })
         }
         update()
+        watchPrompts()
+    }
+
+    private func watchPrompts() {
+        withObservationTracking {
+            _ = model.isShowingPrompt
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.watchPrompts()
+                if self.model.isShowingPrompt { self.showLibraryForPrompt() }
+            }
+        }
+    }
+
+    private func showLibraryForPrompt() {
+        let front = NSApp.keyWindow.map { $0.sheetParent ?? $0 }
+        guard !NSApp.isActive || front?.identifier?.rawValue != WindowID.main else { return }
+        NSApp.bringForward { openWindow?(id: WindowID.main) }
     }
 
     private var showsIcon: Bool { defaults.bool(forKey: Self.showsIconKey) }
@@ -195,9 +214,6 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
             model.deactivateFonts(in: [row.item])
         } else {
             model.activateFonts(in: [row])
-        }
-        if model.manyActivationPrompt != nil || model.movingOutPrompt != nil {
-            NSApp.bringForward { openWindow?(id: WindowID.main) }
         }
     }
 

@@ -27,7 +27,7 @@ capsule on every side, that slides to the next one chosen.
 4. **Compare** (⌥⌘C, or Window → Compare).
 5. **Quick Look** (Space in the browser, ⌘Y) — a floating panel with the selected family.
 
-Closing every window leaves Cicero running, so app folders and Adobe documents' fonts keep working; the Dock icon or Cicero's icon in the menu bar opens the main window again. The watchers for both start at launch (`didFinishLaunchingNotification`), not when the main window appears: AppKit opens no window at a launch that says it's a login item (keyAELaunchedAsLogInItem; checked with a simulated one).
+Closing every window leaves Cicero running, so app folders and Adobe documents' fonts keep working; the Dock icon or Cicero's icon in the menu bar opens the main window again. The watchers for both start at launch (`didFinishLaunchingNotification`), not when the main window appears: AppKit opens no window at a launch that says it's a login item (keyAELaunchedAsLogInItem; checked with a simulated one). So do opening files and the app delegate's hold on the model, so quitting waits for running work with no window open. A question or sheet that comes up while the main window isn't the key window (asked from the Character Toolbox, Compare, Settings or the menu bar icon's menu) brings Cicero forward and opens the main window, where every prompt shows (`MenuBarItem.watchPrompts`).
 
 ## Sidebar
 
@@ -380,8 +380,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
 - Font files (otf ttf ttc otc dfont) come in three ways: File → Add Fonts ⌘O (an open panel for those
   types), dropped from the Finder on the browser or a font page (outlined while files from outside Cicero are over
   it), and opened from the Finder: Info.plist declares the font types (Viewer, rank Default), and the main window
-  scene handles external events. URLs arriving within 150 ms of each other are one batch; before the first scan
-  they wait for it. A batch with nothing to add says so: “Cicero doesn’t use web fonts like WOFF2” (“… like WOFF and
+  scene handles external events. URLs arriving within 150 ms of each other for the same place are one batch (a drop on
+  a folder is a batch of its own); until the first scan has ended, or a saved library is read, they wait for it. A batch with nothing to add says so: “Cicero doesn’t use web fonts like WOFF2” (“… like WOFF and
   WOFF2” for both kinds) for web fonts, else “That isn’t a font Cicero can read”. `fontFiles` loses web fonts
   that versions before 0.6 added when it's read.
 - A dropped or opened folder is added as a watched folder, under Locations. A font file the library lists already (a face's file or
