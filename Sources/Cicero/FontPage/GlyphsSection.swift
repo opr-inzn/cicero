@@ -34,6 +34,7 @@ struct GlyphsSection: View {
     static let labelGap: CGFloat = 4
     static let runGap = labelLine - spacing - 2
     static let glyphSize: CGFloat = 26
+    static let popoverWidth: CGFloat = 196
 
     nonisolated static func columns(fitting width: CGFloat) -> Int {
         max(1, Int((width - 2 * inset + spacing) / (cell + spacing)))
@@ -181,7 +182,7 @@ struct GlyphsSection: View {
             switch cell {
             case .character(let scalar):
                 character(scalar, style: style, size: 96)
-                    .frame(minWidth: 160, minHeight: 130)
+                    .frame(maxWidth: .infinity, minHeight: 130)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
                 Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
@@ -233,7 +234,7 @@ struct GlyphsSection: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: 260)
+        .frame(width: Self.popoverWidth)
     }
 
     private func copyMenu(_ cell: Cell, style: Style) -> [GridMenuItem] {
@@ -363,6 +364,7 @@ struct GlyphsSection: View {
         } else {
             FontText(text: Self.text(scalar), face: style.face, size: size, weight: style.weight,
                      variations: style.variations)
+                .minimumScaleFactor(0.25)
                 .foregroundStyle(Color.ink)
         }
     }

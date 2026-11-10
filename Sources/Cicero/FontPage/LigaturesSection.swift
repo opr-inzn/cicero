@@ -65,7 +65,7 @@ struct LigaturesSection: View {
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         VStack(spacing: 10) {
             GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: weight, variations: variations)
-                .frame(width: 220, height: 130)
+                .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                 .contentShape(.rect)
                 .onDrag { dragItem(ligature) }
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
@@ -91,8 +91,9 @@ struct LigaturesSection: View {
             }
             .buttonStyle(StillPushButtonStyle())
         }
+        .multilineTextAlignment(.center)
         .padding(16)
-        .frame(maxWidth: 300)
+        .frame(width: GlyphsSection.popoverWidth)
     }
 
     private func copy(_ text: String, shown: String) {
