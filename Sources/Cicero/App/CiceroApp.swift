@@ -259,6 +259,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         WindowList.start()
     }
 
+    // A change half made when Cicero quits would leave fonts on or off that its records don't know about.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model, model.isWorking else { return .terminateNow }
+        Task {
+            await model.finishWork(within: .seconds(30))
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         waiting += urls
         flush()

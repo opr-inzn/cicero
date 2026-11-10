@@ -8,6 +8,8 @@ final class CommandRequests {
     private var source: DispatchSourceFileSystemObject?
     private var working = false
 
+    var isAnswering: Bool { working }
+
     init(model: AppModel) {
         self.model = model
         support = model.locations.support

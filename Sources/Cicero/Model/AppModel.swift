@@ -232,6 +232,7 @@ final class AppModel {
     @ObservationIgnored private var latestProgress: ScanProgress?
     @ObservationIgnored private var progressDue = false
     @ObservationIgnored private var runningOperations = 0
+    @ObservationIgnored private var queuedOperations = 0
     @ObservationIgnored private var changeSeenBeforeScan: Int?
     @ObservationIgnored private var operationCount = 0
     @ObservationIgnored private var expectations: [Expectation] = []
@@ -721,12 +722,22 @@ final class AppModel {
     func enqueue(_ work: @escaping (AppModel) async -> Void) {
         let previous = operation
         runningOperations += 1
+        queuedOperations += 1
         operation = Task { [weak self] in
             await previous?.value
             guard let self else { return }
             await work(self)
+            self.queuedOperations -= 1
             self.endOperation()
         }
+    }
+
+    var isWorking: Bool { queuedOperations > 0 || commandRequests?.isAnswering == true }
+
+    func finishWork(within limit: Duration) async {
+        commandRequests?.stop()
+        let deadline = ContinuousClock.now + limit
+        while isWorking, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(50)) }
     }
 
     func holdScans() {
