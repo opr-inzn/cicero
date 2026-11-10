@@ -246,6 +246,8 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 | 4 | `needsConfirmation` | the change asks first; nothing changed. Ask the user, then run it again with `--yes` |
 | 5 | `busy` | Cicero is open but didn’t take the change within 5 seconds, or another `cicero` command was making one; nothing changed |
 
+`activate` and `deactivate` exit with 6 when a file couldn’t be turned on or off, also when others could. The answer is the same as with 0: `failed` lists those files and why, `changed` the families that did change.
+
 `coverage` exits with 3 when the family lacks characters. It isn’t an error: the answer is the same as with 0, with `"covered": false`. A script can ask `if cicero coverage Inter --set adobe-latin-3 > /dev/null` without reading the JSON.
 
 ## Questions

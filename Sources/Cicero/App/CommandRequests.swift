@@ -101,9 +101,9 @@ final class AppRequestWriter: Writer {
         model.data = data
     }
 
-    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult {
+    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async throws -> ActivationResult {
         let operation = model.expect(faces, at: .on)
-        return await withCheckedContinuation { continuation in
+        return try await withCheckedThrowingContinuation { continuation in
             let queued = model.enqueue { model in
                 let result = untilQuit
                     ? await model.engine.activateTemporarily(faces, records: model.data.records)
@@ -111,7 +111,7 @@ final class AppRequestWriter: Writer {
                 model.finish(result, operation: operation, undo: model.undo(turning: faces, on: false, failed: result.failed))
                 continuation.resume(returning: result)
             }
-            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: UserData.newerVersionMessage)) }
+            if !queued { continuation.resume(throwing: CommandError(.failed, UserData.newerVersionMessage)) }
         }
     }
 
@@ -120,15 +120,15 @@ final class AppRequestWriter: Writer {
         while model.lastEndedScan < id { try? await Task.sleep(for: .milliseconds(100)) }
     }
 
-    func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
+    func deactivate(_ faces: [LibraryFace]) async throws -> ActivationResult {
         let operation = model.expect(faces, at: .off)
-        return await withCheckedContinuation { continuation in
+        return try await withCheckedThrowingContinuation { continuation in
             let queued = model.enqueue { model in
                 let result = await model.engine.deactivate(faces, records: model.data.records)
                 model.finish(result, operation: operation, undo: model.undo(turning: faces, on: true, failed: result.failed))
                 continuation.resume(returning: result)
             }
-            if !queued { continuation.resume(returning: ActivationResult(records: model.data.records, succeeded: 0, failed: faces.map(\.face.path), message: UserData.newerVersionMessage)) }
+            if !queued { continuation.resume(throwing: CommandError(.failed, UserData.newerVersionMessage)) }
         }
     }
 }
