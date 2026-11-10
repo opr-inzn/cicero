@@ -20,6 +20,7 @@ extension ActivationEngine {
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
+        var keptAside = 0
         var goingInOff: [String: FileReplacement] = [:]
         var intoLibrary: [String: FileReplacement] = [:]
         var spare: [(replacement: FileReplacement, original: String)] = []
@@ -56,6 +57,7 @@ extension ActivationEngine {
             failed += off.failed
             placed.merge(off.placed) { first, _ in first }
             renameLater = off.renameLater
+            keptAside = off.keptAside
             for replacement in off.done { records.installedCopies[replacement.old] = nil }
         }
         if !intoLibrary.isEmpty {
@@ -94,7 +96,10 @@ extension ActivationEngine {
                                    undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
         } else {
             let names = FontNames.describe(FontNames.fonts(inFiles: done.map(new))) ?? (done.count == 1 ? "1 file" : "\(done.count) files")
-            message = "Replaced \(names). " + (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
+            let trashed = done.count - keptAside
+            message = "Replaced \(names). " + (keptAside == 0 ? (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
+                : trashed == 0 ? (done.count == 1 ? "The old file is in Cicero’s Inactive folder" : "The old files are in Cicero’s Inactive folder")
+                : "\(trashed) old \(trashed == 1 ? "file is" : "files are") in the Trash, \(keptAside) in Cicero’s Inactive folder")
             if !failed.isEmpty {
                 let undone = FontNames.describe(FontNames.fonts(inFiles: failed.filter { fm.fileExists(atPath: $0) }))
                 message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
@@ -184,12 +189,13 @@ extension ActivationEngine {
     }
 
     func replaceOff(_ staged: [String: FileReplacement]) async
-        -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String]) {
+        -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String], keptAside: Int) {
         let fm = FileManager.default
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
+        var keptAside = 0
         func name(_ replacement: FileReplacement) -> String {
             Self.replacementName(of: Self.url(replacement.old), by: Self.url(replacement.added))
         }
@@ -234,16 +240,18 @@ extension ActivationEngine {
                 failed.append(replacement.old)
                 continue
             }
-            guard didTrash(Self.url(aside ?? replacement.old)) || aside != nil else {
+            let trashed = didTrash(Self.url(aside ?? replacement.old))
+            guard trashed || aside != nil else {
                 try? fm.removeItem(atPath: new)
                 failed.append(replacement.old)
                 continue
             }
+            if !trashed { keptAside += 1 }
             done.append(replacement)
             if new != replacement.old { placed[replacement.old] = new }
             if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
         }
-        return (done, failed, placed, renameLater)
+        return (done, failed, placed, renameLater, keptAside)
     }
 
     func replaceIntoLibrary(_ staged: [String: FileReplacement]) -> (done: [FileReplacement], failed: [String], placed: [String: String]) {
