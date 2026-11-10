@@ -25,8 +25,8 @@ struct SmartSetEditor: View {
                     Text("Any of the rules").tag(false)
                 }
                 Section("Rules") {
-                    ForEach($draft.rules) { $rule in
-                        RuleRow(rule: $rule, canRemove: draft.rules.count > 1) {
+                    ForEach(draft.rules) { rule in
+                        RuleRow(rule: binding(to: rule), canRemove: draft.rules.count > 1) {
                             draft.rules.removeAll { $0.id == rule.id }
                         } add: {
                             let position = draft.rules.firstIndex { $0.id == rule.id } ?? draft.rules.count - 1
@@ -54,6 +54,16 @@ struct SmartSetEditor: View {
         }
         .frame(width: 700, height: 480)
         .onAppear { openedAsNew = isNew }
+    }
+
+    // By id, not index: a number field commits its edit after a click on another row's − has removed its own row.
+    private func binding(to rule: SmartRule) -> Binding<SmartRule> {
+        Binding {
+            draft.rules.first { $0.id == rule.id } ?? rule
+        } set: { new in
+            guard let index = draft.rules.firstIndex(where: { $0.id == rule.id }) else { return }
+            draft.rules[index] = new
+        }
     }
 
     private var matchSummary: String {
