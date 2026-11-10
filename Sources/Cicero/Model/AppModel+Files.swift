@@ -249,12 +249,14 @@ extension AppModel {
     }
 
     private func offerInstall(_ prompt: InstallPrompt) {
-        guard let shown = installPrompt else { return ask(overActivationSheets: true) { $0.installPrompt = prompt } }
-        installPrompt = InstallPrompt(files: shown.files + prompt.files.filter { !shown.files.contains($0) },
-                                      offersMove: shown.offersMove || prompt.offersMove,
-                                      location: shown.location == prompt.location ? shown.location : nil) { model, method in
-            shown.add(model, method)
-            prompt.add(model, method)
+        ask(overActivationSheets: true) { model in
+            guard let shown = model.installPrompt else { return model.installPrompt = prompt }
+            model.installPrompt = InstallPrompt(files: shown.files + prompt.files.filter { !shown.files.contains($0) },
+                                                offersMove: shown.offersMove || prompt.offersMove,
+                                                location: shown.location == prompt.location ? shown.location : nil) { model, method in
+                shown.add(model, method)
+                prompt.add(model, method)
+            }
         }
     }
 
