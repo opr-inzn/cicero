@@ -4,7 +4,7 @@ import Sparkle
 
 @Observable
 final class Updates {
-    private(set) var canCheckForUpdates = false
+    let isAvailable = Bundle.main.bundleURL.pathExtension == "app"
     var checksAutomatically: Bool {
         didSet { controller.updater.automaticallyChecksForUpdates = checksAutomatically }
     }
@@ -12,18 +12,26 @@ final class Updates {
     @ObservationIgnored private let controller = SPUStandardUpdaterController(
         startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
     @ObservationIgnored private var observation: NSKeyValueObservation?
+    @ObservationIgnored private var checkWhenReady = false
 
     init() {
         checksAutomatically = controller.updater.automaticallyChecksForUpdates
-        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
+        guard isAvailable else { return }
         controller.startUpdater()
         if checksAutomatically { controller.updater.checkForUpdatesInBackground() }
-        observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] updater, _ in
-            MainActor.assumeIsolated { self?.canCheckForUpdates = updater.canCheckForUpdates }
+        observation = controller.updater.observe(\.canCheckForUpdates, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.checkIfWaiting() }
         }
     }
 
     func checkForUpdates() {
+        checkWhenReady = true
+        checkIfWaiting()
+    }
+
+    private func checkIfWaiting() {
+        guard checkWhenReady, controller.updater.canCheckForUpdates else { return }
+        checkWhenReady = false
         controller.checkForUpdates(nil)
     }
 }

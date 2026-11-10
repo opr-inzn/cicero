@@ -113,7 +113,7 @@ struct CiceroCommands: Commands {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
-                .disabled(!updates.canCheckForUpdates)
+                .disabled(!updates.isAvailable)
             if CommandLineTool.State.shared.installed {
                 Button("Cicero CLI installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
             } else {
