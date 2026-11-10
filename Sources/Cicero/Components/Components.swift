@@ -27,6 +27,7 @@ struct FontText: View {
     var lineHeight: Double?
     var scale: ((CTFont) -> CGFloat)?
     var cached = true
+    var onCaps = false
     @State private var readPath: String?
 
     var body: some View {
@@ -40,16 +41,32 @@ struct FontText: View {
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))
+                .onCaps(onCaps ? font : nil)
         } else {
             Text(text.isEmpty ? " " : text)
                 .font(.system(size: size))
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
+                .onCaps(onCaps ? NSFont.systemFont(ofSize: size) as CTFont : nil)
                 .hidden()
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
                     readPath = face.path
                 }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder func onCaps(_ font: CTFont?) -> some View {
+        if let font {
+            let size = CTFontGetSize(font)
+            let cap = CTFontGetCapHeight(font) > 0 ? CTFontGetCapHeight(font) : size * 0.7
+            let baseline = (size * 0.1 + cap).rounded()
+            alignmentGuide(.top) { $0[.firstTextBaseline] - baseline }
+                .frame(height: baseline + (size * 0.15).rounded(), alignment: .topLeading)
+        } else {
+            self
         }
     }
 }

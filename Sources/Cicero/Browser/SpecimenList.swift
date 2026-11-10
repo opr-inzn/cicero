@@ -75,19 +75,18 @@ private struct Specimen: View {
             let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
             FontText(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
-                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
+                onCaps: true
             )
             .foregroundStyle(Color.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
-            if family.faces.count > 1 {
-                FlowLayout(spacing: 14, lineSpacing: 4) {
-                    ForEach(family.faces.prefix(Self.styleLimit)) { face in
-                        FontText(text: face.face.styleName, face: face.face, size: 13, weight: face.face.styleWeight)
-                            .foregroundStyle(.secondary)
-                    }
-                    if family.faces.count > Self.styleLimit {
-                        Text("+\((family.faces.count - Self.styleLimit).plain) more").font(.caption).foregroundStyle(.tertiary)
-                    }
+            FlowLayout(spacing: 14, lineSpacing: 4) {
+                ForEach(family.faces.prefix(Self.styleLimit)) { face in
+                    FontText(text: face.face.styleName, face: face.face, size: 13, weight: face.face.styleWeight, onCaps: true)
+                        .foregroundStyle(.secondary)
+                }
+                if family.faces.count > Self.styleLimit {
+                    Text("+\((family.faces.count - Self.styleLimit).plain) more").font(.caption).foregroundStyle(.tertiary)
                 }
             }
         }
