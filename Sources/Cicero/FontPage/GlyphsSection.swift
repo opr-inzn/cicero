@@ -127,7 +127,7 @@ struct GlyphsSection: View {
         let heading = GlyphHeading(index: index, category: section.category, name: section.name,
                                    detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous)
         return Section {
-            // Rows of the page's lazy stack, all one height: it guesses unplaced rows' heights from placed ones, so a LazyVGrid per group re-laid it out at full CPU, and rows in stacks of their own drew other groups' rows after a long jump.
+            // Not a LazyVGrid per group, which made the page's lazy stack lay it out again at full CPU, nor a stack per group, which drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in
                 let above = row == 0 ? 0 : Self.runGap
                 GlyphRow(open: open, cells: rows[row].cells) { selected in
