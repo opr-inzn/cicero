@@ -187,11 +187,9 @@ enum GSUBSubstitutions {
             return (required.map { [$0] } ?? []) + (0..<(reader.u16(langSys + 4) ?? 0)).compactMap { reader.u16(langSys + 6 + $0 * 2) }
         }
         var languages: [Int: [String]] = [:]
-        var byDefault = Set<Int>()
         for script in 0..<(reader.u16(scriptList) ?? 0) {
             guard let offset = reader.u16(scriptList + 2 + script * 6 + 4) else { continue }
             let start = scriptList + offset
-            if let offset = reader.u16(start), offset != 0 { byDefault.formUnion(features(of: start + offset)) }
             for system in 0..<(reader.u16(start + 2) ?? 0) {
                 let at = start + 4 + system * 6
                 guard let language = reader.tag(at)?.trimmingCharacters(in: .whitespaces), let offset = reader.u16(at + 4) else { continue }
@@ -200,7 +198,6 @@ enum GSUBSubstitutions {
                 }
             }
         }
-        for index in byDefault where languages[index] == nil { languages[index] = [] }
         let lookups = Lookups(reader: reader, list: lookupList)
         var result: [(languages: [String], entries: [Entry])] = []
         for record in 0..<(reader.u16(featureList) ?? 0) where !lookups.isSpent {

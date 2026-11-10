@@ -56,14 +56,14 @@ extension ActivationEngine {
             failed += off.failed
             placed.merge(off.placed) { first, _ in first }
             renameLater = off.renameLater
-            for old in off.placed.keys { records.installedCopies[old] = nil }
+            for replacement in off.done { records.installedCopies[replacement.old] = nil }
         }
         if !intoLibrary.isEmpty {
             let library = replaceIntoLibrary(intoLibrary)
             done += library.done
             failed += library.failed
             placed.merge(library.placed) { first, _ in first }
-            for old in library.placed.keys { records.installedCopies[old] = nil }
+            for replacement in library.done { records.installedCopies[replacement.old] = nil }
         }
         for (replacement, original) in spare {
             guard done.contains(where: { $0.old == original }), didTrash(Self.url(replacement.old)) else {
