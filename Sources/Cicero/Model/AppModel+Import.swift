@@ -13,6 +13,7 @@ struct ImportPrompt: Identifiable {
 }
 
 enum ImportStage: Equatable {
+    case waiting
     case copying(done: Int, total: Int)
     case stopping
     case reading(done: Int, total: Int)
@@ -136,7 +137,9 @@ extension AppModel {
         let files = LibraryImport.fontFiles(imported, choices: choices, data: &data, locations: locations)
         self.data.showAdobeAppFolders = data.showAdobeAppFolders
         // Copied outside the queue, so only after what's in it: the launch's tidying trashes what it finds in Staging, where the copies wait.
+        stage(.waiting)
         await enqueued { _ in }
+        if Task.isCancelled { return nil }
         holdScans()
         defer { releaseScans() }
         let activePaths = choices.activate ? Set(imported.active.compactMap(\.path)) : []

@@ -60,7 +60,9 @@ extension AppModel {
         defer { endJob(.copyingEarlierImport) }
         guard await saveSetupSnapshot(named: "Before Copying FontExplorer X’s Fonts", nothingWas: "copied") else { return nil }
         // Copied outside the queue, so only after what's in it: the launch's tidying trashes what it finds in Staging, where the copies wait.
+        stage(.waiting)
         await enqueued { _ in }
+        if Task.isCancelled { return nil }
         holdScans()
         defer { releaseScans() }
         let onFiles = Set(library.faces(inFiles: Set(prompt.files)).filter { isOnWhereItIs($0) }.map(\.face.path))

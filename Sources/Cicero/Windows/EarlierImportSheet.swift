@@ -53,7 +53,7 @@ struct EarlierImportSheet: View {
                         dismiss()
                     }
                 }
-                .disabled(stage != nil && !isCopying)
+                .disabled(stage != nil && !canStop)
                 Button("Copy Fonts") { start() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(stage != nil)
@@ -110,6 +110,9 @@ struct EarlierImportSheet: View {
             case .stopping:
                 ProgressView()
                 Text("Stopping…")
+            case .waiting:
+                ProgressView()
+                Text("Waiting for other changes to finish")
             }
         }
         .progressViewStyle(.linear)
@@ -119,8 +122,11 @@ struct EarlierImportSheet: View {
         .frame(maxWidth: 260, alignment: .leading)
     }
 
-    private var isCopying: Bool {
-        if case .copying = stage { true } else { false }
+    private var canStop: Bool {
+        switch stage {
+        case .copying, .waiting: true
+        default: false
+        }
     }
 
     private func start() {

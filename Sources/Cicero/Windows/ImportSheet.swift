@@ -260,7 +260,7 @@ struct ImportSheet: View {
             Button("Cancel", role: .cancel) {
                 if let task { stage = .stopping; task.cancel() } else { dismiss() }
             }
-            .disabled(stage != nil && !isCopying)
+            .disabled(stage != nil && !canStop)
             Button("Import") { start() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(stage != nil || !hasChoice || isWaiting)
@@ -284,6 +284,9 @@ struct ImportSheet: View {
             case .stopping:
                 ProgressView()
                 Text("Stopping…")
+            case .waiting:
+                ProgressView()
+                Text("Waiting for other changes to finish")
             }
         }
         .progressViewStyle(.linear)
@@ -293,8 +296,11 @@ struct ImportSheet: View {
         .frame(maxWidth: 400, alignment: .leading)
     }
 
-    private var isCopying: Bool {
-        if case .copying = stage { true } else { false }
+    private var canStop: Bool {
+        switch stage {
+        case .copying, .waiting: true
+        default: false
+        }
     }
 
     private func start() {
