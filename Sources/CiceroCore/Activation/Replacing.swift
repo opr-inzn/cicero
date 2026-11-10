@@ -220,16 +220,14 @@ extension ActivationEngine {
                 failed.append(replacement.old)
                 continue
             }
-            if didTrash(Self.url(aside ?? replacement.old)) {
-                done.append(replacement)
-                if new != replacement.old { placed[replacement.old] = new }
-                if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
-            } else if aside != nil {
-                done.append(replacement)
-            } else {
+            guard didTrash(Self.url(aside ?? replacement.old)) || aside != nil else {
                 try? fm.removeItem(atPath: new)
                 failed.append(replacement.old)
+                continue
             }
+            done.append(replacement)
+            if new != replacement.old { placed[replacement.old] = new }
+            if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
         }
         return (done, failed, placed, renameLater)
     }
@@ -296,14 +294,16 @@ extension ActivationEngine {
     }
 
     @concurrent
-    public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> [String: String] {
+    public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> (renamed: [String: String], settled: Set<String>) {
         let fm = FileManager.default
-        let ready = pending.filter { interim, original in
-            !fm.fileExists(atPath: original) && fm.fileExists(atPath: interim) && isInsideFontsFolder(interim)
-                && Self.url(interim).deletingLastPathComponent() == Self.url(original).deletingLastPathComponent()
-                && records.temporary[interim] == nil && !registrar.isActive(Self.url(interim))
+        let never = Set(pending.filter { interim, original in
+            fm.fileExists(atPath: original) || !fm.fileExists(atPath: interim) || !isInsideFontsFolder(interim)
+                || Self.url(interim).deletingLastPathComponent() != Self.url(original).deletingLastPathComponent()
+        }.keys)
+        let ready = pending.filter { interim, _ in
+            !never.contains(interim) && records.temporary[interim] == nil && !registrar.isActive(Self.url(interim))
         }
-        guard !ready.isEmpty else { return [:] }
+        guard !ready.isEmpty else { return ([:], never) }
         let remembered = await registrar.waitUntilForgotten(ready.values.sorted(), timeout: .zero, every: .zero)
         var waiting: [String: (interim: String, original: String)] = [:]
         for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
@@ -313,13 +313,15 @@ extension ActivationEngine {
             guard (try? move(Self.url(interim), to: aside)) != nil else { continue }
             waiting[aside.path] = (interim, original)
         }
-        guard !waiting.isEmpty else { return [:] }
+        guard !waiting.isEmpty else { return ([:], never) }
         let moved = await moveIntoFontsFolderOff(waiting.mapValues(\.original), exactly: true)
         var renamed: [String: String] = [:]
+        var back: [String: String] = [:]
         for (aside, file) in waiting {
-            if let path = moved.placed[aside] { renamed[file.interim] = path }
+            if let path = moved.placed[aside] { renamed[file.interim] = path } else { back[aside] = file.interim }
         }
-        return renamed
+        if !back.isEmpty { _ = await moveIntoFontsFolderOff(back, exactly: true) }
+        return (renamed, never.union(renamed.keys))
     }
 
     private func putBack(_ aside: String, at old: String, remembered: Bool) async {

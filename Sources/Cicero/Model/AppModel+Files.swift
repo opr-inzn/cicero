@@ -268,9 +268,9 @@ extension AppModel {
             let ready = pending.filter { !remembered.contains($0.value) }
             guard !ready.isEmpty, let self else { return }
             self.enqueue { model in
-                let renamed = await model.engine.renameBack(ready, records: model.data.records)
-                model.engine.forgetRenamesLater(ready.keys)
-                if !renamed.isEmpty { model.rescan() }
+                let result = await model.engine.renameBack(ready, records: model.data.records)
+                model.engine.forgetRenamesLater(result.settled)
+                if !result.renamed.isEmpty { model.rescan() }
             }
         }
     }
