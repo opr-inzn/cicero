@@ -595,13 +595,13 @@ final class AppModel {
         hasScanned = true
         defer { guessClassifications() }
         // Looking for gone added files every time touches their folder, which may be one macOS asks about, like Downloads.
-        if !new.goneFiles.isEmpty || !data.missingFontFiles.isEmpty { data.noteGoneFiles(new.goneFiles) }
+        if !store.isReadOnly, !new.goneFiles.isEmpty || !data.missingFontFiles.isEmpty { data.noteGoneFiles(new.goneFiles) }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
-        data.recordActivations(from: library, to: new)
+        if !store.isReadOnly { data.recordActivations(from: library, to: new) }
         let offline = library.offlinePaths
         library = new
-        activateAddedFonts(knowing: known, offline: offline)
+        if !store.isReadOnly { activateAddedFonts(knowing: known, offline: offline) }
         endScan(id)
         if first { offerEarlierImportCopy() }
         refreshGroups()
