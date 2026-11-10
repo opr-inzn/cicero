@@ -66,6 +66,8 @@ enum LaunchWait {
             ("Waiting for the Cicero CLI", "The Cicero CLI is making a change. Cicero opens as soon as it’s done.")
         case .app(let name):
             ("Another Cicero Is Open", "“\(name)” uses the same fonts and data. Quit it, and this Cicero opens.")
+        case .unknown:
+            ("Waiting for Cicero’s Data", "Another Cicero or the Cicero CLI is using the same fonts and data. Cicero opens as soon as it’s done.")
         }
     }
 }

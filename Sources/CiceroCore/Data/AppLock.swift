@@ -16,17 +16,23 @@ public final class AppLock: @unchecked Sendable {
     public enum Holder: Equatable, Sendable {
         case command
         case app(name: String)
+        case unknown
 
         var text: String {
             switch self {
             case .command: "command\n"
             case .app(let name): "app\n\(name)\n\(Int(Date.now.timeIntervalSince1970))\n"
+            case .unknown: ""
             }
         }
 
         init(text: String) {
             let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-            self = lines.first == "app" && lines.count > 1 ? .app(name: String(lines[1])) : .command
+            switch lines.first {
+            case "app" where lines.count > 1: self = .app(name: String(lines[1]))
+            case "command": self = .command
+            default: self = .unknown
+            }
         }
     }
 
@@ -45,12 +51,18 @@ public final class AppLock: @unchecked Sendable {
             let readOnly = open(path, O_RDONLY | O_CLOEXEC)
             guard readOnly >= 0 else { return .unavailable }
             defer { close(readOnly) }
-            guard flock(readOnly, LOCK_EX | LOCK_NB) == 0, isNamed(path, by: readOnly) else { return .held }
+            guard flock(readOnly, LOCK_EX | LOCK_NB) == 0 else { return errno == EWOULDBLOCK ? .held : .unavailable }
+            guard isNamed(path, by: readOnly) else { return .held }
             if unlink(path) == 0 { descriptor = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644) }
         }
         guard descriptor >= 0 else { return .unavailable }
         // Still the file at that path once locked, or another process replaced it meanwhile, and the lock would be on a file no one else opens.
-        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0, isNamed(path, by: descriptor) else {
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            let error = errno
+            close(descriptor)
+            return error == EWOULDBLOCK ? .held : .unavailable
+        }
+        guard isNamed(path, by: descriptor) else {
             close(descriptor)
             return .held
         }
