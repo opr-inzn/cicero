@@ -16,7 +16,7 @@ struct LigaturesSection: View {
     let category: String
     let after: String?
     let categories: [String]
-    @State private var popover: (tag: String, characters: [UInt32])?
+    @State private var popover: (tag: String, ligature: Ligature)?
 
     private static var spacing: CGFloat { GlyphsSection.spacing }
     private static var inset: CGFloat { GlyphsSection.inset }
@@ -40,10 +40,10 @@ struct LigaturesSection: View {
 
     private func ligatureRow(_ ligatures: ArraySlice<Ligature>, in group: LigatureGroup) -> some View {
         let column = popover.flatMap { shown in
-            shown.tag == group.tag ? ligatures.firstIndex { $0.characters == shown.characters } : nil
+            shown.tag == group.tag ? ligatures.firstIndex(of: shown.ligature) : nil
         }.map { $0 - ligatures.startIndex }
         let shown = Array(ligatures)
-        let actions = GridRowActions(open: { popover = (group.tag, shown[$0].characters) },
+        let actions = GridRowActions(open: { popover = (group.tag, shown[$0]) },
                                      details: { AnyView(details(shown[$0], in: group).environment(model)) },
                                      closed: { popover = nil }, menu: { menu(shown[$0], in: group) },
                                      file: { dragFile(shown[$0]) }, help: { shown[$0].text })

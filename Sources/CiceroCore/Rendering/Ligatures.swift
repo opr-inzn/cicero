@@ -10,7 +10,7 @@ public struct Ligature: Hashable, Sendable, Identifiable {
         self.characters = characters
     }
 
-    public var id: [UInt32] { characters }
+    public var id: Ligature { self }
 
     public var text: String {
         String(String.UnicodeScalarView(characters.compactMap(Unicode.Scalar.init)))
@@ -72,10 +72,11 @@ public struct LigatureGroup: Identifiable, Sendable {
             pending = next
         }
         return features.compactMap { feature in
-            var seen = Set<[UInt32]>()
+            var seen = Set<Ligature>()
             var ligatures: [Ligature] = []
-            for (tag, entry, text) in resolved where tag == feature.tag && seen.insert(text).inserted {
-                ligatures.append(Ligature(glyph: entry.glyph, characters: text))
+            for (tag, entry, text) in resolved where tag == feature.tag {
+                let ligature = Ligature(glyph: entry.glyph, characters: text)
+                if seen.insert(ligature).inserted { ligatures.append(ligature) }
             }
             return ligatures.isEmpty ? nil : LigatureGroup(tag: feature.tag, ligatures: ligatures)
         }
