@@ -72,6 +72,8 @@ struct GlyphHeader: View {
         .background(alignment: .top) {
             Color.canvas.frame(height: 200).alignmentGuide(.top) { $0[.bottom] }
                 .modifier(WhenPinned(always: false, below: -200))
+                // Invisible until pinned, but still in front of the 200 pt of glyph rows above the heading, where it took their clicks.
+                .allowsHitTesting(false)
         }
         .overlay(alignment: .bottom) { Divider().modifier(WhenPinned(always: false, below: height - 1)) }
         .visualEffect { [pins, height] content, proxy in
