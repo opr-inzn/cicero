@@ -636,7 +636,7 @@ struct FolderActivationPicker: View {
                 switch choice {
                 case Self.specificApp: askForApp()
                 case Self.active: model.setActivation(ofFolder: folder.id, active: true, app: nil)
-                default: model.setActivation(ofFolder: folder.id, active: false, app: choice)
+                default: model.setActivation(ofFolder: folder.id, active: false, app: choice.isEmpty ? nil : choice)
                 }
             }
         )) {

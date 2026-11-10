@@ -377,7 +377,7 @@ private struct SidebarRowMenu: View {
                     revealButton(ids)
                     Divider()
                     FolderActivationPicker(folder: folder) {
-                        model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
+                        model.prompt("Active in Specific App", confirm: "OK", requiresText: true) { model.setActivation(ofFolder: id, active: false, app: $0) }
                     }
                 }
             }

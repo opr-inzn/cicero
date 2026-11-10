@@ -42,6 +42,7 @@ struct FoldersSettings: View {
         ) { folder in
             TextField("App name", text: $appName, prompt: Text("App name"))
             Button("OK") { model.setActivation(ofFolder: folder.id, active: false, app: appName) }
+                .disabled(appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("Cancel", role: .cancel) {}
         } message: { folder in
             Text("Cicero lists the fonts in “\(model.data.named(folder).displayName)” as active in that app, which loads them by itself.")

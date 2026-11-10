@@ -621,7 +621,8 @@ extension AppModel {
         guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
         let folder = data.folders[index]
         let trimmed = app?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let app = active || trimmed?.isEmpty != false ? nil : trimmed
+        if !active, trimmed?.isEmpty == true { return }
+        let app = active ? nil : trimmed
         guard folder.isActive != active || folder.appName != app else { return }
         if folder.isActive && !active { turnOffKeptFonts(in: [folder]) }
         data.folders[index].isActive = active
@@ -1109,8 +1110,8 @@ extension AppModel {
 
     // MARK: Prompts
 
-    func prompt(_ title: String, text: String = "", confirm: String, action: @escaping (String) -> Void) {
-        ask { $0.textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, action: action) }
+    func prompt(_ title: String, text: String = "", confirm: String, requiresText: Bool = false, action: @escaping (String) -> Void) {
+        ask { $0.textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, requiresText: requiresText, action: action) }
     }
 
     // MARK: Compare

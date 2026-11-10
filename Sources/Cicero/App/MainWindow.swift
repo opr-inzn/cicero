@@ -101,6 +101,7 @@ struct MainWindow: View {
         ) { prompt in
             TextField("Name", text: $promptText)
             Button(prompt.confirmTitle) { prompt.action(promptText) }
+                .disabled(prompt.requiresText && promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("Cancel", role: .cancel) {}
         }
         .onChange(of: model.textPrompt?.id) { promptText = model.textPrompt?.initialText ?? "" }

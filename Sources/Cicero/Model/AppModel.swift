@@ -1073,6 +1073,7 @@ struct TextPrompt: Identifiable {
     var title: String
     var initialText: String
     var confirmTitle: String
+    var requiresText = false
     var action: (String) -> Void
 }
 
