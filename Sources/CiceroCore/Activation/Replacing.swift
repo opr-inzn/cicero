@@ -115,10 +115,28 @@ extension ActivationEngine {
         return spare
     }
 
+    private struct Replacing: Codable {
+        var staged: String
+        var old: String
+    }
+
+    private var replacingNotes: URL { locations.support.appendingPathComponent("Replacing", isDirectory: true) }
+
     func replaceInPlace(_ old: URL, with added: URL) -> Bool {
         let fm = FileManager.default
         // The old file goes to the Trash only once its replacement is whole beside it, and comes back should the last step fail: a font must never be left gone from its place.
         let staged = old.deletingLastPathComponent().appendingPathComponent(Self.movingPrefix + UUID().uuidString, isDirectory: false)
+        // Noted first, so a Cicero that stops partway finishes the replacement at its next launch, or takes the copy away.
+        let note = replacingNotes.appendingPathComponent(UUID().uuidString + ".json", isDirectory: false)
+        do {
+            try fm.createDirectory(at: replacingNotes, withIntermediateDirectories: true)
+            try JSONEncoder().encode(Replacing(staged: staged.path, old: old.path)).write(to: note, options: .atomic)
+            guard UserDataStore.syncToDisk(note) else { throw CocoaError(.fileWriteUnknown) }
+        } catch {
+            try? fm.removeItem(at: note)
+            return false
+        }
+        defer { try? fm.removeItem(at: note) }
         do {
             try fm.copyItem(at: added, to: staged)
             Self.unlock(staged)
@@ -133,10 +151,24 @@ extension ActivationEngine {
             try? fm.removeItem(at: staged)
             return false
         }
-        if renamex_np(staged.path, old.path, UInt32(RENAME_EXCL)) == 0 { return true }
+        if Self.renameExclusively(staged.path, to: old.path) { return true }
         try? fm.removeItem(at: staged)
-        if let trashed { try? Self.moveItem(trashed, to: old) }
+        if let trashed, (try? Self.moveItem(trashed, to: old)) == nil { try? fm.moveItem(at: trashed, to: old) }
         return false
+    }
+
+    func finishReplacing() {
+        let fm = FileManager.default
+        for name in (try? fm.contentsOfDirectory(atPath: replacingNotes.path)) ?? [] where name.hasSuffix(".json") {
+            let note = replacingNotes.appendingPathComponent(name, isDirectory: false)
+            if let replacing = (try? Data(contentsOf: note)).flatMap({ try? JSONDecoder().decode(Replacing.self, from: $0) }),
+               (replacing.staged as NSString).lastPathComponent.hasPrefix(Self.movingPrefix), Self.exists(replacing.staged) {
+                if Self.exists(replacing.old) || !Self.renameExclusively(replacing.staged, to: replacing.old) {
+                    try? fm.removeItem(atPath: replacing.staged)
+                }
+            }
+            try? fm.removeItem(at: note)
+        }
     }
 
     func replaceOff(_ staged: [String: FileReplacement]) async

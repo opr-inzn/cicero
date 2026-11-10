@@ -311,6 +311,7 @@ extension ActivationEngine {
     }
 
     public func trashStagingLeftovers() {
+        finishReplacing()
         let fm = FileManager.default
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         // To the Trash, not deleted: an import's originals may be gone since.
@@ -404,7 +405,7 @@ extension ActivationEngine {
                (try? fm.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil {
                 let planned = Dictionary(uniqueKeysWithValues: names.map { (former.appendingPathComponent($0).path, folder.appendingPathComponent($0).path) })
                 if (try? noteInactiveFolderMoves(moves.merging(planned) { first, _ in first })) != nil,
-                   renamex_np(former.path, folder.path, UInt32(RENAME_EXCL)) == 0 {
+                   Self.renameExclusively(former.path, to: folder.path) {
                     moves.merge(planned) { first, _ in first }
                     continue
                 }
@@ -491,11 +492,23 @@ extension ActivationEngine {
 
     static let movingPrefix = ".cicero-moving-"
 
+    // Some disks (exFAT, FAT, some file servers) can't rename exclusively: there, a plain rename, once nothing is at the destination.
+    static func renameExclusively(_ from: String, to: String) -> Bool {
+        if renamex_np(from, to, UInt32(RENAME_EXCL)) == 0 { return true }
+        let error = errno
+        guard error == ENOTSUP || error == EINVAL else { return false }
+        guard !exists(to) else {
+            errno = EEXIST
+            return false
+        }
+        return rename(from, to) == 0
+    }
+
     static func moveItem(_ from: URL, to: URL) throws {
         let fm = FileManager.default
         // macOS sets a file's Date Added anew when it moves into another folder.
         let added = dateAdded(of: from)
-        if renamex_np(from.path, to.path, UInt32(RENAME_EXCL)) != 0 {
+        if !renameExclusively(from.path, to: to.path) {
             let error = errno
             // Never a folder onto another disk: deleting one could stop partway, and taking the copy back out would then lose the files only it has.
             guard error == EXDEV, !isFolder(from.path) else { throw POSIXError(POSIXErrorCode(rawValue: error) ?? .EIO) }
@@ -505,7 +518,7 @@ extension ActivationEngine {
                 try fm.copyItem(at: from, to: copy)
                 // copyItem gives the copy its original's flags, and a Locked copy could be neither named nor taken back out.
                 unlock(copy)
-                guard renamex_np(copy.path, to.path, UInt32(RENAME_EXCL)) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+                guard renameExclusively(copy.path, to: to.path) else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             } catch {
                 try? fm.removeItem(at: copy)
                 throw error

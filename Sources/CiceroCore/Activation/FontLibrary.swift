@@ -218,7 +218,7 @@ extension ActivationEngine {
             if Self.isFolder(new) {
                 let whole = (!Self.exists(old) || Self.removeIfEmpty(old))
                     && (try? fm.createDirectory(atPath: (old as NSString).deletingLastPathComponent, withIntermediateDirectories: true)) != nil
-                    && renamex_np(new, old, UInt32(RENAME_EXCL)) == 0
+                    && Self.renameExclusively(new, to: old)
                 if !whole {
                     for (from, to) in Self.fileMoves(Self.url(new), to: Self.url(old)) {
                         if Self.exists(to.path) {
