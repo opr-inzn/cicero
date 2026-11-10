@@ -16,6 +16,7 @@ struct LigaturesSection: View {
     let category: String
     let after: String?
     let categories: [String]
+    let labelled: Int?
     @State private var popover: (tag: String, ligature: Ligature)?
 
     private static var spacing: CGFloat { GlyphsSection.spacing }
@@ -30,7 +31,7 @@ struct LigaturesSection: View {
                 ForEach(0..<rows, id: \.self) { row in
                     ligatureRow(group.ligatures[row * columns ..< min((row + 1) * columns, group.ligatures.count)], in: group)
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, row == rows - 1 ? GlyphsSection.bottom(of: firstIndex + index, in: categories) : Self.spacing)
+                        .padding(.bottom, row == rows - 1 ? GlyphsSection.bottom(of: firstIndex + index, in: categories, labelled: labelled) : Self.spacing)
                 }
             } header: {
                 GlyphHeader(heading: heading)

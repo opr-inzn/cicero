@@ -7,13 +7,15 @@ nonisolated struct GlyphHeading: Hashable, Sendable {
     let name: String?
     let detail: String
     let startsCategory: Bool
+    let labelFollows: Bool
 
-    init(index: Int, category: String, name: String, detail: String, after previous: String?) {
+    init(index: Int, category: String, name: String, detail: String, after previous: String?, labelFollows: Bool = false) {
         self.index = index
         self.category = category
         self.name = name == category ? nil : name
         self.detail = detail
         startsCategory = previous != category
+        self.labelFollows = labelFollows && self.name != nil
     }
 }
 
@@ -46,12 +48,14 @@ struct GlyphHeader: View {
     static let line = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .headline)).rounded(.up)
     static let barHeight = line + 4
     static let headingHeight = line + 8
+    static let labelLift = headingHeight - line
 
     @Environment(\.pinsHeadings) private var pins
     let heading: GlyphHeading
 
     var body: some View {
         let height = heading.name == nil ? Self.barHeight : Self.barHeight + Self.headingHeight
+        let lift = heading.labelFollows ? Self.labelLift : 0
         VStack(alignment: .leading, spacing: 0) {
             CategoryBar(heading: heading)
                 .modifier(WhenPinned(always: heading.startsCategory || heading.name == nil))
@@ -68,7 +72,14 @@ struct GlyphHeader: View {
                 .frame(height: Self.headingHeight, alignment: .top)
             }
         }
-        .background(Color.canvas)
+        .visualEffect { [pins, lift] content, proxy in
+            content.offset(y: pins ? lift * min(1, max(0, proxy.frame(in: .scrollView).minY) / Self.barHeight) : lift)
+        }
+        .background {
+            Color.canvas.visualEffect { [pins, lift, height] content, proxy in
+                content.scaleEffect(x: 1, y: pins && proxy.frame(in: .scrollView).minY <= 1.5 ? 1 : (height - lift) / height, anchor: .bottom)
+            }
+        }
         .background(alignment: .top) {
             Color.canvas.frame(height: 200).alignmentGuide(.top) { $0[.bottom] }
                 .modifier(WhenPinned(always: false, below: -200))
