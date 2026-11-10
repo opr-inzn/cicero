@@ -45,7 +45,7 @@ extension ActivationEngine {
                     let goingOff = moved.filter { !staysOn.contains($0.from) }.map(\.to)
                     // Written down before the file moves in, so a stop halfway leaves none of them on.
                     try noteTurningOff(goingOff + (staysOn.contains(from) ? [] : [destination.path]), in: list)
-                    try Self.moveItem(Self.url(from), to: destination)
+                    try move(Self.url(from), to: destination)
                     moved.append((from, destination.path))
                 } catch {
                     failed.append(from)
@@ -67,7 +67,7 @@ extension ActivationEngine {
                 }
                 // macOS would turn on one it didn't take as soon as it noticed it, and one that won't go off is on.
                 if stillOn.contains(to) { _ = await registrar.unregister([Self.url(to)], scope: .persistent) }
-                try? Self.moveItem(Self.url(to), to: Self.url(from))
+                try? move(Self.url(to), to: Self.url(from))
                 failed.append(from)
             }
             try? fm.removeItem(at: list)
@@ -312,6 +312,7 @@ extension ActivationEngine {
 
     public func trashStagingLeftovers() {
         finishReplacing()
+        removeHalfCopiesOfMoves()
         let fm = FileManager.default
         let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
         // To the Trash, not deleted: an import's originals may be gone since.
@@ -351,7 +352,7 @@ extension ActivationEngine {
             let target = Self.uniqueURL(for: (path as NSString).lastPathComponent, in: destination)
             do {
                 try fm.createDirectory(at: destination, withIntermediateDirectories: true)
-                try Self.moveItem(Self.url(path), to: target)
+                try move(Self.url(path), to: target)
                 placed[path] = target.path
             } catch {
                 continue
@@ -423,7 +424,7 @@ extension ActivationEngine {
             guard (try? noteInactiveFolderMoves(all)) != nil else { continue }
             for (from, to) in planned {
                 guard (try? fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil,
-                      (try? Self.moveItem(from, to: to)) != nil
+                      (try? move(from, to: to)) != nil
                 else { continue }
                 moves[from.path] = to.path
             }
@@ -504,7 +505,25 @@ extension ActivationEngine {
         return rename(from, to) == 0
     }
 
-    static func moveItem(_ from: URL, to: URL) throws {
+    private var movingNotes: URL { locations.support.appendingPathComponent("Moving", isDirectory: true) }
+
+    func move(_ from: URL, to: URL) throws {
+        try Self.moveItem(from, to: to, notes: movingNotes)
+    }
+
+    func removeHalfCopiesOfMoves() {
+        let fm = FileManager.default
+        for name in (try? fm.contentsOfDirectory(atPath: movingNotes.path)) ?? [] where name.hasSuffix(".txt") {
+            let note = movingNotes.appendingPathComponent(name, isDirectory: false)
+            if let copy = try? String(contentsOf: note, encoding: .utf8), (copy as NSString).lastPathComponent.hasPrefix(Self.movingPrefix), Self.exists(copy) {
+                Self.unlock(Self.url(copy))
+                try? fm.removeItem(atPath: copy)
+            }
+            try? fm.removeItem(at: note)
+        }
+    }
+
+    static func moveItem(_ from: URL, to: URL, notes: URL? = nil) throws {
         let fm = FileManager.default
         // macOS sets a file's Date Added anew when it moves into another folder.
         let added = dateAdded(of: from)
@@ -514,6 +533,13 @@ extension ActivationEngine {
             guard error == EXDEV, !isFolder(from.path) else { throw POSIXError(POSIXErrorCode(rawValue: error) ?? .EIO) }
             // Under a hidden name until it's whole, so a copy that stops halfway is never taken for a font.
             let copy = to.deletingLastPathComponent().appendingPathComponent(movingPrefix + UUID().uuidString)
+            // Noted, so a half copy left by a Cicero that stopped is taken away at its next launch.
+            let note = notes?.appendingPathComponent(UUID().uuidString + ".txt", isDirectory: false)
+            if let notes, let note {
+                try? fm.createDirectory(at: notes, withIntermediateDirectories: true)
+                try? copy.path.write(to: note, atomically: true, encoding: .utf8)
+            }
+            defer { if let note { try? fm.removeItem(at: note) } }
             do {
                 try fm.copyItem(at: from, to: copy)
                 // copyItem gives the copy its original's flags, and a Locked copy could be neither named nor taken back out.

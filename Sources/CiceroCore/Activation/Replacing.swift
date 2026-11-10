@@ -153,7 +153,7 @@ extension ActivationEngine {
         }
         if Self.renameExclusively(staged.path, to: old.path) { return true }
         try? fm.removeItem(at: staged)
-        if let trashed, (try? Self.moveItem(trashed, to: old)) == nil { try? fm.moveItem(at: trashed, to: old) }
+        if let trashed, (try? move(trashed, to: old)) == nil { try? fm.moveItem(at: trashed, to: old) }
         return false
     }
 
@@ -192,7 +192,7 @@ extension ActivationEngine {
             do {
                 // The old file waits in the Inactive folder, where it stays in the library, off, should Cicero stop.
                 let aside = Self.uniqueURL(for: old.lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-                try Self.moveItem(old, to: aside)
+                try move(old, to: aside)
                 waiting[replacement.old] = aside.path
             } catch {
                 try? fm.removeItem(atPath: path)
@@ -284,7 +284,7 @@ extension ActivationEngine {
             // Renamed where it is, a file would lose being off, so it leaves for the Inactive folder and goes in again.
             guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
             let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
-            guard (try? Self.moveItem(Self.url(interim), to: aside)) != nil else { continue }
+            guard (try? move(Self.url(interim), to: aside)) != nil else { continue }
             waiting[aside.path] = (interim, original)
         }
         guard !waiting.isEmpty else { return [:] }
