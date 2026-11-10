@@ -3,13 +3,11 @@ import SwiftUI
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(BackupPrompts.self) private var backup
     @Environment(\.openWindow) private var openWindow
     @State private var promptText = ""
 
     var body: some View {
         @Bindable var model = model
-        @Bindable var backup = backup
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: SidebarWidth.minimum, ideal: SidebarWidth.ideal, max: SidebarWidth.maximum)
@@ -63,8 +61,8 @@ struct MainWindow: View {
         .sheet(isPresented: Binding(get: { model.editingAppsForSet != nil }, set: { if !$0 { model.editingAppsForSet = nil } })) {
             if let id = model.editingAppsForSet { AppSetEditor(setID: id) }
         }
-        .backupSheet(isPresented: $backup.isBackingUp)
-        .restoreSheet(contents: $backup.restoring)
+        .backupSheet(isPresented: $model.showsBackupSheet)
+        .restoreSheet(contents: $model.restorePrompt)
         .alert(
             "Turn Off Other Styles Too?",
             isPresented: Binding(get: { model.copySwitchPrompt != nil }, set: { if !$0 { model.copySwitchPrompt = nil } }),

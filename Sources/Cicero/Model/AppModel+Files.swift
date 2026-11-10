@@ -185,16 +185,7 @@ extension AppModel {
                 model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, into: location, then: then,
                                    askedAboutOpenApps: true)
             }
-            Task {
-                guard let shown = installPrompt else { return installPrompt = prompt }
-                installPrompt = InstallPrompt(files: shown.files + prompt.files.filter { !shown.files.contains($0) },
-                                              offersMove: shown.offersMove || prompt.offersMove,
-                                              location: shown.location == prompt.location ? shown.location : nil) { model, method in
-                    shown.add(model, method)
-                    prompt.add(model, method)
-                }
-            }
-            return
+            return offerInstall(prompt)
         }
         let method = method ?? data.installMethod
         let installs = method == .copy || method == .move
@@ -254,6 +245,16 @@ extension AppModel {
             }
             then(model, found, AddNote(message: message, installedAll: location == nil && !installing.isEmpty && !failed
                                                                        && replacements.isEmpty && skipNote.isEmpty))
+        }
+    }
+
+    private func offerInstall(_ prompt: InstallPrompt) {
+        guard let shown = installPrompt else { return ask(overActivationSheets: true) { $0.installPrompt = prompt } }
+        installPrompt = InstallPrompt(files: shown.files + prompt.files.filter { !shown.files.contains($0) },
+                                      offersMove: shown.offersMove || prompt.offersMove,
+                                      location: shown.location == prompt.location ? shown.location : nil) { model, method in
+            shown.add(model, method)
+            prompt.add(model, method)
         }
     }
 

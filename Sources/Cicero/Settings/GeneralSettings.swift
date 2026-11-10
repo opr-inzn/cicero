@@ -107,11 +107,13 @@ struct GeneralSettings: View {
                         Button("Back Up") { isBackingUp = true }
                         Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
+                    .disabled(model.job != nil)
                 }
                 .formRowCentered()
                 LabeledContent("macOS, Adobe and Office font caches") {
                     Button("Clear") { isClearingCaches = true }
                         .foregroundStyle(.red)
+                        .disabled(model.job != nil)
                 }
                 .formRowCentered()
             }

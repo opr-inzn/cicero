@@ -189,8 +189,9 @@ final class AppModel {
             showHeldToast()
         }
     }
-    var isImporting = false
-    @ObservationIgnored var isRestoringBackup = false
+    var showsBackupSheet = false
+    var restorePrompt: BackupContents?
+    private(set) var job: LibraryJob?
     var earlierImportPrompt: EarlierImportPrompt? {
         didSet { showHeldToast() }
     }
@@ -863,7 +864,21 @@ final class AppModel {
         return hosts || manyActivationPrompt != nil || movingOutPrompt != nil || copySwitchPrompt != nil || duplicatePrompt != nil
             || replacePrompt != nil || openAppsReplacePrompt != nil || trashPlan != nil || textPrompt != nil || newTagRequest != nil
             || editingSmartSet != nil || editingAppsForSet != nil || editingCharacterSet != nil || !deletingCharacterSets.isEmpty
-            || isClearingCaches || importing != nil || earlierImportPrompt != nil || showsGuessingQuestion
+            || isClearingCaches || importing != nil || earlierImportPrompt != nil || showsGuessingQuestion || showsBackupSheet
+            || restorePrompt != nil
+    }
+
+    func startJob(_ new: LibraryJob) -> Bool {
+        if let job {
+            showToast(job.waitMessage)
+            return false
+        }
+        job = new
+        return true
+    }
+
+    func endJob(_ ended: LibraryJob) {
+        if job == ended { job = nil }
     }
 
     func answerGuessing(_ guesses: Bool) {
@@ -932,6 +947,19 @@ private struct ScannedGroups: Codable, Equatable {
     var ownFolders: Set<UUID>
     var foundries: [String]
     var classifications: [String]
+}
+
+enum LibraryJob: Equatable {
+    case importing, copyingEarlierImport, restoring, backingUp, clearingCaches
+
+    var waitMessage: String {
+        switch self {
+        case .importing, .copyingEarlierImport: "Wait for the import to finish first"
+        case .restoring: "Wait for the restore to finish first"
+        case .backingUp: "Wait for the backup to finish first"
+        case .clearingCaches: "Wait for the font caches to be cleared first"
+        }
+    }
 }
 
 struct CoverageProgress: Equatable {

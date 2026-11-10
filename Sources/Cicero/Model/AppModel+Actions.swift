@@ -1036,6 +1036,8 @@ extension AppModel {
     // MARK: Font caches
 
     func clearCaches(scopes: [SystemFontCaches.Scope], apps: [AppFontCaches.App]) async -> Bool {
+        guard startJob(.clearingCaches) else { return false }
+        defer { endJob(.clearingCaches) }
         var trashed: [String] = []
         var failures = 0
         for app in apps {

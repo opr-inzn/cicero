@@ -3,12 +3,6 @@ import CiceroCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-@Observable
-final class BackupPrompts {
-    var isBackingUp = false
-    var restoring: BackupContents?
-}
-
 extension UTType {
     nonisolated static let ciceroBackup = UTType(exportedAs: "com.maximilianinzinger.cicero.backup")
 }
@@ -84,6 +78,8 @@ extension AppModel {
     }
 
     func backUp(to destination: URL, fonts: [BackupFont], includeFonts: Bool, progress: @escaping @Sendable (BackupProgress) -> Void) async throws {
+        guard startJob(.backingUp) else { throw CancellationError() }
+        defer { endJob(.backingUp) }
         // Replace in the save panel must never trash a font, even when the sheet hasn't counted them yet.
         let kept = FontExporter.keptPaths(in: library, data: data, locations: locations)
         try await backup.write(to: destination, userData: data, fonts: fonts, includeFonts: includeFonts, keeping: kept,
@@ -93,8 +89,8 @@ extension AppModel {
     // MARK: Restore
 
     func chooseBackupToRestore() async -> BackupContents? {
-        guard !isRestoringBackup else {
-            showToast("Wait for the restore to finish first")
+        if let job {
+            showToast(job.waitMessage)
             return nil
         }
         let panel = NSOpenPanel()
@@ -115,9 +111,8 @@ extension AppModel {
     }
 
     func restore(_ contents: BackupContents, settings: Bool, fonts: Bool, progress: @escaping @Sendable (Int, Int) -> Void) async {
-        guard !isRestoringBackup else { return showToast("Wait for the restore to finish first") }
-        isRestoringBackup = true
-        defer { isRestoringBackup = false }
+        guard startJob(.restoring) else { return }
+        defer { endJob(.restoring) }
         let backup = backup
         let current = data
         guard await saveSetupSnapshot(named: "Before Restore", nothingWas: "restored") else { return }

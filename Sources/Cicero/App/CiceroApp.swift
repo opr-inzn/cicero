@@ -7,7 +7,6 @@ struct CiceroApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var model: AppModel
     @State private var preview = PreviewSettings()
-    @State private var backup = BackupPrompts()
     @State private var updates: Updates
     @State private var menuBarItem: MenuBarItem
 
@@ -38,7 +37,6 @@ struct CiceroApp: App {
             MainWindow()
                 .environment(model)
                 .environment(preview)
-                .environment(backup)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     TextEditingKeys.install()
@@ -55,7 +53,7 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
-        .commands { CiceroCommands(model: model, backup: backup, updates: updates, menuBarItem: menuBarItem) }
+        .commands { CiceroCommands(model: model, updates: updates, menuBarItem: menuBarItem) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -96,7 +94,6 @@ struct CiceroApp: App {
 
 struct CiceroCommands: Commands {
     let model: AppModel
-    let backup: BackupPrompts
     let updates: Updates
     let menuBarItem: MenuBarItem
     @Environment(\.openWindow) private var openWindow
@@ -136,15 +133,25 @@ struct CiceroCommands: Commands {
                 model.newApplicationSet(with: model.selectedFamilies)
             }
             Divider()
-            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
-            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
-            Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
+            Group {
+                Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
+                Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+                Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
+            }
+            .disabled(model.job != nil)
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             Divider()
-            Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
-            Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
+            Button("Back Up Library", systemImage: "externaldrive") { model.ask { $0.showsBackupSheet = true } }
+                .disabled(model.job != nil)
+            Button("Restore Library", systemImage: "clock.arrow.circlepath") {
+                Task {
+                    guard let contents = await model.chooseBackupToRestore() else { return }
+                    model.ask { $0.restorePrompt = contents }
+                }
+            }
+            .disabled(model.job != nil)
         }
         SidebarCommands()
         // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.

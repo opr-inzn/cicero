@@ -25,7 +25,7 @@ extension AppModel {
     }
 
     func offerEarlierImportCopy() {
-        guard !askedAboutEarlierImport, !isImporting, importing == nil,
+        guard !askedAboutEarlierImport, job == nil, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data), !Self.declinedEarlierImport(folder)
         else { return mayOfferEarlierImportCopy = false }
         let faces = faces(in: [folder])
@@ -40,10 +40,14 @@ extension AppModel {
         Task {
             defer { mayOfferEarlierImportCopy = false }
             let copying = await Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }.value
-            guard !isImporting, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
-            earlierImportPrompt = EarlierImportPrompt(folder: folder, name: data.folderNames[folder.id.uuidString] ?? folder.displayName,
-                                                      files: files, copying: copying, countedForFontLibrary: intoFontLibrary,
-                                                      onCount: onCount, smartSets: smartSets)
+            guard job == nil, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
+            let prompt = EarlierImportPrompt(folder: folder, name: data.folderNames[folder.id.uuidString] ?? folder.displayName,
+                                             files: files, copying: copying, countedForFontLibrary: intoFontLibrary,
+                                             onCount: onCount, smartSets: smartSets)
+            ask { model in
+                guard model.job == nil else { return }
+                model.earlierImportPrompt = prompt
+            }
         }
     }
 
@@ -52,8 +56,8 @@ extension AppModel {
     }
 
     func copyEarlierImport(_ prompt: EarlierImportPrompt, stage: @escaping @Sendable (ImportStage) -> Void) async -> Int? {
-        isImporting = true
-        defer { isImporting = false }
+        guard startJob(.copyingEarlierImport) else { return nil }
+        defer { endJob(.copyingEarlierImport) }
         guard await saveSetupSnapshot(named: "Before Copying FontExplorer X’s Fonts", nothingWas: "copied") else { return nil }
         holdScans()
         defer { releaseScans() }

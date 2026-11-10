@@ -81,9 +81,9 @@ extension AppModel {
         Task {
             let read = await Self.read(urls, source: source)
             switch read {
-            case .success(let library) where isImporting:
+            case .success(let library) where job != nil:
                 library.discard()
-                showToast("Wait for the import to finish first")
+                showToast(job?.waitMessage ?? "")
             case .success(let library) where library.isEmpty:
                 library.discard()
                 showToast(source == .fontBook ? "No collections Cicero can import" : "Nothing in it Cicero can import")
@@ -128,8 +128,8 @@ extension AppModel {
 
     func performImport(_ prompt: ImportPrompt, choices: ImportChoices, stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
         let imported = prompt.library
-        isImporting = true
-        defer { isImporting = false }
+        guard startJob(.importing) else { return nil }
+        defer { endJob(.importing) }
         guard await saveSetupSnapshot(named: "Before Import", nothingWas: "imported") else { return nil }
         let removed = choices.removeCopies ? LibraryImport.removeCopies(imported) : 0
         var data = data
