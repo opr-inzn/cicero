@@ -37,11 +37,14 @@ enum LetterImages {
             let top = path.boundingBoxOfPath.maxY
             return top > 0 ? top : nil
         }
-        let x = font.glyph(for: Character("x")).flatMap { CTFontCreatePathForGlyph(font, $0, nil) }.map(\.boundingBoxOfPath.maxY)
-        guard let xHeight = [x, CTFontGetXHeight(font), height("n"), height("o")].compactMap({ $0 }).first(where: { $0 > 0 }),
-              let capHeight = [height("H"), CTFontGetCapHeight(font), xHeight / 0.7].compactMap({ $0 }).first(where: { $0 > 0 })
+        // An empty path's box is the null rectangle, whose maxY is infinite.
+        let x = font.glyph(for: Character("x")).flatMap { CTFontCreatePathForGlyph(font, $0, nil) }.map(\.boundingBoxOfPath)
+            .flatMap { $0.isNull || $0.isEmpty ? nil : $0.maxY }
+        guard let xHeight = [x, CTFontGetXHeight(font), height("n"), height("o")].compactMap({ $0 }).first(where: { $0 > 0 && $0.isFinite }),
+              let capHeight = [height("H"), CTFontGetCapHeight(font), xHeight / 0.7].compactMap({ $0 }).first(where: { $0 > 0 && $0.isFinite })
         else { return nil }
         let scale = min(Self.xHeight / xHeight, largestCapHeight / capHeight)
+        guard scale > 0, scale.isFinite else { return nil }
 
         let area = size * size
         var pixels = [UInt8](repeating: 0, count: area * letters.count)

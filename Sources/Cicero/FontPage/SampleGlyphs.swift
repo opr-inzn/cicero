@@ -17,12 +17,19 @@ nonisolated struct SampleGlyph: Codable, Hashable, Sendable {
         index = face.id.index
         self.glyph = glyph
         let font = FontLoader.shared.font(face, size: 12)
-        name = (CTFontCopyNameForGlyph(font, glyph) as String?).flatMap { $0.isEmpty ? nil : $0 }
+        name = Self.name(of: glyph, in: font)
         self.features = features
     }
 
+    private static func name(of glyph: CGGlyph, in font: CTFont) -> String? {
+        (CTFontCopyNameForGlyph(font, glyph) as String?).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
     func glyph(in font: CTFont, face: FontFace) -> CGGlyph? {
-        if face.id == FaceID(path: path, index: index) { return glyph }
+        // The same path can hold a file exported again with a new glyph order.
+        if face.id == FaceID(path: path, index: index), CFIndex(glyph) < CTFontGetGlyphCount(font), Self.name(of: glyph, in: font) == name {
+            return glyph
+        }
         if let name {
             let named = CTFontGetGlyphWithName(font, name as CFString)
             if named != 0 { return named }
@@ -56,6 +63,11 @@ nonisolated struct SampleGlyphRun: Codable, Hashable, Sendable {
     let glyph: SampleGlyph
 
     var range: NSRange { NSRange(location: location, length: (glyph.characters as NSString).length) }
+
+    func isIn(_ string: NSString) -> Bool {
+        let length = (glyph.characters as NSString).length
+        return location >= 0 && location <= string.length - length && string.substring(with: range) == glyph.characters
+    }
 }
 
 struct SampleClip: Codable {
@@ -140,7 +152,7 @@ nonisolated extension NSAttributedString {
 nonisolated extension NSMutableAttributedString {
     func addSampleGlyphs(_ runs: [SampleGlyphRun]) {
         let string = self.string as NSString
-        for run in runs where NSMaxRange(run.range) <= length && string.substring(with: run.range) == run.glyph.characters {
+        for run in runs where run.isIn(string) {
             addAttribute(.sampleGlyph, value: SampleGlyphValue(run.glyph), range: run.range)
         }
     }

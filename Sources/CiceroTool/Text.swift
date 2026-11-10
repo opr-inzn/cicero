@@ -3,8 +3,30 @@ import Foundation
 
 enum Text {
     static func string(_ value: JSON?) -> String? {
-        if case .string(let text) = value { return text }
+        if case .string(let text) = value { return clean(text) }
         return nil
+    }
+
+    static func long(_ value: JSON?) -> String? {
+        if case .string(let text) = value { return clean(text, lines: true) }
+        return nil
+    }
+
+    // Security: a font's names and texts can hold escape sequences that rename the terminal window, hide text or forge lines.
+    static func clean(_ text: String, lines: Bool = false) -> String {
+        var result = String.UnicodeScalarView()
+        var previous: Unicode.Scalar?
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 0x0A where lines: if previous != "\r" { result.append("\n") }
+            case 0x0D where lines: result.append("\n")
+            case 0x09, 0x0A, 0x0D: result.append(" ")
+            case 0x00...0x1F, 0x7F...0x9F, 0x202A...0x202E, 0x2066...0x2069: result.append("\u{FFFD}")
+            default: result.append(scalar)
+            }
+            previous = scalar
+        }
+        return String(result)
     }
 
     static func int(_ value: JSON?) -> Int? {
@@ -53,7 +75,9 @@ enum Text {
         let widths = (0..<columns).map { column in rows.map { column < $0.count ? $0[column].count : 0 }.max() ?? 0 }
         return rows.map { row in
             row.enumerated().map { column, cell in
-                column == row.count - 1 ? cell : cell.padding(toLength: widths[column], withPad: " ", startingAt: 0)
+                guard column == row.count - 1 else { return cell + String(repeating: " ", count: max(0, widths[column] - cell.count)) }
+                let indent = String(repeating: " ", count: widths.prefix(column).reduce(0, +) + 2 * column)
+                return cell.replacingOccurrences(of: "\n", with: "\n" + indent)
             }.joined(separator: "  ")
         }.joined(separator: "\n")
     }
@@ -144,11 +168,11 @@ enum Text {
         add("Manufacturer URL", string(answer["manufacturerURL"]))
         add("Vendor ID", string(answer["vendorID"]))
         add("Embedding", string(answer["fsType"]))
-        add("Description", string(answer["description"]))
-        add("License", string(answer["license"]))
+        add("Description", long(answer["description"]))
+        add("License", long(answer["license"]))
         add("License URL", string(answer["licenseURL"]))
-        add("Copyright", string(answer["copyright"]))
-        add("Note", string(answer["note"]))
+        add("Copyright", long(answer["copyright"]))
+        add("Note", long(answer["note"]))
         add("Coverage", coverage(answer["coverage"]))
         lines.append(table(facts))
         let styles = array(answer["styles"])
@@ -174,7 +198,7 @@ enum Text {
                 let index = int(style["indexInFile"]) ?? 0
                 return index > 0 ? "\(path) (font \(index + 1) in the file)" : path
             })
-            detail("Other copies", strings(style["otherCopies"]).joined(separator: "\n" + String(repeating: " ", count: 18)))
+            detail("Other copies", strings(style["otherCopies"]).joined(separator: "\n"))
             detail("Axes", array(style["axes"]).map { axis in
                 "\(string(axis["name"]) ?? "") \(number(axis["value"])) (\(number(axis["minimum"]))–\(number(axis["maximum"])))"
             }.joined(separator: ", "))
@@ -186,10 +210,10 @@ enum Text {
             detail("Manufacturer URL", string(style["manufacturerURL"]))
             detail("Vendor ID", string(style["vendorID"]))
             detail("Embedding", string(style["fsType"]))
-            detail("Description", string(style["description"]))
-            detail("License", string(style["license"]))
+            detail("Description", long(style["description"]))
+            detail("License", long(style["license"]))
             detail("License URL", string(style["licenseURL"]))
-            detail("Copyright", string(style["copyright"]))
+            detail("Copyright", long(style["copyright"]))
             detail("Coverage", coverage(style["coverage"]))
             lines.append(table(details))
         }

@@ -10,6 +10,7 @@ public enum WriteDispatcher {
     public static func perform(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
         let support = environment.locations.support
         var freeSince: Date?
+        var commandSince: ContinuousClock.Instant?
         while true {
             if let lock = AppLock.take(support: support) {
                 guard runningApp(environment) != nil else {
@@ -26,16 +27,24 @@ public enum WriteDispatcher {
                 continue
             }
             freeSince = nil
-            if runningApp(environment) != nil, AppLock.holder(support: support) != .command {
+            if runningApp(environment) != nil, !commandHolds(support: support) {
+                commandSince = nil
                 guard let answer = try await Requests.send(request, support: support) else { continue }
                 if let error = CommandError(answer: answer) { throw error }
                 return answer
             }
-            guard let lock = await AppLock.wait(support: support, timeout: otherCommand) else {
+            let since = commandSince ?? .now
+            if ContinuousClock.now - since > otherCommand {
                 throw CommandError(.busy, "The Cicero CLI is making another change. Nothing changed. Try again in a moment.")
             }
-            lock.release()
+            commandSince = since
+            try await Task.sleep(for: .milliseconds(50))
         }
+    }
+
+    static func commandHolds(support: URL) -> Bool {
+        let text = (try? String(contentsOf: AppLock.url(support: support), encoding: .utf8)) ?? ""
+        return text.split(separator: "\n", omittingEmptySubsequences: false).first == "command"
     }
 
     static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
@@ -91,6 +100,9 @@ final class ClosedAppWriter: Writer {
 
     func update(_ change: (inout UserData) -> Void) {
         change(&data)
+        if !store.hasSavedData, environment.defaults.object(forKey: ClassificationGuesses.guessingKey) == nil {
+            environment.defaults.set(true, forKey: ClassificationGuesses.askingKey)
+        }
         store.save(data)
         if !store.flush(durably: true) { saveFailed = true }
     }
@@ -102,15 +114,15 @@ final class ClosedAppWriter: Writer {
         return engine
     }
 
-    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult {
-        guard begin(faces, turningOn: true) else { return unjournaled(faces) }
+    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async throws -> ActivationResult {
+        try begin(faces, turningOn: true)
         let result = await engine.activate(faces, method: .inPlace, records: data.records)
         finish(result)
         return result
     }
 
-    func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
-        guard begin(faces, turningOn: false) else { return unjournaled(faces) }
+    func deactivate(_ faces: [LibraryFace]) async throws -> ActivationResult {
+        try begin(faces, turningOn: false)
         let result = await engine.deactivate(faces, records: data.records)
         finish(result)
         return result
@@ -121,14 +133,11 @@ final class ClosedAppWriter: Writer {
     }
 
     // Nothing turns without the note: a command stopped halfway would leave changes the records never learn of.
-    private func unjournaled(_ faces: [LibraryFace]) -> ActivationResult {
-        ActivationResult(records: data.records, succeeded: 0, failed: faces.map(\.face.path),
-                         message: "Couldn’t write a note in \(environment.locations.support.path) before the change, so nothing changed. Check that the disk has space and can be written to.")
-    }
-
-    private func begin(_ faces: [LibraryFace], turningOn: Bool) -> Bool {
+    private func begin(_ faces: [LibraryFace], turningOn: Bool) throws {
         let journal = ActivationJournal(turningOn: turningOn, paths: faces.map(\.face.path))
-        return (try? journal.write(support: environment.locations.support)) != nil
+        guard (try? journal.write(support: environment.locations.support)) != nil else {
+            throw CommandError(.failed, "Couldn’t write a note in \(environment.locations.support.path) before the change, so nothing changed. Check that the disk has space and can be written to.")
+        }
     }
 
     private func finish(_ result: ActivationResult) {

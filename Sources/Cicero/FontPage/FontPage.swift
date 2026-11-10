@@ -582,7 +582,7 @@ private final class TesterTextStore {
         let text = (UserDefaults.standard.string(forKey: Self.key) ?? TesterText.defaultText) as NSString
         self.text = text as String
         let saved = UserDefaults.standard.data(forKey: Self.glyphsKey).flatMap { try? JSONDecoder().decode([SampleGlyphRun].self, from: $0) }
-        glyphs = (saved ?? []).filter { NSMaxRange($0.range) <= text.length && text.substring(with: $0.range) == $0.glyph.characters }
+        glyphs = (saved ?? []).filter { $0.isIn(text) }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { TesterTextStore.shared.save() }
         }

@@ -10,7 +10,7 @@ public struct Ligature: Hashable, Sendable, Identifiable {
         self.characters = characters
     }
 
-    public var id: [UInt32] { characters }
+    public var id: Ligature { self }
 
     public var text: String {
         String(String.UnicodeScalarView(characters.compactMap(Unicode.Scalar.init)))
@@ -47,7 +47,7 @@ public struct LigatureGroup: Identifiable, Sendable {
         var made: [CGGlyph: [UInt32]] = [:]
         var pending = features.flatMap { feature in (found[feature.tag] ?? []).map { (feature.tag, $0) } }
         var resolved: [(String, GSUBSubstitutions.Entry, [UInt32])] = []
-        while true {
+        for _ in 0..<16 {
             var next: [(String, GSUBSubstitutions.Entry)] = []
             for (tag, entry) in pending {
                 var text: [UInt32] = []
@@ -72,10 +72,11 @@ public struct LigatureGroup: Identifiable, Sendable {
             pending = next
         }
         return features.compactMap { feature in
-            var seen = Set<[UInt32]>()
+            var seen = Set<Ligature>()
             var ligatures: [Ligature] = []
-            for (tag, entry, text) in resolved where tag == feature.tag && seen.insert(text).inserted {
-                ligatures.append(Ligature(glyph: entry.glyph, characters: text))
+            for (tag, entry, text) in resolved where tag == feature.tag {
+                let ligature = Ligature(glyph: entry.glyph, characters: text)
+                if seen.insert(ligature).inserted { ligatures.append(ligature) }
             }
             return ligatures.isEmpty ? nil : LigatureGroup(tag: feature.tag, ligatures: ligatures)
         }
@@ -165,15 +166,14 @@ enum GSUBSubstitutions {
         guard let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [:] }
         let lookups = Lookups(reader: reader, list: lookupList)
         var result: [String: [Entry]] = [:]
-        var done: [String: Set<Int>] = [:]
-        for record in 0..<(reader.u16(featureList) ?? 0) {
+        var visited: [String: Lookups.Visited] = [:]
+        for record in 0..<(reader.u16(featureList) ?? 0) where !lookups.isSpent {
             let at = featureList + 2 + record * 6
             guard let tag = reader.tag(at), includes(tag), let offset = reader.u16(at + 4) else { continue }
             let feature = featureList + offset
             for index in 0..<(reader.u16(feature + 2) ?? 0) {
-                guard let lookup = reader.u16(feature + 4 + index * 2), done[tag, default: []].insert(lookup).inserted else { continue }
-                var visited = Set<Int>()
-                result[tag, default: []] += lookups.ligatures(in: lookup, visited: &visited)
+                guard let lookup = reader.u16(feature + 4 + index * 2) else { continue }
+                result[tag, default: []] += lookups.ligatures(in: lookup, visited: &visited[tag, default: Lookups.Visited()])
             }
         }
         return result.filter { !$0.value.isEmpty }
@@ -182,31 +182,35 @@ enum GSUBSubstitutions {
     static func readByLanguage(_ table: Data, feature tag: String) -> [(languages: [String], entries: [Entry])] {
         let reader = Reader(bytes: [UInt8](table))
         guard let scriptList = reader.u16(4), let featureList = reader.u16(6), let lookupList = reader.u16(8) else { return [] }
+        func features(of langSys: Int) -> [Int] {
+            let required = reader.u16(langSys + 2).flatMap { $0 == 0xFFFF ? nil : $0 }
+            return (required.map { [$0] } ?? []) + (0..<(reader.u16(langSys + 4) ?? 0)).compactMap { reader.u16(langSys + 6 + $0 * 2) }
+        }
         var languages: [Int: [String]] = [:]
+        var byDefault = Set<Int>()
         for script in 0..<(reader.u16(scriptList) ?? 0) {
             guard let offset = reader.u16(scriptList + 2 + script * 6 + 4) else { continue }
             let start = scriptList + offset
+            if let offset = reader.u16(start), offset != 0 { byDefault.formUnion(features(of: start + offset)) }
             for system in 0..<(reader.u16(start + 2) ?? 0) {
                 let at = start + 4 + system * 6
                 guard let language = reader.tag(at)?.trimmingCharacters(in: .whitespaces), let offset = reader.u16(at + 4) else { continue }
-                let langSys = start + offset
-                let required = reader.u16(langSys + 2).flatMap { $0 == 0xFFFF ? nil : $0 }
-                let indices = (0..<(reader.u16(langSys + 4) ?? 0)).compactMap { reader.u16(langSys + 6 + $0 * 2) }
-                for index in (required.map { [$0] } ?? []) + indices where !languages[index, default: []].contains(language) {
+                for index in features(of: start + offset) where !languages[index, default: []].contains(language) {
                     languages[index, default: []].append(language)
                 }
             }
         }
+        for index in byDefault where languages[index] == nil { languages[index] = [] }
         let lookups = Lookups(reader: reader, list: lookupList)
         var result: [(languages: [String], entries: [Entry])] = []
-        for record in 0..<(reader.u16(featureList) ?? 0) {
+        for record in 0..<(reader.u16(featureList) ?? 0) where !lookups.isSpent {
             let at = featureList + 2 + record * 6
             guard reader.tag(at) == tag, let names = languages[record], let offset = reader.u16(at + 4) else { continue }
             let feature = featureList + offset
             var entries: [Entry] = []
+            var visited = Lookups.Visited()
             for index in 0..<(reader.u16(feature + 2) ?? 0) {
                 guard let lookup = reader.u16(feature + 4 + index * 2) else { continue }
-                var visited = Set<Int>()
                 entries += lookups.ligatures(in: lookup, visited: &visited)
             }
             if !entries.isEmpty { result.append((names, entries)) }
@@ -214,40 +218,72 @@ enum GSUBSubstitutions {
         return result
     }
 
-    private struct Lookups {
+    // Security: a few kilobytes of hostile GSUB can point thousands of lookups at one huge subtable, or nest context rules, and ask for billions of entries.
+    final class Lookups {
+        struct Visited {
+            var lookups = Set<Int>()
+            var subtables = Set<Int>()
+        }
+
+        static let entryBudget = 200_000
+        static let stepBudget = 2_000_000
+
         let reader: Reader
         let list: Int
+        private var entriesLeft = Lookups.entryBudget
+        private var stepsLeft = Lookups.stepBudget
 
-        func ligatures(in index: Int, visited: inout Set<Int>) -> [Entry] {
-            guard visited.insert(index).inserted, visited.count < 64,
-                  index < reader.u16(list) ?? 0, let offset = reader.u16(list + 2 + index * 2)
+        init(reader: Reader, list: Int) {
+            self.reader = reader
+            self.list = list
+        }
+
+        var isSpent: Bool { entriesLeft <= 0 || stepsLeft <= 0 }
+
+        private func step() -> Bool {
+            stepsLeft -= 1
+            return !isSpent
+        }
+
+        func ligatures(in index: Int, visited: inout Visited, depth: Int = 0) -> [Entry] {
+            guard !isSpent, depth < 64, index < reader.u16(list) ?? 0, let offset = reader.u16(list + 2 + index * 2),
+                  visited.lookups.insert(list + offset).inserted
             else { return [] }
             let lookup = list + offset
             guard let type = reader.u16(lookup), let count = reader.u16(lookup + 4) else { return [] }
             var entries: [Entry] = []
-            for subtable in 0..<count {
+            for subtable in 0..<count where step() {
                 guard let offset = reader.u16(lookup + 6 + subtable * 2) else { continue }
-                entries += self.subtable(lookup + offset, type: type, visited: &visited)
+                entries += self.subtable(lookup + offset, type: type, visited: &visited, depth: depth)
             }
             return entries
         }
 
-        private func subtable(_ start: Int, type: Int, visited: inout Set<Int>) -> [Entry] {
+        private func subtable(_ start: Int, type: Int, visited: inout Visited, depth: Int) -> [Entry] {
+            guard type == 7 || visited.subtables.insert(start).inserted else { return [] }
+            let entries: [Entry]
             switch type {
             case 1:
-                return singleSubstitution(start)
+                entries = singleSubstitution(start)
             case 3:
-                return alternateSubstitution(start)
+                entries = alternateSubstitution(start)
             case 4:
-                return ligatureSubstitution(start)
+                entries = ligatureSubstitution(start)
             case 5, 6:
-                return applied(in: start, chained: type == 6).flatMap { ligatures(in: $0, visited: &visited) }
+                var nested: [Entry] = []
+                for index in applied(in: start, chained: type == 6) where !isSpent {
+                    nested += ligatures(in: index, visited: &visited, depth: depth + 1)
+                }
+                return nested
             case 7:
                 guard reader.u16(start) == 1, let type = reader.u16(start + 2), type != 7, let offset = reader.u32(start + 4) else { return [] }
-                return subtable(start + offset, type: type, visited: &visited)
+                return subtable(start + offset, type: type, visited: &visited, depth: depth)
             default:
                 return []
             }
+            let kept = Array(entries.prefix(max(0, entriesLeft)))
+            entriesLeft -= entries.count
+            return kept
         }
 
         private func singleSubstitution(_ start: Int) -> [Entry] {
@@ -270,22 +306,24 @@ enum GSUBSubstitutions {
 
         private func alternateSubstitution(_ start: Int) -> [Entry] {
             guard reader.u16(start) == 1, let coverage = reader.u16(start + 2), let setCount = reader.u16(start + 4) else { return [] }
-            return reader.coverage(start + coverage).enumerated().flatMap { index, input -> [Entry] in
-                guard index < setCount, let offset = reader.u16(start + 6 + index * 2), let count = reader.u16(start + offset) else { return [] }
-                return (0..<count).compactMap { choice in
-                    reader.u16(start + offset + 2 + choice * 2).map { Entry(glyph: CGGlyph($0), components: [input]) }
+            var entries: [Entry] = []
+            for (index, input) in reader.coverage(start + coverage).enumerated() where index < setCount && step() {
+                guard let offset = reader.u16(start + 6 + index * 2), let count = reader.u16(start + offset) else { continue }
+                for choice in 0..<count where step() {
+                    if let glyph = reader.u16(start + offset + 2 + choice * 2) { entries.append(Entry(glyph: CGGlyph(glyph), components: [input])) }
                 }
             }
+            return entries
         }
 
         private func ligatureSubstitution(_ start: Int) -> [Entry] {
             guard reader.u16(start) == 1, let coverage = reader.u16(start + 2), let setCount = reader.u16(start + 4) else { return [] }
             let firsts = reader.coverage(start + coverage)
             var entries: [Entry] = []
-            for (index, first) in firsts.enumerated() where index < setCount {
+            for (index, first) in firsts.enumerated() where index < setCount && step() {
                 guard let setOffset = reader.u16(start + 6 + index * 2) else { continue }
                 let set = start + setOffset
-                for ligature in 0..<(reader.u16(set) ?? 0) {
+                for ligature in 0..<(reader.u16(set) ?? 0) where step() {
                     guard let offset = reader.u16(set + 2 + ligature * 2), let glyph = reader.u16(set + offset),
                           let count = reader.u16(set + offset + 2), count >= 2
                     else { continue }
@@ -304,10 +342,10 @@ enum GSUBSubstitutions {
                 let first = start + (chained && format == 2 ? 10 : format == 2 ? 6 : 4)
                 guard let setCount = reader.u16(first) else { return [] }
                 var indices: [Int] = []
-                for set in 0..<setCount {
+                for set in 0..<setCount where step() {
                     guard let setOffset = reader.u16(first + 2 + set * 2), setOffset != 0 else { continue }
                     let ruleSet = start + setOffset
-                    for rule in 0..<(reader.u16(ruleSet) ?? 0) {
+                    for rule in 0..<(reader.u16(ruleSet) ?? 0) where step() {
                         guard let offset = reader.u16(ruleSet + 2 + rule * 2) else { continue }
                         indices += chained ? chainedRuleRecords(ruleSet + offset) : ruleRecords(ruleSet + offset)
                     }
@@ -350,7 +388,9 @@ enum GSUBSubstitutions {
         }
 
         private func records(_ at: Int, count: Int) -> [Int] {
-            (0..<count).compactMap { reader.u16(at + $0 * 4 + 2) }
+            let count = min(count, max(0, stepsLeft))
+            stepsLeft -= count
+            return (0..<count).compactMap { reader.u16(at + $0 * 4 + 2) }
         }
     }
 
