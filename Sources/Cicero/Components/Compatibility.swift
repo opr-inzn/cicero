@@ -48,35 +48,19 @@ extension View {
 
 private struct FreshScrollEdges: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.appearsActive) private var appearsActive
     @State private var isHard = false
-    @State private var settle: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
             content
                 .scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top)
-                .onChange(of: colorScheme) { refresh() }
-                // On a switch back to Cicero, the toolbar's glass could come back in the system's appearance and fade to the app's.
-                .onChange(of: appearsActive) { if appearsActive && differsFromSystem { refresh() } }
+                .onChange(of: colorScheme) {
+                    // Hard for a moment, so macOS sets the top edges up afresh: on macOS 26 the toolbar's glass over them could keep the old appearance until something scrolled.
+                    isHard = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isHard = false }
+                }
         } else {
             content
-        }
-    }
-
-    private var differsFromSystem: Bool {
-        guard let appearance = NSApp.appearance else { return false }
-        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        return isDark != (UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark")
-    }
-
-    private func refresh() {
-        // Hard for a moment, so macOS sets the top edges up afresh: on macOS 26 the toolbar's glass over them could keep the old appearance until something scrolled.
-        isHard = true
-        settle?.cancel()
-        settle = Task {
-            try? await Task.sleep(for: .milliseconds(100))
-            if !Task.isCancelled { isHard = false }
         }
     }
 }
