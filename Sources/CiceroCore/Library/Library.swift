@@ -193,6 +193,7 @@ public final class LibraryScanner: Sendable {
         var built = false
         var restored: Library?
         var offlineKnown: [String: Set<String>] = [:]
+        var changedSinceTaken = Set<String>()
         var savedFingerprint: Int?
         var onDisk: Library?
         var rereadsAsked = 0
@@ -454,6 +455,11 @@ public final class LibraryScanner: Sendable {
             if (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return false }
         }
         return true
+    }
+
+    public func tookChanges(_ paths: Set<String>) {
+        guard !paths.isEmpty else { return }
+        state.withLock { $0.changedSinceTaken.subtract(paths) }
     }
 
     public func clearCache() {
@@ -996,6 +1002,8 @@ public final class LibraryScanner: Sendable {
                 for path in found.keys where state.lastStamps[path] == nil && !read.contains(path) { changed.insert(path) }
             }
             state.built = true
+            state.changedSinceTaken.formUnion(changed)
+            changed = state.changedSinceTaken
             state.lastStamps = found.mapValues(\.stamp)
             state.restored = nil
             state.offlineKnown = offlineKnown

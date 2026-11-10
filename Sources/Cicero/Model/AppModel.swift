@@ -610,6 +610,7 @@ final class AppModel {
         if let similar = similarFamilyID, new.family(similar) == nil { endSimilar() }
         FontLoader.shared.invalidate(paths: new.changedPaths)
         pageContents.forget(paths: new.changedPaths)
+        scanner.tookChanges(new.changedPaths)
         FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
         updateCoverage()
         updateProblems()
