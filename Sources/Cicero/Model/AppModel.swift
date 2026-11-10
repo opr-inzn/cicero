@@ -205,7 +205,6 @@ final class AppModel {
     var earlierImportPrompt: EarlierImportPrompt? {
         didSet { showHeldToast() }
     }
-    @ObservationIgnored var askedAboutEarlierImport = false
     var mayOfferEarlierImportCopy = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?

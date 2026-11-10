@@ -25,14 +25,13 @@ extension AppModel {
     }
 
     func offerEarlierImportCopy() {
-        guard !askedAboutEarlierImport, job == nil, importing == nil,
+        guard job == nil, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data), !Self.declinedEarlierImport(folder)
         else { return mayOfferEarlierImportCopy = false }
         let faces = faces(in: [folder])
         let prefix = folder.path + "/"
         let files = Set(faces.flatMap { [$0.face.path] + $0.otherCopies }).filter { $0.hasPrefix(prefix) }.sorted()
         guard !files.isEmpty else { return mayOfferEarlierImportCopy = false }
-        askedAboutEarlierImport = true
         let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
         let engine = importEngine
