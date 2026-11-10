@@ -210,7 +210,7 @@ final class AppModel {
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
     private(set) var toastUndo: (() -> Void)?
-    @ObservationIgnored private var heldToast: (message: String, undo: (() -> Void)?)?
+    @ObservationIgnored private var heldToast: String?
 
     // MARK: Compare
 
@@ -323,7 +323,7 @@ final class AppModel {
         let center = NotificationCenter.default
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, !self.movingAtLaunch, Date().timeIntervalSince(self.lastScan) > 60,
+                guard let self, !self.movingAtLaunch, self.runningOperations == 0, Date().timeIntervalSince(self.lastScan) > 60,
                       self.runningScan.map({ $0.scope != .everything }) ?? true
                 else { return }
                 self.rescan(check: true)
@@ -837,7 +837,7 @@ final class AppModel {
     static let undoTime = Duration.seconds(6)
 
     func showToast(_ message: String, undo: (() -> Void)? = nil) {
-        if importing != nil || earlierImportPrompt != nil { return heldToast = (message, undo) }
+        if importing != nil || earlierImportPrompt != nil { return heldToast = message }
         toast = message
         toastUndo = undo
         toastTask?.cancel()
@@ -852,7 +852,7 @@ final class AppModel {
     private func showHeldToast() {
         guard importing == nil, earlierImportPrompt == nil, let held = heldToast else { return }
         heldToast = nil
-        showToast(held.message, undo: held.undo)
+        showToast(held)
     }
 
     func undoToast() {
