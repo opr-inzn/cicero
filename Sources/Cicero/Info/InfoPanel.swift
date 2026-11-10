@@ -321,6 +321,7 @@ private struct NoteRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
     @State private var text = ""
+    @State private var loaded = ""
     @State private var editing: String?
     @FocusState private var isFocused: Bool
 
@@ -340,7 +341,7 @@ private struct NoteRow: View {
             save()
             load()
         }
-        .onChange(of: model.note(of: family)) { if !isFocused { load() } }
+        .onChange(of: model.note(of: family)) { if !isFocused || text == loaded { load() } }
         .onChange(of: isFocused) { if !isFocused { save() } }
         .onDisappear(perform: save)
         .task(id: text) {
@@ -351,7 +352,8 @@ private struct NoteRow: View {
 
     private func load() {
         editing = family.id
-        text = model.note(of: family) ?? ""
+        loaded = model.note(of: family) ?? ""
+        text = loaded
     }
 
     private func newLine() -> KeyPress.Result {
@@ -361,8 +363,9 @@ private struct NoteRow: View {
     }
 
     private func save() {
-        guard let editing, let family = model.family(editing) else { return }
+        guard text != loaded, let editing, let family = model.family(editing) else { return }
         model.setNote(text, for: family)
+        loaded = model.note(of: family) ?? ""
     }
 }
 
