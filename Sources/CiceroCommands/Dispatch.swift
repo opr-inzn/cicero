@@ -26,7 +26,7 @@ public enum WriteDispatcher {
                 continue
             }
             freeSince = nil
-            if runningApp(environment) != nil {
+            if runningApp(environment) != nil, AppLock.holder(support: support) != .command {
                 guard let answer = try await Requests.send(request, support: support) else { continue }
                 if let error = CommandError(answer: answer) { throw error }
                 return answer

@@ -38,9 +38,19 @@ public final class AppLock: @unchecked Sendable {
 
     public static func attempt(support: URL, holder: Holder = .command) -> Attempt {
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        let descriptor = open(url(support: support).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
+        let path = url(support: support).path
+        var descriptor = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
+        // One left by `sudo cicero` belongs to root and can only be replaced, once no one holds it: holding no lock, Cicero and the command could write at once.
+        if descriptor < 0, errno == EACCES || errno == EPERM {
+            let readOnly = open(path, O_RDONLY | O_CLOEXEC)
+            guard readOnly >= 0 else { return .unavailable }
+            defer { close(readOnly) }
+            guard flock(readOnly, LOCK_EX | LOCK_NB) == 0, isNamed(path, by: readOnly) else { return .held }
+            if unlink(path) == 0 { descriptor = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644) }
+        }
         guard descriptor >= 0 else { return .unavailable }
-        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+        // Still the file at that path once locked, or another process replaced it meanwhile, and the lock would be on a file no one else opens.
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0, isNamed(path, by: descriptor) else {
             close(descriptor)
             return .held
         }
@@ -48,6 +58,11 @@ public final class AppLock: @unchecked Sendable {
         ftruncate(descriptor, 0)
         _ = pwrite(descriptor, text, text.count, 0)
         return .taken(AppLock(descriptor: descriptor))
+    }
+
+    private static func isNamed(_ path: String, by descriptor: Int32) -> Bool {
+        var held = stat(), named = stat()
+        return fstat(descriptor, &held) == 0 && stat(path, &named) == 0 && held.st_dev == named.st_dev && held.st_ino == named.st_ino
     }
 
     public static func take(support: URL, holder: Holder = .command) -> AppLock? {
