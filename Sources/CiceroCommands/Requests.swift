@@ -128,7 +128,11 @@ public enum Requests {
             let id = String(url.lastPathComponent.dropLast(".request.json".count))
             let sender = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(WriteRequest.self, from: $0) }?.sender
             // A change the user cancelled must never be made: its command has stopped (Ctrl-C, a closed terminal or agent), or would have withdrawn it by now.
-            if sender.map({ !$0.isRunning }) == true || date < late {
+            if let sender, !sender.isRunning {
+                try? fm.removeItem(at: url)
+                continue
+            }
+            if sender == nil, date < late {
                 try? fm.removeItem(at: url)
                 continue
             }
