@@ -950,7 +950,8 @@ public final class LibraryScanner: Sendable {
         let grouped = byFamily
         var families = Array(byFamily.keys).concurrentMap { name in
             let members = grouped[name]!
-            let faces = members.map(\.0).sorted { Self.stylePrecedes($0.face, $1.face) }
+            let order = Self.axisOrder(of: members.map(\.0.face))
+            let faces = members.map(\.0).sorted { Self.stylePrecedes($0.face, $1.face, axisOrder: order) }
             return Family(
                 name: name, faces: faces, state: Self.familyState(of: faces),
                 folderIDs: members.reduce(into: Set<UUID>()) { $0.formUnion($1.1) },
@@ -1023,21 +1024,39 @@ public final class LibraryScanner: Sendable {
         return known
     }
 
-    static func stylePrecedes(_ a: FontFace, _ b: FontFace) -> Bool {
+    static func axisOrder(of faces: [FontFace]) -> [String: Int] {
+        var order: [String: Int] = [:]
+        for face in faces.sorted(by: { $0.id < $1.id }) {
+            for axis in face.axes where order[axis.tag] == nil { order[axis.tag] = order.count }
+        }
+        return order
+    }
+
+    static func stylePrecedes(_ a: FontFace, _ b: FontFace, axisOrder: [String: Int] = [:]) -> Bool {
         if a.styleWeight != b.styleWeight { return a.styleWeight < b.styleWeight }
-        if let order = precedes(a, b, along: { $0.first?.isUppercase == true }) { return order }
+        if let order = precedes(a, b, axisOrder: axisOrder, along: { $0.first?.isUppercase == true }) { return order }
         if a.styleWidth != b.styleWidth { return a.styleWidth < b.styleWidth }
-        if let order = precedes(a, b, along: { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }) {
+        if let order = precedes(a, b, axisOrder: axisOrder, along: { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }) {
             return order
         }
         if a.isItalic != b.isItalic { return !a.isItalic }
-        if a.styleName != b.styleName { return a.styleName.caseInsensitiveCompare(b.styleName) == .orderedAscending }
+        let names = a.styleName.caseInsensitiveCompare(b.styleName)
+        if names != .orderedSame { return names == .orderedAscending }
         return a.id < b.id
     }
 
-    private static func precedes(_ a: FontFace, _ b: FontFace, along tags: (String) -> Bool) -> Bool? {
-        for axis in a.axes where tags(axis.tag) {
-            if let value = b.axes.first(where: { $0.tag == axis.tag })?.value, value != axis.value { return axis.value < value }
+    private static func precedes(_ a: FontFace, _ b: FontFace, axisOrder: [String: Int], along tags: (String) -> Bool) -> Bool? {
+        // One order of axes for the whole family, one without the axis first: its faces can list different axes, in different orders.
+        let all = Set((a.axes + b.axes).map(\.tag)).filter(tags).sorted { (axisOrder[$0] ?? .max, $0) < (axisOrder[$1] ?? .max, $1) }
+        for tag in all {
+            let x = a.axes.first(where: { $0.tag == tag })?.value, y = b.axes.first(where: { $0.tag == tag })?.value
+            guard let x else { if y == nil { continue } else { return true } }
+            guard let y else { return false }
+            if x.isNaN || y.isNaN {
+                if x.isNaN && y.isNaN { continue }
+                return x.isNaN
+            }
+            if x != y { return x < y }
         }
         return nil
     }
@@ -1116,16 +1135,15 @@ public final class LibraryScanner: Sendable {
 
     private func sorted(_ families: [Family]) -> [Family] {
         let keys = families.map { $0.name == $0.id ? $0.id : $0.name + "\u{0}" + $0.id }
-        let order: [String] = state.withLock { state in
+        let order: [Int] = state.withLock { state in
             if keys.allSatisfy({ state.ranks[$0] != nil }) {
-                return keys.sorted { state.ranks[$0]! < state.ranks[$1]! }
+                return keys.indices.sorted { state.ranks[keys[$0]]! < state.ranks[keys[$1]]! }
             }
-            let sorted = keys.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-            state.ranks = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($1, $0) })
+            let sorted = keys.indices.sorted { keys[$0] < keys[$1] }.sorted { keys[$0].localizedStandardCompare(keys[$1]) == .orderedAscending }
+            state.ranks = Dictionary(sorted.enumerated().map { (keys[$1], $0) }, uniquingKeysWith: { first, _ in first })
             return sorted
         }
-        let byKey = Dictionary(uniqueKeysWithValues: zip(keys, families))
-        return order.map { byKey[$0]! }
+        return order.map { families[$0] }
     }
 }
 
