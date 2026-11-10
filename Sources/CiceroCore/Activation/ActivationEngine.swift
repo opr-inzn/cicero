@@ -306,7 +306,6 @@ public struct ActivationEngine: Sendable {
         let sessionOnly = temporary.filter { !isInsideFontsFolder($0) }
         let stuckInSession = sessionOnly.isEmpty ? [] : await registrar.unregister(sessionOnly.map(Self.url), scope: .session)
         for path in temporary where !stuckInSession.contains(path) { records.temporary[path] = nil }
-        // One still on for the session stays only that: on for good as well, it would be in both records, and turning it off would end only the session.
         failed.append(contentsOf: stuckInSession.sorted())
         for face in targets where !stuckInSession.contains(face.face.path) {
             let path = face.face.path
@@ -639,13 +638,13 @@ public struct ActivationEngine: Sendable {
             let alsoInPlace = session.filter { records.inPlace.contains($0) }
             let stuckForGood = alsoInPlace.isEmpty ? [] : await unregisterPersistent(alsoInPlace)
             for path in alsoInPlace where !stuckForGood.contains(path) { records.inPlace.remove(path) }
-            let stuck = await registrar.unregister(session.map(Self.url), scope: .session).union(stuckForGood)
+            let stuck = await registrar.unregister(session.map(Self.url), scope: .session)
             for path in session {
-                if stuck.contains(path) {
+                if !stuck.contains(path) { records.temporary[path] = nil }
+                if stuck.contains(path) || stuckForGood.contains(path) {
                     failed.append(path)
-                } else {
-                    records.temporary[path] = nil
-                    if !leaving.contains(path) { succeeded += 1 }
+                } else if !leaving.contains(path) {
+                    succeeded += 1
                 }
             }
         }
