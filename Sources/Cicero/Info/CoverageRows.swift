@@ -82,6 +82,7 @@ private struct LanguageList: View {
             }
         }
         .listStyle(.plain)
+        .popoverListInsets(top: 0, bottom: 10)
         .topBar {
             TextField("Search", text: $query, prompt: Text("Search languages"))
                 .textFieldStyle(.roundedBorder)
@@ -115,7 +116,7 @@ struct CharacterSetsRow: View {
                 }
                 let incomplete = incompleteSets(in: ranges)
                 if !incomplete.isEmpty {
-                    Menu("Show Missing") {
+                    Menu {
                         ForEach(incomplete, id: \.name) { group in
                             Section(group.name) {
                                 ForEach(group.sets, id: \.set.id) { entry in
@@ -123,8 +124,12 @@ struct CharacterSetsRow: View {
                                 }
                             }
                         }
+                    } label: {
+                        // One text, as a menu's label puts an image of its own first.
+                        Text("Show Missing \(Image(systemName: "chevron.down"))")
                     }
                     .menuStyle(.button)
+                    .menuIndicator(.hidden)
                     .controlSize(.small)
                     .fixedSize()
                     .padding(.top, 2)
@@ -255,15 +260,15 @@ private struct MissingCharacterList: View {
 struct UnicodeBlocksRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var loaded: Loaded<[(block: CharacterSetDefinition, has: Int)]>?
+    @State private var loaded: Loaded<(ranges: ScalarRanges, blocks: [BlockCoverage])>?
     @State private var showsAll = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Unicode Blocks").font(.caption).foregroundStyle(.secondary)
-            if let coverage = loaded?.value {
-                let complete = coverage.filter { $0.has == $0.block.scalars.count }.map(\.block.name)
-                let partial = coverage.count { $0.has > 0 && $0.has < $0.block.scalars.count }
+            if let (ranges, coverage) = loaded?.value {
+                let complete = coverage.filter(\.isComplete).map(\.block.name)
+                let partial = coverage.count { $0.has > 0 && !$0.isComplete }
                 Text(complete.isEmpty ? "None complete" : "Complete: " + complete.listed())
                     .font(.callout)
                     .textSelection(.enabled)
@@ -276,33 +281,53 @@ struct UnicodeBlocksRow: View {
                 Button("Show All") { showsAll = true }
                     .controlSize(.small)
                     .padding(.top, 2)
-                    .popover(isPresented: $showsAll, arrowEdge: .leading) { list(coverage) }
+                    .popover(isPresented: $showsAll, arrowEdge: .leading) { BlockList(ranges: ranges, coverage: coverage) }
             } else {
                 ProgressView().controlSize(.small)
             }
         }
-        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id).map { blocks(covered: $0.scalars) } }) { [face] in
+        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id).map { ($0.scalars, blocks(covered: $0.scalars)) } }) { [face] in
             let ranges = await model.coverage.coverage(computing: face).scalars
-            return blocks(covered: ranges)
+            return (ranges, blocks(covered: ranges))
         }
     }
 
-    private func blocks(covered ranges: ScalarRanges) -> [(block: CharacterSetDefinition, has: Int)] {
+    private func blocks(covered ranges: ScalarRanges) -> [BlockCoverage] {
         let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
-        return blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
+        return blocks.map { BlockCoverage(block: $0, has: $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
     }
+}
 
-    private func list(_ coverage: [(block: CharacterSetDefinition, has: Int)]) -> some View {
+private struct BlockCoverage {
+    let block: CharacterSetDefinition
+    let has: Int
+    var isComplete: Bool { has == block.scalars.count }
+}
+
+private struct BlockList: View {
+    let ranges: ScalarRanges
+    let coverage: [BlockCoverage]
+    @State private var showsMissing: CharacterSetDefinition?
+
+    var body: some View {
         List(coverage, id: \.block.id) { entry in
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(entry.block.name)
-                    Spacer()
-                    Text("\(entry.has.plain) of \(entry.block.scalars.count.plain)").monospacedDigit().foregroundStyle(.secondary)
+            Button { if !entry.isComplete { showsMissing = entry.block } } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(entry.block.name)
+                        Spacer()
+                        Text("\(entry.has.plain) of \(entry.block.scalars.count.plain)").monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: Double(entry.has), total: Double(max(entry.block.scalars.count, 1)))
+                        .progressViewStyle(.linear)
+                        .controlSize(.mini)
                 }
-                ProgressView(value: Double(entry.has), total: Double(max(entry.block.scalars.count, 1)))
-                    .progressViewStyle(.linear)
-                    .controlSize(.mini)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .help(entry.isComplete ? "" : "Show the missing characters")
+            .popover(item: Binding(get: { showsMissing?.id == entry.block.id ? showsMissing : nil }, set: { showsMissing = $0 }), arrowEdge: .leading) { block in
+                MissingCharacterList(missing: ranges.missing(sorted: block.scalars))
             }
         }
         .listStyle(.plain)
