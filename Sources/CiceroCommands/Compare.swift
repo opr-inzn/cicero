@@ -137,7 +137,7 @@ struct Sample {
         missing = isItself ? CoverageSearch.scalars(in: text).filter { !font.has($0) } : []
     }
 
-    var label: String { "\(family.id) — \(style.face.styleName)" }
+    var label: String { "\(family.id), \(style.face.styleName)" }
 }
 
 private extension CTFont {

@@ -206,7 +206,7 @@ struct CopySourcesMenu: View {
         if styles.count > 1 && source.choices.count < styles.count {
             details.append(source.choices.count == 1 ? "1 style" : "\(source.choices.count) styles")
         }
-        return details.isEmpty ? source.name : "\(source.name) — " + details.joined(separator: ", ")
+        return details.isEmpty ? source.name : "\(source.name) (\(details.joined(separator: ", ")))"
     }
 }
 
