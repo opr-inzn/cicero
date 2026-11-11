@@ -231,8 +231,11 @@ struct FontList: View {
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
     @AppStorage("fontList.characterSetColumns") private var addedColumns = ""
     @AppStorage("fontList.columnWidths") private var columnWidths = ""
+    @AppStorage("fontList.columnOrder") private var columnOrder = ""
     @State private var anchor = SelectionAnchor()
     @State private var resizing: (column: FontListColumn, start: CGFloat, room: CGFloat)?
+    @State private var fitting: FontListColumn?
+    @State private var moving: (column: FontListColumn, start: CGFloat, offset: CGFloat)?
     @FocusState private var focused: Bool
     @State private var visibleWidth: CGFloat = 900
     @State private var visibleHeight: CGFloat = 0
@@ -244,6 +247,7 @@ struct FontList: View {
         let sortsByCoverage = sort.map { $0.isSeries || $0.isSingleSet } ?? false
         let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], coverageColumns: sortsByCoverage ? sort.map { [$0] } ?? [] : [])
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
+        let moved = moving.map { MovingColumn(column: $0.column, offset: $0.offset) }
         ScrollViewReader { proxy in
             ScrollView {
                 // A lazy stack, not a Table: a Table makes every row's cells whenever an accessibility client, like a password manager's autofill, walks the window.
@@ -251,7 +255,7 @@ struct FontList: View {
                     // The rows themselves, not Array(rows.enumerated()), which copied every row at each update.
                     ForEach(rows) { row in
                         FontListRow(row: row, columns: columns, widths: widths, isStriped: !row.position.isMultiple(of: 2),
-                                    isSelected: model.selectedIDs.contains(row.id), model: model)
+                                    isSelected: model.selectedIDs.contains(row.id), model: model, moving: moved)
                             .modifier(FamilyItem(family: row.family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                             .onAppear { ReadAhead.around(row.family, in: families) }
                     }
@@ -279,6 +283,24 @@ struct FontList: View {
         .onChange(of: model.similarFamilyID) { keepsOwnOrder = true }
         .onChange(of: model.similarStyleID) { keepsOwnOrder = true }
         .onChange(of: model.selectedItems) { keepsOwnOrder = true }
+        .background {
+            if let fitting {
+                VStack(alignment: .leading, spacing: 0) {
+                    HeaderCell(column: fitting, title: fitting.title(model), sortColumn: sort, ascending: ascending, isMovable: false,
+                               sort: {}, move: { _ in }, endMove: {})
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, FontListRow.inset)
+                    ForEach(widest(fitting, in: rows)) { row in
+                        FontListRow(row: row, columns: [fitting], widths: [:], isStriped: false, isSelected: false, model: model, moving: nil)
+                    }
+                }
+                .fixedSize()
+                .hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                    fit(fitting, to: width - 2 * FontListRow.inset, widths: widths)
+                }
+            }
+        }
     }
 
     private func order(_ column: FontListColumn) -> [KeyPathComparator<FontRow>] {
@@ -303,10 +325,45 @@ struct FontList: View {
     private var shownColumns: [FontListColumn] {
         let hidden = Set(hiddenColumns.split(separator: ",").map(String.init))
         let added = Set(addedColumns.split(separator: ",").map(String.init))
-        return allColumns.filter { column in
+        let columns = allColumns.filter { column in
             if !column.canHide { return true }
             return column.isStandard ? !hidden.contains(column.id) : added.contains(column.id)
         }
+        return ordered(columns)
+    }
+
+    private static let fixedColumns = 2
+
+    private func ordered(_ columns: [FontListColumn]) -> [FontListColumn] {
+        var result = Array(columns.prefix(Self.fixedColumns))
+        let saved = columnOrder.split(separator: ",").compactMap { FontListColumn(id: String($0)) }
+        result += saved.filter { columns.contains($0) && !result.contains($0) }
+        for (index, column) in columns.enumerated() where !result.contains(column) {
+            let before = columns[..<index].last(where: result.contains).flatMap { result.firstIndex(of: $0) }
+            result.insert(column, at: (before ?? Self.fixedColumns - 1) + 1)
+        }
+        return result
+    }
+
+    private func move(_ column: FontListColumn, by translation: CGFloat, in columns: [FontListColumn], widths: [FontListColumn: CGFloat]) {
+        func left(_ column: FontListColumn, in order: [FontListColumn]) -> CGFloat {
+            order.prefix { $0 != column }.reduce(0) { $0 + (widths[$1] ?? 0) + FontListRow.spacing }
+        }
+        let start = moving?.column == column ? moving?.start ?? 0 : left(column, in: columns)
+        let position = start + translation
+        let width = widths[column] ?? 0
+        var order = columns
+        while let index = order.firstIndex(of: column) {
+            if index + 1 < order.count, position + width > left(order[index + 1], in: order) + (widths[order[index + 1]] ?? 0) / 2 {
+                order.swapAt(index, index + 1)
+            } else if index - 1 >= Self.fixedColumns, position < left(order[index - 1], in: order) + (widths[order[index - 1]] ?? 0) / 2 {
+                order.swapAt(index, index - 1)
+            } else {
+                break
+            }
+        }
+        if order != columns { columnOrder = order.map(\.id).joined(separator: ",") }
+        moving = (column, start, position - left(column, in: order))
     }
 
     static func fit(_ columns: [FontListColumn], widths: [FontListColumn: CGFloat], in visible: CGFloat) -> [FontListColumn: CGFloat] {
@@ -351,10 +408,14 @@ struct FontList: View {
     }
 
     private func header(columns: [FontListColumn], widths: [FontListColumn: CGFloat], sort: FontListColumn?) -> some View {
-        HStack(spacing: FontListRow.spacing) {
-            ForEach(columns) { column in
+        HStack(spacing: 0) {
+            ForEach(Array(columns.enumerated()), id: \.element) { index, column in
+                let isMoving = moving?.column == column
+                if index > 0 {
+                    divider(between: columns[index - 1], and: column, in: columns, widths: widths)
+                }
                 HeaderCell(column: column, title: column.title(model), sortColumn: sort, ascending: ascending,
-                           resizeEdge: resizeEdge(column, in: columns)) {
+                           isMovable: index >= Self.fixedColumns) {
                     if sort == column {
                         ascending.toggle()
                     } else {
@@ -362,12 +423,15 @@ struct FontList: View {
                         ascending = true
                         keepsOwnOrder = false
                     }
-                } resize: { change in
-                    resize(column, by: change, widths: widths)
-                } endResize: {
-                    resizing = nil
+                } move: { translation in
+                    move(column, by: translation, in: columns, widths: widths)
+                } endMove: {
+                    moving = nil
                 }
                 .frame(width: widths[column], alignment: .leading)
+                .opacity(isMoving ? 0.5 : 1)
+                .offset(x: isMoving ? moving?.offset ?? 0 : 0)
+                .zIndex(isMoving ? 1 : 0)
             }
         }
         .font(.subheadline.weight(.semibold))
@@ -427,6 +491,18 @@ struct FontList: View {
         return ids.sorted().joined(separator: ",")
     }
 
+    @ViewBuilder
+    private func divider(between left: FontListColumn, and right: FontListColumn, in columns: [FontListColumn], widths: [FontListColumn: CGFloat]) -> some View {
+        let endResize = { resizing = nil }
+        if resizeEdge(right, in: columns) == .leading {
+            ColumnDivider(resize: { resize(right, by: -$0, widths: widths) }, endResize: endResize) { fitting = right }
+        } else if resizeEdge(left, in: columns) == .trailing {
+            ColumnDivider(resize: { resize(left, by: $0, widths: widths) }, endResize: endResize) { fitting = left }
+        } else {
+            Color.clear.frame(width: FontListRow.spacing)
+        }
+    }
+
     private func resizeEdge(_ column: FontListColumn, in columns: [FontListColumn]) -> HorizontalEdge? {
         guard column != .status, column.defaultWidth != nil, let index = columns.firstIndex(of: column),
               let preview = columns.firstIndex(of: .preview) else { return nil }
@@ -441,6 +517,57 @@ struct FontList: View {
         }
         guard let resizing else { return }
         setWidths([column: resizing.start + min(change, resizing.room)])
+    }
+
+    private func widest(_ column: FontListColumn, in rows: [FontRow]) -> [FontRow] {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        var groups: [String: [(width: CGFloat, row: FontRow)]] = [:]
+        for row in rows {
+            guard let (text, group) = fitSample(column, row) else { continue }
+            groups[group, default: []].append(((text as NSString).size(withAttributes: [.font: font]).width, row))
+        }
+        return groups.values.flatMap { $0.sorted { $0.width > $1.width }.prefix(5).map(\.row) }
+    }
+
+    private func fitSample(_ column: FontListColumn, _ row: FontRow) -> (text: String, group: String)? {
+        let family = row.family
+        switch column {
+        case .status, .preview:
+            return nil
+        case .name:
+            return (row.name, "\(row.tags.count) \(family.isVariable) \(family.isAdobeFonts) \(String(describing: family.temporaryScope)) \(String(describing: family.state))")
+        case .styles:
+            return (row.styles.plain, "")
+        case .classification:
+            return (row.classification, "")
+        case .foundry:
+            return (row.foundry, "")
+        case .year:
+            return row.year > 0 ? (String(row.year), "") : nil
+        case .rating:
+            return row.rating > 0 ? (Rating.stars(row.rating), "") : nil
+        case .series:
+            guard case .largest(let name, _) = model.coverageCell(column, of: row) else { return nil }
+            return (name, "")
+        case .characterSet:
+            switch model.coverageCell(column, of: row) {
+            case .missing(0, _): return ("", "all")
+            case .missing(let missing, _): return ("\(missing.plain) missing", "")
+            default: return nil
+            }
+        case .added:
+            return row.added != .distantPast ? (row.added.formatted(.dateTime.day().month(.abbreviated).year()), "") : nil
+        case .format:
+            return (row.format, "")
+        }
+    }
+
+    private func fit(_ column: FontListColumn, to width: CGFloat, widths: [FontListColumn: CGFloat]) {
+        fitting = nil
+        let room = max(0, (widths[.preview] ?? 0) - FontListColumn.preview.minimumWidth)
+        var fitted = widths
+        fitted[column] = min(width.rounded(.up), (widths[column] ?? column.minimumWidth) + room)
+        setWidths(fitted)
     }
 
     private func setWidths(_ widths: [FontListColumn: CGFloat]) {
@@ -468,12 +595,11 @@ private struct HeaderCell: View {
     let title: String
     let sortColumn: FontListColumn?
     let ascending: Bool
-    let resizeEdge: HorizontalEdge?
+    let isMovable: Bool
     let sort: () -> Void
-    let resize: (CGFloat) -> Void
-    let endResize: () -> Void
-    @GestureState private var isResizing = false
-    @State private var isOverEdge = false
+    let move: (CGFloat) -> Void
+    let endMove: () -> Void
+    @GestureState private var isMoving = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -485,49 +611,62 @@ private struct HeaderCell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)
         .onTapGesture { if column.comparator != nil { sort() } }
+        .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .global)
+            .updating($isMoving) { _, state, _ in state = true }
+            .onChanged { drag in move(drag.translation.width) }
+            .onEnded { _ in endMove() }, isEnabled: isMovable)
+        .onChange(of: isMoving) { _, now in if !now { endMove() } }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { if column.comparator != nil { sort() } }
-        .overlay(alignment: resizeEdge == .leading ? .leading : .trailing) {
-            if let resizeEdge {
-                // The drag is measured in the window, where it doesn't move with the edge.
-                let gap = FontListRow.spacing
-                Color.clear
-                    .frame(width: gap)
-                    .frame(maxHeight: .infinity)
-                    .overlay(alignment: .leading) {
-                        Rectangle().fill(.separator).frame(width: 1, height: 16).offset(x: (gap / 2).rounded(.down))
-                    }
-                    .contentShape(.rect)
-                    .offset(x: resizeEdge == .leading ? -gap : gap)
-                    // Set by hand, as .pointerStyle(.columnResize) never showed here.
-                    .onContinuousHover { phase in
-                        if case .active = phase {
-                            isOverEdge = true
-                            NSCursor.columnResize.set()
-                        } else {
-                            isOverEdge = false
-                            if !isResizing { NSCursor.arrow.set() }
-                        }
-                    }
-                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                        .updating($isResizing) { _, state, _ in state = true }
-                        .onChanged { drag in
-                            NSCursor.columnResize.set()
-                            resize(resizeEdge == .leading ? -drag.translation.width : drag.translation.width)
-                        }
-                        .onEnded { _ in endResize() })
-                    // A cancelled drag never ends, and the next one on this column would start from where it stopped.
-                    .onChange(of: isResizing) { _, now in
-                        if !now {
-                            endResize()
-                            if !isOverEdge { NSCursor.arrow.set() }
-                        }
-                    }
-                    .accessibilityHidden(true)
-            }
-        }
     }
+}
+
+private struct ColumnDivider: View {
+    let resize: (CGFloat) -> Void
+    let endResize: () -> Void
+    let fit: () -> Void
+    @GestureState private var isResizing = false
+    @State private var isOver = false
+
+    var body: some View {
+        Rectangle().fill(.separator).frame(width: 1, height: 16)
+            .frame(width: FontListRow.spacing)
+            .frame(maxHeight: .infinity)
+            .contentShape(.rect)
+            // Set by hand, as .pointerStyle(.columnResize) never showed here.
+            .onContinuousHover { phase in
+                if case .active = phase {
+                    isOver = true
+                    NSCursor.columnResize.set()
+                } else {
+                    isOver = false
+                    if !isResizing { NSCursor.arrow.set() }
+                }
+            }
+            .onTapGesture(count: 2, perform: fit)
+            // The drag is measured in the window, where it doesn't move with the divider.
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .updating($isResizing) { _, state, _ in state = true }
+                .onChanged { drag in
+                    NSCursor.columnResize.set()
+                    resize(drag.translation.width)
+                }
+                .onEnded { _ in endResize() })
+            // A cancelled drag never ends, and the next one on this column would start from where it stopped.
+            .onChange(of: isResizing) { _, now in
+                if !now {
+                    endResize()
+                    if !isOver { NSCursor.arrow.set() }
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct MovingColumn {
+    let column: FontListColumn
+    let offset: CGFloat
 }
 
 private struct FontListRow: View {
@@ -538,6 +677,7 @@ private struct FontListRow: View {
     let isStriped: Bool
     let isSelected: Bool
     let model: AppModel
+    let moving: MovingColumn?
 
     static let spacing: CGFloat = 12
     static let inset: CGFloat = 12
@@ -545,7 +685,11 @@ private struct FontListRow: View {
     var body: some View {
         HStack(spacing: Self.spacing) {
             ForEach(columns) { column in
+                let isMoving = moving?.column == column
                 ZStack(alignment: .leading) { cell(column) }.frame(width: widths[column], alignment: .leading)
+                    .opacity(isMoving ? 0.5 : 1)
+                    .offset(x: isMoving ? moving?.offset ?? 0 : 0)
+                    .zIndex(isMoving ? 1 : 0)
             }
         }
         .padding(.horizontal, Self.inset)
