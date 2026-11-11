@@ -66,7 +66,10 @@ public struct FontInfo: Sendable {
             guard let value, !value.isEmpty else { return nil }
             return (label, value)
         })
-        cache.withLock { $0[cacheKey] = info }
+        cache.withLock { cache in
+            if cache.count >= 500 { cache.removeAll() }
+            cache[cacheKey] = info
+        }
         return info
     }
 }
