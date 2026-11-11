@@ -364,7 +364,7 @@ private struct BlockList: View {
                 }
                 .contentShape(.rect)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(StillButtonStyle())
             .help(entry.isComplete ? "" : "Show the missing characters")
             .popover(item: Binding(get: { showsMissing?.id == entry.block.id ? showsMissing : nil }, set: { showsMissing = $0 }), arrowEdge: .leading) { block in
                 MissingCharacterList(missing: ranges.missing(sorted: block.scalars))
