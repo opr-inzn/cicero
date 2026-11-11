@@ -57,6 +57,12 @@ public final class LanguageCatalog: Sendable {
         store.requirements.support(in: scalars)
     }
 
+    public func missing(_ id: String, in scalars: ScalarRanges) -> [UInt32] {
+        let store = store
+        guard let position = store.order.positions[id] else { return [] }
+        return store.requirements.missing(position, in: scalars)
+    }
+
     private var store: Storage {
         loaded.wait()
         return storage.withLock { $0! }
@@ -188,6 +194,12 @@ struct LanguageRequirements: Sendable {
         orthographies = sets.map { language in
             language.map { Orthography(base: $0.base.map { positions[$0]! }.sorted(), auxiliary: $0.auxiliary.map { positions[$0]! }.sorted()) }
         }
+    }
+
+    func missing(_ position: Int, in scalars: ScalarRanges) -> [UInt32] {
+        orthographies[position]
+            .map { scalars.missing(sorted: $0.base.map { universe[Int($0)] }) }
+            .min { $0.count < $1.count } ?? []
     }
 
     func support(in scalars: ScalarRanges) -> LanguageBits {

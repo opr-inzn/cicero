@@ -53,15 +53,15 @@ struct LanguagesRow: View {
 }
 
 private struct LanguageList: View {
+    @Environment(AppModel.self) private var model
     let languages: [Language]
     let coverage: FaceCoverage
     @State private var query = ""
+    @State private var showsMissing: String?
 
     var body: some View {
-        let shown = query.isEmpty ? languages : languages.filter {
-            $0.name.localizedCaseInsensitiveContains(query) || ($0.autonym?.localizedCaseInsensitiveContains(query) ?? false)
-                || $0.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
-        }
+        let shown = query.isEmpty ? languages : languages.filter(matches)
+        let unsupported = query.isEmpty ? [] : unsupportedMatches
         let scripts = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
         List {
             ForEach(scripts.keys.sorted { (scripts[$0]?.count ?? 0) > (scripts[$1]?.count ?? 0) }, id: \.self) { script in
@@ -82,6 +82,13 @@ private struct LanguageList: View {
                     }
                 }
             }
+            if !unsupported.isEmpty {
+                Section("Not Supported (\(unsupported.count.plain))") {
+                    ForEach(unsupported, id: \.language.id) { entry in
+                        unsupportedRow(entry.language, missing: entry.missing)
+                    }
+                }
+            }
         }
         .listStyle(.plain)
         .popoverListInsets(top: 0, bottom: 10)
@@ -92,6 +99,37 @@ private struct LanguageList: View {
                 .padding(.bottom, 6)
         }
         .frame(width: 320, height: 420)
+    }
+
+    private func matches(_ language: Language) -> Bool {
+        language.name.localizedCaseInsensitiveContains(query) || (language.autonym?.localizedCaseInsensitiveContains(query) ?? false)
+            || language.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var unsupportedMatches: [(language: Language, missing: [UInt32])] {
+        model.languages.languages
+            .filter { coverage.support(for: $0.id) == nil && matches($0) }
+            .sorted { $0.speakers > $1.speakers }
+            .map { ($0, model.languages.missing($0.id, in: coverage.scalars)) }
+    }
+
+    private func unsupportedRow(_ language: Language, missing: [UInt32]) -> some View {
+        let shows = Binding(get: { showsMissing == language.id }, set: { if !$0 { showsMissing = nil } })
+        return HStack {
+            Text(language.name)
+            if let autonym = language.autonym, autonym != language.name {
+                Text(autonym).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("\(missing.count.plain) missing").foregroundStyle(.secondary)
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .contentShape(.rect)
+        .onTapGesture { showsMissing = language.id }
+        .help("Show the characters the font needs for \(language.name)")
+        .popover(isPresented: shows, arrowEdge: .trailing) {
+            MissingCharacterList(missing: missing)
+        }
     }
 }
 
@@ -122,7 +160,7 @@ struct CharacterSetsRow: View {
                         ForEach(incomplete, id: \.name) { group in
                             Section(group.name) {
                                 ForEach(group.sets, id: \.set.id) { entry in
-                                    Button("\(entry.set.name) — \(entry.missing.plain) missing") { showsMissing = entry.set }
+                                    Button("\(entry.set.name) (\(entry.missing.plain) missing)") { showsMissing = entry.set }
                                 }
                             }
                         }
