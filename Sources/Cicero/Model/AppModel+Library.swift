@@ -91,7 +91,26 @@ extension Classification {
 extension AppModel {
     // MARK: Families
 
-    func family(_ id: String) -> Family? { library.family(id) }
+    func family(_ id: String) -> Family? { library.family(id).map(shown) }
+
+    var showsAdobeFontsOnly: Bool {
+        selectedItems == [.folder(WatchedFolder.adobeFontsID)] && documentList == nil && similarFamilyID == nil
+    }
+
+    func shown(_ family: Family) -> Family {
+        guard showsAdobeFontsOnly, !family.isAdobeFonts else { return family }
+        return adobeFontsOnly[family.id] ?? family
+    }
+
+    var adobeFontsOnly: [String: Family] {
+        if let cached = adobeFontsOnlyCache, cached.fingerprint == library.fingerprint { return cached.families }
+        var families: [String: Family] = [:]
+        for family in library.families where !family.isAdobeFonts && family.folderIDs.contains(WatchedFolder.adobeFontsID) {
+            families[family.id] = family.adobeFontsOnly
+        }
+        adobeFontsOnlyCache = (library.fingerprint, families)
+        return families
+    }
 
     var openFamily: Family? { openFamilyID.flatMap(family) }
 
@@ -114,7 +133,7 @@ extension AppModel {
     }
 
     private func inLibraryOrder(_ ids: Set<String>) -> [Family] {
-        ids.compactMap { library.position(of: $0) }.sorted().map { library.families[$0] }
+        ids.compactMap { library.position(of: $0) }.sorted().map { shown(library.families[$0]) }
     }
 
     var inspectedFamily: Family? {
@@ -252,6 +271,7 @@ extension AppModel {
         var kept: [Int] = []
         for index in families.indices where keeps(families[index]) { kept.append(index) }
         let listed = kept.count == families.count ? families : kept.map { families[$0] }
+        if showsAdobeFontsOnly { return listed.map(shown) }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 

@@ -230,3 +230,21 @@ extension FontFace {
         )
     }
 }
+
+extension Family {
+    public var adobeFontsOnly: Family? {
+        if isAdobeFonts { return self }
+        let faces = faces.compactMap(\.adobeFontsCopy)
+        guard !faces.isEmpty else { return nil }
+        return Family(name: id, faces: faces, state: LibraryScanner.familyState(of: faces), folderIDs: folderIDs, manufacturer: manufacturer)
+    }
+}
+
+private extension LibraryFace {
+    var adobeFontsCopy: LibraryFace? {
+        if isAdobeFonts { return self }
+        guard let adobe = copies.first(where: { ActiveSource.isAdobeFonts($0.face.path) }) else { return nil }
+        let others = [FaceCopy(self)] + copies.filter { $0.face.path != adobe.face.path }
+        return LibraryFace(face: adobe.face, state: adobe.state, copies: others, dateAdded: dateAdded, app: adobe.app)
+    }
+}
