@@ -494,6 +494,9 @@ private struct HeaderCell: View {
                 Color.clear
                     .frame(width: gap)
                     .frame(maxHeight: .infinity)
+                    .overlay(alignment: .leading) {
+                        Rectangle().fill(.separator).frame(width: 1, height: 16).offset(x: (gap / 2).rounded(.down))
+                    }
                     .contentShape(.rect)
                     .offset(x: resizeEdge == .leading ? -gap : gap)
                     .pointerStyle(.columnResize)
