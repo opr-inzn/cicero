@@ -473,6 +473,7 @@ private struct HeaderCell: View {
     let resize: (CGFloat) -> Void
     let endResize: () -> Void
     @GestureState private var isResizing = false
+    @State private var isOverEdge = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -499,13 +500,30 @@ private struct HeaderCell: View {
                     }
                     .contentShape(.rect)
                     .offset(x: resizeEdge == .leading ? -gap : gap)
-                    .pointerStyle(.columnResize)
+                    // Set by hand, as .pointerStyle(.columnResize) never showed here.
+                    .onContinuousHover { phase in
+                        if case .active = phase {
+                            isOverEdge = true
+                            NSCursor.columnResize.set()
+                        } else {
+                            isOverEdge = false
+                            if !isResizing { NSCursor.arrow.set() }
+                        }
+                    }
                     .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                         .updating($isResizing) { _, state, _ in state = true }
-                        .onChanged { drag in resize(resizeEdge == .leading ? -drag.translation.width : drag.translation.width) }
+                        .onChanged { drag in
+                            NSCursor.columnResize.set()
+                            resize(resizeEdge == .leading ? -drag.translation.width : drag.translation.width)
+                        }
                         .onEnded { _ in endResize() })
                     // A cancelled drag never ends, and the next one on this column would start from where it stopped.
-                    .onChange(of: isResizing) { _, now in if !now { endResize() } }
+                    .onChange(of: isResizing) { _, now in
+                        if !now {
+                            endResize()
+                            if !isOverEdge { NSCursor.arrow.set() }
+                        }
+                    }
                     .accessibilityHidden(true)
             }
         }
