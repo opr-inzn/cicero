@@ -273,7 +273,7 @@ struct Tag: View {
         .fixedSize()
     }
 
-    private static let font = Font.system(size: 9, weight: .semibold)
+    private static let font = Font.system(size: 10, weight: .semibold)
 }
 
 struct VariableTag: View {
