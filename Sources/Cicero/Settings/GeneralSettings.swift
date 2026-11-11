@@ -134,6 +134,10 @@ struct GeneralSettings: View {
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)
         .restoreSheet(contents: $restoring)
+        .onAppear { loginItem = LoginItem.status }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem = LoginItem.status
+        }
     }
 
     private var guessingExplanation: String {
