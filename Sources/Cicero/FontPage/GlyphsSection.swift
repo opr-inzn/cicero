@@ -41,7 +41,7 @@ struct GlyphsSection: View {
     }
 
     var body: some View {
-        let (chosen, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let (chosen, weight) = model.previewStyle(of: family)
         let style = chosen.id == face.id ? Style(face: face, weight: weight, variations: model.variations(for: family, face: face.id))
             : Style(face: face, weight: face.styleWeight, variations: [:])
         let shown = filtered(sections)

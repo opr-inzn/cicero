@@ -96,3 +96,37 @@ struct CopyingProgressLine: View {
         }
     }
 }
+
+struct ImportProgress: View {
+    let stage: ImportStage
+    let starting: String
+    let estimate: CopyTimeEstimate
+    let stacked: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            switch stage {
+            case .copying(let done, let total):
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: stacked)
+            case .reading(let done, let total):
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                Text("Reading fonts, \(done.plain) of \(total.plain)")
+            case .starting:
+                ProgressView()
+                Text(starting)
+            case .stopping:
+                ProgressView()
+                Text("Stopping…")
+            case .waiting:
+                ProgressView()
+                Text("Waiting for other changes to finish")
+            }
+        }
+        .progressViewStyle(.linear)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .frame(maxWidth: stacked ? 260 : 400, alignment: .leading)
+    }
+}

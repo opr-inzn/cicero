@@ -351,7 +351,7 @@ extension ActivationEngine {
         let files = all.filter { path in
             var info = stat()
             return !(path as NSString).lastPathComponent.hasPrefix(".")
-                && FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
+                && FontFormat.isFontFile(path)
                 && lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG
                 && records.appFolderOrigins[path] == nil && records.temporary[path] == nil
                 && !registrar.isActive(Self.url(path)) && !FontFileReader.faces(atPath: path).isEmpty
@@ -416,7 +416,7 @@ extension ActivationEngine {
             let staying = Set(names.filter { name in
                 let path = former.appendingPathComponent(name).path
                 return records.temporary.keys.contains { $0 == path || $0.hasPrefix(path + "/") }
-                    || FontFileReader.fontExtensions.contains((name as NSString).pathExtension.lowercased()) && registrar.isActive(Self.url(path))
+                    || FontFormat.isFontFile(name) && registrar.isActive(Self.url(path))
             })
             let movable = names.filter { !staying.contains($0) }
             if movable.isEmpty {

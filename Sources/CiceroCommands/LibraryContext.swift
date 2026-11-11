@@ -1,4 +1,3 @@
-import AppKit
 import CiceroCore
 import Foundation
 
@@ -39,7 +38,7 @@ public final class LibraryContext: @unchecked Sendable {
         let proofingDiffers = proofingDiffers(data, from: saved, environment: environment)
         let scans = rescan || proofingDiffers
         // Never while Cicero is open: it writes its caches itself, and would write over the tool's or keep showing its own.
-        let saves = savesScan && scans && !proofingDiffers && !isAppOpen(environment)
+        let saves = savesScan && scans && !proofingDiffers && WriteDispatcher.runningApp(environment) == nil
         let scanner = LibraryScanner(locations: environment.locations, registrar: environment.registrar, saves: saves)
         let languages = environment.resources.map { LanguageCatalog(contentsOf: $0.appendingPathComponent("Languages.json")) }
         let coverage = languages.map { CoverageIndex(caches: environment.locations.caches, languages: $0) }
@@ -124,12 +123,6 @@ public final class LibraryContext: @unchecked Sendable {
         }
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = environment.locations.defaultFontLibrary.path }
         return data
-    }
-
-    public static func isAppOpen(_ environment: ToolEnvironment) -> Bool {
-        NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).contains {
-            !$0.isTerminated && kill($0.processIdentifier, 0) == 0
-        }
     }
 
     // MARK: What the app shows

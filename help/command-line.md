@@ -144,7 +144,7 @@ Cicero draws each font from its file, on or off. **When a font doesn’t have a 
 
 ### Fonts Cicero hides
 
-The command shows the fonts Cicero’s window shows. When **Settings → General** hides fonts that come with macOS, fonts from Creative Cloud or fonts installed for proofing in Adobe apps, the command hides them too. Add these to any command to show them, or `--no-…` to hide them, only for that command:
+The command shows the fonts Cicero’s window shows. When **Preferences → General** hides fonts that come with macOS, fonts from Creative Cloud or fonts installed for proofing in Adobe apps, the command hides them too. Add these to any command to show them, or `--no-…` to hide them, only for that command:
 
 | Option | Shows |
 |---|---|
@@ -266,7 +266,7 @@ No. Only one of them changes Cicero’s data at a time. While Cicero is open, th
 
 ### Why doesn’t it find a font that comes with macOS?
 
-When **Show system fonts** is off in **Settings → General**, the command leaves those fonts out too, as Cicero’s window does. It says so when you ask for one by name. Add `--system-fonts` to see them (see [Fonts Cicero hides](#fonts-cicero-hides)).
+When **Show system fonts** is off in **Preferences → General**, the command leaves those fonts out too, as Cicero’s window does. It says so when you ask for one by name. Add `--system-fonts` to see them (see [Fonts Cicero hides](#fonts-cicero-hides)).
 
 ### How do I remove the command?
 

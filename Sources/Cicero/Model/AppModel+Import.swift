@@ -18,6 +18,13 @@ enum ImportStage: Equatable {
     case stopping
     case reading(done: Int, total: Int)
     case starting
+
+    var canStop: Bool {
+        switch self {
+        case .copying, .waiting: true
+        default: false
+        }
+    }
 }
 
 extension AppModel {

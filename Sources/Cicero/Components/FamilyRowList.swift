@@ -10,9 +10,9 @@ struct FamilyRowSection: Identifiable {
 
 struct FamilyRowList<Row: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let sections: [FamilyRowSection]
     @Binding var selection: Set<String>
-    let open: (String) -> Void
     @ViewBuilder let row: (Family) -> Row
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
@@ -64,6 +64,11 @@ struct FamilyRowList<Row: View>: View {
                 return .handled
             }
         }
+    }
+
+    private func open(_ id: String) {
+        model.openFamilyID = id
+        openWindow(id: WindowID.main)
     }
 
     private func item(_ family: Family, isStriped: Bool, ids: [String]) -> some View {

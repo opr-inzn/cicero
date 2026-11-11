@@ -3,7 +3,6 @@ import SwiftUI
 
 struct BrowserView: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     @AppStorage("browser.mode") private var mode: BrowserMode = .grid
 
     var body: some View {
@@ -51,7 +50,7 @@ struct BrowserView: View {
 
     private func preparePage() {
         guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
-        model.pageContents.prepare(model.previewStyle(of: family, weight: preview.weight).face.face)
+        model.pageContents.prepare(model.previewStyle(of: family).face.face)
     }
 
     private func subtitle(_ families: [Family]) -> String {

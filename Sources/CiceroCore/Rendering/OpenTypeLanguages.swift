@@ -1,11 +1,11 @@
 import Foundation
 
-public enum OpenTypeLanguages {
-    public static func name(of tag: String) -> String {
+enum OpenTypeLanguages {
+    static func name(of tag: String) -> String {
         names[tag.trimmingCharacters(in: .whitespaces)] ?? tag
     }
 
-    public static func names(of tags: [String]) -> String {
+    static func names(of tags: [String]) -> String {
         tags.map(name(of:)).listed()
     }
 

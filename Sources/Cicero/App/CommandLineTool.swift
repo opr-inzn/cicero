@@ -1,5 +1,4 @@
 import AppKit
-import CiceroCore
 import Observation
 
 enum CommandLineTool {

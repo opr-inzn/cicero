@@ -47,7 +47,7 @@ public enum WriteDispatcher {
         return text.split(separator: "\n", omittingEmptySubsequences: false).first == "command"
     }
 
-    static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
+    nonisolated static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
         NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).first {
             // Asked of the process too: without a run loop, the command's list of running apps isn't told when one quits.
             !$0.isTerminated && kill($0.processIdentifier, 0) == 0
@@ -64,7 +64,7 @@ public enum WriteDispatcher {
         let answer = try await WriteRunner.run(request, in: context, writer: writer)
         if writer.activated { _ = try? await LibraryContext.load(environment, rescan: true) }
         if writer.saveFailed {
-            throw CommandError(.failed, "The change couldn’t be saved in \(environment.locations.support.appendingPathComponent("user-data.json").path). Check that the disk has space and can be written to.")
+            throw CommandError(.failed, "The change couldn’t be saved in \(environment.userDataURL.path). Check that the disk has space and can be written to.")
         }
         return answer
     }
@@ -114,7 +114,7 @@ final class ClosedAppWriter: Writer {
         return engine
     }
 
-    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async throws -> ActivationResult {
+    func activate(_ faces: [LibraryFace], untilQuit: Bool) async throws -> ActivationResult {
         try begin(faces, turningOn: true)
         let result = await engine.activate(faces, method: .inPlace, records: data.records)
         finish(result)

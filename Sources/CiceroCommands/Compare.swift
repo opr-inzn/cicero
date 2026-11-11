@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 
 public enum CompareCommand {
     public static let defaultText = "Sphinx of black quartz, judge my vow."
-    public static let maximumSamples = 50
+    static let maximumSamples = 50
     public static let sizes = 6...400
     public static let widths = 200...8000
 
@@ -35,7 +35,7 @@ public enum CompareCommand {
         let size = CGFloat(options.size)
         let samples = chosen.map { family, style in Sample(family: family, style: style, text: text, size: size) }
         let url = try destination(options.png, names: options.names)
-        guard let (png, height) = try SampleSheet.png(samples, text: text, size: size, width: options.width) else {
+        guard let (png, height) = try SampleSheet.png(samples, text: text, width: options.width) else {
             throw CommandError(.failed, "Cicero can’t draw the picture.")
         }
         do {
@@ -174,7 +174,7 @@ enum SampleSheet {
         var height: CGFloat { labelHeight + labelGap + sampleHeight }
     }
 
-    static func png(_ samples: [Sample], text: String, size: CGFloat, width: Int) throws -> (Data, Int)? {
+    static func png(_ samples: [Sample], text: String, width: Int) throws -> (Data, Int)? {
         let contentWidth = CGFloat(width) - 2 * margin
         let labelFont = CTFontCreateUIFontForLanguage(.system, labelSize, nil) ?? CTFontCreateWithName("Helvetica" as CFString, labelSize, nil)
         let rows = samples.map { sample -> Row in

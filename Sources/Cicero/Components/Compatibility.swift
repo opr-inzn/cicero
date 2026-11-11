@@ -1,9 +1,9 @@
 import SwiftUI
 
 extension View {
-    @ViewBuilder func glass(in shape: some Shape, interactive: Bool = false) -> some View {
+    @ViewBuilder func glass(in shape: some Shape) -> some View {
         if #available(macOS 26, *) {
-            glassEffect(interactive ? .regular.interactive() : .regular, in: shape)
+            glassEffect(.regular, in: shape)
         } else {
             background {
                 shape.fill(.bar)
@@ -66,28 +66,23 @@ private struct FreshScrollEdges: ViewModifier {
 }
 
 extension View {
-    @ViewBuilder func drops<T: Transferable>(of type: T.Type, fromOutsideOnly: Bool = false, isOver: ((Bool) -> Void)? = nil,
-                                             perform action: @escaping ([T]) -> Void) -> some View {
+    @ViewBuilder func outsideFileDrops(isOver: @escaping (Bool) -> Void, perform action: @escaping ([URL]) -> Void) -> some View {
         if #available(macOS 26, *) {
-            let destination = dropDestination(for: type) { items, session in
-                if fromOutsideOnly, session.localSession != nil { return }
+            dropDestination(for: URL.self) { items, session in
+                if session.localSession != nil { return }
                 action(items)
             }
-            if let isOver {
-                destination.onDropSessionUpdated { session in
-                    switch session.phase {
-                    case .entering, .active: isOver(!fromOutsideOnly || session.localSession == nil)
-                    default: isOver(false)
-                    }
+            .onDropSessionUpdated { session in
+                switch session.phase {
+                case .entering, .active: isOver(session.localSession == nil)
+                default: isOver(false)
                 }
-            } else {
-                destination
             }
         } else {
-            dropDestination(for: type) { items, _ in
+            dropDestination(for: URL.self) { items, _ in
                 action(items)
                 return true
-            } isTargeted: { isOver?($0) }
+            } isTargeted: { isOver($0) }
         }
     }
 }

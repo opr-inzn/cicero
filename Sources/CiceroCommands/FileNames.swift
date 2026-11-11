@@ -29,15 +29,3 @@ public struct FileNames: Sendable, Equatable {
         return Dictionary(read) { first, _ in first }
     }
 }
-
-extension Array where Element: Sendable {
-    func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
-        guard count > 1 else { return map(transform) }
-        let results = UnsafeMutableBufferPointer<T?>.allocate(capacity: count)
-        results.initialize(repeating: nil)
-        defer { results.deallocate() }
-        nonisolated(unsafe) let output = results
-        DispatchQueue.concurrentPerform(iterations: count) { output[$0] = transform(self[$0]) }
-        return results.map { $0! }
-    }
-}

@@ -491,11 +491,11 @@ public struct ActivationEngine: Sendable {
     }
 
     @concurrent
-    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords, movable: Set<String> = []) async -> ActivationResult {
+    public func switchCopies(_ switches: [CopySwitch], method: InstallMethod, records: ActivationRecords) async -> ActivationResult {
         let origins = records.installedCopies
         var moved: [String: String] = [:]
         let off = await deactivate(switches.flatMap(\.others), records: records, trashingCopies: true, moved: &moved)
-        let on = await activate(switches.compactMap(\.target), method: method, records: off.records, movable: movable)
+        let on = await activate(switches.compactMap(\.target), method: method, records: off.records)
         var result = ActivationResult(records: on.records, succeeded: on.succeeded, failed: off.failed + on.failed, message: "Switched")
         let stuck = Set(on.failed)
         let restoring = switches.filter { $0.target.map { stuck.contains($0.face.path) } ?? false }

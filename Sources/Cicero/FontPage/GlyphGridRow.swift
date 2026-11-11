@@ -42,7 +42,7 @@ struct GlyphGridRow: View {
 
     var body: some View {
         let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
-        let room = Self.room(for: cells, in: font, columns: columns)
+        let room = Self.room(for: cells, in: font)
         let drawing = GridRowDrawing(cells: cells, columns: columns, face: face, generation: generation, weight: weight,
                                      variations: variations, padding: padding, selected: selected, room: room)
         drawing.equatable()
@@ -102,7 +102,7 @@ struct GlyphGridRow: View {
         return ((height - ascent - descent) / 2 * scale).rounded() / scale + ascent
     }
 
-    private static func room(for cells: [GridCell], in font: CTFont, columns: Int) -> EdgeInsets {
+    private static func room(for cells: [GridCell], in font: CTFont) -> EdgeInsets {
         guard cells.contains(where: { if case .text = $0.content { true } else { false } }) else { return EdgeInsets() }
         let box = CTFontGetBoundingBox(font)
         let half = CTFontGetSize(font) / 2

@@ -22,7 +22,6 @@ struct CompareWindow: View {
     static let steps: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
 
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
     @AppStorage("compare.size") private var size = 72.0
     @Bindable private var savedText = SavedSoon.compareText
@@ -35,12 +34,12 @@ struct CompareWindow: View {
     var body: some View {
         let entries = model.compareEntries.compactMap { entry in
             model.family(entry.familyID).map { family in
-                (entry: entry, family: family, path: CompareSample.face(for: entry, in: family, preview: preview).face.path)
+                (entry: entry, family: family, path: CompareSample.face(for: entry, in: family).face.path)
             }
         }
         let waiting = entries.map(\.path).filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
         let samples = entries.filter { !waiting.contains($0.path) }.map {
-            CompareSample($0.entry, family: $0.family, text: text.isEmpty ? Self.placeholder : text, size: size, model: model, preview: preview)
+            CompareSample($0.entry, family: $0.family, text: text.isEmpty ? Self.placeholder : text, size: size, model: model)
         }
         Group {
             if entries.isEmpty {
@@ -239,7 +238,6 @@ private struct CompareSample: Identifiable {
 
     let family: Family
     let face: LibraryFace
-    let style: FaceID?
     let line: TextLine
     // Not the font's ascent, which often keeps room for accents and line spacing far above the ascenders.
     let letterAscent: CGFloat
@@ -248,13 +246,12 @@ private struct CompareSample: Identifiable {
 
     var tint: Color { Self.tints[tintIndex].color }
 
-    init(_ entry: CompareEntry, family: Family, text: String, size: Double, model: AppModel, preview: PreviewSettings) {
+    init(_ entry: CompareEntry, family: Family, text: String, size: Double, model: AppModel) {
         self.family = family
         id = entry.id
         let chosen = Self.chosenStyle(of: entry, in: family)
-        style = chosen?.id
-        face = Self.face(for: entry, in: family, preview: preview)
-        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
+        face = Self.face(for: entry, in: family)
+        let weight = chosen.map(\.face.styleWeight) ?? 400
         let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
         line = TextLine(text, font: font, kerning: 0)
         letterAscent = max(line.inkAscent, (Self.ascenderHeight(of: font) ?? 0).rounded(.up))
@@ -278,8 +275,8 @@ private struct CompareSample: Identifiable {
         entry.style.flatMap { style in family.faces.first { $0.id == style } }
     }
 
-    static func face(for entry: CompareEntry, in family: Family, preview: PreviewSettings) -> LibraryFace {
-        chosenStyle(of: entry, in: family) ?? family.face(nearestWeight: preview.weight)
+    static func face(for entry: CompareEntry, in family: Family) -> LibraryFace {
+        chosenStyle(of: entry, in: family) ?? family.regular
     }
 }
 
@@ -452,7 +449,6 @@ private struct SampleDrag: Equatable {
 
 private struct SampleCaption: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     let sample: CompareSample
     let showsTint: Bool
 
@@ -472,7 +468,7 @@ private struct SampleCaption: View {
     }
 
     private var styleMenu: some View {
-        let automatic = sample.family.face(nearestWeight: preview.weight).id
+        let automatic = sample.family.regular.id
         return Menu {
             Picker("Style", selection: Binding(get: { sample.face.id }, set: { model.setCompareStyle($0 == automatic ? nil : $0, of: sample.id) })) {
                 ForEach(sample.family.faces) { Text($0.face.styleName).tag($0.id) }

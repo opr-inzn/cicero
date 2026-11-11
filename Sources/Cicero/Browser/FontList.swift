@@ -552,7 +552,7 @@ private struct FontListRow: View {
                 VariableTag(family: family)
             }
         case .preview:
-            let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
+            let (style, weight) = model.previewStyle(of: family)
             FontLine(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face,
                 size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,

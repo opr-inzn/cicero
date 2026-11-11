@@ -419,7 +419,7 @@ struct List: Answering {
 
 // MARK: Changes
 
-func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts = ShownFonts()) async throws {
+func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts) async throws {
     try await answer(common, text: { Text.changes(command, $0) }, exitCode: { Text.array($0["failed"]).isEmpty ? 0 : 6 }) {
         var request = WriteRequest(command, confirmed: common.yes, shown: shown)
         while true {

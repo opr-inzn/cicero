@@ -1,10 +1,9 @@
 import AppKit
 import CiceroCore
-import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-nonisolated struct FontDrag: Codable, Transferable {
+nonisolated struct FontDrag: Codable {
     var families: [String]
     var style: String?
 
@@ -15,12 +14,6 @@ nonisolated struct FontDrag: Codable, Transferable {
     init(family: String, style: String) {
         families = [family]
         self.style = style
-    }
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .ciceroFontStyle)
-        ProxyRepresentation(exporting: { $0.families.joined(separator: "\n") },
-                            importing: { FontDrag(families: $0.split(whereSeparator: \.isNewline).map(String.init)) })
     }
 }
 

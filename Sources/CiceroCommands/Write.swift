@@ -50,7 +50,7 @@ public struct WriteRequest: Codable, Sendable, Equatable {
 public protocol Writer: AnyObject {
     var data: UserData { get }
     func update(_ change: (inout UserData) -> Void)
-    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async throws -> ActivationResult
+    func activate(_ faces: [LibraryFace], untilQuit: Bool) async throws -> ActivationResult
     func deactivate(_ faces: [LibraryFace]) async throws -> ActivationResult
     func rescan() async
     var isApp: Bool { get }
@@ -85,7 +85,7 @@ public enum WriteRunner {
                                    question: .init(kind: "manyFamilies", title: "Activate \(prompt.families.plain) Families?",
                                                    message: "Apps load every font that’s on as they open, so this many at once can slow them down."))
             }
-            let result = wanted.isEmpty ? nil : try await writer.activate(wanted, untilQuit: untilQuit, title: title)
+            let result = wanted.isEmpty ? nil : try await writer.activate(wanted, untilQuit: untilQuit)
             return answer(faces: faces, wanted: wanted, result: result, on: true)
         case .deactivate(let families, let folder, let tag):
             let (faces, _) = try targets(families: families, folder: folder, tag: tag, in: context)

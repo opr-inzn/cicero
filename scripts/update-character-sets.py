@@ -3,7 +3,7 @@
 
 Run by hand when a source changes: ./scripts/update-character-sets.py (Python 3.13 or later, whose
 Unicode data matches the block list it downloads). It downloads the sources at the commits and
-versions pinned below (Cicero itself never goes online), resolves sets that build on each other into
+versions pinned below (the app never downloads them), resolves sets that build on each other into
 complete lists, and drops whitespace and invisible characters, which aren't what people mean by
 character set support.
 

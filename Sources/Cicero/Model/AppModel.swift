@@ -61,13 +61,13 @@ final class AppModel {
     private(set) var classificationGuesses: [String: Classification] = [:]
     private(set) var letterGuesses: [String: Classification] = [:]
     private(set) var guessRevision = 0
-    private(set) var coverageProgress: CoverageProgress?
+    private(set) var coverageProgress: WorkProgress?
     private(set) var measurementRevision = 0
-    private(set) var measurementProgress: CoverageProgress?
+    private(set) var measurementProgress: WorkProgress?
     private(set) var foundryNames: [String] = []
     private(set) var presentClassifications: [String] = []
     private(set) var ownFoldersWithFonts: Set<UUID> = []
-    var downloads: [UUID: DownloadProgress] = [:]
+    var downloads: [UUID: WorkProgress] = [:]
     private(set) var expectedFamilyPositions: [String: SwitchPosition] = [:]
     private(set) var expectedFacePositions: [FaceID: SwitchPosition] = [:]
 
@@ -642,7 +642,7 @@ final class AppModel {
             guard let self else { return }
             Task { @MainActor in
                 guard self.coverageRun == run else { return }
-                self.coverageProgress = CoverageProgress(done: done, total: total)
+                self.coverageProgress = WorkProgress(done: done, total: total)
                 if done == total || done % 200 == 0 { self.coverageRevision &+= 1 }
             }
         }
@@ -669,7 +669,7 @@ final class AppModel {
             guard let self else { return }
             Task { @MainActor in
                 guard self.measurementRun == run else { return }
-                self.measurementProgress = CoverageProgress(done: done, total: total)
+                self.measurementProgress = WorkProgress(done: done, total: total)
                 if done == total || done % 200 == 0 {
                     self.measurementRevision &+= 1
                     self.refreshLetterGuesses()
@@ -1007,12 +1007,7 @@ enum LibraryJob: Equatable {
     }
 }
 
-struct CoverageProgress: Equatable {
-    var done: Int
-    var total: Int
-}
-
-struct DownloadProgress: Equatable {
+struct WorkProgress: Equatable {
     var done: Int
     var total: Int
 }
@@ -1047,7 +1042,6 @@ struct DropLocation: Equatable {
 struct CopySwitchRequest: Identifiable {
     let id = UUID()
     var source: String
-    var title: String
     var plan: CopySwitchPlan
 }
 

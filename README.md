@@ -12,7 +12,7 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **Info and Features.** The info panel shows a font’s details (its designer, vendor ID and embedding permission among them), its tags and rating, your note on it, the languages it supports, its coverage and the Unicode blocks it covers; the Features tab turns OpenType features on in the text on the family’s font page.
 - **Search** by family or style name, foundry, PostScript name, designer, vendor ID or your note, or by what a family is: variable, mono, italic, serif, sans, script, display or text, condensed or extended, a tag. Words combine, so “variable sans” finds the variable sans serifs.
 - **Names in your language.** A family whose fonts name it in your Mac’s language, as many Japanese, Chinese and Korean fonts do, shows and sorts by that name: Hiragino Sans is ヒラギノ角ゴシック on a Mac in Japanese.
-- **Similar fonts.** Right-click a family and choose Show Similar Fonts to see the 12 in your library that look most like it, the closest first, measured from the shapes of their letters on your Mac (x-height, weight, contrast and stress, width and spacing, slant, serifs, aperture, and the a’s and g’s stories) and looked at by a small model that has learned what letters of a kind look like. A font page shows the six closest.
+- **Similar fonts.** Right-click a family and choose Show Similar Fonts to see the 12 in your library that look most like it, the closest first, measured from the shapes of their letters on your Mac (x-height, weight, contrast and stress, width and spacing, slant, serifs, aperture, and the a’s and g’s stories) and looked at by a small model that has learned what letters of a kind look like.
 - **Preview Options.** Preview text, size, weight and leading, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Preferences → General.
 - **Menu bar.** Click Cicero’s icon in the menu bar to open it, drop fonts or a document on it, or right-click it to add fonts, find the fonts of the document you have open, turn folders on and off, see which fonts are on for apps, or quit. Turn off *Show Cicero in the Dock* in Preferences → General, and Cicero is in the Dock only while one of its windows is open.
@@ -58,7 +58,7 @@ Bug reports, sample fonts, sample texts, ideas and pull requests are all welcome
 
 ## Roadmap
 
-Coming next: **better similar lists**, from a letter model trained on more families and judged on fonts it has never seen, then **similar styles**, Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones, **subfolders** in Locations and Folders, and a search field that **searches licenses and descriptions**. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **better similar lists**, from a letter model trained on more families and judged on fonts it has never seen, **subfolders** in Locations and Folders, and a search field that **searches licenses and descriptions**. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 

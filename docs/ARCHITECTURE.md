@@ -1,8 +1,8 @@
 # Architecture
 
 Cicero is a SwiftPM package with four targets and a test target, which stays out of the public
-repository. Its dependencies are Sparkle (a binary framework, used by the app target only) for updates, and Swift
-Argument Parser for the `cicero` command's arguments.
+repository. Its dependencies are Sparkle (a binary framework, used by the app target only) for updates, Swift
+Argument Parser for the `cicero` command's arguments, and the Model Context Protocol Swift SDK for `cicero mcp`.
 
 ```
 Sources/CiceroCore      fonts, the library, activation, coverage, user data — no UI
@@ -37,7 +37,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   CoreText's fonts-changed notice replays them instead of walking again.
 - **Data** (`Data/`): `UserData` is everything the user set up (watched folders, added font files, sets and smart sets, which the
   UI calls folders and smart folders, tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
-  `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
+  `UserDataStore` saves it as JSON, coalesced and off the main thread.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
   state and the engine stays testable; `FontRegistrar` hides CoreText so tests never touch the system.
@@ -80,10 +80,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   (`F_RDADVISE`), glyphs included, not just the tables a descriptor needs. It keeps
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
-  (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
+  (`GSUBSubstitutions`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
   their components back to characters through the cmap. `CharacterCodes` writes a character's U+ code and HTML
-  entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
-  UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
+  entities for the glyph map.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
   Illustrator file (XMP) or Photoshop file (text layers) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
   (`Library/`: by file, PostScript name, or family and style names).
@@ -95,8 +94,7 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   goes and what happens to the original (`move`), the path a translocated app was opened from
   (Security.framework SPI looked up with dlsym), and the copy that strips quarantine (`install`, whose
   Trash tests replace).
-- **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive; `FontListCSV` writes
-  the font list as CSV;
+- **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.
   Restoring trusts nothing in the archive: only font files, only into font locations, and only
@@ -284,8 +282,9 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   with an `@AppStorage` again whenever anything is saved there, whatever the key: the browser behind a
   font page, Settings and the Compare window. The type tester's text is kept in memory and saved a second
   after typing stops, and at quit (`TesterTextStore`), with the glyphs pasted into it (`SampleGlyph`).
-- The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
-  uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
+- The network access is Sparkle's (the appcast on GitHub and an update the user accepts) and the usage
+  statistics (`UsageStatistics`, a TelemetryDeck signal at launch, see help/privacy.md). Nothing about the user's
+  fonts is uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
   engine, exporter and backup, `using:` for app caches), so tests remove temporary files instead and
   never touch the user's Trash.
 
@@ -298,8 +297,8 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Autoupdate and Updater.app, the framework, then the app. Dev builds are signed ad hoc; with
   `SIGN_IDENTITY` (a Developer ID) every piece gets the hardened runtime and a secure timestamp.
   It hands the SDK to the link step as well (`-Xclang-linker -isysroot`): SwiftPM's build system leaves it
-  out, so the binary would record the deployment target's SDK (26) and a newer macOS would treat Cicero as
-  built for 26, with that release's behaviour. The script stops if the recorded SDK isn't the one it built with.
+  out, so the binary would record the deployment target's SDK (15) and a newer macOS would treat Cicero as
+  built for 15, with that release's behaviour. The script stops if the recorded SDK isn't the one it built with.
 - `scripts/release.sh` signs with the Developer ID, notarizes and staples the app (nested Sparkle code
   included) and then the DMG made by `make-dmg.sh`.
 - `scripts/publish.sh` runs `make-appcast.sh`, which signs the final DMG with the Sparkle EdDSA key (keychain

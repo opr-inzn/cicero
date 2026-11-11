@@ -4,15 +4,10 @@ import SwiftUI
 
 struct FontPage: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     let familyID: String
     @State private var glyphColumns: Int?
     @State private var loaded: (face: FaceID, content: PageContent)?
 
-    private struct Reading: Equatable {
-        let face: FaceID
-        let generation: Int
-    }
     @FocusState private var focused: Bool
     @State private var position = ScrollPosition()
     @State private var keeper = TopRowKeeper()
@@ -30,7 +25,7 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        let face = model.previewStyle(of: family, weight: preview.weight).face.face
+        let face = model.previewStyle(of: family).face.face
         let ready = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
         let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
             family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
@@ -73,11 +68,11 @@ struct FontPage: View {
             }
         }
         .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
-        .task(id: FileFace(family.face(nearestWeight: preview.weight).face)) {
-            model.pageFeatures.prepare(family.face(nearestWeight: preview.weight).face)
+        .task(id: FileFace(family.regular.face)) {
+            model.pageFeatures.prepare(family.regular.face)
         }
         // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
-        .task(id: Reading(face: face.id, generation: FontLoader.shared.generation(of: face.path))) {
+        .task(id: FileFace(face)) {
             let content = await model.pageContents.content(loading: face)
             guard !Task.isCancelled else { return }
             loaded = (face.id, content)
@@ -230,7 +225,7 @@ private struct TypeTester: View {
     @State private var caseChange: CaseChange?
 
     var body: some View {
-        let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let (face, weight) = model.previewStyle(of: family)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
             TesterControls {
@@ -307,7 +302,7 @@ private struct TypeTester: View {
             isAdjusted ? .custom : .style(face.id)
         } set: { choice in
             guard case .style(let id) = choice else { return }
-            model.pageStyleID = id == model.unchosenStyle(of: family, weight: preview.weight).face.id ? nil : id
+            model.pageStyleID = id == model.unchosenStyle(of: family).face.id ? nil : id
             model.familyAxes[family.id] = nil
         }
     }

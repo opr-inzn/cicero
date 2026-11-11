@@ -52,7 +52,7 @@ struct FamilyMenu: View {
             }
         }
         if families.count == 1 {
-            CopySourcesMenu(styles: families[0].faces, title: families[0].name, model: model)
+            CopySourcesMenu(styles: families[0].faces, model: model)
         }
 
         Divider()
@@ -146,7 +146,7 @@ struct StyleMenu: View {
         if face.canDeactivate {
             Button("Deactivate Style", systemImage: "xmark.seal") { model.deactivate([face]) }
         }
-        CopySourcesMenu(styles: [face], title: "\(family.name) \(face.face.styleName)", model: model)
+        CopySourcesMenu(styles: [face], model: model)
         Divider()
         Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: family, style: face) }
             .disabled(!model.canShowSimilar(family, style: face))
@@ -182,7 +182,6 @@ struct StyleMenu: View {
 
 struct CopySourcesMenu: View {
     let styles: [LibraryFace]
-    let title: String
     let model: AppModel
 
     var body: some View {
@@ -192,7 +191,7 @@ struct CopySourcesMenu: View {
                 ForEach(sources) { source in
                     Toggle(label(source), isOn: Binding(
                         get: { source.isInUse },
-                        set: { _ in model.useCopies(from: source, title: "\(title) from \(source.name)") }
+                        set: { _ in model.useCopies(from: source) }
                     ))
                 }
             } label: {

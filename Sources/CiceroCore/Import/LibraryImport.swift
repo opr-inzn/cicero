@@ -47,7 +47,6 @@ public enum LibraryImport {
         let folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
         let listed = Set(data.fontFiles)
         func isRead(_ path: String) -> Bool { listed.contains(path) || folders.contains { path == $0 || path.hasPrefix($0 + "/") } }
-        func isFont(_ path: String) -> Bool { FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased()) }
         var files: [(path: String, source: String)] = []
         if choices.fontFolder, let folder = imported.fontFolder {
             if WatchedFolder.detectAppName(forPath: folder) != nil {
@@ -55,7 +54,7 @@ public enum LibraryImport {
             } else if let bundled = imported.bundledFonts {
                 let source = URL(fileURLWithPath: bundled.folder.resolvingSymlinksInPath().path)
                 // A backup is a file anyone could have made: take only font files, and only from inside the unzipped backup, never through a symbolic link or out of it.
-                for file in bundled.files where isFont(file) {
+                for file in bundled.files where FontFormat.isFontFile(file) {
                     let parts = file.split(separator: "/", omittingEmptySubsequences: false)
                     guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { continue }
                     let from = source.appendingPathComponent(file)
@@ -66,11 +65,11 @@ public enum LibraryImport {
                     files.append((folder + "/" + file, from.path))
                 }
             } else {
-                files += imported.fontFolderFiles.filter { isFont($0) && !isRead($0) }.map { ($0, $0) }
+                files += imported.fontFolderFiles.filter { FontFormat.isFontFile($0) && !isRead($0) }.map { ($0, $0) }
             }
         }
         if choices.otherFiles {
-            files += imported.otherFiles.filter { isFont($0) && !isRead($0) }.map { ($0, $0) }
+            files += imported.otherFiles.filter { FontFormat.isFontFile($0) && !isRead($0) }.map { ($0, $0) }
         }
         return files
     }
@@ -79,7 +78,7 @@ public enum LibraryImport {
         // Only the copies the reader found, only font files, and only of fonts Cicero has now, may go to the Trash.
         imported.leftoverCopies.count { path in
             imported.leftoverCopyOrigins[path].map(isInLibrary) == true
-                && FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased())
+                && FontFormat.isFontFile(path)
                 && (try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)) != nil
         }
     }

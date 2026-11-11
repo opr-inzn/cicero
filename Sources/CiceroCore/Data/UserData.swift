@@ -100,7 +100,7 @@ public struct UserData: Codable, Equatable, Sendable {
         version = try value(.version, d.version)
         folders = try value(.folders, d.folders)
         folderNames = try value(.folderNames, d.folderNames)
-        fontFiles = try value(.fontFiles, d.fontFiles).filter { FontFormat.fileExtensions.contains(($0 as NSString).pathExtension.lowercased()) }
+        fontFiles = try value(.fontFiles, d.fontFiles).filter(FontFormat.isFontFile)
         missingFontFiles = try value(.missingFontFiles, d.missingFontFiles)
         sets = try value(.sets, d.sets)
         smartSets = try value(.smartSets, d.smartSets)
@@ -123,9 +123,6 @@ public struct UserData: Codable, Equatable, Sendable {
         installMethod = try value(.installMethod, String?.none).map { InstallMethod(rawValue: $0) ?? .ask } ?? d.installMethod
         installsIntoFontLibrary = try value(.installsIntoFontLibrary, d.installsIntoFontLibrary)
         fontLibraryPath = try value(.fontLibraryPath, d.fontLibraryPath)
-        if let location = fontLibraryLocation, let name = folderNames[location.id.uuidString], Self.formerFontLibraryNames.contains(name) {
-            folderNames[location.id.uuidString] = nil
-        }
         duplicateHandling = try value(.duplicateHandling, String?.none).flatMap(DuplicateHandling.init(rawValue:)) ?? d.duplicateHandling
         asksBeforeActivatingMany = try value(.asksBeforeActivatingMany, d.asksBeforeActivatingMany)
         asksBeforeMovingOutOfSharedFolders = try value(.asksBeforeMovingOutOfSharedFolders, d.asksBeforeMovingOutOfSharedFolders)
@@ -136,15 +133,6 @@ public struct UserData: Codable, Equatable, Sendable {
         showCreativeCloudFonts = try value(.showCreativeCloudFonts, d.showCreativeCloudFonts)
         activatesDocumentFonts = try value(.activatesDocumentFonts, d.activatesDocumentFonts)
         records = try value(.records, d.records)
-        let serif = classificationRenames[Classification.serif.rawValue] ?? Classification.serif.rawValue
-        for set in smartSets.indices {
-            for rule in smartSets[set].rules.indices where smartSets[set].rules[rule].field == .classification {
-                let value = smartSets[set].rules[rule].value
-                if !classifications.contains(value), Classification(saved: value) == .serif, value != Classification.serif.rawValue {
-                    smartSets[set].rules[rule].value = serif
-                }
-            }
-        }
     }
 
     public static let missingFileGrace: TimeInterval = 30 * 24 * 60 * 60
@@ -180,8 +168,6 @@ public struct UserData: Codable, Equatable, Sendable {
         guard installsIntoFontLibrary, !fontLibraryPath.isEmpty else { return nil }
         return WatchedFolder(id: WatchedFolder.fontLibraryID, path: fontLibraryPath)
     }
-
-    static let formerFontLibraryNames: Set<String> = ["Font Library", "Cicero’s Font Library"]
 
     public var fontLibraryLocation: WatchedFolder? {
         guard !fontLibraryPath.isEmpty else { return nil }

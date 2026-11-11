@@ -627,7 +627,7 @@ public enum ProblemDetector {
     }
 }
 
-public struct SpareCopies: Sendable {
+struct SpareCopies: Sendable {
     private struct FaceKey: Hashable {
         var family: String
         var postScriptName: String
@@ -651,7 +651,7 @@ public struct SpareCopies: Sendable {
     private var faceCounts: [String: Int] = [:]
     private var fileIDs: [String: FileID?] = [:]
 
-    public init(_ library: Library) {
+    init(_ library: Library) {
         unreadable = Set(library.unreadableFiles)
         for family in library.families {
             for face in family.faces {
@@ -664,7 +664,7 @@ public struct SpareCopies: Sendable {
         }
     }
 
-    public mutating func areSpare(_ paths: Set<String>) -> Bool {
+    mutating func areSpare(_ paths: Set<String>) -> Bool {
         var removed = Set<FileID>()
         for path in paths {
             if let id = fileID(of: path) { removed.insert(id) }

@@ -1,10 +1,10 @@
 import CiceroCore
 import Foundation
 
-public enum Names {
-    public static let suggestionCount = 5
+enum Names {
+    static let suggestionCount = 5
 
-    public static func family(_ typed: String, in context: LibraryContext) throws -> Family {
+    static func family(_ typed: String, in context: LibraryContext) throws -> Family {
         let families = context.listedFamilies
         let key = fold(typed)
         let found = families.filter { fold($0.id) == key || fold($0.name) == key }
@@ -25,7 +25,7 @@ public enum Names {
         }))
     }
 
-    public static func style(_ typed: String, of family: Family) throws -> LibraryFace {
+    static func style(_ typed: String, of family: Family) throws -> LibraryFace {
         let key = fold(typed)
         let found = family.faces.filter { fold($0.face.styleName) == key || fold($0.face.postScriptName) == key }
         if found.count == 1 { return found[0] }
@@ -37,7 +37,7 @@ public enum Names {
                            suggestions: suggestions(for: typed, among: family.faces.flatMap { [$0.face.styleName, $0.face.postScriptName] }))
     }
 
-    public static func tag(_ typed: String, in data: UserData) throws -> String {
+    static func tag(_ typed: String, in data: UserData) throws -> String {
         let key = fold(typed)
         let found = data.tags.filter { fold($0) == key }
         if let exact = found.first(where: { $0 == typed }) { return exact }
@@ -46,7 +46,7 @@ public enum Names {
         throw CommandError(.notFound, "No tag is called “\(typed)”.", suggestions: suggestions(for: typed, among: data.tags))
     }
 
-    public static func folder(_ typed: String, in data: UserData) throws -> FontSet {
+    static func folder(_ typed: String, in data: UserData) throws -> FontSet {
         if let id = UUID(uuidString: typed), let set = data.sets.first(where: { $0.id == id }) { return set }
         let key = fold(typed)
         let found = data.sets.filter { fold($0.name) == key }
@@ -58,7 +58,7 @@ public enum Names {
         throw CommandError(.notFound, "No folder is called “\(typed)”.", suggestions: suggestions(for: typed, among: data.sets.map(\.name)))
     }
 
-    public static func location(_ typed: String, in data: UserData) throws -> WatchedFolder {
+    static func location(_ typed: String, in data: UserData) throws -> WatchedFolder {
         let folders = data.namedFolders
         if let id = UUID(uuidString: typed), let folder = folders.first(where: { $0.id == id }) { return folder }
         let path = URL(fileURLWithPath: (typed as NSString).expandingTildeInPath).standardizedFileURL.path
@@ -76,7 +76,7 @@ public enum Names {
 
     // MARK: Near names
 
-    public static func suggestions(for typed: String, among names: [String]) -> [String] {
+    static func suggestions(for typed: String, among names: [String]) -> [String] {
         var seen = Set<String>()
         let unique = names.filter { seen.insert($0).inserted }
         let query = SearchQuery(typed)
@@ -121,11 +121,11 @@ public enum Names {
         return best
     }
 
-    public static func fold(_ name: String) -> String {
+    static func fold(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
     }
 
-    public static func distance(_ a: String, _ b: String, limit: Int = .max) -> Int {
+    static func distance(_ a: String, _ b: String, limit: Int = .max) -> Int {
         let a = Array(a), b = Array(b)
         if abs(a.count - b.count) > limit { return limit &+ 1 }
         if a.isEmpty { return b.count }

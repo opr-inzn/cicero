@@ -13,7 +13,6 @@ enum ToolboxTab: String, CaseIterable {
 }
 
 struct ToolboxWindow: View {
-    @Environment(AppModel.self) private var model
     @AppStorage("toolbox.tab") private var tab: ToolboxTab = .text
 
     var body: some View {
@@ -43,7 +42,6 @@ extension LanguageCatalog {
 private struct TextTab: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
-    @Environment(\.openWindow) private var openWindow
     @Bindable private var savedText = SavedSoon.toolboxText
     private var text: String { savedText.value }
     @AppStorage("toolbox.maxMissing") private var maxMissing = 0
@@ -121,7 +119,7 @@ private struct TextTab: View {
         let sample = query.text
         let matches = sample.isEmpty ? [] : self.matches
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
-        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
+        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
                         Text(family.name).lineLimit(1)
@@ -129,7 +127,7 @@ private struct TextTab: View {
                     }
                     .frame(width: 220, alignment: .leading)
                     FontText(
-                        text: sample, face: family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
+                        text: sample, face: family.regular.face, size: 17,
                         variations: model.variations(for: family)
                     )
                     .foregroundStyle(Color.ink)
@@ -155,11 +153,6 @@ private struct TextTab: View {
 
     private static func characters(_ scalars: [UInt32]) -> String {
         scalars.compactMap { Unicode.Scalar($0) }.map { String(Character($0)) }.joined(separator: " ")
-    }
-
-    private func open(_ id: String) {
-        model.openFamilyID = id
-        openWindow(id: WindowID.main)
     }
 
     private func search(_ query: Query) async {
@@ -192,7 +185,6 @@ private struct TextTab: View {
 
 private struct LanguagesTab: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @AppStorage("toolbox.languageSort") private var sortByName = false
     @AppStorage("toolbox.language") private var languageID = ""
     @State private var search = ""
@@ -285,7 +277,7 @@ private struct LanguagesTab: View {
             FamilyRowList(sections: [
                 FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.plain))", families: support.full, emptyText: "None"),
                 FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.plain))", families: support.base, emptyText: "None"),
-            ], selection: $selection, open: open) { family in
+            ], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
                         Text(family.name).lineLimit(1)
@@ -331,11 +323,6 @@ private struct LanguagesTab: View {
             parts.append("checking characters, \(progress.done.plain) of \(progress.total.plain)")
         }
         return parts.joined(separator: " · ")
-    }
-
-    private func open(_ id: String) {
-        model.openFamilyID = id
-        openWindow(id: WindowID.main)
     }
 
     private func load(_ query: Query) async {

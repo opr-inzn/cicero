@@ -65,7 +65,7 @@ extension ActivationEngine {
         guard let enumerator = FileManager.default.enumerator(
             at: folder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return false }
-        for case let url as URL in enumerator where FontFileReader.fontExtensions.contains(url.pathExtension.lowercased()) {
+        for case let url as URL in enumerator where FontFormat.fileExtensions.contains(url.pathExtension.lowercased()) {
             if (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true { return true }
         }
         return false

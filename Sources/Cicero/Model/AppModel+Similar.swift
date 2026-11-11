@@ -9,8 +9,6 @@ struct SimilarKey: Equatable {
 }
 
 extension AppModel {
-    static let similarListed = SimilarFonts.longestList
-
     var similarFonts: SimilarFonts {
         let key = SimilarKey(fingerprint: library.fingerprint, measurementRevision: measurementRevision, dataRevision: dataRevision,
                              guessRevision: guessRevision)
@@ -34,11 +32,11 @@ extension AppModel {
         }
     }
 
-    func similarFamilies(to family: Family, kind: SearchQuery.Style? = nil, limit: Int) -> [Family] {
+    func similarFamilies(to family: Family, kind: SearchQuery.Style?, limit: Int) -> [Family] {
         similarFonts.nearest(to: family.id, kind: kind, limit: limit).compactMap(library.family)
     }
 
-    func canShowSimilar(_ family: Family, style: LibraryFace? = nil) -> Bool {
+    func canShowSimilar(_ family: Family, style: LibraryFace?) -> Bool {
         similarFonts.contains(family.id, kind: style.map(family.kind(of:)))
     }
 
@@ -46,7 +44,7 @@ extension AppModel {
         let chosen = openFamilyID == family.id && pageStyleID != nil
         let searched = family.namesStyle(SearchQuery(appliedSearch), tokens: searchTokens)
         guard chosen || searched || similarStyle != nil else { return nil }
-        let face = previewStyle(of: family, weight: 400).face
+        let face = previewStyle(of: family).face
         return face.id == family.regular.id ? nil : face
     }
 
@@ -61,7 +59,7 @@ extension AppModel {
         return similarStyle.map { "\(name) \($0.face.styleName)" } ?? name
     }
 
-    func showSimilar(to family: Family, style: LibraryFace? = nil) {
+    func showSimilar(to family: Family, style: LibraryFace?) {
         if similarFamilyID == nil, documentList == nil {
             listReturn = selectedItems
             listReturnPage = openFamilyID

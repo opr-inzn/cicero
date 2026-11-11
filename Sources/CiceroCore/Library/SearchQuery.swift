@@ -99,7 +99,7 @@ public struct SearchQuery: Sendable {
     static let opticalSize = ["optical size", "opsz"]
 
     static let keywords: Set<String> = Set(
-        Classification.allCases.flatMap(\.searchTerms) + narrow + wide + slab + opticalSize + FontFileReader.fontExtensions
+        Classification.allCases.flatMap(\.searchTerms) + narrow + wide + slab + opticalSize + FontFormat.fileExtensions
             + ["variable", "italics", "italic", "text", "display"]
     )
 
@@ -192,7 +192,7 @@ extension Family {
         return SearchToken.style(of: tokens, over: typed) != nil
     }
 
-    public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double) -> (face: LibraryFace, weight: Double) {
+    public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double = 400) -> (face: LibraryFace, weight: Double) {
         let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
         let variable = tokens.contains(.variable)
         guard let style = SearchToken.style(of: tokens, over: typed) else {

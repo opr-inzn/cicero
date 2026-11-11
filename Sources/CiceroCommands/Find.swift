@@ -45,7 +45,7 @@ public enum FindCommand {
         return answer.json
     }
 
-    public static func families(_ options: FindOptions, in context: LibraryContext) throws -> [Family] {
+    static func families(_ options: FindOptions, in context: LibraryContext) throws -> [Family] {
         let words = options.words.map(unquoted)
         if options.any, words.allSatisfy({ SearchQuery($0).isEmpty }) {
             throw CommandError.invalid("--any goes with words: cicero find trial unlicensed test --any.")

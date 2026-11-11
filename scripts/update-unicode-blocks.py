@@ -7,7 +7,7 @@ of every character Unicode gives one other than Common and Inherited, like Han f
 the scripts Unicode lists a character for besides or instead of its own, like Bengali, Devanagari and more for the
 danda, or Thaana for Arabic's digits.
 
-Run by hand when a new Unicode version is out (Cicero itself never goes online):
+Run by hand when a new Unicode version is out (the app never downloads them):
 
     scripts/update-unicode-blocks.py               # downloads them for VERSION below
     scripts/update-unicode-blocks.py path/to/Blocks.txt path/to/Scripts.txt path/to/ScriptExtensions.txt path/to/PropertyValueAliases.txt

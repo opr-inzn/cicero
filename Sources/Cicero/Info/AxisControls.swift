@@ -8,7 +8,7 @@ struct AxisControls: View {
     let family: Family
 
     var body: some View {
-        let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let (style, weight) = model.previewStyle(of: family)
         ReadingFonts(paths: [style.face.path]) {
             let axes = FontLoader.shared.axes(of: style.face)
             if axes.isEmpty {
@@ -115,7 +115,7 @@ struct AxisControls: View {
             return
         }
         if model.openFamilyID == family.id, let other = otherStyle(at: position, axes: axes, besides: style) {
-            let automatic = model.automaticStyle(of: family, weight: preview.weight)
+            let automatic = model.automaticStyle(of: family)
             let isAutomatic = automatic.face.id == other.id && Self.isSame(place(of: automatic.face, weight: automatic.weight), position, on: axes)
             model.pageStyleID = isAutomatic ? nil : other.id
             model.familyAxes[family.id] = nil

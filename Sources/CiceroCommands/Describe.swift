@@ -1,14 +1,14 @@
 import CiceroCore
 import Foundation
 
-public struct Describer {
+struct Describer {
     let context: LibraryContext
     private let folders: [String: [FontSet]]
     private let appNames: [String: String]
 
-    public static let mixed = "mixed"
+    static let mixed = "mixed"
 
-    public init(_ context: LibraryContext) {
+    init(_ context: LibraryContext) {
         self.context = context
         var folders: [String: [FontSet]] = [:]
         var appNames: [String: String] = [:]
@@ -30,7 +30,7 @@ public struct Describer {
 
     // MARK: Families
 
-    public func family(_ family: Family) -> JSONObject {
+    func family(_ family: Family) -> JSONObject {
         var object = JSONObject()
         let faces = family.faces.map(\.face)
         object.set("id", family.id)
@@ -70,7 +70,7 @@ public struct Describer {
         return object
     }
 
-    public func familyStatus(_ family: Family, details: (LibraryFace) -> Bool) -> JSONObject {
+    func familyStatus(_ family: Family, details: (LibraryFace) -> Bool) -> JSONObject {
         var object = self.family(family)
         let faces = family.faces.map(\.face)
         let names = FileNames.read(faces)
@@ -92,7 +92,7 @@ public struct Describer {
 
     // MARK: Styles
 
-    public func style(_ libraryFace: LibraryFace, details: FileNames?) -> JSONObject {
+    func style(_ libraryFace: LibraryFace, details: FileNames?) -> JSONObject {
         let face = libraryFace.face
         var object = JSONObject()
         object.set("name", face.styleName)

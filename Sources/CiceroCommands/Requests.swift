@@ -6,8 +6,8 @@ public enum Requests {
         support.appendingPathComponent("Requests", isDirectory: true)
     }
 
-    public static let takeWithin: Duration = .seconds(5)
-    public static let whileStarting: TimeInterval = 30
+    static let takeWithin: Duration = .seconds(5)
+    static let whileStarting: TimeInterval = 30
     public static let beat: Duration = .seconds(2)
     static let silentFor: TimeInterval = 60
 

@@ -1,8 +1,8 @@
 import CoreText
 import Foundation
 
-public enum CharacterMap {
-    public static func characters(of font: CTFont) -> ScalarRanges {
+enum CharacterMap {
+    static func characters(of font: CTFont) -> ScalarRanges {
         // CoreText's character set adds characters the font draws with another glyph, like U+A789 with the colon, U+2010 and U+2011 with the hyphen, and U+00A0, U+202F and the line and paragraph separators with the space.
         let reported = ScalarRanges(characterSet: CTFontCopyCharacterSet(font))
         // A font with only a Mac Roman subtable has none to read, and CoreText maps it itself.

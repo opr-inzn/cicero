@@ -2,8 +2,6 @@ import CoreText
 import Foundation
 
 enum FontFileReader {
-    static let fontExtensions: Set<String> = ["otf", "ttf", "ttc", "otc", "dfont"]
-
     static func faces(atPath path: String) -> [FontFace] {
         read(atPath: path).faces
     }

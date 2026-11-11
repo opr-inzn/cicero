@@ -60,7 +60,7 @@ struct ItemReplacement {
         let isLink = info.st_mode & S_IFMT == S_IFLNK
         // Deleted for good with no Trash to take it, so never a font, nor a folder with anything in it.
         let folderItems = isFolder ? ((try? fm.contentsOfDirectory(atPath: destination.path)) ?? [""]).filter { $0 != ".DS_Store" } : []
-        let holdsFonts = !isLink && (isFolder ? !folderItems.isEmpty : FontFileReader.fontExtensions.contains(destination.pathExtension.lowercased()))
+        let holdsFonts = !isLink && (isFolder ? !folderItems.isEmpty : FontFormat.fileExtensions.contains(destination.pathExtension.lowercased()))
         guard !holdsFonts else { throw KeptItemError(name: destination.lastPathComponent, isFolder: isFolder, noTrash: true) }
         let aside = destination.deletingLastPathComponent().appendingPathComponent(ActivationEngine.movingPrefix + UUID().uuidString)
         try fm.moveItem(at: destination, to: aside)

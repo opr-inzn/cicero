@@ -70,15 +70,11 @@ public struct ToolEnvironment: @unchecked Sendable {
         return nil
     }
 
-    public var userDataURL: URL { locations.support.appendingPathComponent("user-data.json", isDirectory: false) }
+    var userDataURL: URL { locations.support.appendingPathComponent("user-data.json", isDirectory: false) }
 }
 
 struct ListedRegistrar: FontRegistrar {
     let file: String
-
-    init?(file: String) {
-        self.file = file
-    }
 
     private var paths: Set<String> {
         guard let text = try? String(contentsOfFile: file, encoding: .utf8) else { return [] }

@@ -142,23 +142,23 @@ extension AppModel {
         return adjusted.values
     }
 
-    func previewStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
+    func previewStyle(of family: Family) -> (face: LibraryFace, weight: Double) {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
-        return unchosenStyle(of: family, weight: weight)
+        return unchosenStyle(of: family)
     }
 
-    func unchosenStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
+    func unchosenStyle(of family: Family) -> (face: LibraryFace, weight: Double) {
         if let style = similarStyle, let source = similarFamilyID.flatMap(library.family), appliedSearch.isEmpty, searchTokens.isEmpty {
             if family.id == source.id { return (style, style.face.styleWeight) }
             return (family.face(for: source.kind(of: style), weight: style.face.styleWeight), style.face.styleWeight)
         }
-        return automaticStyle(of: family, weight: weight)
+        return automaticStyle(of: family)
     }
 
-    func automaticStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
-        family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens, weight: weight)
+    func automaticStyle(of family: Family) -> (face: LibraryFace, weight: Double) {
+        family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens)
     }
 
     func tokenSuggestions(for typed: String) -> [SearchToken] {
@@ -244,7 +244,7 @@ extension AppModel {
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
             let kind = similarStyle.map(family.kind(of:))
-            return ([family] + similarFamilies(to: family, kind: kind, limit: Self.similarListed)).filter(matches)
+            return ([family] + similarFamilies(to: family, kind: kind, limit: SimilarFonts.longestList)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
         let data = data, families = library.families
@@ -254,8 +254,6 @@ extension AppModel {
         let listed = kept.count == families.count ? families : kept.map { families[$0] }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
-
-    static let recentDays = FamilyFilters.recentDays
 
     var hasOwnOrder: Bool { similarFamilyID != nil || selectedItems == [.recent] }
 
@@ -329,10 +327,6 @@ extension AppModel {
 
     func characterSet(_ id: String) -> CharacterSetDefinition? {
         id.hasPrefix("custom.") ? customCharacterSets.first { $0.id == id } : characterSetCatalog.builtIn.first { $0.id == id }
-    }
-
-    func has(_ set: CharacterSetDefinition, _ family: Family) -> Bool? {
-        missingCount(set, family).map { $0 == 0 }
     }
 
     func missingCount(_ set: CharacterSetDefinition, _ family: Family) -> Int? {

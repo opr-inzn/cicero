@@ -3,7 +3,7 @@
 Greek and Cyrillic characters in, from GlyphsInfo, the glyph data of Glyphs by Georg Seifert, under the BSD 3-Clause
 License (Resources/GlyphsInfo-LICENSE.txt): its glyph names, categories, subcategories, cases and scripts.
 
-Run by hand when GlyphsInfo changes (Cicero itself never goes online):
+Run by hand when GlyphsInfo changes (the app never downloads it):
 
     scripts/update-letter-order.py                         # downloads GlyphData.xml of the GlyphsInfo commit below
     scripts/update-letter-order.py path/to/GlyphData.xml

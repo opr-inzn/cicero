@@ -326,7 +326,7 @@ public struct LibraryBackup: Sendable {
             progress(index, fonts.count)
             let target = restoredPath(expand(font.path), libraries: libraries)
             // A backup is a file anyone could have made: only font files go back, only into font locations, and never from outside the unzipped folder.
-            guard Self.isFontFile(target), let source = Self.archivedFile(font.archivePath!, in: contents.folder) else {
+            guard FontFormat.isFontFile(target), let source = Self.archivedFile(font.archivePath!, in: contents.folder) else {
                 result.failed += 1
                 continue
             }
@@ -407,17 +407,13 @@ public struct LibraryBackup: Sendable {
     }
 
     private static func isFontLocation(_ path: String, in roots: [String]) -> Bool {
-        guard isPlainPath(path), isFontFile(path), !ActivationEngine.isProtected(path) else { return false }
+        guard isPlainPath(path), FontFormat.isFontFile(path), !ActivationEngine.isProtected(path) else { return false }
         return roots.contains { path.hasPrefix($0 + "/") } || path.firstMatch(of: #/^/Applications/Adobe [^/]+/Fonts//#) != nil
     }
 
     static func isPlainPath(_ path: String) -> Bool {
         guard path.hasPrefix("/"), path.count > 1 else { return false }
         return path.dropFirst().split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
-    }
-
-    private static func isFontFile(_ path: String) -> Bool {
-        FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
     }
 
     private static func archivedFile(_ archivePath: String, in folder: URL) -> URL? {
@@ -464,7 +460,7 @@ public struct LibraryBackup: Sendable {
         }
         let added = Set(data.fontFiles)
         data.records.inPlace = Set(data.records.inPlace.map(map).filter { path in
-            isFont(path) || added.contains(path) && Self.isPlainPath(path) && Self.isFontFile(path) && !ActivationEngine.isProtected(path)
+            isFont(path) || added.contains(path) && Self.isPlainPath(path) && FontFormat.isFontFile(path) && !ActivationEngine.isProtected(path)
         })
         data.records.temporary = [:]
         data.records.appFolderOrigins = map(data.records.appFolderOrigins).filter { isFont($0.key, in: locations.inactiveFolder) && isFont($0.value) }
@@ -548,32 +544,8 @@ enum Archive {
     }
 
     private static func ditto(_ arguments: [String]) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = arguments
-        let pipe = Pipe()
-        process.standardError = pipe
-        process.standardOutput = FileHandle.nullDevice
-        let errors = pipe.fileHandleForReading
-        let (status, message): (Int32, Data) = try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                DispatchQueue.global(qos: .utility).async {
-                    do {
-                        try process.run()
-                    } catch {
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    // Read before waiting: ditto, with more to say than a pipe holds, waits until it's read.
-                    let message = errors.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    continuation.resume(returning: (process.terminationStatus, message))
-                }
-            }
-        } onCancel: {
-            if process.isRunning { process.terminate() }
-        }
+        let result = try await Process.run("/usr/bin/ditto", arguments)
         try Task.checkCancellation()
-        guard status == 0 else { throw LibraryBackup.Failure.archive(String(decoding: message, as: UTF8.self)) }
+        guard result.status == 0 else { throw LibraryBackup.Failure.archive(result.stderr) }
     }
 }

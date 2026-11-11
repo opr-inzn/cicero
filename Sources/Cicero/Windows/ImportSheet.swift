@@ -242,7 +242,7 @@ struct ImportSheet: View {
     private var footer: some View {
         HStack(spacing: 12) {
             if let stage {
-                progress(stage)
+                ImportProgress(stage: stage, starting: "Importing", estimate: estimate, stacked: false)
             } else if isRereading {
                 ProgressView().controlSize(.small)
                 Text("Reading \(appName)’s library").font(.callout).foregroundStyle(.secondary)
@@ -260,47 +260,12 @@ struct ImportSheet: View {
             Button("Cancel", role: .cancel) {
                 if let task { stage = .stopping; task.cancel() } else { dismiss() }
             }
-            .disabled(stage != nil && !canStop)
+            .disabled(stage.map { !$0.canStop } ?? false)
             Button("Import") { start() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(stage != nil || !hasChoice || isWaiting)
         }
         .padding(16)
-    }
-
-    @ViewBuilder
-    private func progress(_ stage: ImportStage) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            switch stage {
-            case .copying(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                CopyingProgressLine(done: done, total: total, estimate: estimate)
-            case .reading(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.plain) of \(total.plain)")
-            case .starting:
-                ProgressView()
-                Text("Importing")
-            case .stopping:
-                ProgressView()
-                Text("Stopping…")
-            case .waiting:
-                ProgressView()
-                Text("Waiting for other changes to finish")
-            }
-        }
-        .progressViewStyle(.linear)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-        .frame(maxWidth: 400, alignment: .leading)
-    }
-
-    private var canStop: Bool {
-        switch stage {
-        case .copying, .waiting: true
-        default: false
-        }
     }
 
     private func start() {

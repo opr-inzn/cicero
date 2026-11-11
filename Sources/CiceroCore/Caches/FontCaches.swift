@@ -56,12 +56,10 @@ public enum AppFontCaches {
     }
 
     public struct Found: Sendable {
-        public var app: App
         public var items: [URL]
         public var size: Int64
 
-        public init(app: App, items: [URL], size: Int64) {
-            self.app = app
+        public init(items: [URL], size: Int64) {
             self.items = items
             self.size = size
         }
@@ -105,7 +103,7 @@ public enum AppFontCaches {
             }
         }
         let size = items.reduce(Int64(0)) { $0 + allocatedSize(of: $1) }
-        return Found(app: app, items: items, size: size)
+        return Found(items: items, size: size)
     }
 
     public static func trash(_ found: Found, using trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) -> Int {
@@ -152,25 +150,29 @@ extension Process {
     }
 
     static func run(_ path: String, _ arguments: [String]) async throws -> Output {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: path)
-                process.arguments = arguments
-                let errors = Pipe()
-                process.standardError = errors
-                process.standardOutput = FileHandle.nullDevice
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
-                    return
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        let errors = Pipe()
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        try process.run()
+                    } catch {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    // Read before waiting: a tool with more to say than a pipe holds waits until it's read.
+                    let data = errors.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    continuation.resume(returning: Output(status: process.terminationStatus, stderr: String(decoding: data, as: UTF8.self)))
                 }
-                // Read before waiting: a tool with more to say than a pipe holds waits until it's read.
-                let data = errors.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                continuation.resume(returning: Output(status: process.terminationStatus, stderr: String(decoding: data, as: UTF8.self)))
             }
+        } onCancel: {
+            if process.isRunning { process.terminate() }
         }
     }
 }

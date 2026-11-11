@@ -270,13 +270,9 @@ public enum TemporaryScope: String, Codable, Sendable, CaseIterable {
     case untilQuit
     case whileAppsRun
 
-    public init?(saved value: String) {
-        self.init(rawValue: value == "untilLogout" ? Self.untilQuit.rawValue : value)
-    }
-
     public init(from decoder: Decoder) throws {
         // A scope a later version adds ends when Cicero quits here, rather than a file that doesn't load.
-        self = Self(saved: try decoder.singleValueContainer().decode(String.self)) ?? .untilQuit
+        self = Self(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .untilQuit
     }
 }
 
@@ -405,10 +401,6 @@ public enum Classification: String, CaseIterable, Codable, Sendable {
     case ornamental = "Ornamental"
     case symbol = "Symbol"
     case unclassified = "Unclassified"
-
-    public init?(saved value: String) {
-        self.init(rawValue: value == "Slab Serif" ? Self.serif.rawValue : value)
-    }
 }
 
 public enum FontFormat: String, CaseIterable, Codable, Sendable {
@@ -419,7 +411,11 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     case mixed = "Mixed"
     case other = "Other"
 
-    public static var fileExtensions: Set<String> { FontFileReader.fontExtensions }
+    public static let fileExtensions: Set<String> = ["otf", "ttf", "ttc", "otc", "dfont"]
+
+    public static func isFontFile(_ path: String) -> Bool {
+        fileExtensions.contains((path as NSString).pathExtension.lowercased())
+    }
 
     public static func of(path: String) -> FontFormat {
         switch (path as NSString).pathExtension.lowercased() {
@@ -455,7 +451,6 @@ public struct Family: Identifiable, Hashable, Sendable {
         let isMonospaced: Bool
         let hasItalics: Bool
         let rangeLabel: String
-        let formatLabel: String
         let app: String?
         let isAdobeFonts: Bool
         let position: SwitchPosition
@@ -484,7 +479,6 @@ public struct Family: Identifiable, Hashable, Sendable {
             isMonospaced = faces.contains { $0.face.isMonospaced }
             hasItalics = faces.contains { $0.face.isItalic }
             rangeLabel = Family.rangeLabel(of: faces.map(\.face))
-            formatLabel = Family.formatLabel(of: faces.map(\.face))
             let apps = Set(faces.map(\.app))
             app = apps.count == 1 ? apps.first! : nil
             isAdobeFonts = faces.allSatisfy(\.isAdobeFonts)
@@ -519,7 +513,6 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var isMonospaced: Bool { storage.fields.isMonospaced }
     public var hasItalics: Bool { storage.fields.hasItalics }
     public var rangeLabel: String { storage.fields.rangeLabel }
-    public var formatLabel: String { storage.fields.formatLabel }
     public var app: String? { storage.fields.app }
     public var isAdobeFonts: Bool { storage.fields.isAdobeFonts }
     public var position: SwitchPosition { storage.fields.position }
@@ -640,12 +633,6 @@ public struct Family: Identifiable, Hashable, Sendable {
         let told = Set(faces.indices.map { [weights[$0], Double(widthGroups[$0])] })
         if told.count < faces.count || parts.isEmpty { parts.append(faces.count == 1 ? "1 Style" : "\(faces.count) Styles") }
         return parts.joined(separator: " · ")
-    }
-
-    static func formatLabel(of faces: [FontFace]) -> String {
-        Set(faces.map { face in face.axes.isEmpty ? (face.path as NSString).pathExtension.uppercased() : "Variable" })
-            .sorted()
-            .joined(separator: " · ")
     }
 
     private static func groups<Word: Hashable>(_ keys: [(place: Double, word: Word?)]) -> [Int] {

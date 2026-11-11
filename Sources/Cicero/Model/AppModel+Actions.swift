@@ -238,10 +238,10 @@ extension AppModel {
         CopyChooser.sources(of: styles, folders: data.namedFolders, records: data.records, locations: locations)
     }
 
-    func useCopies(from source: CopySource, title: String) {
+    func useCopies(from source: CopySource) {
         let plan = CopyChooser.plan(source, records: data.records, library: library)
         guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name)") }
-        let request = CopySwitchRequest(source: source.name, title: title, plan: plan)
+        let request = CopySwitchRequest(source: source.name, plan: plan)
         if plan.alsoTurnsOff.isEmpty {
             confirmCopySwitch(request)
         } else {
@@ -596,7 +596,7 @@ extension AppModel {
     func downloadOnlineOnlyFonts(inFolder id: UUID) {
         let paths = library.onlineOnlyFiles[id] ?? []
         guard !paths.isEmpty, downloads[id] == nil else { return }
-        downloads[id] = DownloadProgress(done: 0, total: paths.count)
+        downloads[id] = WorkProgress(done: 0, total: paths.count)
         Task { [weak self] in
             let failed = await Reachability.download(paths) { [weak self] done in
                 Task { @MainActor in self?.downloads[id]?.done = done }

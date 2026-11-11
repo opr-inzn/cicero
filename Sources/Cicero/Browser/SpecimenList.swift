@@ -72,7 +72,7 @@ private struct Specimen: View {
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
-            let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
+            let (style, weight) = model.previewStyle(of: family)
             FontText(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
                 size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,

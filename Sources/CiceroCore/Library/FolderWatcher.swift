@@ -78,7 +78,7 @@ public final class FolderWatcher {
         let name = (path as NSString).lastPathComponent
         guard !name.hasPrefix(".") || hiddenFolders.contains(where: isIn) else { return false }
         if flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir) != 0 { return true }
-        return FontFileReader.fontExtensions.contains((name as NSString).pathExtension.lowercased())
+        return FontFormat.isFontFile(name)
     }
 
     private func followed(_ path: String, _ flags: FSEventStreamEventFlags) -> String? {

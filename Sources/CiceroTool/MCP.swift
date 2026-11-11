@@ -27,7 +27,7 @@ struct MCPServer: AsyncParsableCommand {
             version: Version.text,
             title: "Cicero",
             instructions: MCPTools.instructions,
-            capabilities: .init(resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false))
+            capabilities: .init(tools: .init(listChanged: false))
         )
         await server.withMethodHandler(ListTools.self) { _ in
             ListTools.Result(tools: tools.map(\.tool))
@@ -37,15 +37,6 @@ struct MCPServer: AsyncParsableCommand {
                 return MCPTools.failure(CommandError(.invalidArgument, "There’s no tool named \(parameters.name)."))
             }
             return await MCPTools.call(tool, parameters.arguments ?? [:])
-        }
-        await server.withMethodHandler(ListResources.self) { _ in
-            ListResources.Result(resources: [MCPTools.coverageResource])
-        }
-        await server.withMethodHandler(ReadResource.self) { parameters in
-            guard parameters.uri == MCPTools.coverageResource.uri else {
-                throw MCPError.invalidParams("There’s no resource \(parameters.uri).")
-            }
-            return ReadResource.Result(contents: [.text(await MCPTools.coverageSets(), uri: parameters.uri, mimeType: "application/json")])
         }
         try await server.start(transport: StdioTransport(input: .standardInput, output: FileDescriptor(rawValue: output)))
         await server.waitUntilCompleted()
@@ -87,14 +78,6 @@ enum MCPTools {
         asks first answers with the code needsConfirmation and the question, and changes nothing: ask the user, then \
         call again with yes: true. To see fonts, not only read about them, use compare: it answers with a picture.
         """
-
-    static let coverageResource = Resource(
-        name: "coverage",
-        uri: "cicero://coverage",
-        title: "Coverage sets",
-        description: "The coverage sets Cicero checks fonts against, with the ids that coverage and find take as set.",
-        mimeType: "application/json"
-    )
 
     // Without compare's --png, with which a tool marked as only reading could write over any file: an agent can be told to by text in a font file, like its license.
     static let notForAgents: Set<String> = ["help", "version", "json", "debug", "png"]
@@ -297,17 +280,6 @@ enum MCPTools {
         }
         return [.image(data: data.base64EncodedString(), mimeType: "image/png", annotations: nil, _meta: nil)]
     }
-
-    @MainActor
-    static func coverageSets() async -> String {
-        do {
-            return try await result(of: ["list", "coverage"]).compactText()
-        } catch let error as CommandError {
-            return error.json.compactText()
-        } catch {
-            return CommandError(.failed, error.localizedDescription).json.compactText()
-        }
-    }
 }
 
 extension MCPTools.Input.Kind {
@@ -334,7 +306,6 @@ private struct HelpDump: Decodable {
         var shouldDisplay: Bool
         var isOptional: Bool
         var isRepeating: Bool
-        var names: [Name]?
         var preferredName: Name?
         var valueName: String?
         var defaultValue: String?

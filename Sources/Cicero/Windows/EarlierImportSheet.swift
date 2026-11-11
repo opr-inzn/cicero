@@ -39,7 +39,7 @@ struct EarlierImportSheet: View {
             }
             HStack(spacing: 12) {
                 if let stage {
-                    progress(stage)
+                    ImportProgress(stage: stage, starting: "Turning fonts on", estimate: estimate, stacked: true)
                 } else {
                     Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.").font(.callout).foregroundStyle(.secondary)
                 }
@@ -53,7 +53,7 @@ struct EarlierImportSheet: View {
                         dismiss()
                     }
                 }
-                .disabled(stage != nil && !canStop)
+                .disabled(stage.map { !$0.canStop } ?? false)
                 Button("Copy Fonts") { start() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(stage != nil)
@@ -92,41 +92,6 @@ struct EarlierImportSheet: View {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         return "\(files)\(state)\(office) Your folders, tags, ratings and notes stay as they are. "
             + "Then the location is removed. FontExplorer X’s own files stay where they are."
-    }
-
-    @ViewBuilder
-    private func progress(_ stage: ImportStage) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            switch stage {
-            case .copying(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: true)
-            case .reading(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.plain) of \(total.plain)")
-            case .starting:
-                ProgressView()
-                Text("Turning fonts on")
-            case .stopping:
-                ProgressView()
-                Text("Stopping…")
-            case .waiting:
-                ProgressView()
-                Text("Waiting for other changes to finish")
-            }
-        }
-        .progressViewStyle(.linear)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-        .frame(maxWidth: 260, alignment: .leading)
-    }
-
-    private var canStop: Bool {
-        switch stage {
-        case .copying, .waiting: true
-        default: false
-        }
     }
 
     private func start() {

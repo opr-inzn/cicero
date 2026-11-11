@@ -1,11 +1,11 @@
 import Foundation
 
-public enum ChromiumIndexedDB {
-    public enum Failure: Error, Equatable {
+enum ChromiumIndexedDB {
+    enum Failure: Error, Equatable {
         case notFound
     }
 
-    public static func values(in leveldb: URL, database: String, store: String) throws -> [String: JSValue] {
+    static func values(in leveldb: URL, database: String, store: String) throws -> [String: JSValue] {
         let entries = try LevelDB.read(leveldb)
         var databaseID: Int?
         for (key, value) in entries {

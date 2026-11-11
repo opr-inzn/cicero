@@ -114,12 +114,11 @@ struct KeepsTopOnResize: ViewModifier {
 
 private struct InfoPanel: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
 
     var body: some View {
         // The same view from one family to the next, so what its rows work out stays until the next family's is ready.
         if let family = model.inspectedFamily {
-            FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
+            FamilyInfo(family: family, face: family.regular)
         } else {
             let count = model.shownSelection.count
             EmptyState(count > 1 ? "\(count.plain) Families Selected" : "No Selection", systemImage: "info.circle",

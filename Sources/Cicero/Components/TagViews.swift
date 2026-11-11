@@ -29,10 +29,10 @@ extension TagColor {
 
 extension NSImage {
     // Not an SF Symbol, which menus draw as a template in one colour. Its label needs .titleAndIcon: built with the macOS 27 SDK, menus hide every other image.
-    static func menuDot(_ color: NSColor, size: CGFloat = 12, inset: CGFloat = 1) -> NSImage {
-        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+    static func menuDot(_ color: NSColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
             color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: inset, dy: inset)).fill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
             return true
         }
         image.isTemplate = false

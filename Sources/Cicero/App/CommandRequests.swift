@@ -111,7 +111,7 @@ final class AppRequestWriter: Writer {
         model.data = data
     }
 
-    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async throws -> ActivationResult {
+    func activate(_ faces: [LibraryFace], untilQuit: Bool) async throws -> ActivationResult {
         let operation = model.expect(faces, at: .on)
         return try await withCheckedThrowingContinuation { continuation in
             let queued = model.enqueue { model in

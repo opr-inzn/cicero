@@ -30,7 +30,7 @@ swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/Cicer
 
 `classify` fits a small classifier on the embedding as it is, for Cicero's guesses of classifications: serif, sans
 serif, script or ornamental, from Google's category, stroke and tags (see `label` in train.py). It says how often it's
-right on the held-out families, and how often when it's sure, which `AppModel.letterGuessLikelihood` goes by.
+right on the held-out families, and how often when it's sure, which `ClassificationGuesses.letterLikelihood` goes by.
 
 It learns designs: a family's uprights at one width and optical size (the normal one, and condensed and expanded, small
 and large ones of a variable font with those axes) or its italics, each a design of its own, that the others of the

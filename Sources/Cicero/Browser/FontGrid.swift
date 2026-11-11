@@ -114,7 +114,6 @@ struct FontGrid: View {
         hasher.combine(model.data.showSystemFonts)
         hasher.combine(model.data.showCreativeCloudFonts)
         hasher.combine(preview.sampleText)
-        hasher.combine(preview.weight)
         return hasher.finalize()
     }
 
@@ -128,11 +127,11 @@ struct FontGrid: View {
             shown = Shown(text: text, ratio: SampleWidths.shared.listRatio)
             return
         }
-        let families = model.library.families, data = model.data, weight = preview.weight
+        let families = model.library.families, data = model.data
         let axes = model.familyAxes.mapValues { (face: $0.face, values: $0.values) }
         let samples = await Task.detached(priority: .userInitiated) {
             families.filter(data.lists).map { family in
-                let (style, weight) = family.previewStyle(for: SearchQuery(""), weight: weight)
+                let (style, weight) = family.previewStyle(for: SearchQuery(""))
                 let variations = axes[family.id].flatMap { $0.face == style.id ? $0.values : nil } ?? [:]
                 return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: variations, features: [])
             }
@@ -310,7 +309,7 @@ private struct Tile: View {
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
-            let (style, weight) = model.previewStyle(of: family, weight: preview.weight)
+            let (style, weight) = model.previewStyle(of: family)
             let sample = SampleWidths.Sample(face: style.face, text: sampleText, weight: weight,
                                              variations: model.variations(for: family, face: style.id), features: model.searchFeatures)
             let text = model.scriptSamples.text(sample.text, for: style.face)

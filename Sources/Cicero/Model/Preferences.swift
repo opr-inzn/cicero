@@ -13,7 +13,6 @@ final class PreviewSettings {
     var sampleText: String { didSet { SavedSoon.set(sampleText, forKey: Keys.sampleText) } }
     var savedPresets: [String] { didSet { defaults.set(savedPresets, forKey: Keys.savedPresets) } }
     var size: Double { didSet { SavedSoon.set(size, forKey: Keys.size) } }
-    let weight = 400.0
     var lineSpacing: Double { didSet { SavedSoon.set(lineSpacing, forKey: Keys.lineSpacing) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
@@ -22,7 +21,6 @@ final class PreviewSettings {
         static let sampleText = "preview.sampleText"
         static let savedPresets = "preview.savedPresets"
         static let size = "preview.size"
-        static let weight = "preview.weight"
         static let lineSpacing = "preview.lineSpacing"
     }
 
@@ -30,7 +28,6 @@ final class PreviewSettings {
         sampleText = defaults.string(forKey: Keys.sampleText) ?? ""
         savedPresets = defaults.stringArray(forKey: Keys.savedPresets) ?? []
         size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
-        defaults.removeObject(forKey: Keys.weight)
         lineSpacing = min(max(defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120, Self.lineSpacings.lowerBound),
                           Self.lineSpacings.upperBound)
     }

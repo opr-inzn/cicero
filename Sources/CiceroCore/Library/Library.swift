@@ -7,7 +7,6 @@ public struct Locations: Sendable {
     public var userFonts: URL
     public var allUsersFonts: URL
     public var systemFonts: [URL]
-    public var home: URL
     public var adobeFontsInAdobeApps: URL?
     public var adobeFontsList: URL?
     public var defaultFontLibrary: URL
@@ -18,14 +17,13 @@ public struct Locations: Sendable {
         defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Font Library", isDirectory: true)
     }
 
-    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
+    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [],
                 adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil, inactiveFolder: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
         self.allUsersFonts = allUsersFonts
         self.systemFonts = systemFonts
-        self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
         self.adobeFontsList = adobeFontsList
         let defaultFontLibrary = defaultFontLibrary
@@ -44,15 +42,9 @@ public struct Locations: Sendable {
             userFonts: home.appendingPathComponent("Library/Fonts", isDirectory: true),
             allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true),
             systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)],
-            home: realHome,
             adobeFontsInAdobeApps: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.w", isDirectory: true),
             adobeFontsList: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.c/entitlements.xml")
         )
-    }
-
-    private static var realHome: URL? {
-        guard let entry = getpwuid(getuid()), let directory = entry.pointee.pw_dir else { return nil }
-        return URL(fileURLWithPath: String(cString: directory), isDirectory: true)
     }
 
     public var formerInactiveFolders: [URL] {
@@ -386,7 +378,7 @@ public final class LibraryScanner: Sendable {
         guard changes.count <= 200 else { return nil }
         let input = last.input
         var found = last.found
-        for path in changes where Self.isFontFile(path) {
+        for path in changes where FontFormat.isFontFile(path) {
             if input.records.appFolderOrigins[path] != nil || last.reach.onlineOnlyPaths.contains(path) || last.reach.disconnectedFiles.contains(path) {
                 return nil
             }
@@ -643,7 +635,7 @@ public final class LibraryScanner: Sendable {
                 found[path]!.appName = "Adobe"
             }
         }
-        for path in input.files where Self.isFontFile(path) {
+        for path in input.files where FontFormat.isFontFile(path) {
             guard let stamp = Self.stamp(ofPath: path) else {
                 if Reachability.disconnectedVolume(of: path) != nil {
                     reach.disconnectedFiles.insert(path)
@@ -677,7 +669,7 @@ public final class LibraryScanner: Sendable {
             }
             if found[path] != nil {
                 found[path]!.isActive = true
-            } else if Self.isFontFile(path), let stamp = Self.stamp(ofPath: path) {
+            } else if FontFormat.isFontFile(path), let stamp = Self.stamp(ofPath: path) {
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }
@@ -713,10 +705,6 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    private static func isFontFile(_ path: String) -> Bool {
-        FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
-    }
-
     private static func enumerate(_ folder: URL, includingHidden: Bool = false, skipping: [String] = [], onlineOnly: ((String) -> Void)? = nil,
                                   _ body: (String, FaceStamp) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
@@ -729,7 +717,7 @@ public final class LibraryScanner: Sendable {
             options: includingHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return }
         for case let url as URL in enumerator {
-            guard FontFileReader.fontExtensions.contains(url.pathExtension.lowercased()),
+            guard FontFormat.fileExtensions.contains(url.pathExtension.lowercased()),
                   let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
                   let modified = values.contentModificationDate, let size = values.fileSize
             else { continue }
@@ -1147,10 +1135,10 @@ public final class LibraryScanner: Sendable {
     }
 }
 
-public enum Foundry {
+enum Foundry {
     private static let suffixes = [", Inc.", " Inc", " LLC", " Ltd.", " GmbH", " AG", " S.A.", " B.V.", " Corporation", " Corp."]
 
-    public static func normalized(_ raw: String?) -> String? {
+    static func normalized(_ raw: String?) -> String? {
         guard var name = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty, name.count <= 60 else { return nil }
         let lowercased = name.lowercased()
         guard !lowercased.contains("http"), !lowercased.contains("www."), !lowercased.hasPrefix("copyright"), !name.contains("©") else { return nil }
@@ -1172,7 +1160,7 @@ public enum Foundry {
 }
 
 extension Array where Element: Sendable {
-    func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
+    public func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
         [T](unsafeUninitializedCapacity: count) { buffer, initialized in
             guard let base = buffer.baseAddress else { return }
             let slots = Slots(base: base)

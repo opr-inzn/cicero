@@ -207,14 +207,14 @@ public enum CopyChooser {
     }
 }
 
-public enum FontVersion {
-    public static func number(_ version: String) -> [Double] {
+enum FontVersion {
+    static func number(_ version: String) -> [Double] {
         let parts = version.drop { !$0.isNumber }.prefix { $0.isNumber || $0 == "." }.split(separator: ".")
         guard let major = parts.first else { return [] }
         return [Double(parts.count > 1 ? "\(major).\(parts[1])" : String(major)) ?? 0] + parts.dropFirst(2).compactMap { Double($0) }
     }
 
-    public static func precedes(_ a: String, _ b: String) -> Bool {
+    static func precedes(_ a: String, _ b: String) -> Bool {
         number(a).lexicographicallyPrecedes(number(b))
     }
 }

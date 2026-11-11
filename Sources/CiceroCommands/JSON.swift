@@ -104,6 +104,6 @@ enum JSONDates {
     }
 }
 
-public enum Contract {
-    public static let schema = 1
+enum Contract {
+    static let schema = 1
 }

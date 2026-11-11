@@ -1,7 +1,7 @@
 import CoreFoundation
 import Foundation
 
-public enum LocalizedNames {
+enum LocalizedNames {
     static func familyNames(_ table: Data?, besides familyName: String) -> [String: String] {
         guard let table, table.count >= 6 else { return [:] }
         func u16(_ offset: Int) -> Int? {
@@ -75,9 +75,9 @@ public enum LocalizedNames {
         return names.compactMapValues { $0.name == familyName ? nil : $0.name }
     }
 
-    public static let preferredLanguages = Locale.preferredLanguages
+    static let preferredLanguages = Locale.preferredLanguages
 
-    public static func name(in names: [String: String], for languages: [String] = preferredLanguages) -> String? {
+    static func name(in names: [String: String], for languages: [String] = preferredLanguages) -> String? {
         guard !names.isEmpty else { return nil }
         let candidates = names.keys.sorted().map { (language: Locale.Language(identifier: Locale.Language(identifier: $0).maximalIdentifier), name: names[$0]!) }
         for preferred in languages {
