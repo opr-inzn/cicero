@@ -96,7 +96,7 @@ struct CharacterSetsRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
     @State private var loaded: Loaded<ScalarRanges>?
-    @State private var showsMissing = false
+    @State private var showsMissing: CharacterSetDefinition?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -108,16 +108,29 @@ struct CharacterSetsRow: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if let next = nextLatin(after: has) {
-                    let missing = ranges.missing(sorted: next.scalars)
-                    Text(missing.count == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.count.plain) more characters")
+                    let missing = ranges.missingCount(sorted: next.scalars)
+                    Text(missing == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.plain) more characters")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button("Show Missing") { showsMissing = true }
-                        .controlSize(.small)
-                        .padding(.top, 2)
-                        .popover(isPresented: $showsMissing, arrowEdge: .leading) {
-                            MissingCharacterList(missing: missing)
+                }
+                let incomplete = incompleteSets(in: ranges)
+                if !incomplete.isEmpty {
+                    Menu("Show Missing") {
+                        ForEach(incomplete, id: \.name) { group in
+                            Section(group.name) {
+                                ForEach(group.sets, id: \.set.id) { entry in
+                                    Button("\(entry.set.name) — \(entry.missing.plain) missing") { showsMissing = entry.set }
+                                }
+                            }
                         }
+                    }
+                    .menuStyle(.button)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .padding(.top, 2)
+                    .popover(item: $showsMissing, arrowEdge: .leading) { set in
+                        MissingCharacterList(missing: ranges.missing(sorted: set.scalars))
+                    }
                 }
             } else {
                 ProgressView().controlSize(.small)
@@ -141,6 +154,18 @@ struct CharacterSetsRow: View {
     }
 
     static let unicodeGroupID = "unicode"
+
+    private func incompleteSets(in ranges: ScalarRanges) -> [(name: String, sets: [(set: CharacterSetDefinition, missing: Int)])] {
+        let groups = model.characterSetCatalog.groups.filter { $0.id != Self.unicodeGroupID }.map { ($0.name, $0.sets) }
+            + [("Your Coverage Sets", model.customCharacterSets)]
+        return groups.compactMap { name, sets in
+            let incomplete = sets.compactMap { set in
+                let missing = ranges.missingCount(sorted: set.scalars)
+                return missing > 0 ? (set: set, missing: missing) : nil
+            }
+            return incomplete.isEmpty ? nil : (name: name, sets: incomplete)
+        }
+    }
 
     private func nextLatin(after has: [CharacterSetDefinition]) -> CharacterSetDefinition? {
         guard let series = model.characterSetCatalog.groups.first(where: { $0.id == CharacterSetCatalog.latinSeriesID })?.sets else { return nil }
