@@ -142,7 +142,7 @@ struct ImportSheet: View {
         if library.fontFolder != nil || !library.otherFiles.isEmpty {
             section("Fonts") {
                 Text(toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
-                    : "They’re copied into \(model.installPlace), \(copiedState). \(appName)’s own files stay where they are.")
+                    : "They’re copied into \(model.installPlace). \(appName)’s own files stay where they are.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -342,10 +342,6 @@ struct ImportSheet: View {
             || (choices.tags && !library.tags.isEmpty) || (choices.classifications && !library.classifications.isEmpty)
             || (choices.ratings && !library.ratings.isEmpty) || (choices.comments && !library.comments.isEmpty)
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
-    }
-
-    private var copiedState: String {
-        !library.active.isEmpty && choices.activate ? "inactive except the ones that were active" : "inactive"
     }
 
     private var activateDetail: String {
