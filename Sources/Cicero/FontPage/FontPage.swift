@@ -139,7 +139,6 @@ private struct Header: View {
     private var summary: String {
         var parts: [String] = []
         if let foundry = model.foundryName(of: family) { parts.append(foundry) }
-        parts.append(family.format.rawValue)
         if family.isVariable { parts.append("Variable") }
         parts.append("\(family.stylesLabel) · \(activation)")
         return parts.joined(separator: " · ")

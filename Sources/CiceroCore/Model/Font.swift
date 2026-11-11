@@ -407,11 +407,9 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
     case openTypePostScript = "OpenType PostScript"
     case openTypeTrueType = "OpenType TrueType"
     case collection = "Font Collection"
-    case datafork = "Datafork TrueType"
-    case mixed = "Mixed"
     case other = "Other"
 
-    public static let fileExtensions: Set<String> = ["otf", "ttf", "ttc", "otc", "dfont"]
+    public static let fileExtensions: Set<String> = ["otf", "ttf", "ttc", "otc"]
 
     public static func isFontFile(_ path: String) -> Bool {
         fileExtensions.contains((path as NSString).pathExtension.lowercased())
@@ -422,7 +420,6 @@ public enum FontFormat: String, CaseIterable, Codable, Sendable {
         case "otf": .openTypePostScript
         case "ttf": .openTypeTrueType
         case "ttc", "otc": .collection
-        case "dfont": .datafork
         default: .other
         }
     }
@@ -446,7 +443,6 @@ public struct Family: Identifiable, Hashable, Sendable {
         let dateAdded: Date?
         let classification: Classification
         let mixesSerifAndSans: Bool
-        let format: FontFormat
         let isVariable: Bool
         let isMonospaced: Bool
         let hasItalics: Bool
@@ -483,8 +479,6 @@ public struct Family: Identifiable, Hashable, Sendable {
             app = apps.count == 1 ? apps.first! : nil
             isAdobeFonts = faces.allSatisfy(\.isAdobeFonts)
             position = app == nil ? (faces.contains { $0.state.isActive } ? .on : .off) : SwitchPosition(faces.map(\.position))
-            let formats = Set(faces.map { FontFormat.of(path: $0.face.path) })
-            format = formats.count == 1 ? formats.first! : .mixed
             classification = Classification.of(name: name, faces: faces)
             mixesSerifAndSans = Set(Classification.judged(faces).compactMap(\.letterShape)).isSuperset(of: [.serif, .sansSerif])
             self.regular = regular
@@ -508,7 +502,6 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var dateAdded: Date? { storage.fields.dateAdded }
     public var classification: Classification { storage.fields.classification }
     public var mixesSerifAndSans: Bool { storage.fields.mixesSerifAndSans }
-    public var format: FontFormat { storage.fields.format }
     public var isVariable: Bool { storage.fields.isVariable }
     public var isMonospaced: Bool { storage.fields.isMonospaced }
     public var hasItalics: Bool { storage.fields.hasItalics }

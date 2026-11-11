@@ -52,7 +52,7 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         foundry = inputs.foundryName(family) ?? ""
         styles = family.faces.count
         classification = inputs.classificationName(family)
-        format = family.format.rawValue
+        format = family.fileKinds
         activation = switch family.state {
         case .active, .system: 0
         case .partial: 1

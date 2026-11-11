@@ -208,7 +208,7 @@ public struct FamilyFilters {
                 }
             }
         case .format:
-            return compare { $0.format.rawValue == value }
+            return compare { $0.faces.contains { FontFormat.of(path: $0.face.path).rawValue == value } }
         case .styles:
             let number = Int(value) ?? 0
             switch rule.comparison {

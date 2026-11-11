@@ -181,7 +181,7 @@ private struct RuleRow: View {
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })
         case .format:
-            options(FontFormat.allCases.map { ($0.rawValue, $0.rawValue) })
+            options(FontFormat.allCases.filter { $0 != .other }.map { ($0.rawValue, $0.rawValue) })
         case .styles:
             number(in: 0...999)
         case .feature:
