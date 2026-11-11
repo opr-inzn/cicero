@@ -181,7 +181,7 @@ private struct RuleRow: View {
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })
         case .format:
-            options(FontFormat.allCases.filter { $0 != .other }.map { ($0.rawValue, $0.rawValue) })
+            options(FontFormat.allCases.filter { $0 != .other }.map { ($0.rawValue, Self.formatTitle($0)) })
         case .styles:
             number(in: 0...999)
         case .feature:
@@ -203,6 +203,11 @@ private struct RuleRow: View {
         TextField("Text", text: $rule.value, prompt: Text("Text"))
             .textFieldStyle(.roundedBorder)
             .frame(minWidth: 140, maxWidth: 260)
+    }
+
+    private static func formatTitle(_ format: FontFormat) -> String {
+        let extensions = FontFormat.fileExtensions.filter { FontFormat.of(path: "x.\($0)") == format }.sorted()
+        return "\(format.rawValue) (\(extensions.map { "." + $0 }.joined(separator: ", ")))"
     }
 
     @ViewBuilder
