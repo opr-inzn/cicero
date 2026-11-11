@@ -261,6 +261,23 @@ private final class SampleTextView: NSTextView {
         [.sampleClip] + super.readablePasteboardTypes
     }
 
+    // NSTextView puts a dropped file's path or URL in the text: a glyph dragged off the page and let go here would leave its temporary file's path in the sample.
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        carriesFile(sender) ? [] : super.draggingEntered(sender)
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        carriesFile(sender) ? [] : super.draggingUpdated(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        carriesFile(sender) ? false : super.performDragOperation(sender)
+    }
+
+    private func carriesFile(_ drag: NSDraggingInfo) -> Bool {
+        drag.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+    }
+
     override func preferredPasteboardType(from availableTypes: [NSPasteboard.PasteboardType],
                                           restrictedToTypesFrom allowedTypes: [NSPasteboard.PasteboardType]?) -> NSPasteboard.PasteboardType? {
         if availableTypes.contains(.sampleClip), allowedTypes?.contains(.sampleClip) ?? true { return .sampleClip }
