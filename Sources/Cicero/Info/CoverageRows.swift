@@ -74,7 +74,9 @@ private struct LanguageList: View {
                             }
                             Spacer()
                             if coverage.support(for: language.id) == .full {
-                                Image(systemName: "checkmark").foregroundStyle(.secondary).help("Fully supported, including less common characters")
+                                Image(systemName: "checkmark").foregroundStyle(.green).help("Fully supported, including less common characters")
+                            } else {
+                                Image(systemName: "checkmark").foregroundStyle(.secondary).help("Supported, without some less common characters")
                             }
                         }
                     }
