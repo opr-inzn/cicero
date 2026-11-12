@@ -240,7 +240,7 @@ private struct MissingCharacterList: View {
             }
         }
         .listStyle(.plain)
-        .popoverListInsets(top: 4, bottom: 14)
+        .popoverListInsets(top: 2, bottom: 14)
         .bottomBar {
             // StillPushButtonStyle on the list's background, as the default button's fill is see-through and the rows showed through its label.
             Button("Copy Characters", systemImage: "doc.on.doc", action: copy)
@@ -255,7 +255,7 @@ private struct MissingCharacterList: View {
                         .allowsHitTesting(false)
                 }
         }
-        .frame(width: 340, height: min(420, CGFloat(missing.count) * 30 + 4 + 14 + Self.buttonHeight + Self.barBottom))
+        .frame(width: 340, height: min(420, CGFloat(missing.count) * 30 + 2 + 14 + Self.buttonHeight + Self.barBottom))
     }
 
     private static let background = Color(nsColor: .controlBackgroundColor)
@@ -371,7 +371,7 @@ private struct BlockList: View {
             }
         }
         .listStyle(.plain)
-        .popoverListInsets()
+        .popoverListInsets(top: 3)
         .frame(width: 320, height: 420)
     }
 }
