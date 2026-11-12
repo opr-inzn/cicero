@@ -499,7 +499,8 @@ final class AppModel {
             }
         }
         let restoring = restoring
-        scanTask = Task { [weak self] in
+        // Detached: a task of the main actor starts only once the main thread is free, which at launch is after the window is made.
+        scanTask = Task.detached(priority: .userInitiated) { [weak self] in
             await restoring?.finished()
             do {
                 let library = switch scope {
@@ -507,13 +508,17 @@ final class AppModel {
                 case .files(let changes): try await scanner.scan(input, changes: changes, progress: report)
                 case .fontd(let except): try await scanner.scan(input, keepingWalksExcept: except, progress: report)
                 }
-                guard !Task.isCancelled else { return }
-                self?.finishScan(id)
-                self?.apply(library, scan: id)
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    self?.finishScan(id)
+                    self?.apply(library, scan: id)
+                }
             } catch is CancellationError {
             } catch {
-                self?.finishScan(id)
-                self?.endScan(id)
+                await MainActor.run {
+                    self?.finishScan(id)
+                    self?.endScan(id)
+                }
             }
         }
         return id

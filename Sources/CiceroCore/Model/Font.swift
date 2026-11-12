@@ -461,6 +461,7 @@ public struct Family: Identifiable, Hashable, Sendable {
         let hasTemporarilyActivatable: Bool
         let hasDeactivatable: Bool
         let temporaryScope: TemporaryScope?
+        let fileKinds: String
 
         init(name: String, faces: [LibraryFace], state: FamilyState, folderIDs: Set<UUID>, manufacturer: String?) {
             precondition(!faces.isEmpty, "A family has at least one face")
@@ -493,6 +494,14 @@ public struct Family: Identifiable, Hashable, Sendable {
             hasDeactivatable = faces.contains(where: \.canDeactivate)
             let scopes = Set(faces.filter(\.state.isActive).map(\.state.temporaryScope))
             temporaryScope = scopes.count == 1 ? scopes.first! : nil
+            var kinds: [String] = []
+            var lastPath: String?
+            for face in faces where face.face.path != lastPath {
+                lastPath = face.face.path
+                let kind = (face.face.path as NSString).pathExtension.uppercased()
+                if !kinds.contains(kind) { kinds.append(kind) }
+            }
+            fileKinds = kinds.sorted().joined(separator: " · ")
         }
     }
 
@@ -519,9 +528,7 @@ public struct Family: Identifiable, Hashable, Sendable {
     public var hasTemporarilyActivatable: Bool { storage.fields.hasTemporarilyActivatable }
     public var hasDeactivatable: Bool { storage.fields.hasDeactivatable }
     public var temporaryScope: TemporaryScope? { storage.fields.temporaryScope }
-    public var fileKinds: String {
-        Set(faces.map { ($0.face.path as NSString).pathExtension.uppercased() }).sorted().joined(separator: " · ")
-    }
+    public var fileKinds: String { storage.fields.fileKinds }
 
     public static func == (a: Family, b: Family) -> Bool {
         a.storage === b.storage || a.storage.fields == b.storage.fields

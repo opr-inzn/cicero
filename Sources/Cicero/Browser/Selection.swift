@@ -319,7 +319,7 @@ struct FamilyItem: ViewModifier {
                 if NSApp.currentEvent?.clickCount == 2 { model.openFamilyID = family.id }
             }
             .contextMenu {
-                FamilyMenu(families: model.targets(for: family), model: model)
+                TargetsMenu(family: family, model: model)
             }
             .fontDrag { FontDrag(families: model.targets(for: family).map(\.id)) } preview: {
                 FamilyDragPreview(family: family, count: model.targets(for: family).count)
@@ -329,6 +329,15 @@ struct FamilyItem: ViewModifier {
             .accessibilityAction { model.openFamilyID = family.id }
             .accessibilityAction(named: "Select") { model.click(family, in: order.families, anchor: &anchor) }
             .accessibilityAction(named: family.hasActive ? "Deactivate" : "Activate") { model.toggle(family) }
+    }
+}
+
+private struct TargetsMenu: View {
+    let family: Family
+    let model: AppModel
+
+    var body: some View {
+        FamilyMenu(families: model.targets(for: family), model: model)
     }
 }
 

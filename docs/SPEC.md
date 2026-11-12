@@ -182,7 +182,10 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
   axes and features it's drawn with — once, off the main thread, as a width per point of the size (from the leftmost of
   its first glyph's outline and its line's start to the rightmost of its last glyph's outline and its line's end; outlines
   scale with the size, so dragging Size measures nothing, and a font is drawn at its size, never a smaller one, in
-  proportion to its true width). Of the families All Fonts lists, in the styles they show without a search, the width
+  proportion to its true width). In a library of more than 2,000 listed families it measures about 2,000 of them, the
+  same ones at each launch (`SampleWidths.measured(of:)`, by a hash of the family's name): measuring 20,000 took 1.3 s
+  for each letter typed into the preview text, on every core. Of the families All Fonts lists, or of those measured, in
+  the styles they show without a search, the width
   that all but the widest twentieth stay within (all of them in a library of fewer than twenty) sets the tiles' least
   width, for every list and search alike: measured for each sidebar selection, a list with a few more wide fonts than
   another (Active next to All Fonts, without the narrower fonts for Adobe apps) had wider tiles, often one fewer in a

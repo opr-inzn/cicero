@@ -31,7 +31,10 @@ enum MeasureRun {
         guard await until(minutes: 60, { model.measuredLibraries > 0 }) else { return Measurements.count("run.failed", detail: "not indexed") }
         await launchStep("launch.indexed")
         _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(30))
-        if ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"] == "launch" { return }
+        if ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"] == "launch" {
+            Measurements.count("whatsNew", detail: WhatsNew.shared.notes.map(\.version).joined(separator: " "))
+            return
+        }
 
         let defaults = UserDefaults.standard
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
@@ -120,6 +123,70 @@ enum MeasureRun {
                     await step("page.close") { model.openFamilyID = nil }
                 }
             }
+            return
+        }
+
+        if only == "type" {
+            let widths = SampleWidths.shared
+            await step("mode", detail: "grid") { defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let text = "Sphinx of black quartz"
+            for end in text.indices.dropFirst() where text[text.index(before: end)] != " " {
+                let measured = widths.measuredLog.count, start = ContinuousClock.now
+                preview.sampleText = String(text[..<end])
+                let done = await until(seconds: 10) { widths.measuredLog.count > measured }
+                let ratio = widths.listRatio.map { "\($0)" } ?? "none"
+                Measurements.record("type.measured", ms: (ContinuousClock.now - start).milliseconds,
+                                    detail: done ? "\(widths.measuredLog.last?.all ?? 0) samples, ratio \(ratio)" : "not measured")
+                _ = await MainSettle.wait()
+            }
+            preview.sampleText = ""
+            return
+        }
+        if only == "select" {
+            for info in [false, true] {
+                model.isInfoPresented = info
+                _ = await MainSettle.wait(quiet: .milliseconds(500), limit: .seconds(10))
+                let tag = info ? ".info" : ""
+                for mode in [BrowserMode.grid, .list, .specimens] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    _ = await MainSettle.wait(quiet: .milliseconds(500), limit: .seconds(10))
+                    for family in model.visibleFamilies.prefix(12) {
+                        await step("select.\(mode.rawValue)\(tag)", detail: family.name) { model.selectedIDs = [family.id] }
+                    }
+                    await step("select.none.\(mode.rawValue)\(tag)") { model.selectedIDs = [] }
+                    await step("select.all.\(mode.rawValue)\(tag)") { model.selectedIDs = Set(model.visibleFamilies.map(\.id)) }
+                    await scroll(mode: mode)
+                    await step("select.none.\(mode.rawValue)\(tag)") { model.selectedIDs = [] }
+                }
+            }
+            model.isInfoPresented = false
+            return
+        }
+        if only == "similar" {
+            let table = model.similarFonts
+            var asked = 0, differing: [String] = []
+            for family in model.library.families {
+                let kinds: [SearchQuery.Style?] = [nil] + family.kinds + family.faces.map(family.kind(of:))
+                    + [SearchQuery.Style(isItalic: true, width: nil), SearchQuery.Style(isItalic: false, width: 3)]
+                for kind in kinds {
+                    asked += 1
+                    let style = kind.flatMap { kind in family.faces.first { family.kind(of: $0) == kind } }
+                    guard kind == nil || style != nil else { continue }
+                    if table.contains(family.id, kind: kind) != model.canShowSimilar(family, style: style) { differing.append(family.name) }
+                }
+            }
+            check(differing.isEmpty, "the menu's answer is the table's for every family and kind (\(asked) asked, \(differing.count) differ: \(differing.prefix(5)))")
+            let picks = pagePicks(model)
+            for family in picks {
+                await step("select", detail: family.name) { model.selectedIDs = [family.id] }
+                await step("rate.selected", detail: family.name) { model.setRating(3, for: [family]) }
+                await step("similar.menu", detail: family.name) { _ = model.canShowSimilar(family, style: nil) }
+                await step("rate.selected", detail: family.name) { model.setRating(nil, for: [family]) }
+                await step("similar.table", detail: family.name) { _ = model.similarFonts.contains(family.id) }
+            }
+            model.selectedIDs = []
+            Measurements.count("key", detail: "\(LibraryFocus.shared.isKey)")
             return
         }
 
@@ -246,8 +313,8 @@ enum MeasureRun {
             check(FileManager.default.fileExists(atPath: SampleWidths.savedURL.path), "the widths are saved")
         case "2":
             check(!log.isEmpty && log.allSatisfy { $0.new == 0 }, "a warm launch measures no sample (\(log.map(\.new)))")
-            let listed = model.library.families.filter(model.data.lists).count
-            check(log.last.map { $0.all == listed } ?? false, "it knows every family's sample (\(log.last?.all ?? 0) of \(listed))")
+            let listed = SampleWidths.measured(of: model.library.families.filter(model.data.lists)).count
+            check(log.last.map { $0.all == listed } ?? false, "it knows every measured family's sample (\(log.last?.all ?? 0) of \(listed))")
 
             let before = names()
             let first = await notice()

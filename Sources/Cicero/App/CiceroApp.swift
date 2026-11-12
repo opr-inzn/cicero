@@ -11,7 +11,11 @@ struct CiceroApp: App {
     @State private var menuBarItem: MenuBarItem
 
     init() {
+        #if CICERO_MEASURE
+        Measurements.time("noteLaunch") { WhatsNew.shared.noteLaunch() }
+        #else
         WhatsNew.shared.noteLaunch()
+        #endif
         let model = AppModel()
         let updates = Updates()
         let menuBarItem = MenuBarItem(model: model)

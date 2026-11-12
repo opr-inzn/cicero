@@ -122,7 +122,7 @@ public struct SimilarFonts: Sendable {
         var styles: [(family: Int, kind: SearchQuery.Style, values: [Float], embedding: [Float])] = []
         var neighbors: [(family: Int, values: [Float], embedding: [Float])] = []
         func usable(_ measured: LetterMeasurements?, _ embedded: [Float]?) -> Bool {
-            (measured != nil || !measuring) && (embedded != nil || !embedding) && (measured != nil || embedded != nil)
+            Self.usable(measured, embedded, measuring: measuring, embedding: embedding)
         }
         for family in families {
             let measured = measurements(family), embedded = embedding ? embeddings?(family) : nil
@@ -191,6 +191,23 @@ public struct SimilarFonts: Sendable {
         self.weights = LetterMeasurements.Measure.allCases.map { weights[$0] ?? 0 }
         self.embeddingWeight = embedding ? embeddingWeight : 0
         self.otherClassification = otherClassification
+    }
+
+    private static func usable(_ measured: LetterMeasurements?, _ embedded: [Float]?, measuring: Bool, embedding: Bool) -> Bool {
+        (measured != nil || !measuring) && (embedded != nil || !embedding) && (measured != nil || embedded != nil)
+    }
+
+    public static func covers(_ family: Family, kind: SearchQuery.Style? = nil, measurements: (Family) -> LetterMeasurements?,
+                              embeddings: ((Family) -> [Float]?)? = nil, styleMeasurements: ((LibraryFace) -> LetterMeasurements?)? = nil,
+                              styleEmbeddings: ((LibraryFace) -> [Float]?)? = nil,
+                              weights: [LetterMeasurements.Measure: Float] = SimilarFonts.weights,
+                              embeddingWeight: Float = SimilarFonts.embeddingWeight) -> Bool {
+        let measuring = weights.values.contains { $0 > 0 }, embedding = embeddings != nil && embeddingWeight > 0
+        guard usable(measurements(family), embedding ? embeddings?(family) : nil, measuring: measuring, embedding: embedding) else { return false }
+        guard let kind, kind != family.kind(of: family.regular) else { return true }
+        guard styleMeasurements != nil, family.kinds.contains(kind), let face = family.representative(of: kind) else { return false }
+        if face.id == family.regular.id { return true }
+        return usable(styleMeasurements?(face), embedding ? styleEmbeddings?(face) : nil, measuring: measuring, embedding: embedding)
     }
 
     public var count: Int { ids.count }
