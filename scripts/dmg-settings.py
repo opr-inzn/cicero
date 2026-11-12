@@ -9,7 +9,7 @@ app = defines["app"]  # noqa: F821, both given by make-dmg.sh with -D
 # bookmark, can't resolve the one dmgbuild makes up, and shows no picture at all; without it, it uses the alias.
 mac_alias.Bookmark.for_file = staticmethod(lambda path: None)
 
-format = "UDZO"
+format = "ULMO"
 filesystem = "HFS+"
 files = [app]
 symlinks = {"Applications": "/Applications"}

@@ -3,7 +3,9 @@
 #   SIGN_IDENTITY  codesigning identity (default: ad-hoc "-"); a real identity also enables the hardened runtime
 #                  and a secure timestamp, as notarization needs
 #   MEASURE=1      compiles in the app performance runs' measurements (-D CICERO_MEASURE), for
-#                  Tests/E2E/app-perf/build-perf-app.sh only; without it, a binary that has them is refused
+#                  Tests/E2E/app-perf/build-perf-app.sh only, and keeps the symbols that Instruments shows; without it,
+#                  a binary that has them is refused, and both binaries are stripped, their symbols kept in
+#                  build/dSYMs/<version>-<build> for crash reports
 # Apple silicon only.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -54,6 +56,16 @@ BUILT_SDK="$(otool -l "$APP/Contents/MacOS/Cicero" | awk '/LC_BUILD_VERSION/ { f
 if [[ "$BUILT_SDK" != "$(xcrun --sdk macosx --show-sdk-version)" ]]; then
     echo "Cicero says it was built with the macOS $BUILT_SDK SDK, not $(xcrun --sdk macosx --show-sdk-version)" >&2
     exit 1
+fi
+if [[ "${MEASURE:-}" != 1 ]]; then
+    PLIST=Resources/Info.plist
+    DSYMS="build/dSYMs/$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$PLIST")-$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$PLIST")"
+    rm -rf "$DSYMS"
+    mkdir -p "$DSYMS"
+    dsymutil "$APP/Contents/MacOS/Cicero" -o "$DSYMS/Cicero.dSYM"
+    # Not cicero.dSYM, which is Cicero.dSYM on a disk that ignores case.
+    dsymutil "$APP/Contents/Helpers/cicero" -o "$DSYMS/cicero-cli.dSYM"
+    strip -S -x "$APP/Contents/MacOS/Cicero" "$APP/Contents/Helpers/cicero"
 fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Language data from Hyperglot (see scripts/update-languages.py) and its license.
