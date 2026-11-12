@@ -2,7 +2,7 @@ import Foundation
 
 enum LibraryCache {
     private static let magic: UInt32 = 0x4243_4C43
-    private static let version: UInt32 = 1
+    private static let version: UInt32 = 2
 
     private struct SavedFamily: Sendable {
         var name: String
@@ -30,6 +30,8 @@ enum LibraryCache {
                 writer.write(face.app)
                 writer.write(face.state)
                 writer.write(face.dateAdded?.timeIntervalSinceReferenceDate)
+                writer.write(UInt32(face.folderIDs.count))
+                for id in face.folderIDs { writer.write(id) }
                 writer.write(UInt32(face.copies.count))
                 for copy in face.copies {
                     writer.write(copy.face.path)
@@ -89,6 +91,8 @@ enum LibraryCache {
                         let app = try reader.optionalString()
                         let state = current(try reader.state(), path, app)
                         let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
+                        var faceFolderIDs = Set<UUID>()
+                        for _ in 0..<Int(try reader.u32()) { faceFolderIDs.insert(try reader.uuid()) }
                         var copies: [FaceCopy] = []
                         for _ in 0..<Int(try reader.u32()) {
                             let path = try reader.string()
@@ -96,7 +100,7 @@ enum LibraryCache {
                             let app = try reader.optionalString()
                             copies.append(FaceCopy(face: face, state: current(try reader.state(), path, app), app: app))
                         }
-                        faces.append(LibraryFace(face: face, state: state, copies: copies, dateAdded: dateAdded, app: app))
+                        faces.append(LibraryFace(face: face, state: state, copies: copies, dateAdded: dateAdded, app: app, folderIDs: faceFolderIDs))
                     }
                     guard !faces.isEmpty else { return nil }
                     members.append(SavedFamily(name: name, manufacturer: manufacturer, folderIDs: folderIDs, faces: faces))

@@ -254,7 +254,7 @@ final class AppModel {
     @ObservationIgnored private var fontdChangedDuringScan = false
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family], ids: Set<String>)?
-    @ObservationIgnored var adobeFontsOnlyCache: (fingerprint: Int, families: [String: Family])?
+    @ObservationIgnored var locationOnlyCache: (fingerprint: Int, location: UUID, families: [String: Family])?
     @ObservationIgnored var visibleCountsCache: (key: VisibleKey, active: Int, appOnly: [String])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()

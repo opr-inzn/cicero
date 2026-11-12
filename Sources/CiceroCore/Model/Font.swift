@@ -350,15 +350,18 @@ public struct LibraryFace: Identifiable, Hashable, Sendable {
     public let copies: [FaceCopy]
     public let dateAdded: Date?
     public let app: String?
+    public let folderIDs: Set<UUID>
     public let isAdobeFonts: Bool
 
-    public init(face: FontFace, state: FaceState, otherCopies: [String] = [], copies: [FaceCopy] = [], dateAdded: Date? = nil, app: String? = nil) {
+    public init(face: FontFace, state: FaceState, otherCopies: [String] = [], copies: [FaceCopy] = [], dateAdded: Date? = nil, app: String? = nil,
+                folderIDs: Set<UUID> = []) {
         self.face = face
         self.state = state
         self.otherCopies = copies.isEmpty ? otherCopies : copies.map(\.face.path)
         self.copies = copies
         self.dateAdded = dateAdded
         self.app = app
+        self.folderIDs = folderIDs
         isAdobeFonts = ActiveSource.isAdobeFonts(face.path)
     }
 

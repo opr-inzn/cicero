@@ -238,6 +238,14 @@ extension Family {
         guard !faces.isEmpty else { return nil }
         return Family(name: id, faces: faces, state: LibraryScanner.familyState(of: faces), folderIDs: folderIDs, manufacturer: manufacturer)
     }
+
+    public func only(inLocation id: UUID) -> Family? {
+        if id == WatchedFolder.adobeFontsID { return adobeFontsOnly }
+        let faces = faces.filter { $0.folderIDs.contains(id) }
+        guard !faces.isEmpty else { return nil }
+        guard faces.count < self.faces.count else { return self }
+        return Family(name: self.id, faces: faces, state: LibraryScanner.familyState(of: faces), folderIDs: folderIDs, manufacturer: manufacturer)
+    }
 }
 
 private extension LibraryFace {
@@ -245,6 +253,6 @@ private extension LibraryFace {
         if isAdobeFonts { return self }
         guard let adobe = copies.first(where: { ActiveSource.isAdobeFonts($0.face.path) }) else { return nil }
         let others = [FaceCopy(self)] + copies.filter { $0.face.path != adobe.face.path }
-        return LibraryFace(face: adobe.face, state: adobe.state, copies: others, dateAdded: dateAdded, app: adobe.app)
+        return LibraryFace(face: adobe.face, state: adobe.state, copies: others, dateAdded: dateAdded, app: adobe.app, folderIDs: folderIDs)
     }
 }

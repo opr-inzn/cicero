@@ -926,8 +926,9 @@ public final class LibraryScanner: Sendable {
             for copy in sorted.dropFirst() where copy.face.path != winner.face.path && !others.contains(where: { $0.face.path == copy.face.path }) {
                 others.append(FaceCopy(face: copy.face, state: copy.state, app: copy.app))
             }
-            let face = LibraryFace(face: winner.face, state: winner.state, copies: others, dateAdded: sorted.compactMap(\.dateAdded).min(), app: winner.app)
             let folderIDs = Set(sorted.flatMap(\.folderIDs))
+            let face = LibraryFace(face: winner.face, state: winner.state, copies: others, dateAdded: sorted.compactMap(\.dateAdded).min(), app: winner.app,
+                                   folderIDs: folderIDs)
             byFamily[winner.face.familyName, default: []].append((face, folderIDs, winner.stamp))
         }
 
@@ -977,6 +978,7 @@ public final class LibraryScanner: Sendable {
                 hasher.combine(face.state)
                 hasher.combine(face.copies)
                 hasher.combine(face.app)
+                hasher.combine(face.folderIDs)
                 hasher.combine(face.dateAdded)
                 hasher.combine(stamps[face.id])
             }

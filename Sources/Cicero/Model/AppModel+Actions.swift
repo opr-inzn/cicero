@@ -740,9 +740,9 @@ extension AppModel {
     func families(in item: SidebarItem) -> [Family] {
         let test = filter(for: item)
         let families = library.families.filter { data.lists($0) && test($0) }
-        guard item == .folder(WatchedFolder.adobeFontsID) else { return families }
-        let adobeFontsOnly = adobeFontsOnly
-        return families.map { adobeFontsOnly[$0.id] ?? $0 }
+        guard case .folder(let location) = item else { return families }
+        let onlyIn = onlyIn(location)
+        return families.map { onlyIn[$0.id] ?? $0 }
     }
 
     func faces(in items: [SidebarItem]) -> [LibraryFace] {

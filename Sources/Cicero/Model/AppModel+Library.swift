@@ -93,22 +93,23 @@ extension AppModel {
 
     func family(_ id: String) -> Family? { library.family(id).map(shown) }
 
-    var showsAdobeFontsOnly: Bool {
-        selectedItems == [.folder(WatchedFolder.adobeFontsID)] && documentList == nil && similarFamilyID == nil
+    var shownLocation: UUID? {
+        guard documentList == nil, similarFamilyID == nil, selectedItems.count == 1, case .folder(let id) = selectedItems.first else { return nil }
+        return id
     }
 
     func shown(_ family: Family) -> Family {
-        guard showsAdobeFontsOnly, !family.isAdobeFonts else { return family }
-        return adobeFontsOnly[family.id] ?? family
+        guard let location = shownLocation else { return family }
+        return onlyIn(location)[family.id] ?? family
     }
 
-    var adobeFontsOnly: [String: Family] {
-        if let cached = adobeFontsOnlyCache, cached.fingerprint == library.fingerprint { return cached.families }
+    func onlyIn(_ location: UUID) -> [String: Family] {
+        if let cached = locationOnlyCache, cached.fingerprint == library.fingerprint, cached.location == location { return cached.families }
         var families: [String: Family] = [:]
-        for family in library.families where !family.isAdobeFonts && family.folderIDs.contains(WatchedFolder.adobeFontsID) {
-            families[family.id] = family.adobeFontsOnly
+        for family in library.families where family.folderIDs.contains(location) {
+            if let only = family.only(inLocation: location), only != family { families[family.id] = only }
         }
-        adobeFontsOnlyCache = (library.fingerprint, families)
+        locationOnlyCache = (library.fingerprint, location, families)
         return families
     }
 
@@ -271,7 +272,7 @@ extension AppModel {
         var kept: [Int] = []
         for index in families.indices where keeps(families[index]) { kept.append(index) }
         let listed = kept.count == families.count ? families : kept.map { families[$0] }
-        if showsAdobeFontsOnly { return listed.map(shown) }
+        if shownLocation != nil { return listed.map(shown) }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 
