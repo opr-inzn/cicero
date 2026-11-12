@@ -130,7 +130,7 @@ struct FontGrid: View {
         let families = model.library.families, data = model.data
         let axes = model.familyAxes.mapValues { (face: $0.face, values: $0.values) }
         let samples = await Task.detached(priority: .userInitiated) {
-            families.filter(data.lists).map { family in
+            SampleWidths.measured(of: families.filter(data.lists)).map { family in
                 let (style, weight) = family.previewStyle(for: SearchQuery(""))
                 let variations = axes[family.id].flatMap { $0.face == style.id ? $0.values : nil } ?? [:]
                 return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: variations, features: [])

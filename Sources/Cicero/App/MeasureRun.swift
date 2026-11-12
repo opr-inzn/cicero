@@ -123,6 +123,23 @@ enum MeasureRun {
             return
         }
 
+        if only == "type" {
+            let widths = SampleWidths.shared
+            await step("mode", detail: "grid") { defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let text = "Sphinx of black quartz"
+            for end in text.indices.dropFirst() where text[text.index(before: end)] != " " {
+                let measured = widths.measuredLog.count, start = ContinuousClock.now
+                preview.sampleText = String(text[..<end])
+                let done = await until(seconds: 10) { widths.measuredLog.count > measured }
+                let ratio = widths.listRatio.map { "\($0)" } ?? "none"
+                Measurements.record("type.measured", ms: (ContinuousClock.now - start).milliseconds,
+                                    detail: done ? "\(widths.measuredLog.last?.all ?? 0) samples, ratio \(ratio)" : "not measured")
+                _ = await MainSettle.wait()
+            }
+            preview.sampleText = ""
+            return
+        }
         if only == "select" {
             for info in [false, true] {
                 model.isInfoPresented = info
@@ -293,8 +310,8 @@ enum MeasureRun {
             check(FileManager.default.fileExists(atPath: SampleWidths.savedURL.path), "the widths are saved")
         case "2":
             check(!log.isEmpty && log.allSatisfy { $0.new == 0 }, "a warm launch measures no sample (\(log.map(\.new)))")
-            let listed = model.library.families.filter(model.data.lists).count
-            check(log.last.map { $0.all == listed } ?? false, "it knows every family's sample (\(log.last?.all ?? 0) of \(listed))")
+            let listed = SampleWidths.measured(of: model.library.families.filter(model.data.lists)).count
+            check(log.last.map { $0.all == listed } ?? false, "it knows every measured family's sample (\(log.last?.all ?? 0) of \(listed))")
 
             let before = names()
             let first = await notice()
