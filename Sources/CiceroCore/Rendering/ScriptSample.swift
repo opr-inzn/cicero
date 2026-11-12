@@ -60,10 +60,10 @@ public final class ScriptSamples: Sendable {
         self.languages = languages
     }
 
-    public func text(_ text: String, for face: FontFace, long: Bool = false, cached: Bool = true) -> String {
+    public func text(_ text: String, for face: FontFace, long: Bool = false, cached: Bool = true, font: CTFont? = nil) -> String {
         guard !FontLoader.shared.wouldWait(for: face.path) else { return text }
         let generation = FontLoader.shared.generation(of: face.path)
-        let font = FontLoader.shared.font(face, size: 12, cached: cached)
+        let font = font ?? FontLoader.shared.font(face, size: 12, cached: cached)
         guard ScriptSample.isNeeded(for: text, has: { font.glyph(for: Character($0)) != nil }),
               let sample = sample(for: face, generation: generation, font: font)
         else { return text }

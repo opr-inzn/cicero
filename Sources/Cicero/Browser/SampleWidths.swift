@@ -210,14 +210,14 @@ final class SampleWidths {
             }
             // Nor one a cloud service keeps online only, which reading would download.
             if local, file.st_flags & UInt32(SF_DATALESS) != 0, !FontLoader.shared.hasDescriptors(for: path) { continue }
-            let text = scriptSamples.text(sample.text, for: sample.face, cached: false)
+            let font = FontLoader.shared.font(sample.face, size: 100, weight: sample.weight, variations: sample.variations,
+                                              features: sample.features, cached: false)
+            let text = scriptSamples.text(sample.text, for: sample.face, cached: false, font: font)
             let key = sample.key(text: text)
             let ratio: CGFloat
             if let known = measured[sample.text]?[key] ?? ratios.withLock({ $0.value(key, text: sample.text) }) {
                 ratio = known
             } else {
-                let font = FontLoader.shared.font(sample.face, size: 100, weight: sample.weight, variations: sample.variations,
-                                                  features: sample.features, cached: false)
                 ratio = width(of: text, in: font) / CTFontGetSize(font)
                 measured[sample.text, default: [:]][key] = ratio
             }
