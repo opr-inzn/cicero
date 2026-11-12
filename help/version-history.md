@@ -6,6 +6,8 @@ What changed in each version of Cicero, newest first. To download a version, see
 
 ## 0.12.0
 
+- **Copy the characters a font is missing:** in the **Info** tab, **Show Missing** under **Coverage** lets you choose any character set, and in **Show All** under **Unicode Blocks** you can click a block to see what it is missing. **Copy Characters** puts them on the clipboard, to paste into your font editor.
+- **Languages:** every supported language now has a checkmark: green for full support, grey for support without some less common characters. Type a language the font doesn’t support in the search field to see the characters it is missing.
 - **The Cicero CLI** finds, checks and turns on your fonts, tags them, puts them in folders, and gives them ratings and notes, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. Tab completion works in zsh, bash and fish. See [The Cicero CLI](command-line.md).
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](command-line.md#use-it-in-claude-and-codex) says.
 - `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
