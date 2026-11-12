@@ -646,14 +646,17 @@ private struct StyleRows: View {
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         let showsWeight = family.stylesDifferInWeight
+        let showsFormat = Set(family.faces.map { ($0.face.path as NSString).pathExtension.lowercased() }).count > 1
         // Not lazy: in a lazy stack, rows each as high as their own font's line moved the page below, and with it the glyph row `TopRowKeeper` keeps at the top.
         VStack(spacing: 0) {
-            row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
+            row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
                 Text("Styles")
             } style: {
                 Text("Style")
             } weight: {
                 Text("Weight")
+            } format: {
+                Text("Format")
             } axes: {
                 ForEach(axes, id: \.tag) { Text($0.name).frame(width: $0.width, alignment: .leading) }
             } status: {
@@ -664,7 +667,7 @@ private struct StyleRows: View {
             .padding(.vertical, 6)
             ForEach(family.faces) { style in
                 Divider()
-                row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
+                row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
                     FontText(text: model.scriptSamples.text(family.name, for: style.face), face: style.face, size: 20,
                              weight: style.face.styleWeight)
                         .foregroundStyle(Color.ink)
@@ -672,6 +675,8 @@ private struct StyleRows: View {
                     Text(style.face.styleName)
                 } weight: {
                     Text(Int(style.face.styleWeight.rounded()).formatted(.number.grouping(.never))).monospacedDigit().foregroundStyle(.secondary)
+                } format: {
+                    Text((style.face.path as NSString).pathExtension.uppercased()).foregroundStyle(.secondary)
                 } axes: {
                     ForEach(axes, id: \.tag) { axis in
                         Text(style.face.styleValue(on: axis.tag)?.formatted(.number.grouping(.never).precision(.fractionLength(0...1))) ?? "")
@@ -708,14 +713,15 @@ private struct StyleRows: View {
         return min(max(minimum, widest.rounded(.up)), maximum)
     }
 
-    private func row(styleWidth: CGFloat, statusWidth: CGFloat, showsWeight: Bool,
+    private func row(styleWidth: CGFloat, statusWidth: CGFloat, showsWeight: Bool, showsFormat: Bool,
                      @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
-                     @ViewBuilder weight: () -> some View, @ViewBuilder axes: () -> some View,
+                     @ViewBuilder weight: () -> some View, @ViewBuilder format: () -> some View, @ViewBuilder axes: () -> some View,
                      @ViewBuilder status: () -> some View) -> some View {
         HStack(spacing: 12) {
             preview().frame(maxWidth: .infinity, alignment: .leading)
             style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
             if showsWeight { weight().frame(width: 56, alignment: .leading) }
+            if showsFormat { format().lineLimit(1).frame(width: 56, alignment: .leading) }
             axes().lineLimit(1)
             status().frame(width: statusWidth, alignment: .leading)
         }
