@@ -37,7 +37,14 @@ extension AppModel {
     }
 
     func canShowSimilar(_ family: Family, style: LibraryFace?) -> Bool {
-        similarFonts.contains(family.id, kind: style.map(family.kind(of:)))
+        _ = measurementRevision
+        guard let listed = library.family(family.id), data.lists(listed) else { return false }
+        let measurements = measurements
+        return SimilarFonts.covers(listed, kind: style.map(family.kind(of:)),
+                                   measurements: { measurements.measurements(of: $0.regular.face.id) },
+                                   embeddings: { measurements.embedding(of: $0.regular.face.id) },
+                                   styleMeasurements: { measurements.measurements(of: $0.id) },
+                                   styleEmbeddings: { measurements.embedding(of: $0.id) })
     }
 
     func shownStyle(of family: Family) -> LibraryFace? {
