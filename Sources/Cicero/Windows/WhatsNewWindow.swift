@@ -16,20 +16,28 @@ struct ReleaseNotes: Identifiable {
         return SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func base(_ version: String) -> URL? {
-        URL(string: "https://github.com/opr-inzn/cicero/blob/v\(version)/")
+    struct Source {
+        let version: String
+        var paragraphs: [String] = []
+        var items: [String] = []
+
+        var notes: ReleaseNotes {
+            let base = URL(string: "https://github.com/opr-inzn/cicero/blob/v\(version)/")
+            return ReleaseNotes(version: version, paragraphs: paragraphs.map { ReleaseNotes.inline($0, base: base) },
+                                items: items.map { ReleaseNotes.inline($0, base: base) })
+        }
     }
 
-    static func parse(_ text: String) -> [ReleaseNotes] {
-        var versions: [ReleaseNotes] = []
-        var current: ReleaseNotes?
+    static func sources(_ text: String) -> [Source] {
+        var versions: [Source] = []
+        var current: Source?
         var lines: [String] = []
         var isItem = false
 
         func flush() {
             defer { lines = [] }
             guard current != nil, !lines.isEmpty else { return }
-            let text = inline(lines.joined(separator: " "), base: base(current?.version ?? ""))
+            let text = lines.joined(separator: " ")
             if isItem { current!.items.append(text) } else { current!.paragraphs.append(text) }
         }
         for line in text.components(separatedBy: .newlines) {
@@ -38,7 +46,7 @@ struct ReleaseNotes: Identifiable {
                 flush()
                 if let current { versions.append(current) }
                 let heading = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
-                current = heading.first?.isNumber == true ? ReleaseNotes(version: heading) : nil
+                current = heading.first?.isNumber == true ? Source(version: heading) : nil
             } else if trimmed.isEmpty {
                 flush()
             } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
@@ -70,10 +78,10 @@ struct ReleaseNotes: Identifiable {
         return text
     }
 
-    static var bundled: [ReleaseNotes]? {
+    static var bundled: [Source]? {
         guard let url = Bundle.main.url(forResource: "CHANGELOG", withExtension: "md"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        return parse(text)
+        return sources(text)
     }
 }
 
@@ -94,34 +102,36 @@ final class WhatsNew {
         guard let current = Self.currentVersion, let all = ReleaseNotes.bundled else { return }
         let defaults = UserDefaults.standard
         let last = defaults.string(forKey: Self.lastVersionKey)
+        let ours = all.first { $0.version == current }?.notes
         if let last {
-            pending = all.filter { Self.isNewer($0.version, than: last) && !Self.isNewer($0.version, than: current) }
-            if pending.isEmpty, last == current, let notes = all.first(where: { $0.version == current }),
-               defaults.string(forKey: Self.lastNotesKey) != notes.checksum {
-                pending = [notes]
+            pending = all.filter { Self.isNewer($0.version, than: last) && !Self.isNewer($0.version, than: current) }.map(\.notes)
+            if pending.isEmpty, last == current, let ours, defaults.string(forKey: Self.lastNotesKey) != ours.checksum {
+                pending = [ours]
             }
-        } else if UserDataStore(locations: .standard).hasSavedData, let notes = all.first(where: { $0.version == current }) {
-            pending = [notes]
+        } else if UserDataStore(locations: .standard).hasSavedData, let ours {
+            pending = [ours]
         }
-        if pending.isEmpty { Self.remember(current, notes: all) }
+        if pending.isEmpty { Self.remember(current, notes: ours) }
     }
 
-    private static func remember(_ current: String, notes all: [ReleaseNotes]?) {
+    private static func remember(_ current: String, notes: ReleaseNotes?) {
         UserDefaults.standard.set(current, forKey: lastVersionKey)
-        UserDefaults.standard.set(all?.first(where: { $0.version == current })?.checksum, forKey: lastNotesKey)
+        UserDefaults.standard.set(notes?.checksum, forKey: lastNotesKey)
     }
 
     func takePending() -> Bool {
         guard !pending.isEmpty else { return false }
         notes = pending
         pending = []
-        if let current = Self.currentVersion { Self.remember(current, notes: ReleaseNotes.bundled) }
+        if let current = Self.currentVersion {
+            Self.remember(current, notes: ReleaseNotes.bundled?.first { $0.version == current }?.notes)
+        }
         return true
     }
 
     func showLatest() -> Bool {
         guard let current = Self.currentVersion,
-              let latest = ReleaseNotes.bundled?.first(where: { !Self.isNewer($0.version, than: current) }) else { return false }
+              let latest = ReleaseNotes.bundled?.first(where: { !Self.isNewer($0.version, than: current) })?.notes else { return false }
         notes = [latest]
         return true
     }

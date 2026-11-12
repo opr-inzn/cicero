@@ -31,7 +31,10 @@ enum MeasureRun {
         guard await until(minutes: 60, { model.measuredLibraries > 0 }) else { return Measurements.count("run.failed", detail: "not indexed") }
         await launchStep("launch.indexed")
         _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(30))
-        if ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"] == "launch" { return }
+        if ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"] == "launch" {
+            Measurements.count("whatsNew", detail: WhatsNew.shared.notes.map(\.version).joined(separator: " "))
+            return
+        }
 
         let defaults = UserDefaults.standard
         defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode")
