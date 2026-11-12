@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
+    @State private var width: CGFloat = 0
 
     var body: some View {
         let groups = ProblemKind.allCases.compactMap { kind -> (kind: ProblemKind, problems: [Problem])? in
@@ -31,12 +32,15 @@ struct ProblemsView: View {
                     }
                     .frame(maxWidth: 760, alignment: .leading)
                     .padding(24)
+                    // Centred by the width outside the scroll view: inside it, a scroll bar that takes room moves the centre whenever the list starts to scroll.
+                    .padding(.leading, max(0, (width - 808) / 2))
                     // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its bar sits at the edge.
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(Color.canvas)
         .navigationTitle("Conflicts")
         .navigationSubtitle(subtitle)
