@@ -134,7 +134,11 @@ extension AppModel {
     }
 
     private func inLibraryOrder(_ ids: Set<String>) -> [Family] {
-        ids.compactMap { library.position(of: $0) }.sorted().map { shown(library.families[$0]) }
+        let library = library, only = shownLocation.map(onlyIn)
+        return ids.compactMap { library.position(of: $0) }.sorted().map { index in
+            let family = library.families[index]
+            return only?[family.id] ?? family
+        }
     }
 
     var inspectedFamily: Family? {
@@ -272,7 +276,10 @@ extension AppModel {
         var kept: [Int] = []
         for index in families.indices where keeps(families[index]) { kept.append(index) }
         let listed = kept.count == families.count ? families : kept.map { families[$0] }
-        if shownLocation != nil { return listed.map(shown) }
+        if let location = shownLocation {
+            let only = onlyIn(location)
+            return listed.map { only[$0.id] ?? $0 }
+        }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 
