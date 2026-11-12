@@ -123,6 +123,53 @@ enum MeasureRun {
             return
         }
 
+        if only == "select" {
+            for info in [false, true] {
+                model.isInfoPresented = info
+                _ = await MainSettle.wait(quiet: .milliseconds(500), limit: .seconds(10))
+                let tag = info ? ".info" : ""
+                for mode in [BrowserMode.grid, .list, .specimens] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    _ = await MainSettle.wait(quiet: .milliseconds(500), limit: .seconds(10))
+                    for family in model.visibleFamilies.prefix(12) {
+                        await step("select.\(mode.rawValue)\(tag)", detail: family.name) { model.selectedIDs = [family.id] }
+                    }
+                    await step("select.none.\(mode.rawValue)\(tag)") { model.selectedIDs = [] }
+                    await step("select.all.\(mode.rawValue)\(tag)") { model.selectedIDs = Set(model.visibleFamilies.map(\.id)) }
+                    await scroll(mode: mode)
+                    await step("select.none.\(mode.rawValue)\(tag)") { model.selectedIDs = [] }
+                }
+            }
+            model.isInfoPresented = false
+            return
+        }
+        if only == "similar" {
+            let table = model.similarFonts
+            var asked = 0, differing: [String] = []
+            for family in model.library.families {
+                let kinds: [SearchQuery.Style?] = [nil] + family.kinds + family.faces.map(family.kind(of:))
+                    + [SearchQuery.Style(isItalic: true, width: nil), SearchQuery.Style(isItalic: false, width: 3)]
+                for kind in kinds {
+                    asked += 1
+                    let style = kind.flatMap { kind in family.faces.first { family.kind(of: $0) == kind } }
+                    guard kind == nil || style != nil else { continue }
+                    if table.contains(family.id, kind: kind) != model.canShowSimilar(family, style: style) { differing.append(family.name) }
+                }
+            }
+            check(differing.isEmpty, "the menu's answer is the table's for every family and kind (\(asked) asked, \(differing.count) differ: \(differing.prefix(5)))")
+            let picks = pagePicks(model)
+            for family in picks {
+                await step("select", detail: family.name) { model.selectedIDs = [family.id] }
+                await step("rate.selected", detail: family.name) { model.setRating(3, for: [family]) }
+                await step("similar.menu", detail: family.name) { _ = model.canShowSimilar(family, style: nil) }
+                await step("rate.selected", detail: family.name) { model.setRating(nil, for: [family]) }
+                await step("similar.table", detail: family.name) { _ = model.similarFonts.contains(family.id) }
+            }
+            model.selectedIDs = []
+            Measurements.count("key", detail: "\(LibraryFocus.shared.isKey)")
+            return
+        }
+
         if only == "panels" {
             await step("mode", detail: "grid") { defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode") }
             _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
