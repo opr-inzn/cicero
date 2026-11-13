@@ -28,7 +28,7 @@ struct LanguagesRow: View {
                         }
                 }
             } else {
-                ProgressView().controlSize(.small)
+                SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
         .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id) }) { [face] in
@@ -178,7 +178,7 @@ struct CharacterSetsRow: View {
                     }
                 }
             } else {
-                ProgressView().controlSize(.small)
+                SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
         .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id)?.scalars }) { [face] in
@@ -323,7 +323,7 @@ struct UnicodeBlocksRow: View {
                     .padding(.top, 2)
                     .popover(isPresented: $showsAll, arrowEdge: .leading) { BlockList(ranges: ranges, coverage: coverage) }
             } else {
-                ProgressView().controlSize(.small)
+                SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
         .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id).map { ($0.scalars, blocks(covered: $0.scalars)) } }) { [face] in
