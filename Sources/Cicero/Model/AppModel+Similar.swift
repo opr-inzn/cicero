@@ -33,14 +33,23 @@ extension AppModel {
     }
 
     func similarFamilies(to family: Family, kind: SearchQuery.Style?, limit: Int) -> [Family] {
-        similarFonts.nearest(to: family.id, kind: kind, limit: limit).compactMap(library.family)
+        var table = similarFonts
+        if !table.contains(family.id, kind: kind), covers(family, kind: kind) {
+            similarCache = nil
+            table = similarFonts
+        }
+        return table.nearest(to: family.id, kind: kind, limit: limit).compactMap(library.family)
     }
 
     func canShowSimilar(_ family: Family, style: LibraryFace?) -> Bool {
         _ = measurementRevision
+        return covers(family, kind: style.map(family.kind(of:)))
+    }
+
+    private func covers(_ family: Family, kind: SearchQuery.Style?) -> Bool {
         guard let listed = library.family(family.id), data.lists(listed) else { return false }
         let measurements = measurements
-        return SimilarFonts.covers(listed, kind: style.map(family.kind(of:)),
+        return SimilarFonts.covers(listed, kind: kind,
                                    measurements: { measurements.measurements(of: $0.regular.face.id) },
                                    embeddings: { measurements.embedding(of: $0.regular.face.id) },
                                    styleMeasurements: { measurements.measurements(of: $0.id) },
