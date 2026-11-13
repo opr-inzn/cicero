@@ -106,6 +106,7 @@ struct CiceroCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
+    @FocusedValue(\.focusSearch) private var focusSearch
 
     private var opensSelection: Bool { LibraryFocus.shared.isKey && model.openFamilyID == nil && !model.shownSelection.isEmpty }
 
@@ -160,6 +161,12 @@ struct CiceroCommands: Commands {
                 }
             }
             .disabled(model.job != nil || model.isShowingPrompt)
+        }
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Find", systemImage: "magnifyingglass") { focusSearch?() }
+                .keyboardShortcut("f")
+                .disabled(focusSearch == nil)
         }
         SidebarCommands()
         // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.

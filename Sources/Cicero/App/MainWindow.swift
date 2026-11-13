@@ -5,6 +5,7 @@ struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @State private var promptText = ""
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -35,6 +36,8 @@ struct MainWindow: View {
         // On the split view: on the stack, the search field doesn't show at all.
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
+        .searchFocused($isSearchFocused)
+        .focusedSceneValue(\.focusSearch) { isSearchFocused = true }
         .toolbarGlassFollowsAppearance()
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
@@ -172,6 +175,10 @@ struct MainWindow: View {
         parts.append(plan.paths.count == 1 ? "You can put it back from the Trash." : "You can put them back from the Trash.")
         return parts.joined(separator: " ")
     }
+}
+
+extension FocusedValues {
+    @Entry var focusSearch: (() -> Void)?
 }
 
 private struct ReplaceAlerts: ViewModifier {
