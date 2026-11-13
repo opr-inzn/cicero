@@ -69,11 +69,11 @@ final class SampleWidths {
 
     nonisolated static func measured(of families: [Family]) -> [Family] {
         guard families.count > mostMeasured else { return families }
-        let count = UInt64(families.count)
+        let below = UInt64(mostMeasured) << 32 / UInt64(families.count)
         return families.filter { family in
             var hash: UInt64 = 0xcbf2_9ce4_8422_2325
             for byte in family.id.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100_0000_01b3 }
-            return (hash >> 20) % count < UInt64(mostMeasured)
+            return hash >> 32 < below
         }
     }
 
