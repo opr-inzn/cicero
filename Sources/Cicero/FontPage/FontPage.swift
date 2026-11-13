@@ -669,7 +669,7 @@ private struct StyleRows: View {
                 Divider()
                 row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
                     FontText(text: model.scriptSamples.text(family.name, for: style.face), face: style.face, size: 20,
-                             weight: style.face.styleWeight)
+                             weight: style.face.styleWeight, showsPlaceholder: true)
                         .foregroundStyle(Color.ink)
                 } style: {
                     Text(style.face.styleName)

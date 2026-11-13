@@ -76,7 +76,7 @@ private struct Specimen: View {
             FontText(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
                 size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
-                onCaps: true
+                onCaps: true, showsPlaceholder: true
             )
             .foregroundStyle(Color.ink)
             .frame(maxWidth: .infinity, alignment: .leading)

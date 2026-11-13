@@ -28,6 +28,7 @@ struct FontText: View {
     var scale: ((CTFont) -> CGFloat)?
     var cached = true
     var onCaps = false
+    var showsPlaceholder = false
     @State private var readPath: String?
 
     var body: some View {
@@ -49,6 +50,9 @@ struct FontText: View {
                 .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
                 .onCaps(onCaps ? NSFont.systemFont(ofSize: size) as CTFont : nil)
                 .hidden()
+                .overlay {
+                    if showsPlaceholder { SamplePlaceholder(size: size) }
+                }
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
                     readPath = face.path
@@ -79,6 +83,7 @@ struct FontLine: View {
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     let height: CGFloat
+    var showsPlaceholder = false
     @State private var readPath: String?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -110,6 +115,15 @@ struct FontLine: View {
         } else {
             Color.clear
                 .frame(height: height)
+                .overlay(alignment: .leading) {
+                    if showsPlaceholder {
+                        Text(text.isEmpty ? " " : text)
+                            .font(.system(size: size))
+                            .lineLimit(1)
+                            .hidden()
+                            .overlay { SamplePlaceholder(size: size) }
+                    }
+                }
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
                     readPath = face.path
@@ -138,6 +152,24 @@ struct FontLine: View {
             cg.textPosition = .zero
             CTLineDraw(drawn, cg)
         }
+    }
+}
+
+struct SamplePlaceholder: View {
+    let size: Double
+    @State private var isShown = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.15)
+            .fill(.quaternary)
+            .frame(height: size * 0.6)
+            .opacity(isShown ? 1 : 0)
+            .animation(.easeIn(duration: 0.2), value: isShown)
+            .accessibilityHidden(true)
+            .task {
+                try? await Task.sleep(for: .milliseconds(250))
+                isShown = true
+            }
     }
 }
 

@@ -321,7 +321,7 @@ private struct Tile: View {
                     FontText(
                         text: text, face: style.face,
                         size: preview.size, weight: weight, variations: sample.variations, features: sample.features,
-                        scale: { fit.scale(sample, text: text, in: $0) }
+                        scale: { fit.scale(sample, text: text, in: $0) }, showsPlaceholder: true
                     )
                     .foregroundStyle(Color.ink)
                     .minimumScaleFactor(0.4)

@@ -721,7 +721,7 @@ private struct FontListRow: View {
             FontLine(
                 text: model.scriptSamples.text(preview.text(for: family), for: style.face), face: style.face,
                 size: 17, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
-                height: 22
+                height: 22, showsPlaceholder: true
             )
         case .styles:
             Text(row.styles.plain).monospacedDigit().foregroundStyle(.secondary)
