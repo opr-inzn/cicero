@@ -10,7 +10,8 @@ struct GlyphsSection: View {
     let face: FontFace
     let columns: Int
     let sections: [GlyphSection]
-    let characterCount: Int
+    let glyphCount: Int
+    let alternateCount: Int
     let ligatures: [LigatureGroup]
     let ligatureCharacters: [CGGlyph: UInt32]
     let alternates: [UInt32: [FeatureAlternate]]
@@ -161,13 +162,8 @@ struct GlyphsSection: View {
     }
 
     private var count: String {
-        let characters = characterCount
         let ligatureCount = ligatures.reduce(0) { $0 + $1.ligatures.count }
-        let featureGlyphs = sections.reduce(0) { total, section in
-            total + (section.group == .tabularFigures ? section.glyphs.filter(\.isAlternate).count : section.glyphs.count)
-        }
-        let alternateCount = alternates.values.reduce(0) { $0 + $1.filter { !$0.isFigureStyle }.count } + featureGlyphs
-        var parts = [characters == 1 ? "1 character" : "\(characters.plain) characters"]
+        var parts = [glyphCount == 1 ? "1 glyph" : "\(glyphCount.plain) glyphs"]
         if ligatureCount > 0 { parts.append(ligatureCount == 1 ? "1 ligature" : "\(ligatureCount.plain) ligatures") }
         if alternateCount > 0 { parts.append(alternateCount == 1 ? "1 alternate" : "\(alternateCount.plain) alternates") }
         return parts.joined(separator: " · ")

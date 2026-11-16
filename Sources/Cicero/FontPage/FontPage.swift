@@ -44,7 +44,7 @@ struct FontPage: View {
                         if let glyphColumns {
                             let content = shown.content
                             GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
-                                          characterCount: content.characterCount, ligatures: content.ligatures,
+                                          glyphCount: content.glyphCount, alternateCount: content.alternateCount, ligatures: content.ligatures,
                                           ligatureCharacters: content.ligatureCharacters, alternates: content.alternates,
                                           generation: content.generation)
                         }

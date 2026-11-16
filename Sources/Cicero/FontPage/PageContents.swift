@@ -4,7 +4,8 @@ import CoreText
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
     let glyphs: [GlyphSection]
-    let characterCount: Int
+    let glyphCount: Int
+    let alternateCount: Int
     let ligatureCharacters: [CGGlyph: UInt32]
     let alternates: [UInt32: [FeatureAlternate]]
     // Glyphs are by ID, and a new version of the file can give those IDs to other glyphs.
@@ -13,7 +14,6 @@ nonisolated struct PageContent: Sendable {
     init(ligatures: [LigatureGroup], glyphs: [GlyphSection], alternates: [UInt32: [FeatureAlternate]], font: CTFont, generation: Int) {
         self.alternates = alternates
         self.generation = generation
-        characterCount = glyphs.reduce(0) { $0 + $1.scalars.count }
         let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
         var listed: Set<UInt32> = []
@@ -42,6 +42,26 @@ nonisolated struct PageContent: Sendable {
             return left.isEmpty && section.glyphs.isEmpty ? nil : GlyphSection(group: section.group, scalars: left, glyphs: section.glyphs)
         }
         ligatureCharacters = characters
+        var cells = self.ligatures.reduce(0) { $0 + $1.ligatures.count }, choices = 0
+        for section in self.glyphs {
+            for run in section.runs(alternates: { alternates[$0] ?? [] }) {
+                cells += run.count
+                choices += run.count { cell in
+                    switch cell {
+                    case .character: false
+                    case .feature(let glyph): glyph.featureTags.contains(where: Self.isChoice)
+                    case .alternate(let alternate): alternate.allFeatures.contains(where: Self.isChoice)
+                    }
+                }
+            }
+        }
+        glyphCount = cells
+        alternateCount = choices
+    }
+
+    private static func isChoice(_ tag: String) -> Bool {
+        let number = Int(tag.dropFirst(2)) ?? 0
+        return tag == "salt" || tag == "swsh" || tag.hasPrefix("ss") && 1...20 ~= number || tag.hasPrefix("cv") && 1...99 ~= number
     }
 
     func isCurrent(for face: FontFace) -> Bool {
