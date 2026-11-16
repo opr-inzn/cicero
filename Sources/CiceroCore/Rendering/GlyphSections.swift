@@ -15,7 +15,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     public static let greek = GlyphGroup.script("Greek")
 
     public enum ScriptPart: Int, Sendable {
-        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, signs, caseSensitiveForms
+        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, localizedForms, signs, caseSensitiveForms
 
         var title: String {
             switch self {
@@ -24,6 +24,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
             case .uppercaseAccents: "Uppercase Accents"
             case .lowercaseAccents: "Lowercase Accents"
             case .smallCaps: "Small Caps"
+            case .localizedForms: "Localized Forms"
             case .signs: "Signs and Marks"
             case .caseSensitiveForms: "Case-Sensitive Forms"
             }
@@ -33,6 +34,13 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     }
 
     public var isScript: Bool { scriptName != nil }
+
+    public var isLocalizedForms: Bool {
+        switch self {
+        case .localizedForms, .scriptPart(_, .localizedForms): true
+        default: false
+        }
+    }
 
     public var scriptName: String? {
         switch self {
@@ -417,6 +425,7 @@ public struct GlyphSection: Identifiable, Sendable {
             switch glyph.group {
             case .smallCaps: smallCaps(of: glyph.character)
             case .caseSensitiveForms: ofScript(.caseSensitiveForms, glyph.character, .caseSensitiveForms)
+            case .localizedForms: ofScript(.localizedForms, glyph.character, .localizedForms)
             case let group: group
             }
         }
@@ -641,6 +650,14 @@ public struct GlyphSection: Identifiable, Sendable {
         func withAlternates(_ scalars: [UInt32]) -> [GlyphCell] {
             scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) }
         }
+        if group.isLocalizedForms {
+            var runs: [[GlyphCell]] = []
+            for (index, glyph) in glyphs.enumerated() {
+                if index == 0 || glyph.languages != glyphs[index - 1].languages { runs.append([]) }
+                runs[runs.count - 1].append(.feature(glyph))
+            }
+            return runs
+        }
         switch group {
         case .circledFigures:
             func rank(_ kind: String) -> (Int, String) { (GlyphGroup.enclosureKinds.firstIndex(of: kind) ?? .max, kind) }
@@ -665,13 +682,6 @@ public struct GlyphSection: Identifiable, Sendable {
             let small = scalars.filter { Self.name(of: $0)?.hasPrefix("SMALL") == true }
             return [withAlternates(scalars.filter { !small.contains($0) }), withAlternates(small) + glyphs.map(GlyphCell.feature)]
                 .filter { !$0.isEmpty }
-        case .localizedForms:
-            var runs: [[GlyphCell]] = []
-            for (index, glyph) in glyphs.enumerated() {
-                if index == 0 || glyph.languages != glyphs[index - 1].languages { runs.append([]) }
-                runs[runs.count - 1].append(.feature(glyph))
-            }
-            return runs
         default:
             break
         }
@@ -728,7 +738,7 @@ public struct GlyphSection: Identifiable, Sendable {
 
     public func labeledRuns(alternates: (UInt32) -> [FeatureAlternate]) -> [(label: String?, cells: [GlyphCell])] {
         let runs = runs(alternates: alternates)
-        guard group == .localizedForms else { return runs.map { (nil, $0) } }
+        guard group.isLocalizedForms else { return runs.map { (nil, $0) } }
         return runs.map { run in
             guard case .feature(let glyph) = run.first else { return (nil, run) }
             return (glyph.featureName, run)

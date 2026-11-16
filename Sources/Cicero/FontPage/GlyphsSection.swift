@@ -92,7 +92,7 @@ struct GlyphsSection: View {
     private static let shortRows = 60
 
     private static func lifted(_ shown: [GlyphSection], ligatures: Int, lead: Int) -> Set<Int> {
-        Set(shown.indices.filter { shown[$0].group == .localizedForms || shown[$0].name == shown[$0].category }.map { $0 < lead ? $0 : $0 + ligatures })
+        Set(shown.indices.filter { shown[$0].group.isLocalizedForms || shown[$0].name == shown[$0].category }.map { $0 < lead ? $0 : $0 + ligatures })
     }
 
     @ViewBuilder
@@ -133,7 +133,7 @@ struct GlyphsSection: View {
         let total = runs.reduce(0) { $0 + $1.cells.count }
         let heading = GlyphHeading(index: index, category: section.category, name: section.name,
                                    detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous,
-                                   labelFollows: section.group == .localizedForms)
+                                   labelFollows: section.group.isLocalizedForms)
         return Section {
             // Not a LazyVGrid per group, which made the page's lazy stack lay it out again at full CPU, nor a stack per group, which drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in
