@@ -90,7 +90,13 @@ extension View {
 
 struct FontDropTarget: NSViewRepresentable {
     var isOver: ((Bool) -> Void)?
+    var files: FileDrops?
     var perform: ([FontDrag]) -> Void
+
+    struct FileDrops {
+        var isOver: (Bool) -> Void
+        var perform: ([URL]) -> Void
+    }
 
     func makeNSView(context: Context) -> TargetView {
         let view = TargetView()
@@ -100,12 +106,14 @@ struct FontDropTarget: NSViewRepresentable {
 
     func updateNSView(_ view: TargetView, context: Context) {
         view.isOver = isOver
+        view.files = files
         view.perform = perform
     }
 
     final class TargetView: NSView {
         static let types = [NSPasteboard.PasteboardType(UTType.ciceroFontStyle.identifier), .string]
         var isOver: ((Bool) -> Void)?
+        var files: FileDrops?
         var perform: ([FontDrag]) -> Void = { _ in }
 
         // Clicks go to the view in front, and drags still find this one: AppKit finds where a drag is over by the types registered here.
@@ -115,12 +123,17 @@ struct FontDropTarget: NSViewRepresentable {
 
         override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation { operation(for: sender) }
 
-        override func draggingExited(_ sender: (any NSDraggingInfo)?) { isOver?(false) }
+        override func draggingExited(_ sender: (any NSDraggingInfo)?) { isOver?(false); files?.isOver(false) }
 
-        override func draggingEnded(_ sender: any NSDraggingInfo) { isOver?(false) }
+        override func draggingEnded(_ sender: any NSDraggingInfo) { isOver?(false); files?.isOver(false) }
 
         override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
             isOver?(false)
+            if let files, case let urls = Self.fileURLs(on: sender.draggingPasteboard), !urls.isEmpty {
+                files.isOver(false)
+                files.perform(urls)
+                return true
+            }
             let drags = Self.drags(on: sender.draggingPasteboard)
             guard !drags.isEmpty else { return false }
             perform(drags)
@@ -128,9 +141,18 @@ struct FontDropTarget: NSViewRepresentable {
         }
 
         private func operation(for sender: any NSDraggingInfo) -> NSDragOperation {
+            if let files, !Self.fileURLs(on: sender.draggingPasteboard).isEmpty {
+                isOver?(false)
+                files.isOver(true)
+                return .copy
+            }
             let takes = sender.draggingPasteboard.availableType(from: Self.types) != nil
             isOver?(takes)
             return takes ? .copy : []
+        }
+
+        static func fileURLs(on pasteboard: NSPasteboard) -> [URL] {
+            pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
         }
 
         static func drags(on pasteboard: NSPasteboard) -> [FontDrag] {

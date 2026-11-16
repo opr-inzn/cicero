@@ -75,7 +75,7 @@ Add folders of fonts to see their fonts in your library without activating them.
 
 ### Add a location
 
-Choose **File → Add Location** (⇧⌘O), click **+** next to **Locations**, or click **+** in **Preferences → Locations**, and pick a folder of fonts. You can pick several folders at once.
+Choose **File → Add Location** (⇧⌘O), click **+** next to **Locations**, or click **+** in **Preferences → Locations**, and pick a folder of fonts. You can pick several folders at once. Or drag folders from the Finder onto the sidebar.
 
 A folder called “Fonts” is shown with the name of the folder it’s in, like “Projects Fonts”.
 
@@ -130,7 +130,7 @@ With **Copy into ~/Library/Fonts** (the setting at first) or **Move into ~/Libra
   The browser stays where it is and selects them there. It only goes elsewhere when they can’t show where you are: to **Added Fonts** for files left where they are, or, from anywhere but a folder, tag or location, to **All Fonts**.
 - In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All**
 
-Cicero reads OpenType, TrueType, font collections and datafork TrueType. It leaves out web fonts (WOFF and WOFF2), which are made for websites: Adobe apps can’t use them. Cicero then shows the fonts you added in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or one of your locations, are just shown. Dropping a folder adds it as a location, whichever way you activate fonts.
+Cicero reads OpenType, TrueType, font collections and datafork TrueType. It leaves out web fonts (WOFF and WOFF2), which are made for websites: Adobe apps can’t use them. Cicero then shows the fonts you added in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or one of your locations, are just shown. Dropping a folder on the browser adds the font files in it, and in the folders inside it, as if you’d dropped them one by one. With **Leave files where they are**, or on **Added Fonts**, Cicero adds the folder as a location instead. To add a folder as a location, drop it on the sidebar.
 
 ### Fonts already in your library
 

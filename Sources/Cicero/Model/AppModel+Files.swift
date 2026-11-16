@@ -71,6 +71,21 @@ extension AppModel {
         NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
 
+    func openOnSidebar(_ urls: [URL]) {
+        let urls = urls.filter(\.isFileURL).map(\.standardizedFileURL)
+        let folders = urls.filter { url in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+                && !NSWorkspace.shared.isFilePackage(atPath: url.path)
+        }
+        let rest = urls.filter { !folders.contains($0) }
+        if !folders.isEmpty {
+            addFolders(folders)
+            if rest.isEmpty, folders.count == 1, let folder = data.folders.first(where: { $0.path == folders[0].path }) { selection = .folder(folder.id) }
+        }
+        if !rest.isEmpty { open(rest) }
+    }
+
     func pasteFiles() {
         let urls = Self.pastedFiles
         if !urls.isEmpty { open(urls, into: targetForAddedFiles) }
@@ -113,6 +128,27 @@ extension AppModel {
             if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
             return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
         }
+        var method: InstallMethod?
+        var location: DropLocation?
+        if case .folder(let id) = target {
+            if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(id) }
+        }
+        let opened = folders.filter { WatchedFolder.detectAppName(forPath: $0.path) == nil }
+        guard (method ?? data.installMethod) != .inPlace, !opened.isEmpty else {
+            return add(files, folders: folders, method: method, location: location, target: target)
+        }
+        Task { [files] in
+            var files = files
+            let found = await Task.detached(priority: .userInitiated) { opened.flatMap(LibraryScanner.fontFiles(in:)) }.value
+            for path in found.map({ libraryPath(of: $0, folders: readFolders) }) where !files.contains(path) { files.append(path) }
+            guard !files.isEmpty || opened.count < folders.count else {
+                return showToast(opened.count == 1 ? "There are no fonts Cicero can read in “\(opened[0].lastPathComponent)”" : "There are no fonts Cicero can read in those folders")
+            }
+            add(files, folders: folders.filter { !opened.contains($0) }, method: method, location: location, target: target)
+        }
+    }
+
+    private func add(_ files: [String], folders: [URL], method: InstallMethod?, location: DropLocation?, target: SidebarItem?) {
         if !folders.isEmpty {
             let before = Set(data.folders.map(\.id))
             addFolders(folders)
@@ -120,11 +156,6 @@ extension AppModel {
             if files.isEmpty, added.count == 1 { selection = .folder(added[0].id) }
         }
         guard !files.isEmpty else { return }
-        var method: InstallMethod?
-        var location: DropLocation?
-        if case .folder(let id) = target {
-            if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(id) }
-        }
         addCheckingDuplicates(files, method: method, into: location) { model, paths, note in
             model.awaitingScan.append(OpenedFiles(scan: model.rescan(), paths: paths, target: target, note: note))
         }

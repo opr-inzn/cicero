@@ -514,17 +514,28 @@ extension AppModel {
 
     func addFolders(_ urls: [URL]) {
         let existing = Set(data.folders.map(\.path))
-        let new = urls.map(\.standardizedFileURL.path).filter { !existing.contains($0) }
-        guard !new.isEmpty else { return }
+        let paths = urls.map(\.standardizedFileURL.path)
+        let new = paths.filter { !existing.contains($0) }
+        guard !new.isEmpty else {
+            let name = URL(fileURLWithPath: paths.first ?? "").lastPathComponent
+            return showToast(paths.count == 1 ? "“\(name)” is already a location" : "These folders are already locations")
+        }
+        var added: [String] = []
         for path in new {
             if WatchedFolder.detectAppName(forPath: path) != nil {
                 data.showAdobeAppFolders = true
             } else {
                 data.folders.append(WatchedFolder(path: path))
+                added.append(path)
             }
         }
         data.sidebar.hidden.remove(SidebarSection.folders.key)
         rescan()
+        if added.count == 1 {
+            showToast("Added “\(URL(fileURLWithPath: added[0]).lastPathComponent)” as a location")
+        } else if added.count > 1 {
+            showToast("Added \(added.count.plain) locations")
+        }
     }
 
     func removeFolder(_ id: UUID) {

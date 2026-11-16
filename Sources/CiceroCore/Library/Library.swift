@@ -734,6 +734,12 @@ public final class LibraryScanner: Sendable {
         }
     }
 
+    public static func fontFiles(in folder: URL) -> [String] {
+        var paths: [String] = []
+        enumerate(folder) { path, _ in paths.append(path) }
+        return paths
+    }
+
     static func realPath(_ path: String) -> String {
         guard let resolved = realpath(path, nil) else { return path }
         defer { free(resolved) }

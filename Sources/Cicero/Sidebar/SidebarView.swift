@@ -18,6 +18,18 @@ struct SidebarView: View {
             SidebarContent(highlight: highlight, drag: drag, fit: fit)
         }
         .listStyle(.sidebar)
+        .outsideFileDrops(isOver: { highlight.filesOver = $0 }) { urls in
+            highlight.filesOver = false
+            model.openOnSidebar(urls)
+        }
+        .overlay {
+            if highlight.filesOver {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .padding(4)
+                    .allowsHitTesting(false)
+            }
+        }
         .background { SidebarSnapReader(fit: fit) }
         .onChange(of: shown, initial: true) { highlight.selected = shown }
         .contextMenu { EditSidebarButton(model: model) }
@@ -272,6 +284,9 @@ private struct SidebarContent: View {
                     } else if highlight.dropTarget == row.item {
                         highlight.dropTarget = nil
                     }
+                }, files: .init(isOver: { highlight.filesOver = $0 }) { urls in
+                    highlight.filesOver = false
+                    model.openOnSidebar(urls)
                 }) { drags in
                     highlight.dropTarget = nil
                     _ = model.handleDrop(drags, on: row.item)
@@ -504,6 +519,7 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
 final class SidebarHighlight {
     var selected: Set<SidebarItem> = []
     var dropTarget: SidebarItem?
+    var filesOver = false
 }
 
 private struct OrganizeRow: View {
