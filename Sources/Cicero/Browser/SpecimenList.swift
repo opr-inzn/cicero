@@ -38,7 +38,7 @@ struct SpecimenList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .defaultFocus($focused, true)
+            .modifier(TakesStartFocus(focused: $focused))
             .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .specimens, pinned: pinned?.id))
         }
     }

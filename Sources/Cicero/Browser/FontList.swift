@@ -275,7 +275,7 @@ struct FontList: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .defaultFocus($focused, true)
+            .modifier(TakesStartFocus(focused: $focused))
             .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position))
             .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                 move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)

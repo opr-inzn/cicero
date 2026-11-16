@@ -6,6 +6,7 @@ struct MainWindow: View {
     @Environment(\.openWindow) private var openWindow
     @State private var promptText = ""
     @FocusState private var isSearchFocused: Bool
+    @State private var startFocus = StartFocus()
 
     var body: some View {
         @Bindable var model = model
@@ -37,6 +38,7 @@ struct MainWindow: View {
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
         .searchFocused($isSearchFocused)
+        .environment(\.startFocus, startFocus)
         .focusedSceneValue(\.focusSearch) { isSearchFocused = true }
         .toolbarGlassFollowsAppearance()
         .modifier(InfoPanelOverlay())
@@ -179,6 +181,53 @@ struct MainWindow: View {
 
 extension FocusedValues {
     @Entry var focusSearch: (() -> Void)?
+}
+
+@Observable
+final class StartFocus {
+    var isPending = true
+    var owner: UUID?
+    @ObservationIgnored var shown: Set<UUID> = []
+}
+
+extension EnvironmentValues {
+    @Entry var startFocus: StartFocus?
+}
+
+struct TakesStartFocus: ViewModifier {
+    let focused: FocusState<Bool>.Binding
+    @Environment(\.startFocus) private var startFocus
+    @State private var id = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: LibraryFocus.shared.isKey, initial: true) { take() }
+            .onChange(of: startFocus?.isPending) { take() }
+            .onChange(of: focused.wrappedValue) { _, isFocused in
+                guard !isFocused else { return }
+                DispatchQueue.main.async { if startFocus?.owner == id { startFocus?.owner = nil } }
+            }
+            .onAppear { startFocus?.shown.insert(id) }
+            // SwiftUI makes the browser twice as the window opens and removes the first, which hands the cursor to the sidebar.
+            .onDisappear {
+                guard let startFocus else { return }
+                startFocus.shown.remove(id)
+                guard startFocus.owner == id else { return }
+                startFocus.owner = nil
+                startFocus.isPending = true
+            }
+    }
+
+    private func take() {
+        guard LibraryFocus.shared.isKey, let startFocus, startFocus.isPending else { return }
+        // A turn later: as the window becomes key, the sidebar's outline takes the cursor.
+        DispatchQueue.main.async {
+            guard startFocus.isPending, startFocus.shown.contains(id) else { return }
+            startFocus.isPending = false
+            startFocus.owner = id
+            focused.wrappedValue = true
+        }
+    }
 }
 
 private struct ReplaceAlerts: ViewModifier {
