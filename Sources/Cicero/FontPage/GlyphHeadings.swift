@@ -15,7 +15,7 @@ nonisolated struct GlyphHeading: Hashable, Sendable {
         self.name = name == category ? nil : name
         self.detail = detail
         startsCategory = previous != category
-        lifts = self.name == nil || labelFollows
+        lifts = labelFollows
     }
 }
 

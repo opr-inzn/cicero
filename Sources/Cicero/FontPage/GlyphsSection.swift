@@ -92,7 +92,7 @@ struct GlyphsSection: View {
     private static let shortRows = 60
 
     private static func lifted(_ shown: [GlyphSection], ligatures: Int, lead: Int) -> Set<Int> {
-        Set(shown.indices.filter { shown[$0].group.isLocalizedForms || shown[$0].name == shown[$0].category }.map { $0 < lead ? $0 : $0 + ligatures })
+        Set(shown.indices.filter { shown[$0].group.isLocalizedForms }.map { $0 < lead ? $0 : $0 + ligatures })
     }
 
     @ViewBuilder
