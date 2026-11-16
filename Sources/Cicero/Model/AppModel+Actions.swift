@@ -271,6 +271,7 @@ extension AppModel {
         if let folder = data.namedFolders.filter({ path.hasPrefix($0.path + "/") }).max(by: { $0.path.count < $1.path.count }) {
             return "in \(folder.displayName)"
         }
+        if WatchedFolder.appFontFolders().contains(where: { path.hasPrefix($0.path + "/") }) { return "in \(folderName(WatchedFolder.adobeAppsID))" }
         return "in “\(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent)”"
     }
 
