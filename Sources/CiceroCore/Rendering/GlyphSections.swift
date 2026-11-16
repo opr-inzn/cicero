@@ -15,8 +15,8 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     public static let greek = GlyphGroup.script("Greek")
 
     public enum ScriptPart: Int, Sendable {
-        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, letters, smallCaps, presentationForms, localizedForms, figures, signs
-        case caseSensitiveForms, marks
+        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, letters, smallCaps, presentationForms
+        case initialForms, medialForms, finalForms, isolatedForms, localizedForms, figures, signs, caseSensitiveForms, marks
 
         var title: String {
             switch self {
@@ -27,6 +27,10 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
             case .smallCaps: "Small Caps"
             case .letters: "Letters"
             case .presentationForms: "Presentation Forms"
+            case .initialForms: "Initial Forms"
+            case .medialForms: "Medial Forms"
+            case .finalForms: "Final Forms"
+            case .isolatedForms: "Isolated Forms"
             case .localizedForms: "Localized Forms"
             case .figures: "Figures"
             case .signs: "Punctuation and Symbols"
@@ -434,6 +438,10 @@ public struct GlyphSection: Identifiable, Sendable {
             case .smallCaps: smallCaps(of: glyph.character)
             case .caseSensitiveForms: ofScript(.caseSensitiveForms, glyph.character, .caseSensitiveForms)
             case .localizedForms: ofScript(.localizedForms, glyph.character, .localizedForms)
+            case .initialForms: ofScript(.initialForms, glyph.character, .initialForms)
+            case .medialForms: ofScript(.medialForms, glyph.character, .medialForms)
+            case .finalForms: ofScript(.finalForms, glyph.character, .finalForms)
+            case .isolatedForms: ofScript(.isolatedForms, glyph.character, .isolatedForms)
             case let group: group
             }
         }
