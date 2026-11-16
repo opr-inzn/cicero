@@ -419,8 +419,8 @@ and rounded to the step; ↑/↓ step it, ten steps with ⇧), as does the font 
   Helvetica, already in your library" / "Skipped 3 families already in your library". Replace
   (`AddedDuplicate.replacements`, `ActivationEngine.replace`) is file for file: each of the library's files with the
   family's styles is matched to the added file with exactly its fonts (by PostScript name, every face in the file, a
-  collection's other families too); copies Cicero doesn't change stay beside it (macOS's, an app's, Adobe Fonts', one
-  in an app's own folder, one on for all users; one on until quit or for an app folder goes on again the same way), and a file with no match
+  collection's other families too); copies Cicero doesn't change stay beside it (macOS's, one inside an app, Adobe Fonts', one in an app folder
+  Cicero can't write to, one on for all users; one in an app folder it can write to, like Proofing's, is replaced (`AddedDuplicates.mayReplace`), its `appFolderOrigins` note following a new name; one on until quit or for an app folder goes on again the same way), and a file with no match
   makes it impossible (`ReplaceBlock.differentFiles`; `.unchangeable` when no copy may change). As one queued
   operation, the old files that are on are unregistered (persistently, in place or in a Fonts folder; for the session,
   until quit), each added file is copied into Cicero's staging folder, the old file goes to the Trash, and the copy

@@ -105,6 +105,10 @@ extension ActivationEngine {
                 message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
             }
         }
+        for (old, new) in placed {
+            guard let origin = records.appFolderOrigins.removeValue(forKey: old) else { continue }
+            records.appFolderOrigins[new] = origin
+        }
         var result = ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
         result.placed = placed
         result.renameLater = renameLater

@@ -137,11 +137,16 @@ public enum AddedDuplicates {
     }
 
     static func mayReplace(_ copy: FaceCopy) -> Bool {
-        guard copy.app == nil, !ActivationEngine.isProtected(copy.face.path) else { return false }
+        guard !ActivationEngine.isProtected(copy.face.path) else { return false }
         switch copy.state.source {
-        case .macOS?, .allUsers?, .app?, .adobeFonts?: return false
-        default: return true
+        case .macOS?, .allUsers?, .adobeFonts?: return false
+        case .app?: return isWritableFolder(of: copy.face.path)
+        default: return copy.app == nil || isWritableFolder(of: copy.face.path)
         }
+    }
+
+    private static func isWritableFolder(of path: String) -> Bool {
+        FileManager.default.isWritableFile(atPath: (path as NSString).deletingLastPathComponent)
     }
 
     static func compare(_ added: [FontFace], with styles: [LibraryFace]) -> DuplicateVersion {
