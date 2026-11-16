@@ -104,6 +104,7 @@ struct FontGrid: View {
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
+            .defaultFocus($focused, true)
             .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count), pinned: pinned?.id))
         }
     }
