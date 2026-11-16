@@ -7,7 +7,7 @@ nonisolated struct GlyphHeading: Hashable, Sendable {
     let name: String?
     let detail: String
     let startsCategory: Bool
-    let labelFollows: Bool
+    let lifts: Bool
 
     init(index: Int, category: String, name: String, detail: String, after previous: String?, labelFollows: Bool = false) {
         self.index = index
@@ -15,7 +15,7 @@ nonisolated struct GlyphHeading: Hashable, Sendable {
         self.name = name == category ? nil : name
         self.detail = detail
         startsCategory = previous != category
-        self.labelFollows = labelFollows && self.name != nil
+        lifts = self.name == nil || labelFollows
     }
 }
 
@@ -54,8 +54,8 @@ struct GlyphHeader: View {
     let heading: GlyphHeading
 
     var body: some View {
-        let height = heading.name == nil ? Self.barHeight : Self.barHeight + Self.headingHeight
-        let lift = heading.labelFollows ? Self.labelLift : 0
+        let height = heading.name == nil ? Self.barHeight + Self.labelLift : Self.barHeight + Self.headingHeight
+        let lift = heading.lifts ? Self.labelLift : 0
         VStack(alignment: .leading, spacing: 0) {
             CategoryBar(heading: heading)
                 .modifier(WhenPinned(always: heading.startsCategory || heading.name == nil))
@@ -72,6 +72,7 @@ struct GlyphHeader: View {
                 .frame(height: Self.headingHeight, alignment: .top)
             }
         }
+        .padding(.bottom, heading.name == nil ? Self.labelLift : 0)
         .visualEffect { [pins, lift] content, proxy in
             content.offset(y: pins ? lift * min(1, max(0, proxy.frame(in: .scrollView).minY) / Self.barHeight) : lift)
         }

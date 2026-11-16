@@ -46,7 +46,7 @@ struct GlyphsSection: View {
             : Style(face: face, weight: face.styleWeight, variations: [:])
         let shown = filtered(sections)
         let shownLigatures = filtered(ligatures)
-        let labelled = Self.labelled(shown, ligatures: shownLigatures.count, lead: GlyphSection.beforeLigatures(shown, of: sections))
+        let lifted = Self.lifted(shown, ligatures: shownLigatures.count, lead: GlyphSection.beforeLigatures(shown, of: sections))
         HStack(spacing: 12) {
             Text("Glyphs").font(.title2.weight(.semibold))
             Text(count)
@@ -60,7 +60,7 @@ struct GlyphsSection: View {
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(TopRowKeeper.space)).minY } action: { [title] y in if title?.y != y { title?.y = y } }
         .padding(.horizontal, Self.inset)
         .padding(.top, Self.titleGap)
-        .padding(.bottom, labelled == 0 ? 4 - GlyphHeader.labelLift : 4)
+        .padding(.bottom, lifted.contains(0) ? 4 - GlyphHeader.labelLift : 4)
         if shown.isEmpty && shownLigatures.isEmpty {
             EmptyState(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
                        description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
@@ -68,11 +68,11 @@ struct GlyphsSection: View {
         } else if isShort(shown, shownLigatures) {
             // In one stack: as rows of the page's lazy stack under the tall title, a few rows made it lay the page out again and again at full CPU.
             VStack(alignment: .leading, spacing: 0) {
-                groups(shown, shownLigatures, style: style, labelled: labelled)
+                groups(shown, shownLigatures, style: style, lifted: lifted)
             }
             .environment(\.pinsHeadings, false)
         } else {
-            groups(shown, shownLigatures, style: style, labelled: labelled)
+            groups(shown, shownLigatures, style: style, lifted: lifted)
         }
     }
 
@@ -91,38 +91,38 @@ struct GlyphsSection: View {
 
     private static let shortRows = 60
 
-    private static func labelled(_ shown: [GlyphSection], ligatures: Int, lead: Int) -> Int? {
-        shown.firstIndex { $0.group == .localizedForms }.map { $0 < lead ? $0 : $0 + ligatures }
+    private static func lifted(_ shown: [GlyphSection], ligatures: Int, lead: Int) -> Set<Int> {
+        Set(shown.indices.filter { shown[$0].group == .localizedForms || shown[$0].name == shown[$0].category }.map { $0 < lead ? $0 : $0 + ligatures })
     }
 
     @ViewBuilder
-    private func groups(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup], style: Style, labelled: Int?) -> some View {
+    private func groups(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup], style: Style, lifted: Set<Int>) -> some View {
         let lead = GlyphSection.beforeLigatures(shown, of: sections)
         let ligatureCategory = lead > 0 ? shown[lead - 1].category : "Latin"
         let categories = shown.prefix(lead).map(\.category) + shownLigatures.map { _ in ligatureCategory } + shown.dropFirst(lead).map(\.category)
         let indexed = Array(shown.enumerated())
         ForEach(indexed.prefix(lead), id: \.element.id) { index, section in
-            self.section(section, style: style, index: index, after: index > 0 ? shown[index - 1].category : nil, categories: categories, labelled: labelled)
+            self.section(section, style: style, index: index, after: index > 0 ? shown[index - 1].category : nil, categories: categories, lifted: lifted)
         }
         if !shownLigatures.isEmpty {
             LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
                              columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation,
                              firstIndex: lead, category: ligatureCategory, after: lead > 0 ? shown[lead - 1].category : nil,
-                             categories: categories, labelled: labelled)
+                             categories: categories, lifted: lifted)
         }
         ForEach(indexed.dropFirst(lead), id: \.element.id) { index, section in
             let previous = index > lead ? shown[index - 1].category : shownLigatures.isEmpty ? (lead > 0 ? shown[lead - 1].category : nil) : ligatureCategory
-            self.section(section, style: style, index: index + shownLigatures.count, after: previous, categories: categories, labelled: labelled)
+            self.section(section, style: style, index: index + shownLigatures.count, after: previous, categories: categories, lifted: lifted)
         }
         Color.clear.frame(height: 6)
     }
 
-    static func bottom(of index: Int, in categories: [String], labelled: Int?) -> CGFloat {
+    static func bottom(of index: Int, in categories: [String], lifted: Set<Int>) -> CGFloat {
         let bottom = index + 1 < categories.count && categories[index + 1] == categories[index] ? max(0, 22 - GlyphHeader.barHeight) : 18
-        return labelled == index + 1 ? bottom - GlyphHeader.labelLift : bottom
+        return lifted.contains(index + 1) ? bottom - GlyphHeader.labelLift : bottom
     }
 
-    private func section(_ section: GlyphSection, style: Style, index: Int, after previous: String?, categories: [String], labelled: Int?) -> some View {
+    private func section(_ section: GlyphSection, style: Style, index: Int, after previous: String?, categories: [String], lifted: Set<Int>) -> some View {
         let filter = Filter(query)
         let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
         let rows = runs.flatMap { run in
@@ -133,7 +133,7 @@ struct GlyphsSection: View {
         let total = runs.reduce(0) { $0 + $1.cells.count }
         let heading = GlyphHeading(index: index, category: section.category, name: section.name,
                                    detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous,
-                                   labelFollows: labelled == index)
+                                   labelFollows: section.group == .localizedForms)
         return Section {
             // Not a LazyVGrid per group, which made the page's lazy stack lay it out again at full CPU, nor a stack per group, which drew other groups' rows after a long jump.
             ForEach(rows.indices, id: \.self) { row in
@@ -153,7 +153,7 @@ struct GlyphsSection: View {
                     }
                 }
                 .padding(.horizontal, Self.inset)
-                .padding(.bottom, row == rows.count - 1 ? Self.bottom(of: index, in: categories, labelled: labelled) : Self.spacing)
+                .padding(.bottom, row == rows.count - 1 ? Self.bottom(of: index, in: categories, lifted: lifted) : Self.spacing)
             }
         } header: {
             GlyphHeader(heading: heading)
