@@ -20,11 +20,24 @@ public struct Ligature: Hashable, Sendable, Identifiable {
 public struct LigatureGroup: Identifiable, Sendable {
     public let tag: String
     public let ligatures: [Ligature]
-    public var id: String { tag }
+    public let script: String?
+    public var id: String { script.map { "\(tag) \($0)" } ?? tag }
 
-    public init(tag: String, ligatures: [Ligature]) {
+    public init(tag: String, ligatures: [Ligature], script: String? = nil) {
         self.tag = tag
         self.ligatures = ligatures
+        self.script = script
+    }
+
+    public static func byScript(_ groups: [LigatureGroup]) -> [LigatureGroup] {
+        groups.flatMap { group in
+            let scripts = group.ligatures.map { ligature in ligature.characters.lazy.compactMap { GlyphGroup.of($0)?.scriptName }.first }
+            var order: [String?] = []
+            for script in scripts where !order.contains(script) { order.append(script) }
+            return order.map { script in
+                LigatureGroup(tag: group.tag, ligatures: zip(group.ligatures, scripts).filter { $0.1 == script }.map(\.0), script: script)
+            }
+        }
     }
 
     public static let features: [(tag: String, name: String)] = [

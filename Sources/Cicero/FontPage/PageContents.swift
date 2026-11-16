@@ -24,7 +24,7 @@ nonisolated struct PageContent: Sendable {
                 var units = Array(String(Character(character)).utf16)
                 var glyph = [CGGlyph](repeating: 0, count: units.count)
                 guard CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), made.contains(glyph[0]) else { continue }
-                if section.group == .ligatures || character.properties.generalCategory == .privateUse {
+                if section.group == .ligatures || character.properties.name?.contains("LIGATURE") == true || character.properties.generalCategory == .privateUse {
                     characters[glyph[0]] = scalar
                     listed.insert(scalar)
                 } else {
@@ -35,7 +35,7 @@ nonisolated struct PageContent: Sendable {
         let kept = ownGlyphs.subtracting(characters.keys)
         self.ligatures = kept.isEmpty ? ligatures : ligatures.compactMap { group in
             let left = group.ligatures.filter { !kept.contains($0.glyph) }
-            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
+            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left, script: group.script)
         }
         self.glyphs = listed.isEmpty ? glyphs : glyphs.compactMap { section in
             let left = section.scalars.filter { !listed.contains($0) }
@@ -140,9 +140,9 @@ final class PageContents {
         // Small capitals an older font keeps in private use too are listed as small capitals, not again as characters.
         let smallCaps = GlyphSection.privateUse(in: font, coverage: scalars,
                                                 drawing: Set(featureGlyphs.filter { $0.group == .smallCaps }.map(\.glyph)))
-        let drawn = await ligatures.compactMap { group in
+        let drawn = await LigatureGroup.byScript(ligatures).compactMap { group in
             let left = group.ligatures.filter { !empty.contains($0.glyph) }
-            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
+            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left, script: group.script)
         }
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
                                              privateUse: GlyphSection.privateUseNames(in: font, coverage: scalars),

@@ -182,7 +182,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         let unicodeBlock = UnicodeBlock.containing(value)
         let block = unicodeBlock?.name ?? ""
         let isMark = category == .nonspacingMark || category == .spacingMark || category == .enclosingMark
-        if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") { return .ligatures }
+        if block == "Alphabetic Presentation Forms" && name.contains("LIGATURE") && UnicodeScripts.script(of: value) == "Latin" { return .ligatures }
         // Every script's currency signs together, like ฿ and ؋, and the florin ƒ, a letter to Unicode.
         if category == .currencySymbol || value == 0x192 { return .currency }
         // Letters to Unicode but signs to a type designer, like Ω OHM SIGN, K KELVIN SIGN, ℓ and the micro sign µ.

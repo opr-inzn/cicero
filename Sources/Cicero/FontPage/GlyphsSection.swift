@@ -47,7 +47,8 @@ struct GlyphsSection: View {
             : Style(face: face, weight: face.styleWeight, variations: [:])
         let shown = filtered(sections)
         let shownLigatures = filtered(ligatures)
-        let lifted = Self.lifted(shown, ligatures: shownLigatures.count, lead: GlyphSection.beforeLigatures(shown, of: sections))
+        let items = items(shown, shownLigatures)
+        let lifted = Set(items.indices.filter { items[$0].isLocalizedForms })
         HStack(spacing: 12) {
             Text("Glyphs").font(.title2.weight(.semibold))
             Text(count)
@@ -69,11 +70,11 @@ struct GlyphsSection: View {
         } else if isShort(shown, shownLigatures) {
             // In one stack: as rows of the page's lazy stack under the tall title, a few rows made it lay the page out again and again at full CPU.
             VStack(alignment: .leading, spacing: 0) {
-                groups(shown, shownLigatures, style: style, lifted: lifted)
+                groups(items, style: style, lifted: lifted)
             }
             .environment(\.pinsHeadings, false)
         } else {
-            groups(shown, shownLigatures, style: style, lifted: lifted)
+            groups(items, style: style, lifted: lifted)
         }
     }
 
@@ -92,28 +93,63 @@ struct GlyphsSection: View {
 
     private static let shortRows = 60
 
-    private static func lifted(_ shown: [GlyphSection], ligatures: Int, lead: Int) -> Set<Int> {
-        Set(shown.indices.filter { shown[$0].group.isLocalizedForms }.map { $0 < lead ? $0 : $0 + ligatures })
+    private enum Item: Identifiable {
+        case section(GlyphSection)
+        case ligatures(LigatureGroup, category: String)
+
+        var id: String {
+            switch self {
+            case .section(let section): "section \(section.id)"
+            case .ligatures(let group, _): "ligatures \(group.id)"
+            }
+        }
+
+        var category: String {
+            switch self {
+            case .section(let section): section.category
+            case .ligatures(_, let category): category
+            }
+        }
+
+        var isLocalizedForms: Bool {
+            if case .section(let section) = self { section.group.isLocalizedForms } else { false }
+        }
+    }
+
+    private func items(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup]) -> [Item] {
+        let lead = GlyphSection.beforeLigatures(shown, of: sections)
+        let common = lead > 0 ? shown[lead - 1].category : "Latin"
+        var items = shown.map(Item.section)
+        let others = shownLigatures.filter { $0.script == nil }
+        items.insert(contentsOf: others.map { .ligatures($0, category: common) }, at: lead)
+        var scripts: [String] = []
+        for script in shownLigatures.compactMap(\.script) where !scripts.contains(script) { scripts.append(script) }
+        for script in scripts {
+            let own = items.indices.filter { if case .section(let section) = items[$0] { section.group.scriptName == script } else { false } }
+            let after = own.first { index in
+                guard case .section(let section) = items[index], case .scriptPart(_, let part) = section.group else { return false }
+                return part.rawValue >= GlyphGroup.ScriptPart.localizedForms.rawValue
+            }
+            let at = after ?? own.last.map { $0 + 1 } ?? lead + others.count
+            let groups = shownLigatures.filter { $0.script == script }
+            items.insert(contentsOf: groups.map { .ligatures($0, category: script) }, at: at)
+        }
+        return items
     }
 
     @ViewBuilder
-    private func groups(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup], style: Style, lifted: Set<Int>) -> some View {
-        let lead = GlyphSection.beforeLigatures(shown, of: sections)
-        let ligatureCategory = lead > 0 ? shown[lead - 1].category : "Latin"
-        let categories = shown.prefix(lead).map(\.category) + shownLigatures.map { _ in ligatureCategory } + shown.dropFirst(lead).map(\.category)
-        let indexed = Array(shown.enumerated())
-        ForEach(indexed.prefix(lead), id: \.element.id) { index, section in
-            self.section(section, style: style, index: index, after: index > 0 ? shown[index - 1].category : nil, categories: categories, lifted: lifted)
-        }
-        if !shownLigatures.isEmpty {
-            LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
-                             columns: columns, groups: shownLigatures, characters: ligatureCharacters, generation: generation,
-                             firstIndex: lead, category: ligatureCategory, after: lead > 0 ? shown[lead - 1].category : nil,
-                             categories: categories, lifted: lifted)
-        }
-        ForEach(indexed.dropFirst(lead), id: \.element.id) { index, section in
-            let previous = index > lead ? shown[index - 1].category : shownLigatures.isEmpty ? (lead > 0 ? shown[lead - 1].category : nil) : ligatureCategory
-            self.section(section, style: style, index: index + shownLigatures.count, after: previous, categories: categories, lifted: lifted)
+    private func groups(_ items: [Item], style: Style, lifted: Set<Int>) -> some View {
+        let categories = items.map(\.category)
+        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+            let previous = index > 0 ? categories[index - 1] : nil
+            switch item {
+            case .section(let section):
+                self.section(section, style: style, index: index, after: previous, categories: categories, lifted: lifted)
+            case .ligatures(let group, let category):
+                LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
+                                 columns: columns, groups: [group], characters: ligatureCharacters, generation: generation,
+                                 firstIndex: index, category: category, after: previous, categories: categories, lifted: lifted)
+            }
         }
         Color.clear.frame(height: 6)
     }
@@ -438,7 +474,7 @@ struct GlyphsSection: View {
                     || filter.code.map { ligature.characters.contains($0) || own == $0 } ?? false
                     || own.flatMap(Unicode.Scalar.init).map { String(Character($0)) == trimmed } ?? false
             }
-            return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches)
+            return matches.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: matches, script: group.script)
         }
     }
 }
