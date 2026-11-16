@@ -15,7 +15,8 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
     public static let greek = GlyphGroup.script("Greek")
 
     public enum ScriptPart: Int, Sendable {
-        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, smallCaps, localizedForms, signs, caseSensitiveForms
+        case uppercase, lowercase, uppercaseAccents, lowercaseAccents, letters, smallCaps, presentationForms, localizedForms, figures, signs
+        case caseSensitiveForms, marks
 
         var title: String {
             switch self {
@@ -24,9 +25,13 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
             case .uppercaseAccents: "Uppercase Accents"
             case .lowercaseAccents: "Lowercase Accents"
             case .smallCaps: "Small Caps"
+            case .letters: "Letters"
+            case .presentationForms: "Presentation Forms"
             case .localizedForms: "Localized Forms"
-            case .signs: "Signs and Marks"
+            case .figures: "Figures"
+            case .signs: "Punctuation and Symbols"
             case .caseSensitiveForms: "Case-Sensitive Forms"
+            case .marks: "Marks"
             }
         }
 
@@ -374,10 +379,13 @@ public struct GlyphSection: Identifiable, Sendable {
             }
         }
         for (group, values) in buckets {
+            guard case .script(let script) = group else { continue }
             let bases = values.map { privateUse.characters[$0] ?? $0 }
-            guard case .script(let script) = group, Self.hasBothCases(bases) else { continue }
+            let cased = Self.hasBothCases(bases)
+            let parts = bases.map { Self.part(of: $0, in: script, cased: cased) }
+            guard Set(parts).count > 1 else { continue }
             buckets[group] = nil
-            for (value, base) in zip(values, bases) { buckets[.scriptPart(script, Self.part(of: base, in: script)), default: []].append(value) }
+            for (value, part) in zip(values, parts) { buckets[.scriptPart(script, part), default: []].append(value) }
         }
         func smallCaps(of character: UInt32) -> GlyphGroup { ofScript(.smallCaps, character, .smallCaps) }
         func ofScript(_ group: GlyphGroup, _ character: UInt32, _ part: GlyphGroup.ScriptPart) -> GlyphGroup {
@@ -444,12 +452,25 @@ public struct GlyphSection: Identifiable, Sendable {
     }
 
     private static func hasBothCases(_ values: [UInt32]) -> Bool {
-        let categories = Set(values).compactMap { Unicode.Scalar($0)?.properties.generalCategory }
-        return categories.count { $0 == .lowercaseLetter } >= 10 && categories.count { $0 == .uppercaseLetter || $0 == .titlecaseLetter } >= 10
+        let all = Set(values)
+        return all.count { value in
+            guard let scalar = Unicode.Scalar(value), scalar.properties.generalCategory == .lowercaseLetter else { return false }
+            let upper = scalar.properties.uppercaseMapping.unicodeScalars
+            return upper.count == 1 && upper.first!.value != value && all.contains(upper.first!.value)
+        } >= 5
     }
 
-    private static func part(of value: UInt32, in script: String) -> GlyphGroup.ScriptPart {
+    private static func part(of value: UInt32, in script: String, cased: Bool) -> GlyphGroup.ScriptPart {
         guard let scalar = Unicode.Scalar(value) else { return .signs }
+        switch scalar.properties.generalCategory {
+        case .nonspacingMark, .spacingMark, .enclosingMark: return .marks
+        case .decimalNumber, .letterNumber, .otherNumber: return .figures
+        case .uppercaseLetter, .titlecaseLetter, .lowercaseLetter, .modifierLetter, .otherLetter: break
+        default: return .signs
+        }
+        if UnicodeBlock.containing(value)?.name.contains("Presentation Forms") == true { return .presentationForms }
+        guard cased else { return .letters }
+        if scalar.properties.generalCategory == .modifierLetter { return .signs }
         let basic: Bool = switch script {
         case "Greek": (0x391...0x3A9 ~= value || 0x3B1...0x3C9 ~= value) && value != 0x3C2
         case "Cyrillic": 0x410...0x44F ~= value
@@ -458,7 +479,7 @@ public struct GlyphSection: Identifiable, Sendable {
         switch scalar.properties.generalCategory {
         case .uppercaseLetter, .titlecaseLetter: return basic ? .uppercase : .uppercaseAccents
         case .lowercaseLetter: return basic ? .lowercase : .lowercaseAccents
-        default: return .signs
+        default: return .letters
         }
     }
 
@@ -468,7 +489,8 @@ public struct GlyphSection: Identifiable, Sendable {
         let lowercase = String(Character(scalar)).lowercased()
         let scalars = Array(lowercase.unicodeScalars)
         let letter = scalars.count == 1 ? scalars[0].value : character
-        let base = lowercase.decomposedStringWithCompatibilityMapping.unicodeScalars.first?.value ?? letter
+        // Arabic's isolated forms of its vowel marks, like ﹰ and ﱞ, start with a space, which would put them before every letter.
+        let base = lowercase.decomposedStringWithCompatibilityMapping.unicodeScalars.first { $0 != " " }?.value ?? letter
         let built = lowercase.decomposedStringWithCanonicalMapping.unicodeScalars.first?.value ?? letter
         let kind: UInt32 = letter == base ? 0 : built == base ? 1 : max(built, 2)
         return (base, kind, letter, character == letter ? 0 : 1, character)
