@@ -695,6 +695,7 @@ private struct OutlineViewSetup: NSViewRepresentable {
             while let current = view, !(current is NSOutlineView) { view = current.superview }
             guard let outline = view as? NSOutlineView else { return }
             outline.selectionHighlightStyle = .none
+            outline.refusesFirstResponder = true
             // Without the answers, a row dragged out of the list stops Cicero.
             if SidebarDataSource.answer(for: outline, drag: drag) { outline.draggingDestinationFeedbackStyle = .gap }
             SidebarDrag.prepare(in: outline)
