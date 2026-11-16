@@ -47,6 +47,8 @@ struct GlyphGridRow: View {
                                      variations: variations, padding: padding, selected: selected, room: room)
         drawing.equatable()
             .accessibilityHidden(true)
+            // The drawing reaches past the row, over the rows next to it, where it took their clicks: a font with tall glyphs, like STIX Two Math, reaches over whole rows.
+            .allowsHitTesting(false)
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
             .modifier(SquareRow(columns: columns))
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TopRowKeeper.space)) } action: { [keeper, key] in
