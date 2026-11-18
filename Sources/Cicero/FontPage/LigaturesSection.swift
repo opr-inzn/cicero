@@ -65,7 +65,7 @@ struct LigaturesSection: View {
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         VStack(spacing: 10) {
-            GlyphMetrics(face: face, glyph: ligature.glyph, characters: ligature.characters, weight: weight, variations: variations)
+            GlyphMetrics(face: face, glyph: ligature.glyph, weight: weight, variations: variations)
                 .frame(maxWidth: .infinity)
                 .frame(height: GlyphsSection.metricsHeight)
                 .contentShape(.rect)

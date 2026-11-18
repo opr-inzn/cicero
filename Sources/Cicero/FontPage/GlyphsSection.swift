@@ -241,7 +241,7 @@ struct GlyphsSection: View {
             case .character(let scalar):
                 Group {
                     if let glyph = GlyphVectors.glyph(of: scalar, in: GlyphVectors.font(style.face, weight: style.weight, variations: style.variations)) {
-                        GlyphMetrics(face: style.face, glyph: glyph, characters: [scalar], weight: style.weight, variations: style.variations)
+                        GlyphMetrics(face: style.face, glyph: glyph, weight: style.weight, variations: style.variations)
                             .frame(height: Self.metricsHeight)
                     } else {
                         character(scalar, style: style, size: 96)
@@ -260,7 +260,7 @@ struct GlyphsSection: View {
                 }
                 .buttonStyle(StillPushButtonStyle())
             case .feature(let glyph):
-                GlyphMetrics(face: style.face, glyph: glyph.glyph, characters: [glyph.character], weight: style.weight, variations: style.variations)
+                GlyphMetrics(face: style.face, glyph: glyph.glyph, weight: style.weight, variations: style.variations)
                     .frame(maxWidth: .infinity)
                     .frame(height: Self.metricsHeight)
                     .contentShape(.rect)
@@ -281,7 +281,7 @@ struct GlyphsSection: View {
                 .buttonStyle(StillPushButtonStyle())
             case .alternate(let alternate):
                 let names = alternate.listedNames
-                GlyphMetrics(face: style.face, glyph: alternate.glyph, characters: [alternate.character], weight: style.weight, variations: style.variations)
+                GlyphMetrics(face: style.face, glyph: alternate.glyph, weight: style.weight, variations: style.variations)
                     .frame(maxWidth: .infinity)
                     .frame(height: Self.metricsHeight)
                     .contentShape(.rect)
