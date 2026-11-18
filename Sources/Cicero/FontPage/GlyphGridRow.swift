@@ -100,8 +100,7 @@ struct GlyphGridRow: View {
     private static let mostZoom: CGFloat = 3
 
     nonisolated static func baseline(in height: CGFloat, font: CTFont, scale: CGFloat = 1) -> CGFloat {
-        let ascent = CTFontGetAscent(font).rounded(), descent = CTFontGetDescent(font).rounded()
-        return ((height - ascent - descent) / 2 * scale).rounded() / scale + ascent
+        ((height / 2 + GlyphDrawing.middle(of: font)) * scale).rounded() / scale
     }
 
     private static func room(for cells: [GridCell], in font: CTFont) -> EdgeInsets {
@@ -309,11 +308,17 @@ enum GlyphDrawing {
 
     private static let margin: CGFloat = 6
 
+    nonisolated static func middle(of font: CTFont) -> CGFloat {
+        let capHeight = CTFontGetCapHeight(font), ascent = CTFontGetAscent(font)
+        return capHeight > 0 && capHeight <= ascent ? capHeight / 2 : (ascent - CTFontGetDescent(font)) / 2
+    }
+
     private static func fit(_ bounds: CGRect, font: CTFont, in rect: CGRect) -> (origin: CGPoint, scale: CGFloat) {
         let ascent = max(CTFontGetAscent(font), bounds.maxY), descent = max(CTFontGetDescent(font), -bounds.minY)
         let scale = min(1, (rect.width - margin) / max(bounds.width, 1), rect.height / max(ascent + descent, 1))
+        let baseline = rect.minY + rect.height / 2 + middle(of: font) * scale
         return (CGPoint(x: rect.minX + (rect.width - bounds.width * scale) / 2 - bounds.minX * scale,
-                        y: rect.minY + (rect.height + (ascent - descent) * scale) / 2), scale)
+                        y: min(max(baseline, rect.minY + bounds.maxY * scale), rect.maxY + bounds.minY * scale)), scale)
     }
 }
 
