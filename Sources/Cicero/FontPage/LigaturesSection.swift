@@ -65,8 +65,9 @@ struct LigaturesSection: View {
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
         VStack(spacing: 10) {
-            GlyphImage(face: face, glyph: ligature.glyph, size: 96, weight: weight, variations: variations)
-                .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+            GlyphMetrics(face: face, glyph: ligature.glyph, characters: ligature.characters, weight: weight, variations: variations)
+                .frame(maxWidth: .infinity)
+                .frame(height: GlyphsSection.metricsHeight)
                 .contentShape(.rect)
                 .onDrag { dragItem(ligature) }
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))

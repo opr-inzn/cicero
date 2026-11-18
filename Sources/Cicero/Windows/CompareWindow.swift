@@ -254,21 +254,12 @@ private struct CompareSample: Identifiable {
         let weight = chosen.map(\.face.styleWeight) ?? 400
         let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
         line = TextLine(text, font: font, kerning: 0)
-        letterAscent = max(line.inkAscent, (Self.ascenderHeight(of: font) ?? 0).rounded(.up))
+        letterAscent = max(line.inkAscent, (GlyphMetrics.ascenderHeight(of: font) ?? 0).rounded(.up))
         tintIndex = entry.tint % Self.tints.count
     }
 
     static func topAscent(of samples: [CompareSample]) -> CGFloat {
         samples.map(\.letterAscent).max() ?? 0
-    }
-
-    static func ascenderHeight(of font: CTFont) -> CGFloat? {
-        var characters = Array("bdhkl".utf16), glyphs = [CGGlyph](repeating: 0, count: characters.count)
-        CTFontGetGlyphsForCharacters(font, &characters, &glyphs, characters.count)
-        return glyphs.filter { $0 != 0 }.compactMap { glyph -> CGFloat? in
-            guard let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isNull else { return nil }
-            return path.boundingBoxOfPath.maxY
-        }.max()
     }
 
     static func chosenStyle(of entry: CompareEntry, in family: Family) -> LibraryFace? {

@@ -35,7 +35,8 @@ struct GlyphsSection: View {
     static let labelGap: CGFloat = 4
     static let runGap = labelLine - spacing - 2
     static let glyphSize: CGFloat = 26
-    static let popoverWidth: CGFloat = 196
+    static let popoverWidth: CGFloat = 280
+    static let metricsHeight: CGFloat = 190
 
     nonisolated static func columns(fitting width: CGFloat) -> Int {
         max(1, Int((width - 2 * inset + spacing) / (cell + spacing)))
@@ -220,10 +221,18 @@ struct GlyphsSection: View {
         VStack(spacing: 10) {
             switch cell {
             case .character(let scalar):
-                character(scalar, style: style, size: 96)
-                    .frame(maxWidth: .infinity, minHeight: 130)
-                    .contentShape(.rect)
-                    .onDrag { dragItem(cell, style: style) }
+                Group {
+                    if let glyph = GlyphVectors.glyph(of: scalar, in: GlyphVectors.font(style.face, weight: style.weight, variations: style.variations)) {
+                        GlyphMetrics(face: style.face, glyph: glyph, characters: [scalar], weight: style.weight, variations: style.variations)
+                            .frame(height: Self.metricsHeight)
+                    } else {
+                        character(scalar, style: style, size: 96)
+                            .frame(minHeight: 130)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(.rect)
+                .onDrag { dragItem(cell, style: style) }
                 Text(GlyphSection.shownName(of: scalar) ?? "Unnamed").font(.callout).multilineTextAlignment(.center)
                 CharacterCodesGrid(scalar: scalar)
                 VStack {
@@ -233,8 +242,9 @@ struct GlyphsSection: View {
                 }
                 .buttonStyle(StillPushButtonStyle())
             case .feature(let glyph):
-                GlyphImage(face: style.face, glyph: glyph.glyph, size: 96, weight: style.weight, variations: style.variations)
-                    .frame(width: 160, height: 130)
+                GlyphMetrics(face: style.face, glyph: glyph.glyph, characters: [glyph.character], weight: style.weight, variations: style.variations)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Self.metricsHeight)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
                 VStack(spacing: 0) {
@@ -253,8 +263,9 @@ struct GlyphsSection: View {
                 .buttonStyle(StillPushButtonStyle())
             case .alternate(let alternate):
                 let names = alternate.listedNames
-                GlyphImage(face: style.face, glyph: alternate.glyph, size: 96, weight: style.weight, variations: style.variations)
-                    .frame(width: 160, height: 130)
+                GlyphMetrics(face: style.face, glyph: alternate.glyph, characters: [alternate.character], weight: style.weight, variations: style.variations)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Self.metricsHeight)
                     .contentShape(.rect)
                     .onDrag { dragItem(cell, style: style) }
                 VStack(spacing: 0) {
