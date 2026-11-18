@@ -13,6 +13,8 @@ struct FontPage: View {
     @State private var keeper = TopRowKeeper()
     @State private var title = GlyphsTitle()
     @State private var solidTop = false
+    @State private var glyphQuery = ""
+    @State private var openCell = OpenCell()
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -30,65 +32,91 @@ struct FontPage: View {
         let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
             family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
         }
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Header(family: family)
-                Divider()
-                TypeTester(family: family)
-                if family.faces.count > 1 {
-                    StyleRows(family: family)
-                }
-                // Not the styles in this lazy stack: their rows, far taller than glyph rows, made it lay the page out again and again at full CPU.
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-                    if let shown {
-                        if let glyphColumns {
-                            let content = shown.content
-                            GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
-                                          glyphCount: content.glyphCount, alternateCount: content.alternateCount, ligatures: content.ligatures,
-                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates,
-                                          generation: content.generation)
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Header(family: family)
+                    Divider()
+                    TypeTester(family: family)
+                    if family.faces.count > 1 {
+                        StyleRows(family: family)
+                    }
+                    // Not the styles in this lazy stack: their rows, far taller than glyph rows, made it lay the page out again and again at full CPU.
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                        if let shown {
+                            if let glyphs = glyphsSection(family, shown) {
+                                glyphs
+                            }
+                        } else {
+                            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                         }
-                    } else {
-                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                     }
                 }
+                .modifier(GlyphColumnsReader(columns: $glyphColumns))
+                .environment(\.topRowKeeper, keeper)
+                .environment(\.glyphsTitle, title)
+                .coordinateSpace(.named(TopRowKeeper.space))
             }
-            .modifier(GlyphColumnsReader(columns: $glyphColumns))
-            .environment(\.topRowKeeper, keeper)
-            .environment(\.glyphsTitle, title)
-            .coordinateSpace(.named(TopRowKeeper.space))
-        }
-        .scrollPosition($position)
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
-        .onScrollGeometryChange(for: Bool.self) { [titleY = title.y] geometry in titleY.map { geometry.contentOffset.y >= $0 - GlyphsSection.titleGap + 2 } ?? false } action: { solidTop = $1 }
-        .hardTopScrollEdge(solidTop)
-        .overlay(alignment: .top) {
-            if solidTop {
-                Color.canvas.frame(height: 2).background(Color.canvas.ignoresSafeArea(edges: .top))
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
+            .onScrollGeometryChange(for: Bool.self) { [titleY = title.y] geometry in titleY.map { geometry.contentOffset.y >= $0 - GlyphsSection.titleGap + 2 } ?? false } action: { solidTop = $1 }
+            .hardTopScrollEdge(solidTop)
+            .overlay(alignment: .top) {
+                if solidTop {
+                    Color.canvas.frame(height: 2).background(Color.canvas.ignoresSafeArea(edges: .top))
+                }
             }
+            .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
+            .task(id: FileFace(family.regular.face)) {
+                model.pageFeatures.prepare(family.regular.face)
+            }
+            // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
+            .task(id: FileFace(face)) {
+                let content = await model.pageContents.content(loading: face)
+                guard !Task.isCancelled else { return }
+                loaded = (face.id, content)
+            }
+            .background(Color.canvas)
+            .contextMenu { FamilyMenu(families: [family], model: model) }
+            .focusable()
+            .focused($focused)
+            .focusEffectDisabled()
+            .defaultFocus($focused, true)
+            .navigationTitle(family.name)
+            .toolbar {
+                ToolbarCapsule { InfoButton() }
+                ToolbarGap()
+            }
+            .onKeyPress(phases: .down) { press in
+                guard press.modifiers.isDisjoint(with: [.command, .control]), let scalar = Self.typed(press.characters),
+                      let glyphs = glyphsSection(family, shown), let row = glyphs.row(of: scalar)
+                else { return .ignored }
+                CellPopover.shared.close(animated: false)
+                openCell.cell = .character(scalar)
+                proxy.scrollTo(row, anchor: .center)
+                return .handled
+            }
+            .onExitCommand { model.openFamilyID = nil }
         }
-        .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
-        .task(id: FileFace(family.regular.face)) {
-            model.pageFeatures.prepare(family.regular.face)
+    }
+
+    private func glyphsSection(_ family: Family, _ shown: (face: FontFace, content: PageContent)?) -> GlyphsSection? {
+        guard let shown, let glyphColumns else { return nil }
+        let content = shown.content
+        return GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
+                             glyphCount: content.glyphCount, alternateCount: content.alternateCount, ligatures: content.ligatures,
+                             ligatureCharacters: content.ligatureCharacters, alternates: content.alternates,
+                             generation: content.generation, query: $glyphQuery, open: openCell)
+    }
+
+    private static func typed(_ characters: String) -> UInt32? {
+        guard let scalar = characters.unicodeScalars.first, characters.unicodeScalars.count == 1 else { return nil }
+        // AppKit gives the arrow, function and other special keys characters of their own in private use, from U+F700.
+        guard !(0xF700...0xF8FF).contains(scalar.value) else { return nil }
+        switch scalar.properties.generalCategory {
+        case .control, .format, .spaceSeparator, .lineSeparator, .paragraphSeparator: return nil
+        default: return scalar.value
         }
-        // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
-        .task(id: FileFace(face)) {
-            let content = await model.pageContents.content(loading: face)
-            guard !Task.isCancelled else { return }
-            loaded = (face.id, content)
-        }
-        .background(Color.canvas)
-        .contextMenu { FamilyMenu(families: [family], model: model) }
-        .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
-        .defaultFocus($focused, true)
-        .navigationTitle(family.name)
-        .toolbar {
-            ToolbarCapsule { InfoButton() }
-            ToolbarGap()
-        }
-        .onExitCommand { model.openFamilyID = nil }
     }
 }
 
@@ -696,7 +724,7 @@ private struct StyleRows: View {
                 .padding(.vertical, 8)
                 .contentShape(.rect)
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
-                .fontDrag { FontDrag(family: family.id, style: style.face.postScriptName) } preview: {
+                .styleDrag(style, of: family) {
                     FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20, weight: style.face.styleWeight)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)

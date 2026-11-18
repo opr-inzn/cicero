@@ -16,8 +16,8 @@ struct GlyphsSection: View {
     let ligatureCharacters: [CGGlyph: UInt32]
     let alternates: [UInt32: [FeatureAlternate]]
     let generation: Int
-    @State private var query = ""
-    @State private var open = OpenCell()
+    @Binding var query: String
+    let open: OpenCell
 
     private typealias Cell = GlyphCell
 
@@ -37,6 +37,23 @@ struct GlyphsSection: View {
     static let glyphSize: CGFloat = 26
     static let popoverWidth: CGFloat = 280
     static let metricsHeight: CGFloat = 190
+
+    struct RowID: Hashable {
+        let group: GlyphGroup
+        let row: Int
+    }
+
+    func row(of scalar: UInt32) -> RowID? {
+        let filter = Filter(query)
+        for section in filtered(sections) {
+            var row = 0
+            for run in section.labeledRuns(alternates: { shownAlternates(of: $0, filter) }) {
+                if let index = run.cells.firstIndex(of: .character(scalar)) { return RowID(group: section.group, row: row + index / columns) }
+                row += (run.cells.count + columns - 1) / columns
+            }
+        }
+        return nil
+    }
 
     nonisolated static func columns(fitting width: CGFloat) -> Int {
         max(1, Int((width - 2 * inset + spacing) / (cell + spacing)))
@@ -192,6 +209,7 @@ struct GlyphsSection: View {
                 }
                 .padding(.horizontal, Self.inset)
                 .padding(.bottom, row == rows.count - 1 ? Self.bottom(of: index, in: categories, lifted: lifted) : Self.spacing)
+                .id(RowID(group: section.group, row: row))
             }
         } header: {
             GlyphHeader(heading: heading)
