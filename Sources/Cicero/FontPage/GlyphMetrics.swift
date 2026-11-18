@@ -55,8 +55,8 @@ struct GlyphMetrics: View {
             var used = area.height
             for line in lines.reversed() {
                 let y = baseline - line.value * scale + 0.5
-                let ink = line.value == 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(light)
-                context.stroke(Path { $0.move(to: CGPoint(x: 0, y: y)); $0.addLine(to: CGPoint(x: area.width, y: y)) }, with: .style(ink), lineWidth: 1)
+                let ink = line.value == 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary)
+                context.stroke(Path { $0.move(to: CGPoint(x: 0, y: y)); $0.addLine(to: CGPoint(x: area.width, y: y)) }, with: .color(line.value == 0 ? .accentColor : light), lineWidth: 1)
                 for name in line.names.reversed() {
                     let below = !["Ascender", "Descender"].contains(name) && y + 2 + Self.labelHeight <= used
                     let labelY = below ? y + 2 : y - 2
@@ -71,7 +71,7 @@ struct GlyphMetrics: View {
                 context.stroke(Path { $0.move(to: CGPoint(x: x, y: 0)); $0.addLine(to: CGPoint(x: x, y: area.height)) }, with: .color(light), lineWidth: 1)
             }
             func number(_ value: CGFloat, at x: CGFloat, _ anchor: UnitPoint) {
-                context.draw(Text(Int(value.rounded()).plain).font(label).foregroundStyle(light), at: CGPoint(x: x, y: area.height), anchor: anchor)
+                context.draw(Text(Int(value.rounded()).plain).font(label).foregroundStyle(.secondary), at: CGPoint(x: x, y: area.height), anchor: anchor)
             }
             number(width, at: (leftX + rightX) / 2, .bottom)
             if !bounds.isEmpty {
