@@ -332,13 +332,13 @@ private struct FileDrop: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .outsideFileDrops(isOver: { isTargeted = $0 }) { urls in
+            .overlay(FontDropTarget(files: .init(isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
                 // A glyph dragged off a font page and let go over it again: macOS 15 doesn't say the drag is Cicero's own, so its file is left out.
                 let urls = urls.filter { !GlyphVectors.isDragFile($0) }
                 guard !urls.isEmpty else { return }
                 model.open(urls, into: model.targetForAddedFiles)
-            }
+            }))
             .onPasteCommand(of: [.fileURL]) { _ in model.pasteFiles() }
             .overlay {
                 if isTargeted {

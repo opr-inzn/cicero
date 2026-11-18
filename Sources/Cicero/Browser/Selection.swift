@@ -321,9 +321,7 @@ struct FamilyItem: ViewModifier {
             .contextMenu {
                 TargetsMenu(family: family, model: model)
             }
-            .fontDrag { FontDrag(families: model.targets(for: family).map(\.id)) } preview: {
-                FamilyDragPreview(family: family, count: model.targets(for: family).count)
-            }
+            .familyDrag { model.targets(for: family) }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.openFamilyID = family.id }

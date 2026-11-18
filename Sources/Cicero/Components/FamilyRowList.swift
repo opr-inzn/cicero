@@ -91,9 +91,7 @@ struct FamilyRowList<Row: View>: View {
                 FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor)
             })
             .contextMenu { FamilyMenu(families: targets(for: family.id, in: ids).compactMap(model.family), model: model) }
-            .fontDrag { FontDrag(families: targets(for: family.id, in: ids)) } preview: {
-                FamilyDragPreview(family: family, count: targets(for: family.id, in: ids).count)
-            }
+            .familyDrag { targets(for: family.id, in: ids).compactMap(model.family) }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { open(family.id) }

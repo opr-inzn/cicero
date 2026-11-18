@@ -80,6 +80,9 @@ extension View {
             }
         } else {
             dropDestination(for: URL.self) { items, _ in
+                // Fonts dragged in Cicero carry their files, and macOS 15 doesn't say the drag is Cicero's own: without this, they would be added again.
+                let items = items.filter { !FontDragSource.shared.isDragging($0) }
+                guard !items.isEmpty else { return false }
                 action(items)
                 return true
             } isTargeted: { isOver($0) }

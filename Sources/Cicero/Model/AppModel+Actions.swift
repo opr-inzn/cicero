@@ -862,14 +862,16 @@ extension AppModel {
         guard !families.isEmpty else { return false }
         switch item {
         case .set(let id):
+            var whole: [Family] = [], inWhole = Set<String>()
             for drag in drags {
                 let dragged = drag.families.compactMap { family($0) }
                 if let style = drag.style, let family = dragged.first, let face = family.faces.first(where: { $0.face.postScriptName == style }) {
                     setMembership(true, for: face, of: family, in: id)
                 } else {
-                    setMembership(true, for: dragged, in: id)
+                    whole += dragged.filter { inWhole.insert($0.id).inserted }
                 }
             }
+            if !whole.isEmpty { setMembership(true, for: whole, in: id) }
         case .tag(let name): setTag(name, true, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         case .classification(let name): setClassification(name, for: families)
