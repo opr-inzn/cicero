@@ -2,6 +2,12 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## 0.12.1
+
+- **Go to a glyph by typing it:** on a font page, type a character to scroll to its glyph and mark it. Typing in the sample text still only types.
+- **Drag fonts out of Cicero:** drag families or styles to the Finder or another app to copy their font files. Several fonts move together as a pile of cards.
+- A character a font doesn’t have shows as that font’s own missing-glyph shape, not in another font.
+
 ## 0.12.0
 
 - **Copy the characters a font is missing:** in the **Info** tab, **Show Missing** under **Coverage** lets you choose any character set, and in **Show All** under **Unicode Blocks** you can click a block to see what it is missing. **Copy Characters** puts them on the clipboard, to paste into your font editor.
