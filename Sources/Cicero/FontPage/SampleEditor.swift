@@ -197,15 +197,14 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
 
         func textContentStorage(_ content: NSTextContentStorage, textParagraphWith range: NSRange) -> NSTextParagraph? {
             guard let storage = content.textStorage, let glyphStyle else { return nil }
-            let pasted = storage.sampleGlyphs(in: range)
-            guard !pasted.isEmpty else { return nil }
             let paragraph = NSMutableAttributedString(attributedString: storage.attributedSubstring(from: range))
-            for run in pasted where run.glyph.family == glyphStyle.family {
+            for run in storage.sampleGlyphs(in: range) where run.glyph.family == glyphStyle.family {
                 guard let glyph = shownGlyph(run.glyph, in: glyphStyle),
                       let info = NSGlyphInfo(cgGlyph: glyph, for: glyphStyle.font as NSFont, baseString: run.glyph.characters)
                 else { continue }
                 paragraph.addAttribute(.glyphInfo, value: info, range: run.range)
             }
+            paragraph.showMissingAsNotdef(in: glyphStyle.font)
             return NSTextParagraph(attributedString: paragraph)
         }
 

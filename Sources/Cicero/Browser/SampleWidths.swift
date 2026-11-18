@@ -123,7 +123,7 @@ final class SampleWidths {
         static var version: String {
             let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
             // For this build of Cicero on this version of macOS only: a new one may put other text in a font's own script, or CoreText measure it differently.
-            return "1|\(build)|\(ProcessInfo.processInfo.operatingSystemVersionString)"
+            return "2|\(build)|\(ProcessInfo.processInfo.operatingSystemVersionString)"
         }
 
         @concurrent
@@ -152,7 +152,9 @@ final class SampleWidths {
     }
 
     nonisolated static func width(of text: String, in font: CTFont) -> CGFloat {
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
+        let shown = NSMutableAttributedString(string: text, attributes: [.font: font])
+        shown.showMissingAsNotdef(in: font)
+        let line = CTLineCreateWithAttributedString(shown)
         let advance = CTLineGetTypographicBounds(line, nil, nil, nil)
         let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         guard !ink.isEmpty else { return advance }

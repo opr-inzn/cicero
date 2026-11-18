@@ -37,7 +37,7 @@ struct FontText: View {
             let scale = scale?(atSize) ?? 1
             let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations,
                                                                     features: features, cached: cached)
-            Text(text.isEmpty ? " " : text)
+            Text(text.isEmpty ? " " : text, notdefIn: font)
                 .font(Font(font))
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: font.naturalLineHeight)
@@ -142,7 +142,9 @@ struct FontLine: View {
     private static func draw(_ text: String, font: CTFont, in context: inout GraphicsContext, x: CGFloat, width: CGFloat, baseline: CGFloat) {
         let color = Color.ink.resolve(in: context.environment).cgColor
         let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color]
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+        let shown = NSMutableAttributedString(string: text, attributes: attributes)
+        shown.showMissingAsNotdef(in: font)
+        let line = CTLineCreateWithAttributedString(shown)
         let ellipsis = CTLineCreateWithAttributedString(NSAttributedString(string: "…", attributes: attributes))
         let drawn = CTLineCreateTruncatedLine(line, Double(width), .end, ellipsis) ?? line
         context.withCGContext { cg in

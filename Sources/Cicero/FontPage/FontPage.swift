@@ -200,7 +200,7 @@ private struct FamilyName: View {
             set = line(size * min(1, area.height / set.ink.height))
             baseline = (area.height - set.ink.height) / 2 + set.ink.maxY
         }
-        let ellipsis = TextLine("…", font: set.font, kerning: 0).line
+        let ellipsis = TextLine("…", font: set.font, kerning: 0, showsNotdef: false).line
         let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .end, ellipsis) ?? set.line
         context.saveGState()
         context.setFillColor(color)
