@@ -62,6 +62,7 @@ struct GlyphMetrics: View {
                     let labelY = below ? y + 2 : y - 2
                     used = below ? y : labelY - Self.labelHeight
                     context.draw(Text(name).font(label).foregroundStyle(ink), at: CGPoint(x: 0, y: labelY), anchor: below ? .topLeading : .bottomLeading)
+                    guard name == line.names.last else { continue }
                     context.draw(Text(Int(line.value).plain).font(label).foregroundStyle(ink),
                                  at: CGPoint(x: area.width, y: labelY), anchor: below ? .topTrailing : .bottomTrailing)
                 }
