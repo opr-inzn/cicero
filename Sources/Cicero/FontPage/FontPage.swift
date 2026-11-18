@@ -254,6 +254,7 @@ private struct TypeTester: View {
                     Text("Custom").tag(StyleChoice.custom)
                 }
             }
+            .labelsHidden()
             .fixedSize()
             .help("Which style to show; until you pick one, it is the regular style, or a style the search names, like Italic")
             .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
