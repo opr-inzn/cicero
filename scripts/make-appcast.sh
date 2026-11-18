@@ -62,7 +62,7 @@ cat >"$APPCAST" <<EOF
             <description sparkle:format="markdown"><![CDATA[
 ${NOTES//]]>/]]]]><![CDATA[>}
 ]]></description>
-            <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
+            <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero-$VERSION-$BUILD.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
         </item>
     </channel>
 </rss>

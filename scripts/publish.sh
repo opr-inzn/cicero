@@ -1,7 +1,7 @@
 #!/bin/bash
 # Publishes build/Cicero-<version>.dmg (made by release.sh) as a GitHub release, using that
 # version's section of CHANGELOG.md as the notes, with the appcast.xml Sparkle reads for updates
-# (see make-appcast.sh). The assets always have these names, so
+# (see make-appcast.sh) and Cicero-<version>-<build>.dmg, the copy the feed names. The other two assets always have these names, so
 # https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg stays the latest version
 # and .../latest/download/appcast.xml offers it as an update.
 #   ./scripts/publish.sh                  publish the version in Resources/Info.plist
@@ -30,8 +30,10 @@ fi
 ./scripts/make-appcast.sh "$DMG"
 
 ASSET_DIR=$(mktemp -d)
+BUILD=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' Resources/Info.plist)
 cp "$DMG" "$ASSET_DIR/Cicero.dmg"
+cp "$DMG" "$ASSET_DIR/Cicero-$VERSION-$BUILD.dmg"
 cp build/appcast.xml "$ASSET_DIR/appcast.xml"
-gh release create "v$VERSION" "$ASSET_DIR/Cicero.dmg" "$ASSET_DIR/appcast.xml" \
+gh release create "v$VERSION" "$ASSET_DIR/Cicero.dmg" "$ASSET_DIR/Cicero-$VERSION-$BUILD.dmg" "$ASSET_DIR/appcast.xml" \
     --title "Cicero $VERSION" --notes "$NOTES" --target "$(git rev-parse HEAD)" --latest
 rm -rf "$ASSET_DIR"
