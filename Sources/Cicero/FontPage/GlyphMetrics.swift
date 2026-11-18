@@ -51,28 +51,32 @@ struct GlyphMetrics: View {
                             (area.width - 2 * Self.labelRoom) / max(right - left, 1))
             let baseline = (Self.topRoom + (area.height - Self.topRoom - Self.bottomRoom + (top - bottom) * scale) / 2 + bottom * scale).rounded()
             let origin = ((area.width - (right - left) * scale) / 2 - left * scale).rounded()
-            let rule = Color.primary.opacity(0.15)
-            let label = Font.caption2.weight(.medium)
-            var used = -CGFloat.infinity
-            for line in lines {
+            let label = Font.caption2.weight(.medium), light = Color.primary.opacity(0.15)
+            var used = area.height
+            for line in lines.reversed() {
                 let y = baseline - line.value * scale + 0.5
-                context.stroke(Path { $0.move(to: CGPoint(x: 0, y: y)); $0.addLine(to: CGPoint(x: area.width, y: y)) }, with: .color(rule), lineWidth: 1)
-                for (index, name) in line.names.enumerated() {
-                    let below = index > 0 || y - 2 - Self.labelHeight < used
+                let ink = line.value == 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(light)
+                context.stroke(Path { $0.move(to: CGPoint(x: 0, y: y)); $0.addLine(to: CGPoint(x: area.width, y: y)) }, with: .style(ink), lineWidth: 1)
+                for name in line.names.reversed() {
+                    let below = !["Ascender", "Descender"].contains(name) && y + 2 + Self.labelHeight <= used
                     let labelY = below ? y + 2 : y - 2
-                    used = below ? labelY + Self.labelHeight : y
-                    context.draw(Text(name).font(label).foregroundStyle(.secondary), at: CGPoint(x: 0, y: labelY), anchor: below ? .topLeading : .bottomLeading)
-                    guard index == 0 else { continue }
-                    context.draw(Text(Int(line.value).formatted()).font(label.monospacedDigit()).foregroundStyle(.secondary),
+                    used = below ? y : labelY - Self.labelHeight
+                    context.draw(Text(name).font(label).foregroundStyle(ink), at: CGPoint(x: 0, y: labelY), anchor: below ? .topLeading : .bottomLeading)
+                    context.draw(Text(Int(line.value).plain).font(label).foregroundStyle(ink),
                                  at: CGPoint(x: area.width, y: labelY), anchor: below ? .topTrailing : .bottomTrailing)
                 }
             }
-            let rulesTop = baseline - top * scale - 4, rulesBottom = area.height - Self.bottomRoom + 2
-            for value in [0, width] {
-                let x = (origin + value * scale).rounded() + 0.5
-                context.stroke(Path { $0.move(to: CGPoint(x: x, y: rulesTop)); $0.addLine(to: CGPoint(x: x, y: rulesBottom)) }, with: .color(rule), lineWidth: 1)
-                context.draw(Text(Int(value).formatted()).font(label.monospacedDigit()).foregroundStyle(.secondary),
-                             at: CGPoint(x: x + 3, y: area.height), anchor: .bottomLeading)
+            let leftX = origin.rounded() + 0.5, rightX = (origin + width * scale).rounded() + 0.5
+            for x in [leftX, rightX] {
+                context.stroke(Path { $0.move(to: CGPoint(x: x, y: 0)); $0.addLine(to: CGPoint(x: x, y: area.height)) }, with: .color(light), lineWidth: 1)
+            }
+            func number(_ value: CGFloat, at x: CGFloat, _ anchor: UnitPoint) {
+                context.draw(Text(Int(value.rounded()).plain).font(label).foregroundStyle(light), at: CGPoint(x: x, y: area.height), anchor: anchor)
+            }
+            number(width, at: (leftX + rightX) / 2, .bottom)
+            if !bounds.isEmpty {
+                number(bounds.minX, at: leftX - 3, .bottomTrailing)
+                number(width - bounds.maxX, at: rightX + 3, .bottomLeading)
             }
             let color = Color.ink.resolve(in: context.environment).cgColor
             context.withCGContext { cg in
