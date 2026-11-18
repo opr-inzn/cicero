@@ -67,6 +67,8 @@ struct FontPage: View {
                 }
             }
             .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
+            // The font list under this page in the navigation stack keeps the focus, and defaultFocus counts only when the window opens.
+            .task { focused = true }
             .task(id: FileFace(family.regular.face)) {
                 model.pageFeatures.prepare(family.regular.face)
             }
@@ -88,6 +90,8 @@ struct FontPage: View {
                 ToolbarGap()
             }
             .onKeyPress(phases: .down) { press in
+                // SwiftUI hands keys to this page before the sample text's NSTextView, which is inside it, so typing there would jump too.
+                guard !(NSApp.keyWindow?.firstResponder is NSTextView) else { return .ignored }
                 guard press.modifiers.isDisjoint(with: [.command, .control]), let scalar = Self.typed(press.characters),
                       let glyphs = glyphsSection(family, shown), let row = glyphs.row(of: scalar)
                 else { return .ignored }
