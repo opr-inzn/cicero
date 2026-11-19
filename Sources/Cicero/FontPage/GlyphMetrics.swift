@@ -21,22 +21,29 @@ struct GlyphMetrics: View {
         }.max()
     }
 
-    var body: some View {
-        Canvas { context, area in
-            let units = CGFloat(CTFontGetUnitsPerEm(FontLoader.shared.font(face, size: 12, weight: weight, variations: variations)))
-            let font = FontLoader.shared.font(face, size: units, weight: weight, variations: variations)
+    private struct Layout {
+        let font: CTFont
+        let units: CGFloat
+        let bounds: CGRect
+        let width: CGFloat
+        let lines: [(value: CGFloat, names: [String])]
+        let top: CGFloat, bottom: CGFloat, left: CGFloat, right: CGFloat
+
+        init(face: FontFace, glyph: CGGlyph, weight: Double, variations: [String: Double]) {
+            units = CGFloat(CTFontGetUnitsPerEm(FontLoader.shared.font(face, size: 12, weight: weight, variations: variations)))
+            font = FontLoader.shared.font(face, size: units, weight: weight, variations: variations)
             var glyph = glyph
             var bounds = CGRect.zero
             CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyph, &bounds, 1)
             var advance = CGSize.zero
             CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
-            let width = advance.width.rounded()
+            width = advance.width.rounded()
             let capHeight = CTFontGetCapHeight(font).rounded()
             var lines: [(value: CGFloat, names: [String])] = [("Cap Height", capHeight), ("x-Height", CTFontGetXHeight(font).rounded()),
                                                               ("Baseline", 0), ("Descender", -CTFontGetDescent(font).rounded())]
                 .filter { $0.0 == "Baseline" || $0.1 != 0 }
                 .map { ($0.1, [$0.0]) }
-            if let ascender = Self.ascenderHeight(of: font)?.rounded() {
+            if let ascender = GlyphMetrics.ascenderHeight(of: font)?.rounded() {
                 if capHeight != 0, abs(ascender - capHeight) <= units / 100 {
                     lines[0].names.insert("Ascender", at: 0)
                 } else {
@@ -44,9 +51,29 @@ struct GlyphMetrics: View {
                 }
             }
             lines.sort { $0.value > $1.value }
-            let top = max(bounds.isEmpty ? 0 : bounds.maxY, lines.map(\.value).max() ?? 0)
-            let bottom = min(bounds.isEmpty ? 0 : bounds.minY, lines.map(\.value).min() ?? 0)
-            let left = min(0, bounds.isEmpty ? 0 : bounds.minX), right = max(width, bounds.isEmpty ? 0 : bounds.maxX)
+            self.bounds = bounds
+            self.lines = lines
+            top = max(bounds.isEmpty ? 0 : bounds.maxY, lines.map(\.value).max() ?? 0)
+            bottom = min(bounds.isEmpty ? 0 : bounds.minY, lines.map(\.value).min() ?? 0)
+            left = min(0, bounds.isEmpty ? 0 : bounds.minX)
+            right = max(width, bounds.isEmpty ? 0 : bounds.maxX)
+        }
+    }
+
+    static func popoverWidth(face: FontFace, glyph: CGGlyph?, weight: Double, variations: [String: Double]) -> CGFloat {
+        guard let glyph else { return GlyphsSection.popoverWidth }
+        let layout = Layout(face: face, glyph: glyph, weight: weight, variations: variations)
+        let scale = (GlyphsSection.metricsHeight - topRoom - bottomRoom) / max(layout.top - layout.bottom, 1)
+        let wanted = (layout.right - layout.left) * scale + 2 * labelRoom + 2 * GlyphsSection.popoverPadding
+        return min(max(GlyphsSection.popoverWidth, wanted.rounded(.up)), GlyphsSection.widestPopover)
+    }
+
+    var body: some View {
+        Canvas { context, area in
+            let layout = Layout(face: face, glyph: glyph, weight: weight, variations: variations)
+            let (font, bounds, width, lines) = (layout.font, layout.bounds, layout.width, layout.lines)
+            let (top, bottom, left, right) = (layout.top, layout.bottom, layout.left, layout.right)
+            var glyph = glyph
             let scale = min((area.height - Self.topRoom - Self.bottomRoom) / max(top - bottom, 1),
                             (area.width - 2 * Self.labelRoom) / max(right - left, 1))
             let baseline = (Self.topRoom + (area.height - Self.topRoom - Self.bottomRoom + (top - bottom) * scale) / 2 + bottom * scale).rounded()

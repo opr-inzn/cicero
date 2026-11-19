@@ -16,7 +16,7 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
 
     public enum ScriptPart: Int, Sendable {
         case uppercase, lowercase, uppercaseAccents, lowercaseAccents, letters, smallCaps, presentationForms
-        case initialForms, medialForms, finalForms, isolatedForms, localizedForms, figures, signs, caseSensitiveForms, marks
+        case localizedForms, figures, signs, caseSensitiveForms, marks, initialForms, medialForms, finalForms, isolatedForms
 
         var title: String {
             switch self {
@@ -74,7 +74,9 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .proportionalFigures, .tabularFigures, .fractions, .superscripts, .subscripts, .numerators, .denominators, .ordinals,
              .circledFigures, .romanNumerals: "Figures"
         case .punctuationAndSymbols, .currency, .mathematicalOperators, .letterlikeSymbols, .arrows, .caseSensitiveForms: "Symbols"
-        case .initialForms, .medialForms, .finalForms, .isolatedForms, .stylisticSet: "Forms"
+        case .initialForms, .medialForms, .finalForms, .isolatedForms, .scriptPart(_, .initialForms), .scriptPart(_, .medialForms),
+             .scriptPart(_, .finalForms), .scriptPart(_, .isolatedForms): "Forms"
+        case .stylisticSet: "Stylistic Sets"
         case .script(let name), .scriptPart(let name, _): name
         case .graphical: "Graphical"
         case .diacriticalMarks, .combiningMarks: "Marks"
@@ -142,27 +144,27 @@ public enum GlyphGroup: Hashable, Comparable, Sendable {
         case .phoneticLetters: 5
         case .ligatures: 6
         case .localizedForms: 7
-        case .proportionalFigures: 8
-        case .tabularFigures: 9
-        case .fractions: 10
-        case .superscripts: 11
-        case .subscripts: 12
-        case .numerators: 13
-        case .denominators: 14
-        case .ordinals: 15
-        case .circledFigures: 16
-        case .romanNumerals: 17
-        case .punctuationAndSymbols: 18
-        case .currency: 19
-        case .mathematicalOperators: 20
-        case .letterlikeSymbols: 21
-        case .arrows: 22
-        case .caseSensitiveForms: 23
-        case .initialForms: 24
-        case .medialForms: 25
-        case .finalForms: 26
-        case .isolatedForms: 27
-        case .stylisticSet: 28
+        case .stylisticSet: 8
+        case .proportionalFigures: 9
+        case .tabularFigures: 10
+        case .fractions: 11
+        case .superscripts: 12
+        case .subscripts: 13
+        case .numerators: 14
+        case .denominators: 15
+        case .ordinals: 16
+        case .circledFigures: 17
+        case .romanNumerals: 18
+        case .punctuationAndSymbols: 19
+        case .currency: 20
+        case .mathematicalOperators: 21
+        case .letterlikeSymbols: 22
+        case .arrows: 23
+        case .caseSensitiveForms: 24
+        case .initialForms: 25
+        case .medialForms: 26
+        case .finalForms: 27
+        case .isolatedForms: 28
         case .script, .scriptPart: 29
         case .graphical: 30
         case .diacriticalMarks: 31

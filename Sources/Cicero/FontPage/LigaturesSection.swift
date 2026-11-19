@@ -54,13 +54,14 @@ struct LigaturesSection: View {
     }
 
     private func menu(_ ligature: Ligature, in group: LigatureGroup) -> [GridMenuItem] {
-        [
+        var items = [
             GridMenuItem(title: "Copy Characters") { copyCharacters(ligature, in: group) },
             GridMenuItem(title: "Copy as Vector", isEnabled: outline(ligature) != nil) { copyVector(ligature, in: group) },
-            GridMenuItem(title: "Copy Unicode") {
-                copy(CharacterCodes.unicode(ligature.characters), shown: CharacterCodes.unicode(ligature.characters))
-            },
         ]
+        if let character = characters[ligature.glyph] {
+            items.append(GridMenuItem(title: "Copy Unicode") { copy(CharacterCodes.unicode(character), shown: CharacterCodes.unicode(character)) })
+        }
+        return items
     }
 
     private func details(_ ligature: Ligature, in group: LigatureGroup) -> some View {
@@ -72,13 +73,9 @@ struct LigaturesSection: View {
                 .onDrag { dragItem(ligature) }
             Text(ligature.characters.compactMap(Unicode.Scalar.init).map { String(Character($0)) }.joined(separator: " + "))
                 .font(.title3)
-            Text(CharacterCodes.unicode(ligature.characters))
-                .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
             Text("\(group.name) (\(group.tag))").font(.callout).foregroundStyle(.secondary)
             if let character = characters[ligature.glyph] {
-                Text("Also \(CharacterCodes.unicode(character))\(GlyphSection.shownName(of: character).map { ", \($0)" } ?? "")")
+                Text("\(CharacterCodes.unicode(character))\(GlyphSection.shownName(of: character).map { ", \($0)" } ?? "")")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -94,8 +91,8 @@ struct LigaturesSection: View {
             .buttonStyle(StillPushButtonStyle())
         }
         .multilineTextAlignment(.center)
-        .padding(16)
-        .frame(width: GlyphsSection.popoverWidth)
+        .padding(GlyphsSection.popoverPadding)
+        .frame(width: GlyphMetrics.popoverWidth(face: face, glyph: ligature.glyph, weight: weight, variations: variations))
     }
 
     private func copy(_ text: String, shown: String) {

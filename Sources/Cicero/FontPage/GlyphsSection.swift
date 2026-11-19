@@ -36,6 +36,8 @@ struct GlyphsSection: View {
     static let runGap = labelLine - spacing - 2
     static let glyphSize: CGFloat = 26
     static let popoverWidth: CGFloat = 280
+    static let widestPopover: CGFloat = 640
+    static let popoverPadding: CGFloat = 16
     static let metricsHeight: CGFloat = 190
 
     struct RowID: Hashable {
@@ -301,8 +303,8 @@ struct GlyphsSection: View {
                 .buttonStyle(StillPushButtonStyle())
             }
         }
-        .padding(16)
-        .frame(width: Self.popoverWidth)
+        .padding(Self.popoverPadding)
+        .frame(width: GlyphMetrics.popoverWidth(face: style.face, glyph: glyph(of: cell, style: style), weight: style.weight, variations: style.variations))
     }
 
     private func copyMenu(_ cell: Cell, style: Style) -> [GridMenuItem] {
@@ -373,13 +375,16 @@ struct GlyphsSection: View {
         }
     }
 
-    private func outline(_ cell: Cell, style: Style) -> GlyphOutline? {
-        let glyph = switch cell {
+    private func glyph(of cell: Cell, style: Style) -> CGGlyph? {
+        switch cell {
         case .character(let scalar): GlyphVectors.glyph(of: scalar, in: GlyphVectors.font(style.face, weight: style.weight, variations: style.variations))
-        case .feature(let glyph): Optional(glyph.glyph)
-        case .alternate(let alternate): Optional(alternate.glyph)
+        case .feature(let glyph): glyph.glyph
+        case .alternate(let alternate): alternate.glyph
         }
-        return GlyphVectors.outline(glyph, face: style.face, weight: style.weight, variations: style.variations)
+    }
+
+    private func outline(_ cell: Cell, style: Style) -> GlyphOutline? {
+        GlyphVectors.outline(glyph(of: cell, style: style), face: style.face, weight: style.weight, variations: style.variations)
     }
 
     private func dragItem(_ cell: Cell, style: Style) -> NSItemProvider {
@@ -527,7 +532,7 @@ private struct CharacterCodesGrid: View {
     let scalar: UInt32
 
     var body: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 0) {
             GridRow {
                 Text("Unicode").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
                 Text(CharacterCodes.unicode(scalar)).monospaced().textSelection(.enabled)

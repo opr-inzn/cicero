@@ -506,19 +506,18 @@ public struct FeatureGlyph: Hashable, Sendable {
         let characters = LigatureGroup.characterGlyphs(of: font, needed: glyphs)
         let names = FeatureAlternates.names(in: font)
         return resolve(found, characters: characters, names: names, localized: localized, shared: shared,
-                       sets: bigSets(in: found, characters: characters, total: CharacterMap.characters(of: font).count, names: names))
+                       sets: bigSets(in: found, characters: characters, names: names))
     }
 
-    static func bigSets(in found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32], total: Int,
+    static func bigSets(in found: [String: [GSUBSubstitutions.Entry]], characters: [CGGlyph: UInt32],
                         names: [String: String]) -> [(tag: String, name: String)] {
-        guard total > 0 else { return [] }
         var taken = Set(features.flatMap { found[$0.tag] ?? [] }.map(\.glyph))
         return found.keys.filter { $0.hasPrefix("ss") && Int($0.dropFirst(2)).map { (1...20).contains($0) } == true }.sorted().compactMap { tag in
             let entries = (found[tag] ?? []).filter { entry in
                 guard let input = entry.components.first, entry.glyph != input, characters[entry.glyph] == nil else { return false }
                 return characters[input] != nil && !taken.contains(entry.glyph)
             }
-            guard Set(entries.compactMap { characters[$0.components[0]] }).count * 2 >= total else { return nil }
+            guard Set(entries.compactMap { characters[$0.components[0]] }).count >= 15 else { return nil }
             taken.formUnion(entries.map(\.glyph))
             return (tag, FeatureAlternates.name(of: tag, in: names))
         }
@@ -662,7 +661,11 @@ public struct FeatureGlyph: Hashable, Sendable {
             func place(of character: UInt32) -> Place {
                 if group == .smallCaps { return letterOrder(of: character) }
                 let order = GlyphSection.letterOrder(of: character)
-                return (GlyphGroup.of(character) ?? .graphical, order.0, order.1, order.2, order.3, order.4)
+                var kind = GlyphGroup.of(character) ?? .graphical
+                if case .stylisticSet = group {
+                    if kind == .uppercaseAccents { kind = .uppercase } else if kind == .lowercaseAccents { kind = .lowercase }
+                }
+                return (kind, order.0, order.1, order.2, order.3, order.4)
             }
             var places: [UInt32: Place] = [:]
             for block in blocks where places[block[0].character] == nil { places[block[0].character] = place(of: block[0].character) }
