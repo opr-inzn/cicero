@@ -279,18 +279,31 @@ private struct TypeTester: View {
     @ViewBuilder
     private func stylePicker(face: LibraryFace, isAdjusted: Bool) -> some View {
         if family.faces.count > 1 {
-            Picker("Style", selection: choice(face: face, isAdjusted: isAdjusted)) {
-                ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
-                if isAdjusted {
-                    Divider()
-                    Text("Custom").tag(StyleChoice.custom)
+            ZStack {
+                Picker("Style", selection: .constant(0)) { Text(longestStyleTitle).tag(0) }
+                    .labelsHidden()
+                    .hidden()
+                    .accessibilityHidden(true)
+                Picker("Style", selection: choice(face: face, isAdjusted: isAdjusted)) {
+                    ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
+                    if isAdjusted {
+                        Divider()
+                        Text("Custom").tag(StyleChoice.custom)
+                    }
                 }
+                .labelsHidden()
             }
-            .labelsHidden()
             .fixedSize()
             .help("Which style to show; until you pick one, it is the regular style, or a style the search names, like Italic")
             .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
         }
+    }
+
+    private var longestStyleTitle: String {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        var titles = family.faces.map(\.face.styleName)
+        if family.faces.contains(where: { !$0.face.axes.isEmpty }) { titles.append("Custom") }
+        return titles.max { ($0 as NSString).size(withAttributes: [.font: font]).width < ($1 as NSString).size(withAttributes: [.font: font]).width } ?? ""
     }
 
     @ViewBuilder
