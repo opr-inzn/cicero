@@ -677,8 +677,16 @@ public struct GlyphSection: Identifiable, Sendable {
     }
 
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
+        var left = glyphs
+        let owned = Set(glyphs.lazy.filter { !$0.isAlternate }.map(\.character))
         func withAlternates(_ scalars: [UInt32]) -> [GlyphCell] {
-            scalars.flatMap { [GlyphCell.character($0)] + alternates($0).map(GlyphCell.alternate) }
+            scalars.flatMap { scalar -> [GlyphCell] in
+                let plain = Unicode.Scalar(scalar).map { Array(String(Character($0)).decomposedStringWithCompatibilityMapping.unicodeScalars) } ?? []
+                let base = plain.count == 1 ? plain[0].value : scalar
+                let own = left.filter { $0.isAlternate && !owned.contains($0.character) && ($0.character == scalar || $0.character == base) }
+                left.removeAll { own.contains($0) }
+                return [.character(scalar)] + alternates(scalar).map(GlyphCell.alternate) + own.map(GlyphCell.feature)
+            }
         }
         if group.isLocalizedForms {
             var runs: [[GlyphCell]] = []
@@ -693,30 +701,31 @@ public struct GlyphSection: Identifiable, Sendable {
             func rank(_ kind: String) -> (Int, String) { (GlyphGroup.enclosureKinds.firstIndex(of: kind) ?? .max, kind) }
             func value(_ scalar: UInt32) -> Double { Unicode.Scalar(scalar)?.properties.numericValue ?? 0 }
             let kinds = Dictionary(grouping: scalars, by: GlyphGroup.enclosureKind(of:)).sorted { rank($0.key) < rank($1.key) }
-            return kinds.map { withAlternates($0.value.sorted { (value($0), $0) < (value($1), $1) }) }
-                + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
+            let runs = kinds.map { withAlternates($0.value.sorted { (value($0), $0) < (value($1), $1) }) }
+            return runs + (left.isEmpty ? [] : [left.map(GlyphCell.feature)])
         case .superscripts, .subscripts, .numerators, .denominators:
-            return [withAlternates(scalars), glyphs.map(GlyphCell.feature)].filter { !$0.isEmpty }
+            let cells = withAlternates(scalars)
+            return [cells, left.map(GlyphCell.feature)].filter { !$0.isEmpty }
         case .phoneticLetters:
-            let modifiers = scalars.filter(Self.isModifier)
-            return [withAlternates(scalars.filter { !Self.isModifier($0) }) + glyphs.map(GlyphCell.feature), withAlternates(modifiers)]
-                .filter { !$0.isEmpty }
+            let letters = withAlternates(scalars.filter { !Self.isModifier($0) }), modifiers = withAlternates(scalars.filter(Self.isModifier))
+            return [letters + left.map(GlyphCell.feature), modifiers].filter { !$0.isEmpty }
         case .letterlikeSymbols:
             var runs: [[GlyphCell]] = []
             for (index, scalar) in scalars.enumerated() {
                 if index == 0 || Self.letterStyle(of: scalar) != Self.letterStyle(of: scalars[index - 1]) { runs.append([]) }
                 runs[runs.count - 1] += withAlternates([scalar])
             }
-            return runs + (glyphs.isEmpty ? [] : [glyphs.map(GlyphCell.feature)])
+            return runs + (left.isEmpty ? [] : [left.map(GlyphCell.feature)])
         case .romanNumerals:
             let small = scalars.filter { Self.name(of: $0)?.hasPrefix("SMALL") == true }
-            return [withAlternates(scalars.filter { !small.contains($0) }), withAlternates(small) + glyphs.map(GlyphCell.feature)]
-                .filter { !$0.isEmpty }
+            let large = withAlternates(scalars.filter { !small.contains($0) }), smallCells = withAlternates(small)
+            return [large, smallCells + left.map(GlyphCell.feature)].filter { !$0.isEmpty }
         default:
             break
         }
         guard group == .proportionalFigures || group == .tabularFigures || group == .currency else {
-            return [withAlternates(scalars) + glyphs.map(GlyphCell.feature)]
+            let cells = withAlternates(scalars)
+            return [cells + left.map(GlyphCell.feature)]
         }
         let found = scalars.map { ($0, alternates($0)) }
         let tags = found.flatMap { $0.1.flatMap(\.allFeatures) } + glyphs.flatMap(\.alongWith)
