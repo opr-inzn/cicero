@@ -847,6 +847,7 @@ final class AppModel {
     static let undoTime = Duration.seconds(6)
 
     func showToast(_ message: String, undo: (() -> Void)? = nil) {
+        let message = message.isEmpty || ".!?…".contains(message.last!) ? message : message + "."
         if importing != nil || earlierImportPrompt != nil { return heldToast = message }
         toast = message
         toastUndo = undo

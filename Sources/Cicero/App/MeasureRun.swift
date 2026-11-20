@@ -510,7 +510,7 @@ enum MeasureRun {
         let lists = ((try? FileManager.default.contentsOfDirectory(atPath: model.locations.support.path)) ?? []).filter { $0.hasPrefix("turning-off") && $0.hasSuffix(".json") }
         check(lists.isEmpty, "no list of files turning off left behind: \(lists)")
         let message = model.toast ?? ""
-        check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved", "the toast: \(message)")
+        check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved.", "the toast: \(message)")
         check(took < 15_000, "Undo took \(Int(took)) ms")
         Measurements.count("refusedInTrash", detail: bTrash.joined(separator: "|"))
 
