@@ -87,7 +87,6 @@ struct FamilyGroup: Identifiable {
 struct FamilyGroupHeader: View {
     let group: FamilyGroup
     var isFirst = false
-    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         let count = group.families.count
@@ -96,7 +95,7 @@ struct FamilyGroupHeader: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(group.title ?? "")
                     .font(.headline)
-                    .foregroundStyle(appearsActive ? .primary : .tertiary)
+                    .modifier(WindowTitleTint())
                 Text(count == 1 ? "1 family" : "\(count.plain) families")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

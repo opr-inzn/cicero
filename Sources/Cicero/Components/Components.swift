@@ -1052,6 +1052,14 @@ extension View {
     }
 }
 
+struct WindowTitleTint: ViewModifier {
+    @Environment(\.appearsActive) private var appearsActive
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(.primary.opacity(appearsActive ? 0.83 : 0.34))
+    }
+}
+
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 

@@ -102,7 +102,7 @@ private struct CategoryBar: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(heading.category).font(.headline)
+            Text(heading.category).font(.headline).modifier(WindowTitleTint())
                 .accessibilityAddTraits(.isHeader)
             if heading.name == nil {
                 Text(heading.detail).font(.callout).foregroundStyle(.secondary)
