@@ -420,8 +420,14 @@ final class AppModel {
     }
 
     private func restoreLibrary() {
-        let scanner = scanner, records = data.records
-        restoring = SavedLibraryRead { scanner.savedLibrary(records: records) }
+        let scanner = scanner, records = data.records, coverage = coverage
+        restoring = SavedLibraryRead {
+            let coverageRead = DispatchGroup()
+            DispatchQueue.global(qos: .userInteractive).async(group: coverageRead) { coverage.loadSaved(removingOldFile: true) }
+            let library = scanner.savedLibrary(records: records)
+            coverageRead.wait()
+            return library
+        }
     }
 
     private func finishRestoring() {

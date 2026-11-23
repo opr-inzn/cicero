@@ -114,8 +114,8 @@ public final class CoverageIndex: Sendable {
         return coverage
     }
 
-    public func loadSaved() {
-        loadIfNeeded(removingOldFile: false)
+    public func loadSaved(removingOldFile: Bool = false) {
+        loadIfNeeded(removingOldFile: removingOldFile)
     }
 
     public func clearCache() {
