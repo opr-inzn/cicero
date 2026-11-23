@@ -142,7 +142,9 @@ final class AppModel {
             openFamilyID = nil
         }
     }
-    var selectedItems: Set<SidebarItem> = [.all]
+    var selectedItems: Set<SidebarItem> = [.all] {
+        didSet { if selectedItems != oldValue { keepsOwnOrder = true } }
+    }
     var selectedIDs: Set<String> = []
     var openFamilyID: String? {
         didSet {
@@ -154,9 +156,25 @@ final class AppModel {
     }
     var pageStyleID: FaceID?
     var similarFamilyID: String? {
-        didSet { if similarFamilyID != oldValue { similarStyleID = nil } }
+        didSet {
+            if similarFamilyID != oldValue {
+                similarStyleID = nil
+                keepsOwnOrder = true
+            }
+        }
     }
-    var similarStyleID: FaceID?
+    var similarStyleID: FaceID? {
+        didSet { if similarStyleID != oldValue { keepsOwnOrder = true } }
+    }
+    var sortColumn = UserDefaults.standard.string(forKey: AppModel.sortColumnKey).flatMap(FontListColumn.init(id:)) ?? .name {
+        didSet { UserDefaults.standard.set(sortColumn.id, forKey: Self.sortColumnKey) }
+    }
+    var sortsAscending = UserDefaults.standard.object(forKey: AppModel.sortsAscendingKey) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(sortsAscending, forKey: Self.sortsAscendingKey) }
+    }
+    var keepsOwnOrder = true
+    static let sortColumnKey = "fontList.sortColumn"
+    static let sortsAscendingKey = "fontList.sortAscending"
     var documentList: DocumentList?
     var jumpTargets: Set<String>?
     var searchText = "" {

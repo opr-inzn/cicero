@@ -172,6 +172,8 @@ struct CiceroCommands: Commands {
         // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
         CommandGroup(after: .sidebar) {
             Divider()
+            Menu("Sort By", systemImage: "arrow.up.arrow.down") { SortMenuItems(model: model) }
+            Divider()
             Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
                 .disabled(model.openFamilyID == nil)

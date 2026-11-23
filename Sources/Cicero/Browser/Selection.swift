@@ -27,8 +27,10 @@ enum FamilySelection {
         anchor = SelectionAnchor(id: id)
     }
 
-    static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor, extending: Bool) -> String? {
+    static func step(_ step: Int, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor, extending: Bool,
+                     target: ((Int) -> Int)? = nil) -> String? {
         guard !ids.isEmpty else { return nil }
+        let moved = target ?? { $0 + step }
         if extending, let start = anchor.id, selection.contains(start), let a = ids.firstIndex(of: start) {
             let head: Int
             if let id = anchor.head, selection.contains(id), let index = ids.firstIndex(of: id) {
@@ -37,15 +39,32 @@ enum FamilySelection {
                 let first = ids.firstIndex { selection.contains($0) } ?? a
                 head = first < a ? first : ids.lastIndex { selection.contains($0) } ?? a
             }
-            let target = ids[min(max(head + step, 0), ids.count - 1)]
+            let target = ids[min(max(moved(head), 0), ids.count - 1)]
             if extend(to: target, in: ids, selection: &selection, anchor: &anchor) { return target }
         }
         let first = ids.firstIndex { selection.contains($0) }
         let current = ids.lastIndex { selection.contains($0) && $0 != anchor.id } ?? first
-        let index = current.map { min(max($0 + step, 0), ids.count - 1) } ?? (step > 0 ? 0 : ids.count - 1)
+        let index = current.map { min(max(moved($0), 0), ids.count - 1) } ?? (step > 0 ? 0 : ids.count - 1)
         selection = [ids[index]]
         anchor = SelectionAnchor(id: ids[index])
         return ids[index]
+    }
+
+    static func gridTarget(from index: Int, forward: Bool, columns: Int, groups starts: [Int], count: Int) -> Int {
+        let group = starts.lastIndex { $0 <= index } ?? 0
+        let start = starts[group], end = group + 1 < starts.count ? starts[group + 1] : count
+        let column = (index - start) % columns
+        if forward {
+            if index + columns < end { return index + columns }
+            if index < start + (end - 1 - start) / columns * columns { return end - 1 }
+            guard group + 1 < starts.count else { return count - 1 }
+            let nextEnd = group + 2 < starts.count ? starts[group + 2] : count
+            return min(end + column, nextEnd - 1)
+        }
+        if index - columns >= start { return index - columns }
+        guard group > 0 else { return 0 }
+        let previous = starts[group - 1]
+        return min(previous + (start - 1 - previous) / columns * columns + column, start - 1)
     }
 
     private static func extend(to id: String, in ids: [String], selection: inout Set<String>, anchor: inout SelectionAnchor) -> Bool {
@@ -60,7 +79,7 @@ enum FamilySelection {
 enum FamilyLayout {
     case list
     case specimens
-    case grid(columns: Int)
+    case grid(columns: Int, groups: [Int] = [])
 }
 
 struct DeselectsOnEmptyClick: ViewModifier {
@@ -222,9 +241,14 @@ struct FamilyKeys: ViewModifier {
         let vertical = press.key == .upArrow || press.key == .downArrow
         let forward = press.key == .downArrow || press.key == .rightArrow
         var step = 1
+        var target: ((Int) -> Int)?
         switch layout {
-        case .grid(let columns):
+        case .grid(let columns, let groups):
             if vertical { step = columns }
+            if vertical, !groups.isEmpty {
+                let count = families.count - (pinned != nil && families.first?.id == pinned ? 1 : 0)
+                target = { FamilySelection.gridTarget(from: $0, forward: forward, columns: columns, groups: groups, count: count) }
+            }
         case .list, .specimens:
             guard vertical else {
                 guard model.quickLook.isOpen, !press.modifiers.contains(.shift) else { return .ignored }
@@ -250,7 +274,7 @@ struct FamilyKeys: ViewModifier {
             }
         }
         guard let target = FamilySelection.step(forward ? step : -step, in: ids, selection: &model.selectedIDs,
-                                                anchor: &anchor, extending: press.modifiers.contains(.shift)) else {
+                                                anchor: &anchor, extending: press.modifiers.contains(.shift), target: target) else {
             return .ignored
         }
         proxy.scrollTo(target)

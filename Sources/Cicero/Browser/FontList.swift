@@ -225,9 +225,6 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
 
 struct FontList: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("fontList.sortColumn") private var sortColumnID = FontListColumn.name.id
-    @AppStorage("fontList.sortAscending") private var ascending = true
-    @State private var keepsOwnOrder = true
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
     @AppStorage("fontList.characterSetColumns") private var addedColumns = ""
     @AppStorage("fontList.columnWidths") private var columnWidths = ""
@@ -241,16 +238,11 @@ struct FontList: View {
     @State private var visibleHeight: CGFloat = 0
     @State private var position = ScrollPosition(idType: String.self)
 
-    private var sortColumn: FontListColumn {
-        get { FontListColumn(id: sortColumnID) ?? .name }
-        nonmutating set { sortColumnID = newValue.id }
-    }
-
     var body: some View {
         let columns = shownColumns
-        let sort: FontListColumn? = model.hasOwnOrder && keepsOwnOrder ? nil : columns.contains(sortColumn) ? sortColumn : .name
+        let sort = model.shownSort.map { columns.contains($0) ? $0 : .name }
         let sortsByCoverage = sort.map { $0.isSeries || $0.isSingleSet } ?? false
-        let (rows, families) = model.fontRows(sortedBy: sort.map(order) ?? [], coverageColumns: sortsByCoverage ? sort.map { [$0] } ?? [] : [])
+        let (rows, families) = model.fontRows(sortedBy: sort.map(model.sortOrder) ?? [], coverageColumns: sortsByCoverage ? sort.map { [$0] } ?? [] : [])
         let widths = Self.fit(columns, widths: self.widths, in: visibleWidth)
         let moved = moving.map { MovingColumn(column: $0.column, offset: $0.offset) }
         ScrollViewReader { proxy in
@@ -286,13 +278,13 @@ struct FontList: View {
                 move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)
             }
         }
-        .onChange(of: model.similarFamilyID) { keepsOwnOrder = true }
-        .onChange(of: model.similarStyleID) { keepsOwnOrder = true }
-        .onChange(of: model.selectedItems) { keepsOwnOrder = true }
+        .onChange(of: model.shownSort, initial: true) {
+            if let column = model.shownSort, column.canHide, allColumns.contains(column), !shownColumns.contains(column) { setShown(true, column) }
+        }
         .background {
             if let fitting {
                 VStack(alignment: .leading, spacing: 0) {
-                    HeaderCell(column: fitting, title: fitting.title(model), sortColumn: sort, ascending: ascending, isMovable: false,
+                    HeaderCell(column: fitting, title: fitting.title(model), sortColumn: sort, ascending: model.sortsAscending, isMovable: false,
                                sort: {}, move: { _ in }, endMove: {})
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, FontListRow.inset)
@@ -307,12 +299,6 @@ struct FontList: View {
                 }
             }
         }
-    }
-
-    private func order(_ column: FontListColumn) -> [KeyPathComparator<FontRow>] {
-        var comparator = column.comparator ?? KeyPathComparator(\FontRow.libraryPosition)
-        comparator.order = ascending ? .forward : .reverse
-        return [comparator]
     }
 
     private var allColumns: [FontListColumn] {
@@ -420,14 +406,12 @@ struct FontList: View {
                 if index > 0 {
                     divider(between: columns[index - 1], and: column, in: columns, widths: widths)
                 }
-                HeaderCell(column: column, title: column.title(model), sortColumn: sort, ascending: ascending,
+                HeaderCell(column: column, title: column.title(model), sortColumn: sort, ascending: model.sortsAscending,
                            isMovable: index >= Self.fixedColumns) {
                     if sort == column {
-                        ascending.toggle()
+                        model.sortsAscending.toggle()
                     } else {
-                        sortColumn = column
-                        ascending = true
-                        keepsOwnOrder = false
+                        model.sort(by: column)
                     }
                 } move: { translation in
                     move(column, by: translation, in: columns, widths: widths)
@@ -484,6 +468,7 @@ struct FontList: View {
     }
 
     private func setShown(_ shown: Bool, _ column: FontListColumn) {
+        if !shown, model.shownSort == column { model.sort(by: .name) }
         if column.isStandard {
             hiddenColumns = Self.updating(hiddenColumns, column, adding: !shown)
         } else {

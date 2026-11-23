@@ -23,8 +23,8 @@ struct BrowserView: View {
             } else {
                 switch mode {
                 case .list: FontList()
-                case .grid: FontGrid(families: families)
-                case .specimens: SpecimenList(families: families)
+                case .grid: FontGrid(families: model.sortedFamilies)
+                case .specimens: SpecimenList(families: model.sortedFamilies)
                 }
             }
         }
@@ -75,6 +75,7 @@ struct BrowserView: View {
 struct BrowserToolbar: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarCapsule { BrowserModePicker() }
+        ToolbarCapsule(spaced: true) { SortButton() }
         ToolbarCapsule(spaced: true) { PreviewOptionsButton() }
         ToolbarCapsule(spaced: true) { InfoButton() }
         ToolbarGap()

@@ -13,13 +13,20 @@ struct SpecimenList: View {
 
     var body: some View {
         let pinned = model.similarFamilyID.flatMap { id in families.first?.id == id ? families.first : nil }
+        let groups = FamilyGroup.groups(pinned == nil ? families[...] : families.dropFirst(), sort: model.shownSort)
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: FontGrid.spacing) {
-                    ForEach(pinned == nil ? families[...] : families.dropFirst()) { family in
-                        Specimen(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
-                            .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
-                            .onAppear { prefetchStyles(near: family) }
+                    ForEach(groups) { group in
+                        Section {
+                            ForEach(group.families) { family in
+                                Specimen(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
+                                    .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                                    .onAppear { prefetchStyles(near: family) }
+                            }
+                        } header: {
+                            if group.title != nil { FamilyGroupHeader(group: group) }
+                        }
                     }
                 }
                 .scrollTargetLayout()

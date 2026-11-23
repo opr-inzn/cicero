@@ -70,13 +70,20 @@ struct FontGrid: View {
         let inputs = sampleInputs
         let pinned = model.similarFamilyID.flatMap { id in families.first?.id == id ? families.first : nil }
         let rowWidth = CGFloat(count) * (tile + Self.spacing) - Self.spacing
+        let groups = FamilyGroup.groups(pinned == nil ? families[...] : families.dropFirst(), sort: model.shownSort)
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Self.spacing), count: count), spacing: Self.spacing) {
-                    ForEach(pinned == nil ? families[...] : families.dropFirst()) { family in
-                        Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
-                            .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
-                            .onAppear { ReadAhead.around(family, in: families) }
+                    ForEach(groups) { group in
+                        Section {
+                            ForEach(group.families) { family in
+                                Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
+                                    .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                                    .onAppear { ReadAhead.around(family, in: families) }
+                            }
+                        } header: {
+                            if group.title != nil { FamilyGroupHeader(group: group) }
+                        }
                     }
                 }
                 .scrollTargetLayout()
@@ -105,7 +112,7 @@ struct FontGrid: View {
             .focused($focused)
             .focusEffectDisabled()
             .modifier(TakesStartFocus(focused: $focused))
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count), pinned: pinned?.id))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count, groups: FamilyGroup.starts(groups)), pinned: pinned?.id))
         }
     }
 
