@@ -704,7 +704,7 @@ private struct StyleRows: View {
         // Not lazy: in a lazy stack, rows each as high as their own font's line moved the page below, and with it the glyph row `TopRowKeeper` keeps at the top.
         VStack(spacing: 0) {
             row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
-                Text("Styles")
+                Text("Preview")
             } style: {
                 Text("Style")
             } weight: {

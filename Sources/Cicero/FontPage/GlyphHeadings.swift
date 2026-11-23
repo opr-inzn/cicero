@@ -62,7 +62,7 @@ struct GlyphHeader: View {
                 .accessibilityHidden(!heading.startsCategory && heading.name != nil)
             if let name = heading.name {
                 HStack(spacing: 4) {
-                    Text(name).font(.headline).foregroundStyle(.primary.opacity(0.82))
+                    Text(name).font(.headline).foregroundStyle(.secondary)
                         .accessibilityLabel("\(heading.category), \(name)")
                         .accessibilityAddTraits(.isHeader)
                     Text(heading.detail).font(.callout).foregroundStyle(.secondary)
