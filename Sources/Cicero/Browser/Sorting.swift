@@ -107,8 +107,8 @@ struct SortMenuItems: View {
         Divider()
         let isDate = model.sortColumn == .added
         Picker("Order", selection: Binding(get: { model.sortsAscending }, set: { model.sortsAscending = $0 })) {
-            Text(isDate ? "Oldest First" : "Ascending").tag(true)
-            Text(isDate ? "Newest First" : "Descending").tag(false)
+            Text(isDate ? "Oldest" : "Ascending").tag(true)
+            Text(isDate ? "Newest" : "Descending").tag(false)
         }
         .pickerStyle(.inline)
         .labelsHidden()
