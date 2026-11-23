@@ -1,0 +1,358 @@
+import CoreText
+import Foundation
+
+extension ActivationEngine {
+    @concurrent
+    public func replace(_ replacements: [FileReplacement], moving: Bool, records: ActivationRecords) async -> ActivationResult {
+        let fm = FileManager.default
+        let olds = replacements.map(\.old)
+        let persistent = olds.filter { records.inPlace.contains($0) || isInsideUserFonts($0) && registrar.isActive(Self.url($0)) }
+        let session = olds.filter { records.temporary[$0] != nil }
+        let off = Set(olds.filter { isInsideFontsFolder($0) && records.temporary[$0] == nil && !registrar.isActive(Self.url($0)) })
+        let spareCopies = spareCopies(among: replacements, records: records)
+        var records = records
+        if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
+        if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
+
+        var stagedFiles: [URL] = []
+        defer { for staged in stagedFiles { Self.removeStaged(staged) } }
+        var done: [FileReplacement] = []
+        var failed: [String] = []
+        var placed: [String: String] = [:]
+        var renameLater: [String: String] = [:]
+        var keptAside = 0
+        var goingInOff: [String: FileReplacement] = [:]
+        var intoLibrary: [String: FileReplacement] = [:]
+        var spare: [(replacement: FileReplacement, original: String)] = []
+        for replacement in replacements {
+            if let original = spareCopies[replacement.old] {
+                spare.append((replacement, original))
+                continue
+            }
+            let old = Self.url(replacement.old)
+            if off.contains(replacement.old) {
+                let staged: URL
+                do {
+                    staged = try newStagedFile(named: Self.replacementName(of: old, by: Self.url(replacement.added)))
+                    stagedFiles.append(staged)
+                    try fm.copyItem(at: Self.realFile(Self.url(replacement.added)), to: staged)
+                } catch {
+                    failed.append(replacement.old)
+                    continue
+                }
+                if installsIntoFontLibrary, fontLibrary != nil { intoLibrary[staged.path] = replacement } else { goingInOff[staged.path] = replacement }
+                continue
+            }
+            if let new = replaceInPlace(old, with: Self.url(replacement.added)) {
+                done.append(replacement)
+                if new != replacement.old { placed[replacement.old] = new }
+            } else {
+                failed.append(replacement.old)
+            }
+        }
+
+        if !goingInOff.isEmpty {
+            let off = await replaceOff(goingInOff)
+            done += off.done
+            failed += off.failed
+            placed.merge(off.placed) { first, _ in first }
+            renameLater = off.renameLater
+            keptAside = off.keptAside
+            for replacement in off.done { records.installedCopies[replacement.old] = nil }
+        }
+        if !intoLibrary.isEmpty {
+            let library = replaceIntoLibrary(intoLibrary)
+            done += library.done
+            failed += library.failed
+            placed.merge(library.placed) { first, _ in first }
+            for replacement in library.done { records.installedCopies[replacement.old] = nil }
+        }
+        for (replacement, original) in spare {
+            guard done.contains(where: { $0.old == original }), didTrash(Self.url(replacement.old)) else {
+                failed.append(replacement.old)
+                continue
+            }
+            done.append(replacement)
+            placed[replacement.old] = original
+            records.installedCopies[replacement.old] = nil
+        }
+
+        let back = { (paths: [String]) in paths.filter { fm.fileExists(atPath: $0) } }
+        if !back(persistent).isEmpty { _ = await registerAndConfirm(back(persistent), scope: .persistent) }
+        if !back(session).isEmpty { _ = await registerAndConfirm(back(session), scope: .session) }
+
+        func new(_ replacement: FileReplacement) -> String { placed[replacement.old] ?? replacement.old }
+        if moving {
+            for (added, copies) in Dictionary(grouping: done, by: \.added) where !Self.isProtected(added) {
+                let meant = replacements.filter { $0.added == added }.count
+                guard copies.count == meant, copies.allSatisfy({ Self.isIdenticalCopy(new($0), of: added) }) else { continue }
+                try? fm.removeItem(atPath: added)
+            }
+        }
+
+        var message: String
+        if done.isEmpty {
+            message = Self.message("Replaced", "replace", succeeded: 0, failed: failed.count,
+                                   undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
+        } else {
+            let names = FontNames.describe(FontNames.fonts(inFiles: done.map(new))) ?? (done.count == 1 ? "1 file" : "\(done.count) files")
+            let trashed = done.count - keptAside
+            message = "Replaced \(names). " + (keptAside == 0 ? (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
+                : trashed == 0 ? (done.count == 1 ? "The old file is in Cicero’s Inactive folder" : "The old files are in Cicero’s Inactive folder")
+                : "\(trashed) old \(trashed == 1 ? "file is" : "files are") in the Trash, \(keptAside) in Cicero’s Inactive folder")
+            if !failed.isEmpty {
+                let undone = FontNames.describe(FontNames.fonts(inFiles: failed.filter { fm.fileExists(atPath: $0) }))
+                message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
+            }
+        }
+        for (old, new) in placed {
+            guard let origin = records.appFolderOrigins.removeValue(forKey: old) else { continue }
+            records.appFolderOrigins[new] = origin
+        }
+        var result = ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
+        result.placed = placed
+        result.renameLater = renameLater
+        return result
+    }
+
+    public func spareCopies(among replacements: [FileReplacement], records: ActivationRecords) -> [String: String] {
+        guard installsIntoFontLibrary else { return [:] }
+        let olds = Set(replacements.map(\.old))
+        var spare: [String: String] = [:]
+        for old in olds where isInsideFontsFolder(old) && records.temporary[old] == nil && !registrar.isActive(Self.url(old)) {
+            guard let original = records.installedCopies[old], isInFontLibrary(original), olds.contains(original) else { continue }
+            spare[old] = original
+        }
+        return spare
+    }
+
+    static func replacementName(of old: URL, by added: URL) -> String {
+        let ext = added.pathExtension.isEmpty ? old.pathExtension : added.pathExtension
+        let base = old.deletingPathExtension().lastPathComponent
+        return ext.isEmpty ? base : base + "." + ext
+    }
+
+    private struct Replacing: Codable {
+        var staged: String
+        var old: String
+        var new: String?
+    }
+
+    private var replacingNotes: URL { locations.support.appendingPathComponent("Replacing", isDirectory: true) }
+
+    func replaceInPlace(_ old: URL, with added: URL) -> String? {
+        let fm = FileManager.default
+        let name = Self.replacementName(of: old, by: added)
+        let new = name.compare(old.lastPathComponent, options: .caseInsensitive) == .orderedSame
+            ? old : Self.uniqueURL(for: name, in: old.deletingLastPathComponent())
+        // The old file goes to the Trash only once its replacement is whole beside it, and comes back should the last step fail: a font must never be left gone from its place.
+        let staged = old.deletingLastPathComponent().appendingPathComponent(Self.movingPrefix + UUID().uuidString, isDirectory: false)
+        // Noted first, so a Cicero that stops partway finishes the replacement at its next launch, or takes the copy away.
+        let note = replacingNotes.appendingPathComponent(UUID().uuidString + ".json", isDirectory: false)
+        do {
+            try fm.createDirectory(at: replacingNotes, withIntermediateDirectories: true)
+            try JSONEncoder().encode(Replacing(staged: staged.path, old: old.path, new: new.path)).write(to: note, options: .atomic)
+            guard UserDataStore.syncToDisk(note) else { throw CocoaError(.fileWriteUnknown) }
+        } catch {
+            try? fm.removeItem(at: note)
+            return nil
+        }
+        defer { try? fm.removeItem(at: note) }
+        do {
+            try fm.copyItem(at: Self.realFile(added), to: staged)
+            Self.unlock(staged)
+        } catch {
+            try? fm.removeItem(at: staged)
+            return nil
+        }
+        let trashed: URL?
+        do {
+            trashed = try trash(old)
+        } catch {
+            try? fm.removeItem(at: staged)
+            return nil
+        }
+        if Self.renameExclusively(staged.path, to: new.path) { return new.path }
+        try? fm.removeItem(at: staged)
+        if let trashed, (try? move(trashed, to: old)) == nil { try? fm.moveItem(at: trashed, to: old) }
+        return nil
+    }
+
+    func finishReplacing() {
+        let fm = FileManager.default
+        for name in (try? fm.contentsOfDirectory(atPath: replacingNotes.path)) ?? [] where name.hasSuffix(".json") {
+            let note = replacingNotes.appendingPathComponent(name, isDirectory: false)
+            if let replacing = (try? Data(contentsOf: note)).flatMap({ try? JSONDecoder().decode(Replacing.self, from: $0) }),
+               (replacing.staged as NSString).lastPathComponent.hasPrefix(Self.movingPrefix), Self.exists(replacing.staged) {
+                if Self.exists(replacing.old) || !Self.renameExclusively(replacing.staged, to: replacing.new ?? replacing.old) {
+                    try? fm.removeItem(atPath: replacing.staged)
+                }
+            }
+            try? fm.removeItem(at: note)
+        }
+    }
+
+    func replaceOff(_ staged: [String: FileReplacement]) async
+        -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String], keptAside: Int) {
+        let fm = FileManager.default
+        var done: [FileReplacement] = []
+        var failed: [String] = []
+        var placed: [String: String] = [:]
+        var renameLater: [String: String] = [:]
+        var keptAside = 0
+        func name(_ replacement: FileReplacement) -> String {
+            Self.replacementName(of: Self.url(replacement.old), by: Self.url(replacement.added))
+        }
+        func sameName(_ replacement: FileReplacement) -> Bool {
+            name(replacement).compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
+        }
+        var waiting: [String: String] = [:]
+        var moves: [String: String] = [:]
+        for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
+            let old = Self.url(replacement.old)
+            guard sameName(replacement) else {
+                moves[path] = Self.uniqueURL(for: name(replacement), in: old.deletingLastPathComponent()).path
+                continue
+            }
+            do {
+                // The old file waits in the Inactive folder, where it stays in the library, off, should Cicero stop.
+                let aside = Self.uniqueURL(for: old.lastPathComponent, in: try locations.inactiveFolderForNewFiles())
+                try move(old, to: aside)
+                waiting[replacement.old] = aside.path
+            } catch {
+                try? fm.removeItem(atPath: path)
+                failed.append(replacement.old)
+            }
+        }
+        // macOS keeps a font off by its file's path and PostScript name, and lets go of a gone file's entry a moment later: a new file at that path would come on as it does.
+        let remembered = await registrar.waitUntilForgotten(waiting.keys.sorted(), timeout: forgetWait, every: .milliseconds(100))
+        for (path, replacement) in staged where waiting[replacement.old] != nil {
+            let old = Self.url(replacement.old)
+            if remembered.contains(replacement.old) {
+                let name = old.deletingPathExtension().lastPathComponent + " 2" + (old.pathExtension.isEmpty ? "" : "." + old.pathExtension)
+                moves[path] = Self.uniqueURL(for: name, in: old.deletingLastPathComponent()).path
+            } else {
+                moves[path] = old.path
+            }
+        }
+        let moved = await moveIntoFontsFolderOff(moves)
+        for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) where moves[path] != nil {
+            let aside = waiting[replacement.old]
+            guard let new = moved.placed[path] else {
+                try? fm.removeItem(atPath: path)
+                if let aside { await putBack(aside, at: replacement.old, remembered: remembered.contains(replacement.old)) }
+                failed.append(replacement.old)
+                continue
+            }
+            let trashed = didTrash(Self.url(aside ?? replacement.old))
+            guard trashed || aside != nil else {
+                try? fm.removeItem(atPath: new)
+                failed.append(replacement.old)
+                continue
+            }
+            if !trashed { keptAside += 1 }
+            done.append(replacement)
+            if new != replacement.old { placed[replacement.old] = new }
+            if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
+        }
+        return (done, failed, placed, renameLater, keptAside)
+    }
+
+    func replaceIntoLibrary(_ staged: [String: FileReplacement]) -> (done: [FileReplacement], failed: [String], placed: [String: String]) {
+        let fm = FileManager.default
+        var done: [FileReplacement] = []
+        var failed: [String] = []
+        var placed: [String: String] = [:]
+        for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
+            let old = Self.url(replacement.old)
+            let folder = installFolder(for: replacement.added, family: nil)
+            let new = Self.uniqueURL(for: Self.replacementName(of: old, by: Self.url(replacement.added)), in: folder)
+            do {
+                try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+                try fm.moveItem(at: Self.url(path), to: new)
+            } catch {
+                try? fm.removeItem(atPath: path)
+                removeEmptyFolders(around: new.path)
+                failed.append(replacement.old)
+                continue
+            }
+            do {
+                _ = try trash(old)
+                done.append(replacement)
+                placed[replacement.old] = new.path
+            } catch {
+                try? fm.removeItem(at: new)
+                removeEmptyFolders(around: new.path)
+                failed.append(replacement.old)
+            }
+        }
+        return (done, failed, placed)
+    }
+
+    @concurrent
+    public func waitUntilForgotten(_ paths: [String], timeout: Duration, every: Duration) async -> Set<String> {
+        await registrar.waitUntilForgotten(paths, timeout: timeout, every: every)
+    }
+
+    private var renamesLaterList: URL { locations.support.appendingPathComponent("renaming-later.json", isDirectory: false) }
+
+    public var renamesLater: [String: String] {
+        (try? Data(contentsOf: renamesLaterList)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+    }
+
+    public func noteRenamesLater(_ pending: [String: String]) {
+        writeRenamesLater(renamesLater.merging(pending) { _, new in new })
+    }
+
+    public func forgetRenamesLater(_ interims: some Sequence<String>) {
+        var list = renamesLater
+        for interim in interims { list[interim] = nil }
+        writeRenamesLater(list)
+    }
+
+    private func writeRenamesLater(_ list: [String: String]) {
+        guard !list.isEmpty else {
+            try? FileManager.default.removeItem(at: renamesLaterList)
+            return
+        }
+        try? FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(list).write(to: renamesLaterList, options: .atomic)
+    }
+
+    @concurrent
+    public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> (renamed: [String: String], settled: Set<String>) {
+        let fm = FileManager.default
+        let never = Set(pending.filter { interim, original in
+            fm.fileExists(atPath: original) || !fm.fileExists(atPath: interim) || !isInsideFontsFolder(interim)
+                || Self.url(interim).deletingLastPathComponent() != Self.url(original).deletingLastPathComponent()
+        }.keys)
+        let ready = pending.filter { interim, _ in
+            !never.contains(interim) && records.temporary[interim] == nil && !registrar.isActive(Self.url(interim))
+        }
+        guard !ready.isEmpty else { return ([:], never) }
+        let remembered = await registrar.waitUntilForgotten(ready.values.sorted(), timeout: .zero, every: .zero)
+        var waiting: [String: (interim: String, original: String)] = [:]
+        for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
+            // Renamed where it is, a file would lose being off, so it leaves for the Inactive folder and goes in again.
+            guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
+            let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
+            guard (try? move(Self.url(interim), to: aside)) != nil else { continue }
+            waiting[aside.path] = (interim, original)
+        }
+        guard !waiting.isEmpty else { return ([:], never) }
+        let moved = await moveIntoFontsFolderOff(waiting.mapValues(\.original), exactly: true)
+        var renamed: [String: String] = [:]
+        var back: [String: String] = [:]
+        for (aside, file) in waiting {
+            if let path = moved.placed[aside] { renamed[file.interim] = path } else { back[aside] = file.interim }
+        }
+        if !back.isEmpty { _ = await moveIntoFontsFolderOff(back, exactly: true) }
+        return (renamed, never.union(renamed.keys))
+    }
+
+    private func putBack(_ aside: String, at old: String, remembered: Bool) async {
+        // One macOS still remembers stays in the Inactive folder: put back, it would come on as macOS lets go of the entry.
+        guard !remembered else { return }
+        _ = await moveIntoFontsFolderOff([aside: old])
+    }
+}

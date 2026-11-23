@@ -12,7 +12,6 @@ enum ToolboxTab: String, CaseIterable {
     }
 }
 
-/// Which fonts have every character of a text, and which support a language.
 struct ToolboxWindow: View {
     @AppStorage("toolbox.tab") private var tab: ToolboxTab = .text
 
@@ -32,7 +31,6 @@ struct ToolboxWindow: View {
 }
 
 extension LanguageCatalog {
-    /// The user's language when the catalog knows it, else English.
     var preferredLanguageID: String {
         let code = Locale.current.language.languageCode?.identifier(.alpha3) ?? "eng"
         return language(code) != nil ? code : "eng"
@@ -44,8 +42,8 @@ extension LanguageCatalog {
 private struct TextTab: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
-    @Environment(\.openWindow) private var openWindow
-    @AppStorage("toolbox.text") private var text = ""
+    @Bindable private var savedText = SavedSoon.toolboxText
+    private var text: String { savedText.value }
     @AppStorage("toolbox.maxMissing") private var maxMissing = 0
     @AppStorage("toolbox.activatedOnly") private var activatedOnly = false
     @State private var matches: [TextMatch] = []
@@ -70,19 +68,18 @@ private struct TextTab: View {
     }
 
     var body: some View {
-        Group {
+        // The rows stay, empty, under the messages: the bar is rebuilt when the scroll view under it comes or goes, and the text field in it lost focus with the first letter typed.
+        ZStack {
+            table
             if query.text.isEmpty {
-                ContentUnavailableView("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
-                                       description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
+                EmptyState("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
+                           description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
             } else if matches.isEmpty && !isSearching {
-                ContentUnavailableView("No Fonts Have Every Character", systemImage: "character.textbox",
-                                       description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
-            } else {
-                table
+                EmptyState("No Fonts Have Every Character", systemImage: "character.textbox",
+                           description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // The fonts scroll under the controls and column titles.
         .fadingTopBar {
             VStack(spacing: 0) {
                 controls
@@ -94,11 +91,11 @@ private struct TextTab: View {
 
     private var controls: some View {
         HStack(spacing: 16) {
-            TextField("Text", text: $text, prompt: Text("Type or paste text"))
+            TextField("Text", text: $savedText.value, prompt: Text("Type or paste text"))
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
-                Text("Include fonts missing up to \(maxMissing) \(maxMissing == 1 ? "character" : "characters")")
+                Text("Missing characters allowed: \(maxMissing.plain)")
             }
             Toggle("Active only", isOn: $activatedOnly)
             Spacer()
@@ -109,9 +106,9 @@ private struct TextTab: View {
 
     private var summary: String {
         guard !query.text.isEmpty else { return "" }
-        let count = matches.count == 1 ? "1 family" : "\(matches.count.formatted()) families"
+        let count = matches.count == 1 ? "1 family" : "\(matches.count.plain) families"
         if let progress = model.coverageProgress {
-            return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)"
         }
         return count
     }
@@ -120,20 +117,21 @@ private struct TextTab: View {
         let model = self.model
         let preview = self.preview
         let sample = query.text
+        let matches = sample.isEmpty ? [] : self.matches
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
-        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
+        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
+                        Text(family.name).lineLimit(1).truncationMode(.middle)
                         StatusTag(family: family)
                     }
                     .frame(width: 220, alignment: .leading)
                     FontText(
-                        text: sample, face: family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
-                        variations: model.variations(for: family), kerning: preview.kerning(at: 17)
+                        text: sample, face: family.regular.face, size: 17,
+                        variations: model.variations(for: family)
                     )
+                    .foregroundStyle(Color.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    // Glyphs taller than the row run over its edges rather than be cut off.
                     .frame(height: 22)
                     Text(Self.characters(missing[family.id] ?? [])).foregroundStyle(.secondary).lineLimit(1)
                         .frame(width: 160, alignment: .leading)
@@ -157,11 +155,6 @@ private struct TextTab: View {
         scalars.compactMap { Unicode.Scalar($0) }.map { String(Character($0)) }.joined(separator: " ")
     }
 
-    private func open(_ id: String) {
-        model.openFamilyID = id
-        openWindow(id: WindowID.main)
-    }
-
     private func search(_ query: Query) async {
         guard !query.text.isEmpty else {
             matches = []
@@ -169,7 +162,6 @@ private struct TextTab: View {
             return
         }
         isSearching = true
-        // Wait for a pause in typing before walking a big library.
         try? await Task.sleep(for: .milliseconds(200))
         guard !Task.isCancelled else { return }
         let data = model.data
@@ -193,7 +185,6 @@ private struct TextTab: View {
 
 private struct LanguagesTab: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @AppStorage("toolbox.languageSort") private var sortByName = false
     @AppStorage("toolbox.language") private var languageID = ""
     @State private var search = ""
@@ -216,7 +207,7 @@ private struct LanguagesTab: View {
 
     var body: some View {
         HSplitView {
-            list.frame(minWidth: 240, idealWidth: 300, maxWidth: 420, maxHeight: .infinity)
+            list.frame(minWidth: 260, idealWidth: 300, maxWidth: 420, maxHeight: .infinity)
             detail.frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
@@ -253,10 +244,9 @@ private struct LanguagesTab: View {
                     .monospacedDigit()
             }
         }
-        // The languages scroll under the search field.
         .fadingTopBar {
             HStack(spacing: 8) {
-                TextField("Search", text: $search, prompt: Text("Language, autonym or script"))
+                TextField("Search", text: $search, prompt: Text("Language or script"))
                     .textFieldStyle(.roundedBorder)
                 Picker("Sort", selection: $sortByName) {
                     Text("Speakers").tag(false)
@@ -285,21 +275,21 @@ private struct LanguagesTab: View {
             let query = Query(id: language.id, showSystem: model.data.showSystemFonts, showCreativeCloud: model.data.showCreativeCloudFonts,
                               fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
             FamilyRowList(sections: [
-                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
-                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
-            ], selection: $selection, open: open) { family in
+                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.plain))", families: support.full, emptyText: "None"),
+                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.plain))", families: support.base, emptyText: "None"),
+            ], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
+                        Text(family.name).lineLimit(1).truncationMode(.middle)
                         StatusTag(family: family)
                     }
                     .frame(width: 220, alignment: .leading)
                     FontText(text: language.sampleCharacters, face: family.regular.face, size: 17)
+                        .foregroundStyle(Color.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: 22)
                 }
             }
-            // The fonts scroll under the language.
             .fadingTopBar {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -322,22 +312,17 @@ private struct LanguagesTab: View {
             }
             .task(id: query) { await load(query) }
         } else {
-            ContentUnavailableView("No Language Selected", systemImage: "globe",
-                                   description: Text("Choose a language to see which fonts support it."))
+            EmptyState("No Language Selected", systemImage: "globe",
+                       description: Text("Choose a language to see which fonts support it."))
         }
     }
 
     private func facts(_ language: Language) -> String {
         var parts = ["\(language.scripts.joined(separator: ", ")) · \(language.speakers.formatted(.number.notation(.compactName))) speakers"]
         if let progress = model.coverageProgress, support.unindexed > 0 {
-            parts.append("checking characters, \(progress.done.formatted()) of \(progress.total.formatted())")
+            parts.append("checking characters, \(progress.done.plain) of \(progress.total.plain)")
         }
         return parts.joined(separator: " · ")
-    }
-
-    private func open(_ id: String) {
-        model.openFamilyID = id
-        openWindow(id: WindowID.main)
     }
 
     private func load(_ query: Query) async {

@@ -3,62 +3,92 @@ import Observation
 import CiceroCore
 import SwiftUI
 
-/// How previews look everywhere: sample text, size, weight, letter and line spacing, and alignment. Saved in
-/// user defaults.
 @Observable
 final class PreviewSettings {
-    static let presets = ["Sphinx of black quartz, judge my vow.", "Hamburgefonstiv", "0123456789 €$£¥ %&@", "ÀÉÎÕÜ ñçß øæœ"]
-    /// What grid tiles show when no sample text is set: capitals, lowercase, a descender and figures.
+    static let presets = ["Sphinx of black quartz, judge my vow.", "Lorem ipsum dolor sit amet", "Hamburgefonstiv", "0123456789 €$£¥ %&@"]
     static let tileSample = "Aa Gg 123"
+    static let sizes: ClosedRange<Double> = 24...200
+    static let lineSpacings: ClosedRange<Double> = 80...200
 
-    /// Empty means each family's own name.
-    var sampleText: String { didSet { defaults.set(sampleText, forKey: Keys.sampleText) } }
-    var size: Double { didSet { defaults.set(size, forKey: Keys.size) } }
-    var weight: Double { didSet { defaults.set(weight, forKey: Keys.weight) } }
-    /// Letter spacing in percent of the em.
-    var tracking: Double { didSet { defaults.set(tracking, forKey: Keys.tracking) } }
-    /// Line height in percent of the size, wherever a sample runs over several lines; 120 is what layout apps
-    /// call automatic leading.
-    var lineSpacing: Double { didSet { defaults.set(lineSpacing, forKey: Keys.lineSpacing) } }
-    /// How samples line up in specimens and Quick Look. Font pages have their own.
-    var alignment: SampleAlignment { didSet { defaults.set(alignment.rawValue, forKey: Keys.alignment) } }
+    var sampleText: String { didSet { SavedSoon.set(sampleText, forKey: Keys.sampleText) } }
+    var savedPresets: [String] { didSet { defaults.set(savedPresets, forKey: Keys.savedPresets) } }
+    var size: Double { didSet { SavedSoon.set(size, forKey: Keys.size) } }
+    var lineSpacing: Double { didSet { SavedSoon.set(lineSpacing, forKey: Keys.lineSpacing) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
 
     private enum Keys {
         static let sampleText = "preview.sampleText"
+        static let savedPresets = "preview.savedPresets"
         static let size = "preview.size"
-        static let weight = "preview.weight"
-        static let tracking = "preview.tracking"
         static let lineSpacing = "preview.lineSpacing"
-        static let alignment = "preview.alignment"
     }
 
     init() {
         sampleText = defaults.string(forKey: Keys.sampleText) ?? ""
-        size = defaults.object(forKey: Keys.size) as? Double ?? 32
-        weight = defaults.object(forKey: Keys.weight) as? Double ?? 400
-        tracking = defaults.object(forKey: Keys.tracking) as? Double ?? 0
-        lineSpacing = defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120
-        alignment = defaults.string(forKey: Keys.alignment).flatMap(SampleAlignment.init) ?? .leading
+        savedPresets = defaults.stringArray(forKey: Keys.savedPresets) ?? []
+        size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
+        lineSpacing = min(max(defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120, Self.lineSpacings.lowerBound),
+                          Self.lineSpacings.upperBound)
+    }
+
+    func isSavedPreset(_ text: String) -> Bool { savedPresets.contains(text) }
+
+    func canSavePreset(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !Self.presets.contains(text) && !isSavedPreset(text)
     }
 
     func text(for family: Family) -> String {
         sampleText.isEmpty ? family.name : sampleText
     }
-
-    /// Points of extra space between letters at a size.
-    func kerning(at size: Double) -> Double {
-        size * tracking / 100
-    }
-
-    /// The distance from one line's baseline to the next at a size.
-    func lineHeight(at size: Double) -> AttributedString.LineHeight {
-        .exact(points: size * lineSpacing / 100)
-    }
 }
 
-/// Left, centred or right, for samples.
+enum SavedSoon {
+    // Only in memory until saved: read a value from where it's kept (`PreviewSettings`, `SavedSoon.Value`), never from the defaults.
+    private static var pending: [String: Any] = [:]
+    private static var save: Task<Void, Never>?
+    private static var observesQuit = false
+
+    static func set(_ value: Any, forKey key: String) {
+        pending[key] = value
+        if !observesQuit {
+            observesQuit = true
+            NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { flush() }
+            }
+        }
+        save?.cancel()
+        // SwiftUI draws every view with an `@AppStorage` again whenever anything is saved to the defaults, whatever the key.
+        save = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            flush()
+        }
+    }
+
+    static func flush() {
+        save?.cancel()
+        save = nil
+        let values = pending
+        pending = [:]
+        for (key, value) in values { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    @Observable
+    final class Value<Stored> {
+        @ObservationIgnored let key: String
+        var value: Stored { didSet { SavedSoon.set(value, forKey: key) } }
+
+        init(_ key: String, default value: Stored) {
+            self.key = key
+            self.value = UserDefaults.standard.object(forKey: key) as? Stored ?? value
+        }
+    }
+
+    static let compareText = Value("compare.text", default: "")
+    static let toolboxText = Value("toolbox.text", default: "")
+}
+
 enum SampleAlignment: String, CaseIterable {
     case leading, center, trailing
 
@@ -78,22 +108,6 @@ enum SampleAlignment: String, CaseIterable {
         }
     }
 
-    var text: TextAlignment {
-        switch self {
-        case .leading: .leading
-        case .center: .center
-        case .trailing: .trailing
-        }
-    }
-
-    var frame: Alignment {
-        switch self {
-        case .leading: .leading
-        case .center: .center
-        case .trailing: .trailing
-        }
-    }
-
     var paragraph: NSTextAlignment {
         switch self {
         case .leading: .natural
@@ -101,18 +115,8 @@ enum SampleAlignment: String, CaseIterable {
         case .trailing: .right
         }
     }
-
-    var horizontal: HorizontalAlignment {
-        switch self {
-        case .leading: .leading
-        case .center: .center
-        case .trailing: .trailing
-        }
-    }
 }
 
-/// Light or dark for the whole app, or whatever macOS uses. Set on NSApp so every window, sheet
-/// and popover follows.
 enum Appearance: String, CaseIterable, Identifiable {
     case system, light, dark
 
@@ -129,6 +133,7 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 
     func apply() {
+        // On NSApp, so every window, sheet and popover follows.
         NSApp.appearance = switch self {
         case .system: nil
         case .light: NSAppearance(named: .aqua)
@@ -154,7 +159,7 @@ enum BrowserMode: String, CaseIterable {
 
     var icon: String {
         switch self {
-        case .list: "list.bullet"
+        case .list: "list.triangle"
         case .grid: "square.grid.2x2"
         case .specimens: "rectangle.grid.1x2"
         }
@@ -165,4 +170,5 @@ enum WindowID {
     static let main = "main"
     static let toolbox = "toolbox"
     static let compare = "compare"
+    static let whatsNew = "whatsNew"
 }

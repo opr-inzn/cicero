@@ -1,0 +1,98 @@
+import CoreText
+import Foundation
+
+enum CharacterMap {
+    static func characters(of font: CTFont) -> ScalarRanges {
+        // CoreText's character set adds characters the font draws with another glyph, like U+A789 with the colon, U+2010 and U+2011 with the hyphen, and U+00A0, U+202F and the line and paragraph separators with the space.
+        let reported = ScalarRanges(characterSet: CTFontCopyCharacterSet(font))
+        // A font with only a Mac Roman subtable has none to read, and CoreText maps it itself.
+        guard let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableCmap), []) as Data?,
+              let mapped = mapped(in: table)
+        else { return reported }
+        return reported.intersection(mapped)
+    }
+
+    static func mapped(in table: Data) -> ScalarRanges? {
+        let reader = GSUBSubstitutions.Reader(bytes: [UInt8](table))
+        var ranges: [ClosedRange<UInt32>] = []
+        var read = false
+        var seen = Set<Int>()
+
+        func add(_ low: Int, _ high: Int) {
+            let high = min(high, 0x10FFFF)
+            guard low <= high, ranges.count < 0x20000 else { return }
+            if let last = ranges.last, Int(last.upperBound) + 1 == low {
+                ranges[ranges.count - 1] = last.lowerBound...UInt32(high)
+            } else {
+                ranges.append(UInt32(low)...UInt32(high))
+            }
+        }
+
+        for record in 0..<(reader.u16(2) ?? 0) {
+            let at = 4 + record * 8
+            guard let platform = reader.u16(at), let encoding = reader.u16(at + 2), let start = reader.u32(at + 4),
+                  platform == 0 || (platform == 3 && [0, 1, 10].contains(encoding)),
+                  seen.insert(start).inserted, let format = reader.u16(start)
+            else { continue }
+            switch format {
+            case 0:
+                guard reader.u16(start + 6 + 254) != nil else { continue }
+                read = true
+                for code in 0..<256 where reader.bytes[start + 6 + code] != 0 { add(code, code) }
+            case 4:
+                guard let doubled = reader.u16(start + 6) else { continue }
+                let ends = start + 14, starts = ends + doubled + 2, deltas = starts + doubled, offsets = deltas + doubled
+                guard reader.u16(offsets + doubled - 2) != nil else { continue }
+                read = true
+                // Each code once, from the segment that has it first: a damaged table's overlapping segments could otherwise add up to billions.
+                var next = 0
+                for segment in 0..<doubled / 2 {
+                    guard let last = reader.u16(ends + segment * 2), let segmentStart = reader.u16(starts + segment * 2),
+                          let delta = reader.u16(deltas + segment * 2), let rangeOffset = reader.u16(offsets + segment * 2),
+                          max(segmentStart, next) <= last
+                    else { continue }
+                    let first = max(segmentStart, next)
+                    next = last + 1
+                    for code in first...last {
+                        let glyph: Int
+                        if rangeOffset == 0 {
+                            glyph = (code + delta) & 0xFFFF
+                        } else {
+                            // The offset counts from where it's stored, into the glyph ID array after the segments.
+                            guard let id = reader.u16(offsets + segment * 2 + rangeOffset + (code - segmentStart) * 2), id != 0 else { continue }
+                            glyph = (id + delta) & 0xFFFF
+                        }
+                        if glyph != 0 { add(code, code) }
+                    }
+                }
+            case 6, 10:
+                let wide = format == 10
+                guard let first = wide ? reader.u32(start + 12) : reader.u16(start + 6),
+                      let count = wide ? reader.u32(start + 16) : reader.u16(start + 8)
+                else { continue }
+                let glyphs = start + (wide ? 20 : 10)
+                guard count == 0 || reader.u16(glyphs + (count - 1) * 2) != nil else { continue }
+                read = true
+                for index in 0..<count where reader.u16(glyphs + index * 2) != 0 { add(first + index, first + index) }
+            case 12, 13:
+                guard let count = reader.u32(start + 12), reader.u32(start + 16 + count * 12 - 4) != nil || count == 0 else { continue }
+                read = true
+                for group in 0..<count {
+                    let at = start + 16 + group * 12
+                    guard let first = reader.u32(at), let last = reader.u32(at + 4), let glyph = reader.u32(at + 8),
+                          first <= last
+                    else { continue }
+                    if glyph != 0 {
+                        add(first, last)
+                    } else if format == 12 {
+                        add(first + 1, last)
+                    }
+                }
+            default:
+                // Format 14 lists variation sequences, not characters; 2 and 8 hold no Unicode.
+                continue
+            }
+        }
+        return read ? ScalarRanges(ranges) : nil
+    }
+}

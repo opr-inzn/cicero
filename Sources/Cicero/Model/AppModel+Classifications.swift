@@ -1,76 +1,44 @@
 import CiceroCore
 import Foundation
 
-/// Where a guessed classification comes from.
-enum ClassificationGuessSource {
-    /// Apple Intelligence, from the family's name.
-    case name
-    /// The model of letters, from their shapes.
-    case letters
-}
+typealias ClassificationGuessSource = ClassificationGuesses.Source
 
-/// Classifications: the one a family's fonts suggest (or for one they don't, a guess from its name or its letters),
-/// unless the user put it in another, the user's own among them. Built-in ones keep their place under the names the
-/// user gave them.
 extension AppModel {
-    /// Every classification, for menus: the built-in ones under their names, then the user's.
-    var classificationNames: [String] {
-        Classification.allCases.map(name(of:)) + data.classifications
-    }
+    var classificationNames: [String] { data.classificationNames }
 
-    /// A built-in classification's name, as the user renamed it.
     func name(of classification: Classification) -> String {
-        data.classificationRenames[classification.rawValue] ?? classification.rawValue
+        data.name(of: classification)
     }
 
     func classificationName(of family: Family) -> String {
         classificationNamer()(family)
     }
 
-    /// `classificationName(of:)` for many families: the user's choices are read once, not for every family.
     func classificationNamer() -> (Family) -> String {
-        let overrides = data.classificationOverrides
-        let renames = data.classificationRenames
         let guess = classificationGuess()
-        return { family in
-            if let override = overrides[family.id] { return override }
-            let classification = guess(family)?.classification ?? family.classification
-            return renames[classification.rawValue] ?? classification.rawValue
-        }
+        return data.classificationNamer { guess($0)?.classification }
     }
 
-    /// The classification Automatic puts a family in: the one its fonts suggest, or the guess.
     func suggestedClassification(of family: Family) -> Classification {
         guessedClassification(of: family)?.classification ?? family.classification
     }
 
-    /// The guess for a family its fonts don't classify, and where it comes from; nil without one.
     func guessedClassification(of family: Family) -> (classification: Classification, source: ClassificationGuessSource)? {
         classificationGuess()(family)
     }
 
-    /// `guessedClassification(of:)` for many families: Apple Intelligence's guess from the name, which it makes only
-    /// when the name says, else what the model sees in the letters; nothing while guessing is off, and nothing for a
-    /// family whose letters say serif for some styles and sans serif for others.
     func classificationGuess() -> (Family) -> (classification: Classification, source: ClassificationGuessSource)? {
-        let names = classificationGuesses, letters = letterGuesses, guessing = guessesClassifications
-        return { family in
-            guard guessing, family.classification == .unclassified, !family.mixesSerifAndSans else { return nil }
-            if let guess = names[family.id], guess != .unclassified { return (guess, .name) }
-            return letters[family.id].map { ($0, .letters) }
-        }
+        ClassificationGuesses.rule(names: classificationGuesses, letters: letterGuesses, guessing: guessesClassifications)
     }
 
     func isUserClassification(_ name: String) -> Bool {
         data.classifications.contains(name)
     }
 
-    /// The icon of a built-in classification, or of the user's.
     func classificationIcon(_ name: String) -> String {
         Classification.allCases.first { self.name(of: $0) == name }?.icon ?? "character"
     }
 
-    /// Puts the families in the classification; nil takes them back to the one their fonts suggest.
     func setClassification(_ name: String?, for families: [Family]) {
         var data = data
         for family in families { data.classificationOverrides[family.id] = name }
@@ -81,7 +49,6 @@ extension AppModel {
         prompt("New Classification", confirm: "Create") { self.addClassification(named: $0, to: families) }
     }
 
-    /// Makes a classification and puts the families in it. A name that's taken puts them in that one.
     func addClassification(named name: String, to families: [Family] = []) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -94,8 +61,6 @@ extension AppModel {
         self.data = data
     }
 
-    /// Renames one of the user's classifications, or gives a built-in one another name (its own name back
-    /// undoes that). Families put in it, smart set rules and the sidebar follow.
     func renameClassification(_ old: String, to new: String) {
         let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != old else { return }
@@ -122,18 +87,17 @@ extension AppModel {
         }
     }
 
-    /// Deletes one of the user's classifications: its families go back to the ones their fonts suggest, and
-    /// smart set rules for it go.
-    func deleteClassification(_ name: String) {
-        guard isUserClassification(name) else { return }
+    func deleteClassifications(_ names: Set<String>) {
+        let names = names.filter(isUserClassification)
+        guard !names.isEmpty else { return }
         var data = data
-        data.classifications.removeAll { $0 == name }
-        data.classificationOverrides = data.classificationOverrides.filter { $0.value != name }
+        data.classifications.removeAll(where: names.contains)
+        data.classificationOverrides = data.classificationOverrides.filter { !names.contains($0.value) }
         for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .classification && $0.value == name }
+            data.smartSets[index].rules.removeAll { $0.field == .classification && names.contains($0.value) }
         }
-        data.sidebar.forget("classification.\(name)")
+        for name in names { data.sidebar.forget("classification.\(name)") }
         self.data = data
-        deselect { $0 == .classification(name) }
+        deselect { if case .classification(let name) = $0 { names.contains(name) } else { false } }
     }
 }

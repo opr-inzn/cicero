@@ -642,7 +642,6 @@ def train(arguments):
             losses.append(loss.item())
         if epoch % arguments.every == arguments.every - 1 or epoch == arguments.epochs - 1:
             judged = average.module if average is not None else model
-            # With nothing held out (--fold -1), there's nothing to judge it on.
             scores = evaluate(model_distance(judged, drawn, device), designs, tag_names, measurements) \
                 if any(design["held_out"] for design in designs) else {}
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
@@ -689,7 +688,6 @@ def classify(arguments):
         optimizer.step()
     head.eval()
     print(f"{len(learn)} styles of {sum(not design['held_out'] for design in labelled)} designs learned from; {len(check)} held out")
-    # How it does on those held out, when there are any (none with --fold -1).
     if check:
         with torch.no_grad():
             chances = F.softmax(head(held), dim=1)

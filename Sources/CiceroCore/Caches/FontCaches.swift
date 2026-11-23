@@ -1,11 +1,9 @@
 import Darwin
 import Foundation
 
-/// The font caches macOS keeps.
 public enum SystemFontCaches {
     public enum Scope: Sendable {
         case currentUser
-        /// Needs an administrator; macOS asks for the password itself.
         case allUsers
     }
 
@@ -14,26 +12,28 @@ public enum SystemFontCaches {
         case failed(String)
     }
 
-    /// Removes the caches and restarts the font service, which rebuilds them on demand.
     public static func clear(_ scope: Scope) async throws {
         switch scope {
         case .currentUser:
             let result = try await Process.run("/usr/bin/atsutil", ["databases", "-removeUser"])
             guard result.status == 0 else { throw Failure.failed(result.stderr) }
-            // fontd may not be running; it starts again on demand either way.
             _ = try? await Process.run("/usr/bin/killall", ["fontd"])
         case .allUsers:
-            let script = "do shell script \"/usr/bin/atsutil databases -remove; /usr/bin/killall fontd || true\" with administrator privileges"
-            let result = try await Process.run("/usr/bin/osascript", ["-e", script])
-            guard result.status == 0 else {
-                throw result.stderr.contains("-128") ? Failure.cancelled : Failure.failed(result.stderr)
+            // Run in Cicero, not by osascript, so the password dialog names Cicero.
+            let script = "do shell script \"/usr/bin/atsutil databases -remove; /usr/bin/killall fontd || true\" with prompt \"Cicero wants to clear the macOS font caches for all users.\" with administrator privileges"
+            let error = await MainActor.run { () -> (number: Int?, message: String)? in
+                var error: NSDictionary?
+                guard let script = NSAppleScript(source: script) else { return (nil, "Couldn’t compile the script") }
+                _ = script.executeAndReturnError(&error)
+                return error.map { ($0[NSAppleScript.errorNumber] as? Int, $0[NSAppleScript.errorMessage] as? String ?? "") }
+            }
+            if let error {
+                throw error.number == -128 ? Failure.cancelled : Failure.failed(error.message)
             }
         }
     }
 }
 
-/// Font caches other apps keep and rebuild the next time they open. Only the files and folders
-/// matched here are ever touched, and only ever moved to the Trash.
 public enum AppFontCaches {
     public enum App: String, CaseIterable, Identifiable, Sendable {
         case adobe, office
@@ -47,26 +47,19 @@ public enum AppFontCaches {
             }
         }
 
-        /// Apps that read these caches and must be quit first.
         public var bundleIDs: Set<String> {
             switch self {
             case .adobe: ["com.adobe.InDesign", "com.adobe.illustrator", "com.adobe.Photoshop", "com.adobe.Acrobat.Pro", "com.adobe.Reader"]
             case .office: ["com.microsoft.Word", "com.microsoft.Excel", "com.microsoft.Powerpoint", "com.microsoft.Outlook", "com.microsoft.onenote.mac"]
             }
         }
-
-        /// Office keeps its caches inside its app containers. Looking there makes macOS ask whether
-        /// Cicero may access other apps' data, so only look when the user chooses to clear them.
-        public var isGuardedByMacOS: Bool { self == .office }
     }
 
     public struct Found: Sendable {
-        public var app: App
         public var items: [URL]
         public var size: Int64
 
-        public init(app: App, items: [URL], size: Int64) {
-            self.app = app
+        public init(items: [URL], size: Int64) {
             self.items = items
             self.size = size
         }
@@ -74,7 +67,7 @@ public enum AppFontCaches {
         public var isEmpty: Bool { items.isEmpty }
     }
 
-    /// Where each app keeps its caches, relative to the home folder (glob patterns, braces allowed).
+    // Only what these patterns match may ever be touched, and only by moving it to the Trash.
     static func patterns(for app: App) -> [String] {
         switch app {
         case .adobe: [
@@ -90,6 +83,7 @@ public enum AppFontCaches {
             // Acrobat names these with a literal backslash.
             "Library/Application Support/Adobe/Acrobat/DC/ProtectedView\\\\Adobe{Sys,Com,CMap}Fnt*.lst",
         ]
+        // Looking in Office's app containers makes macOS ask whether Cicero may access other apps' data, so the sheet looks only when the user chooses Office.
         case .office: [
             "Library/Group Containers/UBF8T346G9.Office/FontCache",
             "Library/Containers/com.microsoft.{Word,Excel,Powerpoint,Outlook,onenote.mac}/Data/Library/Application Support/Microsoft/{FontCache,FontPreviewCache}",
@@ -97,7 +91,6 @@ public enum AppFontCaches {
         }
     }
 
-    /// What exists for `app`, with its size. Walks folders; call off the main thread.
     public static func find(_ app: App) -> Found {
         find(app, home: FileManager.default.homeDirectoryForCurrentUser)
     }
@@ -110,11 +103,9 @@ public enum AppFontCaches {
             }
         }
         let size = items.reduce(Int64(0)) { $0 + allocatedSize(of: $1) }
-        return Found(app: app, items: items, size: size)
+        return Found(items: items, size: size)
     }
 
-    /// Moves every found item to the Trash; returns how many couldn't be moved. Tests pass their own
-    /// `trash` so they don't fill the user's Trash.
     public static func trash(_ found: Found, using trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) -> Int {
         found.items.count { (try? trash($0)) == nil }
     }
@@ -137,7 +128,6 @@ public enum AppFontCaches {
         return escaped
     }
 
-    /// Bytes on disk of a file, or of everything inside a folder. Symbolic links count as themselves.
     private static func allocatedSize(of url: URL) -> Int64 {
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
         func size(_ url: URL) -> Int64 {
@@ -159,27 +149,30 @@ extension Process {
         var stderr: String
     }
 
-    /// Runs a tool to completion without blocking the caller.
     static func run(_ path: String, _ arguments: [String]) async throws -> Output {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: path)
-                process.arguments = arguments
-                let errors = Pipe()
-                process.standardError = errors
-                process.standardOutput = FileHandle.nullDevice
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
-                    return
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        let errors = Pipe()
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        try process.run()
+                    } catch {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    // Read before waiting: a tool with more to say than a pipe holds waits until it's read.
+                    let data = errors.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    continuation.resume(returning: Output(status: process.terminationStatus, stderr: String(decoding: data, as: UTF8.self)))
                 }
-                // Read before waiting: a tool with more to say than a pipe holds waits until it's read.
-                let data = errors.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                continuation.resume(returning: Output(status: process.terminationStatus, stderr: String(decoding: data, as: UTF8.self)))
             }
+        } onCancel: {
+            if process.isRunning { process.terminate() }
         }
     }
 }

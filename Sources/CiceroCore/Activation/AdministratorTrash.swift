@@ -1,10 +1,6 @@
 import Foundation
 
-/// Moves files the user may not change to the Trash, once macOS has asked for an administrator's password, as the
-/// Finder does: for a file in a folder only an administrator can change, like the Fonts folder InDesign's installer
-/// makes next to the app, FileManager's `trashItem` only reports that permission was denied.
 enum AdministratorTrash {
-    /// Returns the paths that went: none when the password was cancelled or wrong.
     @concurrent
     static func move(_ urls: [URL]) async -> Set<String> {
         let fm = FileManager.default
@@ -15,7 +11,6 @@ enum AdministratorTrash {
             moves.append((url.path, destination(for: url, in: trash, taken: &taken)))
         }
         guard !moves.isEmpty else { return [] }
-        // The file stays the user's in the Trash, so they can open it or put it back without a password.
         let user = getuid()
         let script = moves.map { "/bin/mv -n \(quoted($0.source)) \(quoted($0.destination)) && /usr/sbin/chown \(user) \(quoted($0.destination))" }
             .joined(separator: "; ")
@@ -30,7 +25,6 @@ enum AdministratorTrash {
         return Set(moves.filter { !fm.fileExists(atPath: $0.source) && fm.fileExists(atPath: $0.destination) }.map(\.source))
     }
 
-    /// The file's name in the Trash, numbered when the Trash already has one by that name: "Sans-Bold 2.otf".
     private static func destination(for url: URL, in trash: URL, taken: inout Set<String>) -> String {
         let name = url.deletingPathExtension().lastPathComponent
         let suffix = url.pathExtension.isEmpty ? "" : "." + url.pathExtension
@@ -44,12 +38,10 @@ enum AdministratorTrash {
         return candidate
     }
 
-    /// A path as one shell word.
     private static func quoted(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
     }
 
-    /// Text as an AppleScript string.
     private static func literal(_ text: String) -> String {
         "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }

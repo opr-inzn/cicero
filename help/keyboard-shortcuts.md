@@ -6,28 +6,33 @@
 
 | Shortcut | Command |
 | --- | --- |
-| ⌘, | **Cicero → Settings** |
-| ⌘O | **File → Add Fonts** |
-| ⇧⌘O | **File → Add Folder** |
-| ⇧⌘N | **File → New Set** |
-| ⌥⌘N | **File → New Smart Set** |
+| ⌘, | **Cicero → Preferences** |
+| ⌘O | **File → Add Fonts** (no family selected) |
+| ⇧⌘O | **File → Add Location** |
+| ⇧⌘N | **File → New Folder** |
+| ⌥⌘N | **File → New Smart Folder** |
 | ⇧⌘E | **File → Export Fonts** |
+| ⌘← | **View → Back** (a font page) |
+| ⌘+ | **View → Zoom In** (the Compare window) |
+| ⌘− | **View → Zoom Out** (the Compare window) |
 | ⌘↩ | **Fonts → Activate** |
 | ⌥⌘↩ | **Fonts → Activate Temporarily** |
 | ⌫ | **Fonts → Deactivate** |
 | ⌘Y | **Fonts → Quick Look** |
-| ⌘↓ | **Fonts → Open** (one family selected) |
+| ⌘O or ⌘↓ | **Fonts → Open** (one family selected) |
 | ⌘I | **Fonts → Show Info** |
 | ⇧⌘R | **Fonts → Reveal in Finder** |
 | ⌘⌫ | **Fonts → Move to Trash** |
-| ⌥⌘C | **Fonts → Compare** (two or more families selected) |
+| ⌥⌘C | **Fonts → Compare**: several families selected start over, one joins the others, none just opens the window |
 | ⌥⌘T | **Fonts → Character Toolbox** |
 | ⌘R | **Fonts → Rescan Library** |
 | ⌘? | **Help → Cicero Help** |
 
 While you type in a text field, like the search field, the preview text or a font page’s text, ⌫, ⌘⌫ and ⌘ with an arrow key edit the text, as in any Mac app: ⌘⌫ deletes to the start of the line, and ⌘↓ moves to the end. They don’t deactivate, trash or open fonts then. ⌘↩ and ⌥⌘↩ still activate the selected fonts.
 
-⌫ and ⌘⌫ act on the fonts selected in the main window, so they do nothing to them in the Compare window, the Character Toolbox or Settings.
+⌫ and ⌘⌫ act on the fonts selected in the main window, so they do nothing to them in the Compare window, the Character Toolbox or Preferences.
+
+⌘+ and ⌘− are your keyboard’s own, as in other Mac apps: on a US keyboard, where + takes Shift, ⌘= zooms in too. To give a command another shortcut, add it by its name in **System Settings → Keyboard → Keyboard Shortcuts → App Shortcuts**.
 
 ## The browser
 
@@ -54,11 +59,21 @@ While you type in a text field, like the search field, the preview text or a fon
 | ↩ | Opens the family’s font page |
 | Space or Esc | Closes the preview |
 
+## Compare
+
+In **Add Families**:
+
+| Shortcut | Does |
+| --- | --- |
+| ↑ ↓ | Moves to the next or previous family found |
+| ↩ | Adds the family, or takes it out when it has a checkmark |
+| Esc | Closes it |
+
 ## Font pages
 
 | Shortcut | Does |
 | --- | --- |
-| Esc | Goes back to the browser |
+| Esc or ⌘← | Goes back to the browser |
 
 ## The sidebar
 
@@ -80,4 +95,4 @@ In the lists of families on both tabs:
 
 ## Sheets
 
-In sheets like the smart set editor, the coverage set editor and Clear Font Caches, ↩ clicks the blue button, like **Create**, **Save** or **Clear**.
+In sheets like the smart folder editor, the coverage set editor and Clear Font Caches, ↩ clicks the blue button, like **Create**, **Save** or **Clear**.

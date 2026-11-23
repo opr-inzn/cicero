@@ -1,7 +1,6 @@
 import CiceroCore
 import Foundation
 
-/// What `similarFonts` was made from.
 struct SimilarKey: Equatable {
     var fingerprint: Int
     var measurementRevision: Int
@@ -10,69 +9,109 @@ struct SimilarKey: Equatable {
 }
 
 extension AppModel {
-    /// How many families Show Similar Fonts lists after the one they look like.
-    static let similarListed = SimilarFonts.longestList
-
-    /// The listed families side by side by their letters and the letters' embedding, with their classifications as the
-    /// sidebar has them. Made again when the library, its measurements or the user's data change, which takes a
-    /// millisecond or two.
     var similarFonts: SimilarFonts {
         let key = SimilarKey(fingerprint: library.fingerprint, measurementRevision: measurementRevision, dataRevision: dataRevision,
                              guessRevision: guessRevision)
         if let cached = similarCache, cached.key == key { return cached.table }
         let measurements = measurements
-        let classification = classificationNamer()
-        let unclassified = data.classificationRenames[Classification.unclassified.rawValue] ?? Classification.unclassified.rawValue
         let table = SimilarFonts(families: library.families.filter(data.lists), measurements: { measurements.measurements(of: $0.regular.face.id) },
                                  embeddings: { measurements.embedding(of: $0.regular.face.id) },
-                                 classification: { family in
-                                     let name = classification(family)
-                                     return name == unclassified ? nil : name
-                                 })
+                                 styleMeasurements: { measurements.measurements(of: $0.id) },
+                                 styleEmbeddings: { measurements.embedding(of: $0.id) },
+                                 classification: similarClassifier())
         similarCache = (key, table)
         return table
     }
 
-    /// The families that look most like this one, the closest first, without it.
-    func similarFamilies(to family: Family, limit: Int) -> [Family] {
-        similarFonts.nearest(to: family.id, limit: limit).compactMap(library.family)
-    }
-
-    /// Whether the family's letters are measured, so that there are similar fonts to show.
-    func canShowSimilar(_ family: Family) -> Bool {
-        similarFonts.contains(family.id)
-    }
-
-    /// Fills the browser with the family and the families that look most like it, the closest first, the way a
-    /// search does: the sidebar shows nothing selected, and selecting an item there goes back to it.
-    func showSimilar(to family: Family) {
-        if similarFamilyID == nil {
-            similarReturn = selectedItems
-            similarReturnPage = openFamilyID
+    private func similarClassifier() -> (Family) -> String? {
+        let classification = classificationNamer()
+        let unclassified = data.classificationRenames[Classification.unclassified.rawValue] ?? Classification.unclassified.rawValue
+        return { family in
+            let name = classification(family)
+            return name == unclassified ? nil : name
         }
-        searchText = ""
+    }
+
+    func similarFamilies(to family: Family, kind: SearchQuery.Style?, limit: Int) -> [Family] {
+        var table = similarFonts
+        if !table.contains(family.id, kind: kind), covers(family, kind: kind) {
+            similarCache = nil
+            table = similarFonts
+        }
+        return table.nearest(to: family.id, kind: kind, limit: limit).compactMap(library.family)
+    }
+
+    func canShowSimilar(_ family: Family, style: LibraryFace?) -> Bool {
+        _ = measurementRevision
+        return covers(family, kind: style.map(family.kind(of:)))
+    }
+
+    private func covers(_ family: Family, kind: SearchQuery.Style?) -> Bool {
+        guard let listed = library.family(family.id), data.lists(listed) else { return false }
+        let measurements = measurements
+        return SimilarFonts.covers(listed, kind: kind,
+                                   measurements: { measurements.measurements(of: $0.regular.face.id) },
+                                   embeddings: { measurements.embedding(of: $0.regular.face.id) },
+                                   styleMeasurements: { measurements.measurements(of: $0.id) },
+                                   styleEmbeddings: { measurements.embedding(of: $0.id) })
+    }
+
+    func shownStyle(of family: Family) -> LibraryFace? {
+        let chosen = openFamilyID == family.id && pageStyleID != nil
+        let searched = family.namesStyle(SearchQuery(appliedSearch), tokens: searchTokens)
+        guard chosen || searched || similarStyle != nil else { return nil }
+        let face = previewStyle(of: family).face
+        return face.id == family.regular.id ? nil : face
+    }
+
+    var similarStyle: LibraryFace? {
+        guard let id = similarStyleID, let family = similarFamilyID.flatMap(library.family) else { return nil }
+        return family.faces.first { $0.id == id }
+    }
+
+    var similarName: String? {
+        guard let id = similarFamilyID else { return nil }
+        let name = library.family(id)?.name ?? id
+        return similarStyle.map { "\(name) \($0.face.styleName)" } ?? name
+    }
+
+    func showSimilar(to family: Family, style: LibraryFace?) {
+        if similarFamilyID == nil, documentList == nil {
+            listReturn = selectedItems
+            listReturnPage = openFamilyID
+        }
+        clearSearch()
         selection = nil
+        documentList = nil
         similarFamilyID = family.id
+        similarStyleID = style?.id
         openFamilyID = nil
         selectedIDs = [family.id]
         jumpTargets = [family.id]
     }
 
-    /// Back to what the sidebar had selected before, with the family selected there, and to the font page it was
-    /// asked for from, if any.
     func endSimilar() {
         guard let id = similarFamilyID else { return }
-        let items = similarReturn ?? [.all]
-        let page = similarReturnPage
-        similarReturn = nil
-        similarReturnPage = nil
-        selectSidebarItems(items.isEmpty ? [.all] : items)
-        if selection == nil { selection = .all }
-        similarFamilyID = nil
+        returnFromList()
         if visibleFamilies.contains(where: { $0.id == id }) {
             selectedIDs = [id]
             jumpTargets = [id]
         }
+    }
+
+    private func isInSidebar(_ item: SidebarItem) -> Bool {
+        libraryRows.contains { $0.item == item } || SidebarSection.allCases.contains { rows(for: $0).contains { $0.item == item } }
+    }
+
+    func returnFromList() {
+        let items = (listReturn ?? [.all]).filter(isInSidebar)
+        let page = listReturnPage
+        listReturn = nil
+        listReturnPage = nil
+        selectSidebarItems(items.isEmpty ? [.all] : items)
+        if selection == nil { selection = .all }
+        similarFamilyID = nil
+        documentList = nil
         if let page, library.family(page) != nil { openFamilyID = page }
     }
 }

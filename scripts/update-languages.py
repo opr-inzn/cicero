@@ -9,8 +9,8 @@ Hyperglot release is out, then commit the three files:
     scripts/update-languages.py --python /opt/homebrew/bin/python3.13
 
 Hyperglot needs Python 3.11 or newer (`brew install python@3.13`). The script makes its own venv
-in .build/update-languages-venv, installs hyperglot there and re-runs itself inside it. This is the
-only place Cicero ever touches the network; the app itself reads the bundled JSON and nothing else.
+in .build/update-languages-venv, installs hyperglot there and re-runs itself inside it. The app never downloads language data; it reads
+the bundled JSON and nothing else.
 
 What gets exported, using Hyperglot's own API so the resolution matches its checker exactly:
 - every language Hyperglot would consider by default (validity "draft" or better), with the
@@ -39,6 +39,11 @@ RESOURCES = os.path.join(REPO, "Resources")
 VENV = os.path.join(REPO, ".build", "update-languages-venv")
 HYPERGLOT_URL = "https://github.com/rosettatype/hyperglot"
 MIN_PYTHON = (3, 11)
+
+
+def native_name(name):
+    """A language's own name without the stray punctuation some Hyperglot entries end with ("ਪੰਜਾਬੀ,")."""
+    return (name or "").strip().rstrip(",;").strip()
 
 
 def parse_args():
@@ -112,15 +117,15 @@ def export():
                 row["auxiliary"] = "".join(list_unique(aux))
             if aux_marks:
                 row["auxiliaryMarks"] = "".join(aux_marks)
-            autonym = (ort["autonym"] or "").strip()
-            if autonym and autonym != (lang.autonym or "").strip():
+            autonym = native_name(ort["autonym"])
+            if autonym and autonym != native_name(lang.autonym):
                 row["autonym"] = autonym
             orthographies.append(row)
         if not orthographies:
             continue
         row = {"iso": iso, "name": lang.name, "speakers": lang.speakers, "validity": lang.validity, "status": lang.status}
-        if lang.autonym:
-            row["autonym"] = lang.autonym.strip()
+        if native_name(lang.autonym):
+            row["autonym"] = native_name(lang.autonym)
         row["orthographies"] = orthographies
         rows.append(row)
 

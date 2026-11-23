@@ -5,34 +5,62 @@ import SwiftUI
 @main
 struct CiceroApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @State private var model = AppModel()
+    @State private var model: AppModel
     @State private var preview = PreviewSettings()
-    @State private var backup = BackupPrompts()
-    @State private var updates = Updates()
+    @State private var updates: Updates
+    @State private var menuBarItem: MenuBarItem
+
+    init() {
+        #if CICERO_MEASURE
+        Measurements.time("noteLaunch") { WhatsNew.shared.noteLaunch() }
+        #else
+        WhatsNew.shared.noteLaunch()
+        #endif
+        let model = AppModel()
+        let updates = Updates()
+        let menuBarItem = MenuBarItem(model: model)
+        _model = State(initialValue: model)
+        _updates = State(initialValue: updates)
+        _menuBarItem = State(initialValue: menuBarItem)
+        AppDelegate.launchModel = model
+        NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                Appearance.applySaved()
+                model.start()
+                LibraryFocus.shared.start()
+                model.appSets.start(model)
+                model.openDocumentFonts.start(model)
+                menuBarItem.start()
+                // After the lock's message, SwiftUI doesn't open the Library window at launch by itself.
+                if LaunchWait.showedMessage {
+                    DispatchQueue.main.async { menuBarItem.openWindow?(id: WindowID.main) }
+                }
+            }
+        }
+    }
 
     var body: some Scene {
-        Window("Cicero", id: WindowID.main) {
+        Window("Library", id: WindowID.main) {
             MainWindow()
                 .environment(model)
                 .environment(preview)
-                .environment(backup)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
-                    Appearance.applySaved()
                     TextEditingKeys.install()
+                    SearchTokenTint.install()
                     model.start()
-                    model.appSets.start(model)
-                    model.openDocumentFonts.start(model)
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
+                    #if CICERO_MEASURE
+                    MeasureRun.startIfAsked(model: model, preview: preview)
+                    #endif
                 }
-                // Fonts opened from the Finder (Open With, or a double-click when Cicero opens fonts): SwiftUI
-                // hands the first of them here and the others to the delegate.
+                // SwiftUI hands the first of the fonts opened from the Finder here and the others to the delegate.
                 .onOpenURL { model.open([$0]) }
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
-        .commands { CiceroCommands(model: model, backup: backup, updates: updates) }
+        .commands { CiceroCommands(model: model, updates: updates, menuBarItem: menuBarItem) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -50,8 +78,17 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 960, height: 640)
         .restorationBehavior(.disabled)
-        .commandsRemoved()
         .handlesExternalEvents(matching: [])
+
+        Window("What’s New in Cicero", id: WindowID.whatsNew) {
+            WhatsNewWindow()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultWindowPlacement { _, _ in WindowPlacement(.center) }
+        .restorationBehavior(.disabled)
+        .handlesExternalEvents(matching: [])
+        .commandsRemoved()
 
         Settings {
             SettingsWindow()
@@ -64,64 +101,116 @@ struct CiceroApp: App {
 
 struct CiceroCommands: Commands {
     let model: AppModel
-    let backup: BackupPrompts
     let updates: Updates
+    let menuBarItem: MenuBarItem
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    @FocusedBinding(\.compareSize) private var compareSize
+    @FocusedValue(\.focusSearch) private var focusSearch
+
+    private var opensSelection: Bool { LibraryFocus.shared.isKey && model.openFamilyID == nil && !model.shownSelection.isEmpty }
 
     var body: some Commands {
+        // The menu bar's commands are made at launch and have these even while no window is open.
+        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
         CommandGroup(replacing: .appInfo) {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
-                .disabled(!updates.canCheckForUpdates)
+                .disabled(!updates.isAvailable)
+            if CommandLineTool.State.shared.installed {
+                Button("Cicero CLI installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
+            } else {
+                Button("Install Cicero CLI", systemImage: "terminal") { CommandLineTool.install(model: model) }
+                    .disabled(CommandLineTool.State.shared.isInstalling)
+            }
         }
         CommandGroup(after: .newItem) {
             Button("Add Fonts", systemImage: "doc.badge.plus") { model.presentAddFontsPanel() }
-                .keyboardShortcut("o", modifiers: .command)
-            Button("Add Folder", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
+                .keyboardShortcut(opensSelection ? nil : KeyboardShortcut("o"))
+            Button("Add Location", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Find Fonts in Document", systemImage: "doc.text.magnifyingglass") { model.presentFindFontsPanel() }
-            Button("New Set", systemImage: "square.stack") {
-                model.prompt("New Set", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
+            Button(model.selectedFamilies.isEmpty ? "New Folder" : "New Folder from Selection", systemImage: "folder") {
+                model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("New Smart Set", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
+            Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
                 .keyboardShortcut("n", modifiers: [.command, .option])
-            Button("New Application Set", systemImage: "app.badge.checkmark") { model.newApplicationSet(with: model.selectedFamilies) }
+            Button(model.selectedFamilies.isEmpty ? "New App Folder" : "New App Folder from Selection", systemImage: "app.badge.checkmark") {
+                model.newApplicationSet(with: model.selectedFamilies)
+            }
+            Divider()
+            Group {
+                Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
+                Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+                Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
+            }
+            .disabled(model.job != nil || model.isShowingPrompt)
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
-            Button("Export Font List", systemImage: "tablecells") { model.exportFontListOfSelectionOrList() }
             Divider()
-            Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
-            Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
-            Divider()
-            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
-            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+            Button("Back Up Library", systemImage: "externaldrive") { model.ask { $0.showsBackupSheet = true } }
+                .disabled(model.job != nil || model.isShowingPrompt)
+            Button("Restore Library", systemImage: "clock.arrow.circlepath") {
+                Task {
+                    guard let contents = await model.chooseBackupToRestore() else { return }
+                    model.ask { $0.restorePrompt = contents }
+                }
+            }
+            .disabled(model.job != nil || model.isShowingPrompt)
         }
-        // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Find", systemImage: "magnifyingglass") { focusSearch?() }
+                .keyboardShortcut("f")
+                .disabled(focusSearch == nil)
+        }
         SidebarCommands()
+        // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
+        CommandGroup(after: .sidebar) {
+            Divider()
+            Menu("Sort By", systemImage: "arrow.up.arrow.down") { SortMenuItems(model: model) }
+            Divider()
+            Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(model.openFamilyID == nil)
+            Divider()
+            Button("Zoom In", systemImage: "plus.magnifyingglass") {
+                if let size = compareSize { compareSize = CompareWindow.bigger(than: size) }
+            }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(compareSize.map { $0 >= CompareWindow.sizes.upperBound } ?? true)
+            Button("Zoom Out", systemImage: "minus.magnifyingglass") {
+                if let size = compareSize { compareSize = CompareWindow.smaller(than: size) }
+            }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(compareSize.map { $0 <= CompareWindow.sizes.lowerBound } ?? true)
+        }
         CommandMenu("Fonts") {
-            let selection = model.selectedFamilies
-            Button("Activate", systemImage: "checkmark.circle") { model.activate(selection) }
+            let selection = LibraryFocus.shared.isKey ? model.selectedFamilies : []
+            Button("Activate", systemImage: "checkmark.seal") { model.activate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
             Button("Activate Temporarily", systemImage: "clock") { model.activateTemporarily(selection) }
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
-            Button("Deactivate", systemImage: "circle.dashed") { model.deactivate(selection) }
+            Button("Deactivate", systemImage: "xmark.seal") { model.deactivate(selection) }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
-                .keyboardShortcut(.downArrow, modifiers: .command)
+                .keyboardShortcut(opensSelection ? KeyboardShortcut("o") : KeyboardShortcut(.downArrow))
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
-            Button("Show Info", systemImage: "info.circle") { model.toggleInfo() }
+            let hidesInfo = model.isInfoShown && model.shownInfoTab == .info
+            Button(hidesInfo ? "Hide Info" : "Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
+                .disabled(!LibraryFocus.shared.isKey)
             Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look", systemImage: "eye") { model.quickLook.toggle() }
                 .keyboardShortcut("y", modifiers: .command)
-                .disabled(!model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
+                .disabled(!LibraryFocus.shared.isKey || !model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
             Button("Reveal in Finder", systemImage: "finder") { model.reveal(selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
@@ -130,37 +219,40 @@ struct CiceroCommands: Commands {
                 .disabled(selection.isEmpty)
             Divider()
             Button("Compare", systemImage: "rectangle.split.1x2") {
-                model.compare(selection)
+                if selection.count > 1 { model.compare(selection) } else { _ = model.addToCompare(selection.map(\.id)) }
                 openWindow(id: WindowID.compare)
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
-            .disabled(selection.count < 2)
-            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: selection[0]) }
-                .disabled(selection.count != 1 || !model.canShowSimilar(selection[0]))
+            .disabled(!LibraryFocus.shared.isKey)
+            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") {
+                model.showSimilar(to: selection[0], style: model.shownStyle(of: selection[0]))
+            }
+            .disabled(selection.count != 1 || !model.canShowSimilar(selection[0], style: model.shownStyle(of: selection[0])))
             Button("Character Toolbox", systemImage: "character.textbox") { openWindow(id: WindowID.toolbox) }
                 .keyboardShortcut("t", modifiers: [.command, .option])
             Divider()
             Button("Rescan Library", systemImage: "arrow.clockwise") { model.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
-            Button("Rebuild Font List", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
-            Button("Clear Font Caches", systemImage: "eraser") { model.isClearingCaches = true }
+            Button("Rebuild Library", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
+            Button("Clear Font Caches", systemImage: "eraser") { model.ask { $0.isClearingCaches = true } }
         }
-        // The user guide, the project's pages on GitHub and the privacy policy on the website, opened in the
-        // default browser.
         CommandGroup(replacing: .help) {
             Button("Cicero Help", systemImage: "questionmark.circle") {
                 NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/README.md")!)
             }
             .keyboardShortcut("?", modifiers: .command)
-            Button("Release Notes", systemImage: "doc.text") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/releases")!) }
+            Button("What’s New in Cicero", systemImage: "newspaper") {
+                if WhatsNew.shared.showLatest() { openWindow(id: WindowID.whatsNew) }
+            }
+            Button("Version History", systemImage: "doc.text") {
+                NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/version-history.md")!)
+            }
             Button("Privacy Policy", systemImage: "hand.raised") { NSWorkspace.shared.open(URL(string: "https://cicero.maximilianinzinger.com/privacy")!) }
             Divider()
             Button("Report an Issue", systemImage: "exclamationmark.bubble") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/issues/new")!) }
         }
     }
 
-    /// A link to Cicero's website under the version in the About panel. The panel puts the copyright
-    /// (NSHumanReadableCopyright, "© 2026 Maximilian Inzinger") below it, so the name isn't repeated here.
     private static var credits: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -173,18 +265,35 @@ struct CiceroCommands: Commands {
     }
 }
 
-/// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
-/// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Also counts the launch for the usage statistics.
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Set when the main window appears; files that come before wait for it.
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+    @MainActor static var launchModel: AppModel?
     var model: AppModel? {
         didSet { flush() }
     }
     private var waiting: [URL] = []
+    private var addsFonts = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if model == nil { model = Self.launchModel }
         UsageStatistics.sendLaunch()
+        PreferencesItem.keepNamed()
+        WindowList.start()
+    }
+
+    // A change half made when Cicero quits would leave fonts on or off that its records don't know about.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model else { return .terminateNow }
+        if let job = model.job {
+            NSApp.bringForward()
+            model.showToast(job.waitMessage)
+            return .terminateCancel
+        }
+        guard model.isWorking else { return .terminateNow }
+        Task {
+            await model.finishWork(within: .seconds(30))
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -192,9 +301,130 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flush()
     }
 
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
+        addFonts.target = self
+        menu.addItem(addFonts)
+        return menu
+    }
+
+    @objc private func addFonts() {
+        NSApp.bringForward()
+        addsFonts = true
+        flush()
+    }
+
+    @objc func paste(_ sender: Any?) {
+        if canPaste { model?.pasteFiles() }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action == #selector(paste(_:)) ? canPaste : true
+    }
+
+    private var canPaste: Bool {
+        model != nil && NSApp.keyWindow != nil && NSApp.keyWindow === TextEditingKeys.mainWindow && !AppModel.pastedFiles.isEmpty
+    }
+
     private func flush() {
-        guard let model, !waiting.isEmpty else { return }
-        model.open(waiting)
-        waiting = []
+        guard let model else { return }
+        if !waiting.isEmpty {
+            model.open(waiting)
+            waiting = []
+        }
+        if addsFonts {
+            addsFonts = false
+            // Not while the main window is still appearing: the panel runs a loop of its own.
+            DispatchQueue.main.async { model.presentAddFontsPanel() }
+        }
+    }
+}
+
+@Observable
+final class LibraryFocus {
+    static let shared = LibraryFocus()
+    private(set) var isKey = false
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+
+    func start() {
+        guard observers.isEmpty else { return }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                DispatchQueue.main.async { LibraryFocus.shared.update() }
+            })
+        }
+        update()
+    }
+
+    private func update() {
+        let isKey = NSApp.keyWindow.map { $0 === TextEditingKeys.mainWindow } ?? false
+        if isKey != self.isKey { self.isKey = isKey }
+    }
+}
+
+enum PreferencesItem {
+    static let title = "Preferences"
+    private static var observers: [NSObjectProtocol] = []
+    private static var mainMenu: NSKeyValueObservation?
+
+    static func keepNamed() {
+        guard observers.isEmpty else { return }
+        // SwiftUI names the item Settings… again whenever it updates a menu, and gives that title to whatever holds ⌘, (a command group of Cicero's own too).
+        for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification, NSMenu.didBeginTrackingNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+                MainActor.assumeIsolated { rename() }
+            })
+        }
+        // A main menu SwiftUI makes anew is put in place whole, without telling about its items.
+        mainMenu = NSApp.observe(\.mainMenu) { _, _ in
+            MainActor.assumeIsolated { rename() }
+        }
+        rename()
+    }
+
+    private static var appMenu: NSMenu? { NSApp.mainMenu?.items.first?.submenu }
+
+    private static func rename() {
+        for item in appMenu?.items ?? [] where item.keyEquivalent == "," && item.keyEquivalentModifierMask == .command && item.title != title {
+            item.title = title
+        }
+    }
+}
+
+enum WindowList {
+    private static var observers: [NSObjectProtocol] = []
+
+    static func start() {
+        guard observers.isEmpty else { return }
+        let changes = [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.didChangeOcclusionStateNotification]
+        for name in changes {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { update() }
+            })
+        }
+        update()
+    }
+
+    private static func update() {
+        for window in NSApp.windows where window.isVisible || window.isMiniaturized {
+            guard let title = title(of: window) else { continue }
+            if NSApp.windowsMenu?.items.contains(where: { $0.target === window }) ?? false {
+                NSApp.changeWindowsItem(window, title: title, filename: false)
+            } else {
+                NSApp.addWindowsItem(window, title: title, filename: false)
+            }
+        }
+    }
+
+    private static func title(of window: NSWindow) -> String? {
+        guard window.styleMask.contains(.titled), !(window is NSPanel), window.sheetParent == nil else { return nil }
+        switch window.identifier?.rawValue {
+        case WindowID.main: return "Library"
+        case WindowID.compare: return "Compare"
+        case WindowID.toolbox: return "Character Toolbox"
+        case let id? where id.contains("Settings"): return PreferencesItem.title
+        default: return window.title.isEmpty ? nil : window.title
+        }
     }
 }

@@ -3,43 +3,43 @@ import CiceroCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The library sidebar. Edit puts a checkbox on every row and section to show or hide it; the same
-/// choices are in Settings → Sidebar. Sections and groups stay open or closed as they were, and open and close
-/// the same way while editing, so a long one like Foundries can be closed to get past it. Edit and Done switch
-/// at once: animated, hundreds of rows coming and going ran into each other. Rows drag to a new place within their section (or character set
-/// group), several at once when they're selected together, and the rows they pass slide apart to open a
-/// gap where they'll land. Group titles drag onto each other; sections stay in their order.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
-    /// What the list shows selected while the browser hasn't taken it yet (see `select`).
     @State private var pendingSelection: Set<SidebarItem>?
     @State private var pace = SelectionPace()
     @State private var highlight = SidebarHighlight()
+    @State private var drag = SidebarDrag()
+    @State private var fit = SidebarFit()
 
     var body: some View {
         let shown = pendingSelection ?? model.selectedItems
-        // The rows are a view of their own: a list's selection updates whatever makes the list, and this
-        // way that's just this, not every section and row. Each row's title reads the selection it draws.
+        // The rows are a view of their own: a list's selection updates whatever makes the list, and this way that's just this, not every section and row.
         List(selection: Binding(get: { shown }, set: select)) {
-            SidebarContent(highlight: highlight)
+            SidebarContent(highlight: highlight, drag: drag, fit: fit)
         }
         .listStyle(.sidebar)
-        .onChange(of: shown, initial: true) { highlight.selected = shown }
-        .contextMenu {
-            Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
-                   systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
+        .outsideFileDrops(isOver: { highlight.filesOver = $0 }) { urls in
+            highlight.filesOver = false
+            model.openOnSidebar(urls)
         }
+        .overlay {
+            if highlight.filesOver {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .padding(4)
+                    .allowsHitTesting(false)
+            }
+        }
+        .background { SidebarSnapReader(fit: fit) }
+        .onChange(of: shown, initial: true) { highlight.selected = shown }
+        .contextMenu { EditSidebarButton(model: model) }
         .onChange(of: model.selectedItems) {
-            // Selected some other way (a new set, say) while the browser was catching up: that wins.
             guard pendingSelection != nil else { return }
             pace.commit?.cancel()
             pendingSelection = nil
         }
     }
 
-    /// The browser shows a new selection at once, unless the selection changes quickly, as while arrowing
-    /// through a long section: the list then moves on at each step and the browser takes the last one when
-    /// it rests, instead of making every list along the way.
     private func select(_ items: Set<SidebarItem>) {
         let now = ContinuousClock.now
         let resting = pace.last.map { now - $0 > .milliseconds(300) } ?? true
@@ -60,18 +60,17 @@ struct SidebarView: View {
     }
 }
 
-/// When the sidebar's selection last changed, and the change waiting for the browser.
 private final class SelectionPace {
     var last: ContinuousClock.Instant?
     var commit: Task<Void, Never>?
 }
 
-/// The sidebar's sections and rows.
 private struct SidebarContent: View {
     @Environment(AppModel.self) private var model
-    /// Passed in rather than through the environment, which a row's background doesn't get.
+    // Passed in, not through the environment, which a row's background doesn't get.
     let highlight: SidebarHighlight
-    /// The character set group whose title is being dragged, and the one whose title it's over.
+    let drag: SidebarDrag
+    let fit: SidebarFit
     @State private var draggedGroup: String?
     @State private var groupDropTarget: String?
 
@@ -82,13 +81,17 @@ private struct SidebarContent: View {
         } header: {
             header
         }
+        .notCollapsible()
         ForEach(model.sections) { section in
             if editing || model.isVisible(section.key) {
                 let groups = section == .characterSets ? model.characterSetGroups : []
                 let rows = section == .characterSets ? [] : model.rows(for: section)
-                // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside (see `SectionHeader`).
+                // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside.
                 Section {
                     if model.isExpanded(section) {
+                        if section == .classifications && model.asksAboutGuessing && !editing {
+                            OrganizeRow()
+                        }
                         if section == .characterSets {
                             characterSetGroups(groups)
                         } else {
@@ -103,21 +106,23 @@ private struct SidebarContent: View {
                 } header: {
                     sectionHeader(section)
                 }
+                .notCollapsible()
             }
         }
     }
 
-    /// Rows that drag to a new place among themselves.
     private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
         let shownRows = shown(rows)
         return ForEach(shownRows) { row($0, section: section) }
-            .onMove { model.moveSidebarItems($0, to: $1, shown: shownRows.map(\.key), all: rows.map(\.key), in: list) }
+            .onMove { source, destination in
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    model.moveSidebarItems(source, to: destination, shown: shownRows.map(\.key), all: rows.map(\.key), in: list)
+                }
+            }
     }
 
-    /// Character sets in collapsible groups; a group whose sets are all hidden disappears. Sets move within
-    /// their group. A click on a group's title opens or closes it, and a title that takes clicks can't
-    /// hand drags to the list, so groups move by dropping one's title onto another's, which is
-    /// highlighted: the dragged group takes its place, and the other moves towards where it was.
     private func characterSetGroups(_ groups: [(id: String, title: String, rows: [SidebarRow])]) -> some View {
         let shownGroups = groups.filter { !shown($0.rows).isEmpty }
         func key(_ id: String) -> String { "charsetgroup.\(id)" }
@@ -134,12 +139,12 @@ private struct SidebarContent: View {
             )) {
                 movableRows(group.rows, in: key(group.id), section: .characterSets)
             } label: {
-                // Only the chevron toggles a group in a selectable list; make the title do it too. A tap
-                // rather than a button, so the title doesn't dim while it's pressed. An icon and full-strength
-                // text like the rows around it, as a playlist folder has in Music's sidebar. Coloured here, as the
-                // rows are (see `SidebarLabel`), or the list grays it while another window is in front.
-                Label(group.title, systemImage: "character.book.closed")
-                    .lineLimit(1)
+                // In a selectable list only the chevron toggles a group: a tap, not a button, so the title doesn't dim while pressed; coloured here, or the list greys it while another window is in front.
+                Label {
+                    Text(group.title).lineLimit(1).sidebarTitle(group.title, key: key(group.id), fit: fit)
+                } icon: {
+                    Image(systemName: "character.book.closed")
+                }
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
@@ -151,29 +156,20 @@ private struct SidebarContent: View {
                             RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.horizontal, -6)
                         }
                     }
-                    .draggable(beginDrag(of: group.id))
-                    // A move, not the default copy, so the pointer doesn't get a green plus.
-                    .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
-                                                         operationsOutsideApp: .init(allowCopy: false)))
-                    .dropDestination(for: GroupDrag.self) { drags, _ in
-                        guard let dragged = drags.first?.group, dragged != group.id else { return }
+                    .modifier(GroupDragSource { beginDrag(of: group.id) })
+                    .modifier(GroupDrop(group: group.id, dragged: draggedGroup, target: $groupDropTarget) { dragged in
                         withAnimation(.snappy) { move(dragged, onto: group.id) }
-                    }
-                    .dropConfiguration { _ in DropConfiguration(operation: draggedGroup == group.id ? .forbidden : .move) }
-                    .onDropSessionUpdated { session in
-                        switch session.phase {
-                        case .entering, .active:
-                            if draggedGroup != group.id { groupDropTarget = group.id }
-                        default:
-                            if groupDropTarget == group.id { groupDropTarget = nil }
+                    })
+                    .contextMenu {
+                        if group.rows.contains(where: { model.isVisible($0.key) }) {
+                            Button("Hide from Sidebar", systemImage: "eye.slash") { model.hideGroup(group.id) }
                         }
+                        EditSidebarButton(model: model)
                     }
             }
         }
     }
 
-    /// The payload of a group title's drag, made as the drag starts. The group is remembered until the
-    /// mouse button goes up, so its own title doesn't light up as a place to drop it.
     private func beginDrag(of group: String) -> GroupDrag {
         draggedGroup = group
         Task {
@@ -205,11 +201,12 @@ private struct SidebarContent: View {
             .help(model.isEditingSidebar ? "Finish editing the sidebar" : "Choose which items appear in the sidebar")
         }
         .padding(.trailing, 10)
-        .background(OutlineViewSetup())
+        // Behind a header inside the list, so the outline view is among its superviews.
+        .background(OutlineViewSetup(drag: drag) { model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
-        SectionHeader(title: section.title, isExpanded: expansion(section),
+        SectionHeader(title: section.title, key: section.key, fit: fit, isExpanded: expansion(section),
                       isDimmed: model.isEditingSidebar && !model.isVisible(section.key)) {
             if model.isEditingSidebar {
                 checkbox(section.key, section.title)
@@ -226,10 +223,9 @@ private struct SidebarContent: View {
             plus("Add a folder of fonts") { model.presentAddFolderPanel() }
         case .sets:
             Menu {
-                // The symbols the sidebar has for each kind.
-                Button("New Set", systemImage: "square.stack") { model.prompt("New Set", confirm: "Create") { model.addSet(named: $0) } }
-                Button("New Smart Set", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
-                Button("New Application Set", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
+                Button("New Folder", systemImage: "folder") { model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0) } }
+                Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
+                Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
             } label: {
                 Image(systemName: "plus")
             }
@@ -238,11 +234,11 @@ private struct SidebarContent: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .fixedSize()
-            .help("New set or smart set")
+            .help("New folder, smart folder or app folder")
         case .tags:
             plus("New tag") { model.newTag() }
         case .characterSets:
-            plus("New coverage set") { model.editingCharacterSet = CustomCharacterSet(name: "", characters: "") }
+            plus("New coverage set") { model.ask { $0.editingCharacterSet = CustomCharacterSet(name: "", characters: "") } }
         case .classifications:
             plus("New classification") { model.newClassification() }
         case .foundries:
@@ -265,143 +261,226 @@ private struct SidebarContent: View {
 
     // MARK: Rows
 
-    /// Activate, Activate Temporarily and Deactivate for every font in a set or smart set.
-    @ViewBuilder
-    private func activation(for row: SidebarRow, kind: String) -> some View {
-        // The symbols of the sidebar's Active and Inactive.
-        Button("Activate \(kind)", systemImage: "checkmark.circle") { model.activateFonts(in: row.item, named: row.title) }
-        Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: row.item) }
-        Button("Deactivate \(kind)", systemImage: "circle.dashed") { model.deactivateFonts(in: row.item) }
-    }
-
     @ViewBuilder
     private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
-            if model.isEditingSidebar { checkbox(row.key, row.title) }
-            SidebarLabel(row: row, highlight: highlight)
+            if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
+            SidebarLabel(row: row, highlight: highlight, fit: fit)
         }
-        .badge(row.badge > 0 ? Text(row.badge, format: .number) : nil)
+        .badge(row.badge > 0 ? Text(row.badge.plain) : nil)
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
-        .contextMenu { menu(for: row) }
-        // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear,
-        // which shows when a section opens or a long one scrolls. The one families are over lights up.
+        .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
+        // Asked for as the list starts dragging the row, which tells which rows a drag has.
+        .itemProvider { drag.provider(for: row) }
+        // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear.
         if model.takesFamilies(row.item) {
             content
-                .dropDestination(for: FontDrag.self) { drags, _ in
+                .background(FontDropTarget(isOver: { isOver in
+                    if isOver {
+                        if highlight.dropTarget != row.item { highlight.dropTarget = row.item }
+                    } else if highlight.dropTarget == row.item {
+                        highlight.dropTarget = nil
+                    }
+                }, files: .init(isOver: { highlight.filesOver = $0 }) { urls in
+                    highlight.filesOver = false
+                    model.openOnSidebar(urls)
+                }) { drags in
                     highlight.dropTarget = nil
                     _ = model.handleDrop(drags, on: row.item)
-                }
-                .onDropSessionUpdated { session in
-                    switch session.phase {
-                    case .entering, .active: highlight.dropTarget = row.item
-                    default: if highlight.dropTarget == row.item { highlight.dropTarget = nil }
-                    }
-                }
+                })
         } else {
             content
         }
     }
+}
 
-    /// Shows the folder under another name in Cicero; the folder on disk keeps its own. Left empty, it goes back to that.
-    private func renameFolder(_ id: UUID) -> some View {
-        Button("Rename Folder", systemImage: "pencil") {
-            model.prompt("Rename Folder", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+private struct SidebarRowMenu: View {
+    let row: SidebarRow
+    let model: AppModel
+    let highlight: SidebarHighlight
+
+    var body: some View {
+        let rows = model.menuTargets(of: row, selected: highlight.selected)
+        if rows.count > 1 {
+            Text("\(rows.count.plain) \(noun)")
         }
-    }
-
-    @ViewBuilder
-    private func menu(for row: SidebarRow) -> some View {
         switch row.item {
-        case .folder(WatchedFolder.adobeAppsID):
-            renameFolder(WatchedFolder.adobeAppsID)
-            Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(WatchedFolder.appFontFolders().map(\.url)) }
-        case .folder(WatchedFolder.adobeFontsID):
-            renameFolder(WatchedFolder.adobeFontsID)
-            Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
-        case .folder(WatchedFolder.addedFilesID):
-            renameFolder(WatchedFolder.addedFilesID)
-            Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting(model.addedFileURLs) }
-        case .folder(let id):
-            if let folder = model.folder(id) {
-                renameFolder(id)
-                Button("Reveal in Finder", systemImage: "finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
-                if id != WatchedFolder.fontLibraryID {
-                    Divider()
-                    FolderActivationPicker(folder: folder) {
-                        model.prompt("Active in Specific App", confirm: "OK") { model.setActivation(ofFolder: id, active: false, app: $0) }
-                    }
-                    Button("Remove Folder from Library", systemImage: "folder.badge.minus") { model.removeFolder(id) }
-                }
+        case .temporary:
+            if rows.count == 1 {
+                Button("Activate Permanently", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
+                Button("Deactivate", systemImage: "xmark.seal") { model.deactivateFonts(in: [row.item]) }
             }
-        case .set(let id):
-            if let set = model.data.sets.first(where: { $0.id == id }) {
-                activation(for: row, kind: "Set")
-                Divider()
-                Button("Rename Set", systemImage: "pencil") { model.prompt("Rename Set", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
-                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.editingAppsForSet = id }
-                Button("Delete Set", systemImage: "trash") { model.deleteSet(id) }
-            }
-        case .smartSet(let id):
-            if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                activation(for: row, kind: "Smart Set")
-                Divider()
-                Button("Edit Smart Set", systemImage: "slider.horizontal.3") { model.editingSmartSet = smartSet }
-                Button("Delete Smart Set", systemImage: "trash") { model.deleteSmartSet(id) }
-            }
-        case .tag(let name):
-            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
-            Picker(selection: Binding(get: { model.data.tagColors[name] }, set: { model.setColor($0, forTag: name) })) {
-                Text("None").tag(TagColor?.none)
-                Divider()
-                ForEach(TagColor.allCases, id: \.self) { color in
-                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }
-                        .labelStyle(.titleAndIcon)
-                        .tag(Optional(color))
-                }
-            } label: {
-                Label("Color", systemImage: "paintpalette")
-            }
-            Button("Delete Tag", systemImage: "trash") { model.deleteTag(name) }
+        case .folder:
+            locationItems(rows.compactMap { if case .folder(let id) = $0.item { id } else { nil } })
+        case .set, .smartSet:
+            folderItems(rows)
+        case .tag:
+            tagItems(rows.compactMap { if case .tag(let name) = $0.item { name } else { nil } })
         case .foundry(let name):
-            Button("Rename Foundry", systemImage: "pencil") { model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) } }
+            if rows.count == 1 {
+                Button("Rename Foundry", systemImage: "pencil") {
+                    model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) }
+                }
+            }
         case .classification(let name):
-            Button("Rename Classification", systemImage: "pencil") {
-                model.prompt("Rename Classification", text: name, confirm: "Rename") { model.renameClassification(name, to: $0) }
+            if rows.count == 1 {
+                Button("Rename Classification", systemImage: "pencil") {
+                    model.prompt("Rename Classification", text: name, confirm: "Rename") { model.renameClassification(name, to: $0) }
+                }
             }
-            if model.isUserClassification(name) {
-                Button("Delete Classification", systemImage: "trash") { model.deleteClassification(name) }
+            let own = rows.compactMap { if case .classification(let name) = $0.item { name } else { nil } }.filter(model.isUserClassification)
+            if !own.isEmpty {
+                Button(own.count == 1 ? "Delete Classification" : "Delete Classifications", systemImage: "trash") {
+                    model.deleteClassifications(Set(own))
+                }
             }
-        case .characterSet(let id):
-            if let custom = model.data.customCharacterSets.first(where: { $0.setID == id }) {
-                Button("Edit Coverage Set", systemImage: "pencil") { model.editingCharacterSet = custom }
-                Button("Delete Coverage Set", systemImage: "trash") { model.deletingCharacterSet = custom }
+        case .characterSet:
+            let ids = Set(rows.compactMap { if case .characterSet(let id) = $0.item { id } else { nil } })
+            let custom = model.data.customCharacterSets.filter { ids.contains($0.setID) }
+            if rows.count == 1, let set = custom.first {
+                Button("Edit Coverage Set", systemImage: "pencil") { model.ask { $0.editingCharacterSet = set } }
+            }
+            if !custom.isEmpty {
+                Button(custom.count == 1 ? "Delete Coverage Set" : "Delete Coverage Sets", systemImage: "trash") {
+                    model.ask { $0.deletingCharacterSets = custom }
+                }
             }
         default:
             EmptyView()
         }
-        if model.canExport(row.item) {
+        let exported = rows.filter { model.canExport($0.item) }
+        if !exported.isEmpty {
             Divider()
-            Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: row.item, named: row.title) }
-            Button("Export Font List", systemImage: "tablecells") { model.exportFontList(model.families(in: row.item), named: row.title) }
+            Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: exported) }
         }
         Divider()
-        if model.isVisible(row.key) {
-            Button("Hide from Sidebar", systemImage: "eye.slash") { model.setVisible(row.key, false) }
+        let shown = rows.filter { $0.canHide && model.isVisible($0.key) }
+        if !shown.isEmpty {
+            Button("Hide from Sidebar", systemImage: "eye.slash") { model.hide(shown.map(\.key)) }
         }
-        Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
-                   systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
+        EditSidebarButton(model: model)
+    }
+
+    private var noun: String {
+        switch row.item {
+        case .folder: "Locations"
+        case .set, .smartSet: "Folders"
+        case .tag: "Tags"
+        case .foundry: "Foundries"
+        case .classification: "Classifications"
+        case .characterSet: "Coverage Sets"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "Items"
+        }
+    }
+
+    @ViewBuilder
+    private func locationItems(_ ids: [UUID]) -> some View {
+        if ids.count == 1, let id = ids.first {
+            Button("Rename Location", systemImage: "pencil") {
+                model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+            }
+            switch id {
+            case WatchedFolder.adobeFontsID:
+                Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
+            case WatchedFolder.adobeAppsID, WatchedFolder.addedFilesID:
+                revealButton(ids)
+            default:
+                if let folder = model.folder(id) {
+                    revealButton(ids)
+                    Divider()
+                    FolderActivationPicker(folder: folder) {
+                        model.prompt("Active in Specific App", confirm: "OK", requiresText: true) { model.setActivation(ofFolder: id, active: false, app: $0) }
+                    }
+                }
+            }
+        } else {
+            revealButton(ids.filter { $0 != WatchedFolder.adobeFontsID })
+        }
+        let removable = ids.filter(model.isRemovableFolder)
+        if !removable.isEmpty {
+            if ids.count > 1 { Divider() }
+            Button(removable.count == 1 ? "Remove Location from Library" : "Remove Locations from Library", systemImage: "folder.badge.minus") {
+                model.removeFolders(Set(removable))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func revealButton(_ ids: [UUID]) -> some View {
+        if !ids.isEmpty {
+            Button("Reveal in Finder", systemImage: "finder") {
+                NSWorkspace.shared.activateFileViewerSelecting(ids.flatMap(model.finderURLs))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func folderItems(_ rows: [SidebarRow]) -> some View {
+        let sets = Set(rows.compactMap { if case .set(let id) = $0.item { id } else { nil } })
+        let smartSets = Set(rows.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
+        let kind = sets.isEmpty ? "Smart Folder" : "Folder"
+        let kinds = rows.count == 1 ? kind : kind + "s"
+        Button("Activate \(kinds)", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
+        Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: rows.map(\.item)) }
+        Button("Deactivate \(kinds)", systemImage: "xmark.seal") { model.deactivateFonts(in: rows.map(\.item)) }
+        Divider()
+        if rows.count == 1 {
+            if let id = sets.first, let set = model.data.sets.first(where: { $0.id == id }) {
+                Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
+                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.ask { $0.editingAppsForSet = id } }
+            } else if let id = smartSets.first, let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
+                Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.ask { $0.editingSmartSet = smartSet } }
+            }
+        }
+        Button("Delete \(kinds)", systemImage: "trash") {
+            if !sets.isEmpty { model.deleteSets(sets) }
+            if !smartSets.isEmpty { model.deleteSmartSets(smartSets) }
+        }
+    }
+
+    @ViewBuilder
+    private func tagItems(_ names: [String]) -> some View {
+        if names.count == 1, let name = names.first {
+            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
+        }
+        Menu {
+            Toggle("None", isOn: Binding(
+                get: { names.allSatisfy { model.data.tagColors[$0] == nil } },
+                set: { if $0 { model.setColor(nil, forTags: names) } }
+            ))
+            Divider()
+            ForEach(TagColor.allCases, id: \.self) { color in
+                Toggle(isOn: Binding(
+                    get: { names.allSatisfy { model.data.tagColors[$0] == color } },
+                    set: { if $0 { model.setColor(color, forTags: names) } }
+                )) {
+                    Label { Text(color.title) } icon: { Image(nsImage: color.menuImage) }
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+        } label: {
+            Label("Color", systemImage: "paintpalette")
+        }
+        Button(names.count == 1 ? "Delete Tag" : "Delete Tags", systemImage: "trash") { model.deleteTags(Set(names)) }
     }
 }
 
-/// A section's title, with its checkbox while editing and its + at the end, and a chevron before the + while the pointer
-/// is over the row. The list has a chevron that shows the same way, but after the +, narrowing the header as it comes
-/// and goes, which moved the +; keeping its place empty left a gap. The whole row opens and closes the section. Its
-/// own view, so the pointer coming and going doesn't redo the sidebar's rows.
+private struct EditSidebarButton: View {
+    let model: AppModel
+
+    var body: some View {
+        Button(model.isEditingSidebar ? "Done Editing Sidebar" : "Edit Sidebar",
+               systemImage: model.isEditingSidebar ? "checkmark" : "sidebar.left") { model.isEditingSidebar.toggle() }
+    }
+}
+
 private struct SectionHeader<Leading: View, Trailing: View>: View {
     let title: String
+    let key: String
+    let fit: SidebarFit
     @Binding var isExpanded: Bool
     let isDimmed: Bool
     @ViewBuilder let leading: Leading
@@ -412,13 +491,12 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
         HStack(spacing: 6) {
             leading
             Text(title)
+                .sidebarTitle(title, key: key, fit: fit)
                 .opacity(isDimmed ? 0.45 : 1)
                 .accessibilityAction(named: isExpanded ? "Collapse" : "Expand", toggle)
-            Spacer()
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                // Turns at once, while the section's rows open and close.
                 .transaction { $0.animation = nil }
                 .frame(width: 14)
                 .padding(.trailing, 4)
@@ -437,29 +515,43 @@ private struct SectionHeader<Leading: View, Trailing: View>: View {
     }
 }
 
-/// What the sidebar shows selected, and the row families are being dragged over. The list draws neither (see
-/// `OutlineViewSetup`): each row draws its own, from this.
 @Observable
 final class SidebarHighlight {
     var selected: Set<SidebarItem> = []
     var dropTarget: SidebarItem?
+    var filesOver = false
 }
 
-/// A row's title and symbol: in the accent colour while it's selected, white on it while families are over it.
+private struct OrganizeRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button { model.ask { $0.showsGuessingQuestion = true } } label: {
+            Label { Text("Organize").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
+                Image(systemName: "character.magnify").foregroundStyle(Color.solar)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .selectionDisabled()
+        .help("Let Cicero classify fonts that don’t say what they are")
+    }
+}
+
 private struct SidebarLabel: View {
     let row: SidebarRow
     let highlight: SidebarHighlight
+    let fit: SidebarFit
 
     var body: some View {
         let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
             : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
-        // On the symbol too: a sidebar styles symbols itself. A status's dot keeps its own colour.
-        Label { Text(row.title).lineLimit(1).foregroundStyle(style) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
+        // On the symbol too: a sidebar styles symbols itself. A tag's dot keeps its own colour.
+        Label { Text(row.title).lineLimit(1).foregroundStyle(style).sidebarTitle(row.title, key: row.key, fit: fit) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
     }
 }
 
-/// Behind a selected row, a light fill; behind the row families are over, the accent colour, as the list draws a
-/// selected row while it has focus.
 private struct SidebarRowBackground: View {
     let item: SidebarItem
     let highlight: SidebarHighlight
@@ -475,14 +567,12 @@ private struct SidebarRowBackground: View {
     }
 }
 
-/// A row's symbol, or a status's colour as a dot. The dot is a picture rather than a symbol in the colour, which the
-/// list darkened on the accent colour behind a row families are dragged over (and behind a selected row, when the
-/// list drew those).
 struct SidebarIcon: View {
     let row: SidebarRow
 
     var body: some View {
         if let color = row.color {
+            // A picture, not a symbol in the colour, which the list darkens on the accent colour behind a row families are over.
             Image(nsImage: color.menuImage)
                 .accessibilityLabel(color.title)
         } else {
@@ -491,7 +581,6 @@ struct SidebarIcon: View {
     }
 }
 
-/// A character set group's title being dragged onto another's.
 private nonisolated struct GroupDrag: Codable, Transferable {
     var group: String
 
@@ -501,21 +590,103 @@ private nonisolated struct GroupDrag: Codable, Transferable {
 }
 
 private extension UTType {
-    /// Declared in Info.plist.
     nonisolated static let ciceroSidebarGroup = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-group")
 }
 
-/// Makes the list open a gap where dragged rows will land, the rows around it sliding apart as in Finder's
-/// sidebar, instead of drawing an insertion line, and leaves drawing the selection to the rows (see
-/// `SidebarHighlight`). SwiftUI has no setting for either: a List on macOS 26 is an NSOutlineView, whose
-/// `draggingDestinationFeedbackStyle` is `.sourceList` in a sidebar, and SwiftUI leaves the styles alone once
-/// they're set. This sits behind a header inside the list, so the outline view is among its superviews; it takes
-/// no clicks and draws nothing.
+private struct GroupDragSource: ViewModifier {
+    let payload: () -> GroupDrag
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.draggable(payload())
+        } else {
+            // On macOS 15 a title dragged with `draggable` never leaves the list.
+            content.onDrag {
+                let provider = NSItemProvider()
+                provider.register(payload())
+                return provider
+            }
+        }
+    }
+}
+
+private struct GroupDrop: ViewModifier {
+    let group: String
+    let dragged: String?
+    @Binding var target: String?
+    let move: (String) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .dragConfiguration(DragConfiguration(operationsWithinApp: .init(allowCopy: false, allowMove: true),
+                                                     operationsOutsideApp: .init(allowCopy: false)))
+                .dropDestination(for: GroupDrag.self) { drags, _ in
+                    guard let dragged = drags.first?.group, dragged != group else { return }
+                    move(dragged)
+                }
+                .dropConfiguration { _ in DropConfiguration(operation: dragged == group ? .forbidden : .move) }
+                .onDropSessionUpdated { session in
+                    switch session.phase {
+                    case .entering, .active:
+                        if dragged != group { target = group }
+                    default:
+                        if target == group { target = nil }
+                    }
+                }
+        } else {
+            content.onDrop(of: [.ciceroSidebarGroup], delegate: Delegate(group: group, dragged: dragged, target: $target, move: move))
+        }
+    }
+
+    private struct Delegate: DropDelegate {
+        let group: String
+        let dragged: String?
+        @Binding var target: String?
+        let move: (String) -> Void
+
+        func dropUpdated(info: DropInfo) -> DropProposal? {
+            DropProposal(operation: dragged == group ? .forbidden : .move)
+        }
+
+        func dropEntered(info: DropInfo) {
+            if dragged != group { target = group }
+        }
+
+        func dropExited(info: DropInfo) {
+            if target == group { target = nil }
+        }
+
+        func performDrop(info: DropInfo) -> Bool {
+            if target == group { target = nil }
+            guard let dragged, dragged != group else { return false }
+            move(dragged)
+            return true
+        }
+    }
+}
+
 private struct OutlineViewSetup: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { Marker() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    let drag: SidebarDrag
+    let hide: ([SidebarRow]) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        drag.hide = hide
+        return Marker(drag: drag)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) { drag.hide = hide }
 
     private final class Marker: NSView {
+        let drag: SidebarDrag
+
+        init(drag: SidebarDrag) {
+            self.drag = drag
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
         override func viewDidMoveToWindow() {
@@ -523,8 +694,225 @@ private struct OutlineViewSetup: NSViewRepresentable {
             var view = superview
             while let current = view, !(current is NSOutlineView) { view = current.superview }
             guard let outline = view as? NSOutlineView else { return }
-            outline.draggingDestinationFeedbackStyle = .gap
             outline.selectionHighlightStyle = .none
+            outline.refusesFirstResponder = true
+            // Without the answers, a row dragged out of the list stops Cicero.
+            if SidebarDataSource.answer(for: outline, drag: drag) { outline.draggingDestinationFeedbackStyle = .gap }
+            SidebarDrag.prepare(in: outline)
         }
+    }
+}
+
+final class SidebarDrag {
+    var hide: ([SidebarRow]) -> Void = { _ in }
+    private var rows: [SidebarRow] = []
+    private var lastAsked: ContinuousClock.Instant?
+    private var session: NSDraggingSession?
+    private var listFrame = NSRect.zero
+    private var pictures: [NSImage?] = []
+
+    func provider(for row: SidebarRow) -> NSItemProvider {
+        let now = ContinuousClock.now
+        // The list asks each row it drags for an item, and on macOS 26 also as the mouse goes down on one, so a drag's rows are the last ones asked for.
+        if lastAsked.map({ now - $0 > .milliseconds(500) }) ?? true { rows = [] }
+        lastAsked = now
+        rows.append(row)
+        return NSItemProvider()
+    }
+
+    func began(_ session: NSDraggingSession, count: Int, in outline: NSOutlineView) {
+        guard count <= rows.count, let frame = Self.frame(of: outline) else { return rows = [] }
+        rows = Array(rows.suffix(count))
+        self.session = session
+        listFrame = frame
+        // Let go where nothing changes, the rows are there again at once: AppKit slid the picture back there and faded it out first, with the place empty.
+        session.animatesToStartingPositionsOnCancelOrFail = false
+        pictures = []
+        session.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
+            self.dress(item, at: index, in: outline)
+        }
+    }
+
+    func redraw(_ info: NSDraggingInfo, in outline: NSOutlineView) {
+        guard session != nil, info.draggingSource as AnyObject? === outline else { return }
+        info.enumerateDraggingItems(options: [], for: outline, classes: [NSPasteboardItem.self], searchOptions: [:]) { item, index, _ in
+            self.dress(item, at: index, in: outline)
+        }
+    }
+
+    private func dress(_ item: NSDraggingItem, at index: Int, in outline: NSOutlineView) {
+        guard rows.indices.contains(index) else { return }
+        let size = item.draggingFrame.size
+        while pictures.count <= index { pictures.append(nil) }
+        if pictures[index]?.size != size { pictures[index] = Self.picture(of: rows[index], size: size, in: outline) }
+        guard let picture = pictures[index] else { return }
+        item.imageComponentsProvider = {
+            let component = NSDraggingImageComponent(key: .icon)
+            component.contents = picture
+            component.frame = NSRect(origin: .zero, size: size)
+            return [component]
+        }
+    }
+
+    static func prepare(in outline: NSOutlineView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak outline] in
+            guard let outline else { return }
+            _ = picture(of: SidebarRow(key: "", title: "Aa", icon: "folder", item: .all), size: NSSize(width: 120, height: 28), in: outline)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+    }
+
+    private static func picture(of row: SidebarRow, size: NSSize, in outline: NSOutlineView) -> NSImage? {
+        let (fontSize, leading): (CGFloat, CGFloat) = switch outline.effectiveRowSizeStyle {
+        case .small: (11, 3.5)
+        case .large: (15, 3.5)
+        default: (13, 4.5)
+        }
+        let isDark = outline.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let renderer = ImageRenderer(content: Label { Text(row.title).lineLimit(1) } icon: { SidebarIcon(row: row) }
+            .font(.system(size: fontSize))
+            .foregroundStyle(.primary)
+            .padding(.leading, leading)
+            .frame(width: size.width, height: size.height, alignment: .leading)
+            .opacity(0.88)
+            .environment(\.colorScheme, isDark ? .dark : .light))
+        renderer.scale = outline.window?.backingScaleFactor ?? 2
+        return renderer.nsImage
+    }
+
+    func moved(to point: NSPoint) {
+        guard session != nil, rows.contains(where: \.canHide) else { return }
+        let isOutside = !listFrame.contains(point)
+        if isOutside {
+            if NSCursor.current != NSCursor.disappearingItem { NSCursor.disappearingItem.set() }
+        } else if NSCursor.current == NSCursor.disappearingItem {
+            NSCursor.arrow.set()
+        }
+    }
+
+    func ended(at point: NSPoint, operation: NSDragOperation) {
+        let rows = session == nil ? [] : rows.filter(\.canHide)
+        session = nil
+        self.rows = []
+        lastAsked = nil
+        // With the button still down, Escape ended the drag.
+        guard !rows.isEmpty, operation.isEmpty, NSEvent.pressedMouseButtons & 1 == 0, !listFrame.contains(point) else { return }
+        hide(rows)
+    }
+
+    private static func frame(of outline: NSOutlineView) -> NSRect? {
+        let list = outline.enclosingScrollView ?? outline
+        return list.window?.convertToScreen(list.convert(list.bounds, to: nil))
+    }
+}
+
+private enum SidebarDataSource {
+    private typealias Validate = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject, AnyObject?, Int) -> NSDragOperation
+    private typealias Began = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingSession, NSPoint, NSArray) -> Void
+    private typealias Ended = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void
+    private typealias Moved = @convention(c) (NSOutlineView, Selector, AnyObject?, NSPoint) -> Void
+    private typealias SessionEnded = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint, NSDragOperation) -> Void
+    private typealias Update = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject) -> Void
+    private typealias SessionMoved = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint) -> Void
+    private static var answering: Set<ObjectIdentifier> = []
+    private static let dragKey = UnsafeMutableRawPointer.allocate(byteCount: 1, alignment: 1)
+
+    static func answer(for outline: NSOutlineView, drag: SidebarDrag) -> Bool {
+        objc_setAssociatedObject(outline, dragKey, drag, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        followMoves(of: outline)
+        guard let source = outline.dataSource, let type = object_getClass(source) else { return false }
+        if answering.contains(ObjectIdentifier(type)) { return true }
+
+        let validate = #selector(NSOutlineViewDataSource.outlineView(_:validateDrop:proposedItem:proposedChildIndex:))
+        guard let validateMethod = class_getInstanceMethod(type, validate) else { return false }
+        let swiftUIValidate = unsafeBitCast(method_getImplementation(validateMethod), to: Validate.self)
+        let validateAnswer: @convention(block) (AnyObject, NSOutlineView, AnyObject, AnyObject?, Int) -> NSDragOperation = { source, outline, info, item, index in
+            // As a drag leaves, AppKit asks about a drop at child index -2, its nowhere, which SwiftUI's data source looks up as a row and stops Cicero.
+            index == -2 ? [] : swiftUIValidate(source, validate, outline, info, item, index)
+        }
+        method_setImplementation(validateMethod, imp_implementationWithBlock(validateAnswer))
+
+        let update = #selector(NSOutlineViewDataSource.outlineView(_:updateDraggingItemsForDrag:))
+        if let updateMethod = class_getInstanceMethod(type, update) {
+            let swiftUIUpdate = unsafeBitCast(method_getImplementation(updateMethod), to: Update.self)
+            let updateAnswer: @convention(block) (AnyObject, NSOutlineView, AnyObject) -> Void = { source, outline, info in
+                swiftUIUpdate(source, update, outline, info)
+                // SwiftUI draws the dragged rows again as the drag comes over the list, with a white symbol.
+                if let info = info as? NSDraggingInfo { sidebarDrag(of: outline)?.redraw(info, in: outline) }
+            }
+            method_setImplementation(updateMethod, imp_implementationWithBlock(updateAnswer))
+        }
+
+        let begin = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:willBeginAt:forItems:))
+        let end = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:endedAt:operation:))
+        if let beginMethod = class_getInstanceMethod(type, begin), let endMethod = class_getInstanceMethod(type, end) {
+            let swiftUIBegin = unsafeBitCast(method_getImplementation(beginMethod), to: Began.self)
+            let beginAnswer: @convention(block) (AnyObject, NSOutlineView, NSDraggingSession, NSPoint, NSArray) -> Void = { source, outline, session, point, items in
+                swiftUIBegin(source, begin, outline, session, point, items)
+                sidebarDrag(of: outline)?.began(session, count: items.count, in: outline)
+            }
+            method_setImplementation(beginMethod, imp_implementationWithBlock(beginAnswer))
+            let swiftUIEnd = unsafeBitCast(method_getImplementation(endMethod), to: Ended.self)
+            let endAnswer: @convention(block) (AnyObject, NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void = { source, outline, session, point, operation in
+                swiftUIEnd(source, end, outline, session, point, operation)
+                sidebarDrag(of: outline)?.ended(at: point, operation: operation)
+            }
+            method_setImplementation(endMethod, imp_implementationWithBlock(endAnswer))
+        }
+        answering.insert(ObjectIdentifier(type))
+        return true
+    }
+
+    private static func followMoves(of outline: NSOutlineView) {
+        guard let type = object_getClass(outline), !answering.contains(ObjectIdentifier(type)) else { return }
+        let move = NSSelectorFromString("draggedImage:movedTo:")
+        guard let inherited = class_getInstanceMethod(type, move) else { return }
+        let appKit = unsafeBitCast(method_getImplementation(inherited), to: Moved.self)
+        let moved: @convention(block) (NSOutlineView, AnyObject?, NSPoint) -> Void = { outline, image, point in
+            appKit(outline, move, image, point)
+            sidebarDrag(of: outline)?.moved(to: point)
+        }
+        let implementation = imp_implementationWithBlock(moved)
+        if !class_addMethod(type, move, implementation, method_getTypeEncoding(inherited)) {
+            method_setImplementation(inherited, implementation)
+        }
+        // macOS 26 tells a drag's source of its moves this way, and there SwiftUI's outline view has the method itself.
+        let movedTo = #selector(NSDraggingSource.draggingSession(_:movedTo:))
+        if let own = class_getInstanceMethod(type, movedTo) {
+            let swiftUIMoved = unsafeBitCast(method_getImplementation(own), to: SessionMoved.self)
+            let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
+                swiftUIMoved(outline, movedTo, session, point)
+                sidebarDrag(of: outline)?.moved(to: point)
+            }
+            method_setImplementation(own, imp_implementationWithBlock(sessionMoved))
+        } else {
+            let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
+                sidebarDrag(of: outline)?.moved(to: point)
+            }
+            class_addMethod(type, movedTo, imp_implementationWithBlock(sessionMoved), "v@:@{CGPoint=dd}")
+        }
+        let end = #selector(NSDraggingSource.draggingSession(_:endedAt:operation:))
+        if let inheritedEnd = class_getInstanceMethod(type, end) {
+            let appKitEnd = unsafeBitCast(method_getImplementation(inheritedEnd), to: SessionEnded.self)
+            let ended: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void = { outline, session, point, operation in
+                // AppKit closes its gap after SwiftUI has put the dropped rows in place, which, animated, opens another gap the rows below slide into.
+                guard !operation.isEmpty else { return appKitEnd(outline, end, session, point, operation) }
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0
+                    context.allowsImplicitAnimation = false
+                    CATransaction.setDisableActions(true)
+                    appKitEnd(outline, end, session, point, operation)
+                }
+            }
+            let endImplementation = imp_implementationWithBlock(ended)
+            if !class_addMethod(type, end, endImplementation, method_getTypeEncoding(inheritedEnd)) {
+                method_setImplementation(inheritedEnd, endImplementation)
+            }
+        }
+        answering.insert(ObjectIdentifier(type))
+    }
+
+    private static func sidebarDrag(of outline: NSOutlineView) -> SidebarDrag? {
+        objc_getAssociatedObject(outline, dragKey) as? SidebarDrag
     }
 }

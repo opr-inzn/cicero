@@ -1,29 +1,33 @@
 import SwiftUI
 
-// Toolbar controls that highlight only what's chosen or on, never what's under the pointer: AppKit's
-// light up on hover, in a gray of their own, and Cicero has no hover states.
-
-/// A toolbar item in a glass capsule of its own, 8 pt from the next as the Info button is from the search
-/// field. AppKit puts neighbouring items in one capsule, and a ToolbarSpacer between them leaves 16 pt.
 struct ToolbarCapsule<Content: View>: ToolbarContent {
+    var spaced = false
     @ViewBuilder let content: () -> Content
 
     var body: some ToolbarContent {
-        ToolbarItem { content().glassEffect(.regular, in: .capsule) }
-            .sharedBackgroundVisibility(.hidden)
+        if #available(macOS 26, *), spaced {
+            ToolbarSpacer(.fixed)
+            ToolbarItem { content() }
+        } else {
+            ToolbarItem { content() }
+        }
     }
 }
 
-/// A segmented picker for toolbars, its choice on a lens of glass that slides to the next one chosen, 3 pt inside the
-/// capsule all round. Segments show a symbol when there's one, else the title.
+struct ToolbarGap: ToolbarContent {
+    var body: some ToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarSpacer(.fixed)
+        }
+    }
+}
+
 struct ToolbarPicker<Value: Hashable>: View {
-    /// What VoiceOver calls the control.
     let label: String
     let values: [Value]
     @Binding var selection: Value
     let title: (Value) -> String
     let symbol: ((Value) -> String)?
-    /// Each segment's tooltip.
     let help: String?
     @Namespace private var lens
 
@@ -38,7 +42,27 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 
     var body: some View {
-        // Segments as wide as the widest, like AppKit's.
+        if #available(macOS 26, *) {
+            onGlass
+        } else {
+            Picker(label, selection: $selection) {
+                ForEach(values, id: \.self) { value in
+                    Group {
+                        if let symbol { Label(title(value), systemImage: symbol(value)) } else { Text(title(value)) }
+                    }
+                    .tag(value)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelStyle(.iconOnly)
+            .labelsHidden()
+            .fixedSize()
+            .help(help ?? "")
+        }
+    }
+
+    @available(macOS 26, *)
+    private var onGlass: some View {
         HStack(spacing: 0) {
             ForEach(values, id: \.self) { value in
                 Button {
@@ -49,10 +73,8 @@ struct ToolbarPicker<Value: Hashable>: View {
                 .buttonStyle(ToolbarButtonStyle(isOn: selection == value, segment: symbol == nil ? .title : .symbol))
                 .background {
                     if selection == value {
-                        // Grey on glass, so it shows on the capsule's own glass in the dark too.
                         Capsule()
                             .fill(.quaternary)
-                            .glassEffect(.regular.interactive(), in: .capsule)
                             .matchedGeometryEffect(id: "lens", in: lens)
                     }
                 }
@@ -61,8 +83,7 @@ struct ToolbarPicker<Value: Hashable>: View {
         }
         .padding(ToolbarButtonStyle.segmentInset)
         .fixedSize()
-        // To accessibility, a segmented control: as buttons in a toolbar item, every segment took its name from the
-        // item, the first segment's title, as soon as the window updated.
+        // To accessibility, a segmented control: as buttons in a toolbar item, every segment took its name from the item, the first segment's title, as soon as the window updated.
         .accessibilityRepresentation {
             Picker(label, selection: $selection) {
                 ForEach(values, id: \.self) { Text(title($0)).tag($0) }
@@ -73,46 +94,62 @@ struct ToolbarPicker<Value: Hashable>: View {
     }
 }
 
-/// A toolbar button, highlighted while it's on or pressed, and dimmed like AppKit's while it's disabled
-/// or its window is in the background. Sizes are AppKit's: a button fills its 36 pt glass capsule, and a
-/// picker's segments are inside it, `segmentInset` from its edges; the picker draws the chosen one's lens.
 struct ToolbarButtonStyle: ButtonStyle {
     var isOn = false
+    var isToggle = false
     fileprivate var segment: Segment?
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.appearsActive) private var appearsActive
 
-    /// A picker's segment, padded like AppKit's: less around a symbol than around a title.
     fileprivate enum Segment { case symbol, title }
 
-    /// Between a picker's segments and its capsule, at the ends as above and below.
     static let segmentInset: CGFloat = 3
 
     func makeBody(configuration: Configuration) -> some View {
-        // A chosen segment has the picker's lens, not a fill.
-        let filled = segment == nil ? isOn || configuration.isPressed : configuration.isPressed && !isOn
+        ToolbarButton(configuration: configuration, isOn: isOn, isToggle: isToggle, segment: segment)
+    }
+}
+
+private struct ToolbarButton: View {
+    let configuration: ButtonStyleConfiguration
+    let isOn: Bool
+    let isToggle: Bool
+    let segment: ToolbarButtonStyle.Segment?
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.appearsActive) private var appearsActive
+    @State private var isHovered = false
+
+    var body: some View {
+        let pressed = segment == nil ? isOn || configuration.isPressed : configuration.isPressed && !isOn
+        let hovered = isHovered && isEnabled && !(segment != nil && isOn)
+        let tinted = isToggle && isOn && segment == nil && isEnabled && appearsActive
         configuration.label
             .labelStyle(.iconOnly)
             .imageScale(.large)
-            .foregroundStyle(isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-            .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 6 : 8)
-            .frame(minWidth: segment == nil ? 36 : 36 - 2 * Self.segmentInset, maxWidth: segment == nil ? nil : .infinity,
-                   minHeight: 36 - (segment == nil ? 0 : 2 * Self.segmentInset))
-            .background(filled ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .capsule)
+            .foregroundStyle(tinted ? AnyShapeStyle(.white) : isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+            .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 10 : 8)
+            .frame(minWidth: segment == nil ? 36 : 36 - 2 * ToolbarButtonStyle.segmentInset, maxWidth: segment == nil ? nil : .infinity,
+                   minHeight: 36 - (segment == nil ? 0 : 2 * ToolbarButtonStyle.segmentInset))
+            .background(tinted ? AnyShapeStyle(Color.accentColor.opacity(configuration.isPressed ? 0.8 : 1))
+                        : pressed ? AnyShapeStyle(.quaternary) : hovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: .capsule)
             .contentShape(.rect)
+            .onHover { isHovered = $0 }
     }
 }
 
-/// A toolbar toggle, highlighted while it's on.
 struct ToolbarToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
-        Button { configuration.isOn.toggle() } label: { configuration.label }
-            .buttonStyle(ToolbarButtonStyle(isOn: configuration.isOn))
+        if #available(macOS 26, *) {
+            Button { configuration.isOn.toggle() } label: { configuration.label }
+                .buttonStyle(ToolbarButtonStyle(isOn: configuration.isOn, isToggle: true))
+        } else {
+            Toggle(configuration).toggleStyle(.button)
+        }
     }
 }
 
-extension ButtonStyle where Self == ToolbarButtonStyle {
-    static var toolbar: ToolbarButtonStyle { ToolbarButtonStyle() }
+extension View {
+    @ViewBuilder func toolbarButtonStyle(isOn: Bool = false) -> some View {
+        if #available(macOS 26, *) { buttonStyle(ToolbarButtonStyle(isOn: isOn)) } else { self }
+    }
 }
 
 extension ToggleStyle where Self == ToolbarToggleStyle {

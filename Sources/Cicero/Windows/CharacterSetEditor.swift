@@ -1,17 +1,14 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for a new or existing custom character set: a name and the characters, typed or pasted.
 struct CharacterSetEditor: View {
     let original: CustomCharacterSet
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: CustomCharacterSet
     @State private var deleting: CustomCharacterSet?
-    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
     @State private var openedAsNew: Bool?
 
-    /// More than this and the preview stops being useful.
     private static let previewLimit = 600
 
     init(original: CustomCharacterSet) {
@@ -40,7 +37,7 @@ struct CharacterSetEditor: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("Preview").font(.headline)
-                    Text(scalars.count == 1 ? "1 character" : "\(scalars.count.formatted()) characters")
+                    Text(scalars.count == 1 ? "1 character" : "\(scalars.count.plain) characters")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -84,25 +81,29 @@ struct CharacterSetEditor: View {
 }
 
 extension View {
-    /// Asks before deleting the coverage set, then calls `deleted`.
     func confirmsCoverageSetDeletion(_ set: Binding<CustomCharacterSet?>, deleted: @escaping () -> Void = {}) -> some View {
-        modifier(CoverageSetDeletion(set: set, deleted: deleted))
+        confirmsCoverageSetDeletion(Binding(get: { set.wrappedValue.map { [$0] } ?? [] }, set: { set.wrappedValue = $0.first }),
+                                    deleted: deleted)
+    }
+
+    func confirmsCoverageSetDeletion(_ sets: Binding<[CustomCharacterSet]>, deleted: @escaping () -> Void = {}) -> some View {
+        modifier(CoverageSetDeletion(sets: sets, deleted: deleted))
     }
 }
 
 private struct CoverageSetDeletion: ViewModifier {
-    @Binding var set: CustomCharacterSet?
+    @Binding var sets: [CustomCharacterSet]
     let deleted: () -> Void
     @Environment(AppModel.self) private var model
 
     func body(content: Content) -> some View {
         content.alert(
-            set.map { "Delete the coverage set “\($0.name)”?" } ?? "",
-            isPresented: Binding(get: { set != nil }, set: { if !$0 { set = nil } }),
-            presenting: set
-        ) { set in
+            sets.count == 1 ? "Delete the Coverage Set “\(sets[0].name)”?" : "Delete \(sets.count) Coverage Sets?",
+            isPresented: Binding(get: { !sets.isEmpty }, set: { if !$0 { sets = [] } }),
+            presenting: sets
+        ) { sets in
             Button("Delete", role: .destructive) {
-                model.deleteCharacterSet(set.id)
+                model.deleteCharacterSets(Set(sets.map(\.id)))
                 deleted()
             }
             Button("Cancel", role: .cancel) {}

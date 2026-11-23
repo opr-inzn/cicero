@@ -1,13 +1,11 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for a new or existing smart set: name, match all or any, and a row per rule.
 struct SmartSetEditor: View {
     let original: SmartSet
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SmartSet
-    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
     @State private var openedAsNew: Bool?
 
     init(original: SmartSet) {
@@ -21,14 +19,14 @@ struct SmartSetEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                TextField("Name", text: $draft.name, prompt: Text("Smart Set"))
+                TextField("Name", text: $draft.name, prompt: Text("Smart Folder"))
                 Picker("Match", selection: $draft.matchAll) {
                     Text("All of the rules").tag(true)
                     Text("Any of the rules").tag(false)
                 }
                 Section("Rules") {
-                    ForEach($draft.rules) { $rule in
-                        RuleRow(rule: $rule, canRemove: draft.rules.count > 1) {
+                    ForEach(draft.rules) { rule in
+                        RuleRow(rule: binding(to: rule), canRemove: draft.rules.count > 1) {
                             draft.rules.removeAll { $0.id == rule.id }
                         } add: {
                             let position = draft.rules.firstIndex { $0.id == rule.id } ?? draft.rules.count - 1
@@ -58,15 +56,24 @@ struct SmartSetEditor: View {
         .onAppear { openedAsNew = isNew }
     }
 
+    // By id, not index: a number field commits its edit after a click on another row's − has removed its own row.
+    private func binding(to rule: SmartRule) -> Binding<SmartRule> {
+        Binding {
+            draft.rules.first { $0.id == rule.id } ?? rule
+        } set: { new in
+            guard let index = draft.rules.firstIndex(where: { $0.id == rule.id }) else { return }
+            draft.rules[index] = new
+        }
+    }
+
     private var matchSummary: String {
         let test = model.matcher(for: draft)
         let data = model.data
         let count = model.library.families.count { data.lists($0) && test($0) }
-        return count == 1 ? "1 family matches" : "\(count.formatted()) families match"
+        return count == 1 ? "1 family matches" : "\(count.plain) families match"
     }
 }
 
-/// Field · comparison · value, with the value control the field needs.
 private struct RuleRow: View {
     @Environment(AppModel.self) private var model
     @Binding var rule: SmartRule
@@ -77,7 +84,7 @@ private struct RuleRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Picker("Field", selection: field) {
-                ForEach(SmartRule.Field.allCases, id: \.self) { Text($0.title).tag($0) }
+                ForEach(fields, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()
             Picker("Comparison", selection: $rule.comparison) {
@@ -99,17 +106,18 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
-    /// The user's folders, then Testing when its fonts are shown, Adobe Fonts when there are some and they're shown,
-    /// Added Fonts when there are some, and the Font Library when it has fonts.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
             + (model.data.fontFiles.isEmpty ? [] : [WatchedFolder.addedFilesID])
-            + (model.ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID) ? [WatchedFolder.fontLibraryID] : [])
+            + (rule.value == WatchedFolder.fontLibraryID.uuidString ? [WatchedFolder.fontLibraryID] : [])
         return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
     }
 
-    /// Changing the field resets the comparison and value to ones that make sense for it.
+    private var fields: [SmartRule.Field] {
+        SmartRule.Field.offered.contains(rule.field) ? SmartRule.Field.offered : SmartRule.Field.offered + [rule.field]
+    }
+
     private var field: Binding<SmartRule.Field> {
         Binding(get: { rule.field }, set: { new in
             guard new != rule.field else { return }
@@ -125,7 +133,7 @@ private struct RuleRow: View {
         case .classification: model.classificationNames[0]
         case .tag: model.data.tags.first ?? ""
         case .rating: "5"
-        case .note: ""
+        case .note, .hasNote: ""
         case .set: model.data.sets.first?.id.uuidString ?? ""
         case .folder: folderOptions.first?.id ?? ""
         case .status: SmartRuleValue.statuses[0]
@@ -155,26 +163,27 @@ private struct RuleRow: View {
         case .designer:
             text
         case .note:
-            TextField("Text", text: $rule.value, prompt: Text("Text, or empty for any note"))
-                .frame(minWidth: 180, maxWidth: 260)
+            text
+        case .hasNote:
+            EmptyView()
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
-            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet")
+            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
         case .rating:
-            options([("0", "No Rating")] + (1...5).map { (String($0), Rating.stars($0)) })
+            options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:
-            options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No sets yet")
+            options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No folders yet")
         case .folder:
-            options(folderOptions, empty: "No folders yet")
+            options(folderOptions, empty: "No locations yet")
         case .status:
             options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })
         case .format:
-            options(FontFormat.allCases.map { ($0.rawValue, $0.rawValue) })
+            options(FontFormat.allCases.filter { $0 != .other }.map { ($0.rawValue, Self.formatTitle($0)) })
         case .styles:
-            number(unit: "styles", in: 0...999)
+            number(in: 0...999)
         case .feature:
             options(OpenTypeFeature.allCases.map { ($0.rawValue, $0.title) })
         case .embedding:
@@ -182,7 +191,7 @@ private struct RuleRow: View {
         case .added, .lastActivated:
             number(unit: "days", in: 1...3650)
         case .timesActivated:
-            number(unit: "times", in: 0...99_999)
+            number(in: 0...99_999)
         case .language:
             LanguagePicker(selection: $rule.value, catalog: model.languages)
         case .characterSet:
@@ -192,32 +201,47 @@ private struct RuleRow: View {
 
     private var text: some View {
         TextField("Text", text: $rule.value, prompt: Text("Text"))
+            .textFieldStyle(.roundedBorder)
             .frame(minWidth: 140, maxWidth: 260)
     }
 
+    private static func formatTitle(_ format: FontFormat) -> String {
+        let extensions = FontFormat.fileExtensions.filter { FontFormat.of(path: "x.\($0)") == format }.sorted()
+        return "\(format.rawValue) (\(extensions.map { "." + $0 }.joined(separator: ", ")))"
+    }
+
     @ViewBuilder
-    private func options(_ options: [(id: String, title: String)], empty: String = "") -> some View {
+    private func options(_ options: [(id: String, title: String)], empty: String = "", colors: [String: TagColor] = [:]) -> some View {
         if options.isEmpty {
             Text(empty).foregroundStyle(.secondary)
         } else {
             Picker("Value", selection: $rule.value) {
-                ForEach(options, id: \.id) { Text($0.title).tag($0.id) }
+                ForEach(options, id: \.id) { option in
+                    if let color = colors[option.id] {
+                        Label { Text(option.title) } icon: { Image(nsImage: color.menuImage) }
+                            .labelStyle(.titleAndIcon)
+                            .tag(option.id)
+                    } else {
+                        Text(option.title).tag(option.id)
+                    }
+                }
             }
             .fixedSize()
         }
     }
 
-    private func number(unit: String, in range: ClosedRange<Int>) -> some View {
+    private func number(unit: String? = nil, in range: ClosedRange<Int>) -> some View {
         let number = Binding<Int>(
             get: { Int(rule.value) ?? range.lowerBound },
             set: { rule.value = String(min(max($0, range.lowerBound), range.upperBound)) }
         )
-        return HStack(spacing: 4) {
+        return HStack(spacing: 6) {
             TextField("Number", value: number, format: .number.grouping(.never))
-                .multilineTextAlignment(.trailing)
-                .frame(width: 56)
-            Stepper("Number", value: number, in: range)
-            Text(unit)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+            if let unit {
+                Text(unit)
+            }
         }
     }
 
@@ -243,7 +267,7 @@ private struct RuleRow: View {
         case "active": "Active"
         case "partial": "Partly Active"
         case "inactive": "Inactive"
-        case "appOnly": "Active in Apps Only"
+        case "appOnly": "Active in Adobe Apps Only"
         default: "Installed with macOS"
         }
     }
@@ -252,12 +276,11 @@ private struct RuleRow: View {
         switch value {
         case "variable": "Variable"
         case "monospaced": "Monospaced"
-        default: "Has Italics"
+        default: "Italic"
         }
     }
 }
 
-/// A pop-up of Hyperglot's languages: searchable, sorted by speakers.
 private struct LanguagePicker: View {
     @Binding var selection: String
     let catalog: LanguageCatalog
@@ -324,8 +347,9 @@ private extension SmartRule.Field {
         case .tag: "Tag"
         case .rating: "Rating"
         case .note: "Note"
-        case .set: "Set"
-        case .folder: "Folder"
+        case .hasNote: "Has Note"
+        case .set: "Folder"
+        case .folder: "Location"
         case .status: "Status"
         case .kind: "Kind"
         case .format: "Format"
@@ -342,8 +366,6 @@ private extension SmartRule.Field {
 }
 
 private extension SmartRule.Comparison {
-    /// The wording depends on the field: a set "is in", a language or an OpenType feature "is supported", coverage
-    /// "includes". A tag "is" any of the family's.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"
@@ -352,6 +374,8 @@ private extension SmartRule.Comparison {
         case (.language, .isNot), (.feature, .isNot): "isn’t supported"
         case (.characterSet, .is): "includes"
         case (.characterSet, .isNot): "doesn’t include"
+        case (.hasNote, .is): "Yes"
+        case (.hasNote, .isNot): "No"
         case (_, .contains): "contains"
         case (_, .doesNotContain): "doesn’t contain"
         case (_, .beginsWith): "begins with"

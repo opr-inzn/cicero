@@ -1,9 +1,9 @@
 import CiceroCore
 import SwiftUI
 
-/// Problems grouped by kind, each with an explanation, its files and what to do about them.
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
+    @State private var width: CGFloat = 0
 
     var body: some View {
         let groups = ProblemKind.allCases.compactMap { kind -> (kind: ProblemKind, problems: [Problem])? in
@@ -12,8 +12,13 @@ struct ProblemsView: View {
         }
         Group {
             if groups.isEmpty {
-                ContentUnavailableView("No Problems", systemImage: "checkmark.circle",
-                                       description: Text(model.hasScanned ? "Cicero found nothing wrong with your fonts." : "Cicero is checking your fonts"))
+                if model.hasScanned {
+                    EmptyState("No Conflicts", systemImage: "checkmark.circle",
+                               description: Text("Fonts installed twice, duplicates, and missing or damaged files show up here."))
+                } else {
+                    EmptyState("Checking Fonts", systemImage: "checkmark.circle",
+                               description: Text("Fonts installed twice, duplicates, and missing or damaged files will show up here."))
+                }
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {
@@ -27,28 +32,25 @@ struct ProblemsView: View {
                     }
                     .frame(maxWidth: 760, alignment: .leading)
                     .padding(24)
+                    // Centred by the width outside the scroll view: inside it, a scroll bar that takes room moves the centre whenever the list starts to scroll.
+                    .padding(.leading, max(0, (width - 808) / 2))
+                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its bar sits at the edge.
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(Color.canvas)
-        .navigationTitle("Problems")
+        .navigationTitle("Conflicts")
         .navigationSubtitle(subtitle)
-        .toolbar {
-            ToolbarItem {
-                Button("Check Again", systemImage: "arrow.clockwise") { model.rescan() }
-                    .buttonStyle(.toolbar)
-                    .disabled(model.scanProgress != nil)
-                    .help("Look through the library again")
-            }
-        }
     }
 
     private var subtitle: String {
         switch model.problems.count(where: { !$0.kind.isMinor }) {
         case 0: ""
-        case 1: "1 problem"
-        case let count: "\(count) problems"
+        case 1: "1 conflict"
+        case let count: "\(count) conflicts"
         }
     }
 }
@@ -60,10 +62,9 @@ private struct ProblemGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
+            HStack(spacing: 12) {
                 Text(kind.title).font(.title2.bold())
                 Spacer(minLength: 0)
-                // One problem's extra copies have their own buttons.
                 let extras = problems.filter { !$0.extraCopies.isEmpty }
                 if extras.count > 1 {
                     Button(kind == .installedTwice ? "Remove All Extra Copies" : "Move All Extra Copies to Trash", role: .destructive) {
@@ -73,6 +74,11 @@ private struct ProblemGroup: View {
                         ? "Keeps the newest copy of each font and moves the others to the Trash."
                         : "Keeps the newest copy of each font in each folder and moves the others to the Trash.")
                 }
+                let forgettable = problems.filter { $0.fixes.contains(where: \.isForget) }
+                if kind == .missing && forgettable.count > 1 {
+                    Button("Forget All") { model.forgetAll(of: forgettable) }
+                        .help("Cicero stops looking for these files and forgets them.")
+                }
             }
             Text(kind.explanation).foregroundStyle(.secondary)
             ForEach(problems) { ProblemCard(problem: $0) }
@@ -80,11 +86,10 @@ private struct ProblemGroup: View {
     }
 }
 
-/// Minor problems, collapsed until opened.
 private struct MinorProblemGroup: View {
     let kind: ProblemKind
     let problems: [Problem]
-    @State private var isExpanded = false
+    @State private var isExpanded = true
 
     var body: some View {
         // DisclosureGroup animates opening but not closing; open instantly too.
@@ -101,7 +106,7 @@ private struct MinorProblemGroup: View {
         } label: {
             HStack(spacing: 6) {
                 Text(kind.title).font(.title3.weight(.semibold))
-                Text("\(problems.count)").foregroundStyle(.secondary).monospacedDigit()
+                Text(problems.count.plain).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
@@ -158,15 +163,15 @@ private struct FileRow: View {
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1)
+                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                     if isNewest { NewestTag() }
                     if !file.preferredFor.isEmpty && file.preferredStyles == nil { PreferredTag(names: file.preferredFor) }
                 }
-                // Under a title, the whole path says which file it is.
                 Text(((file.title == nil ? (file.path as NSString).deletingLastPathComponent : file.path) as NSString).abbreviatingWithTildeInPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .truncationMode(.middle)
                 Text(Self.facts(of: file)).font(.caption).foregroundStyle(.secondary)
                 if let styles = file.preferredStyles {
@@ -190,8 +195,6 @@ private struct FileRow: View {
     }
 }
 
-/// Several files in one folder, usually one copy of a whole family: one row for all of them, with the files
-/// themselves under a disclosure.
 private struct FolderRow: View {
     let folder: ProblemFolder
     let fixes: [ProblemFix]
@@ -213,6 +216,7 @@ private struct FolderRow: View {
                         Text((folder.path as NSString).abbreviatingWithTildeInPath)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                            .truncationMode(.middle)
                         if isNewest { NewestTag() }
                     }
                     Text(facts).font(.caption).foregroundStyle(.secondary)
@@ -223,7 +227,7 @@ private struct FolderRow: View {
                             Image(systemName: "chevron.right")
                                 .font(.caption2.weight(.semibold))
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            Text("\(folder.files.count) files")
+                            Text("\(folder.files.count.plain) files")
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -231,7 +235,7 @@ private struct FolderRow: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 2)
-                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count) Files")
+                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count.plain) Files")
                 }
                 Spacer(minLength: 0)
                 FixButtons(fixes: fixes, kind: kind, family: family).controlSize(.small)
@@ -241,7 +245,7 @@ private struct FolderRow: View {
                     ForEach(folder.files, id: \.path) { file in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                                Text((file.path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                                 if filesDiffer {
                                     Text(FileRow.facts(of: file)).font(.caption).foregroundStyle(.secondary)
                                 }
@@ -256,7 +260,6 @@ private struct FolderRow: View {
         }
     }
 
-    /// What the files have in common, or the range when they don't.
     private var facts: String {
         var parts: [String] = []
         let versions = unique(folder.files.compactMap { $0.version.map(FontFace.displayVersion) })
@@ -276,7 +279,6 @@ private struct FolderRow: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Whether each file needs its own version, date and place.
     private var filesDiffer: Bool {
         Set(folder.files.map(FileRow.facts)).count > 1
     }
@@ -301,7 +303,7 @@ private struct PreferredTag: View {
     }
 
     static func help(_ names: [String]) -> String {
-        "Apps that ask for \(ListFormatter.localizedString(byJoining: names)) get this font."
+        "Apps that ask for \(names.listed()) get this font."
     }
 }
 
@@ -309,21 +311,25 @@ private struct FixButtons: View {
     @Environment(AppModel.self) private var model
     let fixes: [ProblemFix]
     let kind: ProblemKind
-    /// The family the problem is about, if any.
     let family: String?
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(fixes, id: \.self) { fix in
                 Button(title(fix), role: isDestructive(fix) ? .destructive : nil) { model.apply(fix, family: family) }
+                    .help(help(fix))
             }
         }
     }
 
-    /// Only in Installed Twice is a trashed file a spare copy of the same font.
     private func title(_ fix: ProblemFix) -> String {
         if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy" : "Remove Copies" }
         return fix.title
+    }
+
+    private func help(_ fix: ProblemFix) -> String {
+        guard case .removeFromAdobeFonts = fix else { return "" }
+        return "Opens the family’s page on Adobe Fonts, where you remove it. Creative Cloud then takes its copy away."
     }
 
     private func isDestructive(_ fix: ProblemFix) -> Bool {

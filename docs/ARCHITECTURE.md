@@ -1,11 +1,14 @@
 # Architecture
 
-Cicero is a SwiftPM package with two targets and a test target, which stays out of the public
-repository. Its one dependency is Sparkle (a binary framework, used by the app target only) for updates.
+Cicero is a SwiftPM package with four targets and a test target, which stays out of the public
+repository. Its dependencies are Sparkle (a binary framework, used by the app target only) for updates, Swift
+Argument Parser for the `cicero` command's arguments, and the Model Context Protocol Swift SDK for `cicero mcp`.
 
 ```
-Sources/CiceroCore   fonts, the library, activation, coverage, user data — no UI
-Sources/Cicero       the app (SwiftUI); everything runs on the main actor by default
+Sources/CiceroCore      fonts, the library, activation, coverage, user data — no UI
+Sources/CiceroCommands  the cicero command's commands, as functions from input to a JSON value
+Sources/CiceroTool      the cicero command (product cicero-tool): arguments, --json, text for people
+Sources/Cicero          the app (SwiftUI); everything runs on the main actor by default
 Tests/CiceroCoreTests
 ```
 
@@ -21,29 +24,41 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   table, all of them, cached with the face, and picks the one for the Mac's languages: a `Family`'s `name` is the
   one it shows, its `id` the fonts' own, which the user's data keys by.
 - **Library** (`Library/`): `LibraryScanner` finds font files (CoreText's active fonts, macOS's font folders,
-  which CoreText's lists don't cover entirely, the Fonts folders, watched folders, files added one at a time, the Deactivated folder), reads new or changed files
-  with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. A `fingerprint`
+  which CoreText's lists don't cover entirely, the Fonts folders, watched folders (the sidebar's Locations), files added one at a time, the Inactive folder), reads new or changed files
+  with a stamp-keyed cache, and builds an immutable `Library` snapshot off the main thread. Each file read goes into
+  the cache at once, which is written every 2 s while reading goes on and by `flush` as the app quits, so neither a
+  scan that's replaced nor quitting loses what was read; its progress says it updates rather than identifies when most
+  of the files it reads are in the library on screen (the last one built, else the one restored at launch). A `fingerprint`
   lets the app skip rescans that changed nothing. `LibraryCache` saves each library a scan builds that differs from the
-  last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window. `FolderWatcher` (FSEvents) says when font files come or go
+  last one saved, in the face cache's binary layout, and `savedLibrary` reads it back for the next launch's window, on a thread of its own from the start of the launch
+  (`SavedLibraryRead`): the first thing asking for `AppModel.library`, and the first scan, wait for the rest of it. `FolderWatcher` (FSEvents) says when font files come or go
   in the scanned folders, and when an added file changes: it watches the file's folder, which then speaks
-  only for that file.
-- **Data** (`Data/`): `UserData` is everything the user set up (folders, added font files, sets, smart sets,
-  tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
-  `UserDataStore` saves it as JSON, coalesced and off the main thread, and imports the version 1 file once.
+  only for that file. The walks of the watched folders travel with the scan's find (`Find.walks`), so a scan after
+  CoreText's fonts-changed notice replays them instead of walking again.
+- **Data** (`Data/`): `UserData` is everything the user set up (watched folders, added font files, sets and smart sets, which the
+  UI calls folders and smart folders, tags (license tags to begin with) and their colours, ratings, notes, foundry names, character sets, sidebar choices, install method, activation records).
+  `UserDataStore` saves it as JSON, coalesced and off the main thread.
 - **Activation** (`Activation/`): `ActivationEngine` copies, registers in place, registers for the
   session, deactivates and trashes. It takes and returns `ActivationRecords`, so the app owns the
   state and the engine stays testable; `FontRegistrar` hides CoreText so tests never touch the system.
-  Every change goes through fontd and waits for it (copies are registered too, files are unregistered
-  before they move), and a file only counts once fontd reports it active: when an operation returns,
+  Every change goes through fontd and waits for it (copies are registered too; files in a Fonts folder
+  are turned off there with `CTFontManagerEnableFontDescriptors`, as Font Book does, and others
+  unregistered, also before they move), and a file only counts once fontd reports it active: when an operation returns,
   every app already has the result. `SystemActivationTests` (opt-in) checks that against the real system.
   The app's `engine` carries the Font Library (`fontLibrary`, from `UserData.fontLibraryPath`) and whether to install
   into it (`installsIntoFontLibrary`): copies then go into a folder for each family there and are registered where
-  they are, recorded as installed copies and in place, and files in the library are only ever registered and
+  they are, recorded as in place, and files in the library are only ever registered and
   unregistered (`FontLibrary.swift`: folder names, taking away folders left empty, moving the copies installed in
-  ~/Library/Fonts before into the library, moving the library, and where it can't go).
+  ~/Library/Fonts before into the library, moving the library, and where it can't go). The app activates with
+  `.inPlace` only; copying and moving are for adding files (`install`) and imports (`installOff`).
 - **Signposts** (`Signposts.swift`): os_signpost intervals (subsystem com.maximilianinzinger.Cicero) for activation
   (copy, register, confirm), scans (find, parse, build, save cache), restoring the saved library, applying a library, and coverage,
   for timing them in Instruments.
+- **Measurements** (`Measurements.swift`): the app performance runs' timings (Tests/E2E/app-perf), compiled only into
+  their builds (`-D CICERO_MEASURE`, `MEASURE=1 scripts/build-app.sh`), never into one for users: `build-app.sh`
+  refuses a binary without `MEASURE=1` that has them. Signpost intervals in an App category (list rebuilds, font files
+  read on the main thread), and, while `CICERO_MEASURE` names a file, a JSON line per timing there and a watchdog
+  thread that records every main-thread stall over 250 ms. Each hook in the app is inside `#if CICERO_MEASURE` too.
 - **Coverage** (`Coverage/`): `ScalarRanges` (characters a face has), `LanguageCatalog` (Hyperglot),
   `CharacterSetCatalog` (Latin S–XL, Adobe Latin, Google Fonts sets, custom sets), and
   `CoverageIndex`, which works out every family's coverage in the background and caches it on disk.
@@ -53,34 +68,33 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   x-height, with their advances, and `LetterEmbedding` turns them into 128 numbers with a small Core ML model
   learned from Google Fonts (Resources/LetterEmbedding.mlpackage, made by scripts/embedding), close together for
   faces that look alike;
-  `MeasurementIndex` measures and embeds every family's regular style in the background after coverage and caches
+  `MeasurementIndex` measures and embeds every family's regular style and one style of each other kind (italic, condensed…) in the background after coverage and caches
   the results on disk, as `CoverageIndex` does; `SimilarFonts` ranks the families nearest one, measure by measure in
   fixed steps, weighted, and by the embedding's distance. The app keeps one `SimilarFonts` for the listed families
   and makes it again when the library, the measurements or the user's data change.
 - **Rendering** (`Rendering/`): `FontLoader` makes CTFonts straight from files (so inactive fonts
-  preview) and prefetches them after scans, four files at a time, what the browser shows first; specimens
+  preview) and prefetches them four files at a time: after a scan the browser's first 200 families, for a new list
+  (a search, a sidebar item) its first 60, and in the grid and the list the families around those coming into view,
+  mostly after them (`ReadAhead`), not every family (4.7 s of CPU at each launch at 20,000 families); specimens
   prefetch the styles of the cards around those coming into view. A prefetch has the whole file read ahead
   (`F_RDADVISE`), glyphs included, not just the tables a descriptor needs. It keeps
   the descriptors the scanner reads from new files, and coverage uses them too, so a file is read once.
   Feature groups, font info and glyph sections. `LigatureGroup` reads a face's ligatures from its GSUB table
-  (`GSUBLigatures`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
+  (`GSUBSubstitutions`, which checks every offset, so a damaged table gives fewer ligatures, never a crash) and maps
   their components back to characters through the cmap. `CharacterCodes` writes a character's U+ code and HTML
-  entities for the glyph map; `KeyboardLayout` works out how the keyboard layout in use types each character, with
-  UCKeyTranslate over the layout's data (Text Input Sources, on the main thread), once per layout.
+  entities for the glyph map.
 - **Documents** (`Documents/`): `DocumentFonts` reads the fonts a PDF (CGPDF), IDML (`unzip -p`), InDesign or
   Illustrator file (XMP) or Photoshop file (text layers) uses, trusting nothing in the file, and matches them to the library with `FontMatcher`
-  (`Library/`: by file, PostScript name, or family and style names); `FontFileSearch` asks Spotlight for font files
-  by PostScript name.
+  (`Library/`: by file, PostScript name, or family and style names).
 - **Problems**, **Caches**: finding conflicts, duplicates, missing and damaged files; clearing the
   font caches of macOS, Adobe apps and Microsoft Office. `SpareCopies` says whether files can go without
-  taking a face's last copy with them; Problems offers to remove a file only then, and `moveToTrash`
+  taking a face's last copy with them; Conflicts offers to remove a file only then, and `moveToTrash`
   asks it again for those files right before trashing them.
 - **AppLocation** (`AppLocation.swift`): whether a bundle is in an Applications folder, where a moved copy
   goes and what happens to the original (`move`), the path a translocated app was opened from
   (Security.framework SPI looked up with dlsym), and the copy that strips quarantine (`install`, whose
   Trash tests replace).
-- **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive; `FontListCSV` writes
-  the font list as CSV;
+- **Backup** (`Backup/`): `FontExporter` copies families' files into a folder or a ZIP archive;
   `LibraryBackup` writes and reads `.cicerobackup` archives (manifest, user data, font files),
   puts fonts back without writing over anything, and merges activation records for this Mac.
   Restoring trusts nothing in the archive: only font files, only into font locations, and only
@@ -89,10 +103,39 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Cicero uses. Both take URLs, so tests run in temporary folders; ZIPs are made and read with `ditto`.
 - **Import** (`Import/`): `FontExplorerImport` reads FontExplorer X Pro's SQLite database (a copy, opened read-only
   and immutable through `SQLiteFile`, the system's SQLite) or its backups, and `FontBookImport` Font Book's
-  `.collection` archives (their font descriptors read as attributes, without AppKit), into an `ImportedLibrary`:
+  `.collection` archives (their font descriptors read as attributes, without AppKit), and `FontBaseImport` FontBase's
+  IndexedDB (through `ChromiumIndexedDB`: LevelDB, Snappy, Chromium's keys and blob files, V8 values), into an `ImportedLibrary`:
   fonts named by file, PostScript name or family and style, sets, smart sets with their rules already in Cicero's
   terms, labels as tags, ratings, comments, activation history. `LibraryImport` adds the other app's fonts to the user data,
   then, once a scan has read them, matches the rest to the library and adds it, only ever adding.
+
+## The cicero command
+
+- **CiceroCommands**: each command is a function that takes its options and a `LibraryContext` and returns a `JSON`
+  value (an ordered object, so `schema` comes first and fields stay where the contract puts them; a nil field is left
+  out) or throws a `CommandError` (code, message, near names, exit code). Commands never print. `LibraryContext` loads
+  what the app saved: user-data.json (strictly: an unreadable file stops the command rather than being set aside),
+  `LibraryScanner.savedLibraryAsNow` (the saved library, each face on or off as macOS has it now, without a scan),
+  `CoverageIndex.loadSaved`, `MeasurementIndex.loadSaved` and `ClassificationGuesses` for the guessed classes, then
+  answers with the core's `FamilyFilters` and `UserData` rules, as the app does. `Names` finds what a typed name means,
+  or the near names. `Describer` makes families and styles into the contract's JSON, reading what the caches don't keep
+  (URLs, license, copyright, axis ranges) from the files. `ToolEnvironment` says where Cicero's files are; environment
+  variables move them for the tests, and `CICERO_FAKE_REGISTRAR` gives a list of active files in place of macOS.
+- **Changes** (`Write`, `Dispatch`, `Requests`; `AppLock` in CiceroCore): a change is a `WriteCommand` (names as typed) in
+  a `WriteRequest`. `WriteRunner` looks the names up, asks `ActivationQuestions`, and makes it through a `Writer`: the
+  app's `AppRequestWriter` while it's open, `ClosedAppWriter` while it's closed. `WriteDispatcher` picks one: the free
+  `app.lock` means closed (the command holds it while it writes); held by the running app means `Requests/`, where the
+  app's `CommandRequests` takes the request by renaming it and answers in JSON (`JSON(text:)` reads it back in order).
+  `ClosedAppWriter` writes an `ActivationJournal` (CiceroCore) before turning fonts and removes it after saving the
+  records; the next lock holder repairs the records from it. At launch the app waits for the lock as long as it's held
+  (`LaunchWait`, an alert naming the holder after 1 s, with Quit).
+- **CiceroTool**: Swift Argument Parser commands that call those functions and print the value, as JSON with `--json`,
+  else as text (`Text`). Built as `cicero-tool`; `build-app.sh` puts it in `Contents/Helpers/cicero` and signs it.
+  Each command that answers is `Answering` (`result()` gives the JSON without printing; changes are `Changing`, a
+  `WriteCommand` for `WriteDispatcher`). `cicero mcp` (`MCP.swift`, the Swift MCP SDK) makes a tool of each from its
+  ArgumentParser definition, turns a call back into the command line it stands for, and answers with `result()`.
+- The app's `CommandLineTool` links it into /usr/local/bin (Cicero → Install Cicero CLI). The app depends on
+  CiceroCommands for the changes it makes for the command.
 
 ## The app
 
@@ -106,18 +149,23 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   character set lookups, custom character sets) are cached and keyed on the inputs they depend on. The
   sidebar's choices (open sections, order, hidden items) are user data that no list depends on, so changing
   them leaves `dataRevision`, and the browser's list, as they are.
-- `ClassificationGuesser` (`Model/`) asks Apple Intelligence's on-device model to guess, from their names,
+- `ClassificationGuesser` (`Model/`) asks Apple Intelligence's on-device model (macOS 26; its `availability` is
+  `.unavailable` on macOS 15) to guess, from their names,
   the classification of families nothing in their files classifies, one at a time after scans, and keeps the
   answers in the caches. `letterGuesses` holds what `LetterEmbedding`'s model sees in their letters, as
   `MeasurementIndex` caches it. `classificationGuess` applies the name's guess, else the letters', below the user's
   choices and only while guessing is on; `guessRevision`, in `VisibleKey`, refills lists as they come.
 - `PreviewSettings` holds sample text, size, weight, letter and line spacing and alignment; `Appearance` the
-  light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))`, macOS 26), which
+  light/dark choice. Line spacing is an exact line height (`.lineHeight(.exact(points:))` on macOS 26, extra
+  `lineSpacing` on macOS 15: `lineHeight(_:natural:)`), which
   the font page's editor (`SampleEditor`, an NSTextView with the same line height) follows too, so its text
   and the hidden copy that sizes it agree. Not SwiftUI's `TextEditor`, which, like `Text`, cuts glyphs off at
   the font's ascent and descent: `SampleEditor`'s layout fragments (`UnclippedFragment`) widen their rendering
   surface to the glyphs' ink, and `FontText` draws through `UnclippedText`, a text renderer whose display
-  padding gives room above and below. About one font in ten draws past its own descent.
+  padding gives room above and below. About one font in ten draws past its own descent. The font list's previews
+  are `FontLine`s instead: one CoreText line in a `Canvas`, cut with a "…" as `Text` cuts a line, without TextKit's
+  layout for each row, its baseline where `Text`'s is (a rule measured from SwiftUI for all 703 font families of a
+  Mac) and the canvas wider and taller than the cell by as far as the font's glyphs reach, so nothing is cut off.
 - Files come in through `AppModel.open` (`Model/AppModel+Files.swift`): from the Finder (Info.plist declares the
   font types; the main window's scene handles external events, and SwiftUI gives its `onOpenURL` only the first of
   several files, `AppDelegate.application(_:open:)` the rest), from a drop on the browser or a font page, and from
@@ -131,6 +179,11 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   focus, it hands ⌫, ⌘⌫ and ⌘-arrows to it before the menus' shortcuts (Deactivate, Move to Trash, Open) can
   take them. In any window but the main one (its `mainWindow`, set by a `WindowReader` in `MainWindow`), it
   hands ⌫ and ⌘⌫ to that window, since the menus would act on the main window's selection.
+- `SearchTokenTint` (`Browser/`) tints the search field's tokens with the highlight colour. SwiftUI's token cell
+  is a subclass of AppKit's private `NSTokenAttachmentCell` that fills tokens grey in its own
+  `drawTokenWithFrame:inView:`; AppKit's `drawWithFrame:inView:`, replaced at launch, gives that class AppKit's
+  method back and a `tokenTintColor` the first time it draws one of its tokens. Without those classes and
+  methods, the tokens stay SwiftUI's.
 - `QuickLook` (`Windows/QuickLook.swift`, owned by `AppModel` like `AppSetWatcher`) runs the Quick Look
   panel: a `QuickLookPanel`, an NSPanel that can't become key, hosting SwiftUI in an NSHostingView with the
   model and preview settings in its environment. The main window keeps the keyboard, so the browser's keys
@@ -138,6 +191,10 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   moving the selection the panel shows. `QuickLookHost`, in the main window, hands it the window (centred over, closed
   with, out of the way of its sheets) and the selection's changes. The panel is made once, ordered out when
   closed, and draws nothing then; a font file nothing has read yet is read off the main thread first.
+- `MeasureRun` (`App/`, only with `-D CICERO_MEASURE`) is the app performance runs' scenario: with `CICERO_MEASURE_RUN=1` too, it times the launch,
+  then picks sidebar items, searches, opens font pages, rates, switches views, types and scrolls by itself, each step
+  until the main thread has been quiet for 100 ms (`MainSettle`, run-loop observers after Core Animation's commit),
+  and quits. It drives the model as the views' bindings do and never turns a font on or off.
 - `Updates` (`App/`) owns Sparkle's `SPUStandardUpdaterController` for Check for Updates and the
   automatic-check switch. It starts the updater only when Cicero runs from an .app bundle: a `swift run`
   binary has no Info.plist with the feed. With the switch on, it checks right after starting the updater,
@@ -155,11 +212,29 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   are in `Components/`.
 - The sidebar is a SwiftUI `List`, so every row it shows is a hosting view of its own, about a millisecond
   each to make: `SidebarView` keeps its sections in a view apart from the list, so a change of selection
-  doesn't remake them, only sets and foundries are drop targets (that alone makes a row a third slower to
+  doesn't remake them, only sets (the Folders section) and foundries are drop targets (that alone makes a row a third slower to
   appear), and while the selection changes quickly the browser takes it only once it rests. SwiftUI's List
   is an NSOutlineView; a marker view behind the "Fonts" header finds it and sets its drop feedback to
-  `.gap`, the one AppKit setting the sidebar changes. Everything else (selection, moves, menus, headers)
-  stays SwiftUI's.
+  `.gap`, the one AppKit setting the sidebar changes. The gap comes with one question SwiftUI can't answer:
+  as a drag leaves the list, AppKit asks its data source about a drop at child index -2, and SwiftUI looks up
+  row -2 and crashes, so `SidebarDataSource` replaces that method in the data source's class and answers it
+  with no drop, handing every other question on; without the method to replace, no gap. It also hands on
+  the starts and ends of drags to `SidebarDrag`, which learns a drag's rows from each row's `itemProvider`
+  (asked for as the drag starts, an empty item) and hides them when they're let go of outside the list, and
+  puts `draggedImage:movedTo:` into the outline view's class, so each move sets Finder's × outside the list
+  (a timer doesn't run during a drag on macOS 26), and `draggingSession:endedAtPoint:operation:`, which closes
+  the gap without animating after a drop in the list. Dragged rows get pictures drawn by `SidebarDrag`.
+  Everything else (selection, moves, menus, headers) stays SwiftUI's.
+- The deployment target is macOS 15. What Cicero uses of macOS 26 (glass, bars over scroll views, exact line
+  heights, drop sessions and configurations, the on-device language model) is behind `#available(macOS 26, *)`,
+  mostly in small modifiers in `Components/Compatibility.swift` (`glass(in:)`, `topBar`, `drops(of:)`, …) that
+  give macOS 15 what it has instead, so call sites read the same for both. The SPEC's "macOS 15" lists them.
+- A soft top scroll edge on macOS 26 (AppKit's private `NSScrollPocket`, which samples the brightness under it)
+  makes the toolbar's glass over it light or dark from what it sees. After a switch to Dark, AppKit set the
+  toolbar view's appearance to VibrantDark and, half a second later, back to VibrantLight, and kept it until
+  something scrolled; under a hard edge it never did. `toolbarGlassFollowsAppearance()` on the main
+  window's split view turns the top edges hard for a tenth of a second as the colour scheme changes, which has
+  AppKit make them afresh in the new appearance.
 
 ## Rules of thumb
 
@@ -176,13 +251,40 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Only rows of about one height go in a lazy stack: the page's header, type tester and styles sit in a
   plain stack above the lazy one, since a family's fifty styles, one 2,000 pt row of it, made the guesses
   swing the same way whenever the page was scrolled to its end.
+- A row of many cells in a lazy stack is one view, not a view per cell. The font page's glyphs were a view
+  per cell, each with its background, dot, menu, drag and click; the stack built some twenty of them for
+  every row coming into view, about 12 ms per 40 pt scrolled, so a font with thousands of glyphs
+  stuttered. `GlyphGridRow` draws a row's cells in one `Canvas`, about 2 ms, characters on the pixels
+  `Text` put them on (ascent and descent to the nearest point, no leading, the advance to the pixel above,
+  cells shared out as a stack does); an AppKit view over the row tells clicks, drags, right-clicks and
+  tooltips apart by where they are, and gives VoiceOver a button per cell.
+- No SwiftUI accessibility elements per cell in a lazy stack's rows. The glyph rows' cells were a SwiftUI
+  `Button` each in the row's `accessibilityRepresentation`; SwiftUI built them, some 600 elements a row,
+  whenever an accessibility client (VoiceOver, a window manager, an automation tool) read the page, and
+  kept them for every row the stack had made: Arial Unicode MS's page went from 245 MB to 1.4 GB, each
+  jump down it 1.3 s. `GridRowEventView` gives an `NSAccessibilityElement` per cell instead, made when
+  a client asks, kept until the cells change, asking the row for its frame: 419 MB, 0.3 s
+  (Tests/E2E/glyph-accessibility).
+- No GeometryReader over the rows of a lazy stack. One over each glyph row, measuring it for the popover's
+  anchor, left rows in the middle of the font page undrawn on macOS 15 (on screen, with nothing in them);
+  the click gives the clicked cell's frame instead, from the row's AppKit view (`cellPopover`).
 - A row of a lazy stack doesn't hold the whole list it's in. SwiftUI compares every row's inputs whenever
   it updates, and arrays of families compare every family in them unless they're the same array: the
   browser's tiles and rows hold a `FamilyOrder`, equal only to itself, for selecting ranges.
 - Sizes worked out from geometry (the font page's glyph columns, the list's column widths) come from a
   width that doesn't depend on them, so a layout settles in one pass.
-- The only network access is Sparkle's: the appcast on GitHub and an update the user accepts. Nothing is
-  uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
+- No `ViewThatFits` around controls. It builds each of its choices again, AppKit views and menus included,
+  whenever it weighs them, which is whenever anything in them changes: the font page's Style menu, sliders
+  and alignment buttons in one made each letter typed and each step of a slider take a third of a second.
+  They're a `Layout` of their own (`TesterControls`), which keeps both of a slider's labels, the word and the
+  symbol, and shows the other one at no width.
+- What changes with each keystroke isn't saved to `UserDefaults` as it's typed. SwiftUI draws every view
+  with an `@AppStorage` again whenever anything is saved there, whatever the key: the browser behind a
+  font page, Settings and the Compare window. The type tester's text is kept in memory and saved a second
+  after typing stops, and at quit (`TesterTextStore`), with the glyphs pasted into it (`SampleGlyph`).
+- The network access is Sparkle's (the appcast on GitHub and an update the user accepts) and the usage
+  statistics (`UsageStatistics`, a TelemetryDeck signal at launch, see help/privacy.md). Nothing about the user's
+  fonts is uploaded. Files Cicero removes go to the Trash; it never deletes a user's only copy of a font. Everything that trashes takes the trash as a parameter (`trash` on the
   engine, exporter and backup, `using:` for app caches), so tests remove temporary files instead and
   never touch the user's Trash.
 
@@ -195,10 +297,12 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   Autoupdate and Updater.app, the framework, then the app. Dev builds are signed ad hoc; with
   `SIGN_IDENTITY` (a Developer ID) every piece gets the hardened runtime and a secure timestamp.
   It hands the SDK to the link step as well (`-Xclang-linker -isysroot`): SwiftPM's build system leaves it
-  out, so the binary would record the deployment target's SDK (26) and a newer macOS would treat Cicero as
-  built for 26, with that release's behaviour. The script stops if the recorded SDK isn't the one it built with.
+  out, so the binary would record the deployment target's SDK (15) and a newer macOS would treat Cicero as
+  built for 15, with that release's behaviour. The script stops if the recorded SDK isn't the one it built with.
 - `scripts/release.sh` signs with the Developer ID, notarizes and staples the app (nested Sparkle code
   included) and then the DMG made by `make-dmg.sh`.
 - `scripts/publish.sh` runs `make-appcast.sh`, which signs the final DMG with the Sparkle EdDSA key (keychain
   account "cicero"; `SUPublicEDKey` is its public half) and writes `build/appcast.xml`, then uploads the DMG
-  and the appcast to a new GitHub release. `SUFeedURL` points at the latest release's appcast.
+  and the appcast to a new GitHub release. `SUFeedURL` points at the latest release's appcast. If the
+  version's release exists, it replaces its files in place, after it adds their download counts to
+  `docs/downloads.tsv`, a local file git ignores: GitHub starts a replaced file's count again at 0.

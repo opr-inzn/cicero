@@ -2,7 +2,6 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// An OpenType feature setting (AAT type/selector as CoreText reports them).
 public struct FeatureSetting: Hashable, Codable, Sendable {
     public var type: Int
     public var selector: Int
@@ -13,74 +12,92 @@ public struct FeatureSetting: Hashable, Codable, Sendable {
     }
 }
 
-/// Creates CTFonts straight from font files, so inactive fonts preview without being installed.
-/// Thread-safe. Descriptors are prefetched in the background after scans so scrolling never parses files,
-/// and the scanner hands over the ones it reads, so a new file is read once.
 public final class FontLoader: Sendable {
     public static let shared = FontLoader()
 
     private let state = Mutex(State())
     private let fonts = FontCache(limit: 2000)
-    /// Files read at once by a prefetch: enough to warm up thousands of files in well under a second,
-    /// while leaving cores for drawing.
     private static let prefetchLanes = 4
+    static let keptFiles = 3000
 
     private struct State: Sendable {
-        /// The faces of every file read so far (empty for files CoreText can't read).
         var descriptors: [String: FileDescriptors] = [:]
-        /// Files a prefetch is about to read.
+        var lastUse: [String: Int] = [:]
+        var clock = 0
         var pending: Set<String> = []
-        /// Files waiting to be prefetched, the next one last; the latest request goes first.
         var queue: [String] = []
         var lanes = 0
-        /// Bumped by `invalidate`, so fonts made from an old version of a file are never served again.
         var generations: [String: Int] = [:]
-        /// Variable faces' axes, by face and generation (see `axes(of:)`).
+        var drawn: Set<String> = []
+        var changes: [String: Int] = [:]
         var axes: [String: [AxisRange]] = [:]
-    }
 
-    /// The 'wght' axis.
-    private static let weightAxisID = 0x7767_6874
+        mutating func use(_ path: String) {
+            clock += 1
+            lastUse[path] = clock
+        }
+
+        mutating func keep(_ fileDescriptors: FileDescriptors, for path: String) {
+            descriptors[path] = fileDescriptors
+            use(path)
+            guard descriptors.count > FontLoader.keptFiles else { return }
+            let drop = descriptors.count - FontLoader.keptFiles * 9 / 10
+            for (old, _) in lastUse.sorted(by: { $0.value < $1.value }).prefix(drop) {
+                descriptors[old] = nil
+                lastUse[old] = nil
+            }
+        }
+
+        mutating func forget(_ path: String) {
+            descriptors[path] = nil
+            lastUse[path] = nil
+        }
+
+        mutating func changed(_ path: String) {
+            generations[path, default: 0] += 1
+            if drawn.remove(path) != nil { changes[path, default: 0] += 1 }
+        }
+    }
 
     public init() {}
 
-    /// `weight` sets the weight axis of variable faces (clamped to its range); ignored otherwise. `variations` sets
-    /// any of their axes, by tag, the weight axis over `weight`; the slider that sets one keeps it in range. A variable
-    /// face is otherwise drawn exactly where it sits on its axes, optical size included: CoreText would match that to
-    /// the point size, and drops a setting of the default to do so.
     public func font(_ face: FontFace, size: CGFloat, weight: Double? = nil, variations: [String: Double] = [:],
-                     features: [FeatureSetting] = []) -> CTFont {
+                     features: [FeatureSetting] = [], cached: Bool = true) -> CTFont {
         let weight = face.weightAxis.flatMap { axis in weight.map { min(max($0, axis.minimum), axis.maximum) } }
         let variations = face.axes.isEmpty ? [] : variations.sorted { $0.key < $1.key }
         let features = features.sorted { ($0.type, $0.selector) < ($1.type, $1.selector) }
-        let generation = state.withLock { $0.generations[face.path] ?? 0 }
+        let (generation, changes) = state.withLock { state in
+            state.drawn.insert(face.path)
+            if state.descriptors[face.path] != nil { state.use(face.path) }
+            return (state.generations[face.path] ?? 0, state.changes[face.path] ?? 0)
+        }
         var key = "\(face.id)|\(generation)|\(Int((size * 2).rounded()))"
         if let weight { key += "|w\(Int(weight.rounded()))" }
         for (tag, value) in variations { key += "|\(tag)=\(value)" }
         for feature in features { key += "|\(feature.type):\(feature.selector)" }
         if let font = fonts[key] { return font }
 
-        var descriptor = descriptor(for: face)
+        var descriptor = descriptor(for: face, in: cached ? fileDescriptors(at: face.path).list : descriptors(at: face.path))
         if face.weightAxis != nil || !face.axes.isEmpty {
             descriptor = Self.descriptor(descriptor, weight: weight, variations: variations)
         }
         for feature in features {
             descriptor = CTFontDescriptorCreateCopyWithFeature(descriptor, NSNumber(value: feature.type), NSNumber(value: feature.selector))
         }
-        let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
-        fonts[key] = font
+        // A millionth of a point larger for each time the file changed: CoreText calls fonts of the same file, name and size equal whatever the file holds now, and text reuses an equal font it already has, so it kept drawing the old letters.
+        let font = CTFontCreateWithFontDescriptor(descriptor, size + CGFloat(changes) / 1_000_000, nil)
+        if cached { fonts[key] = font }
         return font
     }
 
-    /// A variable face where `weight` and `variations` put it, its other axes where it sits, at that optical size
-    /// whatever the point size. CoreText reads a setting that leaves a descriptor where it already is (a weight set
-    /// again, or a named style left alone) as the named style itself, which optical sizing "none" then draws at the
-    /// default optical size, losing a style's own or a moved one. So every axis is set at once, after a step to the
-    /// defaults, which only leaves a descriptor where it is when that's where it's drawn.
+    public func generation(of path: String) -> Int {
+        state.withLock { $0.generations[path] ?? 0 }
+    }
+
     private static func descriptor(_ descriptor: CTFontDescriptor, weight: Double?,
                                    variations: [(key: String, value: Double)]) -> CTFontDescriptor {
         var values = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:]
-        if let weight { values[NSNumber(value: weightAxisID)] = NSNumber(value: weight) }
+        if let weight { values[NSNumber(value: AxisTag.weight)] = NSNumber(value: weight) }
         for (tag, value) in variations { values[NSNumber(value: AxisTag.identifier(tag))] = NSNumber(value: value) }
         let axes = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAxesAttribute) as? [[String: Any]] ?? []
         let defaults = axes.reduce(into: [NSNumber: NSNumber]()) { defaults, axis in
@@ -88,19 +105,18 @@ public final class FontLoader: Sendable {
                   let value = axis[kCTFontVariationAxisDefaultValueKey as String] as? NSNumber else { return }
             defaults[identifier] = value
         }
+        // Optical size "none", or CoreText matches it to the point size and drops a setting of the default; and every axis at once, after a step to the defaults, as CoreText reads a setting that leaves a descriptor where it is, like a weight set again, as the named style itself, which "none" then draws at the default optical size.
         let atDefaults = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontVariationAttribute: defaults] as CFDictionary)
         return CTFontDescriptorCreateCopyWithAttributes(
             atDefaults, [kCTFontOpticalSizeAttribute: "none", kCTFontVariationAttribute: values] as CFDictionary)
     }
 
-    /// A variable face's axes and how far each goes, those the font hides too, in `AxisOrder`; none for a static face.
-    /// Read once per face, as CoreText looks up the axes' names each time it's asked.
     public func axes(of face: FontFace) -> [AxisRange] {
         guard !face.axes.isEmpty else { return [] }
         let key = state.withLock { "\(face.id)|\($0.generations[face.path] ?? 0)" }
         if let axes = state.withLock({ $0.axes[key] }) { return axes }
         let entries = CTFontCopyVariationAxes(font(face, size: 12)) as? [[String: Any]] ?? []
-        let read = entries.compactMap { entry -> AxisRange? in
+        let axes = entries.compactMap { entry -> AxisRange? in
             guard let identifier = (entry[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value,
                   let minimum = entry[kCTFontVariationAxisMinimumValueKey as String] as? Double,
                   let maximum = entry[kCTFontVariationAxisMaximumValueKey as String] as? Double,
@@ -108,25 +124,20 @@ public final class FontLoader: Sendable {
                   minimum < maximum
             else { return nil }
             let tag = AxisTag.string(identifier)
-            let name = (entry[kCTFontVariationAxisNameKey as String] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
-            return AxisRange(tag: tag, name: name.isEmpty || name == tag ? AxisTag.registeredNames[tag] ?? tag : name,
+            return AxisRange(tag: tag, name: AxisTag.name(of: tag, given: entry[kCTFontVariationAxisNameKey as String] as? String ?? ""),
                              minimum: minimum, maximum: maximum, defaultValue: defaultValue,
                              isHidden: entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true)
         }
-        let axes = AxisOrder.sorted(read, by: \.tag)
         state.withLock { $0.axes[key] = axes }
         return axes
     }
 
-    /// Where a font is drawn on each of its axes, by tag: the named instance's place and the values it was made with.
-    /// Axes left out are at their defaults.
     public static func variation(of font: CTFont) -> [String: Double] {
         (CTFontCopyVariation(font) as? [NSNumber: NSNumber] ?? [:]).reduce(into: [:]) {
             $0[AxisTag.string($1.key.uint32Value)] = $1.value.doubleValue
         }
     }
 
-    /// Loads descriptors for these faces at low priority, in order, ahead of what earlier calls asked for.
     public func prefetch(_ faces: [FontFace]) {
         let lanes: Int = state.withLock { state in
             var paths: [String] = []
@@ -151,55 +162,43 @@ public final class FontLoader: Sendable {
             }
             return path
         }) {
-            guard state.withLock({ $0.pending.contains(path) }) else { continue }
+            guard let generation = state.withLock({ $0.pending.contains(path) ? $0.generations[path] ?? 0 : nil }) else { continue }
             Self.readAhead(path)
             let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
             state.withLock { state in
-                // Still pending means nothing read or invalidated the file in the meantime.
-                if state.pending.remove(path) != nil { state.descriptors[path] = descriptors }
+                if state.generations[path] ?? 0 == generation, state.pending.remove(path) != nil { state.keep(descriptors, for: path) }
             }
         }
     }
 
-    /// Has the whole file read into memory in the background, not only the tables a descriptor needs: drawing text
-    /// reads the glyphs, which in a file not read since the Mac started came off the disk as the text was drawn, and
-    /// prefetching descriptors alone left scrolling as slow as before.
     private static func readAhead(_ path: String) {
         let fd = open(path, O_RDONLY)
         guard fd >= 0 else { return }
         defer { close(fd) }
         var info = stat()
         guard fstat(fd, &info) == 0, info.st_size > 0 else { return }
-        var advice = radvisory(ra_offset: 0, ra_count: Int32(min(info.st_size, Int64(Int32.max))))
+        let count = min(info.st_size, Self.mostReadAhead)
+        var advice = radvisory(ra_offset: 0, ra_count: Int32(count))
         _ = fcntl(fd, F_RDADVISE, &advice)
+        #if CICERO_MEASURE
+        Measurements.record("readAhead.mb", ms: Double(count) / 1_048_576, detail: path)
+        #endif
     }
 
-    /// Keeps descriptors read elsewhere: the scanner reads every new file.
-    func keep(_ descriptors: [CTFontDescriptor], for path: String) {
-        state.withLock { state in
-            state.descriptors[path] = FileDescriptors(descriptors)
-            state.pending.remove(path)
-        }
-    }
+    private static let mostReadAhead: Int64 = 32 << 20
 
-    /// The file's faces, read now unless they were already; for coverage, which needs the same ones.
     func descriptors(at path: String) -> [CTFontDescriptor] {
-        fileDescriptors(at: path).list
+        state.withLock { $0.descriptors[path] }?.list ?? FontFiles.descriptors(at: path)
     }
 
-    /// Whether the file's faces have been read (prefetched or on demand), so making a font from it won't read the file.
     public func hasDescriptors(for path: String) -> Bool {
         state.withLock { $0.descriptors[path] != nil }
     }
 
-    /// Whether making a font from the file would read it now from a server, or download it, as a cloud service keeps it
-    /// online only: either can take a while, or never finish, on a server that stopped answering. Files on the Mac's
-    /// own disks are read at once (see `read`).
     public func wouldWait(for path: String) -> Bool {
         !hasDescriptors(for: path) && (!Reachability.isOnLocalDisk(path) || Reachability.isOnlineOnly(path))
     }
 
-    /// Reads the file's faces off the caller's thread, and the whole file into memory, unless they were read already.
     public func read(_ path: String) async {
         guard !hasDescriptors(for: path) else { return }
         await withCheckedContinuation { continuation in
@@ -211,43 +210,46 @@ public final class FontLoader: Sendable {
         }
     }
 
-    /// Reads these files' faces off the caller's thread, side by side (see `read(_:)`).
     public func read(_ paths: [String]) async {
         await withTaskGroup(of: Void.self) { group in
             for path in paths { group.addTask { await self.read(path) } }
         }
     }
 
-    /// Drops what's cached for files that changed or went away.
     public func invalidate(paths: Set<String>) {
         state.withLock { state in
             for path in paths {
-                state.descriptors[path] = nil
+                state.forget(path)
                 state.pending.remove(path)
-                state.generations[path, default: 0] += 1
+                state.changed(path)
             }
         }
     }
 
-    /// The face's descriptor, reading its file now if it wasn't prefetched; an installed font of
-    /// the same name when the file can't be read.
-    private func descriptor(for face: FontFace) -> CTFontDescriptor {
-        FontFiles.descriptor(for: face, in: fileDescriptors(at: face.path).list) ?? FontFiles.installedDescriptor(named: face.postScriptName)
+    private func descriptor(for face: FontFace, in descriptors: [CTFontDescriptor]) -> CTFontDescriptor {
+        FontFiles.descriptor(for: face, in: descriptors) ?? FontFiles.installedDescriptor(named: face.postScriptName)
     }
 
     private func fileDescriptors(at path: String) -> FileDescriptors {
         if let cached = state.withLock({ $0.descriptors[path] }) { return cached }
+        #if CICERO_MEASURE
+        let measuring = Thread.isMainThread ? Measurements.begin("mainThreadFileRead") : nil
+        defer { measuring?.end(detail: path) }
+        #endif
+        let generation = state.withLock { $0.generations[path] ?? 0 }
         let descriptors = FileDescriptors(FontFiles.descriptors(at: path))
         state.withLock { state in
-            state.descriptors[path] = descriptors
+            guard state.generations[path] ?? 0 == generation else { return }
+            state.keep(descriptors, for: path)
             state.pending.remove(path)
         }
         return descriptors
     }
 }
 
-/// An axis's four-character tag, and the number CoreText knows it by: 'wght' is 0x77676874.
 enum AxisTag {
+    static let weight: UInt32 = 0x7767_6874
+
     static func string(_ identifier: UInt32) -> String {
         String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .isoLatin1) ?? ""
     }
@@ -256,12 +258,17 @@ enum AxisTag {
         tag.unicodeScalars.prefix(4).reduce(0) { $0 << 8 | ($1.value & 0xFF) }
     }
 
-    /// The names of the common axes, for fonts that name one by its tag or not at all.
     static let registeredNames = ["wght": "Weight", "wdth": "Width", "opsz": "Optical Size", "ital": "Italic",
                                   "slnt": "Slant", "GRAD": "Grade"]
+
+    static func name(of tag: String, given: String) -> String {
+        // macOS names the registered axes in the Mac's language, like Breite in German, and a library read before the language changed would keep that name.
+        if tag.first?.isLowercase == true, let name = registeredNames[tag] { return name }
+        let given = given.trimmingCharacters(in: .whitespaces)
+        return given.isEmpty || given == tag ? registeredNames[tag] ?? tag : given
+    }
 }
 
-/// The faces of one file. CTFontDescriptor is immutable and thread-safe, just not marked Sendable.
 private struct FileDescriptors: @unchecked Sendable {
     let list: [CTFontDescriptor]
 
@@ -270,7 +277,6 @@ private struct FileDescriptors: @unchecked Sendable {
     }
 }
 
-/// NSCache is thread-safe but not marked Sendable.
 private final class FontCache: @unchecked Sendable {
     private let cache = NSCache<NSString, CTFont>()
 

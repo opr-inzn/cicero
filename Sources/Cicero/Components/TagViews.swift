@@ -16,7 +16,6 @@ extension TagColor {
         }
     }
 
-    /// A light brown between the Finder's colours, for Licensed + Non-Commercial: Licensed's, toned down.
     private static let sand = Color(nsColor: NSColor(name: "sand") { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0.82, green: 0.75, blue: 0.62, alpha: 1)
@@ -25,12 +24,14 @@ extension TagColor {
 
     var title: String { rawValue.capitalized }
 
-    /// A dot for menus, which draw SF Symbols as templates, in one colour. Its label needs `.titleAndIcon`: built
-    /// with the macOS 27 SDK, menus hide every other image.
-    var menuImage: NSImage {
-        let nsColor = NSColor(color)
+    var menuImage: NSImage { .menuDot(NSColor(color)) }
+}
+
+extension NSImage {
+    // Not an SF Symbol, which menus draw as a template in one colour. Its label needs .titleAndIcon: built with the macOS 27 SDK, menus hide every other image.
+    static func menuDot(_ color: NSColor) -> NSImage {
         let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
-            nsColor.setFill()
+            color.setFill()
             NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
             return true
         }
@@ -39,7 +40,6 @@ extension TagColor {
     }
 }
 
-/// A family's tags as small dots in their colours, side by side.
 struct TagDots: View {
     let colors: [TagColor]
 
@@ -53,13 +53,11 @@ struct TagDots: View {
                 }
             }
             .accessibilityElement()
-            .accessibilityLabel(colors.map(\.title).formatted(.list(type: .and)))
+            .accessibilityLabel(colors.map(\.title).listed())
         }
     }
 }
 
-/// The Tags submenu of a family's menu and the Info panel: the tags, checked when every family has it, Remove All
-/// Tags, and New Tag…. Choosing a tag gives it to the families, or takes it off them; they keep their other tags.
 struct TagMenuItems: View {
     let families: [Family]
     let model: AppModel

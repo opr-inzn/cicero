@@ -2,10 +2,8 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// What one face covers: its scalars and the languages it supports.
 public struct FaceCoverage: Sendable {
     public let scalars: ScalarRanges
-    /// Language ids (shared with every other face from the same catalog) and one bit per language.
     let order: LanguageOrder
     let bits: LanguageBits
 
@@ -25,13 +23,11 @@ public struct FaceCoverage: Sendable {
         self.bits = bits
     }
 
-    /// nil when the language isn't supported.
     public func support(for languageID: String) -> LanguageSupport? {
         guard let position = order.positions[languageID], LanguageBits.isSet(bits.base, position) else { return nil }
         return LanguageBits.isSet(bits.full, position) ? .full : .base
     }
 
-    /// Supported language ids (base or full).
     public var supportedLanguages: [String] {
         order.ids.indices.filter { LanguageBits.isSet(bits.base, $0) }.map { order.ids[$0] }
     }
@@ -41,13 +37,11 @@ public struct FaceCoverage: Sendable {
     }
 }
 
-/// Works out every family's coverage (its regular face) in the background, caches it on disk by file
-/// stamp, and answers lookups from any thread.
 public final class CoverageIndex: Sendable {
     private let file: URL
+    private let oldFile: URL
     private let languages: LanguageCatalog
     private let state = Mutex(State())
-    /// Writes the cache one save at a time, after `update` has returned.
     private let saveQueue = DispatchQueue(label: "Cicero.CoverageIndex.save", qos: .utility)
 
     private struct Entry: Sendable {
@@ -62,17 +56,15 @@ public final class CoverageIndex: Sendable {
     }
 
     public init(caches: URL, languages: LanguageCatalog) {
-        file = caches.appendingPathComponent("coverage-v2.plist", isDirectory: false)
+        file = caches.appendingPathComponent("coverage-v4.plist", isDirectory: false)
+        oldFile = caches.appendingPathComponent("coverage-v3.plist", isDirectory: false)
         self.languages = languages
     }
 
-    /// Computes what's missing at low priority; cheap when nothing changed. `progress` reports
-    /// (done, total) only when there's work. Cancellable. The cache is written afterwards, without
-    /// holding up the lists waiting for the results.
-    public func update(_ families: [Family], progress: @escaping @Sendable (Int, Int) -> Void) async {
+    public func update(_ families: [Family], saves: Bool = true, progress: @escaping @Sendable (Int, Int) -> Void) async {
         let signpost = Signposts.library.beginInterval("Coverage")
         defer { Signposts.library.endInterval("Coverage", signpost) }
-        loadIfNeeded()
+        loadIfNeeded(removingOldFile: saves)
         let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
@@ -99,18 +91,15 @@ public final class CoverageIndex: Sendable {
                 }
             }
         }
-        // What to keep is decided now, against these families; only the writing waits.
-        if let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
+        if saves, !Task.isCancelled, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
             saveQueue.async { self.write(entries) }
         }
     }
 
-    /// nil until computed.
     public func coverage(of face: FaceID) -> FaceCoverage? {
         state.withLock { $0.entries[face]?.coverage }
     }
 
-    /// Computes now if needed (for the Info panel and glyph grid of any face).
     public func coverage(computing face: FontFace) async -> FaceCoverage {
         loadIfNeeded()
         let stamp = CoverageStamp.of(path: face.path)
@@ -125,17 +114,20 @@ public final class CoverageIndex: Sendable {
         return coverage
     }
 
+    public func loadSaved(removingOldFile: Bool = false) {
+        loadIfNeeded(removingOldFile: removingOldFile)
+    }
+
     public func clearCache() {
         state.withLock {
             $0.entries = [:]
             $0.dirty = false
+            $0.loaded = true
         }
-        // After any write already queued, so none can put the file back.
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
     }
 
-    /// Waits for the cache to be written.
-    func waitForSave() {
+    public func waitForSave() {
         saveQueue.sync {}
     }
 
@@ -146,22 +138,22 @@ public final class CoverageIndex: Sendable {
         return FaceCoverage(scalars: scalars, order: languages.order, bits: languages.support(in: scalars))
     }
 
-    /// The scalars the face's file says it covers; an installed font of the same name when the
-    /// file can't be read, and nothing when neither exists.
     static func scalars(of face: FontFace) -> ScalarRanges {
-        let descriptor = FontFiles.descriptor(for: face, in: FontLoader.shared.descriptors(at: face.path))
+        // From the file's own descriptors, never those kept for drawing: the outline of every glyph asked for its bounds stays as long as the font does.
+        let descriptor = FontFiles.descriptor(for: face, in: FontFiles.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         let font = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
         guard CTFontCopyPostScriptName(font) as String == face.postScriptName else { return .empty }
-        return ScalarRanges(characterSet: CTFontCopyCharacterSet(font))
+        return EmptyGlyphs(font: font).drawn(CharacterMap.characters(of: font))
     }
 
     // MARK: - Disk cache
 
-    private func loadIfNeeded() {
+    private func loadIfNeeded(removingOldFile: Bool = true) {
         state.withLock { state in
             guard !state.loaded else { return }
             state.loaded = true
+            if removingOldFile { try? FileManager.default.removeItem(at: oldFile) }
             guard let data = try? Data(contentsOf: file),
                   let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
                   cache.language == languages.dataVersion
@@ -177,7 +169,6 @@ public final class CoverageIndex: Sendable {
         }
     }
 
-    /// Drops faces that are no longer in the library, and returns the entries to write when something changed.
     private func entriesToSave(keeping known: Set<FaceID>) -> [FaceID: Entry]? {
         state.withLock { state in
             let kept = state.entries.filter { known.contains($0.key) }
@@ -206,7 +197,6 @@ public final class CoverageIndex: Sendable {
     }
 
     private struct CacheFile: Codable {
-        /// The language data the bits were computed with.
         var language: String
         var entries: [CacheEntry]
     }
@@ -222,12 +212,10 @@ public final class CoverageIndex: Sendable {
     }
 }
 
-/// A file's modification time and size, which is what tells a cached result is still good.
 struct CoverageStamp: Hashable, Sendable {
     var modified: Double
     var size: Int64
 
-    /// Stands for a file that isn't there, so its (empty) result isn't recomputed on every update.
     static let missing = CoverageStamp(modified: 0, size: -1)
 
     static func of(path: String) -> CoverageStamp {

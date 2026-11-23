@@ -1,33 +1,21 @@
 import CiceroCore
 import SwiftUI
 
-/// The fonts a document uses, each against the library: on, in the library but off (with Activate), or missing
-/// (with Find on This Mac, which asks Spotlight for the file). Below, a set named after the document and
-/// everything available turned on at once.
 struct DocumentFontsSheet: View {
     let report: DocumentFontsReport
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    /// What Find on This Mac turned up for each missing font, by match.
-    @State private var searches: [String: Search] = [:]
-    /// What Make Set did.
-    @State private var message: String?
-
-    enum Search {
-        case searching
-        case found(String)
-        case notFound
-    }
-
     var body: some View {
         @Bindable var model = model
         let matches = sorted(model.documentMatches(report))
         let off = matches.filter { $0.face?.canActivate == true && !isOn($0) }
+        let inApps = off.compactMap(appOnly)
         let missing = matches.filter { $0.face == nil && !$0.isInstalled }
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Fonts in “\(report.name)”").font(.title2.bold()).lineLimit(1).truncationMode(.middle)
-                Text(summary(matches.count, on: matches.count - off.count - missing.count, off: off.count, missing: missing.count))
+                Text(summary(matches.count, active: matches.count - off.count - missing.count, inApps: inApps,
+                             inactive: off.count - inApps.count, missing: missing.count))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -37,18 +25,20 @@ struct DocumentFontsSheet: View {
                 LazyVStack(spacing: 0) {
                     ForEach(matches) { match in
                         row(match)
-                        Divider().padding(.leading, 48)
+                        if match.id != matches.last?.id { Divider().padding(.leading, 48) }
                     }
                 }
             }
             Divider()
             HStack(spacing: 12) {
-                if let message {
-                    Text(message).foregroundStyle(.secondary).lineLimit(2)
-                }
                 Spacer()
-                Button("Make Set") { message = model.makeSet(for: report) }
-                    .help("A set named “\(report.setName)” with the document’s fonts that are in your library")
+                if !model.libraryFamilies(of: report).isEmpty {
+                    Button("Show in Library") {
+                        model.showInLibrary(report)
+                        dismiss()
+                    }
+                    .help("Shows the document’s fonts from your library in the main window")
+                }
                 Button("Activate All") { model.activateAll(in: report) }
                     .disabled(off.isEmpty)
                     .help("Turns on every font of the document that’s in your library")
@@ -58,8 +48,8 @@ struct DocumentFontsSheet: View {
             .padding(16)
         }
         .frame(width: 680, height: 540)
-        // The main window can't show a sheet over this one, so activating asks how from here.
-        .sheet(item: $model.activationPrompt) { ActivationSheet(prompt: $0) }
+        // The main window can't show a sheet over this one, so adding a font file asks how from here.
+        .sheet(item: $model.installPrompt) { InstallSheet(prompt: $0) }
         .confirmsManyActivations()
     }
 
@@ -71,14 +61,14 @@ struct DocumentFontsSheet: View {
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(title(match)).lineLimit(1)
+                    Text(title(match)).lineLimit(1).truncationMode(.middle)
                     if match.font.isEmbedded == true {
                         Tag(text: "Embedded", tint: .secondary)
                             .help("The PDF carries the font, so it shows as it should even where the font is missing.")
                     }
                 }
                 if let postScriptName = match.font.postScriptName, postScriptName != title(match) {
-                    Text(postScriptName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(postScriptName).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
             }
             Spacer(minLength: 12)
@@ -97,9 +87,11 @@ struct DocumentFontsSheet: View {
     @ViewBuilder
     private func statusIcon(_ match: DocumentFontMatch) -> some View {
         if isOn(match) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityLabel("On")
+            Image(systemName: "checkmark.seal.fill").foregroundStyle(.green).accessibilityLabel("Active")
+        } else if let app = appOnly(match) {
+            Image(systemName: "checkmark.seal").foregroundStyle(.red).accessibilityLabel("Active in \(app)")
         } else if match.face != nil {
-            Image(systemName: "circle.dashed").foregroundStyle(.secondary).accessibilityLabel("Off")
+            Image(systemName: "xmark.seal").foregroundStyle(.secondary).accessibilityLabel("Inactive")
         } else {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel("Missing")
         }
@@ -107,89 +99,54 @@ struct DocumentFontsSheet: View {
 
     private func statusText(_ match: DocumentFontMatch) -> String {
         if let face = match.face { return face.state.label }
-        if match.isInstalled { return "Installed with macOS" }
-        switch searches[match.id] {
-        case .searching: return "Searching"
-        case .found(let path): return "Found “\(URL(fileURLWithPath: path).lastPathComponent)”"
-        case .notFound: return "Not found on this Mac"
-        case nil: return "Not in your library"
-        }
+        return match.isInstalled ? "Installed with macOS" : "Not in your library"
     }
 
     @ViewBuilder
     private func action(_ match: DocumentFontMatch) -> some View {
         if let face = match.face {
             if face.canActivate && !isOn(match) {
-                Button("Activate") {
+                Button(face.app != nil ? "Activate in All Apps" : "Activate") {
                     model.activate([face], title: match.font.displayName)
                 }
-            }
-        } else if !match.isInstalled, let postScriptName = match.font.postScriptName {
-            switch searches[match.id] {
-            case .found(let path):
-                // Copied even when fonts are activated by moving: Spotlight may have found it in another document's folder.
-                if model.installsAddedFiles {
-                    Button("Install") { model.addFontFiles([path], mayMove: false) }
-                        .help("Copies the file into \(model.installPlace) and turns it on")
-                } else {
-                    Button("Add") { model.addFontFiles([path]) }
-                        .help("Lists the file in your library where it is, under Added Fonts")
-                }
-            case .searching:
-                ProgressView().controlSize(.small)
-            case nil, .notFound:
-                Button("Find on This Mac") { find(postScriptName, for: match.id) }
-                    .help("Looks for the font file with Spotlight, on this Mac")
             }
         }
     }
 
     // MARK: Helpers
 
-    /// The family and style as the library names them, else as the document does: a PDF gives only PostScript names.
     private func title(_ match: DocumentFontMatch) -> String {
+        // A PDF gives only PostScript names.
         guard let face = match.face else { return match.font.displayName }
         return "\(match.family ?? face.face.familyName) \(face.face.styleName)"
     }
 
-    /// On for apps: the library's face is on (in an app's own folder counts, for that app), or macOS has it.
     private func isOn(_ match: DocumentFontMatch) -> Bool {
         guard let face = match.face else { return match.isInstalled }
         return face.state.isActive
     }
 
-    /// Missing first, then off, then on; each by name.
+    private func appOnly(_ match: DocumentFontMatch) -> String? {
+        guard case .appOnly(let app) = match.face?.state else { return nil }
+        return FaceState.appDescription(app)
+    }
+
     private func sorted(_ matches: [DocumentFontMatch]) -> [DocumentFontMatch] {
-        func rank(_ match: DocumentFontMatch) -> Int { match.face == nil && !match.isInstalled ? 0 : isOn(match) ? 2 : 1 }
+        func rank(_ match: DocumentFontMatch) -> Int {
+            match.face == nil && !match.isInstalled ? 0 : isOn(match) ? 3 : appOnly(match) != nil ? 2 : 1
+        }
         return matches.sorted { a, b in
             rank(a) != rank(b) ? rank(a) < rank(b) : title(a).localizedStandardCompare(title(b)) == .orderedAscending
         }
     }
 
-    /// Spotlight leaves out what's in folders macOS keeps private until the user lets an app in (Documents,
-    /// Desktop, Downloads), without asking. Looking into them asks, once, so a font there can be found.
-    @concurrent
-    private static func askForFolders() async {
-        let fm = FileManager.default
-        for directory in [FileManager.SearchPathDirectory.documentDirectory, .desktopDirectory, .downloadsDirectory] {
-            guard let url = fm.urls(for: directory, in: .userDomainMask).first else { continue }
-            _ = try? fm.contentsOfDirectory(atPath: url.path)
-        }
-    }
-
-    private func summary(_ total: Int, on: Int, off: Int, missing: Int) -> String {
-        var parts = [total == 1 ? "1 font" : "\(total) fonts", "\(on) on"]
-        if off > 0 { parts.append("\(off) off") }
+    private func summary(_ total: Int, active: Int, inApps: [String], inactive: Int, missing: Int) -> String {
+        var parts = [total == 1 ? "1 style" : "\(total) styles", "\(active) active"]
+        var apps: [String] = []
+        for app in inApps where !apps.contains(app) { apps.append(app) }
+        parts += apps.map { app in "\(inApps.count { $0 == app }) in \(app)" }
+        if inactive > 0 { parts.append("\(inactive) inactive") }
         if missing > 0 { parts.append("\(missing) missing") }
         return parts.joined(separator: " · ")
-    }
-
-    private func find(_ postScriptName: String, for id: String) {
-        searches[id] = .searching
-        Task {
-            await Self.askForFolders()
-            let paths = await FontFileSearch.files(withPostScriptName: postScriptName)
-            searches[id] = paths.first.map(Search.found) ?? .notFound
-        }
     }
 }

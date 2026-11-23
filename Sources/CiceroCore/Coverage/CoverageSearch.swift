@@ -1,9 +1,7 @@
 import Foundation
 
-/// Families whose regular face has every character of some text, or misses at most a few.
 public struct TextMatch: Identifiable, Sendable {
     public let family: Family
-    /// In the order the text uses them.
     public let missing: [UInt32]
     public var id: String { family.id }
 
@@ -14,7 +12,6 @@ public struct TextMatch: Identifiable, Sendable {
 }
 
 public enum CoverageSearch {
-    /// Unique scalars worth checking in some text (no whitespace or invisible characters), in order of appearance.
     public static func scalars(in text: String) -> [UInt32] {
         var seen: Set<UInt32> = []
         var scalars: [UInt32] = []
@@ -25,7 +22,6 @@ public enum CoverageSearch {
         return scalars
     }
 
-    /// Sorted by fewest missing, then the families' order. Families not yet indexed are skipped and counted.
     public static func families(having text: String, in families: [Family], maxMissing: Int, index: CoverageIndex) -> (matches: [TextMatch], unindexed: Int) {
         let ordered = scalars(in: text)
         let sorted = ordered.sorted()
@@ -69,7 +65,6 @@ public enum CoverageSearch {
 }
 
 extension Unicode.Scalar {
-    /// Worth checking a font for: not whitespace, a control or format character, a surrogate or unassigned.
     var isCheckable: Bool {
         switch properties.generalCategory {
         case .control, .format, .surrogate, .unassigned, .spaceSeparator, .lineSeparator, .paragraphSeparator: false

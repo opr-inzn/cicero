@@ -3,53 +3,56 @@ import CiceroCore
 import SwiftUI
 
 extension Color {
-    /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-    /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
-    /// system green in light mode, which is too light for small text on its own tint.
+    static let ink = Color(nsColor: .textColor)
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
     })
-    /// The App Set tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
     static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
             : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
     })
+    static let solar = Color(nsColor: NSColor(srgbRed: 1, green: 0.392, blue: 0.04, alpha: 1))
 }
 
-/// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
-/// a cloud service keeps online only, is read off the main thread first, with room kept for the text: a server that's slow
-/// to answer, or stopped answering, never holds up the window.
 struct FontText: View {
     let text: String
     let face: FontFace
     let size: Double
     var weight: Double = 400
-    /// Axes moved in the Info panel, by tag.
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
-    var kerning: Double = 0
     var lineLimit: Int? = 1
-    /// For text that runs over several lines; nil for the font's own line spacing.
-    var lineHeight: AttributedString.LineHeight?
+    var lineHeight: Double?
+    var scale: ((CTFont) -> CGFloat)?
+    var cached = true
+    var onCaps = false
+    var showsPlaceholder = false
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
-            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
-            Text(text.isEmpty ? " " : text)
+            let atSize = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features, cached: cached)
+            let scale = scale?(atSize) ?? 1
+            let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations,
+                                                                    features: features, cached: cached)
+            Text(text.isEmpty ? " " : text, notdefIn: font)
                 .font(Font(font))
-                .kerning(kerning)
                 .lineLimit(lineLimit)
-                .lineHeight(lineHeight)
+                .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))
+                .onCaps(onCaps ? font : nil)
         } else {
             Text(text.isEmpty ? " " : text)
                 .font(.system(size: size))
                 .lineLimit(lineLimit)
-                .lineHeight(lineHeight)
+                .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
+                .onCaps(onCaps ? NSFont.systemFont(ofSize: size) as CTFont : nil)
                 .hidden()
+                .overlay {
+                    if showsPlaceholder { SamplePlaceholder(size: size) }
+                }
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
                     readPath = face.path
@@ -58,10 +61,120 @@ struct FontText: View {
     }
 }
 
-/// Its content once the font files it draws from have been read, so making their fonts never reads a file on the main
-/// thread: at once when they're on the Mac's own disks or were read before, as almost all are; for files on a server,
-/// or online only, once they've been read in the background, with empty room in its place meanwhile (see
-/// `FontLoader.wouldWait`).
+private extension View {
+    @ViewBuilder func onCaps(_ font: CTFont?) -> some View {
+        if let font {
+            let size = CTFontGetSize(font)
+            let cap = CTFontGetCapHeight(font) > 0 ? CTFontGetCapHeight(font) : size * 0.7
+            let baseline = (size * 0.1 + cap).rounded()
+            alignmentGuide(.top) { $0[.firstTextBaseline] - baseline }
+                .frame(height: baseline + (size * 0.15).rounded(), alignment: .topLeading)
+        } else {
+            self
+        }
+    }
+}
+
+struct FontLine: View {
+    let text: String
+    let face: FontFace
+    let size: Double
+    var weight: Double = 400
+    var variations: [String: Double] = [:]
+    var features: [FeatureSetting] = []
+    let height: CGFloat
+    var showsPlaceholder = false
+    @State private var readPath: String?
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        if readPath == face.path || !FontLoader.shared.wouldWait(for: face.path) {
+            let font = FontLoader.shared.font(face, size: size, weight: weight, variations: variations, features: features)
+            let text = text.isEmpty ? " " : text
+            let scheme = colorScheme
+            let scale = displayScale
+            let line = Self.line(of: font, in: height, scale: scale)
+            // A line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
+            let room = UnclippedText(font: font).room
+            let top = min(0, line.top - room.top), bottom = max(height, line.top + line.height + room.bottom)
+            // At the sides too, where Text doesn't cut glyphs off either, as Zapfino's Z reaching left of the line's start.
+            let box = CTFontGetBoundingBox(font)
+            let left = max(0, -box.minX).rounded(.up), right = max(0, box.maxX).rounded(.up)
+            Canvas { context, size in
+                _ = scheme
+                Self.draw(text, font: font, in: &context, x: left, width: size.width - left - right, baseline: line.baseline - top)
+            }
+            .frame(height: bottom - top)
+            .padding(.top, top)
+            .padding(.bottom, height - bottom)
+            .padding(.leading, -left)
+            .padding(.trailing, -right)
+            .accessibilityElement()
+            .accessibilityLabel(text)
+        } else {
+            Color.clear
+                .frame(height: height)
+                .overlay(alignment: .leading) {
+                    if showsPlaceholder {
+                        Text(text.isEmpty ? " " : text)
+                            .font(.system(size: size))
+                            .lineLimit(1)
+                            .hidden()
+                            .overlay { SamplePlaceholder(size: size) }
+                    }
+                }
+                .task(id: face.path) {
+                    await FontLoader.shared.read(face.path)
+                    readPath = face.path
+                }
+        }
+    }
+
+    private static func line(of font: CTFont, in height: CGFloat, scale: CGFloat) -> (top: CGFloat, height: CGFloat, baseline: CGFloat) {
+        let pixel = { (value: CGFloat) in (value * scale).rounded(.down) / scale }
+        let ascent = CTFontGetAscent(font).rounded()
+        let line = pixel(ascent + CTFontGetDescent(font))
+        let top = pixel((height - line) / 2)
+        return (top, line, top + ascent)
+    }
+
+    private static func draw(_ text: String, font: CTFont, in context: inout GraphicsContext, x: CGFloat, width: CGFloat, baseline: CGFloat) {
+        let color = Color.ink.resolve(in: context.environment).cgColor
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color]
+        let shown = NSMutableAttributedString(string: text, attributes: attributes)
+        shown.showMissingAsNotdef(in: font)
+        let line = CTLineCreateWithAttributedString(shown)
+        let ellipsis = CTLineCreateWithAttributedString(NSAttributedString(string: "…", attributes: attributes))
+        let drawn = CTLineCreateTruncatedLine(line, Double(width), .end, ellipsis) ?? line
+        context.withCGContext { cg in
+            cg.textMatrix = .identity
+            cg.translateBy(x: x, y: baseline)
+            cg.scaleBy(x: 1, y: -1)
+            cg.textPosition = .zero
+            CTLineDraw(drawn, cg)
+        }
+    }
+}
+
+struct SamplePlaceholder: View {
+    let size: Double
+    @State private var isShown = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.15)
+            .fill(.quaternary)
+            .frame(height: size * 0.6)
+            .opacity(isShown ? 1 : 0)
+            .animation(.easeIn(duration: 0.2), value: isShown)
+            .accessibilityHidden(true)
+            .task {
+                try? await Task.sleep(for: .milliseconds(250))
+                isShown = true
+            }
+    }
+}
+
 struct ReadingFonts<Content: View>: View {
     let paths: [String]
     @ViewBuilder let content: () -> Content
@@ -81,16 +194,13 @@ struct ReadingFonts<Content: View>: View {
     }
 }
 
-/// Draws text as usual, but with room above and below its lines for glyphs reaching past the font's ascent
-/// and descent, like a descender lower than the font says or a swash, which SwiftUI otherwise cuts off: as far
-/// as any of the font's glyphs reach, and at least half the size, for the fonts that stand in for missing
-/// characters. None at the sides, where text isn't cut off, and room there puts a "…" out of place.
 nonisolated struct UnclippedText: TextRenderer {
     let room: EdgeInsets
 
     init(font: CTFont) {
         let box = CTFontGetBoundingBox(font)
         let half = CTFontGetSize(font) / 2
+        // None at the sides, where text isn't cut off: room there puts a "…" out of place.
         room = EdgeInsets(top: max(box.maxY - CTFontGetAscent(font), half), leading: 0,
                           bottom: max(-box.minY - CTFontGetDescent(font), half), trailing: 0)
     }
@@ -102,22 +212,10 @@ nonisolated struct UnclippedText: TextRenderer {
     }
 }
 
-/// A small switch drawn in SwiftUI. Lists show one per family, and a native switch per row made
-/// building a list much slower. The middle position (on in one app only) puts the knob halfway.
 struct MiniSwitch: View {
     let position: SwitchPosition
     let isEnabled: Bool
     let action: () -> Void
-
-    init(position: SwitchPosition, isEnabled: Bool, action: @escaping () -> Void) {
-        self.position = position
-        self.isEnabled = isEnabled
-        self.action = action
-    }
-
-    init(isOn: Bool, isEnabled: Bool, action: @escaping () -> Void) {
-        self.init(position: isOn ? .on : .off, isEnabled: isEnabled, action: action)
-    }
 
     var body: some View {
         Capsule()
@@ -152,8 +250,6 @@ struct MiniSwitch: View {
     }
 }
 
-/// On/off for a whole family. Gets the model passed in rather than from the environment: AppKit
-/// builds table cells outside SwiftUI's update, where the environment isn't there yet.
 struct ActivationSwitch: View {
     let family: Family
     let model: AppModel
@@ -189,78 +285,31 @@ struct ActivationSwitch: View {
     }
 }
 
-/// A small tinted capsule with a word or two, never shortened: a name next to it gives way instead. (A list
-/// cell lays its row out again at the row's own width, where a stack offers each text half of what's left,
-/// so beside a name about as wide as itself, "Adobe" got less than it needs.)
 struct Tag: View {
     let text: String
     let tint: Color
-    /// A symbol before the text.
     var systemImage: String?
 
     var body: some View {
-        HStack(spacing: 2.5) {
+        HStack(alignment: .firstTextBaseline, spacing: 2.5) {
             if let systemImage {
-                // Its drawing on the middle of the capitals, with no height of its own, so tags with a symbol are as
-                // tall as those without.
-                Image(systemName: systemImage)
-                    .offset(y: Self.capitalsDrop - Self.inkDrop(of: systemImage))
-                    .frame(height: 0)
+                Text(Image(systemName: systemImage))
                     .accessibilityHidden(true)
             }
             Text(text)
         }
         .font(Self.font)
         .padding(.horizontal, 5)
-        // The capitals in the middle of the capsule.
-        .padding(.top, 1.5 - Self.capitalsDrop)
-        .padding(.bottom, 1.5 + Self.capitalsDrop)
+        // A whole number of points tall: centred in a row, a fractional height drew the capsule half a pixel off its text, which snaps to pixels.
+        .frame(height: 14)
         .background(tint.opacity(0.14), in: .capsule)
         .foregroundStyle(tint.opacity(0.9))
         .fixedSize()
     }
 
-    private static let font = Font.system(size: 9, weight: .semibold)
-
-    /// How far the middle of the capitals sits below the middle of the text's line: SwiftUI puts the line's height and
-    /// baseline on whole points, as NSLayoutManager does, which leaves them a third of a point low.
-    private static let capitalsDrop: CGFloat = {
-        let font = NSFont.systemFont(ofSize: 9, weight: .semibold)
-        let layout = NSLayoutManager()
-        return layout.defaultBaselineOffset(for: font) - font.capHeight / 2 - layout.defaultLineHeight(for: font) / 2
-    }()
-
-    private static var inkDrops: [String: CGFloat] = [:]
-
-    /// How far the middle of a symbol's drawing sits below the middle of its frame, measured once per symbol: some
-    /// frames leave room the drawing doesn't use, like app.badge.checkmark's, which drew it 0.35 pt high.
-    private static func inkDrop(of symbol: String) -> CGFloat {
-        if let drop = inkDrops[symbol] { return drop }
-        let scale = 20
-        let renderer = ImageRenderer(content: Image(systemName: symbol).font(font))
-        renderer.scale = CGFloat(scale)
-        var drop: CGFloat = 0
-        if let image = renderer.cgImage,
-           let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
-                                   bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-           let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
-            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            // The rows with ink, from the top.
-            let inked = (0..<image.height).filter { row in
-                (0..<image.width).contains { pixels[(row * image.width + $0) * 4 + 3] > 127 }
-            }
-            if let top = inked.first, let bottom = inked.last {
-                drop = CGFloat(top + bottom + 1 - image.height) / 2 / CGFloat(scale)
-            }
-        }
-        inkDrops[symbol] = drop
-        return drop
-    }
+    private static let font = Font.system(size: 10, weight: .semibold)
 }
 
-/// Marks a variable family wherever it's listed, apart from the kinds of file, with the symbol of its axes and, on
-/// hover, their names.
 struct VariableTag: View {
     let family: Family
 
@@ -271,17 +320,15 @@ struct VariableTag: View {
         }
     }
 
-    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in `AxisOrder`.
     private var help: String {
         var axes: [VariationAxis] = []
         for face in family.faces {
             for axis in face.face.axes where !axes.contains(where: { $0.name == axis.name }) { axes.append(axis) }
         }
-        return axes.isEmpty ? "Variable" : "Variable: " + AxisOrder.sorted(axes, by: \.tag).map(\.name).joined(separator: ", ")
+        return axes.isEmpty ? "Variable" : "Variable: " + axes.map(\.name).joined(separator: ", ")
     }
 }
 
-/// A small capsule for families that aren't simply on or off.
 struct StatusTag: View {
     let family: Family
 
@@ -292,15 +339,13 @@ struct StatusTag: View {
     }
 
     private var content: (String, Color, String?)? {
-        // With the symbols of New Application Set and Activate Temporarily.
-        if family.temporaryScope == .whileAppsRun { return ("App Set", .appSet, "app.badge.checkmark") }
+        if family.temporaryScope == .whileAppsRun { return ("App Folder", .appSet, "app.badge.checkmark") }
         if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
-        // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Testing.
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
         case .system: return ("System", .secondary, nil)
-        case .partial: return ("Partly active", .orange, nil)
-        case .appOnly(let app): return (app == "Adobe" ? "Testing" : app, .red, nil)
+        case .partial: return ("Partly Active", .orange, nil)
+        case .appOnly(let app): return (app == "Adobe" ? "Proofing" : app, .red, nil)
         case .active, .inactive: return nil
         }
     }
@@ -308,7 +353,7 @@ struct StatusTag: View {
     private var help: String {
         switch (family.temporaryScope, family.state) {
         case (.untilQuit, _): "Active until Cicero quits"
-        case (.whileAppsRun, _): "Active while an app it’s set up for is open"
+        case (.whileAppsRun, _): "Active while its app is open"
         case (nil, .appOnly) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud. Active in Adobe apps only."
         case (nil, _) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud"
         case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load fonts from by themselves"
@@ -318,9 +363,51 @@ struct StatusTag: View {
     }
 }
 
-/// The system slider on macOS 27, which draws it itself, and one drawn by Cicero on macOS 26, whose slider's
-/// glass knob disappears in toolbar popovers. Continuous, rounded to the step: a stepped system slider can
-/// show a tick for every step.
+struct EmptyState<Actions: View>: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let description: Text?
+    @ViewBuilder var actions: Actions
+
+    init(_ title: LocalizedStringKey, systemImage: String, description: Text? = nil,
+         @ViewBuilder actions: () -> Actions) {
+        self.title = title
+        self.systemImage = systemImage
+        self.description = description
+        self.actions = actions()
+    }
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage).labelStyle(EmptyStateLabelStyle())
+        } description: {
+            description?.padding(.top, -4)
+        } actions: {
+            actions.padding(.top, 6)
+        }
+    }
+}
+
+extension EmptyState where Actions == EmptyView {
+    init(_ title: LocalizedStringKey, systemImage: String, description: Text? = nil) {
+        self.init(title, systemImage: systemImage, description: description) {}
+    }
+
+    static func search(text: String = "") -> Self {
+        EmptyState(text.isEmpty ? "No Results" : "No Results for “\(text)”", systemImage: "magnifyingglass",
+                   description: Text("Check the spelling or try a new search."))
+    }
+}
+
+private struct EmptyStateLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: 8) {
+            configuration.icon.font(.system(size: 36)).foregroundStyle(.tertiary)
+            configuration.title.bold()
+        }
+    }
+}
+
 struct ValueSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -331,6 +418,7 @@ struct ValueSlider: View {
 
     var body: some View {
         if #available(macOS 27, *) {
+            // Rounded here rather than given the step: a stepped system slider can show a tick for every step.
             Slider(value: Binding(get: { value }, set: { value = rounded($0) }), in: range)
         } else {
             drawn
@@ -372,78 +460,135 @@ struct ValueSlider: View {
     }
 }
 
-/// The number beside a slider, which takes one typed in as well: on Return, or when it loses focus, it's kept to
-/// the slider's range and rounded to its step. ↑ and ↓ step it, ten steps with ⇧.
 struct ValueField: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double = 1
-    /// After the number: " pt", "%".
     var unit = ""
+    var alignment = HorizontalAlignment.trailing
     @State private var text = ""
+    @State private var owner: Binding<Double>?
     @FocusState private var isFocused: Bool
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") {
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "", alignment: HorizontalAlignment = .trailing) {
         self.title = title
         _value = value
         self.range = range
         self.step = step
         self.unit = unit
+        self.alignment = alignment
+        // The number from the start, not once it appears: a field measured before it's on screen, as `TesterControls` does, would measure as wide as its title, which it shows while empty.
+        _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            TextField(title, text: $text)
-                .labelsHidden()
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.trailing)
-                .focused($isFocused)
-                .onSubmit(commit)
-                .onKeyPress(keys: [.upArrow, .downArrow]) { press in
-                    let steps = press.modifiers.contains(.shift) ? 10.0 : 1
-                    set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
-                    return .handled
-                }
+        let content = HStack(spacing: 0) {
+            number
             // In the number's colour: forms grey a row's value text.
             Text(unit).foregroundStyle(.primary)
         }
+        Group {
+            if alignment == .leading {
+                ZStack(alignment: .leading) {
+                    Text(formatted(range.lowerBound) + unit).hidden()
+                    Text(formatted(range.upperBound) + unit).hidden()
+                    content
+                }
+            } else {
+                content.frame(width: 52, alignment: .trailing)
+            }
+        }
         .monospacedDigit()
-        .frame(width: 52, alignment: .trailing)
         .onAppear { text = formatted(value) }
-        // The slider moved; typing leaves the value alone until it's committed.
         .onChange(of: value) { text = formatted($1) }
-        .onChange(of: isFocused) { if !$1 { commit() } }
+        .onChange(of: isFocused) {
+            if $1 {
+                owner = $value
+            } else {
+                commit()
+                owner = nil
+            }
+        }
     }
 
-    /// What's typed, with a decimal comma or point.
+    @ViewBuilder
+    private var number: some View {
+        let field = TextField(title, text: $text)
+            .labelsHidden()
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .onSubmit(commit)
+            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                let steps = press.modifiers.contains(.shift) ? 10.0 : 1
+                set((typed ?? value) + (press.key == .upArrow ? step : -step) * steps)
+                return .handled
+            }
+        if alignment == .leading {
+            field.fixedSize().padding(.trailing, -4)
+        } else {
+            field.multilineTextAlignment(.trailing)
+        }
+    }
+
     private var typed: Double? {
-        Double(text.trimmingCharacters(in: .whitespaces).replacing(",", with: "."))
+        let text = text.trimmingCharacters(in: .whitespaces)
+        // A parse in the Mac's format stops at the other decimal mark, taking 12.5 for 12 in German.
+        return Double(text.replacing(",", with: ".")) ?? (try? Double(text, format: .number.grouping(.never)))
     }
 
     private func commit() {
-        if let typed { set(typed) } else { text = formatted(value) }
+        let target = owner ?? $value
+        guard text != formatted(target.wrappedValue) else { return }
+        if let typed { set(typed, on: target) } else { text = formatted(value) }
     }
 
-    private func set(_ new: Double) {
-        value = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+    private func set(_ new: Double, on target: Binding<Double>? = nil) {
+        let target = target ?? owner ?? $value
+        let new = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+        // Within a thousandth of a step: rounding to the step can leave the same number a hair apart.
+        if abs(new - target.wrappedValue) > step / 1000 { target.wrappedValue = new }
         text = formatted(value)
     }
 
     private func formatted(_ value: Double) -> String {
-        String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
+        Self.formatted(value, step: step)
+    }
+
+    private static func formatted(_ value: Double, step: Double) -> String {
+        let decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0
+        return value.formatted(.number.grouping(.never).precision(.fractionLength(0...max(decimals, 1))))
     }
 }
 
-/// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
+struct DetailToggle: View {
+    let title: String
+    let detail: String
+    @Binding var isOn: Bool
+
+    init(_ title: String, detail: String, isOn: Binding<Bool>) {
+        self.title = title
+        self.detail = detail
+        _isOn = isOn
+    }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .toggleStyle(.checkbox)
+    }
+}
+
 struct StillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.contentShape(.rect)
     }
 }
 
-/// A push button the same as the default one, to the pixel on macOS 26, in light and dark, that stays the same while
-/// it's held down rather than darkening. Greyed out within a point or two of the default one.
 struct StillPushButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         StillPushButton(label: configuration.label)
@@ -464,8 +609,6 @@ struct StillPushButtonStyle: ButtonStyle {
     }
 }
 
-/// A borderless + or − under a list, as in System Settings. The default button style gives each
-/// a glass capsule on macOS 26, narrower when disabled.
 struct ListEditButton: View {
     let title: String
     let systemImage: String
@@ -488,7 +631,6 @@ struct ListEditButton: View {
     }
 }
 
-/// A + or − under a list in a card (see `inCard`).
 struct CardListButton {
     let title: String
     let help: String
@@ -496,8 +638,6 @@ struct CardListButton {
 }
 
 extension View {
-    /// A list in a card with + and − along its bottom, like the lists in System Settings: Settings → Folders,
-    /// and the apps of an application set. Its rows take `cardRow`.
     func inCard(add: CardListButton, remove: CardListButton, canRemove: Bool) -> some View {
         VStack(spacing: 0) {
             listStyle(.plain)
@@ -516,26 +656,21 @@ extension View {
             .padding(.horizontal, 4)
             .padding(.vertical, 3)
         }
-        // The fill and corners of the grouped forms' cards.
         .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
         .clipShape(.rect(cornerRadius: 12, style: .continuous))
     }
 
-    /// Every other row tinted, without separators. A list's own stripes are opaque and would hide the card.
     func cardRow(_ index: Int) -> some View {
         listRowBackground(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
             .listRowSeparator(.hidden)
     }
 }
 
-/// What a folder's fonts are, in its row in Settings → Folders and its menu in the sidebar: Inactive, Active
-/// (Cicero keeps them on), or active in an app that loads the folder by itself. `askForApp` asks for that app's name.
 struct FolderActivationPicker: View {
     let folder: WatchedFolder
     let askForApp: () -> Void
     @Environment(AppModel.self) private var model
 
-    /// Tags that aren't app names.
     private static let active = "\u{0}active", specificApp = "\u{0}app"
 
     var body: some View {
@@ -545,27 +680,24 @@ struct FolderActivationPicker: View {
                 switch choice {
                 case Self.specificApp: askForApp()
                 case Self.active: model.setActivation(ofFolder: folder.id, active: true, app: nil)
-                default: model.setActivation(ofFolder: folder.id, active: false, app: choice)
+                default: model.setActivation(ofFolder: folder.id, active: false, app: choice.isEmpty ? nil : choice)
                 }
             }
         )) {
             Text("Inactive").tag("")
             Text("Active").tag(Self.active)
-            Text("Active in Adobe apps").tag("Adobe")
-            // One typed in, or InDesign from before there was Active in Specific App.
+            Text("Active in Adobe Apps").tag("Adobe")
             if let app = folder.appName, app != "Adobe" {
                 Text("Active in \(FaceState.appDescription(app))").tag(app)
             }
             Divider()
             Text("Active in Specific App").tag(Self.specificApp)
         } label: {
-            Label("Fonts in This Folder", systemImage: "switch.2")
+            Label("Fonts in This Location", systemImage: "switch.2")
         }
     }
 }
 
-/// A pop-up menu that always shows its background. In grouped forms on macOS 26, a SwiftUI Picker
-/// (and a plain NSPopUpButton) is only its text and a chevron until the pointer is over it.
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value
@@ -603,10 +735,6 @@ final class PopUpTarget: NSObject {
     }
 }
 
-/// Icons side by side, one of them chosen, always the same width. A SwiftUI segmented picker (and an NSSegmentedControl
-/// sizing its own segments) measures 77 pt before it's in a window and 74 pt once it is, so a font page drew it wider
-/// at first, then narrower the next time the page was laid out: it, and the size beside it, moved as the page filled
-/// in. Segments of a set width measure the same either way.
 struct IconSegments<Value: Hashable>: NSViewRepresentable {
     let title: String
     let options: [(title: String, systemImage: String, value: Value)]
@@ -617,6 +745,7 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
         let images = options.map { NSImage(systemSymbolName: $0.systemImage, accessibilityDescription: $0.title) ?? NSImage() }
         let control = NSSegmentedControl(images: images, trackingMode: .selectOne, target: context.coordinator,
                                          action: #selector(SegmentTarget.choose(_:)))
+        // A set width: segments that size themselves measure 77 pt before the control is in a window and 74 pt once it is.
         for index in options.indices {
             control.setWidth(segmentWidth, forSegment: index)
         }
@@ -636,6 +765,76 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
     func makeCoordinator() -> SegmentTarget { SegmentTarget() }
 }
 
+enum CaseConversion: CaseIterable {
+    case upper, title, lower
+
+    var label: String {
+        switch self {
+        case .upper: "AA"
+        case .title: "Aa"
+        case .lower: "aa"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .upper: "Uppercase"
+        case .title: "Capitalize"
+        case .lower: "Lowercase"
+        }
+    }
+
+    func apply(to text: String, capitalSharpS: Bool = false) -> String {
+        switch self {
+        // Not in the Mac's language, which would put a Turkish user's i in capitals as İ.
+        case .upper: (capitalSharpS ? text.replacingOccurrences(of: "ß", with: "ẞ") : text).uppercased()
+        case .title: text.capitalized
+        case .lower: text.lowercased()
+        }
+    }
+}
+
+struct CaseChange: Equatable {
+    let conversion: CaseConversion
+    let number: Int
+
+    static func next(_ conversion: CaseConversion, after last: CaseChange?) -> CaseChange {
+        CaseChange(conversion: conversion, number: (last?.number ?? 0) + 1)
+    }
+}
+
+struct CaseButtons: NSViewRepresentable {
+    let convert: (CaseConversion) -> Void
+    private let labelPadding: CGFloat = 14
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(labels: CaseConversion.allCases.map(\.label), trackingMode: .momentary,
+                                         target: context.coordinator, action: #selector(SegmentTarget.choose(_:)))
+        let font = control.font ?? .systemFont(ofSize: NSFont.systemFontSize)
+        let widest = CaseConversion.allCases.map { ($0.label as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        let segmentWidth = (widest + labelPadding).rounded(.up)
+        for (index, conversion) in CaseConversion.allCases.enumerated() {
+            control.setWidth(segmentWidth, forSegment: index)
+            control.setToolTip(conversion.title, forSegment: index)
+        }
+        control.setAccessibilityLabel("Case")
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.onChoose = { index in
+            guard CaseConversion.allCases.indices.contains(index) else { return }
+            convert(CaseConversion.allCases[index])
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSSegmentedControl, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+
+    func makeCoordinator() -> SegmentTarget { SegmentTarget() }
+}
+
 final class SegmentTarget: NSObject {
     var onChoose: (Int) -> Void = { _ in }
 
@@ -645,88 +844,113 @@ final class SegmentTarget: NSObject {
 }
 
 extension View {
-    /// A bar over the top of the scroll view in this view, on the window's background, which what scrolls under it
-    /// fades into just below it, as under the main window's title, rather than meeting at an edge. The system's soft
-    /// edge fades less far than a tall bar reaches, so rows showed behind its lower half.
-    func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
+    @ViewBuilder func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
         let fade: CGFloat = 18
-        return scrollEdgeEffectHidden(true, for: .top)
-            .contentMargins(.top, fade, for: .scrollContent)
-            .safeAreaBar(edge: .top, spacing: 0) {
-                bar()
-                    .background(.background)
-                    .overlay(alignment: .bottom) {
-                        Rectangle()
-                            .fill(.background)
-                            .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
-                            .frame(height: fade)
-                            .offset(y: fade)
-                            .allowsHitTesting(false)
-                    }
+        let fadingBar = bar()
+            .background(.background)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(.background)
+                    .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
+                    .frame(height: fade)
+                    .offset(y: fade)
+                    .allowsHitTesting(false)
             }
+        if #available(macOS 26, *) {
+            scrollEdgeEffectHidden(true, for: .top)
+                .contentMargins(.top, fade, for: .scrollContent)
+                .safeAreaBar(edge: .top, spacing: 0) { fadingBar }
+        } else {
+            contentMargins(.top, fade, for: .scrollContent)
+                .safeAreaInset(edge: .top, spacing: 0) { fadingBar }
+        }
     }
 
-    /// For a section footer in a grouped form: moves it closer to its card than the default gap.
     func formFooter() -> some View {
         padding(.top, -4)
     }
 
-    /// For a grouped-form row with a button, pop-up or segmented picker: macOS 26 sets those 2 pt
-    /// above the middle of the row (6 pt above, 10 below), and the label with them.
     func formRowCentered() -> some View {
         offset(y: 2)
     }
 }
 
-/// Lays children out left to right, wrapping onto new lines.
 struct FlowLayout: Layout {
     var spacing: CGFloat
     var lineSpacing: CGFloat
 
-    /// The children's sizes, measured once per update rather than for every proposal and again to place them:
-    /// specimens are a lazy stack's rows, which it measures over and over while scrolling, and each child is
-    /// text in a face of its own.
-    func makeCache(subviews: Subviews) -> [CGSize] {
-        subviews.map { $0.sizeThatFits(.unspecified) }
+    struct Child {
+        var size: CGSize
+        var baseline: CGFloat
     }
 
-    func updateCache(_ cache: inout [CGSize], subviews: Subviews) {
+    func makeCache(subviews: Subviews) -> [Child] {
+        subviews.map { subview in
+            let dimensions = subview.dimensions(in: .unspecified)
+            return Child(size: CGSize(width: dimensions.width, height: dimensions.height), baseline: dimensions[.firstTextBaseline])
+        }
+    }
+
+    func updateCache(_ cache: inout [Child], subviews: Subviews) {
         cache = makeCache(subviews: subviews)
     }
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) -> CGSize {
         let width = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
-        for size in cache {
-            if x > 0 && x + size.width > width {
-                y += lineHeight + lineSpacing
-                x = 0
-                lineHeight = 0
-            }
-            x += size.width + spacing
-            widest = max(widest, x - spacing)
-            lineHeight = max(lineHeight, size.height)
-        }
-        return CGSize(width: min(widest, width), height: y + lineHeight)
+        let lines = lines(of: cache, width: width)
+        let widest = lines.map(\.width).max() ?? 0
+        let height = lines.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(lines.count - 1, 0))
+        return CGSize(width: min(widest, width), height: height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [CGSize]) {
-        var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
-        for (subview, size) in zip(subviews, cache) {
-            if x > bounds.minX && x + size.width > bounds.maxX {
-                y += lineHeight + lineSpacing
-                x = bounds.minX
-                lineHeight = 0
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) {
+        var y = bounds.minY
+        for line in lines(of: cache, width: bounds.width) {
+            var x = bounds.minX
+            for index in line.children {
+                let child = cache[index]
+                subviews[index].place(at: CGPoint(x: x, y: y + line.baseline - child.baseline), proposal: ProposedViewSize(child.size))
+                x += child.size.width + spacing
             }
-            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            lineHeight = max(lineHeight, size.height)
+            y += line.height + lineSpacing
         }
+    }
+
+    private struct Line {
+        var children: [Int] = []
+        var width: CGFloat = 0
+        var baseline: CGFloat = 0
+        var below: CGFloat = 0
+        var height: CGFloat { baseline + below }
+    }
+
+    private func lines(of children: [Child], width: CGFloat) -> [Line] {
+        var lines: [Line] = []
+        for (index, child) in children.enumerated() {
+            let gap = lines.last.map { $0.children.isEmpty ? 0 : spacing } ?? 0
+            if lines.isEmpty || (lines[lines.count - 1].width > 0 && lines[lines.count - 1].width + gap + child.size.width > width) {
+                lines.append(Line())
+            }
+            var line = lines.removeLast()
+            line.width += (line.children.isEmpty ? 0 : spacing) + child.size.width
+            line.baseline = max(line.baseline, child.baseline)
+            line.below = max(line.below, child.size.height - child.baseline)
+            line.children.append(index)
+            lines.append(line)
+        }
+        return lines
     }
 }
 
-/// The toolbar button with sample text, size, weight and spacing.
+struct OwnPreviewOptions {
+    var text: Binding<String>
+    var placeholder: String
+    var size: Binding<Double>
+    var sizeRange: ClosedRange<Double>
+}
+
 struct PreviewOptionsButton: View {
+    var own: OwnPreviewOptions?
     @State private var isPresented = false
 
     var body: some View {
@@ -735,52 +959,76 @@ struct PreviewOptionsButton: View {
         } label: {
             Label("Preview Options", systemImage: "textformat.size")
         }
-        .buttonStyle(.toolbar)
-        .help("Preview text, size, weight, spacing and alignment")
-        .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions() }
+        .toolbarButtonStyle(isOn: isPresented)
+        .help("Preview text and size")
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(own: own) }
     }
 }
 
 private struct PreviewOptions: View {
     @Environment(PreviewSettings.self) private var preview
+    let own: OwnPreviewOptions?
 
     var body: some View {
         @Bindable var preview = preview
+        let text = own?.text ?? $preview.sampleText
         Form {
             Section {
-                TextField("Preview Text", text: $preview.sampleText, prompt: Text("Font name"))
-                Menu("Presets") {
-                    Button("Font Name") { preview.sampleText = "" }
-                    Divider()
-                    ForEach(PreviewSettings.presets, id: \.self) { sample in
-                        Button(sample) { preview.sampleText = sample }
+                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview Text"))
+                    .labelsHidden()
+                HStack {
+                    Menu("Presets\u{200A}") {
+                        ForEach(preview.savedPresets, id: \.self) { sample in
+                            Button(Self.title(of: sample)) { text.wrappedValue = sample }
+                        }
+                        if !preview.savedPresets.isEmpty {
+                            Divider()
+                        }
+                        ForEach(PreviewSettings.presets, id: \.self) { sample in
+                            Button(sample) { text.wrappedValue = sample }
+                        }
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .fixedSize()
+                    Spacer()
+                    if preview.isSavedPreset(text.wrappedValue) {
+                        Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
+                            .help("Takes the preview text out of Presets")
+                    } else {
+                        Button("Save as Preset") { preview.savedPresets.append(text.wrappedValue) }
+                            .disabled(!preview.canSavePreset(text.wrappedValue))
+                            .help("Adds the preview text to Presets")
                     }
                 }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .fixedSize()
+                // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
+                LabeledContent("Case") {
+                    CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
+                }
             }
             Section {
-                row("Size", $preview.size, range: 8...160, unit: " pt")
-                row("Weight", $preview.weight, range: 100...900)
-                row("Letter Spacing", $preview.tracking, range: -10...40, step: 0.5, unit: "%")
-                row("Line Spacing", $preview.lineSpacing, range: 80...250, step: 5, unit: "%")
-                    .help("The distance between lines, in percent of the size, where a sample runs over several lines")
-                LabeledContent("Alignment") {
-                    Picker("Alignment", selection: $preview.alignment) {
-                        ForEach(SampleAlignment.allCases, id: \.self) { Label($0.title, systemImage: $0.icon).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelStyle(.iconOnly)
-                    .labelsHidden()
-                    .fixedSize()
+                if let own {
+                    row("Size", own.size, range: own.sizeRange, unit: " pt")
+                } else if let factor = GridScale.shared.factor {
+                    row("Size", Binding {
+                        GridScale.drawn(preview.size, factor: factor)
+                    } set: {
+                        preview.size = min(max(GridScale.chosen(drawing: $0, factor: factor), PreviewSettings.sizes.lowerBound), PreviewSettings.sizes.upperBound)
+                    }, range: GridScale.drawn(PreviewSettings.sizes.lowerBound, factor: factor)...GridScale.drawn(PreviewSettings.sizes.upperBound, factor: factor), unit: " pt")
+                    .help("The size the grid shows now. With the sidebar shown and the Info panel closed, it’s \(Int(preview.size)) pt.")
+                } else {
+                    row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
                 }
-                .help("How samples line up in specimens and Quick Look; font pages have their own alignment")
             }
         }
         .formStyle(.grouped)
+        .popoverFormMargins()
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private static func title(of preset: String) -> String {
+        preset.count > 48 ? String(preset.prefix(47)) + "…" : preset
     }
 
     private func row(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "") -> some View {
@@ -793,13 +1041,35 @@ private struct PreviewOptions: View {
     }
 }
 
-/// The Info panel toggle, highlighted while the panel is open, like the view picker's choice; toolbars
-/// give it a capsule of its own.
+extension View {
+    @ViewBuilder func popoverFormMargins() -> some View {
+        if #available(macOS 26, *) {
+            self
+        } else {
+            // Not contentMargins, which add to the 20 pt macOS 15 leaves around a popover's sections rather than replace them.
+            padding(-10)
+        }
+    }
+}
+
+struct WindowTitleTint: ViewModifier {
+    @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if appearsActive && colorScheme == .dark {
+            content.foregroundStyle(Color.ink.opacity(0.92))
+        } else {
+            content.foregroundStyle(.primary.opacity(appearsActive ? 0.83 : 0.34))
+        }
+    }
+}
+
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Toggle(isOn: Binding(get: { model.isInfoPresented }, set: { model.isInfoPresented = $0 })) {
+        Toggle(isOn: Binding(get: { model.isInfoShown }, set: { model.isInfoShown = $0 })) {
             Label("Info", systemImage: "info.circle")
         }
         .toggleStyle(.toolbar)

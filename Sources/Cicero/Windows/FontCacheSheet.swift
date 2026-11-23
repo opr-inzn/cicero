@@ -4,7 +4,6 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Clear Font Caches sheet, and offers a restart afterwards when macOS’s caches were cleared.
     func fontCacheSheet(isPresented: Binding<Bool>) -> some View {
         modifier(FontCacheSheetModifier(isPresented: isPresented))
     }
@@ -19,14 +18,15 @@ private struct FontCacheSheetModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $isPresented) {
-                // The alert waits for the sheet to go away.
                 guard clearedSystemCaches else { return }
                 clearedSystemCaches = false
                 isOfferingRestart = true
             } content: {
-                FontCacheSheet { clearedSystemCaches = $0 }
+                FontCacheSheet { cleared in
+                    if isPresented { clearedSystemCaches = cleared } else if cleared { isOfferingRestart = true }
+                }
             }
-            .alert("Font caches cleared", isPresented: $isOfferingRestart) {
+            .alert("Font Caches Cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
                     if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart") }
                 }
@@ -36,7 +36,6 @@ private struct FontCacheSheetModifier: ViewModifier {
             }
     }
 
-    /// Asks loginwindow to restart, which asks apps to quit first; false when macOS refused.
     private static func restart() -> Bool {
         var error: NSDictionary?
         _ = NSAppleScript(source: "tell application \"loginwindow\" to «event aevtrrst»")?.executeAndReturnError(&error)
@@ -44,9 +43,7 @@ private struct FontCacheSheetModifier: ViewModifier {
     }
 }
 
-/// Which font caches to clear: macOS’s for this account or every user, Adobe’s and Office’s.
 struct FontCacheSheet: View {
-    /// Called before the sheet closes with whether macOS’s caches were cleared.
     let onCleared: (Bool) -> Void
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -54,7 +51,6 @@ struct FontCacheSheet: View {
     @State private var allUsers = false
     @State private var apps: Set<AppFontCaches.App> = []
     @State private var adobeCaches: AppFontCaches.Found?
-    /// The name of a running app that reads each cache, while one is running.
     @State private var runningApps: [AppFontCaches.App: String] = [:]
     @State private var isClearing = false
 
@@ -65,15 +61,14 @@ struct FontCacheSheet: View {
                 Text("macOS and some apps keep lists of fonts that can go stale after fonts change. Clearing them makes the lists get rebuilt. You may need to restart your Mac afterwards.")
                     .foregroundStyle(.secondary)
             }
-            Form {
-                option("macOS (my account)", isOn: $currentUser, detail: "Removes your account’s font caches and restarts the font service.")
-                option("macOS (all users)", isOn: $allUsers, detail: "Needs an administrator password.")
-                option("Adobe apps", isOn: includes(.adobe), detail: adobeDetail)
+            VStack(alignment: .leading, spacing: 10) {
+                DetailToggle("macOS (your account)", detail: "Removes your account’s font caches and restarts the font service.", isOn: $currentUser)
+                DetailToggle("macOS (all users)", detail: "Needs an administrator password.", isOn: $allUsers)
+                DetailToggle("Adobe apps", detail: adobeDetail, isOn: includes(.adobe))
                     .disabled(runningApps[.adobe] != nil || adobeCaches?.isEmpty == true)
-                option("Microsoft Office", isOn: includes(.office), detail: officeDetail)
+                DetailToggle("Microsoft Office", detail: officeDetail, isOn: includes(.office))
                     .disabled(runningApps[.office] != nil)
             }
-            .formStyle(.grouped)
             .fixedSize(horizontal: false, vertical: true)
             .disabled(isClearing)
             HStack {
@@ -101,16 +96,6 @@ struct FontCacheSheet: View {
             }
             runningApps = names
         }
-    }
-
-    private func option(_ title: String, isOn: Binding<Bool>, detail: String) -> some View {
-        Toggle(isOn: isOn) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-            }
-        }
-        .toggleStyle(.checkbox)
     }
 
     private func includes(_ app: AppFontCaches.App) -> Binding<Bool> {

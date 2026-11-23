@@ -1,25 +1,18 @@
 import CiceroCore
 import SwiftUI
 
-/// A titled group of families in a `FamilyRowList`.
 struct FamilyRowSection: Identifiable {
     var id: String
     var title: String?
     var families: [Family]
-    /// Shown when there are no families.
     var emptyText: String?
 }
 
-/// Families as rows with a selection of their own, for the Character Toolbox: click, ⌘- and ⇧-click and
-/// the arrow keys select, double-click or Return opens, right-click for the family menu. A lazy stack, not
-/// a Table or List: those make every row whenever an accessibility client walks the window, which keeps
-/// the app busy for minutes with a thousand families. Section titles scroll with the rows rather than pin, so rows
-/// only meet the bar above them, where they fade out (see `safeAreaBar`) instead of ending at a title's edge.
 struct FamilyRowList<Row: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let sections: [FamilyRowSection]
     @Binding var selection: Set<String>
-    let open: (String) -> Void
     @ViewBuilder let row: (Family) -> Row
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
@@ -28,6 +21,7 @@ struct FamilyRowList<Row: View>: View {
         let ids = sections.flatMap { $0.families.map(\.id) }
         ScrollViewReader { proxy in
             ScrollView {
+                // A lazy stack, not a Table or List: those make every row whenever an accessibility client walks the window.
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(sections) { section in
                         Section {
@@ -54,7 +48,8 @@ struct FamilyRowList<Row: View>: View {
             .focused($focused)
             .focusEffectDisabled()
             .onKeyPress(.return) {
-                guard selection.count == 1, let id = selection.first else { return .ignored }
+                let shown = selection.filter(ids.contains)
+                guard shown.count == 1, let id = shown.first else { return .ignored }
                 open(id)
                 return .handled
             }
@@ -69,6 +64,11 @@ struct FamilyRowList<Row: View>: View {
                 return .handled
             }
         }
+    }
+
+    private func open(_ id: String) {
+        model.openFamilyID = id
+        openWindow(id: WindowID.main)
     }
 
     private func item(_ family: Family, isStriped: Bool, ids: [String]) -> some View {
@@ -90,14 +90,15 @@ struct FamilyRowList<Row: View>: View {
                 focused = true
                 FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor)
             })
-            .contextMenu {
-                let targets = selection.contains(family.id) && selection.count > 1 ? ids.filter(selection.contains) : [family.id]
-                FamilyMenu(families: targets.compactMap(model.family), model: model)
-            }
-            .draggable(family.id)
+            .contextMenu { FamilyMenu(families: targets(for: family.id, in: ids).compactMap(model.family), model: model) }
+            .familyDrag { targets(for: family.id, in: ids).compactMap(model.family) }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { open(family.id) }
             .accessibilityAction(named: "Select") { FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor) }
+    }
+
+    private func targets(for id: String, in ids: [String]) -> [String] {
+        selection.contains(id) && selection.count > 1 ? ids.filter(selection.contains) : [id]
     }
 }

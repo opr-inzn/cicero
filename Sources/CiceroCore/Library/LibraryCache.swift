@@ -1,11 +1,8 @@
 import Foundation
 
-/// The library the last scan built, saved for the next launch, so the window opens with the fonts in it
-/// instead of waiting for that launch's first scan. Written like the face cache, which it takes faces from,
-/// and for the same reason: it's read before the window appears.
 enum LibraryCache {
-    private static let magic: UInt32 = 0x4243_4C43  // "CLCB"
-    private static let version: UInt32 = 1
+    private static let magic: UInt32 = 0x4243_4C43
+    private static let version: UInt32 = 2
 
     private struct SavedFamily: Sendable {
         var name: String
@@ -33,6 +30,8 @@ enum LibraryCache {
                 writer.write(face.app)
                 writer.write(face.state)
                 writer.write(face.dateAdded?.timeIntervalSinceReferenceDate)
+                writer.write(UInt32(face.folderIDs.count))
+                for id in face.folderIDs { writer.write(id) }
                 writer.write(UInt32(face.copies.count))
                 for copy in face.copies {
                     writer.write(copy.face.path)
@@ -46,7 +45,6 @@ enum LibraryCache {
         writer.write(Array(library.activePaths))
         writer.write(UInt32(library.unavailableFolders.count))
         for (id, availability) in library.unavailableFolders {
-            // A disk that isn't connected is saved as not found, as 1.5.2 reads it, with its name at the end.
             let tag: UInt8 = switch availability {
             case .notFound, .disconnected: 0
             case .noAccess: 1
@@ -60,7 +58,6 @@ enum LibraryCache {
             writer.write(paths)
         }
         writer.write(Array(library.offlineFamilies))
-        // Last, so 1.5.2, which stops reading before them, still reads the rest.
         writer.write(Array(library.offlinePaths))
         let disconnected = library.unavailableFolders.compactMap { id, availability in
             if case .disconnected(let volume) = availability { (id, volume) } else { nil }
@@ -73,15 +70,14 @@ enum LibraryCache {
         return writer.data
     }
 
-    /// nil when the data isn't a library this version saved. `current` gives a face's state now from the
-    /// saved one, the face's file and the app that loads it.
     static func decode(_ data: Data, current: (FaceState, String, String?) -> FaceState = { state, _, _ in state }) -> Library? {
         data.withUnsafeBytes { buffer -> Library? in
             var reader = ByteReader(buffer: buffer)
             do {
-                guard try reader.u32() == magic, try reader.u32() == version, try reader.u32() == FaceCache.version else { return nil }
+                guard try reader.u32() == magic, try reader.u32() == version else { return nil }
+                let faces = try reader.u32()
+                guard faces == FaceCache.version || faces == FaceCache.withoutFigures else { return nil }
                 let fingerprint = Int(try reader.i64())
-                // Read in one pass; making the families, most of the work, is spread over the cores after.
                 var members: [SavedFamily] = []
                 for _ in 0..<Int(try reader.u32()) {
                     let name = try reader.string()
@@ -95,6 +91,8 @@ enum LibraryCache {
                         let app = try reader.optionalString()
                         let state = current(try reader.state(), path, app)
                         let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
+                        var faceFolderIDs = Set<UUID>()
+                        for _ in 0..<Int(try reader.u32()) { faceFolderIDs.insert(try reader.uuid()) }
                         var copies: [FaceCopy] = []
                         for _ in 0..<Int(try reader.u32()) {
                             let path = try reader.string()
@@ -102,7 +100,7 @@ enum LibraryCache {
                             let app = try reader.optionalString()
                             copies.append(FaceCopy(face: face, state: current(try reader.state(), path, app), app: app))
                         }
-                        faces.append(LibraryFace(face: face, state: state, copies: copies, dateAdded: dateAdded, app: app))
+                        faces.append(LibraryFace(face: face, state: state, copies: copies, dateAdded: dateAdded, app: app, folderIDs: faceFolderIDs))
                     }
                     guard !faces.isEmpty else { return nil }
                     members.append(SavedFamily(name: name, manufacturer: manufacturer, folderIDs: folderIDs, faces: faces))
@@ -128,13 +126,10 @@ enum LibraryCache {
                     onlineOnly[id] = try reader.strings()
                 }
                 let offline = Set(try reader.strings())
-                // Missing from a library 1.5.2 saved.
-                let offlinePaths = reader.isAtEnd ? [] : Set(try reader.strings())
-                if !reader.isAtEnd {
-                    for _ in 0..<Int(try reader.u32()) {
-                        let id = try reader.uuid()
-                        unavailable[id] = .disconnected(try reader.string())
-                    }
+                let offlinePaths = Set(try reader.strings())
+                for _ in 0..<Int(try reader.u32()) {
+                    let id = try reader.uuid()
+                    unavailable[id] = .disconnected(try reader.string())
                 }
                 return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: fingerprint,
                                unavailableFolders: unavailable, onlineOnlyFiles: onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths)
@@ -205,5 +200,4 @@ private extension ByteReader {
     }
 }
 
-/// A value the library cache doesn't know, as from a damaged file.
 private struct LibraryCacheUnknown: Error {}

@@ -1,5 +1,4 @@
 import CiceroCore
-import FoundationModels
 import ServiceManagement
 import SwiftUI
 
@@ -8,6 +7,8 @@ struct GeneralSettings: View {
     @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @AppStorage(UsageStatistics.defaultsKey) private var sharesUsageStatistics = true
+    @AppStorage(MenuBarItem.showsIconKey) private var showsMenuBarIcon = true
+    @AppStorage(MenuBarItem.showsDockIconKey) private var showsDockIcon = true
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
@@ -24,34 +25,39 @@ struct GeneralSettings: View {
                 .pickerStyle(.segmented)
                 .formRowCentered()
             }
+            Section("Menu Bar and Dock") {
+                Toggle(isOn: $showsMenuBarIcon) {
+                    Text("Show Cicero in the menu bar")
+                    Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts of the document you have open, turn folders on and off, see which fonts are on for apps, or quit Cicero.")
+                }
+                Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
+                    Text("Show Cicero in the Dock")
+                    Text(showsMenuBarIcon
+                        ? "When this is off, Cicero is in the Dock only while one of its windows is open."
+                        : "Cicero can leave the Dock only while it’s in the menu bar.")
+                }
+                .disabled(!showsMenuBarIcon)
+            }
             Section("Installation") {
-                Toggle(isOn: $model.data.installsIntoFontLibrary) {
-                    Text("Keep installed fonts in Cicero’s Font Library")
-                    Text("Fonts Cicero installs go into the Font Library, in a folder for each family, and macOS uses them from there. Turned off, a font stays in the library.")
+                Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {
+                    Text("Install fonts into Cicero’s Library")
+                    Text("Instead of putting the installed fonts into your Fonts folder, Cicero keeps them in a folder of its own, and macOS uses them from there. A font you turn off stays in that folder. Microsoft Office can’t use these fonts. When you turn this off, the folder becomes one of your locations.")
                 }
                 LabeledContent {
                     Button("Change") { model.changeFontLibrary() }
                 } label: {
-                    Text("Font Library")
+                    Text("Cicero’s Library")
                     Text((model.data.fontLibraryPath as NSString).abbreviatingWithTildeInPath)
                 }
-                let misplaced = model.misplacedInstalledFonts()
-                if !misplaced.paths.isEmpty {
-                    LabeledContent {
-                        Button("Move Them") { model.moveInstalledFonts() }
-                    } label: {
-                        Text(misplacedNote(misplaced))
-                    }
-                }
                 LabeledContent {
-                    PopUpPicker(options: InstallMethod.allCases.map { ($0.title(intoFontLibrary: model.data.installsIntoFontLibrary), $0) },
+                    PopUpPicker(options: InstallMethod.allCases.map { (title: $0.title(intoFontLibrary: model.data.installsIntoFontLibrary), value: $0) },
                                 selection: $model.data.installMethod)
                 } label: {
-                    Text("Activate fonts by")
-                    Text(activationExplanation)
+                    Text("When you add font files")
+                    Text(addingExplanation)
                 }
                 LabeledContent {
-                    PopUpPicker(options: DuplicateHandling.allCases.map { ($0.title, $0) }, selection: $model.data.duplicateHandling)
+                    PopUpPicker(options: DuplicateHandling.allCases.map { (title: $0.title, value: $0) }, selection: $model.data.duplicateHandling)
                 } label: {
                     Text("When an added font is already in your library")
                     Text(duplicateExplanation)
@@ -65,51 +71,49 @@ struct GeneralSettings: View {
                     Text("Open at login")
                     Text(loginItem == .requiresApproval
                         ? "Allow Cicero in System Settings → General → Login Items."
-                        : "Application sets activate fonts only while Cicero is open.")
+                        : "App folders activate fonts only while Cicero is open.")
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
-                    Text("Ask before activating more than \(UserData.manyFamilies) families at once")
-                    Text("Apps list every font that’s on in their font menus, and many at once can make them slower to open.")
+                    Text("Ask before activating more than \(UserData.manyFamilies.plain) families at once")
+                    Text("Apps load every font that’s on as they open, so turning on many at once can slow them down.")
+                }
+                Toggle(isOn: $model.data.asksBeforeMovingOutOfSharedFolders) {
+                    Text("Ask before moving fonts out of shared folders")
+                    Text("To turn off a font that an app like InDesign loads from its own folder, Cicero moves the file out. When the folder syncs with a cloud service or is on a server, the file goes away for everyone who shares it.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
-                    HStack(spacing: 4) {
-                        Text("Activate the fonts documents use in Adobe apps")
-                        Tag(text: "BETA", tint: .orange)
-                            .help("New, and still being tried out with each app")
-                    }
-                    Text("When a document open in InDesign, Illustrator or Photoshop uses fonts from your library that are off, Cicero activates them until the app quits. It can take a few seconds, and you’ll still see the Missing Fonts dialog as the document opens. macOS asks once whether Cicero may ask each app. Use with caution.")
+                    Text("Auto-activate fonts in Adobe apps")
+                    Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it. Use with caution.")
                 }
-                .onChange(of: model.data.activatesDocumentFonts) { model.openDocumentFonts.settingChanged() }
             }
             Section("Library") {
                 Toggle("Show system fonts", isOn: $model.data.showSystemFonts)
-                Toggle("Show fonts from Creative Cloud", isOn: $model.data.showCreativeCloudFonts)
-                // The folders type designers export fonts to, to test them in Adobe apps.
+                Toggle(isOn: $model.data.showCreativeCloudFonts) {
+                    Text("Show fonts from Creative Cloud")
+                    Text("Creative Cloud activates and deactivates Adobe Fonts. Cicero lists them but can’t manage them.")
+                }
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
-                    Text("Show test fonts installed for Adobe apps")
-                    Text("[https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                    Text("Show fonts installed for proofing in Adobe apps")
+                    Text("Lists the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them. [How to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
-                    HStack(spacing: 6) {
-                        Text("Classify fonts automatically")
-                        Tag(text: "On-device Intelligence", tint: .purple)
-                            .help("Cicero’s own model reads the letters, and Apple Intelligence the names, on this Mac. Nothing is sent.")
-                    }
+                    Text("Classify fonts automatically")
                     Text(guessingExplanation)
                 }
             }
             Section("Maintenance") {
                 LabeledContent("Library") {
                     HStack {
-                        Button("Rebuild") { model.rebuildFontList() }
                         Button("Back Up") { isBackingUp = true }
                         Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
                     }
+                    .disabled(model.job != nil)
                 }
                 .formRowCentered()
                 LabeledContent("macOS, Adobe and Office font caches") {
                     Button("Clear") { isClearingCaches = true }
                         .foregroundStyle(.red)
+                        .disabled(model.job != nil)
                 }
                 .formRowCentered()
             }
@@ -117,53 +121,51 @@ struct GeneralSettings: View {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
-                    Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac. Nothing about you or your fonts is sent.")
+                    Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac.")
                 }
             }
         }
         .formStyle(.grouped)
         .onChange(of: appearance) { appearance.apply() }
-        .onChange(of: sharesUsageStatistics) { if !sharesUsageStatistics { UsageStatistics.forgetID() } }
+        .onChange(of: sharesUsageStatistics) {
+            guard !sharesUsageStatistics else { return }
+            UsageStatistics.forgetID()
+        }
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)
         .restoreSheet(contents: $restoring)
-    }
-
-    /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
-    private var guessingExplanation: String {
-        let what = "When a font’s files don’t say, Cicero tells from the shapes of its letters and, with Apple Intelligence, from its name, on this Mac. Nothing is sent."
-        return switch ClassificationGuesser.availability {
-        case .available: what
-        case .unavailable(.appleIntelligenceNotEnabled): what + " Turn on Apple Intelligence in System Settings to tell from names too."
-        case .unavailable(.modelNotReady): what + " Apple Intelligence is getting ready."
-        case .unavailable: "When a font’s files don’t say, Cicero tells from the shapes of its letters, on this Mac. Nothing is sent."
+        .onAppear { loginItem = LoginItem.status }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem = LoginItem.status
         }
     }
 
-    /// "Cicero installed Inter and Roboto before, in ~/Library/Fonts."
-    private func misplacedNote(_ misplaced: (paths: [String], families: [String: String])) -> String {
-        let count = misplaced.paths.count
-        let names = FontNames.describe(families: Array(Set(misplaced.families.values))) ?? (count == 1 ? "a font" : "\(count) fonts")
-        return "Cicero installed \(names) before, in ~/Library/Fonts."
+    private var guessingExplanation: String {
+        let what = "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes and, with Apple Intelligence, from its name. Everything stays on this Mac."
+        return switch ClassificationGuesser.availability {
+        case .available: what
+        case .notEnabled: what + " Turn on Apple Intelligence in System Settings to use names too."
+        case .notReady: what + " Apple Intelligence is getting ready."
+        case .unavailable: "If a font doesn’t state its classification, Cicero recognizes it from its letter shapes. Everything stays on this Mac."
+        }
     }
 
     private var duplicateExplanation: String {
         switch model.data.duplicateHandling {
-        case .ask: "When a font file you add has fonts your library has from another file, Cicero asks what to do with each family."
-        case .addCopy: "The added file is listed or installed next to the library’s copy, which stays in use."
-        case .skip: "The added file is left out, and the library’s copy stays in use."
-        case .useAdded: "The added file takes over: where the library’s copy is on, it goes off as deactivating does, and the added one goes on."
-        case .keepNewer: "The added file takes over when its version is newer than the library’s copy, and is left out otherwise."
+        case .ask: "Cicero shows each family you already have, and which version is newer, so you can skip the added file, add it as a copy or replace your copy with it."
+        case .addCopy: "Both stay in your library, and your copy stays in use."
+        case .skip: "The added file is left out, and your copy stays in use."
+        case .replace: "Your copy goes to the Trash, and the added file takes its place, under its name and in its folder. If your library has it more than once, or in files that don’t match, Cicero asks first."
         }
     }
 
-    private var activationExplanation: String {
-        let place = model.data.installsIntoFontLibrary ? "Cicero’s Font Library" : "your user Fonts folder"
+    private var addingExplanation: String {
+        let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder"
         return switch model.data.installMethod {
-        case .ask: "Cicero asks each time whether to copy font files into \(place) or activate them from their current location."
-        case .copy: "Copying duplicates font files into \(place)."
-        case .move: "Moving puts font files into \(place); the folders they were in stay."
-        case .inPlace: "Fonts are activated from their current location, but they deactivate if the source moves."
+        case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. Microsoft Office can’t use fonts left where they are."
+        case .copy: "They’re copied into \(place) and turned on. The originals stay where they are."
+        case .move: "They’re moved into \(place) and turned on. Fonts in your locations stay where they are."
+        case .inPlace: "They’re listed under Added Fonts where they are, but not turned on. Microsoft Office can’t use them."
         }
     }
 }
@@ -172,10 +174,9 @@ private extension DuplicateHandling {
     var title: String {
         switch self {
         case .ask: "Ask each time"
-        case .addCopy: "Add it as another copy"
+        case .addCopy: "Add as a copy"
         case .skip: "Skip it"
-        case .useAdded: "Use the added one"
-        case .keepNewer: "Keep the newer version"
+        case .replace: "Replace your copy"
         }
     }
 }
@@ -184,9 +185,9 @@ private extension InstallMethod {
     func title(intoFontLibrary: Bool) -> String {
         switch self {
         case .ask: "Ask each time"
-        case .copy: intoFontLibrary ? "Copy into the Font Library" : "Copy into ~/Library/Fonts"
-        case .move: intoFontLibrary ? "Move into the Font Library" : "Move into ~/Library/Fonts"
-        case .inPlace: "Leave the files where they are"
+        case .copy: intoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move into Cicero’s Library" : "Move into ~/Library/Fonts"
+        case .inPlace: "Leave files where they are"
         }
     }
 }

@@ -1,10 +1,7 @@
 import CoreFoundation
 import Foundation
 
-/// Unicode scalars a face covers, as sorted closed ranges.
 public struct ScalarRanges: Sendable, Equatable {
-    /// Lower and upper bounds, alternating: sorted, non-overlapping and never adjacent, so every
-    /// lookup is a binary search over half the array.
     let bounds: [UInt32]
 
     public init(_ ranges: [ClosedRange<UInt32>]) {
@@ -21,13 +18,10 @@ public struct ScalarRanges: Sendable, Equatable {
         self.bounds = bounds
     }
 
-    /// Bounds already in canonical form (from the cache or the bitmap reader).
     init(bounds: [UInt32]) {
         self.bounds = bounds
     }
 
-    /// Reads a CoreText character set from its bitmap: 8192 bytes for the BMP, then a plane number
-    /// and 8192 bytes for every other plane with members. Bit n of byte b is scalar b * 8 + n.
     public init(characterSet: CFCharacterSet) {
         guard let data = CFCharacterSetCreateBitmapRepresentation(nil, characterSet) else {
             self.init(bounds: [])
@@ -93,7 +87,6 @@ public struct ScalarRanges: Sendable, Equatable {
     }
 
     public func contains(_ scalar: UInt32) -> Bool {
-        // The last range whose lower bound is at or before the scalar is the only one that can hold it.
         var low = 0
         var high = bounds.count / 2
         while low < high {
@@ -103,7 +96,6 @@ public struct ScalarRanges: Sendable, Equatable {
         return low > 0 && scalar <= bounds[low * 2 - 1]
     }
 
-    /// How many of these sorted, unique scalars are missing (one pass over both lists).
     public func missingCount(sorted scalars: [UInt32]) -> Int {
         var missing = 0
         walk(sorted: scalars) { _, present in
@@ -120,7 +112,6 @@ public struct ScalarRanges: Sendable, Equatable {
         return missing
     }
 
-    /// Whether each of these sorted scalars is covered, in the same order.
     func presence(sorted scalars: [UInt32]) -> [Bool] {
         var present: [Bool] = []
         present.reserveCapacity(scalars.count)
@@ -137,7 +128,36 @@ public struct ScalarRanges: Sendable, Equatable {
         }
     }
 
-    /// Every covered scalar, in order.
+    public func filter(_ isIncluded: (UInt32) -> Bool) -> ScalarRanges {
+        var kept: [UInt32] = []
+        for i in stride(from: 0, to: bounds.count, by: 2) {
+            for scalar in bounds[i]...bounds[i + 1] where isIncluded(scalar) {
+                if let last = kept.last, last + 1 == scalar {
+                    kept[kept.count - 1] = scalar
+                } else {
+                    kept.append(scalar)
+                    kept.append(scalar)
+                }
+            }
+        }
+        return ScalarRanges(bounds: kept)
+    }
+
+    public func intersection(_ other: ScalarRanges) -> ScalarRanges {
+        var kept: [UInt32] = []
+        var mine = 0, theirs = 0
+        while mine < bounds.count, theirs < other.bounds.count {
+            let low = max(bounds[mine], other.bounds[theirs])
+            let high = min(bounds[mine + 1], other.bounds[theirs + 1])
+            if low <= high {
+                kept.append(low)
+                kept.append(high)
+            }
+            if bounds[mine + 1] < other.bounds[theirs + 1] { mine += 2 } else { theirs += 2 }
+        }
+        return ScalarRanges(bounds: kept)
+    }
+
     public var scalars: [UInt32] {
         var all: [UInt32] = []
         all.reserveCapacity(count)

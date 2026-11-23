@@ -12,28 +12,45 @@ enum CompareLayout: String, CaseIterable {
     }
 }
 
-/// Families next to each other, each in a style of its choosing: one row each on a shared baseline, or drawn over
-/// each other in tints.
+extension FocusedValues {
+    @Entry var compareSize: Binding<Double>?
+}
+
 struct CompareWindow: View {
+    static let sizes: ClosedRange<Double> = 24...720
+    static let placeholder = "Hamburgefonstiv"
+    static let steps: [Double] = [24, 30, 36, 48, 60, 72, 96, 120, 144, 192, 240, 288, 384, 480, 576, 720]
+
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     @AppStorage("compare.layout") private var layout: CompareLayout = .stacked
-    /// Files on a server read off the main thread for the samples (see `FontLoader.wouldWait`).
+    @AppStorage("compare.size") private var size = 72.0
+    @Bindable private var savedText = SavedSoon.compareText
+    private var text: String { savedText.value }
     @State private var read: Set<String> = []
+    @State private var isAdding = false
+    @State private var viewport: CGSize = .zero
+    @FocusState private var focused: Bool
 
     var body: some View {
         let entries = model.compareEntries.compactMap { entry in
             model.family(entry.familyID).map { family in
-                (entry: entry, family: family, path: CompareSample.face(for: entry, in: family, preview: preview).face.path)
+                (entry: entry, family: family, path: CompareSample.face(for: entry, in: family).face.path)
             }
         }
-        // A family whose file is on a server joins the others once it's been read in the background.
         let waiting = entries.map(\.path).filter { !read.contains($0) && FontLoader.shared.wouldWait(for: $0) }
-        let samples = entries.filter { !waiting.contains($0.path) }.map { CompareSample($0.entry, family: $0.family, model: model, preview: preview) }
+        let samples = entries.filter { !waiting.contains($0.path) }.map {
+            CompareSample($0.entry, family: $0.family, text: text.isEmpty ? Self.placeholder : text, size: size, model: model)
+        }
         Group {
             if entries.isEmpty {
-                ContentUnavailableView("Nothing to Compare", systemImage: "square.on.square",
-                                       description: Text("Select two or more families and choose Fonts → Compare, or drop families here."))
+                // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls under it.
+                ScrollView {
+                    EmptyState("Nothing to Compare", systemImage: "square.on.square",
+                               description: Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")) {
+                        Button("Add Families") { isAdding = true }
+                    }
+                    .containerRelativeFrame([.horizontal, .vertical])
+                }
             } else {
                 ScrollView([.horizontal, .vertical]) {
                     Group {
@@ -43,101 +60,241 @@ struct CompareWindow: View {
                         }
                     }
                     .padding(24)
+                    // As big as the window at least, so samples smaller than it sit at its top left: macOS 15 centres them in a scroll view of both axes, whatever its alignment anchor.
+                    .frame(minWidth: viewport.width, minHeight: viewport.height, alignment: .topLeading)
                 }
                 .defaultScrollAnchor(.topLeading, for: .alignment)
+                .onScrollGeometryChange(for: CGSize.self, of: \.containerSize) { _, size in
+                    if #unavailable(macOS 26) { viewport = size }
+                }
             }
         }
-        .frame(minWidth: 600, minHeight: 400)
+        .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
+        .focusable()
+        .focused($focused)
+        .focusEffectDisabled()
+        .defaultFocus($focused, true)
+        .onChange(of: isAdding) { if !$1 { focused = true } }
+        .onDisappear { model.compareEntries = [] }
         .background(Color.canvas)
-        .dropDestination(for: String.self) { names, _ in _ = model.addToCompare(names) }
+        .background(FontDropTarget { drags in _ = model.addToCompare(drags.flatMap(\.families)) })
         .task(id: waiting) {
             guard !waiting.isEmpty else { return }
             await FontLoader.shared.read(waiting)
             read.formUnion(waiting)
         }
-        .navigationSubtitle(subtitle(entries.map(\.family)))
+        .focusedSceneValue(\.compareSize, $size)
         .toolbar {
-            ToolbarCapsule {
+            ToolbarCapsule { AddFamiliesButton(isPresented: $isAdding) }
+            ToolbarCapsule(spaced: true) {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
                               help: "One row per font, or every font over each other")
             }
-            ToolbarCapsule { PreviewOptionsButton() }
+            ToolbarCapsule(spaced: true) {
+                PreviewOptionsButton(own: OwnPreviewOptions(text: $savedText.value, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
+            }
         }
     }
 }
 
-private extension CompareWindow {
-    /// "2 families", and how many styles when a family is there in more than one: "2 families · 3 styles". One family
-    /// for each sample.
-    func subtitle(_ samples: [Family]) -> String {
-        let families = Set(samples.map(\.id)).count
-        let text = families == 1 ? "1 family" : "\(families) families"
-        return samples.count > families ? "\(text) · \(samples.count) styles" : text
+extension CompareWindow {
+    static func bigger(than size: Double) -> Double {
+        steps.first { $0 > size } ?? sizes.upperBound
+    }
+
+    static func smaller(than size: Double) -> Double {
+        steps.last { $0 < size } ?? sizes.lowerBound
     }
 }
 
-/// One family's sample, set in the style chosen for it, else the one nearest the preview weight.
+private struct AddFamiliesButton: View {
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        Button {
+            isPresented.toggle()
+        } label: {
+            Label("Add Families", systemImage: "plus")
+        }
+        .toolbarButtonStyle(isOn: isPresented)
+        .help("Add families from anywhere in your library")
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) { AddFamilies() }
+    }
+}
+
+private struct AddFamilies: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.self) private var environment
+    @State private var text = ""
+    @State private var families: [Family] = []
+    @State private var highlighted: String?
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        let compared = Set(model.compareEntries.map(\.familyID))
+        let isFull = model.isCompareFull
+        VStack(spacing: 0) {
+            TextField("Search", text: $text, prompt: Text("Search"))
+                .textFieldStyle(.roundedBorder)
+                .focused($isFocused)
+                // The field can keep an action from before the last search: `current` is read when it's pressed.
+                .onSubmit { if let current { toggle(current) } }
+                .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                    guard let current, let index = families.firstIndex(where: { $0.id == current }) else { return .ignored }
+                    highlighted = families[min(max(index + (press.key == .downArrow ? 1 : -1), 0), families.count - 1)].id
+                    return .handled
+                }
+                .padding(10)
+            Divider()
+            if families.isEmpty {
+                Text("No Families Found")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            let current = current
+                            ForEach(families) { family in
+                                let isCompared = compared.contains(family.id)
+                                row(family, isCompared: isCompared, isAvailable: isCompared || !isFull, isHighlighted: family.id == current)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .id(text)
+                    .onChange(of: highlighted) { if let id = $1 { proxy.scrollTo(id) } }
+                }
+            }
+            if isFull {
+                Divider()
+                Text("Compare holds up to \(AppModel.compareLimit.plain) styles. Take one out to add another.")
+                    .font(.callout)
+                    .foregroundStyle(Color(Color.secondary.resolve(in: environment)))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+        }
+        .frame(width: 320, height: 400)
+        .defaultFocus($isFocused, true)
+        .onChange(of: text, initial: true) {
+            families = model.compareCandidates(for: text)
+            highlighted = nil
+        }
+    }
+
+    private var current: String? {
+        highlighted.flatMap { id in families.contains { $0.id == id } ? id : nil } ?? families.first?.id
+    }
+
+    private func toggle(_ id: String) {
+        guard !model.isCompareFull || model.compareEntries.contains(where: { $0.familyID == id }) else { return }
+        model.toggleInCompare(id)
+    }
+
+    private func row(_ family: Family, isCompared: Bool, isAvailable: Bool, isHighlighted: Bool) -> some View {
+        HStack(spacing: 0) {
+            FontText(text: "Aa", face: family.regular.face, size: 14, weight: family.regular.face.styleWeight)
+                // Resolved, as the popover's material lightens a colour that changes with the appearance.
+                .foregroundStyle(isHighlighted ? Color.white : Color(Color.secondary.resolve(in: environment)))
+                .frame(width: 28)
+                .padding(.trailing, 3)
+                .opacity(isAvailable ? 1 : 0.4)
+            Text(family.name)
+                .foregroundStyle(isHighlighted ? Color.white : Color(Color.primary.resolve(in: environment)))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .opacity(isAvailable ? 1 : 0.4)
+            Spacer(minLength: 8)
+            Image(systemName: "checkmark")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(isHighlighted ? Color.white : Color.accentColor)
+                .opacity(isCompared ? 1 : 0)
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 14)
+        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+        .background {
+            if isHighlighted {
+                RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .selectedContentBackgroundColor)).padding(.horizontal, 5)
+            }
+        }
+        .id(family.id)
+        .contentShape(.rect)
+        .onTapGesture {
+            highlighted = family.id
+            toggle(family.id)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isCompared ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { toggle(family.id) }
+    }
+}
+
 private struct CompareSample: Identifiable {
-    static let tints: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .teal, .indigo, .brown, .cyan, .mint, .yellow]
+    static let tints: [(title: String, color: Color)] = [
+        ("Blue", .blue), ("Red", .red), ("Green", .green), ("Orange", .orange), ("Purple", .purple), ("Pink", .pink),
+        ("Teal", .teal), ("Indigo", .indigo), ("Brown", .brown), ("Cyan", .cyan), ("Mint", .mint), ("Yellow", .yellow),
+    ]
 
     let family: Family
     let face: LibraryFace
-    /// The style chosen; nil when it follows the preview weight.
-    let style: FaceID?
     let line: TextLine
-    let tint: Color
+    // Not the font's ascent, which often keeps room for accents and line spacing far above the ascenders.
+    let letterAscent: CGFloat
+    let tintIndex: Int
     let id: UUID
 
-    init(_ entry: CompareEntry, family: Family, model: AppModel, preview: PreviewSettings) {
+    var tint: Color { Self.tints[tintIndex].color }
+
+    init(_ entry: CompareEntry, family: Family, text: String, size: Double, model: AppModel) {
         self.family = family
         id = entry.id
         let chosen = Self.chosenStyle(of: entry, in: family)
-        style = chosen?.id
-        face = Self.face(for: entry, in: family, preview: preview)
-        let weight = chosen.map(\.face.styleWeight) ?? preview.weight
-        let font = FontLoader.shared.font(face.face, size: preview.size, weight: weight, variations: model.variations(for: family, face: face.id))
-        line = TextLine(preview.sampleText.isEmpty ? "Hamburgefonstiv" : preview.sampleText, font: font, kerning: preview.kerning(at: preview.size))
-        tint = Self.tints[entry.tint % Self.tints.count]
+        face = Self.face(for: entry, in: family)
+        let weight = chosen.map(\.face.styleWeight) ?? 400
+        let font = FontLoader.shared.font(face.face, size: size, weight: weight, variations: model.variations(for: family, face: face.id))
+        line = TextLine(text, font: font, kerning: 0)
+        letterAscent = max(line.inkAscent, (GlyphMetrics.ascenderHeight(of: font) ?? 0).rounded(.up))
+        tintIndex = entry.tint % Self.tints.count
     }
 
-    /// The style chosen for the family, if one was.
+    static func topAscent(of samples: [CompareSample]) -> CGFloat {
+        samples.map(\.letterAscent).max() ?? 0
+    }
+
     static func chosenStyle(of entry: CompareEntry, in family: Family) -> LibraryFace? {
         entry.style.flatMap { style in family.faces.first { $0.id == style } }
     }
 
-    /// The style its sample is set in: the one chosen, else the one nearest the preview weight.
-    static func face(for entry: CompareEntry, in family: Family, preview: PreviewSettings) -> LibraryFace {
-        chosenStyle(of: entry, in: family) ?? family.face(nearestWeight: preview.weight)
+    static func face(for entry: CompareEntry, in family: Family) -> LibraryFace {
+        chosenStyle(of: entry, in: family) ?? family.regular
     }
 }
 
-/// One row per font; every row's baseline sits at the same offset, so the samples line up. Dragging a row
-/// changes the order.
 private struct StackedLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        let ascent = samples.map(\.line.ascent).max() ?? 0
-        let descent = samples.map(\.line.descent).max() ?? 0
         let overhang = samples.map(\.line.overhang).max() ?? 0
         let width = (samples.map(\.line.width).max() ?? 0) + 2
+        let top = CompareSample.topAscent(of: samples)
         Reorderable(samples: samples, layout: AnyLayout(VStackLayout(alignment: .leading, spacing: 20)), axis: .vertical) { sample in
-            row(sample, ascent: ascent, descent: descent, overhang: overhang, width: width)
+            row(sample, overhang: overhang, width: width, top: top)
         } lifted: { sample in
-            // Opaque, so the rows it passes don't show through.
-            row(sample, ascent: ascent, descent: descent, overhang: overhang, width: width)
+            row(sample, overhang: overhang, width: width, top: top)
                 .background { Color.canvas.padding(-8) }
         }
     }
 
-    private func row(_ sample: CompareSample, ascent: CGFloat, descent: CGFloat, overhang: CGFloat, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Glyphs reaching left of the start go into the margin, so the lines start level with the names.
+    private func row(_ sample: CompareSample, overhang: CGFloat, width: CGFloat, top: CGFloat) -> some View {
+        let ascent = sample.id == samples.first?.id ? top : sample.line.ascent
+        return VStack(alignment: .leading, spacing: 6) {
             Canvas { context, _ in
-                let color = Color.primary.resolve(in: context.environment).cgColor
+                let color = Color.ink.resolve(in: context.environment).cgColor
                 context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
             }
-            .frame(width: overhang + width, height: ascent + descent)
+            .frame(width: overhang + width, height: ascent + sample.line.descent)
             .padding(.leading, -overhang)
             SampleCaption(sample: sample, showsTint: false)
                 .help("Drag to change the order")
@@ -146,27 +303,25 @@ private struct StackedLayout: View {
     }
 }
 
-/// Every sample over the others, each in its tint, on a shared baseline. Dragging a chip in the legend below changes
-/// the order, so the last one is drawn on top.
 private struct OverlayLayout: View {
     let samples: [CompareSample]
 
     var body: some View {
-        let ascent = samples.map(\.line.ascent).max() ?? 0
+        let ascent = CompareSample.topAscent(of: samples)
         let descent = samples.map(\.line.descent).max() ?? 0
-        // Glyphs reaching left of the start go into the margin, as in the stacked rows, so the lines start level
-        // with the legend.
-        let overhang = samples.map(\.line.overhang).max() ?? 0
-        let width = (samples.map(\.line.width).max() ?? 0) + 2
-        VStack(alignment: .leading, spacing: 16) {
-            Canvas { context, size in
-                var baseline = Path()
-                baseline.move(to: CGPoint(x: overhang, y: crisp(ascent)))
-                baseline.addLine(to: CGPoint(x: size.width, y: crisp(ascent)))
-                context.stroke(baseline, with: .color(.secondary.opacity(0.35)), lineWidth: 1)
-                for sample in samples {
-                    let color = sample.tint.opacity(0.7).resolve(in: context.environment).cgColor
-                    context.withCGContext { sample.line.draw(in: $0, baselineAt: CGPoint(x: overhang, y: ascent), color: color) }
+        let stems = samples.map { FirstStem.x(in: $0.line.line) ?? 0 }
+        let starts = stems.map { (stems.max() ?? 0) - $0 }
+        let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
+        let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
+        VStack(alignment: .leading, spacing: 6 - Self.chipPadding.height) {
+            Canvas { context, _ in
+                let environment = context.environment
+                context.withCGContext { cg in
+                    cg.setBlendMode(environment.colorScheme == .dark ? .screen : .multiply)
+                    for (sample, start) in zip(samples, starts) {
+                        let color = sample.tint.opacity(0.7).resolve(in: environment).cgColor
+                        sample.line.draw(in: cg, baselineAt: CGPoint(x: overhang + start, y: ascent), color: color)
+                    }
                 }
             }
             .frame(width: overhang + width, height: ascent + descent)
@@ -182,33 +337,26 @@ private struct OverlayLayout: View {
         }
     }
 
+    private static let chipPadding = CGSize(width: 10, height: 5)
+
     private func chip(_ sample: CompareSample) -> some View {
         SampleCaption(sample: sample, showsTint: true)
-            .font(.callout)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Self.chipPadding.width)
+            .padding(.vertical, Self.chipPadding.height)
             .background(.fill.tertiary, in: .capsule)
     }
-
-    /// Centres a one-point line on a pixel row.
-    private func crisp(_ y: CGFloat) -> CGFloat { y.rounded() + 0.5 }
 }
 
-/// Samples laid out by `layout` that can be dragged to new places among each other. The dragged one follows
-/// the pointer, leaving a gap where it will land, and the others make way as it passes their middle.
 private struct Reorderable<Item: View, Lifted: View>: View {
     @Environment(AppModel.self) private var model
     let samples: [CompareSample]
     let layout: AnyLayout
-    /// The way samples pass each other: down a column of rows, or along lines of chips.
     let axis: Axis
-    /// A sample in its place.
     @ViewBuilder let item: (CompareSample) -> Item
-    /// The sample under the pointer while it's dragged.
     @ViewBuilder let lifted: (CompareSample) -> Lifted
     private static var space: String { "compare.reorderable" }
     @State private var drag: SampleDrag?
-    /// Where each sample is laid out, in this view's coordinates.
+    @GestureState private var isDragging = false
     @State private var frames: [UUID: CGRect] = [:]
 
     var body: some View {
@@ -223,9 +371,12 @@ private struct Reorderable<Item: View, Lifted: View>: View {
             }
         }
         .coordinateSpace(.named(Self.space))
+        // A cancelled drag never ends: without this, its sample stays hidden and its lifted copy stays up.
+        .onChange(of: isDragging) { _, now in
+            if !now { DispatchQueue.main.async { if drag?.isSettling == false { drag = nil } } }
+        }
         .overlay(alignment: .topLeading) {
             if let drag, let sample = samples.first(where: { $0.id == drag.id }) {
-                // Rows stay in their column, as in a list; chips go wherever the pointer does.
                 lifted(sample)
                     .offset(x: axis == .vertical ? 0 : drag.location.x - drag.grab.width, y: drag.location.y - drag.grab.height)
                     .allowsHitTesting(false)
@@ -233,9 +384,9 @@ private struct Reorderable<Item: View, Lifted: View>: View {
         }
     }
 
-    /// Picks the sample up and carries it under the pointer, moving it in Compare as it passes the others.
     private func reorder(_ id: UUID) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.space))
+            .updating($isDragging) { _, state, _ in state = true }
             .onChanged { value in
                 if drag?.id != id || drag?.isSettling == true, let frame = frames[id] {
                     drag = SampleDrag(id: id, grab: CGSize(width: value.startLocation.x - frame.minX, height: value.startLocation.y - frame.minY),
@@ -249,9 +400,6 @@ private struct Reorderable<Item: View, Lifted: View>: View {
             .onEnded { _ in settle() }
     }
 
-    /// The sample under `point` the dragged one should take the place of. Only once the pointer is past its
-    /// middle, coming from the dragged one's side, so a wide chip and a narrow one don't keep trading places.
-    /// A row counts all the way across.
     private func target(at point: CGPoint, dragging id: UUID) -> UUID? {
         let ids = model.compareEntries.map(\.id)
         guard let from = ids.firstIndex(of: id) else { return nil }
@@ -269,7 +417,6 @@ private struct Reorderable<Item: View, Lifted: View>: View {
         return nil
     }
 
-    /// Glides the dropped sample into its place, then shows it there.
     private func settle() {
         guard let drag, let frame = frames[drag.id] else {
             self.drag = nil
@@ -285,28 +432,22 @@ private struct Reorderable<Item: View, Lifted: View>: View {
     }
 }
 
-/// A row or chip being dragged.
 private struct SampleDrag: Equatable {
     let id: UUID
-    /// Where the pointer took hold of the sample, from its top-left corner.
     let grab: CGSize
-    /// The pointer, in the Reorderable's coordinates.
     var location: CGPoint
-    /// Dropped, and on its way into its place.
     var isSettling = false
 }
 
-/// Name, a menu of styles and a remove button, as a row caption or a legend chip.
 private struct SampleCaption: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     let sample: CompareSample
     let showsTint: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             if showsTint {
-                Circle().fill(sample.tint).frame(width: 8, height: 8)
+                TintMenu(sample: sample)
             }
             Text(sample.family.name).fontWeight(.semibold)
             styleMenu
@@ -318,28 +459,24 @@ private struct SampleCaption: View {
         }
     }
 
-    /// The style shown, which opens the family's styles; Automatic follows the preview weight. Another of its styles
-    /// can join Compare too, to set them against each other.
     private var styleMenu: some View {
-        Menu {
-            Picker("Style", selection: Binding(get: { sample.style }, set: { model.setCompareStyle($0, of: sample.id) })) {
-                Text("Automatic").tag(FaceID?.none)
-                Divider()
-                ForEach(sample.family.faces) { Text($0.face.styleName).tag(Optional($0.id)) }
+        let automatic = sample.family.regular.id
+        return Menu {
+            Picker("Style", selection: Binding(get: { sample.face.id }, set: { model.setCompareStyle($0 == automatic ? nil : $0, of: sample.id) })) {
+                ForEach(sample.family.faces) { Text($0.face.styleName).tag($0.id) }
             }
             .pickerStyle(.inline)
             .labelsHidden()
             if sample.family.faces.count > 1 {
                 Divider()
-                Button("Compare Another Style", systemImage: "plus") {
-                    let automatic = sample.family.face(nearestWeight: preview.weight).id
+                Button("Another Style", systemImage: "plus") {
                     let shown = model.compareEntries.filter { $0.familyID == sample.family.id }.map { $0.style ?? automatic }
                     model.compareAnotherStyle(of: sample.id, besides: Set(shown))
                 }
+                .disabled(model.isCompareFull)
             }
         } label: {
-            // One text, as a menu's label puts an image of its own first. Grey here only: on the menu, the grey
-            // would reach its items' icons too.
+            // One text, as a menu's label puts an image of its own first; grey here only, as on the menu the grey would reach its items' icons too.
             Text("\(sample.face.face.styleName) \(Image(systemName: "chevron.down"))")
                 .foregroundStyle(.secondary)
                 .tint(.secondary)
@@ -349,5 +486,86 @@ private struct SampleCaption: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Choose the style to compare")
+    }
+}
+
+private struct TintMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.self) private var environment
+    let sample: CompareSample
+
+    var body: some View {
+        Circle()
+            .fill(sample.tint)
+            .frame(width: 8, height: 8)
+            .padding(3)
+            .overlay {
+                TintMenuArea(tints: CompareSample.tints.map { (title: $0.title, image: NSImage.menuDot(resolved($0.color))) },
+                             chosen: sample.tintIndex) { model.setCompareTint($0, of: sample.id) }
+            }
+            .padding(-3)
+    }
+
+    private func resolved(_ color: Color) -> NSColor {
+        // Resolved now, as a menu's images don't change with the appearance.
+        NSColor(cgColor: color.resolve(in: environment).cgColor) ?? .gray
+    }
+}
+
+private struct TintMenuArea: NSViewRepresentable {
+    let tints: [(title: String, image: NSImage)]
+    let chosen: Int
+    let choose: (Int) -> Void
+
+    func makeNSView(context: Context) -> TintMenuView { TintMenuView() }
+
+    func updateNSView(_ view: TintMenuView, context: Context) {
+        view.tints = tints
+        view.chosen = chosen
+        view.choose = choose
+    }
+}
+
+private final class TintMenuView: NSView {
+    var tints: [(title: String, image: NSImage)] = []
+    var chosen = 0
+    var choose: (Int) -> Void = { _ in }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        toolTip = "Choose a color"
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func mouseDown(with event: NSEvent) {
+        showMenu()
+    }
+
+    private func showMenu() {
+        let menu = NSMenu()
+        for (index, tint) in tints.enumerated() {
+            let item = NSMenuItem(title: tint.title, action: #selector(chooseTint(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            item.image = tint.image
+            item.state = index == chosen ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: isFlipped ? bounds.maxY + 4 : -4), in: self)
+    }
+
+    @objc private func chooseTint(_ item: NSMenuItem) {
+        choose(item.tag)
+    }
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .popUpButton }
+    override func accessibilityLabel() -> String? { "Color" }
+    override func accessibilityValue() -> Any? { tints.indices.contains(chosen) ? tints[chosen].title : nil }
+
+    override func accessibilityPerformPress() -> Bool {
+        showMenu()
+        return true
     }
 }

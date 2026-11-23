@@ -8,29 +8,21 @@ extension AppModel {
         activate(families.flatMap(\.faces), title: Self.title(for: families))
     }
 
-    /// Asks how to activate when the install method is Ask, unless every face comes from a folder
-    /// an app loads by itself (those are always used where they are). Asks first whether to turn on so many when that's
-    /// more than `UserData.manyFamilies` families, unless `confirmed`.
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return showToast("Already on") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
-            return manyActivationPrompt = prompt
+            return ask(overActivationSheets: true) { $0.manyActivationPrompt = prompt }
         }
-        let needsChoice = targets.contains { $0.app == nil }
-        if data.installMethod == .ask && needsChoice {
-            activationPrompt = ActivationPrompt(title: title, faces: targets)
-        } else {
-            performActivation(targets, method: data.installMethod == .ask ? .inPlace : data.installMethod)
-        }
+        performActivation(targets)
     }
 
-    func performActivation(_ faces: [LibraryFace], method: InstallMethod) {
+    func performActivation(_ faces: [LibraryFace], named: [LibraryFace]? = nil) {
         let operation = expect(faces, at: .on)
-        let movable = movableFiles(among: faces.map(\.face.path))
         enqueue { model in
-            let result = await model.engine.activate(faces, method: method, records: model.data.records, movable: movable)
-            model.finish(result, operation: operation)
+            var result = await model.engine.activate(faces, method: .inPlace, records: model.data.records)
+            if let named, result.failed.isEmpty { result.message = FontNames.describe(named).map { "\($0) activated" } ?? "" }
+            model.finish(result, operation: operation, undo: model.undo(restoring: named ?? faces, failed: result.failed))
         }
     }
 
@@ -38,29 +30,23 @@ extension AppModel {
         activateTemporarily(families.flatMap(\.faces))
     }
 
-    /// Until Cicero quits. Asks first when that's many families, unless `confirmed`, like `activate`.
     func activateTemporarily(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canActivateTemporarily)
         guard !targets.isEmpty else { return showToast("Already on") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: "", temporarily: true) {
-            return manyActivationPrompt = prompt
+            return ask(overActivationSheets: true) { $0.manyActivationPrompt = prompt }
         }
         let operation = expect(targets, at: .on)
         enqueue { model in
             let result = await model.engine.activateTemporarily(targets, records: model.data.records)
-            model.finish(result, operation: operation)
+            model.finish(result, operation: operation, undo: model.undo(restoring: targets, failed: result.failed))
         }
     }
 
-    /// A question for turning on more than `UserData.manyFamilies` families at once, while the user wants one.
     private func manyActivationPrompt(for faces: [LibraryFace], title: String, temporarily: Bool) -> ManyActivationPrompt? {
-        guard data.asksBeforeActivatingMany else { return nil }
-        let families = Set(faces.map(\.face.familyName)).count
-        guard families > UserData.manyFamilies else { return nil }
-        return ManyActivationPrompt(title: title, faces: faces, families: families, temporarily: temporarily)
+        ActivationQuestions.many(for: faces, title: title, temporarily: temporarily, data: data)
     }
 
-    /// Goes on with an activation the user agreed to.
     func confirm(_ prompt: ManyActivationPrompt) {
         if prompt.temporarily {
             activateTemporarily(prompt.faces, confirmed: true)
@@ -73,26 +59,44 @@ extension AppModel {
         deactivate(families.flatMap(\.faces))
     }
 
-    func deactivate(_ faces: [LibraryFace]) {
+    func deactivate(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canDeactivate)
         guard !targets.isEmpty else {
             return showToast(faces.contains { $0.state.isActive } ? "These fonts are managed by macOS or another app" : "Nothing to deactivate")
         }
+        if !confirmed, let prompt = movingOutPrompt(for: targets) {
+            return ask(overActivationSheets: true) { $0.movingOutPrompt = prompt }
+        }
         performDeactivation(targets)
+    }
+
+    private func movingOutPrompt(for faces: [LibraryFace]) -> MovingOutPrompt? {
+        ActivationQuestions.movingOut(for: faces, data: data)
+    }
+
+    func confirm(_ prompt: MovingOutPrompt, movingOut: Bool) {
+        if movingOut { return deactivate(prompt.faces, confirmed: true) }
+        let shared = Set(prompt.shared.map(\.id))
+        let others = prompt.faces.filter { !shared.contains($0.id) }
+        let keptOn = prompt.shared.filter { $0.position == .on }
+        if !keptOn.isEmpty { useInAppOnly(keptOn) }
+        if !others.isEmpty { deactivate(others, confirmed: true) }
     }
 
     func performDeactivation(_ faces: [LibraryFace]) {
         let operation = expect(faces, at: .off)
         enqueue { model in
             let result = await model.engine.deactivate(faces, records: model.data.records)
-            model.finish(result, operation: operation)
+            model.finish(result, operation: operation, undo: model.undo(restoring: faces, failed: result.failed))
         }
     }
 
-    /// On ↔ off; fonts an app loads from its own folder go from on in that app to on everywhere, then
-    /// off everywhere, then back. A switch already moving waits for its operation.
     func toggle(_ family: Family) {
         guard expectedFamilyPositions[family.id] == nil else { return }
+        let targets = targets(for: family).filter { expectedFamilyPositions[$0.id] == nil }
+        if targets.count > 1 {
+            return family.position == .on ? deactivate(targets) : activate(targets)
+        }
         switch family.position {
         case .on: deactivate([family])
         case .app: activate([family])
@@ -117,13 +121,111 @@ extension AppModel {
         }
     }
 
-    /// The engine has waited for macOS, so a scan now sees what the operation did.
-    func finish(_ result: ActivationResult, operation: Int? = nil) {
+    func finish(_ result: ActivationResult, operation: Int? = nil, operations: [Int] = [], undo: (() -> Void)? = nil) {
+        var data = data
         data.records = result.records
-        forgetInstalledAddedFiles()
-        showToast(result.message)
+        data.forgetInstalledAddedFiles()
+        self.data = data
+        if !result.message.isEmpty { showToast(result.message, undo: undo) }
         let scan = rescan()
-        if let operation { settle(operation, after: scan) }
+        for operation in [operation].compactMap(\.self) + operations { settle(operation, after: scan) }
+    }
+
+    enum EarlierState {
+        case off, app, untilQuit, whileAppsRun, on
+
+        init(_ face: LibraryFace) {
+            switch face.state.temporaryScope {
+            case .untilQuit: self = .untilQuit
+            case .whileAppsRun: self = .whileAppsRun
+            case nil: self = switch face.position { case .on: .on; case .app: .app; case .off: .off }
+            }
+        }
+
+        func matches(_ face: LibraryFace) -> Bool {
+            switch self {
+            case .untilQuit: face.state.temporaryScope == .untilQuit
+            case .whileAppsRun: face.state.temporaryScope == .whileAppsRun
+            case .on: face.position == .on && face.state.temporaryScope == nil
+            case .app: face.position == .app
+            case .off: face.position == .off
+            }
+        }
+    }
+
+    func undo(restoring faces: [LibraryFace], failed: [String]) -> (() -> Void)? {
+        let failed = Set(failed)
+        let changed = faces.filter { !failed.contains($0.face.path) }
+        guard !changed.isEmpty else { return nil }
+        return { [weak self] in self?.restore(changed) }
+    }
+
+    func restore(_ earlier: [LibraryFace]) {
+        let found = findAgain(earlier)
+        guard !found.isEmpty else { return showToast("Couldn’t undo: these fonts are no longer in your library") }
+        var off: [LibraryFace] = [], app: [LibraryFace] = [], on: [LibraryFace] = [], untilQuit: [LibraryFace] = []
+        var forApps = Set<String>()
+        for (old, current) in found {
+            let state = EarlierState(old)
+            guard !state.matches(current) else { continue }
+            switch state {
+            case .off: if current.canDeactivate { off.append(current) }
+            case .app: if current.app != nil { app.append(current) }
+            case .on: if current.canActivate { on.append(current) }
+            case .untilQuit, .whileAppsRun:
+                if current.state.isActive {
+                    if current.app != nil {
+                        app.append(current)
+                    } else if current.canDeactivate {
+                        off.append(current)
+                    } else {
+                        continue
+                    }
+                }
+                if state == .untilQuit { untilQuit.append(current) } else { forApps.insert(current.face.postScriptName) }
+            }
+        }
+        guard !off.isEmpty || !app.isEmpty || !on.isEmpty || !untilQuit.isEmpty || !forApps.isEmpty else { return }
+        let operations = [(off, SwitchPosition.off), (app, .app), (on + untilQuit, .on)].filter { !$0.0.isEmpty }.map { expect($0.0, at: $0.1) }
+        let named = found.map(\.current)
+        enqueue { model in
+            var records = model.data.records
+            var failed: [String] = []
+            var failure: String?
+            func take(_ result: ActivationResult) {
+                records = result.records
+                failed += result.failed
+                if !result.failed.isEmpty, failure == nil { failure = result.message }
+            }
+            if !off.isEmpty { take(await model.engine.deactivate(off, records: records)) }
+            if !app.isEmpty { take(await model.engine.useInAppOnly(app, records: records)) }
+            if !on.isEmpty { take(await model.engine.activate(on, method: .inPlace, records: records)) }
+            let temporary = untilQuit.filter { !failed.contains($0.face.path) }.map { face in
+                face.state.isActive ? LibraryFace(face: face.face, state: face.app.map(FaceState.appOnly) ?? .inactive, copies: face.copies, app: face.app) : face
+            }
+            if !temporary.isEmpty { take(await model.engine.activateTemporarily(temporary, records: records)) }
+            let message = failure ?? "\(FontNames.describe(named) ?? "Fonts") back as before"
+            model.finish(ActivationResult(records: records, succeeded: 0, failed: failed, message: message), operations: operations)
+            model.appSets.allow(forApps)
+        }
+    }
+
+    private func findAgain(_ earlier: [LibraryFace]) -> [(old: LibraryFace, current: LibraryFace)] {
+        let names = Set(earlier.map(\.face.postScriptName))
+        var byID: [FaceID: LibraryFace] = [:]
+        var byName: [String: [LibraryFace]] = [:]
+        for face in library.families.lazy.flatMap(\.faces) where names.contains(face.face.postScriptName) {
+            byID[face.id] = face
+            for copy in face.copies { byID[copy.face.id] = face }
+            byName[face.face.familyName + "\u{0}" + face.face.postScriptName, default: []].append(face)
+        }
+        var seen = Set<FaceID>()
+        return earlier.compactMap { old in
+            let candidates = byName[old.face.familyName + "\u{0}" + old.face.postScriptName] ?? []
+            guard let current = byID[old.id] ?? candidates.first(where: { $0.id.index == old.id.index }) ?? candidates.first,
+                  seen.insert(current.id).inserted else { return nil }
+            return (old, current)
+        }
     }
 
     static func title(for families: [Family]) -> String {
@@ -132,38 +234,25 @@ extension AppModel {
 
     // MARK: Copies
 
-    /// The places these styles can be used from, when some are in more than one, like each client's folder
-    /// (see `CopyChooser`).
     func copySources(of styles: [LibraryFace]) -> [CopySource] {
         CopyChooser.sources(of: styles, folders: data.namedFolders, records: data.records, locations: locations)
     }
 
-    /// Uses a place's copies of the styles it has and turns off the other copies of them Cicero turned on.
-    /// Asks first when that turns off other styles too, and how to activate when the install method is Ask.
-    func useCopies(from source: CopySource, title: String) {
+    func useCopies(from source: CopySource) {
         let plan = CopyChooser.plan(source, records: data.records, library: library)
         guard !plan.isEmpty else { return showToast("Already using the copies from \(source.name)") }
-        let request = CopySwitchRequest(source: source.name, title: title, plan: plan)
+        let request = CopySwitchRequest(source: source.name, plan: plan)
         if plan.alsoTurnsOff.isEmpty {
             confirmCopySwitch(request)
         } else {
-            copySwitchPrompt = request
+            ask { $0.copySwitchPrompt = request }
         }
     }
 
     func confirmCopySwitch(_ request: CopySwitchRequest) {
-        let targets = request.plan.switches.compactMap(\.target)
-        if data.installMethod == .ask && !targets.isEmpty {
-            activationPrompt = ActivationPrompt(title: request.title, faces: targets, switching: request)
-        } else {
-            performCopySwitch(request, method: data.installMethod == .ask ? .inPlace : data.installMethod)
-        }
-    }
-
-    func performCopySwitch(_ request: CopySwitchRequest, method: InstallMethod) {
         let operation = expect(request.plan.styles, at: .on)
         enqueue { model in
-            var result = await model.engine.switchCopies(request.plan.switches, method: method, records: model.data.records)
+            var result = await model.engine.switchCopies(request.plan.switches, method: .inPlace, records: model.data.records)
             if result.failed.isEmpty {
                 result.message = "Using the copies from \(request.source)"
                     + (request.plan.leavesOtherCopiesOn ? ". Another copy Cicero didn’t turn on is still on, so apps may use that one" : "")
@@ -174,35 +263,65 @@ extension AppModel {
 
     // MARK: Font Library
 
-    /// The fonts Cicero installed right in ~/Library/Fonts while it installs into the Font Library, with the family each
-    /// file is in, for its folder there (see `ActivationEngine.misplacedCopies`).
-    func misplacedInstalledFonts() -> (paths: [String], families: [String: String]) {
-        let paths = engine.misplacedCopies(in: data.records)
-        guard !paths.isEmpty else { return ([], [:]) }
-        let wanted = Set(paths)
-        var families: [String: String] = [:]
-        for family in library.families {
-            for face in family.faces {
-                for path in [face.face.path] + face.otherCopies where wanted.contains(path) && families[path] == nil {
-                    families[path] = family.id
-                }
-            }
+    func placeName(of path: String) -> String {
+        if path.hasPrefix(locations.userFonts.path + "/") { return "in your Fonts folder" }
+        if locations.isInInactiveFolder(path) { return "in the Inactive folder" }
+        if let library = data.fontLibrary, path.hasPrefix(library.path + "/") { return "in \(folderName(WatchedFolder.fontLibraryID))" }
+        if data.fontFiles.contains(path) { return "in \(folderName(WatchedFolder.addedFilesID))" }
+        if let folder = data.namedFolders.filter({ path.hasPrefix($0.path + "/") }).max(by: { $0.path.count < $1.path.count }) {
+            return "in \(folder.displayName)"
         }
-        return (paths, families)
+        if WatchedFolder.appFontFolders().contains(where: { path.hasPrefix($0.path + "/") }) { return "in \(folderName(WatchedFolder.adobeAppsID))" }
+        return "in “\(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent)”"
     }
 
-    /// Moves the fonts Cicero installed right in ~/Library/Fonts into the Font Library (see `misplacedInstalledFonts`).
-    func moveInstalledFonts() {
-        let (paths, families) = misplacedInstalledFonts()
-        guard !paths.isEmpty else { return }
-        enqueue { model in
-            let result = await model.engine.moveInstalledCopies(paths, families: families, records: model.data.records)
-            model.finish(result)
+    func replacedPlaces(_ duplicate: AddedDuplicate) -> String { places(of: duplicate.replacements.map(\.old)) }
+
+    func places(of paths: [String]) -> String {
+        let places = paths.map(placeName).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return places.listed()
+    }
+
+    func spareCopies(_ duplicate: AddedDuplicate) -> [String] {
+        engine.spareCopies(among: duplicate.replacements, records: data.records).keys.sorted()
+    }
+
+    func warnsBeforeReplacing(_ duplicate: AddedDuplicate) -> Bool {
+        duplicate.replacesSeveralCopies || duplicate.replacements.contains { replacement in
+            let path = replacement.old
+            let isCiceros = path.hasPrefix(locations.userFonts.path + "/") || locations.isInInactiveFolder(path)
+                || data.fontLibrary.map { path.hasPrefix($0.path + "/") } == true
+            return !isCiceros
         }
     }
 
-    /// Asks for an empty folder and moves the Font Library there, with its fonts, their registrations and the records;
-    /// a folder it can't go into is refused, saying why (see `ActivationEngine.refusal`).
+    func replaceWarning(_ duplicate: AddedDuplicate) -> String {
+        let spare = spareCopies(duplicate)
+        let replaced = duplicate.replacements.map(\.old).filter { !spare.contains($0) }
+        let files = replaced.count == 1 ? "the file \(places(of: replaced))" : "\(replaced.count) files: \(places(of: replaced))"
+        guard !spare.isEmpty else { return "Replaces \(files)" }
+        let copies = spare.count == 1 ? "Cicero’s copy \(places(of: spare)) goes" : "Cicero’s copies \(places(of: spare)) go"
+        return "Replaces \(files), and \(copies) to the Trash"
+    }
+
+    func setInstallsIntoFontLibrary(_ on: Bool) {
+        guard on != data.installsIntoFontLibrary else { return }
+        var changed = data
+        if on {
+            if let location = changed.takeBackFontLibrary() { deselect { $0 == .folder(location.id) } }
+        } else {
+            changed.keepFontLibraryAsLocation(hasFonts: changed.fontLibrary.map { fontLibraryHasFonts($0.url) } ?? false)
+        }
+        changed.installsIntoFontLibrary = on
+        data = changed
+        rescan()
+    }
+
+    func fontLibraryHasFonts(_ folder: URL) -> Bool {
+        let prefix = folder.path + "/"
+        return ActivationEngine.hasFontFiles(in: folder) || data.records.inPlace.contains { $0.hasPrefix(prefix) }
+    }
+
     func changeFontLibrary() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -210,27 +329,31 @@ extension AppModel {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
-        panel.message = "Choose an empty folder for Cicero’s Font Library, or make a new one. Its fonts move there."
+        // One line: the panel cuts off a longer message.
+        panel.message = "Choose where Cicero’s Library goes. In a folder with other files, it goes into a new “Cicero Library” folder."
         panel.directoryURL = data.fontLibrary?.url.deletingLastPathComponent()
-        guard panel.runModal() == .OK, let url = panel.url?.standardizedFileURL else { return }
-        if let reason = ActivationEngine.refusal(forFontLibraryAt: url, current: data.fontLibrary?.url, folders: data.scannedFolders(), locations: locations) {
-            let alert = NSAlert()
-            alert.messageText = "The Font Library can’t go into “\(url.lastPathComponent)”."
-            alert.informativeText = reason
-            alert.runModal()
-            return
+        let current = data.fontLibrary?.url, folders = data.scannedFolders(), locations = locations
+        let checker = FontLibraryFolderCheck { url in
+            ActivationEngine.refusal(forFontLibraryAt: url, current: current, folders: folders, locations: locations)
         }
+        panel.delegate = checker
+        let response = panel.runModal()
+        withExtendedLifetime(checker) {}
+        guard response == .OK, let url = panel.url?.standardizedFileURL else { return }
+        let destination = ActivationEngine.fontLibraryFolder(in: url)
         enqueue { model in
-            let result = await model.engine.moveFontLibrary(to: url, records: model.data.records)
-            if result.failed.isEmpty { model.data.fontLibraryPath = url.path }
+            let result = await model.engine.moveFontLibrary(to: destination, records: model.data.records)
+            if result.failed.isEmpty { model.data.fontLibraryPath = destination.path }
             model.finish(result)
+            // What the move wrote down goes only once the new path is on the disk, so a stop in between still has it.
+            if result.failed.isEmpty, model.store.flush(durably: true) { model.engine.forgetLibraryMove() }
         }
     }
 
     // MARK: Trash
 
     func requestTrash(_ families: [Family]) {
-        let title = families.count == 1 ? "“\(families[0].name)”" : "\(families.count) families"
+        let title = families.count == 1 ? "“\(families[0].name)”" : "\(families.count) Families"
         requestTrash(families.flatMap(\.faces), removing: families.map(\.id), title: title)
     }
 
@@ -238,18 +361,105 @@ extension AppModel {
         guard let plan = engine.trashPlan(for: faces, removing: families, in: library, title: title) else {
             return showToast("Fonts that come with macOS or an app can’t be moved to the Trash")
         }
-        trashPlan = plan
+        ask { $0.trashPlan = plan }
     }
 
     func moveToTrash(_ plan: TrashPlan) {
+        let before = TrashUndo(plan: plan, data: data, library: library)
         enqueue { model in
             let result = await model.engine.moveToTrash(plan, records: model.data.records)
             model.data.records = result.records
             if result.failed.isEmpty {
                 for name in plan.removedFamilies { model.forget(family: name) }
             }
-            model.showToast(result.message)
+            let trashed = result.trashed
+            let unknown = result.succeeded - trashed.count
+            #if CICERO_MEASURE
+            model.lastTrashed = trashed
+            #endif
+            model.showToast(result.message, undo: trashed.isEmpty ? nil : { [weak model] in model?.putBack(trashed, unknown: unknown, as: before) })
             model.rescan()
+        }
+    }
+
+    func putBack(_ trashed: [String: String], unknown: Int, as before: TrashUndo) {
+        enqueue { model in
+            let outcome = await model.engine.putBack(trashed, off: before.off)
+            let back = Set(outcome.back)
+            var records = model.data.records
+            for path in back {
+                if let origin = before.data.records.installedCopies[path] { records.installedCopies[path] = origin }
+                if let origin = before.data.records.appFolderOrigins[path] { records.appFolderOrigins[path] = origin }
+            }
+            model.data.records = records
+            model.restore(families: before.removedFamilies, from: before.data)
+            if !back.isEmpty, let library = try? await model.scanner.scan(model.scanInput, progress: { _ in }) {
+                let faces = library.families.flatMap(\.faces).flatMap { [$0] + $0.copies.map(\.libraryFace) }.filter { back.contains($0.face.path) }
+                let on = faces.filter { before.on.contains($0.face.path) && $0.canActivate }
+                if !on.isEmpty { model.data.records = await model.engine.activate(on, method: .inPlace, records: model.data.records).records }
+                let forNow = faces.filter { before.onForNow.contains($0.face.path) && $0.canActivateTemporarily }
+                if !forNow.isEmpty { model.data.records = await model.engine.activateTemporarily(forNow, records: model.data.records).records }
+                // macOS turns a file that comes back into the Fonts folder on by itself.
+                let off = faces.filter { before.off.contains($0.face.path) && $0.state.isActive && $0.canDeactivate }
+                if !off.isEmpty { model.data.records = await model.engine.deactivate(off, records: model.data.records).records }
+            }
+            model.rescan()
+            model.showToast(Self.putBackMessage(back: back.count, problems: outcome.problems, unknown: unknown))
+        }
+    }
+
+    private func restore(families names: [String], from before: UserData) {
+        var data = self.data
+        for name in names {
+            for old in before.sets where old.families.contains(name) || old.styles[name] != nil {
+                guard let index = data.sets.firstIndex(where: { $0.id == old.id }) else { continue }
+                if old.families.contains(name), !data.sets[index].families.contains(name) { data.sets[index].families.append(name) }
+                if let styles = old.styles[name], data.sets[index].styles[name] == nil { data.sets[index].styles[name] = styles }
+            }
+            if data.familyTags[name] == nil { data.familyTags[name] = before.familyTags[name] }
+            if data.familyRatings[name] == nil { data.familyRatings[name] = before.familyRatings[name] }
+            if data.familyNotes[name] == nil { data.familyNotes[name] = before.familyNotes[name] }
+            if data.activations[name] == nil { data.activations[name] = before.activations[name] }
+            if data.foundryOverrides[name] == nil { data.foundryOverrides[name] = before.foundryOverrides[name] }
+        }
+        self.data = data
+    }
+
+    static func putBackMessage(back: Int, problems: [String: ActivationEngine.PutBackProblem], unknown: Int = 0) -> String {
+        guard !problems.isEmpty || unknown > 0 else { return back == 1 ? "Put back from the Trash" : "Put back \(back) files from the Trash" }
+        let total = back + problems.count + unknown
+        guard !problems.isEmpty else { return "Put back \(back) of \(total) files" }
+        let gone = problems.values.count { $0 == .notInTrash }, taken = problems.values.count { $0 == .pathTaken }
+        let reasons = [gone > 0 ? "\(gone) no longer in the Trash" : nil, taken > 0 ? "\(taken) where another file is now" : nil,
+                       problems.count - gone - taken > 0 ? "\(problems.count - gone - taken) couldn’t be moved" : nil].compactMap { $0 }
+        let lead = back == 0 ? (total == 1 ? "Couldn’t put the file back" : "Couldn’t put the files back")
+            : "Put back \(back) of \(total) files"
+        return lead + ": " + reasons.joined(separator: ", ")
+    }
+
+    struct TrashUndo {
+        let data: UserData
+        let removedFamilies: [String]
+        let on: Set<String>
+        let onForNow: Set<String>
+        let off: Set<String>
+
+        init(plan: TrashPlan, data: UserData, library: Library) {
+            self.data = data
+            removedFamilies = plan.removedFamilies
+            let paths = Set(plan.paths)
+            var on: Set<String> = [], onForNow: Set<String> = [], off: Set<String> = []
+            for face in library.families.lazy.flatMap(\.faces) {
+                for copy in [face] + face.copies.map(\.libraryFace) where paths.contains(copy.face.path) {
+                    switch (copy.position, copy.state.temporaryScope) {
+                    case (.on, .untilQuit): onForNow.insert(copy.face.path)
+                    case (.on, .whileAppsRun), (.off, _): off.insert(copy.face.path)
+                    case (.on, nil): on.insert(copy.face.path)
+                    case (.app, _): break
+                    }
+                }
+            }
+            (self.on, self.onForNow, self.off) = (on, onForNow, off)
         }
     }
 
@@ -282,11 +492,11 @@ extension AppModel {
     // MARK: Info panel
 
     func toggleInfo() {
-        if isInfoPresented && infoTab == .info {
-            isInfoPresented = false
+        if isInfoShown && shownInfoTab == .info {
+            isInfoShown = false
         } else {
             infoTab = .info
-            isInfoPresented = true
+            isInfoShown = true
         }
     }
 
@@ -305,53 +515,100 @@ extension AppModel {
 
     func addFolders(_ urls: [URL]) {
         let existing = Set(data.folders.map(\.path))
-        let new = urls.map(\.standardizedFileURL.path).filter { !existing.contains($0) }
-        guard !new.isEmpty else { return }
+        let paths = urls.map(\.standardizedFileURL.path)
+        let new = paths.filter { !existing.contains($0) }
+        guard !new.isEmpty else {
+            let name = URL(fileURLWithPath: paths.first ?? "").lastPathComponent
+            return showToast(paths.count == 1 ? "“\(name)” is already a location" : "These folders are already locations")
+        }
+        var added: [String] = []
         for path in new {
-            // Adobe's folders come with the Testing switch rather than one by one.
             if WatchedFolder.detectAppName(forPath: path) != nil {
                 data.showAdobeAppFolders = true
             } else {
                 data.folders.append(WatchedFolder(path: path))
+                added.append(path)
             }
         }
         data.sidebar.hidden.remove(SidebarSection.folders.key)
         rescan()
+        if added.count == 1 {
+            showToast("Added “\(URL(fileURLWithPath: added[0]).lastPathComponent)” as a location")
+        } else if added.count > 1 {
+            showToast("Added \(added.count.plain) locations")
+        }
     }
 
     func removeFolder(_ id: UUID) {
         removeFolders([id])
     }
 
-    /// Several at once with one rescan, as Settings → Folders removes the selected ones.
     func removeFolders(_ ids: Set<UUID>) {
-        turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive })
+        let removed = data.folders.filter { ids.contains($0.id) }
+        guard !removed.isEmpty else { return }
+        let before = data
+        let keptOn = removingFolders(ids)
+        let names = removed.count > 3 ? "\(removed.count) locations" : removed.map { data.named($0).displayName }.listed()
+        showToast("\(names) removed from the library") { [weak self] in
+            guard let self else { return }
+            var data = self.data
+            data.folders = before.folders
+            data.folderNames = before.folderNames
+            data.smartSets = before.smartSets
+            data.sidebar = before.sidebar
+            self.data = data
+            self.rescan()
+            self.turnOnAgain(keptOn)
+        }
+    }
+
+    func removingFolders(_ ids: Set<UUID>) -> [LibraryFace] {
+        let keptOn = turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive }, silently: true)
+        let values = Set(ids.map(\.uuidString))
+        for index in data.smartSets.indices where data.smartSets[index].rules.contains(where: { $0.field == .folder && values.contains($0.value) }) {
+            data.smartSets[index].rules.removeAll { $0.field == .folder && values.contains($0.value) }
+        }
+        forgetFolders(ids)
+        rescan()
+        return keptOn
+    }
+
+    func turnOnAgain(_ faces: [LibraryFace]) {
+        guard !faces.isEmpty else { return }
+        let paths = Set(faces.map(\.face.path))
+        let operation = expect(faces, at: .on)
+        enqueue { model in
+            let library = (try? await model.scanner.scan(model.scanInput, progress: { _ in })) ?? model.library
+            let on = library.families.flatMap(\.faces).filter { paths.contains($0.face.path) && $0.canActivate }
+            let result = on.isEmpty ? ActivationResult(records: model.data.records, succeeded: 0, failed: [], message: "")
+                : await model.engine.activate(on, method: .inPlace, records: model.data.records)
+            model.finish(result, operation: operation)
+        }
+    }
+
+    func forgetFolders(_ ids: Set<UUID>) {
+        var data = data
         data.folders.removeAll { ids.contains($0.id) }
         for id in ids {
             data.sidebar.forget("folder.\(id)")
             data.folderNames[id.uuidString] = nil
         }
+        self.data = data
         deselect { item in ids.contains { item == .folder($0) } }
-        rescan()
     }
 
-    /// Why a watched folder's fonts are out of reach, if they are.
     func availability(ofFolder id: UUID) -> FolderAvailability? {
         library.unavailableFolders[id]
     }
 
-    /// Font files in a watched folder (or among the added fonts) that a cloud service keeps online only.
     func onlineOnlyCount(inFolder id: UUID) -> Int {
         library.onlineOnlyFiles[id]?.count ?? 0
     }
 
-    /// Downloads the font files a cloud service keeps online only in a watched folder (or among the added
-    /// fonts), so the library lists them. The cloud service may take them off the Mac again later; making the
-    /// folder available offline in the Finder keeps them.
     func downloadOnlineOnlyFonts(inFolder id: UUID) {
         let paths = library.onlineOnlyFiles[id] ?? []
         guard !paths.isEmpty, downloads[id] == nil else { return }
-        downloads[id] = DownloadProgress(done: 0, total: paths.count)
+        downloads[id] = WorkProgress(done: 0, total: paths.count)
         Task { [weak self] in
             let failed = await Reachability.download(paths) { [weak self] done in
                 Task { @MainActor in self?.downloads[id]?.done = done }
@@ -359,27 +616,25 @@ extension AppModel {
             guard let self else { return }
             downloads[id] = nil
             if failed.isEmpty {
-                showToast(paths.count == 1 ? "Downloaded 1 font file" : "Downloaded \(paths.count.formatted()) font files")
+                showToast(paths.count == 1 ? "Downloaded 1 font file" : "Downloaded \(paths.count.plain) font files")
             } else {
-                showToast("Couldn’t download \(failed.count.formatted()) of \(paths.count.formatted()) font files. Check the connection and try again")
+                showToast("Couldn’t download \(failed.count.plain) of \(paths.count.plain) font files. Check the connection and try again")
             }
             rescan()
         }
     }
 
-    /// System Settings at Privacy & Security → Files and Folders, where Cicero can be let into a folder.
     func openFilesAndFoldersSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders") else { return }
         NSWorkspace.shared.open(url)
     }
 
-    /// Inactive, Active (Cicero turns on every font in the folder where it is, and keeps new ones on: see
-    /// `activateAddedFonts`), or loaded by `app` by itself. Leaving Active turns off what it turned on.
     func setActivation(ofFolder id: UUID, active: Bool, app: String?) {
         guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
         let folder = data.folders[index]
         let trimmed = app?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let app = active || trimmed?.isEmpty != false ? nil : trimmed
+        if !active, trimmed?.isEmpty == true { return }
+        let app = active ? nil : trimmed
         guard folder.isActive != active || folder.appName != app else { return }
         if folder.isActive && !active { turnOffKeptFonts(in: [folder]) }
         data.folders[index].isActive = active
@@ -388,47 +643,62 @@ extension AppModel {
         rescan()
     }
 
-    /// The library's fonts whose files are in these folders.
     func faces(in folders: [WatchedFolder]) -> [LibraryFace] {
         let prefixes = folders.map { $0.path + "/" }
         guard !prefixes.isEmpty else { return [] }
-        return library.families.flatMap(\.faces).filter { face in prefixes.contains { face.face.path.hasPrefix($0) } }
+        return library.families.flatMap(\.faces).filter { face in
+            prefixes.contains { face.face.path.hasPrefix($0) } && !locations.isInInactiveFolder(face.face.path)
+        }
     }
 
-    /// Turned on where they are, whatever Activate fonts by says: moving or copying them would take them out of
-    /// the folder that keeps them on.
     func keepOn(_ faces: [LibraryFace]) {
         let targets = faces.filter(\.canActivate)
         guard !targets.isEmpty else { return }
-        performActivation(targets, method: .inPlace)
+        performActivation(targets)
     }
 
-    /// What Cicero turned on where it is in these folders, as it does for Active ones.
-    private func turnOffKeptFonts(in folders: [WatchedFolder]) {
+    @discardableResult
+    private func turnOffKeptFonts(in folders: [WatchedFolder], silently: Bool = false) -> [LibraryFace] {
         let targets = faces(in: folders).filter { $0.canDeactivate && data.records.inPlace.contains($0.face.path) }
-        guard !targets.isEmpty else { return }
-        performDeactivation(targets)
+        guard !targets.isEmpty else { return [] }
+        guard silently else {
+            performDeactivation(targets)
+            return targets
+        }
+        let operation = expect(targets, at: .off)
+        enqueue { model in
+            var result = await model.engine.deactivate(targets, records: model.data.records)
+            if result.failed.isEmpty { result.message = "" }
+            model.finish(result, operation: operation)
+        }
+        return targets
     }
 
-    /// Every added font file there is, for Reveal in Finder on Added Fonts.
     var addedFileURLs: [URL] {
         data.fontFiles.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
-    /// The user's folder, or Cicero's Font Library, with the name the user gave it.
+    func finderURLs(ofFolder id: UUID) -> [URL] {
+        switch id {
+        case WatchedFolder.adobeAppsID: WatchedFolder.appFontFolders().map(\.url)
+        case WatchedFolder.addedFilesID: addedFileURLs
+        default: folder(id).map { [$0.url] } ?? []
+        }
+    }
+
+    func isRemovableFolder(_ id: UUID) -> Bool {
+        data.folders.contains { $0.id == id }
+    }
+
     func folder(_ id: UUID) -> WatchedFolder? {
         if id == WatchedFolder.fontLibraryID { return data.fontLibrary.map(data.named) }
         return data.folders.first { $0.id == id }.map(data.named)
     }
 
-    /// What the sidebar calls a folder or one of Cicero's own items (Testing, Adobe Fonts, Added Fonts): the name the
-    /// user gave it, else its own.
     func folderName(_ id: UUID) -> String {
         (folder(id) ?? data.named(WatchedFolder(id: id, path: ""))).displayName
     }
 
-    /// Shows a folder under another name; the folder on disk keeps its own. An empty name, or the folder's own, goes
-    /// back to that.
     func renameFolder(_ id: UUID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         var own = folder(id) ?? WatchedFolder(id: id, path: "")
@@ -439,48 +709,30 @@ extension AppModel {
     // MARK: Sets
 
     func addSet(named name: String, with families: [Family] = [], styles: [String: [String]] = [:]) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        data.sets.append(FontSet(name: trimmed, families: families.map(\.id), styles: styles))
-        data.sidebar.hidden.remove(SidebarSection.sets.key)
+        data.addSet(named: name, families: families.map(\.id), styles: styles)
     }
 
     func renameSet(_ id: UUID, to name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let index = data.sets.firstIndex(where: { $0.id == id }) else { return }
-        data.sets[index].name = trimmed
+        data.renameSet(id, to: name)
     }
 
-    func deleteSet(_ id: UUID) {
-        data.sets.removeAll { $0.id == id }
-        data.sidebar.forget("set.\(id)")
-        for index in data.smartSets.indices {
-            data.smartSets[index].rules.removeAll { $0.field == .set && $0.value == id.uuidString }
-        }
-        deselect { $0 == .set(id) }
+    func deleteSets(_ ids: Set<UUID>) {
+        data.deleteSets(ids)
+        deselect { if case .set(let id) = $0 { ids.contains(id) } else { false } }
     }
 
-    /// Whether the set has the whole family.
     func isMember(_ family: Family, of setID: UUID) -> Bool {
         data.sets.first { $0.id == setID }?.families.contains(family.id) ?? false
     }
 
-    /// Puts the families in the set whole, in place of the styles of them it had, or takes them out with their styles.
     func setMembership(_ member: Bool, for families: [Family], in setID: UUID) {
-        guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
-        if member {
-            data.sets[index].add(families: families.map(\.id))
-        } else {
-            data.sets[index].remove(families: Set(families.map(\.id)))
-        }
+        data.setMembership(member, for: families.map(\.id), in: setID)
     }
 
-    /// Whether the set has the style, on its own or with its whole family.
     func isMember(_ face: LibraryFace, of family: Family, in setID: UUID) -> Bool {
         data.sets.first { $0.id == setID }?.contains(style: face.face.postScriptName, of: family.id) ?? false
     }
 
-    /// Puts one style of a family in a set, or takes it out; a family the set has whole keeps its other styles.
     func setMembership(_ member: Bool, for face: LibraryFace, of family: Family, in setID: UUID) {
         guard let index = data.sets.firstIndex(where: { $0.id == setID }) else { return }
         if member {
@@ -490,34 +742,42 @@ extension AppModel {
         }
     }
 
-    /// The styles a sidebar row has: a set's own, which can be only some of a family's, else every style of its families.
     func faces(in item: SidebarItem) -> [LibraryFace] {
         let families = families(in: item)
+        if item == .temporary { return families.flatMap { $0.faces.filter(\.isOnUntilQuit) } }
         guard case .set(let id) = item, let set = data.sets.first(where: { $0.id == id }) else { return families.flatMap(\.faces) }
         return families.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }
     }
 
-    /// The families a sidebar row shows, without the search.
     func families(in item: SidebarItem) -> [Family] {
         let test = filter(for: item)
-        return library.families.filter { data.lists($0) && test($0) }
+        let families = library.families.filter { data.lists($0) && test($0) }
+        guard case .folder(let location) = item else { return families }
+        let onlyIn = onlyIn(location)
+        return families.map { onlyIn[$0.id] ?? $0 }
     }
 
-    /// Activate Set on a set's or smart set's menu: every font in it, asking how when the install method is Ask.
-    func activateFonts(in item: SidebarItem, named name: String) {
-        let faces = faces(in: item)
-        guard !faces.isEmpty else { return showToast("There are no fonts in “\(name)”") }
-        activate(faces, title: "“\(name)”")
+    func faces(in items: [SidebarItem]) -> [LibraryFace] {
+        guard items.count > 1 else { return items.first.map { faces(in: $0) } ?? [] }
+        var seen = Set<FaceID>()
+        return items.flatMap { faces(in: $0) }.filter { seen.insert($0.id).inserted }
     }
 
-    func activateFontsTemporarily(in item: SidebarItem) {
-        let faces = faces(in: item)
+    func activateFonts(in rows: [SidebarRow]) {
+        let faces = faces(in: rows.map(\.item))
+        let names = rows.map { "“\($0.title)”" }.listed()
+        guard !faces.isEmpty else { return showToast("There are no fonts in \(names)") }
+        activate(faces, title: names)
+    }
+
+    func activateFontsTemporarily(in items: [SidebarItem]) {
+        let faces = faces(in: items)
         guard !faces.isEmpty else { return showToast("Nothing to activate") }
         activateTemporarily(faces)
     }
 
-    func deactivateFonts(in item: SidebarItem) {
-        let faces = faces(in: item)
+    func deactivateFonts(in items: [SidebarItem]) {
+        let faces = faces(in: items)
         guard !faces.isEmpty else { return showToast("Nothing to deactivate") }
         deactivate(faces)
     }
@@ -534,10 +794,10 @@ extension AppModel {
         }
     }
 
-    func deleteSmartSet(_ id: UUID) {
-        data.smartSets.removeAll { $0.id == id }
-        data.sidebar.forget("smartset.\(id)")
-        deselect { $0 == .smartSet(id) }
+    func deleteSmartSets(_ ids: Set<UUID>) {
+        data.smartSets.removeAll { ids.contains($0.id) }
+        for id in ids { data.sidebar.forget("smartset.\(id)") }
+        deselect { if case .smartSet(let id) = $0 { ids.contains(id) } else { false } }
     }
 
     // MARK: Foundries
@@ -551,11 +811,19 @@ extension AppModel {
     func renameFoundry(_ old: String, to new: String) {
         let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != old else { return }
+        var data = data
         for family in library.families where family.manufacturer.map({ data.foundryRenames[$0] ?? $0 }) == old {
             if let raw = family.manufacturer { data.foundryRenames[raw] = trimmed }
         }
         for (family, foundry) in data.foundryOverrides where foundry == old { data.foundryOverrides[family] = trimmed }
+        for set in data.smartSets.indices {
+            for rule in data.smartSets[set].rules.indices where data.smartSets[set].rules[rule].field == .foundry
+                && data.smartSets[set].rules[rule].comparison != .contains && data.smartSets[set].rules[rule].value == old {
+                data.smartSets[set].rules[rule].value = trimmed
+            }
+        }
         data.sidebar.rename("foundry.\(old)", to: "foundry.\(trimmed)")
+        self.data = data
         if selectedItems.contains(.foundry(old)) {
             selectSidebarItems(Set(selectedItems.map { $0 == .foundry(old) ? .foundry(trimmed) : $0 }))
         }
@@ -572,16 +840,15 @@ extension AppModel {
         }
     }
 
-    func deleteCharacterSet(_ id: UUID) {
-        let setID = "custom.\(id.uuidString)"
-        data.customCharacterSets.removeAll { $0.id == id }
-        data.sidebar.forget("charset.\(setID)")
-        deselect { $0 == .characterSet(setID) }
+    func deleteCharacterSets(_ ids: Set<UUID>) {
+        let setIDs = Set(ids.map { "custom.\($0.uuidString)" })
+        data.customCharacterSets.removeAll { ids.contains($0.id) }
+        for setID in setIDs { data.sidebar.forget("charset.\(setID)") }
+        deselect { if case .characterSet(let id) = $0 { setIDs.contains(id) } else { false } }
     }
 
     // MARK: Drag and drop
 
-    /// Sidebar rows that family names can be dropped onto: sets, tags, foundries and classifications.
     func takesFamilies(_ item: SidebarItem) -> Bool {
         switch item {
         case .set, .tag, .foundry, .classification: true
@@ -589,22 +856,22 @@ extension AppModel {
         }
     }
 
-    /// Families, or single styles of them, dropped onto a sidebar row. A set takes a style on its own; a tag, foundry or
-    /// classification is the whole family's, and a tag is given along with the ones the family has.
     func handleDrop(_ drags: [FontDrag], on item: SidebarItem) -> Bool {
         var seen = Set<String>()
-        let families = drags.compactMap { family($0.family) }.filter { seen.insert($0.id).inserted }
+        let families = drags.flatMap(\.families).compactMap { family($0) }.filter { seen.insert($0.id).inserted }
         guard !families.isEmpty else { return false }
         switch item {
         case .set(let id):
+            var whole: [Family] = [], inWhole = Set<String>()
             for drag in drags {
-                guard let family = family(drag.family) else { continue }
-                if let style = drag.style, let face = family.faces.first(where: { $0.face.postScriptName == style }) {
+                let dragged = drag.families.compactMap { family($0) }
+                if let style = drag.style, let family = dragged.first, let face = family.faces.first(where: { $0.face.postScriptName == style }) {
                     setMembership(true, for: face, of: family, in: id)
                 } else {
-                    setMembership(true, for: [family], in: id)
+                    whole += dragged.filter { inWhole.insert($0.id).inserted }
                 }
             }
+            if !whole.isEmpty { setMembership(true, for: whole, in: id) }
         case .tag(let name): setTag(name, true, for: families)
         case .foundry(let name): setFoundry(name, for: families)
         case .classification(let name): setClassification(name, for: families)
@@ -615,8 +882,6 @@ extension AppModel {
 
     // MARK: Sidebar
 
-    /// The sections below the library rows. They no longer move, but an order saved when they did is kept
-    /// (Reset Order puts them back).
     var sections: [SidebarSection] {
         data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
     }
@@ -624,16 +889,19 @@ extension AppModel {
     var libraryRows: [SidebarRow] {
         let rows = [
             SidebarRow(key: "library.all", title: "All Fonts", icon: "books.vertical", item: .all),
-            SidebarRow(key: "library.active", title: "Active", icon: "checkmark.circle", item: .active),
-            SidebarRow(key: "library.inactive", title: "Inactive", icon: "circle.dashed", item: .inactive),
-            // With system fonts off in Settings, they're nowhere, this item included.
+            SidebarRow(key: "library.active", title: "Active", icon: "checkmark.seal", item: .active),
+            SidebarRow(key: "library.inactive", title: "Inactive", icon: "xmark.seal", item: .inactive),
+            hasTemporaryFonts || selectedItems.contains(.temporary)
+                ? SidebarRow(key: "library.temporary", title: "Temporary", icon: "clock", item: .temporary) : nil,
+            SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
-            SidebarRow(key: "library.problems", title: "Problems", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
+            SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
         ].compactMap { $0 }
         return data.sidebar.ordered(rows, in: "library", key: \.key)
     }
 
-    /// A section's rows in the user's order. Character sets are in groups, ordered in `characterSetGroups`.
+    var hasTemporaryFonts: Bool { library.hasFacesOnUntilQuit }
+
     func rows(for section: SidebarSection) -> [SidebarRow] {
         let rows = unorderedRows(for: section)
         return section == .characterSets ? rows : data.sidebar.ordered(rows, in: section.rawValue, key: \.key)
@@ -643,28 +911,22 @@ extension AppModel {
         switch section {
         case .folders:
             var folders = data.folders
-            // Every folder Adobe apps load by themselves is one item.
             if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
             }
-            // Adobe Fonts, from Creative Cloud, apart from the fonts the user put in Adobe's folders.
             if ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) {
                 folders.append(WatchedFolder(id: WatchedFolder.adobeFontsID, path: ""))
             }
             if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
                 folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
             }
-            if ownFoldersWithFonts.contains(WatchedFolder.fontLibraryID), let fontLibrary = data.fontLibrary {
-                folders.append(fontLibrary)
-            }
-            // Never Cicero's Deactivated folder: it only keeps fonts while they're off, and Inactive lists those.
             return folders.map {
                 let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
                     : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
                 return SidebarRow(key: "folder.\($0.id)", title: data.named($0).displayName, icon: icon, item: .folder($0.id))
             }
         case .sets:
-            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "square.stack" : "app.badge.checkmark", item: .set($0.id)) }
+            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "folder" : "app.badge.checkmark", item: .set($0.id)) }
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
         case .tags:
             return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: SidebarSection.tags.icon, item: .tag($0), color: data.tagColors[$0]) }
@@ -681,14 +943,14 @@ extension AppModel {
         }
     }
 
-    /// The window title for the sidebar selection: with several items, their names.
     var selectionTitle: String {
-        if let id = similarFamilyID { return "Similar to \(library.family(id)?.name ?? id)" }
+        if let name = similarName { return "Similar to \(name)" }
+        if let list = documentList { return "Fonts in “\(list.name)”" }
         let item = selection ?? .all
         if selectedItems.count > 1 {
             return rows(inList: sidebarList(of: item))
                 .filter { selectedItems.contains($0.item) && $0.item != .problems }
-                .map(\.title).formatted(.list(type: .and))
+                .map(\.title).listed()
         }
         if let row = libraryRows.first(where: { $0.item == item }) { return row.title }
         for section in SidebarSection.allCases {
@@ -697,21 +959,77 @@ extension AppModel {
         return "Fonts"
     }
 
-    func isVisible(_ key: String) -> Bool { !data.sidebar.hidden.contains(key) }
+    func isVisible(_ key: String) -> Bool { SidebarRow.alwaysShown.contains(key) || !data.sidebar.hidden.contains(key) }
 
     func setVisible(_ key: String, _ visible: Bool) {
-        if visible { data.sidebar.hidden.remove(key) } else { data.sidebar.hidden.insert(key) }
-        if !visible { deselect { !isShown($0) } }
+        if visible { data.sidebar.hidden.remove(key) } else { hide([key]) }
     }
 
-    /// What the sidebar list selects. Several items only within one list (a section, or a group of
-    /// character sets), so they can move together: Command-clicking in another list starts over there.
+    func hide(_ keys: [String]) {
+        data.sidebar.hidden.formUnion(keys.filter { !SidebarRow.alwaysShown.contains($0) })
+        deselect { !isShown($0) }
+    }
+
+    func menuTargets(of row: SidebarRow, selected: Set<SidebarItem>) -> [SidebarRow] {
+        guard selected.count > 1, selected.contains(row.item) else { return [row] }
+        let rows = rows(inList: sidebarList(of: row.item)).filter { selected.contains($0.item) }
+        return rows.isEmpty ? [row] : rows
+    }
+
+    func dragOutOfSidebar(_ rows: [SidebarRow]) {
+        let rows = rows.filter { $0.canHide && isVisible($0.key) }
+        guard !rows.isEmpty else { return }
+        let before = data
+        var locations: [SidebarRow] = [], deleted: [SidebarRow] = [], hidden: [SidebarRow] = []
+        for row in rows {
+            switch row.item {
+            case .folder(let id) where isRemovableFolder(id): locations.append(row)
+            case .set, .smartSet, .tag: deleted.append(row)
+            default: hidden.append(row)
+            }
+        }
+        let keptOn = locations.isEmpty ? [] : removingFolders(Set(locations.compactMap { if case .folder(let id) = $0.item { id } else { nil } }))
+        let sets = Set(deleted.compactMap { if case .set(let id) = $0.item { id } else { nil } })
+        if !sets.isEmpty { deleteSets(sets) }
+        let smartSets = Set(deleted.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
+        if !smartSets.isEmpty { deleteSmartSets(smartSets) }
+        let tags = Set(deleted.compactMap { if case .tag(let name) = $0.item { name } else { nil } })
+        if !tags.isEmpty { deleteTags(tags) }
+        if !hidden.isEmpty { hide(hidden.map(\.key)) }
+
+        func names(_ rows: [SidebarRow], _ noun: String) -> String {
+            rows.count > 3 ? "\(rows.count) \(noun)" : rows.map(\.title).listed()
+        }
+        let deletedNoun = deleted.allSatisfy { if case .tag = $0.item { true } else { false } } ? "tags" : "folders"
+        let message = [
+            locations.isEmpty ? nil : "\(names(locations, "locations")) removed from the library",
+            deleted.isEmpty ? nil : "\(names(deleted, deletedNoun)) deleted",
+            hidden.isEmpty ? nil : "\(names(hidden, "items")) hidden from the sidebar",
+        ].compactMap { $0 }.joined(separator: " and ")
+        showToast(message) { [weak self] in
+            guard let self else { return }
+            var data = self.data
+            // The lists as they were before the drag, so what was changed in them since is lost.
+            data.folders = before.folders
+            data.folderNames = before.folderNames
+            data.sets = before.sets
+            data.smartSets = before.smartSets
+            data.tags = before.tags
+            data.familyTags = before.familyTags
+            data.tagColors = before.tagColors
+            data.sidebar = before.sidebar
+            self.data = data
+            if !locations.isEmpty {
+                self.rescan()
+                self.turnOnAgain(keptOn)
+            }
+        }
+    }
+
     func selectSidebarItems(_ items: Set<SidebarItem>) {
         let items = sidebarSelection(items, from: selectedItems)
         guard let any = items.first else { selection = nil; return }
         let list = sidebarList(of: any)
-        // The one selected before when it's still there, else the first. Problems has no fonts to show,
-        // so it's never the one among several.
         let candidates = items.count > 1 ? items.subtracting([.problems]) : items
         let primary = selection.flatMap { candidates.contains($0) ? $0 : nil }
             ?? rows(inList: list).first { candidates.contains($0.item) }?.item ?? candidates.first
@@ -723,8 +1041,6 @@ extension AppModel {
         }
     }
 
-    /// What the list's selection becomes when it goes from `current` to `items`: the items in the list of
-    /// the one just added (else of the one selected before), so that several are only ever in one list.
     func sidebarSelection(_ items: Set<SidebarItem>, from current: Set<SidebarItem>) -> Set<SidebarItem> {
         guard !items.isEmpty else { return [] }
         let added = items.subtracting(current)
@@ -733,17 +1049,15 @@ extension AppModel {
         return items.filter { sidebarList(of: $0) == list }
     }
 
-    /// Takes items that are gone, or hidden, out of the sidebar selection; All Fonts when none are left.
     func deselect(where remove: (SidebarItem) -> Bool) {
         let kept = selectedItems.filter { !remove($0) }
         guard kept != selectedItems else { return }
         if kept.isEmpty { selection = .all } else { selectSidebarItems(kept) }
     }
 
-    /// The list of the sidebar an item is in, named as in `SidebarPreferences.order`.
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
-        case .all, .active, .inactive, .system, .problems: "library"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "library"
         case .folder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .tag: SidebarSection.tags.rawValue
@@ -760,8 +1074,6 @@ extension AppModel {
         return characterSetGroups.first { "charsetgroup.\($0.id)" == list }?.rows ?? []
     }
 
-    /// Character sets for the sidebar, in their groups (Latin S–XL, Adobe Latin, Unicode Blocks,
-    /// Google Fonts, then the user's own).
     var characterSetGroups: [(id: String, title: String, rows: [SidebarRow])] {
         func row(_ set: CharacterSetDefinition) -> SidebarRow {
             SidebarRow(key: "charset.\(set.id)", title: set.name, icon: set.isCustom ? "character.cursor.ibeam" : "textformat.abc", item: .characterSet(set.id))
@@ -774,6 +1086,11 @@ extension AppModel {
         return data.sidebar.ordered(ordered, in: SidebarSection.characterSets.rawValue) { "charsetgroup.\($0.id)" }
     }
 
+    func hideGroup(_ id: String) {
+        guard let group = characterSetGroups.first(where: { $0.id == id }) else { return }
+        hide(group.rows.map(\.key))
+    }
+
     func isGroupExpanded(_ id: String) -> Bool { !data.sidebar.collapsed.contains("charsetgroup.\(id)") }
 
     func setGroupExpanded(_ id: String, _ expanded: Bool) {
@@ -784,8 +1101,6 @@ extension AppModel {
         data.sidebar.hidden.removeAll()
     }
 
-    /// Moves items within one list of the sidebar (see `SidebarPreferences.order`), never into another.
-    /// `shown` is what the list shows, `all` the keys of every item it has.
     func moveSidebarItems(_ source: IndexSet, to destination: Int, shown: [String], all: [String], in list: String) {
         data.sidebar.move(source, to: destination, shown: shown, all: all, in: list)
     }
@@ -812,60 +1127,77 @@ extension AppModel {
 
     // MARK: Prompts
 
-    func prompt(_ title: String, text: String = "", confirm: String, action: @escaping (String) -> Void) {
-        textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, action: action)
+    func prompt(_ title: String, text: String = "", confirm: String, requiresText: Bool = false, action: @escaping (String) -> Void) {
+        ask { $0.textPrompt = TextPrompt(title: title, initialText: text, confirmTitle: confirm, requiresText: requiresText, action: action) }
     }
 
     // MARK: Compare
+
+    static let compareLimit = 12
+
+    var isCompareFull: Bool { compareEntries.count >= Self.compareLimit }
 
     func compare(_ families: [Family]) {
         compareEntries = []
         _ = addToCompare(families.map(\.id))
     }
 
-    /// Adds the families that aren't in Compare yet, in the style the preview weight picks.
     func addToCompare(_ names: [String]) -> Bool {
         let new = names.filter { name in family(name) != nil && !compareEntries.contains { $0.familyID == name } }
-        for name in new {
+        let added = new.prefix(Self.compareLimit - compareEntries.count)
+        for name in added {
             compareEntries.append(CompareEntry(familyID: name, tint: nextCompareTint))
         }
-        return !new.isEmpty
+        if added.count < new.count {
+            showToast("Compare holds up to \(Self.compareLimit) styles")
+        }
+        return !added.isEmpty
     }
 
-    /// The same family again, after it, in its first style not in `shown`: the styles Compare shows it in, those that
-    /// follow the preview weight included.
     func compareAnotherStyle(of id: UUID, besides shown: Set<FaceID>) {
-        guard let index = compareEntries.firstIndex(where: { $0.id == id }), let family = family(compareEntries[index].familyID) else { return }
+        guard !isCompareFull, let index = compareEntries.firstIndex(where: { $0.id == id }),
+              let family = family(compareEntries[index].familyID) else { return }
         let style = family.faces.first { !shown.contains($0.id) }?.id
         compareEntries.insert(CompareEntry(familyID: family.id, style: style, tint: nextCompareTint), at: index + 1)
     }
 
-    /// nil: the style the preview weight picks.
     func setCompareStyle(_ style: FaceID?, of id: UUID) {
         guard let index = compareEntries.firstIndex(where: { $0.id == id }) else { return }
         compareEntries[index].style = style
+    }
+
+    func setCompareTint(_ tint: Int, of id: UUID) {
+        guard let index = compareEntries.firstIndex(where: { $0.id == id }) else { return }
+        compareEntries[index].tint = tint
     }
 
     func removeFromCompare(_ id: UUID) {
         compareEntries.removeAll { $0.id == id }
     }
 
-    /// Puts a compared family where another one is, moving the others along.
+    func toggleInCompare(_ familyID: String) {
+        if compareEntries.contains(where: { $0.familyID == familyID }) {
+            compareEntries.removeAll { $0.familyID == familyID }
+        } else {
+            _ = addToCompare([familyID])
+        }
+    }
+
     func moveInCompare(_ id: UUID, to target: UUID) {
         guard let from = compareEntries.firstIndex(where: { $0.id == id }), let to = compareEntries.firstIndex(where: { $0.id == target }),
               from != to else { return }
         compareEntries.insert(compareEntries.remove(at: from), at: to)
     }
 
-    /// The first tint no compared family has.
     private var nextCompareTint: Int {
         (0...).first { tint in !compareEntries.contains { $0.tint == tint } }!
     }
 
     // MARK: Font caches
 
-    /// Returns true when macOS's caches were cleared, which is when restarting helps.
     func clearCaches(scopes: [SystemFontCaches.Scope], apps: [AppFontCaches.App]) async -> Bool {
+        guard startJob(.clearingCaches) else { return false }
+        defer { endJob(.clearingCaches) }
         var trashed: [String] = []
         var failures = 0
         for app in apps {
@@ -884,10 +1216,19 @@ extension AppModel {
                 showToast("Couldn’t clear the macOS font caches")
             }
         }
+        // Clearing them makes macOS forget the fonts Cicero uses where they are, for good or for a while: on again.
+        if clearedSystem {
+            await enqueued { model in
+                let result = await model.engine.registerAgain(model.data.records)
+                if !result.failed.isEmpty {
+                    model.showToast(result.failed.count == 1 ? "Couldn’t turn 1 file on again" : "Couldn’t turn \(result.failed.count) files on again")
+                }
+            }
+        }
         if failures > 0 {
             showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures) cache items to the Trash")
         } else if !trashed.isEmpty && !clearedSystem {
-            showToast("Moved the \(trashed.formatted(.list(type: .and))) font caches to the Trash")
+            showToast("Moved the \(trashed.listed()) font caches to the Trash")
         }
         if clearedSystem || !trashed.isEmpty { rebuildFontList() }
         return clearedSystem
@@ -895,22 +1236,21 @@ extension AppModel {
 
     // MARK: Problems
 
-    /// `family` is the family the problem is about, if any: removing files names the others in them.
     func apply(_ fix: ProblemFix, family: String? = nil) {
         switch fix {
         case .reveal(let paths):
             NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
         case .deactivate(let ids):
-            // Asks first like any deactivation, for files Cicero didn't install.
             let ids = Set(ids)
             let faces = library.families.flatMap(\.faces).filter { ids.contains($0.id) }
             if !faces.isEmpty { deactivate(faces) }
         case .trash(let paths):
             guard let plan = engine.spareCopiesTrashPlan(paths, families: Set([family].compactMap(\.self)), in: library) else { return }
-            trashPlan = plan
+            ask { $0.trashPlan = plan }
         case .forgetInPlace(let path):
             enqueue { model in
-                model.data.records = await model.engine.forgetInPlace(path, records: model.data.records)
+                model.data.records = await model.engine.forgetInPlace([path], records: model.data.records)
+                model.updateProblems()
                 model.rescan()
             }
         case .forgetInstalledCopy(let path):
@@ -928,15 +1268,75 @@ extension AppModel {
                 let result = await model.engine.installCopy(of: face, records: model.data.records)
                 model.finish(result)
             }
+        case .removeFromAdobeFonts(let paths):
+            CreativeCloud.open(paths)
         }
     }
 
-    /// Remove All Extra Copies: every problem's extra copies at once, after asking.
+    func forgetAll(of problems: [Problem]) {
+        var inPlace: [String] = [], copies: [String] = []
+        for fix in problems.flatMap(\.fixes) {
+            switch fix {
+            case .forgetInPlace(let path): inPlace.append(path)
+            case .forgetInstalledCopy(let path): copies.append(path)
+            default: break
+            }
+        }
+        enqueue { model in
+            for path in copies { model.data.records.installedCopies[path] = nil }
+            if !inPlace.isEmpty {
+                model.data.records = await model.engine.forgetInPlace(inPlace, records: model.data.records)
+                model.rescan()
+            }
+            model.updateProblems()
+        }
+    }
+
     func trashExtraCopies(of problems: [Problem]) {
         var seen = Set<String>()
         let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
-        plan.title = plan.paths.count == 1 ? "1 extra copy" : "\(plan.paths.count) extra copies"
-        trashPlan = plan
+        plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count) Extra Copies"
+        ask { [plan] in $0.trashPlan = plan }
+    }
+}
+
+private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
+    let refusal: (URL) -> String?
+
+    init(refusal: @escaping (URL) -> String?) {
+        self.refusal = refusal
+    }
+
+    func panel(_ sender: Any, validate url: URL) throws {
+        let url = url.standardizedFileURL
+        if let reason = refusal(url) {
+            throw NSError(domain: "Cicero", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Cicero’s Library can’t go into “\(url.lastPathComponent)”.",
+                NSLocalizedRecoverySuggestionErrorKey: reason,
+            ])
+        }
+        guard let service = ActivationEngine.cloudService(syncing: url) else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        switch service {
+        case .iCloudDrive:
+            alert.messageText = "“\(url.lastPathComponent)” Syncs With iCloud Drive"
+            alert.informativeText = "iCloud Drive can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and choose Keep Downloaded."
+        case .other:
+            alert.messageText = "“\(url.lastPathComponent)” Syncs With a Cloud Service"
+            alert.informativeText = "The service can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and make it available offline."
+        }
+        alert.addButton(withTitle: "Choose Another Folder")
+        alert.addButton(withTitle: "Use Anyway")
+        let response: NSApplication.ModalResponse
+        if let panel = sender as? NSWindow {
+            // A sheet on the panel, waited for here: the panel needs the answer before Choose goes on.
+            alert.beginSheetModal(for: panel) { NSApp.stopModal(withCode: $0) }
+            response = NSApp.runModal(for: alert.window)
+        } else {
+            response = alert.runModal()
+        }
+        guard response == .alertSecondButtonReturn else { throw CocoaError(.userCancelled) }
     }
 }

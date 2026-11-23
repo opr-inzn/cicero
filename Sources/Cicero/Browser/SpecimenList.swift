@@ -1,43 +1,55 @@
 import CiceroCore
 import SwiftUI
 
-/// Full-width specimens on cards like the grid's: the sample at the preview size, with the family's styles set
-/// in themselves.
 struct SpecimenList: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.infoPanelShown) private var infoShown
+    @Environment(\.displayScale) private var scale
     let families: [Family]
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
     @State private var visibleHeight: CGFloat = 0
+    @State private var position = ScrollPosition(idType: String.self)
 
     var body: some View {
+        let pinned = model.similarFamilyID.flatMap { id in families.first?.id == id ? families.first : nil }
+        let groups = FamilyGroup.groups(pinned == nil ? families[...] : families.dropFirst(), sort: model.shownSort)
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: FontGrid.spacing) {
-                    ForEach(families) { family in
-                        Specimen(family: family, foundry: model.foundryName(of: family), isSelected: model.selectedIDs.contains(family.id), model: model)
-                            .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
-                            .onAppear { prefetchStyles(near: family) }
+                    ForEach(groups) { group in
+                        Section {
+                            ForEach(group.families) { family in
+                                Specimen(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
+                                    .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                                    .onAppear { prefetchStyles(near: family) }
+                            }
+                        } header: {
+                            if group.title != nil { FamilyGroupHeader(group: group, isFirst: group.id == groups.first?.id) }
+                        }
                     }
                 }
                 .scrollTargetLayout()
-                .cardsPadding(infoPresented: model.isInfoPresented)
+                .cardsPadding(infoShown: infoShown, scale: scale, top: pinned == nil)
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
+            .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
+                if let pinned {
+                    Specimen(family: pinned, isSelected: model.selectedIDs.contains(pinned.id), model: model)
+                        .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
+                }
+            })
             .visibleHeight($visibleHeight)
-            .modifier(KeepsTopOnResize())
+            .modifier(KeepsTopOnResize(position: $position))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .specimens))
+            .modifier(TakesStartFocus(focused: $focused))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .specimens, pinned: pinned?.id))
         }
     }
 
-    /// Scans prefetch each family's regular face, which the grid and list show. Specimens also set every style's
-    /// name in the style, and with files not read since the Mac started, reading them as cards came into view held
-    /// up scrolling: the cards around one that appears have their styles read in the background, mostly those it
-    /// scrolls towards. Only those, not every card's: reading thousands of files at once slowed drawing down.
     private func prefetchStyles(near family: Family) {
         guard let index = families.firstIndex(where: { $0.id == family.id }) else { return }
         let near = families[max(0, index - 4) ..< min(families.count, index + 12)]
@@ -48,50 +60,57 @@ struct SpecimenList: View {
 private struct Specimen: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    let foundry: String?
     let isSelected: Bool
     let model: AppModel
 
-    /// Long families show their first styles and a count, so rows stay a readable height.
     static let styleLimit = 14
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(family.name).font(.headline).lineLimit(1)
-                TagDots(colors: model.tagColors(of: family))
-                StatusTag(family: family)
-                VariableTag(family: family)
-                Text([foundry, family.stylesLabel].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                NoteMark(note: model.note(of: family))
-                RatingStars(rating: model.rating(of: family))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(family.name).font(.headline).lineLimit(1).truncationMode(.middle)
+                    TagDots(colors: model.tagColors(of: family)).centredOnName()
+                    StatusTag(family: family).centredOnName()
+                    VariableTag(family: family).centredOnName()
+                    NoteMark(note: model.note(of: family)).centredOnName()
+                    RatingStars(rating: model.rating(of: family))
+                }
                 Spacer(minLength: 8)
                 ActivationSwitch(family: family, model: model)
                     .accessibilityHidden(true)
             }
+            let (style, weight) = model.previewStyle(of: family)
             FontText(
-                text: preview.text(for: family), face: family.face(nearestWeight: preview.weight).face,
-                size: preview.size, weight: preview.weight, variations: model.variations(for: family),
-                kerning: preview.kerning(at: preview.size)
+                text: model.scriptSamples.text(preview.text(for: family), for: style.face, long: true), face: style.face,
+                size: preview.size, weight: weight, variations: model.variations(for: family, face: style.id), features: model.searchFeatures,
+                onCaps: true, showsPlaceholder: true
             )
-            .frame(maxWidth: .infinity, alignment: preview.alignment.frame)
-            if family.faces.count > 1 {
-                FlowLayout(spacing: 14, lineSpacing: 4) {
-                    ForEach(family.faces.prefix(Self.styleLimit)) { face in
-                        FontText(text: face.face.styleName, face: face.face, size: 13, weight: face.face.styleWeight)
-                            .foregroundStyle(.secondary)
-                    }
-                    if family.faces.count > Self.styleLimit {
-                        Text("+\(family.faces.count - Self.styleLimit) more").font(.caption).foregroundStyle(.tertiary)
-                    }
+            .foregroundStyle(Color.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            FlowLayout(spacing: 14, lineSpacing: 4) {
+                ForEach(family.faces.prefix(Self.styleLimit)) { face in
+                    FontText(text: face.face.styleName, face: face.face, size: 13, weight: face.face.styleWeight, onCaps: true)
+                        .foregroundStyle(.secondary)
+                }
+                if family.faces.count > Self.styleLimit {
+                    Text("+\((family.faces.count - Self.styleLimit).plain) more").font(.caption).foregroundStyle(.tertiary)
                 }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(FamilyCard(isSelected: isSelected))
+    }
+}
+
+private extension View {
+    func centredOnName() -> some View {
+        alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + Self.nameMiddle }
+    }
+
+    static var nameMiddle: CGFloat {
+        let font = NSFont.preferredFont(forTextStyle: .headline)
+        return (font.ascender + font.descender) / 2
     }
 }

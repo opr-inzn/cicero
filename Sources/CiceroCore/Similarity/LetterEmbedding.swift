@@ -4,16 +4,8 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// What a face's letters look like as `dimensions` numbers, from a small model that learned it from Google Fonts'
-/// families (scripts/embedding): it looks at the letters and their advances as `LetterImages` draws them (and the
-/// words it sets in strips and the large letters, for a model that takes them), and faces that look alike, scripts,
-/// stencils and outlines too, come out close together. The numbers have a length of 1, so
-/// two faces are 0 apart when alike and up to 2 when not. Next to the letter measurements in `SimilarFonts`. The model also says
-/// which of `classifications` the face is likely to be, for the families nothing in their files classifies.
 public final class LetterEmbedding: Sendable {
     private let url: URL
-    /// Loaded when first asked, which takes a fifth of a second, so in the background; it answers one question at a
-    /// time here.
     private let model = Mutex(Model.unloaded)
 
     private enum Model {
@@ -23,38 +15,46 @@ public final class LetterEmbedding: Sendable {
     }
 
     public static let dimensions = 128
-    /// The classifications the model tells apart, in the order of its answer. Monospaced faces it leaves to their
-    /// advances, and symbol fonts haven't the letters.
     public static let classifications: [Classification] = [.serif, .sansSerif, .script, .ornamental]
 
-    /// What the model says of a face.
     public struct Reading: Equatable, Sendable {
         public var embedding: [Float]
-        /// How likely each of `classifications` is, adding up to 1; nil from a model that doesn't say.
         public var classification: [Float]?
     }
 
-    /// The compiled model (LetterEmbedding.mlmodelc); nil when there's none.
     public init?(contentsOf url: URL?) {
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
         self.url = url
     }
 
-    /// nil for a face with too few of the letters, as `LetterImages` says, and when the model can't be loaded.
     public func embedding(of font: CTFont) -> [Float]? {
         read(font)?.embedding
     }
 
-    /// nil for a face with too few of the letters, as `LetterImages` says, and when the model can't be loaded.
+    enum Outcome {
+        case read(Reading)
+        case undrawable
+        case failed
+    }
+
+    var hasFailed: Bool {
+        model.withLock { if case .failed = $0 { true } else { false } }
+    }
+
     public func read(_ font: CTFont) -> Reading? {
-        // The words in strips and the large letters are drawn only for a model that takes them.
-        let (takesStrips, takesDetails) = model.withLock { state -> (Bool, Bool) in
+        if case .read(let reading) = outcome(font) { return reading }
+        return nil
+    }
+
+    func outcome(_ font: CTFont) -> Outcome {
+        let inputs = model.withLock { state -> (strips: Bool, details: Bool)? in
             if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
-            guard case .loaded(let model) = state else { return (false, false) }
+            guard case .loaded(let model) = state else { return nil }
             let inputs = model.modelDescription.inputDescriptionsByName
             return (inputs["strips"] != nil, inputs["details"] != nil)
         }
-        guard let drawn = LetterImages.draw(font, strips: takesStrips, details: takesDetails) else { return nil }
+        guard let (takesStrips, takesDetails) = inputs else { return .failed }
+        guard let drawn = LetterImages.draw(font, strips: takesStrips, details: takesDetails) else { return .undrawable }
         var letters = [Float](repeating: 0, count: drawn.pixels.count)
         vDSP.convertElements(of: drawn.pixels, to: &letters)
         letters = vDSP.divide(letters, 255)
@@ -65,7 +65,6 @@ public final class LetterEmbedding: Sendable {
         vDSP.convertElements(of: drawn.details, to: &large)
         large = vDSP.divide(large, 255)
         let found = model.withLock { state -> Reading? in
-            if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
             guard case .loaded(let model) = state else { return nil }
             let shape = [1, LetterImages.letters.count, LetterImages.size, LetterImages.size] as [NSNumber]
             guard let input = try? MLMultiArray(shape: shape, dataType: .float32),
@@ -93,11 +92,11 @@ public final class LetterEmbedding: Sendable {
             else { return nil }
             return Reading(embedding: embedding, classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values))
         }
-        guard var reading = found, reading.embedding.count == Self.dimensions, reading.embedding.allSatisfy(\.isFinite) else { return nil }
+        guard var reading = found, reading.embedding.count == Self.dimensions, reading.embedding.allSatisfy(\.isFinite) else { return .failed }
         if let classification = reading.classification, classification.count != Self.classifications.count || !classification.allSatisfy(\.isFinite) {
             reading.classification = nil
         }
-        return reading
+        return .read(reading)
     }
 
     private static func values(_ array: MLMultiArray) -> [Float] {

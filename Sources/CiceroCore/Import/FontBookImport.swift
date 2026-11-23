@@ -1,17 +1,10 @@
 import Foundation
 
-/// Reads Font Book's collections: `.collection` files in ~/Library/FontCollections, or ones copied from another Mac.
-/// Each is a keyed archive of a dictionary whose NSFontCollectionFontDescriptors name the fonts it has: a family whole
-/// (its family name), a style (its PostScript name), or a style left out of a family (marked negative). A smart
-/// collection, or Font Book's Fixed Width, picks fonts by what they are instead, which isn't read.
 public enum FontBookImport {
     public static let fileExtension = "collection"
 
-    /// Collections Font Book makes itself, which the sheet doesn't pick at first.
     static let builtInNames: Set<String> = ["Fixed Width", "Fun", "Modern", "PDF", "Traditional", "Web"]
 
-    /// The user's collections on this Mac: theirs, Font Book's own, and Favorites; not Recents or the ones Font Book
-    /// keeps for itself.
     public static func collections(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
         let folder = home.appendingPathComponent("Library/FontCollections", isDirectory: true).resolvingSymlinksInPath()
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
@@ -22,37 +15,40 @@ public enum FontBookImport {
         .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
-    /// The collections as sets; ones that pick fonts by rules, or can't be read, are named in the notes.
     public static func read(_ urls: [URL]) -> ImportedLibrary {
         var library = ImportedLibrary(source: .fontBook)
-        var skipped: [String] = []
+        var smart: [String] = []
+        var unreadable: [String] = []
         for url in urls {
             let fileName = url.deletingPathExtension().lastPathComponent
             guard let collection = try? collection(at: url) else {
-                skipped.append(fileName)
+                unreadable.append(url.lastPathComponent)
                 continue
             }
             // Font Book shows a collection by its file's name; the one inside can be another, as Fixed Width's is.
-            let name = fileName == "com.apple.Favorites" ? "Favorites" : fileName
+            // A "/" in a name the Finder shows is a ":" in the file's name on disk.
+            let name = fileName == "com.apple.Favorites" ? "Favorites" : fileName.replacingOccurrences(of: ":", with: "/")
             guard let set = collection.set(id: url.lastPathComponent, name: name, isBuiltIn: builtInNames.contains(fileName)) else {
-                skipped.append(name)
+                smart.append(name)
                 continue
             }
             library.sets.append(set)
         }
-        if !skipped.isEmpty {
-            library.notes.append(skipped.count == 1 ? "the smart collection “\(skipped[0])”"
-                : "the smart collections " + skipped.map { "“\($0)”" }.formatted(.list(type: .and)))
+        if !smart.isEmpty {
+            library.notes.append(smart.count == 1 ? "the smart collection “\(smart[0])”"
+                : "the smart collections " + smart.map { "“\($0)”" }.listed())
+        }
+        if !unreadable.isEmpty {
+            library.notes.append((unreadable.count == 1 ? "the file " : "the files ")
+                + unreadable.map { "“\($0)”" }.listed() + ", which Cicero can’t read")
         }
         return library
     }
 
     struct Collection {
         var descriptors: [[String: Any]]
-        /// The collection picks fonts by rules: a predicate, or descriptors asking for traits or languages.
         var hasRules: Bool
 
-        /// The fonts it names, as a set; nil for one that picks them by rules.
         func set(id: String, name: String, isBuiltIn: Bool) -> ImportedSet? {
             guard !hasRules else { return nil }
             var set = ImportedSet(id: id, name: name, isBuiltIn: isBuiltIn)
@@ -77,18 +73,16 @@ public enum FontBookImport {
         }
     }
 
-    /// What a descriptor may say about a font it names; any other attribute asks for fonts of a kind.
     private static let namingAttributes: Set<String> = [
         "NSFontNameAttribute", "NSFontFamilyAttribute", "NSFontFaceAttribute", "NSFontVisibleNameAttribute",
         "NSFontSizeAttribute", "NSFontDescriptorNegativeAttribute",
     ]
 
-    /// Reads a collection file, trusting nothing in it: only dictionaries, arrays, strings, numbers, data and dates,
-    /// and font descriptors as their attributes alone.
     static func collection(at url: URL) throws -> Collection {
         let data = try Data(contentsOf: url)
         let unarchiver = try NSKeyedUnarchiver(forReadingFrom: data)
         unarchiver.setClass(ArchivedDescriptor.self, forClassName: "NSFontDescriptor")
+        // The file is anyone's: trust nothing in it, decode only these plain classes, and font descriptors as their attributes alone.
         let classes: [AnyClass] = [NSDictionary.self, NSArray.self, NSString.self, NSNumber.self, NSData.self, NSDate.self,
                                    NSSet.self, ArchivedDescriptor.self]
         let root = unarchiver.decodeObject(of: classes, forKey: "NSFontCollectionDictionary")
@@ -102,7 +96,6 @@ public enum FontBookImport {
     }
 }
 
-/// An NSFontDescriptor in an archive, as its attributes, read without AppKit.
 @objc(CiceroArchivedFontDescriptor)
 final class ArchivedDescriptor: NSObject, NSSecureCoding {
     static let supportsSecureCoding = true

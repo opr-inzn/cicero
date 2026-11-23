@@ -2,16 +2,10 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// Quick Look: a floating panel with the family selected in the browser, opened and closed with Space or ⌘Y.
-/// With several selected it shows one at a time. The panel never takes the keyboard, so the browser's arrow
-/// keys go on moving the selection and the panel follows. The model owns it; `QuickLookHost` in the main
-/// window hands it the window and the selection's changes.
 @Observable
 final class QuickLook {
     private(set) var isOpen = false
-    /// The browser's families in the order it shows them, so several selected ones go in that order.
     private(set) var order: [String] = []
-    /// The family added to the selection last (a click, an arrow key) or gone to with ‹ ›; shown while it's selected.
     private var currentID: String?
 
     @ObservationIgnored private weak var model: AppModel?
@@ -19,33 +13,28 @@ final class QuickLook {
     @ObservationIgnored private weak var mainWindow: NSWindow?
     @ObservationIgnored private var mainWindowObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var panel: QuickLookPanel?
+    @ObservationIgnored private var opening = 0
 
-    /// Saved once the user resizes it. (The size under "quickLook.size" was saved on every close, so it was
-    /// the old default, 680 × 620, for most.)
     private static let sizeKey = "quickLook.panelSize"
-    private static let defaultSize = NSSize(width: 520, height: 440)
+    static let defaultSize = NSSize(width: 520, height: 440)
 
     // MARK: What it shows
 
-    /// The selected families, in the browser's order.
     var families: [Family] {
         guard let model else { return [] }
-        let selected = model.selectedIDs
+        let selected = model.shownSelection
         if selected.count == 1, let id = selected.first { return model.family(id).map { [$0] } ?? [] }
         var ids = order.filter(selected.contains)
         if ids.count < selected.count {
-            // Selected but not in the order the browser last gave (sorted or filtered since): after the others.
             let listed = Set(ids)
             ids += model.library.families.lazy.map(\.id).filter { selected.contains($0) && !listed.contains($0) }
         }
         return ids.compactMap(model.family)
     }
 
-    /// The family the panel shows, its place among the selected ones and how many there are.
     var shown: (family: Family, index: Int, count: Int)? {
         let families = families
         guard !families.isEmpty else { return nil }
-        // One family doesn't depend on `currentID`, which every arrow key changes too.
         let index = families.count == 1 ? 0 : families.firstIndex { $0.id == currentID } ?? 0
         return (families[index], index, families.count)
     }
@@ -54,8 +43,6 @@ final class QuickLook {
         if ids != order { order = ids }
     }
 
-    /// Goes to the next or previous of several selected families, round to the first after the last.
-    /// False when there's only one.
     func step(_ delta: Int) -> Bool {
         let families = families
         guard isOpen, families.count > 1 else { return false }
@@ -64,10 +51,8 @@ final class QuickLook {
         return true
     }
 
-    /// Follows the browser: shows a family that's just been added to the selection, and closes when nothing is selected.
     func selectionChanged(from old: Set<String>, to new: Set<String>) {
         let added = new.subtracting(old)
-        // Several at once (⌘A, a ⇧-click) keep the one shown.
         if added.count == 1 {
             currentID = added.first
         } else if let id = currentID, !new.contains(id) {
@@ -78,19 +63,30 @@ final class QuickLook {
 
     // MARK: Opening and closing
 
-    /// `order` is the browser's families in the order it shows them.
     func toggle(order: [String]? = nil) {
         if isOpen { close() } else { open(order: order) }
     }
 
-    /// Opens over the main window, unless nothing is selected or a font page is open.
     func open(order: [String]? = nil) {
-        guard !isOpen, let model, let preview, model.openFamilyID == nil, !model.selectedIDs.isEmpty else { return }
+        guard !isOpen, let model, let preview, model.openFamilyID == nil, !model.shownSelection.isEmpty else { return }
         if let order { updateOrder(order) }
         let panel = panel ?? makePanel(model: model, preview: preview)
         isOpen = true
         place(panel)
         panel.orderFront(nil)
+        opening += 1
+        closeWhenNothingShows(opening)
+    }
+
+    private func closeWhenNothingShows(_ opening: Int) {
+        withObservationTracking {
+            _ = shown?.family.id
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.isOpen, self.opening == opening else { return }
+                if self.shown == nil { self.close() } else { self.closeWhenNothingShows(opening) }
+            }
+        }
     }
 
     func close() {
@@ -103,7 +99,6 @@ final class QuickLook {
         panel?.title = title
     }
 
-    /// The main window: the panel opens centred over it, closes with it, and steps aside while it shows a sheet.
     func attach(to window: NSWindow, model: AppModel, preview: PreviewSettings) {
         self.model = model
         self.preview = preview
@@ -115,7 +110,7 @@ final class QuickLook {
             center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.close() }
             },
-            // Sheets and alerts (the activation prompt, say, from the panel's switch) would open under the panel.
+            // Sheets and alerts would open under the panel.
             center.addObserver(forName: NSWindow.willBeginSheetNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.panel?.orderOut(nil) }
             },
@@ -125,7 +120,6 @@ final class QuickLook {
                     self.panel?.orderFront(nil)
                 }
             },
-            // It goes to the Dock with the window and comes back with it.
             center.addObserver(forName: NSWindow.willMiniaturizeNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.panel?.orderOut(nil) }
             },
@@ -145,7 +139,6 @@ final class QuickLook {
         content.sizingOptions = []
         panel.contentView = content
         let center = NotificationCenter.default
-        // Its close button.
         center.addObserver(forName: NSWindow.willCloseNotification, object: panel, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.close() }
         }
@@ -156,7 +149,6 @@ final class QuickLook {
         return panel
     }
 
-    /// Centres the panel over the main window, at the size it was last left at, on the main window's screen.
     private func place(_ panel: NSPanel) {
         var size = NSSizeFromString(UserDefaults.standard.string(forKey: Self.sizeKey) ?? "")
         if size.width < panel.minSize.width || size.height < panel.minSize.height { size = Self.defaultSize }
@@ -175,9 +167,6 @@ final class QuickLook {
     }
 }
 
-/// A floating panel that never becomes key: the main window keeps the keyboard, so the browser's arrow
-/// keys move the selection while the panel shows it. Hides while Cicero isn't the active app. A full title
-/// bar, not a utility window's, whose buttons and title are smaller than other windows'.
 final class QuickLookPanel: NSPanel {
     convenience init(size: NSSize) {
         self.init(contentRect: NSRect(origin: .zero, size: size),
@@ -191,24 +180,119 @@ final class QuickLookPanel: NSPanel {
         isRestorable = false
         isExcludedFromWindowsMenu = true
         collectionBehavior.insert(.fullScreenAuxiliary)
+        if #available(macOS 26, *) { styleMask.insert(.fullSizeContentView) }
         minSize = NSSize(width: 420, height: 320)
-        // The title bar in the page's colour, so the name sits on the specimen.
         titlebarAppearsTransparent = true
         titlebarSeparatorStyle = .none
-        backgroundColor = .textBackgroundColor
+        backgroundColor = Self.page
+        addTitleBar()
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    override func zoom(_ sender: Any?) {}
+
+    static let page = NSColor(name: nil) { appearance in
+        var page = NSColor.textBackgroundColor
+        appearance.performAsCurrentDrawingAppearance {
+            // As an sRGB colour, as SwiftUI draws this grey, lighter in dark mode than AppKit draws it.
+            if let grey = NSColor.textBackgroundColor.usingColorSpace(.genericGamma22Gray) {
+                page = NSColor(srgbRed: grey.whiteComponent, green: grey.whiteComponent, blue: grey.whiteComponent, alpha: grey.alphaComponent)
+            }
+        }
+        return page
+    }
+
+    override var title: String {
+        didSet { titleLabel.stringValue = title }
+    }
+
+    private let titleLabel = NSTextField(labelWithString: "")
+
+    private func addTitleBar() {
+        guard let close = standardWindowButton(.closeButton), let bar = close.superview else { return }
+        // A title of its own: AppKit sets its title after the buttons it shows, and elsewhere once the title bar has views of its own.
+        titleVisibility = .hidden
+        // A panel that's never key shows its own close button grey and empty.
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            standardWindowButton(kind)?.isHidden = true
+        }
+        let closeButton = QuickLookTitleButton { [weak self] in self?.close() }
+        closeButton.toolTip = "Close"
+        closeButton.setAccessibilityLabel("Close")
+        let top: NSView.AutoresizingMask = bar.isFlipped ? .maxYMargin : .minYMargin
+        let centre = NSPoint(x: close.frame.midX + 1.5, y: close.frame.midY)
+        let side = QuickLookTitleButton.side
+        closeButton.frame = NSRect(x: centre.x - side / 2, y: centre.y - side / 2, width: side, height: side)
+        closeButton.autoresizingMask = [.maxXMargin, top]
+        bar.addSubview(closeButton)
+        titleLabel.font = .titleBarFont(ofSize: 0)
+        titleLabel.textColor = QuickLookTitleButton.titleColor
+        titleLabel.lineBreakMode = .byTruncatingMiddle
+        titleLabel.sizeToFit()
+        let start = (centre.x + QuickLookTitleButton.diameter / 2 + 9 - 2.5).rounded()
+        titleLabel.frame = NSRect(x: start, y: (centre.y - titleLabel.frame.height / 2).rounded(),
+                                  width: max(0, bar.bounds.width - start - 12), height: titleLabel.frame.height)
+        titleLabel.autoresizingMask = [.width, top]
+        bar.addSubview(titleLabel)
+    }
 }
 
-/// Takes a click in a window that isn't key as a click, not as a request to bring the window forward:
-/// the panel is never key, so every click in it is a first click.
+private final class QuickLookTitleButton: NSButton {
+    static let diameter: CGFloat = 12
+    static let side: CGFloat = 16
+    private static let circle = grey(light: 0.55, dark: 0.8)
+    private static let pressedCircle = grey(light: 0.72, dark: 0.92)
+    static let titleColor = grey(light: 0.71, dark: 0.74)
+
+    private static func grey(light: CGFloat, dark: CGFloat) -> NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 1, green: 1, blue: 1, alpha: dark) : NSColor(srgbRed: 0, green: 0, blue: 0, alpha: light)
+        }
+    }
+
+    private let perform: () -> Void
+
+    init(action: @escaping () -> Void) {
+        perform = action
+        super.init(frame: .zero)
+        isBordered = false
+        title = ""
+        target = self
+        self.action = #selector(clicked)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var isFlipped: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    @objc private func clicked() { perform() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.saveGState()
+        context.translateBy(x: bounds.midX - Self.diameter / 2, y: bounds.midY - Self.diameter / 2)
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        context.setFillColor((isHighlighted ? Self.pressedCircle : Self.circle).cgColor)
+        context.fillEllipse(in: CGRect(x: 0, y: 0, width: Self.diameter, height: Self.diameter))
+        context.setBlendMode(.clear)
+        context.setLineWidth(1.75)
+        context.setLineCap(.round)
+        context.strokeLineSegments(between: [CGPoint(x: 3.57, y: 3.57), CGPoint(x: 8.43, y: 8.43),
+                                             CGPoint(x: 3.57, y: 8.43), CGPoint(x: 8.43, y: 3.57)])
+        context.endTransparencyLayer()
+        context.restoreGState()
+    }
+}
+
 private final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-/// In the main window: hands Quick Look the window and has it follow the selection, closing when a font page opens.
 struct QuickLookHost: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -220,7 +304,6 @@ struct QuickLookHost: View {
     }
 }
 
-/// Calls `found` with the window the view is in, once it's in one.
 struct WindowReader: NSViewRepresentable {
     let found: (NSWindow) -> Void
 
@@ -248,79 +331,88 @@ final class WindowReaderView: NSView {
 
 // MARK: - Content
 
-/// The panel's content, while it's open.
 private struct QuickLookView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         if model.quickLook.isOpen, let shown = model.quickLook.shown {
-            FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count)
-                // A new family starts at the top.
-                .id(shown.family.id)
+            GeometryReader { proxy in
+                FamilyQuickLook(family: shown.family, index: shown.index, count: shown.count, width: proxy.size.width,
+                                titleBar: proxy.safeAreaInsets.top)
+                    .id(shown.family.id)
+            }
         }
     }
 }
 
-/// A large sample in the regular style, every style set in itself, and a line about the family with its switch.
 private struct FamilyQuickLook: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
+    @Environment(\.colorScheme) private var colorScheme
     let family: Family
     let index: Int
     let count: Int
+    let width: CGFloat
+    let titleBar: CGFloat
+    @State private var isScrolled = false
 
-    /// Under "Aa Gg 123" when no sample text is set.
     private static let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789"
     private static let inset: CGFloat = 28
 
+    private var scale: Double {
+        max(0.1, (width - 2 * Self.inset) / (QuickLook.defaultSize.width - 2 * Self.inset))
+    }
+
     var body: some View {
+        let scale = scale
         ScrollView {
-            // Lazy, so a family with hundreds of named instances makes only the rows on screen.
             LazyVStack(alignment: .leading, spacing: 0) {
-                sample()
+                sample(scale: scale)
                     .padding(.horizontal, Self.inset)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
-                // With one style the sample already shows it.
+                    .padding(.top, 12 * scale)
+                    .padding(.bottom, 24 * scale)
                 if family.faces.count > 1 {
                     Divider()
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 15 * scale)
                     ForEach(family.faces) { style in
-                        QuickLookText(text: style.face.styleName, face: style.face, size: 22, weight: style.face.styleWeight)
+                        QuickLookText(text: style.face.styleName, face: style.face, size: 22 * scale, weight: style.face.styleWeight)
+                            .frame(minHeight: 22 * scale * 1.25)
                             .padding(.horizontal, Self.inset)
-                            .padding(.vertical, 5)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
+            .foregroundStyle(Color.ink)
         }
-        .background(Color.canvas)
+        .onScrollGeometryChange(for: Bool.self, of: { $0.contentOffset.y + $0.contentInsets.top > 0.5 }) { _, scrolled in
+            isScrolled = scrolled
+        }
+        .underTitleBar(titleBar, isScrolled: isScrolled)
+        .background(Color(nsColor: QuickLookPanel.page))
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onChange(of: family.name, initial: true) { model.quickLook.setTitle(family.name) }
     }
 
-    /// Lined up and spaced as Preview Options say.
-    private func sample() -> some View {
+    private func sample(scale: Double) -> some View {
         let face = family.regular.face
         let variations = model.variations(for: family)
-        let alignment = preview.alignment
         return Group {
             if preview.sampleText.isEmpty {
-                VStack(alignment: alignment.horizontal, spacing: 14) {
-                    QuickLookText(text: PreviewSettings.tileSample, face: face, size: 96, variations: variations, kerning: preview.kerning(at: 96))
+                VStack(alignment: .leading, spacing: 14 * scale) {
+                    QuickLookText(text: model.scriptSamples.text(PreviewSettings.tileSample, for: face), face: face, size: 96 * scale,
+                                  variations: variations)
                         .minimumScaleFactor(0.4)
-                    QuickLookText(text: Self.alphabet, face: face, size: 24, variations: variations, kerning: preview.kerning(at: 24),
-                                  lineLimit: nil, lineHeight: preview.lineHeight(at: 24))
+                    QuickLookText(text: model.scriptSamples.text(Self.alphabet, for: face, long: true), face: face, size: 24 * scale,
+                                  variations: variations, lineLimit: nil, lineHeight: 24 * scale * 1.2)
                 }
             } else {
-                QuickLookText(text: preview.sampleText, face: face, size: 56, variations: variations, kerning: preview.kerning(at: 56),
-                              lineLimit: nil, lineHeight: preview.lineHeight(at: 56))
+                QuickLookText(text: model.scriptSamples.text(preview.sampleText, for: face, long: true), face: face, size: 56 * scale,
+                              variations: variations, lineLimit: nil)
             }
         }
-        .multilineTextAlignment(alignment.text)
-        .frame(maxWidth: .infinity, alignment: alignment.frame)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var footer: some View {
@@ -328,10 +420,10 @@ private struct FamilyQuickLook: View {
             if count > 1 {
                 HStack(spacing: 6) {
                     Button("Previous", systemImage: "chevron.left") { _ = model.quickLook.step(-1) }
-                        .help("Show the previous font")
-                    Text("\((index + 1).formatted()) of \(count.formatted())").monospacedDigit()
+                        .help("Show the previous family")
+                    Text("\((index + 1).plain) of \(count.plain)").monospacedDigit()
                     Button("Next", systemImage: "chevron.right") { _ = model.quickLook.step(1) }
-                        .help("Show the next font")
+                        .help("Show the next family")
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
@@ -347,22 +439,24 @@ private struct FamilyQuickLook: View {
         .font(.callout)
         .padding(.horizontal, 14)
         .frame(height: 36)
-        .glassEffect(.regular, in: .capsule)
+        .glass(in: .capsule)
+        .overlay {
+            if #available(macOS 26, *), colorScheme == .dark {
+                Capsule().fill(.white.opacity(0.06)).allowsHitTesting(false)
+            }
+        }
         .padding(12)
     }
 
-    /// "Foundry · OpenType PostScript · Variable · 12 styles · Active".
     private var summary: String {
         var parts: [String] = []
         if let foundry = model.foundryName(of: family) { parts.append(foundry) }
-        parts.append(family.format.rawValue)
         if family.isVariable { parts.append("Variable") }
         parts.append(family.stylesLabel)
         parts.append(status)
         return parts.joined(separator: " · ")
     }
 
-    /// The styles' status when they share one ("Inactive", "Active until Cicero quits"), else how many are on.
     private var status: String {
         let labels = Set(family.faces.map(\.state.label))
         if labels.count == 1, let label = labels.first { return label }
@@ -370,35 +464,46 @@ private struct FamilyQuickLook: View {
     }
 }
 
-/// `FontText` once its face's file has been read. Until then the file is read off the main thread, with room
-/// kept for the text, so stepping onto a family whose files nothing has read yet never holds up the selection.
+private extension View {
+    @ViewBuilder func underTitleBar(_ height: CGFloat, isScrolled: Bool) -> some View {
+        if #available(macOS 26, *) {
+            // A bar that draws something, however faint: a clear one gets no edge effect under it.
+            safeAreaBar(edge: .top, spacing: 0) {
+                Color.black.opacity(0.001)
+                    .frame(height: height)
+                    .overlay(alignment: .bottom) { if isScrolled { Divider() } }
+                    .allowsHitTesting(false)
+            }
+            .scrollEdgeEffectStyle(.hard, for: .top)
+            .ignoresSafeArea(.container, edges: .top)
+        } else {
+            overlay(alignment: .top) { if isScrolled { Divider() } }
+        }
+    }
+}
+
 private struct QuickLookText: View {
     let text: String
     let face: FontFace
     let size: Double
     var weight: Double = 400
     var variations: [String: Double] = [:]
-    var kerning: Double = 0
     var lineLimit: Int? = 1
-    var lineHeight: AttributedString.LineHeight?
+    var lineHeight: Double?
     @State private var readPath: String?
 
     var body: some View {
         if readPath == face.path || FontLoader.shared.hasDescriptors(for: face.path) {
-            FontText(text: text, face: face, size: size, weight: weight, variations: variations, kerning: kerning,
-                     lineLimit: lineLimit, lineHeight: lineHeight)
+            FontText(text: text, face: face, size: size, weight: weight, variations: variations,
+                     lineLimit: lineLimit, lineHeight: lineHeight, cached: false)
         } else {
             Text(text)
                 .font(.system(size: size))
                 .lineLimit(lineLimit)
-                .lineHeight(lineHeight)
+                .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
                 .hidden()
                 .task(id: face.id) {
-                    let (face, size, weight, variations) = (face, size, weight, variations)
-                    // Makes the font too, so drawing it is a cache hit.
-                    await Task.detached(priority: .userInitiated) {
-                        _ = FontLoader.shared.font(face, size: size, weight: weight, variations: variations)
-                    }.value
+                    await FontLoader.shared.read(face.path)
                     readPath = face.path
                 }
         }
