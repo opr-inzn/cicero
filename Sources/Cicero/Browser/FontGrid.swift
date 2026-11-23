@@ -82,7 +82,7 @@ struct FontGrid: View {
                                     .onAppear { ReadAhead.around(family, in: families) }
                             }
                         } header: {
-                            if group.title != nil { FamilyGroupHeader(group: group) }
+                            if group.title != nil { FamilyGroupHeader(group: group, isFirst: group.id == groups.first?.id) }
                         }
                     }
                 }

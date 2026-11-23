@@ -72,6 +72,7 @@ struct FamilyGroup: Identifiable {
 
 struct FamilyGroupHeader: View {
     let group: FamilyGroup
+    var isFirst = false
 
     var body: some View {
         let count = group.families.count
@@ -87,7 +88,7 @@ struct FamilyGroupHeader: View {
             }
             .padding(.leading, 2)
         }
-        .padding(.top, 8)
+        .padding(.top, isFirst ? 8 : 28)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

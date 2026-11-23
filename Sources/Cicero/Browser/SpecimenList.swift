@@ -25,7 +25,7 @@ struct SpecimenList: View {
                                     .onAppear { prefetchStyles(near: family) }
                             }
                         } header: {
-                            if group.title != nil { FamilyGroupHeader(group: group) }
+                            if group.title != nil { FamilyGroupHeader(group: group, isFirst: group.id == groups.first?.id) }
                         }
                     }
                 }
