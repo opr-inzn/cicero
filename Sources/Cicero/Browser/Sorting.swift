@@ -34,14 +34,25 @@ struct FamilyGroup: Identifiable {
     var id: String { title ?? "" }
 
     static func groups(_ families: ArraySlice<Family>, sort: FontListColumn?) -> [FamilyGroup] {
-        guard sort == .added, !families.isEmpty else { return [FamilyGroup(title: nil, families: families)] }
+        guard !families.isEmpty else { return [FamilyGroup(title: nil, families: families)] }
+        switch sort {
+        case .added: return grouped(families, by: dateTitle())
+        case .year: return grouped(families) { family in
+            guard let year = family.year else { return "Unknown Year" }
+            return year >= 2010 ? String(year) : "\(year / 10 * 10)s"
+        }
+        default: return [FamilyGroup(title: nil, families: families)]
+        }
+    }
+
+    private static func dateTitle() -> (Family) -> String {
         let calendar = Calendar.current, now = Date.now
         let today = calendar.startOfDay(for: now)
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
         let week = calendar.date(byAdding: .day, value: -6, to: today) ?? today
         let year = calendar.component(.year, from: now)
-        func title(_ date: Date?) -> String {
-            guard let date else { return "Unknown Date" }
+        return { family in
+            guard let date = family.dateAdded else { return "Unknown Date" }
             if date >= today { return "Today" }
             if date >= yesterday { return "Yesterday" }
             if date >= week { return "Previous 7 Days" }
@@ -49,11 +60,14 @@ struct FamilyGroup: Identifiable {
                 ? date.formatted(.dateTime.month(.wide))
                 : date.formatted(.dateTime.month(.wide).year())
         }
+    }
+
+    private static func grouped(_ families: ArraySlice<Family>, by title: (Family) -> String) -> [FamilyGroup] {
         var groups: [FamilyGroup] = []
         var start = families.startIndex
-        var current = title(families[start].dateAdded)
+        var current = title(families[start])
         for index in families.indices.dropFirst() {
-            let next = title(families[index].dateAdded)
+            let next = title(families[index])
             if next != current {
                 groups.append(FamilyGroup(title: current, families: families[start..<index]))
                 start = index
