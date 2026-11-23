@@ -959,7 +959,7 @@ struct PreviewOptionsButton: View {
         } label: {
             Label("Preview Options", systemImage: "textformat.size")
         }
-        .toolbarButtonStyle()
+        .toolbarButtonStyle(isOn: isPresented)
         .help("Preview text and size")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(own: own) }
     }

@@ -142,13 +142,9 @@ struct ToolbarToggleStyle: ToggleStyle {
     }
 }
 
-extension ButtonStyle where Self == ToolbarButtonStyle {
-    static var toolbar: ToolbarButtonStyle { ToolbarButtonStyle() }
-}
-
 extension View {
-    @ViewBuilder func toolbarButtonStyle() -> some View {
-        if #available(macOS 26, *) { buttonStyle(.toolbar) } else { self }
+    @ViewBuilder func toolbarButtonStyle(isOn: Bool = false) -> some View {
+        if #available(macOS 26, *) { buttonStyle(ToolbarButtonStyle(isOn: isOn)) } else { self }
     }
 }
 

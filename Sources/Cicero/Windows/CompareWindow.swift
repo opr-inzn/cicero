@@ -116,7 +116,7 @@ private struct AddFamiliesButton: View {
         } label: {
             Label("Add Families", systemImage: "plus")
         }
-        .toolbarButtonStyle()
+        .toolbarButtonStyle(isOn: isPresented)
         .help("Add families from anywhere in your library")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { AddFamilies() }
     }
