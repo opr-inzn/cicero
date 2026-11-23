@@ -20,3 +20,6 @@ Tests/
 *.trace
 *.xctrace
 AGENTS.md
+
+# Download counts publish.sh saves before it replaces a release in place; kept on this Mac only.
+docs/downloads.tsv

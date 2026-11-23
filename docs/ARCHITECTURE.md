@@ -303,4 +303,6 @@ Plain Swift and CoreText, Swift 6 strict concurrency, every public type `Sendabl
   included) and then the DMG made by `make-dmg.sh`.
 - `scripts/publish.sh` runs `make-appcast.sh`, which signs the final DMG with the Sparkle EdDSA key (keychain
   account "cicero"; `SUPublicEDKey` is its public half) and writes `build/appcast.xml`, then uploads the DMG
-  and the appcast to a new GitHub release. `SUFeedURL` points at the latest release's appcast.
+  and the appcast to a new GitHub release. `SUFeedURL` points at the latest release's appcast. If the
+  version's release exists, it replaces its files in place, after it adds their download counts to
+  `docs/downloads.tsv`, a local file git ignores: GitHub starts a replaced file's count again at 0.
