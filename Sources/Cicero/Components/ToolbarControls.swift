@@ -96,6 +96,7 @@ struct ToolbarPicker<Value: Hashable>: View {
 
 struct ToolbarButtonStyle: ButtonStyle {
     var isOn = false
+    var isToggle = false
     fileprivate var segment: Segment?
 
     fileprivate enum Segment { case symbol, title }
@@ -103,13 +104,14 @@ struct ToolbarButtonStyle: ButtonStyle {
     static let segmentInset: CGFloat = 3
 
     func makeBody(configuration: Configuration) -> some View {
-        ToolbarButton(configuration: configuration, isOn: isOn, segment: segment)
+        ToolbarButton(configuration: configuration, isOn: isOn, isToggle: isToggle, segment: segment)
     }
 }
 
 private struct ToolbarButton: View {
     let configuration: ButtonStyleConfiguration
     let isOn: Bool
+    let isToggle: Bool
     let segment: ToolbarButtonStyle.Segment?
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.appearsActive) private var appearsActive
@@ -118,14 +120,16 @@ private struct ToolbarButton: View {
     var body: some View {
         let pressed = segment == nil ? isOn || configuration.isPressed : configuration.isPressed && !isOn
         let hovered = isHovered && isEnabled && !(segment != nil && isOn)
+        let tinted = isToggle && isOn && segment == nil && isEnabled && appearsActive
         configuration.label
             .labelStyle(.iconOnly)
             .imageScale(.large)
-            .foregroundStyle(isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+            .foregroundStyle(tinted ? AnyShapeStyle(.white) : isEnabled && appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
             .padding(.horizontal, segment == .title ? 12 : segment == .symbol ? 10 : 8)
             .frame(minWidth: segment == nil ? 36 : 36 - 2 * ToolbarButtonStyle.segmentInset, maxWidth: segment == nil ? nil : .infinity,
                    minHeight: 36 - (segment == nil ? 0 : 2 * ToolbarButtonStyle.segmentInset))
-            .background(pressed ? AnyShapeStyle(.quaternary) : hovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: .capsule)
+            .background(tinted ? AnyShapeStyle(Color.accentColor.opacity(configuration.isPressed ? 0.8 : 1))
+                        : pressed ? AnyShapeStyle(.quaternary) : hovered ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: .capsule)
             .contentShape(.rect)
             .onHover { isHovered = $0 }
     }
@@ -135,7 +139,7 @@ struct ToolbarToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         if #available(macOS 26, *) {
             Button { configuration.isOn.toggle() } label: { configuration.label }
-                .buttonStyle(ToolbarButtonStyle(isOn: configuration.isOn))
+                .buttonStyle(ToolbarButtonStyle(isOn: configuration.isOn, isToggle: true))
         } else {
             Toggle(configuration).toggleStyle(.button)
         }
